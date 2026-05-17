@@ -72,6 +72,40 @@ export async function updateOrder(id: string, data: any) {
   });
 }
 
-export async function getKtvUsers() {
-  return fetchApi('/users/ktvs');
+export async function getKtvUsers(params: { techStationId?: string } = {}) {
+  const query = new URLSearchParams();
+  if (params.techStationId) query.append('techStationId', params.techStationId);
+  const q = query.toString();
+  return fetchApi(q ? `/users/ktvs?${q}` : '/users/ktvs');
 }
+
+export const getOrderAuditLog = async (id: string) => {
+  return fetchApi(`/orders/${id}/audit`);
+};
+
+// --- STATIONS ---
+export const getStations = async () => {
+  return fetchApi('/stations');
+};
+
+export const createMainStation = async (name: string) => {
+  return fetchApi('/stations/main', {
+    method: 'POST',
+    body: JSON.stringify({ name }),
+  });
+};
+
+export const createTechStation = async (name: string, mainStationId: string) => {
+  return fetchApi('/stations/tech', {
+    method: 'POST',
+    body: JSON.stringify({ name, mainStationId }),
+  });
+};
+
+export const deleteMainStation = async (id: string) => {
+  return fetchApi(`/stations/main/${id}`, { method: 'DELETE' });
+};
+
+export const deleteTechStation = async (id: string) => {
+  return fetchApi(`/stations/tech/${id}`, { method: 'DELETE' });
+};

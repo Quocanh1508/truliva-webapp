@@ -1,18 +1,14 @@
 import React, { useEffect, useState } from 'react';
-import { getOrders, updateOrder, getKtvUsers } from '../../api/client';
-import { Search, ChevronLeft, ChevronRight, ChevronDown, Filter } from 'lucide-react';
+import { getOrders, updateOrder, getKtvUsers, getStations, getOrderAuditLog } from '../../api/client';
+import { Search, ChevronLeft, ChevronRight, ChevronDown, Filter, History, Edit, XCircle } from 'lucide-react';
+import { Link } from 'react-router-dom';
 
 const ADMIN_STATUS_OPTIONS = [
   { value: '', label: 'Tất cả trạng thái' },
-  { value: 'chờ hàng', label: 'Chờ hàng' },
-  { value: 'ưu tiên xuất đơn', label: 'Ưu tiên xuất đơn' },
-  { value: 'xác nhận đơn hàng', label: 'Xác nhận đơn hàng' },
-  { value: 'đang đóng hàng', label: 'Đang đóng hàng' },
-  { value: 'chờ chuyển hàng', label: 'Chờ chuyển hàng' },
-  { value: 'gửi hàng đi', label: 'Gửi hàng đi' },
+  { value: 'chờ xử lý', label: 'Chờ xử lý' },
+  { value: 'đang thực hiện', label: 'Đang thực hiện' },
+  { value: 'hoàn thành', label: 'Hoàn thành' },
   { value: 'hủy đơn', label: 'Hủy đơn' },
-  { value: 'xóa đơn', label: 'Xóa đơn' },
-  { value: 'tạo trùng lặp', label: 'Tạo trùng lặp' },
 ];
 
 export default function OrderList() {
@@ -31,42 +27,39 @@ export default function OrderList() {
   const [totalPages, setTotalPages] = useState(1);
   const [totalItems, setTotalItems] = useState(0);
 
-  // KTVs
+  // Assignment Modal
+  const [assignModal, setAssignModal] = useState<{isOpen: boolean; orderId: string; order: any} | null>(null);
+  const [stations, setStations] = useState<any[]>([]);
   const [ktvs, setKtvs] = useState<any[]>([]);
-  const [assignConfirmModal, setAssignConfirmModal] = useState<{isOpen: boolean; orderId: string; ktvId: string; ktvName: string} | null>(null);
+  
+  const [selectedMain, setSelectedMain] = useState('');
+  const [selectedTech, setSelectedTech] = useState('');
+  const [selectedKtv, setSelectedKtv] = useState('');
+  const [appointment, setAppointment] = useState('');
+  const [rescheduleReason, setRescheduleReason] = useState('');
+  const [workType, setWorkType] = useState('');
+  const [serviceType, setServiceType] = useState('');
 
-  const getStatusStyle = (status: string) => {
-    switch(status) {
-      case 'chờ hàng': return 'bg-amber-500 hover:bg-amber-600 focus:ring-amber-500';
-      case 'ưu tiên xuất đơn': return 'bg-purple-500 hover:bg-purple-600 focus:ring-purple-500';
-      case 'xác nhận đơn hàng': return 'bg-blue-500 hover:bg-blue-600 focus:ring-blue-500';
-      case 'đang đóng hàng': return 'bg-indigo-500 hover:bg-indigo-600 focus:ring-indigo-500';
-      case 'chờ chuyển hàng': return 'bg-cyan-500 hover:bg-cyan-600 focus:ring-cyan-500';
-      case 'gửi hàng đi': return 'bg-emerald-500 hover:bg-emerald-600 focus:ring-emerald-500';
-      case 'hủy đơn': return 'bg-red-500 hover:bg-red-600 focus:ring-red-500';
-      case 'xóa đơn': return 'bg-gray-500 hover:bg-gray-600 focus:ring-gray-500';
-      case 'tạo trùng lặp': return 'bg-rose-500 hover:bg-rose-600 focus:ring-rose-500';
-      default: return 'bg-teal-600 hover:bg-teal-700 focus:ring-teal-500';
-    }
-  };
+  // Audit Log Modal
+  const [auditModal, setAuditModal] = useState<{isOpen: boolean; orderId: string}> | null(null);
+  const [auditLogs, setAuditLogs] = useState<any[]>([]);
+  const [loadingAudit, setLoadingAudit] = useState(false);
+
+  // Cancel Modal
+  const [cancelModal, setCancelModal] = useState<{isOpen: boolean; orderId: string} | null>(null);
+  const [cancelReason, setCancelReason] = useState('');
 
   const fetchOrdersData = async () => {
     try {
       setLoading(true);
       const res = await getOrders({
-        page,
-        limit: 20,
-        search,
-        status: statusFilter,
-        sortBy,
-        sortOrder
+        page, limit: 20, search, status: statusFilter, sortBy, sortOrder
       });
       setOrders(res.orders);
       setTotalPages(res.pagination.totalPages);
       setTotalItems(res.pagination.total);
-      setError('');
     } catch (err: any) {
-      setError(err.message || 'Lỗi tải danh sách đơn hàng');
+      setError(err.message || 'Lỗi tải danh sách');
     } finally {
       setLoading(false);
     }
@@ -77,8 +70,17 @@ export default function OrderList() {
   }, [page, statusFilter, sortBy, sortOrder]);
 
   useEffect(() => {
-    getKtvUsers().then(data => setKtvs(data)).catch(err => console.error('Lỗi tải KTV:', err));
+    getStations().then(data => setStations(data)).catch(console.error);
   }, []);
+
+  // Filter KTVs based on tech station
+  useEffect(() => {
+    if (selectedTech) {
+      getKtvUsers({ techStationId: selectedTech }).then(data => setKtvs(data)).catch(console.error);
+    } else {
+      setKtvs([]);
+    }
+  }, [selectedTech]);
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
@@ -87,48 +89,90 @@ export default function OrderList() {
   };
 
   const handleStatusChange = async (orderId: string, newStatus: string) => {
+    if (newStatus === 'hủy đơn') {
+      setCancelModal({ isOpen: true, orderId });
+      return;
+    }
     try {
       await updateOrder(orderId, { adminStatus: newStatus });
-      setOrders(orders.map(o => o.id === orderId ? { ...o, adminStatus: newStatus } : o));
+      fetchOrdersData();
     } catch (err: any) {
-      alert(err.message || 'Lỗi cập nhật trạng thái');
+      alert(err.message);
     }
   };
 
-  const handleAppointmentTimeChange = async (orderId: string, newTime: string) => {
+  const submitCancel = async () => {
+    if (!cancelModal) return;
     try {
-      await updateOrder(orderId, { appointmentTime: newTime ? new Date(newTime).toISOString() : null });
-      setOrders(orders.map(o => o.id === orderId ? { ...o, appointmentTime: newTime } : o));
+      await updateOrder(cancelModal.orderId, { adminStatus: 'hủy đơn', cancelReason });
+      setCancelModal(null);
+      setCancelReason('');
+      fetchOrdersData();
     } catch (err: any) {
-      alert(err.message || 'Lỗi cập nhật ngày hẹn');
+      alert(err.message);
     }
   };
 
-  const handleAssignKtv = async () => {
-    if (!assignConfirmModal) return;
+  const openAssignModal = (order: any) => {
+    setSelectedMain(order.mainStationId || '');
+    setSelectedTech(order.techStationId || '');
+    setSelectedKtv(order.assignedKtvId || '');
+    
+    // Convert UTC to local input format
+    let appTime = '';
+    if (order.appointmentTime) {
+      appTime = new Date(new Date(order.appointmentTime).getTime() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0,16);
+    }
+    setAppointment(appTime);
+    setRescheduleReason(order.rescheduleReason || '');
+    setWorkType(order.workType || '');
+    setServiceType(order.serviceType || '');
+    
+    setAssignModal({ isOpen: true, orderId: order.id, order });
+  };
+
+  const submitAssign = async () => {
+    if (!assignModal) return;
     try {
-      await updateOrder(assignConfirmModal.orderId, { assignedKtvId: assignConfirmModal.ktvId || null });
-      setOrders(orders.map(o => o.id === assignConfirmModal.orderId 
-        ? { ...o, assignedKtvId: assignConfirmModal.ktvId, assignedKtv: ktvs.find(k => k.id === assignConfirmModal.ktvId) } 
-        : o
-      ));
-      setAssignConfirmModal(null);
-    } catch(err: any) {
-      alert(err.message || 'Lỗi phân công KTV');
+      await updateOrder(assignModal.orderId, {
+        mainStationId: selectedMain || null,
+        techStationId: selectedTech || null,
+        assignedKtvId: selectedKtv || null,
+        appointmentTime: appointment ? new Date(appointment).toISOString() : null,
+        rescheduleReason: rescheduleReason || null,
+        workType: workType || null,
+        serviceType: serviceType || null,
+        adminStatus: selectedKtv ? 'đang thực hiện' : 'chờ xử lý' // auto update status
+      });
+      setAssignModal(null);
+      fetchOrdersData();
+    } catch (err: any) {
+      alert(err.message);
     }
   };
 
-  const statusChips = [
-    { label: 'Tất cả', value: '' },
-    { label: 'Mới', value: 'mới' },
-    { label: 'Chờ hàng', value: 'chờ hàng' },
-    { label: 'Ưu tiên xuất đơn', value: 'ưu tiên xuất đơn' },
-    { label: 'Đã xác nhận', value: 'xác nhận đơn hàng' },
-    { label: 'Đang đóng hàng', value: 'đang đóng hàng' },
-    { label: 'Chờ chuyển hàng', value: 'chờ chuyển hàng' },
-    { label: 'Đã gửi hàng', value: 'gửi hàng đi' },
-    { label: 'Đã hủy', value: 'hủy đơn' },
-  ];
+  const openAuditModal = async (orderId: string) => {
+    setAuditModal({ isOpen: true, orderId });
+    setLoadingAudit(true);
+    try {
+      const logs = await getOrderAuditLog(orderId);
+      setAuditLogs(logs);
+    } catch (err: any) {
+      console.error(err);
+    } finally {
+      setLoadingAudit(false);
+    }
+  };
+
+  const getStatusStyle = (status: string) => {
+    switch(status) {
+      case 'chờ xử lý': return 'bg-amber-500 hover:bg-amber-600 focus:ring-amber-500';
+      case 'đang thực hiện': return 'bg-blue-500 hover:bg-blue-600 focus:ring-blue-500';
+      case 'hoàn thành': return 'bg-emerald-500 hover:bg-emerald-600 focus:ring-emerald-500';
+      case 'hủy đơn': return 'bg-red-500 hover:bg-red-600 focus:ring-red-500';
+      default: return 'bg-gray-500 hover:bg-gray-600 focus:ring-gray-500';
+    }
+  };
 
   return (
     <div className="flex flex-col bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden h-[calc(100vh-120px)] font-sans">
@@ -137,35 +181,7 @@ export default function OrderList() {
       <div className="flex justify-between border-b border-gray-200 bg-gray-50 px-4 pt-1">
         <div className="flex space-x-1">
           <button className="px-5 py-2.5 text-[14px] font-medium text-blue-600 border-b-2 border-blue-600 bg-white -mb-[1px]">Đơn hàng</button>
-          <button className="px-5 py-2.5 text-[14px] font-medium text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-t-lg transition-colors border-b-2 border-transparent">Cần xử lý</button>
-          <button className="px-5 py-2.5 text-[14px] font-medium text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-t-lg transition-colors border-b-2 border-transparent">Trễ giao</button>
-          <button className="px-5 py-2.5 text-[14px] font-medium text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-t-lg transition-colors border-b-2 border-transparent">Vị trí</button>
         </div>
-        <div className="flex items-center space-x-2 pb-1">
-          <button className="p-1.5 border border-gray-200 rounded text-gray-500 hover:bg-gray-100 transition-colors bg-white shadow-sm">
-            <Filter size={16} />
-          </button>
-        </div>
-      </div>
-
-      {/* Filter Chips */}
-      <div className="flex items-center space-x-2 p-3 bg-white border-b border-gray-100 overflow-x-auto">
-        {statusChips.map((chip) => (
-          <button
-            key={chip.label}
-            onClick={() => { setStatusFilter(chip.value); setPage(1); }}
-            className={`whitespace-nowrap px-3 py-1.5 rounded-md text-[13px] transition-colors border flex items-center ${
-              statusFilter === chip.value 
-                ? 'bg-blue-50 border-blue-200 text-blue-700 font-medium' 
-                : 'border-transparent text-gray-600 hover:bg-gray-100'
-            }`}
-          >
-            {chip.label} 
-            <span className={`ml-1.5 px-1.5 py-0.5 rounded-full text-[11px] font-semibold ${statusFilter === chip.value ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-500'}`}>
-              {statusFilter === chip.value ? totalItems : 0}
-            </span>
-          </button>
-        ))}
       </div>
 
       {/* Toolbar */}
@@ -182,131 +198,82 @@ export default function OrderList() {
         </form>
 
         <div className="flex items-center space-x-3">
-          <select
-            className="px-3 py-2 text-[13px] border border-gray-300 rounded-md bg-white text-gray-700 cursor-pointer focus:ring-1 focus:ring-blue-500 outline-none"
-            value={sortBy}
-            onChange={(e) => { setSortBy(e.target.value); setPage(1); }}
-          >
-            <option value="createdAt">Tạo mới</option>
-            <option value="updatedAt">Cập nhật</option>
-            <option value="appointmentTime">Hẹn khách</option>
-          </select>
-          <select
-            className="px-3 py-2 text-[13px] border border-gray-300 rounded-md bg-white text-gray-700 cursor-pointer focus:ring-1 focus:ring-blue-500 outline-none"
-            value={sortOrder}
-            onChange={(e) => { setSortOrder(e.target.value); setPage(1); }}
-          >
-            <option value="desc">Mới nhất</option>
-            <option value="asc">Cũ nhất</option>
-          </select>
+           <select className="px-3 py-2 text-[13px] border border-gray-300 rounded-md bg-white text-gray-700 outline-none" value={statusFilter} onChange={(e) => {setStatusFilter(e.target.value); setPage(1);}}>
+             <option value="">Tất cả trạng thái</option>
+             <option value="chờ xử lý">Chờ xử lý</option>
+             <option value="đang thực hiện">Đang thực hiện</option>
+             <option value="hoàn thành">Hoàn thành</option>
+             <option value="hủy đơn">Hủy đơn</option>
+           </select>
         </div>
       </div>
 
       {/* Table Area */}
       <div className="flex-1 overflow-auto bg-white">
         {loading ? (
-          <div className="flex justify-center py-12">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-          </div>
-        ) : error ? (
-          <div className="text-center py-12 text-red-500 font-medium">{error}</div>
+          <div className="flex justify-center py-12"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div></div>
         ) : orders.length === 0 ? (
-          <div className="text-center py-12 text-gray-400">Không tìm thấy đơn hàng nào</div>
+          <div className="text-center py-12 text-gray-400">Không tìm thấy yêu cầu nào</div>
         ) : (
           <table className="w-full text-left text-[13px] whitespace-nowrap">
-            <thead className="sticky top-0 bg-[#f8f9fa] text-gray-600 font-semibold border-b border-gray-200 z-10 shadow-sm">
+            <thead className="sticky top-0 bg-[#f8f9fa] text-gray-600 font-semibold border-b border-gray-200 z-10">
               <tr>
-                <th className="px-4 py-3 w-10 text-center"><input type="checkbox" className="rounded border-gray-300 text-blue-600 focus:ring-blue-500" /></th>
-                <th className="px-4 py-3">ID</th>
-                <th className="px-4 py-3">Cập nhật / Hẹn</th>
-                <th className="px-4 py-3">Phân công</th>
-                <th className="px-4 py-3">Nguồn đơn</th>
+                <th className="px-4 py-3">Mã đơn</th>
                 <th className="px-4 py-3">Khách hàng</th>
-                <th className="px-4 py-3">SĐT</th>
-                <th className="px-4 py-3">Trạng thái</th>
+                <th className="px-4 py-3">Loại CV</th>
+                <th className="px-4 py-3">Ngày hẹn</th>
+                <th className="px-4 py-3">Trạm - KTV</th>
+                <th className="px-4 py-3 text-center">Trạng thái</th>
+                <th className="px-4 py-3 text-center">Thao tác</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
               {orders.map((order, idx) => {
                  const customerName = order.billFullName || order.customer?.fullName || 'Khách lẻ';
                  const phone = order.billPhoneNumber || order.customer?.phoneNumber || '';
-                 const sourceName = order.orderSource || 'Truliva';
+                 const ktvName = order.assignedKtv?.fullName || 'Chưa gán';
+                 const mainStationName = order.mainStation?.name || '';
                  
                  return (
                   <tr key={order.id} className={`${idx % 2 === 0 ? 'bg-white' : 'bg-[#fafafa]'} hover:bg-blue-50/50 transition-colors`}>
+                    <td className="px-4 py-3 font-medium">{order.pancakeOrderId}</td>
+                    <td className="px-4 py-3">
+                      <div className="font-medium text-gray-900">{customerName}</div>
+                      <div className="text-gray-500">{phone}</div>
+                    </td>
+                    <td className="px-4 py-3">
+                      <div className="font-medium text-gray-800">{order.workType || '-'}</div>
+                      <div className="text-gray-500">{order.serviceType || '-'}</div>
+                    </td>
+                    <td className="px-4 py-3">
+                      {order.appointmentTime ? (
+                        <>
+                          <div className="font-medium text-blue-700">{new Date(order.appointmentTime).toLocaleTimeString('vi-VN', {hour: '2-digit', minute:'2-digit'})}</div>
+                          <div className="text-gray-500">{new Date(order.appointmentTime).toLocaleDateString('vi-VN')}</div>
+                        </>
+                      ) : '-'}
+                    </td>
+                    <td className="px-4 py-3">
+                      <div className="font-medium text-gray-900">{mainStationName || 'Chưa phân trạm'}</div>
+                      <div className="text-gray-500">KTV: {ktvName}</div>
+                    </td>
                     <td className="px-4 py-3 text-center">
-                      <input type="checkbox" className="rounded border-gray-300 text-blue-600 focus:ring-blue-500" />
-                    </td>
-                    <td className="px-4 py-3 text-gray-900 font-medium">
-                      {order.pancakeOrderId}
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="text-gray-800">
-                        {new Date(order.updatedAt).toLocaleTimeString('vi-VN', {hour: '2-digit', minute:'2-digit'})} <span className="text-gray-500">{new Date(order.updatedAt).toLocaleDateString('vi-VN')}</span>
-                      </div>
-                      <div className="mt-1">
-                        <input
-                          type="datetime-local"
-                          className="text-[12px] text-gray-600 border border-transparent hover:border-gray-300 hover:bg-gray-50 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 rounded px-1 py-0.5 cursor-pointer outline-none transition-all"
-                          title="Sửa ngày hẹn"
-                          value={order.appointmentTime ? new Date(new Date(order.appointmentTime).getTime() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0,16) : ''}
-                          onChange={(e) => handleAppointmentTimeChange(order.id, e.target.value)}
-                        />
-                      </div>
-                    </td>
-                    <td className="px-4 py-3">
                       <select
-                        className="w-[140px] appearance-none bg-white border border-gray-300 hover:border-gray-400 text-gray-700 rounded px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer text-[13px]"
-                        value={order.assignedKtvId || ''}
-                        onChange={(e) => {
-                          const ktvId = e.target.value;
-                          if (!ktvId) {
-                            // Gỡ phân công ngay lập tức không cần modal
-                            updateOrder(order.id, { assignedKtvId: null }).then(() => {
-                              setOrders(orders.map(o => o.id === order.id ? { ...o, assignedKtvId: null, assignedKtv: null } : o));
-                            }).catch(err => alert(err.message));
-                            return;
-                          }
-                          const ktvName = ktvs.find(k => k.id === ktvId)?.fullName || '';
-                          setAssignConfirmModal({ isOpen: true, orderId: order.id, ktvId, ktvName });
-                        }}
+                        className={`appearance-none text-white font-medium rounded px-3 py-1 text-[12px] outline-none cursor-pointer ${getStatusStyle(order.adminStatus || '')}`}
+                        value={order.adminStatus || ''}
+                        onChange={(e) => handleStatusChange(order.id, e.target.value)}
                       >
-                        <option value="">Chưa phân công</option>
-                        {ktvs.map(k => (
-                          <option key={k.id} value={k.id}>{k.fullName}</option>
-                        ))}
+                        {ADMIN_STATUS_OPTIONS.map(opt => <option key={opt.value} value={opt.value} className="text-black bg-white">{opt.label}</option>)}
                       </select>
                     </td>
-                    <td className="px-4 py-3 text-gray-700">
-                      {sourceName}
-                    </td>
                     <td className="px-4 py-3">
-                      <div className="flex items-center gap-2">
-                        <div className="w-6 h-6 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center font-bold text-[11px] shrink-0 border border-blue-200">
-                          {customerName.charAt(0).toUpperCase()}
-                        </div>
-                        <span className="text-gray-800 font-medium">{customerName}</span>
-                      </div>
-                    </td>
-                    <td className="px-4 py-3 text-gray-700">
-                      {phone}
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="relative inline-block w-40">
-                        <select
-                          className={`w-full appearance-none text-white font-medium rounded shadow-sm px-3 py-1.5 pr-8 focus:outline-none focus:ring-2 focus:ring-offset-1 cursor-pointer transition-colors text-[13px] ${getStatusStyle(order.adminStatus || '')}`}
-                          value={order.adminStatus || ''}
-                          onChange={(e) => handleStatusChange(order.id, e.target.value)}
-                        >
-                          {ADMIN_STATUS_OPTIONS.map(opt => (
-                            <option key={opt.value} value={opt.value} className="bg-white text-gray-900 font-normal py-1">
-                              {opt.label}
-                            </option>
-                          ))}
-                        </select>
-                        <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-white/80">
-                          <ChevronDown size={14} strokeWidth={3} />
-                        </div>
+                      <div className="flex items-center justify-center gap-2">
+                        <button onClick={() => openAssignModal(order)} className="p-1.5 text-blue-600 hover:bg-blue-50 rounded" title="Phân bổ / Chỉnh sửa">
+                          <Edit size={16} />
+                        </button>
+                        <button onClick={() => openAuditModal(order.id)} className="p-1.5 text-gray-600 hover:bg-gray-100 rounded" title="Lịch sử">
+                          <History size={16} />
+                        </button>
                       </div>
                     </td>
                   </tr>
@@ -319,54 +286,159 @@ export default function OrderList() {
 
       {/* Pagination */}
       {!loading && totalPages > 1 && (
-        <div className="flex justify-between items-center px-4 py-3 border-t border-gray-200 bg-white text-[13px] text-gray-600 shadow-[0_-1px_2px_rgba(0,0,0,0.02)] z-10">
-          <span>
-            Trang <span className="font-medium text-gray-900">{page}</span> / <span className="font-medium text-gray-900">{totalPages}</span>
-          </span>
-          <div className="flex items-center gap-1.5">
-            <button
-              className="p-1.5 border border-gray-300 rounded hover:bg-gray-50 hover:text-gray-900 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-              disabled={page === 1}
-              onClick={() => setPage(p => p - 1)}
-            >
-              <ChevronLeft size={16} />
-            </button>
-            <button
-              className="p-1.5 border border-gray-300 rounded hover:bg-gray-50 hover:text-gray-900 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-              disabled={page === totalPages}
-              onClick={() => setPage(p => p + 1)}
-            >
-              <ChevronRight size={16} />
-            </button>
-          </div>
+        <div className="flex justify-between items-center px-4 py-3 border-t border-gray-200">
+           <span>Trang {page} / {totalPages}</span>
+           <div className="flex gap-2">
+             <button disabled={page === 1} onClick={() => setPage(p => p - 1)} className="p-1.5 border rounded"><ChevronLeft size={16}/></button>
+             <button disabled={page === totalPages} onClick={() => setPage(p => p + 1)} className="p-1.5 border rounded"><ChevronRight size={16}/></button>
+           </div>
         </div>
       )}
 
-      {/* Assign Confirm Modal */}
-      {assignConfirmModal?.isOpen && (
+      {/* ASSIGN MODAL (Truliva Flow) */}
+      {assignModal?.isOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-          <div className="bg-white rounded-lg shadow-xl w-full max-w-md p-6">
-            <h3 className="text-lg font-bold text-gray-900 mb-4">Xác nhận phân công</h3>
-            <p className="text-gray-600 mb-6">
-              Bạn có chắc chắn muốn giao đơn hàng này cho kỹ thuật viên <span className="font-bold text-gray-900">{assignConfirmModal.ktvName}</span> không?
-            </p>
-            <div className="flex justify-end gap-3">
-              <button
-                className="px-4 py-2 bg-gray-100 text-gray-700 hover:bg-gray-200 rounded-md font-medium transition-colors"
-                onClick={() => setAssignConfirmModal(null)}
-              >
-                Hủy
-              </button>
-              <button
-                className="px-4 py-2 bg-blue-600 text-white hover:bg-blue-700 rounded-md font-medium transition-colors"
-                onClick={handleAssignKtv}
-              >
-                Xác nhận giao
-              </button>
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl overflow-hidden flex flex-col max-h-[90vh]">
+            <div className="px-6 py-4 border-b border-gray-200 bg-gray-50 flex justify-between items-center">
+              <h3 className="text-lg font-bold text-gray-900">Chi tiết & Phân bổ Yêu cầu #{assignModal.order.pancakeOrderId}</h3>
+              <button onClick={() => setAssignModal(null)} className="text-gray-400 hover:text-gray-600"><XCircle size={24}/></button>
+            </div>
+            
+            <div className="p-6 overflow-auto flex-1 grid grid-cols-2 gap-6">
+              {/* Cột trái: Phân loại */}
+              <div className="space-y-4">
+                <h4 className="font-semibold text-gray-800 border-b pb-2">1. Phân loại Yêu cầu</h4>
+                
+                <div>
+                  <label className="block text-sm text-gray-600 mb-1">Loại công việc</label>
+                  <select className="w-full border rounded p-2 text-sm outline-none focus:border-blue-500" value={workType} onChange={e => setWorkType(e.target.value)}>
+                    <option value="">-- Chọn loại --</option>
+                    <option value="Giao hàng">Giao hàng</option>
+                    <option value="Lắp đặt">Lắp đặt</option>
+                    <option value="Bảo hành">Bảo hành</option>
+                    <option value="Thay lõi">Thay lõi</option>
+                    <option value="Khảo sát">Khảo sát</option>
+                  </select>
+                </div>
+                
+                <div>
+                  <label className="block text-sm text-gray-600 mb-1">Loại dịch vụ chi tiết</label>
+                  <select className="w-full border rounded p-2 text-sm outline-none focus:border-blue-500" value={serviceType} onChange={e => setServiceType(e.target.value)}>
+                    <option value="">-- Chọn dịch vụ --</option>
+                    <option value="Lắp mới RO">Lắp mới RO</option>
+                    <option value="Thay bộ 3 lõi thô">Thay bộ 3 lõi thô</option>
+                    <option value="Bảo hành bơm">Bảo hành bơm</option>
+                    <option value="Giao máy nóng lạnh">Giao máy nóng lạnh</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm text-gray-600 mb-1">Thời gian hẹn khách</label>
+                  <input type="datetime-local" className="w-full border rounded p-2 text-sm outline-none focus:border-blue-500" value={appointment} onChange={e => setAppointment(e.target.value)} />
+                </div>
+                
+                <div>
+                  <label className="block text-sm text-gray-600 mb-1">Lý do hẹn lại (nếu có)</label>
+                  <textarea rows={2} className="w-full border rounded p-2 text-sm outline-none focus:border-blue-500" value={rescheduleReason} onChange={e => setRescheduleReason(e.target.value)} placeholder="Khách bận, KTV kẹt lịch..."></textarea>
+                </div>
+              </div>
+
+              {/* Cột phải: Phân bổ */}
+              <div className="space-y-4">
+                <h4 className="font-semibold text-gray-800 border-b pb-2">2. Phân bổ Kỹ thuật viên</h4>
+                
+                <div>
+                  <label className="block text-sm text-gray-600 mb-1">Trạm chính</label>
+                  <select className="w-full border rounded p-2 text-sm outline-none focus:border-blue-500" value={selectedMain} onChange={e => {setSelectedMain(e.target.value); setSelectedTech(''); setSelectedKtv('');}}>
+                    <option value="">-- Chọn Trạm chính --</option>
+                    {stations.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                  </select>
+                </div>
+                
+                <div>
+                  <label className="block text-sm text-gray-600 mb-1">Trạm kỹ thuật</label>
+                  <select className="w-full border rounded p-2 text-sm outline-none focus:border-blue-500" value={selectedTech} onChange={e => {setSelectedTech(e.target.value); setSelectedKtv('');}} disabled={!selectedMain}>
+                    <option value="">-- Chọn Trạm Kỹ thuật --</option>
+                    {stations.find(s => s.id === selectedMain)?.techStations?.map((t: any) => <option key={t.id} value={t.id}>{t.name}</option>)}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm text-gray-600 mb-1">Kỹ thuật viên</label>
+                  <select className="w-full border rounded p-2 text-sm outline-none focus:border-blue-500" value={selectedKtv} onChange={e => setSelectedKtv(e.target.value)} disabled={!selectedTech}>
+                    <option value="">-- Chọn KTV --</option>
+                    {ktvs.map(k => <option key={k.id} value={k.id}>{k.fullName}</option>)}
+                  </select>
+                </div>
+
+                {selectedKtv && (
+                  <div className="p-3 bg-green-50 border border-green-200 text-green-800 rounded text-sm mt-4">
+                    Đơn sẽ được chuyển sang trạng thái <b>"Đang thực hiện"</b> khi lưu.
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="px-6 py-4 border-t border-gray-200 bg-gray-50 flex justify-end gap-3">
+              <button onClick={() => setAssignModal(null)} className="px-4 py-2 bg-white border rounded text-gray-700 hover:bg-gray-100">Hủy</button>
+              <button onClick={submitAssign} className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">Lưu thông tin & Phân bổ</button>
             </div>
           </div>
         </div>
       )}
+
+      {/* CANCEL MODAL */}
+      {cancelModal?.isOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <div className="bg-white rounded-lg p-6 w-[400px]">
+            <h3 className="text-lg font-bold text-red-600 mb-4">Hủy yêu cầu dịch vụ</h3>
+            <label className="block text-sm mb-2 text-gray-700">Lý do hủy (bắt buộc)</label>
+            <textarea className="w-full border p-2 rounded mb-4 outline-none focus:border-red-500" rows={3} value={cancelReason} onChange={e=>setCancelReason(e.target.value)} placeholder="Nhập lý do..."></textarea>
+            <div className="flex justify-end gap-2">
+              <button onClick={() => setCancelModal(null)} className="px-4 py-2 border rounded">Đóng</button>
+              <button onClick={submitCancel} disabled={!cancelReason.trim()} className="px-4 py-2 bg-red-600 text-white rounded disabled:opacity-50">Xác nhận hủy</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* AUDIT LOG MODAL */}
+      {auditModal?.isOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <div className="bg-white rounded-lg p-6 w-[600px] max-h-[80vh] flex flex-col">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-lg font-bold text-gray-900">Lịch sử thay đổi yêu cầu</h3>
+              <button onClick={() => setAuditModal(null)}><XCircle size={20} className="text-gray-500"/></button>
+            </div>
+            
+            <div className="flex-1 overflow-auto bg-gray-50 p-4 rounded border">
+              {loadingAudit ? (
+                <div className="text-center py-8">Đang tải...</div>
+              ) : auditLogs.length === 0 ? (
+                <div className="text-center py-8 text-gray-500">Chưa có thay đổi nào.</div>
+              ) : (
+                <div className="space-y-4">
+                  {auditLogs.map(log => (
+                    <div key={log.id} className="bg-white p-3 rounded shadow-sm border text-sm">
+                      <div className="flex justify-between text-gray-500 mb-2">
+                        <span className="font-semibold text-gray-700">{log.userName}</span>
+                        <span>{new Date(log.createdAt).toLocaleString('vi-VN')}</span>
+                      </div>
+                      <div className="text-blue-600 font-medium mb-1">Hành động: {log.action}</div>
+                      {log.changes && log.changes.map((c: any, i: number) => (
+                        <div key={i} className="text-gray-600">
+                          - <span className="font-medium text-gray-800">{c.field}</span>: <span className="line-through text-red-400">{String(c.from || 'Trống')}</span> &rarr; <span className="text-green-600 font-medium">{String(c.to || 'Trống')}</span>
+                        </div>
+                      ))}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }

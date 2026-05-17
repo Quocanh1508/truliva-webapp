@@ -86,14 +86,23 @@ model Order {
   appointmentTime     DateTime? @map("appointment_time")          // Thời gian hẹn khách
   adminStatus         String?   @map("admin_status")              // Trạng thái đơn do Admin quản lý
   assignedKtvId       String?   @map("assigned_ktv_id")           // KTV được phân công
+  // ── Trường mới theo Truliva Flow ──
+  workType            String?   @map("work_type")                 // Loại công việc: giao_hang, lap_dat, bao_hanh...
+  serviceType         String?   @map("service_type")              // Loại dịch vụ (tương ứng loại CV)
+  mainStationId       String?   @map("main_station_id")           // Trạm chính được gán
+  techStationId       String?   @map("tech_station_id")           // Trạm kỹ thuật được gán
+  rescheduleReason    String?   @map("reschedule_reason")         // Lý do hẹn lại
+  cancelReason        String?   @map("cancel_reason")             // Lý do hủy
   rawData             Json?     @map("raw_data")
   createdAt           DateTime  @default(now()) @map("created_at")
   updatedAt           DateTime  @updatedAt @map("updated_at")
 
   // Relations
-  customer            Customer? @relation(fields: [customerId], references: [id])
+  customer            Customer?     @relation(fields: [customerId], references: [id])
   items               OrderItem[]
-  assignedKtv         User?     @relation(fields: [assignedKtvId], references: [id])
+  assignedKtv         User?         @relation(fields: [assignedKtvId], references: [id])
+  mainStation         MainStation?  @relation(fields: [mainStationId], references: [id])
+  techStation         TechStation?  @relation(fields: [techStationId], references: [id])
   serviceReports      ServiceReport[]
 
   @@map("orders")
@@ -144,6 +153,36 @@ model Product {
 //  PHASE 3: KTV Webapp Models
 // ══════════════════════════════════════
 
+// ── Trạm chính ──
+model MainStation {
+  id            String        @id @default(uuid())
+  name          String        @unique
+  isActive      Boolean       @default(true) @map("is_active")
+  createdAt     DateTime      @default(now()) @map("created_at")
+
+  // Relations
+  techStations  TechStation[]
+  orders        Order[]
+
+  @@map("main_stations")
+}
+
+// ── Trạm kỹ thuật ──
+model TechStation {
+  id              String      @id @default(uuid())
+  name            String
+  mainStationId   String      @map("main_station_id")
+  isActive        Boolean     @default(true) @map("is_active")
+  createdAt       DateTime    @default(now()) @map("created_at")
+
+  // Relations
+  mainStation     MainStation @relation(fields: [mainStationId], references: [id])
+  users           User[]
+  orders          Order[]
+
+  @@map("tech_stations")
+}
+
 enum UserRole {
   KTV
   ADMIN
@@ -151,21 +190,37 @@ enum UserRole {
 
 // ── Tài khoản người dùng (KTV + Admin) ──
 model User {
-  id            String    @id @default(uuid())
-  username      String    @unique
-  passwordHash  String    @map("password_hash")
-  fullName      String    @map("full_name")
-  role          UserRole  @default(KTV)
-  phoneNumber   String?   @map("phone_number")
-  isActive      Boolean   @default(true) @map("is_active")
-  createdAt     DateTime  @default(now()) @map("created_at")
-  updatedAt     DateTime  @updatedAt @map("updated_at")
+  id              String       @id @default(uuid())
+  username        String       @unique
+  passwordHash    String       @map("password_hash")
+  fullName        String       @map("full_name")
+  role            UserRole     @default(KTV)
+  phoneNumber     String?      @map("phone_number")
+  techStationId   String?      @map("tech_station_id")  // KTV thuộc trạm kỹ thuật nào
+  isActive        Boolean      @default(true) @map("is_active")
+  createdAt       DateTime     @default(now()) @map("created_at")
+  updatedAt       DateTime     @updatedAt @map("updated_at")
 
   // Relations
-  serviceReports ServiceReport[]
-  assignedOrders Order[]
+  serviceReports  ServiceReport[]
+  assignedOrders  Order[]
+  techStation     TechStation?  @relation(fields: [techStationId], references: [id])
 
   @@map("users")
+}
+
+// ── Lịch sử thay đổi (Audit Log) ──
+model AuditLog {
+  id          String   @id @default(uuid())
+  entityType  String   @map("entity_type")   // "Order"
+  entityId    String   @map("entity_id")     // ID đơn hàng
+  action      String                         // "created", "updated", "cancelled", "assigned", "restored"
+  changes     Json?                          // { field, from, to }
+  userId      String   @map("user_id")
+  userName    String   @map("user_name")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  @@map("audit_logs")
 }
 
 // ── Báo cáo hoàn thành ca KTV ──

@@ -1,0 +1,235 @@
+import React, { useEffect, useState } from 'react';
+import { getStations, createMainStation, createTechStation, deleteMainStation, deleteTechStation } from '../../api/client';
+import { Building, MapPin, Users, Plus, Trash2, ChevronDown, ChevronRight } from 'lucide-react';
+
+export default function StationManage() {
+  const [stations, setStations] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+
+  const [expandedMain, setExpandedMain] = useState<string[]>([]);
+  
+  // Forms
+  const [newMainName, setNewMainName] = useState('');
+  const [newTechName, setNewTechName] = useState('');
+  const [activeMainIdForTech, setActiveMainIdForTech] = useState('');
+
+  const loadStations = async () => {
+    try {
+      setLoading(true);
+      const data = await getStations();
+      setStations(data);
+      if (data.length > 0 && expandedMain.length === 0) {
+        setExpandedMain([data[0].id]);
+      }
+    } catch (err: any) {
+      setError(err.message || 'Lỗi tải danh sách trạm');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadStations();
+  }, []);
+
+  const toggleMain = (id: string) => {
+    setExpandedMain(prev => 
+      prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
+    );
+  };
+
+  const handleCreateMain = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newMainName.trim()) return;
+    try {
+      await createMainStation(newMainName);
+      setNewMainName('');
+      loadStations();
+    } catch (err: any) {
+      alert(err.message);
+    }
+  };
+
+  const handleCreateTech = async (e: React.FormEvent, mainId: string) => {
+    e.preventDefault();
+    if (!newTechName.trim()) return;
+    try {
+      await createTechStation(newTechName, mainId);
+      setNewTechName('');
+      setActiveMainIdForTech('');
+      loadStations();
+    } catch (err: any) {
+      alert(err.message);
+    }
+  };
+
+  const handleDeleteMain = async (id: string) => {
+    if (!window.confirm('Bạn có chắc chắn muốn xóa trạm chính này? Các trạm kỹ thuật bên trong cũng sẽ bị ẩn.')) return;
+    try {
+      await deleteMainStation(id);
+      loadStations();
+    } catch (err: any) {
+      alert(err.message);
+    }
+  };
+
+  const handleDeleteTech = async (id: string) => {
+    if (!window.confirm('Bạn có chắc chắn muốn xóa trạm kỹ thuật này?')) return;
+    try {
+      await deleteTechStation(id);
+      loadStations();
+    } catch (err: any) {
+      alert(err.message);
+    }
+  };
+
+  return (
+    <div className="flex flex-col bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden h-[calc(100vh-80px)] font-sans">
+      <div className="px-5 py-4 border-b border-gray-200 bg-gray-50 flex justify-between items-center">
+        <div>
+          <h2 className="text-lg font-bold text-gray-800">Quản lý Mạng lưới Trạm</h2>
+          <p className="text-sm text-gray-500 mt-0.5">Trạm chính {'>'} Trạm kỹ thuật {'>'} Kỹ thuật viên</p>
+        </div>
+      </div>
+
+      <div className="flex-1 overflow-auto bg-gray-50/50 p-5">
+        {error && <div className="p-4 mb-4 text-red-700 bg-red-100 rounded-lg">{error}</div>}
+
+        {/* Create Main Station */}
+        <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200 mb-6 flex gap-3 items-end">
+          <div className="flex-1">
+            <label className="block text-sm font-medium text-gray-700 mb-1">Thêm Trạm chính mới</label>
+            <input 
+              type="text" 
+              className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:ring-1 focus:ring-blue-500 outline-none"
+              placeholder="Nhập tên trạm chính (VD: Trạm Hồ Chí Minh)"
+              value={newMainName}
+              onChange={(e) => setNewMainName(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && handleCreateMain(e)}
+            />
+          </div>
+          <button 
+            onClick={handleCreateMain}
+            disabled={!newMainName.trim()}
+            className="bg-blue-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-blue-700 disabled:opacity-50 flex items-center gap-2 transition-colors"
+          >
+            <Plus size={16} /> Thêm Trạm chính
+          </button>
+        </div>
+
+        {loading ? (
+          <div className="flex justify-center py-12"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div></div>
+        ) : stations.length === 0 ? (
+          <div className="text-center py-12 text-gray-400 bg-white rounded-lg border border-dashed border-gray-300">
+            Chưa có trạm nào trong hệ thống. Hãy thêm trạm chính đầu tiên.
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {stations.map(main => {
+              const isExpanded = expandedMain.includes(main.id);
+              return (
+                <div key={main.id} className="bg-white border border-gray-200 rounded-lg shadow-sm overflow-hidden transition-all duration-200">
+                  {/* Main Station Header */}
+                  <div 
+                    className="flex justify-between items-center p-4 cursor-pointer hover:bg-gray-50 transition-colors"
+                    onClick={() => toggleMain(main.id)}
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className={`p-1.5 rounded-md ${isExpanded ? 'bg-blue-100 text-blue-600' : 'bg-gray-100 text-gray-500'}`}>
+                        {isExpanded ? <ChevronDown size={20} /> : <ChevronRight size={20} />}
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Building size={20} className="text-blue-600" />
+                        <span className="font-bold text-gray-800 text-lg">{main.name}</span>
+                        <span className="bg-gray-100 text-gray-600 text-xs px-2 py-0.5 rounded-full font-medium ml-2">
+                          {main.techStations?.length || 0} Trạm Kỹ thuật
+                        </span>
+                      </div>
+                    </div>
+                    <button 
+                      onClick={(e) => { e.stopPropagation(); handleDeleteMain(main.id); }}
+                      className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded transition-colors"
+                      title="Xóa trạm chính"
+                    >
+                      <Trash2 size={18} />
+                    </button>
+                  </div>
+
+                  {/* Tech Stations (Expanded Content) */}
+                  {isExpanded && (
+                    <div className="border-t border-gray-100 bg-gray-50 p-4 pl-12 space-y-3">
+                      
+                      {/* Tech Station List */}
+                      {main.techStations?.map((tech: any) => (
+                        <div key={tech.id} className="bg-white border border-gray-200 p-3 rounded-md shadow-sm flex justify-between items-start group hover:border-blue-300 transition-colors">
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2 mb-2">
+                              <MapPin size={16} className="text-emerald-600" />
+                              <span className="font-semibold text-gray-800">{tech.name}</span>
+                            </div>
+                            <div className="flex items-start gap-2 pl-6">
+                              <Users size={14} className="text-gray-400 mt-0.5" />
+                              <div className="text-sm text-gray-600">
+                                {tech.users?.length > 0 ? (
+                                  <div className="flex flex-wrap gap-1.5">
+                                    {tech.users.map((u: any) => (
+                                      <span key={u.id} className="bg-blue-50 text-blue-700 text-[11px] px-2 py-0.5 rounded border border-blue-100">
+                                        {u.fullName} {u.phoneNumber ? `(${u.phoneNumber})` : ''}
+                                      </span>
+                                    ))}
+                                  </div>
+                                ) : (
+                                  <span className="text-gray-400 italic">Chưa có KTV nào thuộc trạm này. Gán KTV ở mục "Tài khoản".</span>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                          <button 
+                            onClick={() => handleDeleteTech(tech.id)}
+                            className="p-1.5 text-gray-400 opacity-0 group-hover:opacity-100 hover:text-red-500 hover:bg-red-50 rounded transition-all"
+                            title="Xóa trạm kỹ thuật"
+                          >
+                            <Trash2 size={16} />
+                          </button>
+                        </div>
+                      ))}
+
+                      {/* Add Tech Station Inline Form */}
+                      {activeMainIdForTech === main.id ? (
+                        <form onSubmit={(e) => handleCreateTech(e, main.id)} className="flex items-center gap-2 mt-2 ml-6">
+                          <input 
+                            type="text"
+                            autoFocus
+                            placeholder="Tên trạm kỹ thuật mới..."
+                            className="flex-1 max-w-sm border border-blue-300 rounded-md px-3 py-1.5 text-sm focus:ring-1 focus:ring-blue-500 outline-none shadow-sm"
+                            value={newTechName}
+                            onChange={(e) => setNewTechName(e.target.value)}
+                          />
+                          <button type="submit" disabled={!newTechName.trim()} className="bg-blue-600 text-white px-3 py-1.5 rounded-md text-sm font-medium hover:bg-blue-700 disabled:opacity-50">
+                            Lưu
+                          </button>
+                          <button type="button" onClick={() => {setActiveMainIdForTech(''); setNewTechName('');}} className="text-gray-500 hover:text-gray-700 px-2 text-sm">
+                            Hủy
+                          </button>
+                        </form>
+                      ) : (
+                        <button 
+                          onClick={() => setActiveMainIdForTech(main.id)}
+                          className="flex items-center gap-1.5 text-sm font-medium text-blue-600 hover:text-blue-800 ml-6 mt-2"
+                        >
+                          <Plus size={16} /> Thêm Trạm Kỹ thuật
+                        </button>
+                      )}
+
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}

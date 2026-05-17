@@ -103,27 +103,104 @@ router.get('/', requireAuth, async (req: Request, res: Response): Promise<void> 
 });
 
 /**
+ * GET /api/orders/:id/audit
+ * Lấy lịch sử thay đổi của 1 đơn hàng
+ */
+router.get('/:id/audit', requireAuth, async (req: Request, res: Response): Promise<void> => {
+  try {
+    const logs = await prisma.auditLog.findMany({
+      where: { entityType: 'Order', entityId: req.params.id },
+      orderBy: { createdAt: 'desc' },
+      take: 50
+    });
+    res.json(logs);
+  } catch (error: any) {
+    logger.error('Get audit log error', { error: error.message });
+    res.status(500).json({ error: 'Lỗi lấy lịch sử' });
+  }
+});
+
+/**
  * PATCH /api/orders/:id
- * Cập nhật trạng thái admin và ngày hẹn
+ * Cập nhật đơn hàng (trạng thái, phân công, loại CV, trạm, hủy/khôi phục...)
  */
 router.patch('/:id', requireAuth, requireAdmin, async (req: Request, res: Response): Promise<void> => {
   try {
     const id = req.params.id as string;
-    const { adminStatus, appointmentTime, assignedKtvId } = req.body;
+    const {
+      adminStatus, appointmentTime, assignedKtvId,
+      workType, serviceType, mainStationId, techStationId,
+      rescheduleReason, cancelReason, note
+    } = req.body;
 
-    const updateData: any = {};
-    if (adminStatus !== undefined) updateData.adminStatus = adminStatus;
-    if (assignedKtvId !== undefined) updateData.assignedKtvId = assignedKtvId || null;
-    if (appointmentTime !== undefined) {
-       updateData.appointmentTime = appointmentTime ? new Date(appointmentTime) : null;
+    // Lấy order hiện tại để so sánh cho audit
+    const oldOrder = await prisma.order.findUnique({ where: { id } });
+    if (!oldOrder) {
+      res.status(404).json({ error: 'Không tìm thấy đơn hàng' });
+      return;
     }
 
+    const updateData: any = {};
+    const changes: any[] = [];
+
+    // Helper ghi nhận thay đổi
+    const track = (field: string, newVal: any) => {
+      const oldVal = (oldOrder as any)[field];
+      if (newVal !== undefined && newVal !== oldVal) {
+        updateData[field] = newVal;
+        changes.push({ field, from: oldVal, to: newVal });
+      }
+    };
+
+    track('adminStatus', adminStatus);
+    track('workType', workType);
+    track('serviceType', serviceType);
+    track('mainStationId', mainStationId || null);
+    track('techStationId', techStationId || null);
+    track('rescheduleReason', rescheduleReason);
+    track('cancelReason', cancelReason);
+    track('note', note);
+
+    if (assignedKtvId !== undefined) {
+      const val = assignedKtvId || null;
+      track('assignedKtvId', val);
+    }
+
+    if (appointmentTime !== undefined) {
+      const val = appointmentTime ? new Date(appointmentTime) : null;
+      updateData.appointmentTime = val;
+      if (String(val) !== String(oldOrder.appointmentTime)) {
+        changes.push({ field: 'appointmentTime', from: oldOrder.appointmentTime, to: val });
+      }
+    }
+
+    // Thực hiện cập nhật
     const order = await prisma.order.update({
       where: { id },
       data: updateData,
     });
 
-    logger.info('Order updated by admin', { orderId: id, by: req.user?.id, updateData });
+    // Ghi audit log
+    if (changes.length > 0) {
+      // Xác định action
+      let action = 'updated';
+      if (adminStatus === 'hủy đơn') action = 'cancelled';
+      if (assignedKtvId && !oldOrder.assignedKtvId) action = 'assigned';
+      if (oldOrder.adminStatus === 'hủy đơn' && adminStatus && adminStatus !== 'hủy đơn') action = 'restored';
+
+      await prisma.auditLog.create({
+        data: {
+          entityType: 'Order',
+          entityId: id,
+          action,
+          changes,
+          userId: req.user!.id,
+          userName: req.user!.fullName
+        }
+      });
+    }
+
+    logger.info('Order updated by admin', { orderId: id, by: req.user?.id, changes });
     res.json({ order });
   } catch (error: any) {
     logger.error('Update order error', { error: error.message });

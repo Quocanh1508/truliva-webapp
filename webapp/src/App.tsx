@@ -14,6 +14,7 @@ import Dashboard from './pages/admin/Dashboard';
 import ReportList from './pages/admin/ReportList';
 import UserManage from './pages/admin/UserManage';
 import OrderList from './pages/admin/OrderList';
+import StationManage from './pages/admin/StationManage';
 
 export default function App() {
   return (
@@ -35,6 +36,7 @@ export default function App() {
               <Route path="/admin" element={<Dashboard />} />
               <Route path="/admin/reports" element={<ReportList />} />
               <Route path="/admin/users" element={<UserManage />} />
+              <Route path="/admin/stations" element={<StationManage />} />
               <Route path="/admin/orders" element={<OrderList />} />
             </Route>
           </Route>

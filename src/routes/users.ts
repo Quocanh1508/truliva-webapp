@@ -16,9 +16,13 @@ const router = Router();
  */
 router.get('/ktvs', requireAuth, async (req: Request, res: Response): Promise<void> => {
   try {
+    const { techStationId } = req.query;
+    const where: any = { role: 'KTV', isActive: true };
+    if (techStationId) where.techStationId = techStationId as string;
+
     const ktvs = await prisma.user.findMany({
-      where: { role: 'KTV', isActive: true },
-      select: { id: true, fullName: true, username: true, phoneNumber: true }
+      where,
+      select: { id: true, fullName: true, username: true, phoneNumber: true, techStationId: true }
     });
     res.json(ktvs);
   } catch (error: any) {
@@ -45,6 +49,8 @@ router.get('/', async (_req: Request, res: Response): Promise<void> => {
         fullName: true,
         role: true,
         phoneNumber: true,
+        techStationId: true,
+        techStation: { select: { name: true, mainStation: { select: { name: true } } } },
         isActive: true,
         createdAt: true,
         _count: { select: { serviceReports: true } },
@@ -65,7 +71,7 @@ router.get('/', async (_req: Request, res: Response): Promise<void> => {
  */
 router.post('/', async (req: Request, res: Response): Promise<void> => {
   try {
-    const { username, password, fullName, role, phoneNumber } = req.body;
+    const { username, password, fullName, role, phoneNumber, techStationId } = req.body;
 
     if (!username || !password || !fullName) {
       res.status(400).json({ error: 'Vui lòng nhập đầy đủ thông tin' });
@@ -95,6 +101,7 @@ router.post('/', async (req: Request, res: Response): Promise<void> => {
         fullName,
         role: role === 'ADMIN' ? 'ADMIN' : 'KTV',
         phoneNumber: phoneNumber || null,
+        techStationId: techStationId || null,
       },
       select: {
         id: true,
@@ -102,6 +109,7 @@ router.post('/', async (req: Request, res: Response): Promise<void> => {
         fullName: true,
         role: true,
         phoneNumber: true,
+        techStationId: true,
         isActive: true,
         createdAt: true,
       },
@@ -122,13 +130,14 @@ router.post('/', async (req: Request, res: Response): Promise<void> => {
 router.put('/:id', async (req: Request, res: Response): Promise<void> => {
   try {
     const id = req.params.id as string;
-    const { fullName, phoneNumber, password, isActive, role } = req.body;
+    const { fullName, phoneNumber, password, isActive, role, techStationId } = req.body;
 
     const updateData: any = {};
     if (fullName !== undefined) updateData.fullName = fullName;
     if (phoneNumber !== undefined) updateData.phoneNumber = phoneNumber;
     if (isActive !== undefined) updateData.isActive = isActive;
     if (role !== undefined) updateData.role = role;
+    if (techStationId !== undefined) updateData.techStationId = techStationId || null;
     if (password) {
       updateData.passwordHash = await bcrypt.hash(password, 10);
     }
@@ -142,6 +151,7 @@ router.put('/:id', async (req: Request, res: Response): Promise<void> => {
         fullName: true,
         role: true,
         phoneNumber: true,
+        techStationId: true,
         isActive: true,
       },
     });
