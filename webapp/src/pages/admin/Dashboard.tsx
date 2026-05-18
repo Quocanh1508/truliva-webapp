@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { fetchApi, getDashboardStats } from '../../api/client';
-import { FileText, CheckCircle, Clock, DollarSign, Building } from 'lucide-react';
+import { FileText, CheckCircle, Clock, Building } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip as RechartsTooltip, Legend, ResponsiveContainer, CartesianGrid } from 'recharts';
 import { ComposableMap, Geographies, Geography } from 'react-simple-maps';
 import { scaleQuantile } from 'd3-scale';

@@ -1,7 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { getOrders, updateOrder, getKtvUsers, getStations, getOrderAuditLog } from '../../api/client';
-import { Search, ChevronLeft, ChevronRight, ChevronDown, Filter, History, Edit, XCircle } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { Search, ChevronLeft, ChevronRight, History, Edit, XCircle } from 'lucide-react';
 
 const ADMIN_STATUS_OPTIONS = [
   { value: '', label: 'Tất cả trạng thái' },
@@ -14,18 +13,18 @@ const ADMIN_STATUS_OPTIONS = [
 export default function OrderList() {
   const [orders, setOrders] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
+  const [_error, setError] = useState('');
 
   // Filters
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
-  const [sortBy, setSortBy] = useState('createdAt');
-  const [sortOrder, setSortOrder] = useState('desc');
+  const [sortBy] = useState('createdAt');
+  const [sortOrder] = useState('desc');
   
   // Pagination
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
-  const [totalItems, setTotalItems] = useState(0);
+  const [_totalItems, setTotalItems] = useState(0);
 
   // Assignment Modal
   const [assignModal, setAssignModal] = useState<{isOpen: boolean; orderId: string; order: any} | null>(null);

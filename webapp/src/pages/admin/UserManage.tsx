@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { fetchApi, getStations } from '../../api/client';
-import { UserPlus, Lock, Unlock, Edit, Save, X } from 'lucide-react';
+import { UserPlus, Lock, Unlock } from 'lucide-react';
 
 export default function UserManage() {
   const [users, setUsers] = useState<any[]>([]);
