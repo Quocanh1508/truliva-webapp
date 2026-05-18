@@ -41,7 +41,7 @@ export default function OrderList() {
   const [serviceType, setServiceType] = useState('');
 
   // Audit Log Modal
-  const [auditModal, setAuditModal] = useState<{isOpen: boolean; orderId: string}> | null(null);
+  const [auditModal, setAuditModal] = useState<{isOpen: boolean; orderId: string} | null>(null);
   const [auditLogs, setAuditLogs] = useState<any[]>([]);
   const [loadingAudit, setLoadingAudit] = useState(false);
 

@@ -109,7 +109,7 @@ router.get('/', requireAuth, async (req: Request, res: Response): Promise<void> 
 router.get('/:id/audit', requireAuth, async (req: Request, res: Response): Promise<void> => {
   try {
     const logs = await prisma.auditLog.findMany({
-      where: { entityType: 'Order', entityId: req.params.id },
+      where: { entityType: 'Order', entityId: req.params.id as string },
       orderBy: { createdAt: 'desc' },
       take: 50
     });

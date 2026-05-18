@@ -104,7 +104,7 @@ router.post('/tech', async (req: Request, res: Response): Promise<void> => {
 router.delete('/main/:id', async (req: Request, res: Response): Promise<void> => {
   try {
     await prisma.mainStation.update({
-      where: { id: req.params.id },
+      where: { id: req.params.id as string },
       data: { isActive: false }
     });
     res.json({ message: 'Đã vô hiệu hóa trạm chính' });
@@ -121,7 +121,7 @@ router.delete('/main/:id', async (req: Request, res: Response): Promise<void> =>
 router.delete('/tech/:id', async (req: Request, res: Response): Promise<void> => {
   try {
     await prisma.techStation.update({
-      where: { id: req.params.id },
+      where: { id: req.params.id as string },
       data: { isActive: false }
     });
     res.json({ message: 'Đã vô hiệu hóa trạm kỹ thuật' });
