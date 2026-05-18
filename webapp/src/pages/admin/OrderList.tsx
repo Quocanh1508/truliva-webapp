@@ -2,13 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { getOrders, updateOrder, getKtvUsers, getStations, getOrderAuditLog } from '../../api/client';
 import { Search, ChevronLeft, ChevronRight, History, Edit, XCircle } from 'lucide-react';
 
-const ADMIN_STATUS_OPTIONS = [
-  { value: '', label: 'Tất cả trạng thái' },
-  { value: 'chờ xử lý', label: 'Chờ xử lý' },
-  { value: 'đang thực hiện', label: 'Đang thực hiện' },
-  { value: 'hoàn thành', label: 'Hoàn thành' },
-  { value: 'hủy đơn', label: 'Hủy đơn' },
-];
+
 
 const ROW_STATUS_OPTIONS = [
   { value: 'chờ xử lý', label: 'Chờ xử lý' },
