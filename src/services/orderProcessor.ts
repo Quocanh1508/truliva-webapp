@@ -82,7 +82,24 @@ export async function processOrderEvent(rawEventId: string, payload: any): Promi
     const pancakeCreatedAt = payload.inserted_at ? new Date(payload.inserted_at) : null;
     const pancakeUpdatedAt = payload.updated_at ? new Date(payload.updated_at) : null;
 
-    const orderData = {
+    // ══════════════════════════════════════
+    // Auto map adminStatus
+    // ══════════════════════════════════════
+    const existingOrder = await prisma.order.findUnique({
+      where: { pancakeOrderId: systemId },
+      select: { adminStatus: true }
+    });
+
+    let newAdminStatus = existingOrder?.adminStatus || 'chờ xử lý';
+    const pStatus = (payload.status_name || '').toLowerCase();
+
+    if (pStatus === 'cancelled' || pStatus === 'returned' || pStatus === 'cancel' || pStatus.includes('hủy')) {
+      newAdminStatus = 'hủy đơn';
+    } else if (pStatus === 'delivered' || pStatus === 'done' || pStatus === 'received' || pStatus.includes('hoàn thành') || pStatus.includes('đã nhận')) {
+      if (newAdminStatus !== 'hủy đơn') newAdminStatus = 'hoàn thành';
+    }
+
+    const orderData: any = {
       customerId,
       statusCode,
       statusName: payload.status_name || null,
@@ -103,6 +120,7 @@ export async function processOrderEvent(rawEventId: string, payload: any): Promi
       feeMarketplace: payload.fee_marketplace ?? null,
       pancakeCreatedAt,
       pancakeUpdatedAt,
+      adminStatus: newAdminStatus, // mapped status
       rawData: payload,
     };
 
@@ -129,8 +147,8 @@ export async function processOrderEvent(rawEventId: string, payload: any): Promi
       await prisma.orderItem.createMany({
         data: items.map((item: any) => ({
           orderId: order.id,
-          productName: item.product_name || item.name || null,
-          sku: item.sku || item.product_sku || null,
+          productName: item.product_name || item.name || item.variation_info?.name || item.variations?.name || 'Sản phẩm không tên',
+          sku: item.sku || item.product_sku || item.variation_info?.display_id || null,
           quantity: item.quantity ?? 1,
           price: item.price ?? item.product_price ?? null,
           discount: item.discount ?? 0,

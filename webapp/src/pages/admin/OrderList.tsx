@@ -10,6 +10,13 @@ const ADMIN_STATUS_OPTIONS = [
   { value: 'hủy đơn', label: 'Hủy đơn' },
 ];
 
+const ROW_STATUS_OPTIONS = [
+  { value: 'chờ xử lý', label: 'Chờ xử lý' },
+  { value: 'đang thực hiện', label: 'Đang thực hiện' },
+  { value: 'hoàn thành', label: 'Hoàn thành' },
+  { value: 'hủy đơn', label: 'Hủy đơn' },
+];
+
 export default function OrderList() {
   const [orders, setOrders] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -217,8 +224,10 @@ export default function OrderList() {
           <table className="w-full text-left text-[13px] whitespace-nowrap">
             <thead className="sticky top-0 bg-[#f8f9fa] text-gray-600 font-semibold border-b border-gray-200 z-10">
               <tr>
-                <th className="px-4 py-3">Mã đơn</th>
-                <th className="px-4 py-3">Khách hàng</th>
+                <th className="px-4 py-3 w-[80px]">Mã đơn</th>
+                <th className="px-4 py-3 w-[250px]">Khách hàng & Địa chỉ</th>
+                <th className="px-4 py-3 w-[250px]">Sản phẩm & Tiền thu</th>
+                <th className="px-4 py-3 w-[200px]">Ghi chú</th>
                 <th className="px-4 py-3">Loại CV</th>
                 <th className="px-4 py-3">Ngày hẹn</th>
                 <th className="px-4 py-3">Trạm - KTV</th>
@@ -236,9 +245,30 @@ export default function OrderList() {
                  return (
                   <tr key={order.id} className={`${idx % 2 === 0 ? 'bg-white' : 'bg-[#fafafa]'} hover:bg-blue-50/50 transition-colors`}>
                     <td className="px-4 py-3 font-medium">{order.pancakeOrderId}</td>
-                    <td className="px-4 py-3">
+                    <td className="px-4 py-3 whitespace-normal">
                       <div className="font-medium text-gray-900">{customerName}</div>
-                      <div className="text-gray-500">{phone}</div>
+                      <div className="text-gray-500 font-medium mb-1">{phone}</div>
+                      <div className="text-gray-500 text-[12px] leading-tight">{order.shippingAddress?.full_address || order.customer?.fullAddress || 'Không có địa chỉ'}</div>
+                    </td>
+                    <td className="px-4 py-3 whitespace-normal">
+                      <div className="text-gray-900 text-[12px] mb-1 leading-tight">
+                        {order.items && order.items.length > 0 ? (
+                          <ul className="list-disc pl-4">
+                            {order.items.map((item: any, i: number) => {
+                              const pName = item.productName || item.rawData?.variation_info?.name || item.rawData?.name || 'Sản phẩm không tên';
+                              return (
+                                <li key={i}>{pName} <span className="font-semibold">x{item.quantity}</span></li>
+                              )
+                            })}
+                          </ul>
+                        ) : 'Chưa có SP'}
+                      </div>
+                      <div className="text-blue-700 font-semibold mt-1">Thu: {(order.moneyToCollect || 0).toLocaleString('vi-VN')} đ</div>
+                    </td>
+                    <td className="px-4 py-3 whitespace-normal">
+                      <div className="text-gray-600 text-[12px] italic max-h-16 overflow-y-auto pr-1">
+                        {order.note || '-'}
+                      </div>
                     </td>
                     <td className="px-4 py-3">
                       <div className="font-medium text-gray-800">{order.workType || '-'}</div>
@@ -258,11 +288,11 @@ export default function OrderList() {
                     </td>
                     <td className="px-4 py-3 text-center">
                       <select
-                        className={`appearance-none text-white font-medium rounded px-3 py-1 text-[12px] outline-none cursor-pointer ${getStatusStyle(order.adminStatus || '')}`}
-                        value={order.adminStatus || ''}
+                        className={`appearance-none text-white font-medium rounded px-3 py-1 text-[12px] outline-none cursor-pointer ${getStatusStyle(order.adminStatus || 'chờ xử lý')}`}
+                        value={order.adminStatus || 'chờ xử lý'}
                         onChange={(e) => handleStatusChange(order.id, e.target.value)}
                       >
-                        {ADMIN_STATUS_OPTIONS.map(opt => <option key={opt.value} value={opt.value} className="text-black bg-white">{opt.label}</option>)}
+                        {ROW_STATUS_OPTIONS.map(opt => <option key={opt.value} value={opt.value} className="text-black bg-white">{opt.label}</option>)}
                       </select>
                     </td>
                     <td className="px-4 py-3">

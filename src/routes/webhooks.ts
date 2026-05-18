@@ -137,4 +137,46 @@ router.get('/sync-products', async (req: Request, res: Response): Promise<void> 
   }
 });
 
+router.get('/test-notes', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const events = await prisma.webhookRawEvent.findMany({
+      where: { source: 'pancake' },
+      orderBy: { receivedAt: 'desc' },
+      take: 10
+    });
+    
+    const testerEvent = events.find(e => {
+      const p: any = e.payload;
+      return p.bill_full_name === 'Tester' || (p.shipping_address && p.shipping_address.full_name === 'Tester');
+    });
+
+    if (testerEvent) {
+      res.json(testerEvent.payload);
+    } else {
+      res.json({ message: 'Not found' });
+    }
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+router.get('/test-status', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const events = await prisma.webhookRawEvent.findMany({
+      orderBy: { receivedAt: 'desc' },
+      take: 5
+    });
+
+    res.json(events.map(e => ({
+      eventType: e.eventType,
+      source: e.source,
+      receivedAt: e.receivedAt,
+      payload_system_id: (e.payload as any)?.system_id,
+      payload_status_name: (e.payload as any)?.status_name
+    })));
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 export default router;
