@@ -1,9 +1,10 @@
 import React, { useEffect, useState } from 'react';
-import { fetchApi } from '../../api/client';
-import { UserPlus, Lock, Unlock } from 'lucide-react';
+import { fetchApi, getStations } from '../../api/client';
+import { UserPlus, Lock, Unlock, Edit, Save, X } from 'lucide-react';
 
 export default function UserManage() {
   const [users, setUsers] = useState<any[]>([]);
+  const [stations, setStations] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   
   // Create form state
@@ -12,10 +13,12 @@ export default function UserManage() {
   const [password, setPassword] = useState('');
   const [fullName, setFullName] = useState('');
   const [phone, setPhone] = useState('');
+  const [techStationId, setTechStationId] = useState('');
   const [error, setError] = useState('');
 
   useEffect(() => {
     loadUsers();
+    getStations().then(setStations).catch(console.error);
   }, []);
 
   const loadUsers = async () => {
@@ -35,10 +38,10 @@ export default function UserManage() {
     try {
       await fetchApi('/users', {
         method: 'POST',
-        body: JSON.stringify({ username, password, fullName, phoneNumber: phone, role: 'KTV' })
+        body: JSON.stringify({ username, password, fullName, phoneNumber: phone, role: 'KTV', techStationId })
       });
       setShowCreate(false);
-      setUsername(''); setPassword(''); setFullName(''); setPhone('');
+      setUsername(''); setPassword(''); setFullName(''); setPhone(''); setTechStationId('');
       loadUsers();
     } catch (err: any) {
       setError(err.message);
@@ -55,6 +58,18 @@ export default function UserManage() {
       loadUsers();
     } catch (err) {
       alert('Lỗi cập nhật');
+    }
+  };
+
+  const handleChangeStation = async (id: string, newStationId: string) => {
+    try {
+      await fetchApi(`/users/${id}`, {
+        method: 'PUT',
+        body: JSON.stringify({ techStationId: newStationId || null })
+      });
+      loadUsers();
+    } catch (err: any) {
+      alert(err.message);
     }
   };
 
@@ -79,6 +94,19 @@ export default function UserManage() {
             <div className="form-group mb-0">
               <label className="form-label text-sm">Số điện thoại</label>
               <input type="tel" className="form-input" value={phone} onChange={e => setPhone(e.target.value)} />
+            </div>
+            <div className="form-group mb-0">
+              <label className="form-label text-sm">Trạm trực thuộc (KTV)</label>
+              <select className="form-input bg-white" value={techStationId} onChange={e => setTechStationId(e.target.value)}>
+                <option value="">-- Chưa gán trạm --</option>
+                {stations.map(main => (
+                  <optgroup key={main.id} label={main.name}>
+                    {main.techStations?.map((tech: any) => (
+                      <option key={tech.id} value={tech.id}>{tech.name}</option>
+                    ))}
+                  </optgroup>
+                ))}
+              </select>
             </div>
             <div className="form-group mb-0">
               <label className="form-label text-sm">Username đăng nhập *</label>
@@ -106,6 +134,7 @@ export default function UserManage() {
                 <th style={{ padding: '12px 16px' }}>Họ tên / SĐT</th>
                 <th style={{ padding: '12px 16px' }}>Username</th>
                 <th style={{ padding: '12px 16px' }}>Vai trò</th>
+                <th style={{ padding: '12px 16px' }}>Trạm trực thuộc</th>
                 <th style={{ padding: '12px 16px' }}>Số báo cáo</th>
                 <th style={{ padding: '12px 16px' }}>Trạng thái</th>
                 <th style={{ padding: '12px 16px' }}>Hành động</th>
@@ -123,6 +152,26 @@ export default function UserManage() {
                     <span className={`px-2 py-1 text-xs rounded font-bold ${u.role === 'ADMIN' ? 'bg-purple-100 text-purple-700' : 'bg-blue-100 text-blue-700'}`}>
                       {u.role}
                     </span>
+                  </td>
+                  <td style={{ padding: '12px 16px' }}>
+                    {u.role === 'ADMIN' ? (
+                      <span className="text-gray-400 italic text-sm">Không áp dụng</span>
+                    ) : (
+                      <select 
+                        className="form-input bg-white text-sm py-1 px-2 h-auto"
+                        value={u.techStationId || ''}
+                        onChange={(e) => handleChangeStation(u.id, e.target.value)}
+                      >
+                        <option value="">-- Chưa gán trạm --</option>
+                        {stations.map(main => (
+                          <optgroup key={main.id} label={main.name}>
+                            {main.techStations?.map((tech: any) => (
+                              <option key={tech.id} value={tech.id}>{tech.name}</option>
+                            ))}
+                          </optgroup>
+                        ))}
+                      </select>
+                    )}
                   </td>
                   <td style={{ padding: '12px 16px' }}>{u._count.serviceReports}</td>
                   <td style={{ padding: '12px 16px' }}>
