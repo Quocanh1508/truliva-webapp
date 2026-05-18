@@ -203,7 +203,7 @@ export default function ReportList() {
                               cursor: 'pointer', whiteSpace: 'nowrap' 
                             }}
                           >
-                            Xem {urls.length} ảnh
+                            Xem ảnh
                           </button>
 
                           {isPopupOpen && (
