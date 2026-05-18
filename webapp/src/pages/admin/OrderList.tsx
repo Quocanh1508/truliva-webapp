@@ -269,12 +269,19 @@ export default function OrderList() {
                       <div className="text-gray-500">{order.serviceType || '-'}</div>
                     </td>
                     <td className="px-4 py-3">
-                      {order.appointmentTime ? (
+                      {order.appointmentTime ? (() => {
+                        const isOverdue = new Date(order.appointmentTime) < new Date() && order.adminStatus !== 'hoàn thành' && order.adminStatus !== 'hủy đơn';
+                        return (
                         <>
-                          <div className="font-medium text-blue-700">{new Date(order.appointmentTime).toLocaleTimeString('vi-VN', {hour: '2-digit', minute:'2-digit'})}</div>
-                          <div className="text-gray-500">{new Date(order.appointmentTime).toLocaleDateString('vi-VN')}</div>
+                          <div className={`font-medium ${isOverdue ? 'text-red-600' : 'text-blue-700'}`}>
+                            {new Date(order.appointmentTime).toLocaleTimeString('vi-VN', {hour: '2-digit', minute:'2-digit'})}
+                          </div>
+                          <div className={isOverdue ? 'text-red-500' : 'text-gray-500'}>
+                            {new Date(order.appointmentTime).toLocaleDateString('vi-VN')}
+                          </div>
                         </>
-                      ) : '-'}
+                        );
+                      })() : '-'}
                     </td>
                     <td className="px-4 py-3">
                       <div className="font-medium text-gray-900">{mainStationName || 'Chưa phân trạm'}</div>
