@@ -1,12 +1,18 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { fetchApi, getStations } from '../../api/client';
-import { UserPlus, Lock, Unlock, KeyRound } from 'lucide-react';
+import { UserPlus, Lock, Unlock, KeyRound, Search, Filter, X } from 'lucide-react';
 
 export default function UserManage() {
   const [users, setUsers] = useState<any[]>([]);
   const [stations, setStations] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   
+  // Filter state
+  const [searchText, setSearchText] = useState('');
+  const [filterMainStation, setFilterMainStation] = useState('');
+  const [filterTechStation, setFilterTechStation] = useState('');
+  const [filterStatus, setFilterStatus] = useState<'all' | 'active' | 'inactive'>('all');
+
   // Create form state
   const [showCreate, setShowCreate] = useState(false);
   const [username, setUsername] = useState('');
@@ -30,6 +36,69 @@ export default function UserManage() {
     } finally {
       setLoading(false);
     }
+  };
+
+  // ── Build flat list of tech stations for filter dropdown ──
+  const allTechStations = useMemo(() => {
+    const list: { id: string; name: string; mainId: string; mainName: string }[] = [];
+    stations.forEach((main: any) => {
+      (main.techStations || []).forEach((tech: any) => {
+        list.push({ id: tech.id, name: tech.name, mainId: main.id, mainName: main.name });
+      });
+    });
+    return list;
+  }, [stations]);
+
+  // ── Filter tech stations by selected main station ──
+  const filteredTechStations = useMemo(() => {
+    if (!filterMainStation) return allTechStations;
+    return allTechStations.filter(ts => ts.mainId === filterMainStation);
+  }, [allTechStations, filterMainStation]);
+
+  // ── Filtered users ──
+  const filteredUsers = useMemo(() => {
+    let result = [...users];
+
+    // Text search (name, phone, username)
+    if (searchText.trim()) {
+      const q = searchText.toLowerCase().trim();
+      result = result.filter(u =>
+        u.fullName?.toLowerCase().includes(q) ||
+        u.phoneNumber?.toLowerCase().includes(q) ||
+        u.username?.toLowerCase().includes(q)
+      );
+    }
+
+    // Main station filter
+    if (filterMainStation) {
+      const techIdsInMain = allTechStations
+        .filter(ts => ts.mainId === filterMainStation)
+        .map(ts => ts.id);
+      result = result.filter(u => techIdsInMain.includes(u.techStationId));
+    }
+
+    // Tech station filter
+    if (filterTechStation) {
+      result = result.filter(u => u.techStationId === filterTechStation);
+    }
+
+    // Status filter
+    if (filterStatus === 'active') {
+      result = result.filter(u => u.isActive);
+    } else if (filterStatus === 'inactive') {
+      result = result.filter(u => !u.isActive);
+    }
+
+    return result;
+  }, [users, searchText, filterMainStation, filterTechStation, filterStatus, allTechStations]);
+
+  const hasFilters = searchText || filterMainStation || filterTechStation || filterStatus !== 'all';
+
+  const clearFilters = () => {
+    setSearchText('');
+    setFilterMainStation('');
+    setFilterTechStation('');
+    setFilterStatus('all');
   };
 
   const handleCreate = async (e: React.FormEvent) => {
@@ -65,7 +134,7 @@ export default function UserManage() {
     const newPassword = window.prompt(
       `Đặt lại mật khẩu cho KTV "${name}"\nNhập mật khẩu mới (để trống = Truliva@2025):`
     );
-    if (newPassword === null) return; // User cancelled
+    if (newPassword === null) return;
     const passwordToSet = newPassword.trim() || 'Truliva@2025';
     try {
       await fetchApi(`/users/${id}`, {
@@ -97,6 +166,83 @@ export default function UserManage() {
         <button className="btn btn-primary flex items-center gap-2" onClick={() => setShowCreate(!showCreate)}>
           <UserPlus size={18} /> Thêm KTV
         </button>
+      </div>
+
+      {/* ── Filter Bar ── */}
+      <div className="card mb-6" style={{ padding: '16px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
+          <Filter size={18} style={{ color: '#1B3A6B' }} />
+          <span style={{ fontWeight: 600, color: '#1B3A6B', fontSize: '14px' }}>Bộ lọc</span>
+          {hasFilters && (
+            <button
+              onClick={clearFilters}
+              style={{
+                marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '4px',
+                padding: '4px 10px', borderRadius: '6px', fontSize: '12px', fontWeight: 500,
+                color: '#dc2626', backgroundColor: '#fef2f2', border: '1px solid #fecaca', cursor: 'pointer'
+              }}
+            >
+              <X size={14} /> Xóa bộ lọc
+            </button>
+          )}
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '12px' }}>
+          {/* Search */}
+          <div style={{ position: 'relative' }}>
+            <Search size={16} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: '#9ca3af' }} />
+            <input
+              type="text"
+              className="form-input"
+              placeholder="Tìm theo tên, SĐT, username..."
+              value={searchText}
+              onChange={e => setSearchText(e.target.value)}
+              style={{ paddingLeft: '34px', fontSize: '13px' }}
+            />
+          </div>
+
+          {/* Main Station */}
+          <select
+            className="form-input bg-white"
+            value={filterMainStation}
+            onChange={e => { setFilterMainStation(e.target.value); setFilterTechStation(''); }}
+            style={{ fontSize: '13px' }}
+          >
+            <option value="">Tất cả trạm chính</option>
+            {stations.map((main: any) => (
+              <option key={main.id} value={main.id}>{main.name}</option>
+            ))}
+          </select>
+
+          {/* Tech Station */}
+          <select
+            className="form-input bg-white"
+            value={filterTechStation}
+            onChange={e => setFilterTechStation(e.target.value)}
+            style={{ fontSize: '13px' }}
+          >
+            <option value="">Tất cả trạm kỹ thuật</option>
+            {filteredTechStations.map(ts => (
+              <option key={ts.id} value={ts.id}>{ts.name} ({ts.mainName})</option>
+            ))}
+          </select>
+
+          {/* Status */}
+          <select
+            className="form-input bg-white"
+            value={filterStatus}
+            onChange={e => setFilterStatus(e.target.value as any)}
+            style={{ fontSize: '13px' }}
+          >
+            <option value="all">Tất cả trạng thái</option>
+            <option value="active">Hoạt động</option>
+            <option value="inactive">Đã khóa</option>
+          </select>
+        </div>
+
+        {/* Result count */}
+        <div style={{ marginTop: '10px', fontSize: '13px', color: 'var(--text-muted)' }}>
+          Hiển thị <strong>{filteredUsers.length}</strong> / {users.length} kỹ thuật viên
+        </div>
       </div>
 
       {showCreate && (
@@ -158,7 +304,14 @@ export default function UserManage() {
               </tr>
             </thead>
             <tbody>
-              {users.map(u => (
+              {filteredUsers.length === 0 ? (
+                <tr>
+                  <td colSpan={7} style={{ padding: '32px 16px', textAlign: 'center', color: 'var(--text-muted)' }}>
+                    {hasFilters ? 'Không tìm thấy kỹ thuật viên phù hợp với bộ lọc.' : 'Chưa có kỹ thuật viên nào.'}
+                  </td>
+                </tr>
+              ) : (
+                filteredUsers.map(u => (
                 <tr key={u.id} style={{ borderBottom: '1px solid var(--border-color)' }} className="hover:bg-gray-50">
                   <td style={{ padding: '12px 16px' }}>
                     <div className="font-bold">{u.fullName}</div>
@@ -215,7 +368,7 @@ export default function UserManage() {
                     )}
                   </td>
                 </tr>
-              ))}
+              )))}
             </tbody>
           </table>
         </div>
