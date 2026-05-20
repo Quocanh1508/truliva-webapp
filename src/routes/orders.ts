@@ -18,7 +18,9 @@ router.get('/', requireAuth, async (req: Request, res: Response): Promise<void> 
       sortBy = 'createdAt', // appointmentTime, createdAt, updatedAt
       sortOrder = 'desc',   // asc, desc
       status,               // custom adminStatus
-      search                // search theo tên, sdt, mã đơn
+      search,               // search theo tên, sdt, mã đơn
+      startDate,
+      endDate
     } = req.query;
 
     const pageNumber = parseInt(page as string, 10);
@@ -35,6 +37,16 @@ router.get('/', requireAuth, async (req: Request, res: Response): Promise<void> 
 
     if (status) {
       where.adminStatus = status as string;
+    }
+
+    if (startDate || endDate) {
+      where.pancakeCreatedAt = {};
+      if (startDate) {
+        where.pancakeCreatedAt.gte = new Date(startDate as string);
+      }
+      if (endDate) {
+        where.pancakeCreatedAt.lte = new Date(endDate as string);
+      }
     }
 
     if (search) {

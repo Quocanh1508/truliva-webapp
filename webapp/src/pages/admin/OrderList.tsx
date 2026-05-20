@@ -22,6 +22,11 @@ export default function OrderList() {
   const [sortBy] = useState('createdAt');
   const [sortOrder] = useState('desc');
   
+  // Date Filters
+  const [datePreset, setDatePreset] = useState('');
+  const [customStartDate, setCustomStartDate] = useState('');
+  const [customEndDate, setCustomEndDate] = useState('');
+  
   // Pagination
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
@@ -49,11 +54,60 @@ export default function OrderList() {
   const [cancelModal, setCancelModal] = useState<{isOpen: boolean; orderId: string} | null>(null);
   const [cancelReason, setCancelReason] = useState('');
 
+  const getDateRange = () => {
+    if (!datePreset) return { startDate: '', endDate: '' };
+    
+    const now = new Date();
+    
+    if (datePreset === 'today') {
+      const start = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0);
+      const end = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
+      return { startDate: start.toISOString(), endDate: end.toISOString() };
+    }
+    
+    if (datePreset === 'yesterday') {
+      const start = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1, 0, 0, 0, 0);
+      const end = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1, 23, 59, 59, 999);
+      return { startDate: start.toISOString(), endDate: end.toISOString() };
+    }
+    
+    if (datePreset === 'week') {
+      const start = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+      return { startDate: start.toISOString(), endDate: now.toISOString() };
+    }
+    
+    if (datePreset === 'month') {
+      const start = new Date(now.getFullYear(), now.getMonth() - 1, now.getDate(), 0, 0, 0, 0);
+      return { startDate: start.toISOString(), endDate: now.toISOString() };
+    }
+    
+    if (datePreset === 'year') {
+      const start = new Date(now.getFullYear() - 1, now.getMonth(), now.getDate(), 0, 0, 0, 0);
+      return { startDate: start.toISOString(), endDate: now.toISOString() };
+    }
+    
+    if (datePreset === 'custom') {
+      const start = customStartDate ? new Date(customStartDate + 'T00:00:00').toISOString() : '';
+      const end = customEndDate ? new Date(customEndDate + 'T23:59:59').toISOString() : '';
+      return { startDate: start, endDate: end };
+    }
+    
+    return { startDate: '', endDate: '' };
+  };
+
   const fetchOrdersData = async () => {
     try {
       setLoading(true);
+      const { startDate, endDate } = getDateRange();
       const res = await getOrders({
-        page, limit: 20, search, status: statusFilter, sortBy, sortOrder
+        page, 
+        limit: 20, 
+        search, 
+        status: statusFilter, 
+        sortBy, 
+        sortOrder,
+        startDate,
+        endDate
       });
       setOrders(res.orders);
       setTotalPages(res.pagination.totalPages);
@@ -67,7 +121,7 @@ export default function OrderList() {
 
   useEffect(() => {
     fetchOrdersData();
-  }, [page, statusFilter, sortBy, sortOrder]);
+  }, [page, statusFilter, sortBy, sortOrder, datePreset, customStartDate, customEndDate]);
 
   useEffect(() => {
     getStations().then(data => setStations(data)).catch(console.error);
@@ -198,13 +252,43 @@ export default function OrderList() {
         </form>
 
         <div className="flex items-center space-x-3">
-           <select className="px-3 py-2 text-[13px] border border-gray-300 rounded-md bg-white text-gray-700 outline-none" value={statusFilter} onChange={(e) => {setStatusFilter(e.target.value); setPage(1);}}>
-             <option value="">Tất cả trạng thái</option>
-             <option value="chờ xử lý">Chờ xử lý</option>
-             <option value="đang thực hiện">Đang thực hiện</option>
-             <option value="hoàn thành">Hoàn thành</option>
-             <option value="hủy đơn">Hủy đơn</option>
-           </select>
+            {datePreset === 'custom' && (
+              <div className="flex items-center space-x-2">
+                <input 
+                  type="date" 
+                  className="px-3 py-1.5 text-[13px] border border-gray-300 rounded-md outline-none text-gray-700 bg-white"
+                  value={customStartDate}
+                  onChange={(e) => { setCustomStartDate(e.target.value); setPage(1); }}
+                />
+                <span className="text-gray-400">đến</span>
+                <input 
+                  type="date" 
+                  className="px-3 py-1.5 text-[13px] border border-gray-300 rounded-md outline-none text-gray-700 bg-white"
+                  value={customEndDate}
+                  onChange={(e) => { setCustomEndDate(e.target.value); setPage(1); }}
+                />
+              </div>
+            )}
+            <select 
+              className="px-3 py-2 text-[13px] border border-gray-300 rounded-md bg-white text-gray-700 outline-none"
+              value={datePreset}
+              onChange={(e) => { setDatePreset(e.target.value); setPage(1); }}
+            >
+              <option value="">Tất cả thời gian</option>
+              <option value="today">Hôm nay</option>
+              <option value="yesterday">Hôm qua</option>
+              <option value="week">1 tuần qua</option>
+              <option value="month">1 tháng qua</option>
+              <option value="year">1 năm qua</option>
+              <option value="custom">Tự chọn khoảng...</option>
+            </select>
+            <select className="px-3 py-2 text-[13px] border border-gray-300 rounded-md bg-white text-gray-700 outline-none" value={statusFilter} onChange={(e) => {setStatusFilter(e.target.value); setPage(1);}}>
+              <option value="">Tất cả trạng thái</option>
+              <option value="chờ xử lý">Chờ xử lý</option>
+              <option value="đang thực hiện">Đang thực hiện</option>
+              <option value="hoàn thành">Hoàn thành</option>
+              <option value="hủy đơn">Hủy đơn</option>
+            </select>
         </div>
       </div>
 
@@ -223,6 +307,7 @@ export default function OrderList() {
                 <th className="px-4 py-3 w-[250px]">Sản phẩm & Tiền thu</th>
                 <th className="px-4 py-3 w-[200px]">Ghi chú</th>
                 <th className="px-4 py-3">Loại CV</th>
+                <th className="px-4 py-3">Ngày tạo</th>
                 <th className="px-4 py-3">Ngày hẹn</th>
                 <th className="px-4 py-3">Trạm - KTV</th>
                 <th className="px-4 py-3 text-center">Trạng thái</th>
@@ -267,6 +352,21 @@ export default function OrderList() {
                     <td className="px-4 py-3">
                       <div className="font-medium text-gray-800">{order.workType || '-'}</div>
                       <div className="text-gray-500">{order.serviceType || '-'}</div>
+                    </td>
+                    <td className="px-4 py-3">
+                      {order.pancakeCreatedAt ? (() => {
+                        const date = new Date(order.pancakeCreatedAt);
+                        return (
+                          <>
+                            <div className="font-medium text-gray-800">
+                              {date.toLocaleTimeString('vi-VN', {hour: '2-digit', minute:'2-digit'})}
+                            </div>
+                            <div className="text-gray-500">
+                              {date.toLocaleDateString('vi-VN')}
+                            </div>
+                          </>
+                        );
+                      })() : '-'}
                     </td>
                     <td className="px-4 py-3">
                       {order.appointmentTime ? (() => {
