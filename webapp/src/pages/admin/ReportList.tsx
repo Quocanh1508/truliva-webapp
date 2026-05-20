@@ -126,6 +126,20 @@ export default function ReportList() {
     }
   };
 
+  const handleDeleteReport = async (id: string) => {
+    if (!window.confirm('Bạn có chắc chắn muốn xóa báo cáo này? Thao tác này không thể hoàn tác.')) {
+      return;
+    }
+    
+    try {
+      await fetchApi(`/reports/${id}`, { method: 'DELETE' });
+      alert('Đã xóa báo cáo thành công');
+      loadReports();
+    } catch (e: any) {
+      alert(e.message || 'Lỗi khi xóa báo cáo');
+    }
+  };
+
   return (
     <div className="animate-fade-in">
       <div className="flex justify-between items-center mb-6">
@@ -160,7 +174,7 @@ export default function ReportList() {
                 <th style={{ padding: '12px 16px' }}>Tỉnh/TP</th>
                 <th style={{ padding: '12px 16px' }}>Tiền thu</th>
                 <th style={{ padding: '12px 16px' }}>Trạng thái</th>
-                <th style={{ padding: '12px 16px' }}>Hình ảnh</th>
+                <th style={{ padding: '12px 16px' }}>Hành động</th>
               </tr>
             </thead>
             <tbody>
@@ -203,17 +217,29 @@ export default function ReportList() {
                         <span className="text-gray-400 text-sm">Không có</span>
                       ) : (
                         <>
-                          <button 
-                            onClick={() => setOpenPopupId(isPopupOpen ? null : r.id)}
-                            className="text-sm font-medium"
-                            style={{ 
-                              color: 'var(--primary)', background: 'none', 
-                              cursor: 'pointer', whiteSpace: 'nowrap' 
-                            }}
-                          >
-                            Xem ảnh
-                          </button>
-
+                          <div className="flex items-center gap-3">
+                            <button 
+                              onClick={() => setOpenPopupId(isPopupOpen ? null : r.id)}
+                              className="text-sm font-medium"
+                              style={{ 
+                                color: 'var(--primary)', background: 'none', 
+                                cursor: 'pointer', whiteSpace: 'nowrap' 
+                              }}
+                            >
+                              Xem ảnh
+                            </button>
+                            
+                            <button
+                              onClick={() => handleDeleteReport(r.id)}
+                              className="text-sm font-medium"
+                              style={{ 
+                                color: '#dc2626', background: 'none', 
+                                cursor: 'pointer', whiteSpace: 'nowrap' 
+                              }}
+                            >
+                              Xóa
+                            </button>
+                          </div>
                           {isPopupOpen && (
                             <div style={{
                               position: 'absolute',

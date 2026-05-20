@@ -349,12 +349,26 @@ router.put('/:id', requireAdmin, async (req: Request, res: Response): Promise<vo
  */
 router.delete('/:id', requireAdmin, async (req: Request, res: Response): Promise<void> => {
   try {
-    await prisma.serviceReport.delete({ where: { id: req.params.id as string } });
-    logger.info('Report deleted', { reportId: req.params.id, by: req.user!.id });
-    res.json({ message: 'Đã xóa báo cáo' });
+    const reportId = req.params.id;
+
+    const existingReport = await prisma.serviceReport.findUnique({
+      where: { id: reportId },
+    });
+
+    if (!existingReport) {
+      res.status(404).json({ error: 'Không tìm thấy báo cáo' });
+      return;
+    }
+
+    await prisma.serviceReport.delete({
+      where: { id: reportId },
+    });
+
+    logger.info('Report deleted by Admin', { reportId, adminId: req.user!.id });
+    res.json({ success: true });
   } catch (error: any) {
     logger.error('Delete report error', { error: error.message });
-    res.status(500).json({ error: 'Lỗi xóa' });
+    res.status(500).json({ error: 'Lỗi xóa báo cáo' });
   }
 });
 

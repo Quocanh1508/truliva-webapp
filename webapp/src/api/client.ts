@@ -114,3 +114,7 @@ export const deleteTechStation = async (id: string) => {
 export const getDashboardStats = async () => {
   return fetchApi('/dashboard/stats');
 };
+
+export const deleteReport = async (id: string) => {
+  return fetchApi(`/reports/${id}`, { method: 'DELETE' });
+};
