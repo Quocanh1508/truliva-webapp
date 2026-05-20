@@ -74,4 +74,54 @@ router.get('/me', requireAuth, (req: Request, res: Response): void => {
   res.json({ user: req.user });
 });
 
+/**
+ * POST /api/auth/change-password
+ * KTV hoặc Admin tự thay đổi mật khẩu của mình
+ */
+router.post('/change-password', requireAuth, async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { currentPassword, newPassword } = req.body;
+
+    if (!currentPassword || !newPassword) {
+      res.status(400).json({ error: 'Vui lòng nhập mật khẩu hiện tại và mật khẩu mới' });
+      return;
+    }
+
+    if (newPassword.length < 4) {
+      res.status(400).json({ error: 'Mật khẩu mới phải có ít nhất 4 ký tự' });
+      return;
+    }
+
+    const user = await prisma.user.findUnique({
+      where: { id: req.user!.id },
+      select: { id: true, passwordHash: true },
+    });
+
+    if (!user) {
+      res.status(404).json({ error: 'Không tìm thấy người dùng' });
+      return;
+    }
+
+    const isValid = await bcrypt.compare(currentPassword, user.passwordHash);
+    if (!isValid) {
+      res.status(400).json({ error: 'Mật khẩu hiện tại không đúng' });
+      return;
+    }
+
+    const newPasswordHash = await bcrypt.hash(newPassword, 10);
+
+    await prisma.user.update({
+      where: { id: user.id },
+      data: { passwordHash: newPasswordHash },
+    });
+
+    logger.info('Password changed by user', { userId: user.id });
+
+    res.json({ message: 'Thay đổi mật khẩu thành công' });
+  } catch (error: any) {
+    logger.error('Change password error', { error: error.message });
+    res.status(500).json({ error: 'Lỗi khi thay đổi mật khẩu' });
+  }
+});
+
 export default router;

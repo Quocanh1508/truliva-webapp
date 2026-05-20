@@ -4,6 +4,9 @@ import LoginPage from './pages/LoginPage';
 import ProtectedRoute from './components/ProtectedRoute';
 import Layout from './components/Layout';
 
+// Shared Pages
+import ChangePasswordPage from './pages/ChangePasswordPage';
+
 // KTV Pages
 import ReportForm from './pages/ktv/ReportForm';
 import MyReports from './pages/ktv/MyReports';
@@ -38,6 +41,11 @@ export default function App() {
               <Route path="/admin/users" element={<UserManage />} />
               <Route path="/admin/stations" element={<StationManage />} />
               <Route path="/admin/orders" element={<OrderList />} />
+            </Route>
+
+            {/* Shared Routes */}
+            <Route element={<ProtectedRoute allowedRoles={['KTV', 'ADMIN']} />}>
+              <Route path="/change-password" element={<ChangePasswordPage />} />
             </Route>
           </Route>
 
