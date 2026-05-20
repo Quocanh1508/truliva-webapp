@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { fetchApi } from '../../api/client';
-import { Download, CheckCircle, Clock, X, ExternalLink, Image as ImageIcon, Loader } from 'lucide-react';
+import { Download, CheckCircle, Clock, X, ExternalLink, Image as ImageIcon, Loader, Search } from 'lucide-react';
 
 // Check if a URL points to a directly viewable image
 function isDirectImage(url: string): boolean {
@@ -91,16 +91,59 @@ export default function ReportList() {
   const [loading, setLoading] = useState(true);
   const [filterMonth, setFilterMonth] = useState('');
   const [openPopupId, setOpenPopupId] = useState<string | null>(null);
+  const [search, setSearch] = useState('');
+  const [datePreset, setDatePreset] = useState('');
+  const [customStartDate, setCustomStartDate] = useState('');
+  const [customEndDate, setCustomEndDate] = useState('');
+
+  const getDateRange = () => {
+    if (!datePreset) return { startDate: '', endDate: '' };
+    const now = new Date();
+    if (datePreset === 'today') {
+      const start = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0);
+      const end = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
+      return { startDate: start.toISOString().split('T')[0], endDate: end.toISOString().split('T')[0] };
+    }
+    if (datePreset === 'yesterday') {
+      const start = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1, 0, 0, 0, 0);
+      const end = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1, 23, 59, 59, 999);
+      return { startDate: start.toISOString().split('T')[0], endDate: end.toISOString().split('T')[0] };
+    }
+    if (datePreset === 'week') {
+      const start = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+      return { startDate: start.toISOString().split('T')[0], endDate: now.toISOString().split('T')[0] };
+    }
+    if (datePreset === 'month') {
+      const start = new Date(now.getFullYear(), now.getMonth() - 1, now.getDate(), 0, 0, 0, 0);
+      return { startDate: start.toISOString().split('T')[0], endDate: now.toISOString().split('T')[0] };
+    }
+    if (datePreset === 'year') {
+      const start = new Date(now.getFullYear() - 1, now.getMonth(), now.getDate(), 0, 0, 0, 0);
+      return { startDate: start.toISOString().split('T')[0], endDate: now.toISOString().split('T')[0] };
+    }
+    if (datePreset === 'custom') {
+      return { startDate: customStartDate, endDate: customEndDate };
+    }
+    return { startDate: '', endDate: '' };
+  };
 
   useEffect(() => {
     loadReports();
-  }, [filterMonth]);
+  }, [filterMonth, datePreset, customStartDate, customEndDate]);
 
   const loadReports = async () => {
     setLoading(true);
     try {
-      const url = filterMonth ? `/reports?month=${filterMonth}&limit=100` : '/reports?limit=100';
-      const data = await fetchApi(url);
+      const params = new URLSearchParams();
+      params.append('limit', '100');
+      if (filterMonth) params.append('month', filterMonth);
+      if (search) params.append('search', search);
+      
+      const { startDate, endDate } = getDateRange();
+      if (startDate) params.append('startDate', startDate);
+      if (endDate) params.append('endDate', endDate);
+
+      const data = await fetchApi(`/reports?${params.toString()}`);
       setReports(data.reports);
     } catch (e) {
       console.error(e);
@@ -109,8 +152,21 @@ export default function ReportList() {
     }
   };
 
+  const handleSearch = (e: React.FormEvent) => {
+    e.preventDefault();
+    loadReports();
+  };
+
   const handleExport = () => {
-    const url = filterMonth ? `/api/reports/export?month=${filterMonth}` : '/api/reports/export';
+    const params = new URLSearchParams();
+    if (filterMonth) params.append('month', filterMonth);
+    if (search) params.append('search', search);
+    
+    const { startDate, endDate } = getDateRange();
+    if (startDate) params.append('startDate', startDate);
+    if (endDate) params.append('endDate', endDate);
+
+    const url = `/api/reports/export?${params.toString()}`;
     window.open(url, '_blank');
   };
 
@@ -144,19 +200,64 @@ export default function ReportList() {
     <div className="animate-fade-in">
       <div className="flex justify-between items-center mb-6">
         <h2 className="font-bold text-2xl text-[#1B3A6B]">Danh sách báo cáo</h2>
-        
-        <div className="flex gap-4">
+        <button className="btn btn-outline flex items-center gap-2" onClick={handleExport}>
+          <Download size={18} /> Xuất Excel
+        </button>
+      </div>
+
+      {/* Filter Toolbar */}
+      <div className="flex flex-wrap items-center justify-between gap-4 bg-white p-4 rounded-lg border border-gray-200 mb-6 shadow-sm">
+        <form onSubmit={handleSearch} className="relative w-full max-w-sm">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
+          <input
+            type="text"
+            placeholder="Tìm theo Mã đơn, KTV, Khách hàng, SĐT..."
+            className="w-full pl-9 pr-3 py-2 text-[13px] border border-gray-300 rounded-md focus:ring-1 focus:ring-blue-500 focus:border-blue-500 transition-shadow outline-none"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
+        </form>
+
+        <div className="flex flex-wrap items-center gap-3">
+          {datePreset === 'custom' && (
+            <div className="flex items-center gap-2">
+              <input 
+                type="date" 
+                className="px-3 py-1.5 text-[13px] border border-gray-300 rounded-md outline-none text-gray-700 bg-white"
+                value={customStartDate}
+                onChange={(e) => setCustomStartDate(e.target.value)}
+              />
+              <span className="text-gray-400 text-sm">đến</span>
+              <input 
+                type="date" 
+                className="px-3 py-1.5 text-[13px] border border-gray-300 rounded-md outline-none text-gray-700 bg-white"
+                value={customEndDate}
+                onChange={(e) => setCustomEndDate(e.target.value)}
+              />
+            </div>
+          )}
+          <select 
+            className="px-3 py-2 text-[13px] border border-gray-300 rounded-md bg-white text-gray-700 outline-none"
+            value={datePreset}
+            onChange={(e) => setDatePreset(e.target.value)}
+          >
+            <option value="">Tất cả thời gian</option>
+            <option value="today">Hôm nay</option>
+            <option value="yesterday">Hôm qua</option>
+            <option value="week">1 tuần qua</option>
+            <option value="month">1 tháng qua</option>
+            <option value="year">1 năm qua</option>
+            <option value="custom">Tự chọn khoảng...</option>
+          </select>
+
           <input 
             type="text" 
-            className="form-input" 
-            style={{ width: '150px', padding: '0.5rem' }} 
+            className="px-3 py-1.5 text-[13px] border border-gray-300 rounded-md outline-none text-gray-700 bg-white"
+            style={{ width: '130px' }} 
             placeholder="Tháng (vd: 5/2026)" 
             value={filterMonth}
             onChange={e => setFilterMonth(e.target.value)}
           />
-          <button className="btn btn-outline flex items-center gap-2" onClick={handleExport}>
-            <Download size={18} /> Xuất Excel
-          </button>
         </div>
       </div>
 

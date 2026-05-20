@@ -101,7 +101,18 @@ router.post('/', async (req: Request, res: Response): Promise<void> => {
  */
 router.get('/', async (req: Request, res: Response): Promise<void> => {
   try {
-    const { month, ktvId, province, serviceType, isPaid, page = '1', limit = '20' } = req.query;
+    const { 
+      month, 
+      ktvId, 
+      province, 
+      serviceType, 
+      isPaid, 
+      page = '1', 
+      limit = '20',
+      search,
+      startDate,
+      endDate
+    } = req.query;
 
     const where: any = {};
 
@@ -116,6 +127,37 @@ router.get('/', async (req: Request, res: Response): Promise<void> => {
     if (province) where.province = { contains: province as string, mode: 'insensitive' };
     if (serviceType) where.serviceType = serviceType;
     if (isPaid !== undefined) where.isPaid = isPaid === 'true';
+
+    // Tìm kiếm tổng hợp
+    if (search) {
+      const searchStr = search as string;
+      const parsedOrderId = parseInt(searchStr);
+      
+      where.OR = [
+        { customerName: { contains: searchStr, mode: 'insensitive' } },
+        { customerPhone: { contains: searchStr } },
+        { ktvUser: { fullName: { contains: searchStr, mode: 'insensitive' } } }
+      ];
+      
+      if (!isNaN(parsedOrderId)) {
+        where.OR.push({
+          order: {
+            pancakeOrderId: parsedOrderId
+          }
+        });
+      }
+    }
+
+    // Lọc theo khoảng thời gian tạo báo cáo
+    if (startDate || endDate) {
+      where.createdAt = {};
+      if (startDate) {
+        where.createdAt.gte = new Date(`${startDate}T00:00:00.000Z`);
+      }
+      if (endDate) {
+        where.createdAt.lte = new Date(`${endDate}T23:59:59.999Z`);
+      }
+    }
 
     const pageNum = parseInt(page as string) || 1;
     const limitNum = Math.min(parseInt(limit as string) || 20, 100);
@@ -203,9 +245,55 @@ router.get('/stats', requireAdmin, async (req: Request, res: Response): Promise<
  */
 router.get('/export', requireAdmin, async (req: Request, res: Response): Promise<void> => {
   try {
-    const { month } = req.query;
+    const { 
+      month, 
+      ktvId, 
+      province, 
+      serviceType, 
+      isPaid, 
+      search,
+      startDate,
+      endDate
+    } = req.query;
+
     const where: any = {};
-    if (month) where.month = month;
+
+    if (ktvId) where.ktvUserId = ktvId as string;
+    if (month) where.month = month as string;
+    if (province) where.province = { contains: province as string, mode: 'insensitive' };
+    if (serviceType) where.serviceType = serviceType as string;
+    if (isPaid !== undefined) where.isPaid = isPaid === 'true';
+
+    // Tìm kiếm tổng hợp
+    if (search) {
+      const searchStr = search as string;
+      const parsedOrderId = parseInt(searchStr);
+      
+      where.OR = [
+        { customerName: { contains: searchStr, mode: 'insensitive' } },
+        { customerPhone: { contains: searchStr } },
+        { ktvUser: { fullName: { contains: searchStr, mode: 'insensitive' } } }
+      ];
+      
+      if (!isNaN(parsedOrderId)) {
+        where.OR.push({
+          order: {
+            pancakeOrderId: parsedOrderId
+          }
+        });
+      }
+    }
+
+    // Lọc theo khoảng thời gian tạo báo cáo
+    if (startDate || endDate) {
+      where.createdAt = {};
+      if (startDate) {
+        where.createdAt.gte = new Date(`${startDate}T00:00:00.000Z`);
+      }
+      if (endDate) {
+        where.createdAt.lte = new Date(`${endDate}T23:59:59.999Z`);
+      }
+    }
 
     const reports = await prisma.serviceReport.findMany({
       where,
