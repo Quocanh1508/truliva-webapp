@@ -349,7 +349,7 @@ router.put('/:id', requireAdmin, async (req: Request, res: Response): Promise<vo
  */
 router.delete('/:id', requireAdmin, async (req: Request, res: Response): Promise<void> => {
   try {
-    const reportId = req.params.id;
+    const reportId = req.params.id as string;
 
     const existingReport = await prisma.serviceReport.findUnique({
       where: { id: reportId },
