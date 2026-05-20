@@ -126,6 +126,7 @@ router.get('/', async (req: Request, res: Response): Promise<void> => {
         where,
         include: {
           ktvUser: { select: { fullName: true, username: true } },
+          order: { select: { pancakeOrderId: true } },
         },
         orderBy: { createdAt: 'desc' },
         skip,
