@@ -111,6 +111,7 @@ export default function ReportForm() {
   const [serviceType, setServiceType] = useState('');
   const [products, setProducts] = useState('');
   const [actualAmount, setActualAmount] = useState('');
+  const [orderNote, setOrderNote] = useState('');
 
   // ── Step 2: Trường kỹ thuật (dynamic) ──
   const [serialNumber, setSerialNumber] = useState('');
@@ -143,6 +144,7 @@ export default function ReportForm() {
       setServiceType('');
       setProducts('');
       setActualAmount('');
+      setOrderNote('');
       return;
     }
     const order = orders.find(o => o.id === orderId);
@@ -173,6 +175,7 @@ export default function ReportForm() {
       if (amount > 0) {
         setActualAmount(String(amount));
       }
+      setOrderNote(order.note || '');
     }
   };
 
@@ -320,6 +323,15 @@ export default function ReportForm() {
               <label className="form-label">Tỉnh / Thành phố *</label>
               <input type="text" className="form-input" value={province} onChange={e => setProvince(e.target.value)} required />
             </div>
+
+            {orderNote && (
+              <div className="form-group bg-amber-50/70 p-3.5 rounded-lg border border-amber-200 mb-4">
+                <label className="form-label text-amber-800 font-bold mb-1 flex items-center gap-1.5 text-[11px] uppercase tracking-wide">
+                  📝 Ghi chú đơn hàng (Từ Admin/Pancake)
+                </label>
+                <div className="text-gray-700 text-[13px] whitespace-pre-wrap font-medium">{orderNote}</div>
+              </div>
+            )}
 
             <div style={{ borderTop: '1px solid #e2e8f0', margin: '20px 0', paddingTop: '16px' }}>
               <div className="form-group">
