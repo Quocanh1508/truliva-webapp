@@ -238,9 +238,19 @@ model ServiceReport {
   serialNumber      String?   @map("serial_number")       // Số serial
   distanceKm        Float?    @map("distance_km")         // Khoảng cách (km)
   isPaid            Boolean   @default(false) @map("is_paid")    // Đã trả tiền công
-  serviceCost       Float?    @map("service_cost")        // Chi phí dịch vụ
-  additionalCost    Float?    @map("additional_cost")     // Chi phí phát sinh
+  serviceCost       Float?    @map("service_cost")        // Chi phí dịch vụ (legacy)
+  additionalCost    Float?    @map("additional_cost")     // Chi phí phát sinh (legacy)
   orderId           String?   @map("order_id")            // Đơn hàng liên kết
+
+  // ── Trường mới theo loại công việc ──
+  workType          String?   @map("work_type")            // Loại công việc: Giao hàng, Lắp đặt, Thay lõi lọc, ...
+  address           String?                                // Địa chỉ chi tiết
+  actualAmount      Float?    @map("actual_amount")        // Tiền thu thực tế (thay serviceCost+additionalCost)
+  waterSource       String?   @map("water_source")         // Nguồn nước: Nước máy trực tiếp, Nước máy bồn, Nước giếng, Nước mưa
+  tdsIn             Float?    @map("tds_in")               // TDS đầu vào (ppm)
+  tdsOut            Float?    @map("tds_out")              // TDS đầu ra (ppm)
+  waterPressure     Float?    @map("water_pressure")       // Áp suất nước đầu vào (psi)
+  spareParts        String[]  @map("spare_parts")          // Linh kiện phát sinh (multi-select)
   createdAt         DateTime  @default(now()) @map("created_at")
   updatedAt         DateTime  @updatedAt @map("updated_at")
 

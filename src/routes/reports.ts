@@ -29,6 +29,15 @@ router.post('/', async (req: Request, res: Response): Promise<void> => {
       serviceCost,
       additionalCost,
       orderId,
+      // ── Trường mới theo loại công việc ──
+      workType,
+      address,
+      actualAmount,
+      waterSource,
+      tdsIn,
+      tdsOut,
+      waterPressure,
+      spareParts,
     } = req.body;
 
     // Validation
@@ -56,7 +65,16 @@ router.post('/', async (req: Request, res: Response): Promise<void> => {
         serviceCost: serviceCost ? parseFloat(serviceCost) : null,
         additionalCost: additionalCost ? parseFloat(additionalCost) : null,
         orderId: orderId || null,
-      },
+        // ── Trường mới ──
+        workType: workType || null,
+        address: address || null,
+        actualAmount: actualAmount ? parseFloat(actualAmount) : null,
+        waterSource: waterSource || null,
+        tdsIn: tdsIn ? parseFloat(tdsIn) : null,
+        tdsOut: tdsOut ? parseFloat(tdsOut) : null,
+        waterPressure: waterPressure ? parseFloat(waterPressure) : null,
+        spareParts: spareParts || [],
+      } as any,
       include: {
         ktvUser: { select: { fullName: true } },
       },
@@ -202,15 +220,21 @@ router.get('/export', requireAdmin, async (req: Request, res: Response): Promise
       { header: 'Mã Đơn', key: 'pancakeOrderId', width: 15 },
       { header: 'Tên khách hàng', key: 'customerName', width: 25 },
       { header: 'SĐT khách hàng', key: 'customerPhone', width: 18 },
+      { header: 'Địa chỉ', key: 'address', width: 30 },
       { header: 'Tỉnh/TP', key: 'province', width: 20 },
+      { header: 'Loại công việc', key: 'workType', width: 22 },
       { header: 'Sản phẩm', key: 'products', width: 40 },
       { header: 'Loại dịch vụ', key: 'serviceType', width: 25 },
-      { header: 'Ghi chú', key: 'notes', width: 30 },
-      { header: 'Số serial', key: 'serialNumber', width: 20 },
+      { header: 'Số serial', key: 'serialNumber', width: 22 },
+      { header: 'Nguồn nước', key: 'waterSource', width: 20 },
+      { header: 'TDS đầu vào (ppm)', key: 'tdsIn', width: 18 },
+      { header: 'TDS đầu ra (ppm)', key: 'tdsOut', width: 18 },
+      { header: 'Áp suất (psi)', key: 'waterPressure', width: 16 },
+      { header: 'Linh kiện phát sinh', key: 'spareParts', width: 30 },
       { header: 'Khoảng cách (km)', key: 'distanceKm', width: 18 },
+      { header: 'Tiền thu thực tế', key: 'actualAmount', width: 18 },
       { header: 'Đã trả tiền', key: 'isPaid', width: 14 },
-      { header: 'Chi phí DV', key: 'serviceCost', width: 18 },
-      { header: 'Phí phát sinh', key: 'additionalCost', width: 18 },
+      { header: 'Ghi chú', key: 'notes', width: 30 },
       { header: 'Hình ảnh', key: 'imageUrls', width: 50 },
     ];
 
@@ -219,7 +243,7 @@ router.get('/export', requireAdmin, async (req: Request, res: Response): Promise
     headerRow.font = { bold: true, color: { argb: 'FFFFFFFF' } };
     headerRow.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1B3A6B' } };
 
-    reports.forEach((r) => {
+    reports.forEach((r: any) => {
       sheet.addRow({
         month: r.month,
         createdAt: r.createdAt.toLocaleString('vi-VN'),
@@ -227,15 +251,21 @@ router.get('/export', requireAdmin, async (req: Request, res: Response): Promise
         pancakeOrderId: r.order?.pancakeOrderId || '',
         customerName: r.customerName,
         customerPhone: r.customerPhone,
+        address: r.address || '',
         province: r.province,
+        workType: r.workType || '',
         products: r.products.join(', '),
         serviceType: r.serviceType,
-        notes: r.notes || '',
         serialNumber: r.serialNumber || '',
+        waterSource: r.waterSource || '',
+        tdsIn: r.tdsIn || '',
+        tdsOut: r.tdsOut || '',
+        waterPressure: r.waterPressure || '',
+        spareParts: r.spareParts?.join(', ') || '',
         distanceKm: r.distanceKm || '',
+        actualAmount: r.actualAmount || 0,
         isPaid: r.isPaid ? 'Đã trả' : 'Chưa trả',
-        serviceCost: r.serviceCost || 0,
-        additionalCost: r.additionalCost || 0,
+        notes: r.notes || '',
         imageUrls: r.imageUrls.join(', '),
       });
     });
