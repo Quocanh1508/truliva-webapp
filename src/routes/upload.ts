@@ -78,7 +78,7 @@ router.post(
 router.post(
   '/multiple',
   requireAuth,
-  upload.array('images', 5),
+  upload.array('images', 20),
   async (req: Request, res: Response): Promise<void> => {
     try {
       const files = req.files as Express.Multer.File[];
