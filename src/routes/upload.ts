@@ -28,7 +28,7 @@ const storage = new CloudinaryStorage({
 
 const upload = multer({
   storage: storage,
-  limits: { fileSize: 20 * 1024 * 1024 }, // 20MB
+  limits: { fileSize: 100 * 1024 * 1024 }, // 100MB
 });
 
 /**
@@ -42,7 +42,7 @@ router.post(
     upload.single('image')(req, res, (err) => {
       if (err instanceof multer.MulterError) {
         if (err.code === 'LIMIT_FILE_SIZE') {
-          return res.status(400).json({ error: 'Ảnh quá lớn (tối đa 20MB)' });
+          return res.status(400).json({ error: 'Ảnh quá lớn (tối đa 100MB)' });
         }
         return res.status(400).json({ error: `Lỗi tải ảnh: ${err.message}` });
       } else if (err) {
@@ -80,7 +80,7 @@ router.post(
     upload.array('images', 20)(req, res, (err) => {
       if (err instanceof multer.MulterError) {
         if (err.code === 'LIMIT_FILE_SIZE') {
-          return res.status(400).json({ error: 'Ảnh quá lớn (tối đa 20MB mỗi file)' });
+          return res.status(400).json({ error: 'Ảnh quá lớn (tối đa 100MB mỗi file)' });
         }
         return res.status(400).json({ error: `Lỗi tải ảnh: ${err.message}` });
       } else if (err) {
