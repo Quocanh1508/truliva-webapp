@@ -216,7 +216,7 @@ export default function ReportForm() {
           spareParts: [],
           notes,
           imageUrls,
-          orderId: selectedOrderId || undefined,
+          orderId: selectedOrderId,
         })
       });
       navigate('/ktv/my-reports');
@@ -280,14 +280,15 @@ export default function ReportForm() {
             {/* Auto-fill từ đơn hàng */}
             <div className="form-group bg-blue-50/50 p-4 rounded-lg border border-blue-100 mb-6">
               <label className="form-label text-blue-800 font-semibold mb-2 flex items-center gap-2">
-                📦 Điền tự động từ đơn hàng được giao
+                📦 Chọn đơn hàng để báo cáo *
               </label>
               <select
                 className="form-select bg-white border-blue-200 focus:border-blue-500 focus:ring-blue-500 text-sm"
                 value={selectedOrderId}
                 onChange={(e) => handleOrderSelect(e.target.value)}
+                required
               >
-                <option value="">-- Tự nhập thông tin (Không chọn đơn) --</option>
+                <option value="">-- Vui lòng chọn đơn hàng --</option>
                 {orders.map(o => {
                   const name = o.billFullName || o.customer?.fullName || 'Khách';
                   const addr = o.shippingAddress?.province_name || o.customer?.provinceName || '';
@@ -298,6 +299,9 @@ export default function ReportForm() {
                   );
                 })}
               </select>
+              {!selectedOrderId && (
+                <p className="text-xs text-red-500 mt-1">⚠ Bắt buộc phải chọn đơn hàng để Admin có thể tracking.</p>
+              )}
             </div>
 
             <div className="form-group">
@@ -360,7 +364,7 @@ export default function ReportForm() {
               type="button"
               className="btn btn-primary w-full"
               onClick={() => setStep(2)}
-              disabled={!customerName || !customerPhone || !province || !address || !workType || !serviceType}
+              disabled={!selectedOrderId || !customerName || !customerPhone || !province || !address || !workType || !serviceType}
             >
               Tiếp tục
             </button>

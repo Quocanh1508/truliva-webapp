@@ -153,11 +153,12 @@ export default function ReportList() {
           <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
             <thead>
               <tr style={{ borderBottom: '2px solid var(--border-color)' }}>
+                <th style={{ padding: '12px 16px' }}>Mã đơn</th>
                 <th style={{ padding: '12px 16px' }}>KTV</th>
                 <th style={{ padding: '12px 16px' }}>Khách hàng</th>
                 <th style={{ padding: '12px 16px' }}>Dịch vụ</th>
                 <th style={{ padding: '12px 16px' }}>Tỉnh/TP</th>
-                <th style={{ padding: '12px 16px' }}>Chi phí</th>
+                <th style={{ padding: '12px 16px' }}>Tiền thu</th>
                 <th style={{ padding: '12px 16px' }}>Trạng thái</th>
                 <th style={{ padding: '12px 16px' }}>Hình ảnh</th>
               </tr>
@@ -169,6 +170,13 @@ export default function ReportList() {
 
                 return (
                   <tr key={r.id} style={{ borderBottom: '1px solid var(--border-color)' }} className="hover:bg-gray-50">
+                    <td style={{ padding: '12px 16px' }}>
+                      {r.order?.pancakeOrderId ? (
+                        <span className="font-bold text-blue-700">#{r.order.pancakeOrderId}</span>
+                      ) : (
+                        <span className="text-gray-400 text-sm">---</span>
+                      )}
+                    </td>
                     <td style={{ padding: '12px 16px' }} className="font-medium">{r.ktvUser.fullName}</td>
                     <td style={{ padding: '12px 16px' }}>
                       <div>{r.customerName}</div>
@@ -180,7 +188,7 @@ export default function ReportList() {
                     </td>
                     <td style={{ padding: '12px 16px' }}>{r.province}</td>
                     <td style={{ padding: '12px 16px' }} className="font-bold">
-                      {((r.serviceCost || 0) + (r.additionalCost || 0)).toLocaleString('vi-VN')} đ
+                      {(r.actualAmount || 0).toLocaleString('vi-VN')} đ
                     </td>
                     <td style={{ padding: '12px 16px' }}>
                       <button 
@@ -242,7 +250,7 @@ export default function ReportList() {
               })}
               {reports.length === 0 && (
                 <tr>
-                  <td colSpan={7} className="text-center py-8 text-gray-500">Không có dữ liệu</td>
+                  <td colSpan={8} className="text-center py-8 text-gray-500">Không có dữ liệu</td>
                 </tr>
               )}
             </tbody>

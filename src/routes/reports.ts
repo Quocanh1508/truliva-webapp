@@ -46,6 +46,11 @@ router.post('/', async (req: Request, res: Response): Promise<void> => {
       return;
     }
 
+    if (!orderId) {
+      res.status(400).json({ error: 'Vui lòng chọn đơn hàng để báo cáo' });
+      return;
+    }
+
     // Tự động lấy tháng hiện tại nếu không truyền
     const reportMonth = month || `${new Date().getMonth() + 1}/${new Date().getFullYear()}`;
 
