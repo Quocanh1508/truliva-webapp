@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { fetchApi, getStations } from '../../api/client';
-import { UserPlus, Lock, Unlock } from 'lucide-react';
+import { UserPlus, Lock, Unlock, KeyRound } from 'lucide-react';
 
 export default function UserManage() {
   const [users, setUsers] = useState<any[]>([]);
@@ -58,6 +58,23 @@ export default function UserManage() {
       loadUsers();
     } catch (err) {
       alert('Lỗi cập nhật');
+    }
+  };
+
+  const resetPassword = async (id: string, name: string) => {
+    const newPassword = window.prompt(
+      `Đặt lại mật khẩu cho KTV "${name}"\nNhập mật khẩu mới (để trống = Truliva@2025):`
+    );
+    if (newPassword === null) return; // User cancelled
+    const passwordToSet = newPassword.trim() || 'Truliva@2025';
+    try {
+      await fetchApi(`/users/${id}`, {
+        method: 'PUT',
+        body: JSON.stringify({ password: passwordToSet })
+      });
+      alert(`Đã đặt lại mật khẩu cho "${name}" thành công!`);
+    } catch (err: any) {
+      alert('Lỗi: ' + err.message);
     }
   };
 
@@ -179,13 +196,22 @@ export default function UserManage() {
                   </td>
                   <td style={{ padding: '12px 16px' }}>
                     {u.role !== 'ADMIN' && (
-                      <button 
-                        onClick={() => toggleActive(u.id, u.isActive)}
-                        className={`p-2 rounded text-sm ${u.isActive ? 'text-red-600 hover:bg-red-50' : 'text-green-600 hover:bg-green-50'}`}
-                        title={u.isActive ? "Khóa tài khoản" : "Mở khóa tài khoản"}
-                      >
-                        {u.isActive ? <Lock size={18} /> : <Unlock size={18} />}
-                      </button>
+                      <div style={{ display: 'flex', gap: '4px' }}>
+                        <button 
+                          onClick={() => toggleActive(u.id, u.isActive)}
+                          className={`p-2 rounded text-sm ${u.isActive ? 'text-red-600 hover:bg-red-50' : 'text-green-600 hover:bg-green-50'}`}
+                          title={u.isActive ? "Khóa tài khoản" : "Mở khóa tài khoản"}
+                        >
+                          {u.isActive ? <Lock size={18} /> : <Unlock size={18} />}
+                        </button>
+                        <button 
+                          onClick={() => resetPassword(u.id, u.fullName)}
+                          className="p-2 rounded text-sm text-amber-600 hover:bg-amber-50"
+                          title="Đặt lại mật khẩu"
+                        >
+                          <KeyRound size={18} />
+                        </button>
+                      </div>
                     )}
                   </td>
                 </tr>
