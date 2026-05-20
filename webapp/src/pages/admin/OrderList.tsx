@@ -397,12 +397,35 @@ export default function OrderList() {
                   <label className="block text-sm text-gray-600 mb-1">Kỹ thuật viên</label>
                   <select className="w-full border rounded p-2 text-sm outline-none focus:border-blue-500" value={selectedKtv} onChange={e => setSelectedKtv(e.target.value)} disabled={!selectedTech}>
                     <option value="">-- Chọn KTV --</option>
-                    {ktvs.map(k => <option key={k.id} value={k.id}>{k.fullName}</option>)}
+                    {ktvs.map((k: any) => (
+                      <option key={k.id} value={k.id}>
+                        {k.fullName} — {k.pendingOrderCount || 0} đơn đang xử lý
+                      </option>
+                    ))}
                   </select>
                 </div>
 
+                {/* Workload indicator */}
+                {selectedKtv && (() => {
+                  const ktv = ktvs.find((k: any) => k.id === selectedKtv);
+                  const count = ktv?.pendingOrderCount || 0;
+                  const isHigh = count >= 5;
+                  const isMedium = count >= 3 && count < 5;
+                  return (
+                    <div className={`p-3 rounded text-sm mt-2 border ${isHigh ? 'bg-red-50 border-red-200 text-red-700' : isMedium ? 'bg-amber-50 border-amber-200 text-amber-700' : 'bg-green-50 border-green-200 text-green-700'}`}>
+                      <div className="font-semibold mb-1">
+                        {isHigh ? '⚠️ Tải cao' : isMedium ? '⚡ Tải trung bình' : '✅ Tải nhẹ'}
+                      </div>
+                      <div>
+                        <b>{ktv?.fullName}</b> hiện đang có <b>{count}</b> đơn chưa hoàn thành.
+                        {isHigh && ' Cân nhắc giao cho KTV khác.'}
+                      </div>
+                    </div>
+                  );
+                })()}
+
                 {selectedKtv && (
-                  <div className="p-3 bg-green-50 border border-green-200 text-green-800 rounded text-sm mt-4">
+                  <div className="p-3 bg-green-50 border border-green-200 text-green-800 rounded text-sm mt-2">
                     Đơn sẽ được chuyển sang trạng thái <b>"Đang thực hiện"</b> khi lưu.
                   </div>
                 )}

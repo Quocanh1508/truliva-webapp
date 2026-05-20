@@ -22,9 +22,34 @@ router.get('/ktvs', requireAuth, async (req: Request, res: Response): Promise<vo
 
     const ktvs = await prisma.user.findMany({
       where,
-      select: { id: true, fullName: true, username: true, phoneNumber: true, techStationId: true }
+      select: {
+        id: true,
+        fullName: true,
+        username: true,
+        phoneNumber: true,
+        techStationId: true,
+        // Đếm đơn đang xử lý: chưa hủy VÀ chưa có báo cáo
+        assignedOrders: {
+          where: {
+            adminStatus: { notIn: ['hủy đơn', 'hoàn thành'] },
+            serviceReports: { none: {} }
+          },
+          select: { id: true }
+        }
+      }
     });
-    res.json(ktvs);
+
+    // Map để thêm pendingOrderCount
+    const result = ktvs.map(k => ({
+      id: k.id,
+      fullName: k.fullName,
+      username: k.username,
+      phoneNumber: k.phoneNumber,
+      techStationId: k.techStationId,
+      pendingOrderCount: k.assignedOrders.length
+    }));
+
+    res.json(result);
   } catch (error: any) {
     logger.error('Fetch KTVs error', { error: error.message });
     res.status(500).json({ error: 'Lỗi lấy danh sách KTV' });
