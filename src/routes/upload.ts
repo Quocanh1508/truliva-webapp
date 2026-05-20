@@ -28,7 +28,7 @@ const storage = new CloudinaryStorage({
 
 const upload = multer({
   storage: storage,
-  limits: { fileSize: 10 * 1024 * 1024 }, // 10MB
+  limits: { fileSize: 20 * 1024 * 1024 }, // 20MB
 });
 
 /**
@@ -38,7 +38,19 @@ const upload = multer({
 router.post(
   '/',
   requireAuth,
-  upload.single('image'),
+  (req, res, next) => {
+    upload.single('image')(req, res, (err) => {
+      if (err instanceof multer.MulterError) {
+        if (err.code === 'LIMIT_FILE_SIZE') {
+          return res.status(400).json({ error: 'Ảnh quá lớn (tối đa 20MB)' });
+        }
+        return res.status(400).json({ error: `Lỗi tải ảnh: ${err.message}` });
+      } else if (err) {
+        return res.status(500).json({ error: 'Lỗi hệ thống khi tải ảnh' });
+      }
+      next();
+    });
+  },
   async (req: Request, res: Response): Promise<void> => {
     try {
       if (!req.file) {
@@ -64,7 +76,19 @@ router.post(
 router.post(
   '/multiple',
   requireAuth,
-  upload.array('images', 20),
+  (req, res, next) => {
+    upload.array('images', 20)(req, res, (err) => {
+      if (err instanceof multer.MulterError) {
+        if (err.code === 'LIMIT_FILE_SIZE') {
+          return res.status(400).json({ error: 'Ảnh quá lớn (tối đa 20MB mỗi file)' });
+        }
+        return res.status(400).json({ error: `Lỗi tải ảnh: ${err.message}` });
+      } else if (err) {
+        return res.status(500).json({ error: 'Lỗi hệ thống khi tải ảnh' });
+      }
+      next();
+    });
+  },
   async (req: Request, res: Response): Promise<void> => {
     try {
       const files = req.files as Express.Multer.File[];
