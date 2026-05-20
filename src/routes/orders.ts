@@ -89,10 +89,24 @@ router.get('/', requireAuth, async (req: Request, res: Response): Promise<void> 
               fullAddress: true,
             }
           },
+          mainStation: {
+            select: {
+              name: true,
+            }
+          },
           assignedKtv: {
             select: {
               id: true,
               fullName: true,
+              techStation: {
+                select: {
+                  mainStation: {
+                    select: {
+                      name: true,
+                    }
+                  }
+                }
+              }
             }
           }
         }

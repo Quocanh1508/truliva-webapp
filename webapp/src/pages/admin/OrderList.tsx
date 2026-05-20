@@ -319,7 +319,9 @@ export default function OrderList() {
                  const customerName = order.billFullName || order.customer?.fullName || 'Khách lẻ';
                  const phone = order.billPhoneNumber || order.customer?.phoneNumber || '';
                  const ktvName = order.assignedKtv?.fullName || 'Chưa gán';
-                 const mainStationName = order.mainStation?.name || '';
+                 const mainStationName = order.mainStation?.name 
+                    || order.assignedKtv?.techStation?.mainStation?.name 
+                    || '';
                  
                  return (
                   <tr key={order.id} className={`${idx % 2 === 0 ? 'bg-white' : 'bg-[#fafafa]'} hover:bg-blue-50/50 transition-colors`}>
