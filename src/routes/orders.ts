@@ -20,7 +20,14 @@ router.get('/', requireAuth, async (req: Request, res: Response): Promise<void> 
       status,               // custom adminStatus
       search,               // search theo tên, sdt, mã đơn
       startDate,
-      endDate
+      endDate,
+      adminStatuses,
+      assignedKtvIds,
+      workTypes,
+      mainStationIds,
+      customerName,
+      customerPhone,
+      pancakeOrderId
     } = req.query;
 
     const pageNumber = parseInt(page as string, 10);
@@ -29,37 +36,126 @@ router.get('/', requireAuth, async (req: Request, res: Response): Promise<void> 
 
     // Xây dựng điều kiện tìm kiếm
     const where: Prisma.OrderWhereInput = {};
+    const conditions: Prisma.OrderWhereInput[] = [];
     
     // Nếu user là KTV, chỉ lấy các đơn hàng được giao cho KTV đó
     if (req.user?.role === 'KTV') {
-      where.assignedKtvId = req.user.id;
+      conditions.push({ assignedKtvId: req.user.id });
     }
 
-    if (status) {
-      where.adminStatus = status as string;
+    if (pancakeOrderId) {
+      const parsedId = parseInt(pancakeOrderId as string, 10);
+      if (!isNaN(parsedId)) {
+        conditions.push({ pancakeOrderId: parsedId });
+      }
+    }
+
+    if (customerName) {
+      conditions.push({ billFullName: { contains: customerName as string, mode: 'insensitive' } });
+    }
+
+    if (customerPhone) {
+      conditions.push({ billPhoneNumber: { contains: customerPhone as string } });
+    }
+
+    if (adminStatuses) {
+      const statusesList = typeof adminStatuses === 'string' ? adminStatuses.split(',') : (Array.isArray(adminStatuses) ? adminStatuses as string[] : []);
+      if (statusesList.length > 0) {
+        conditions.push({ adminStatus: { in: statusesList } });
+      }
+    } else if (status) {
+      conditions.push({ adminStatus: status as string });
+    }
+
+    if (assignedKtvIds) {
+      const ktvIdsList = typeof assignedKtvIds === 'string' ? assignedKtvIds.split(',') : (Array.isArray(assignedKtvIds) ? assignedKtvIds as string[] : []);
+      if (ktvIdsList.length > 0) {
+        const hasNullKtv = ktvIdsList.includes('null') || ktvIdsList.includes('');
+        const actualKtvIds = ktvIdsList.filter(id => id && id !== 'null');
+        
+        if (hasNullKtv && actualKtvIds.length > 0) {
+          conditions.push({
+            OR: [
+              { assignedKtvId: { in: actualKtvIds } },
+              { assignedKtvId: null }
+            ]
+          });
+        } else if (hasNullKtv) {
+          conditions.push({ assignedKtvId: null });
+        } else {
+          conditions.push({ assignedKtvId: { in: actualKtvIds } });
+        }
+      }
+    }
+
+    if (workTypes) {
+      const workTypesList = typeof workTypes === 'string' ? workTypes.split(',') : (Array.isArray(workTypes) ? workTypes as string[] : []);
+      if (workTypesList.length > 0) {
+        const hasNullWorkType = workTypesList.includes('null') || workTypesList.includes('');
+        const actualWorkTypes = workTypesList.filter(w => w && w !== 'null');
+        
+        if (hasNullWorkType && actualWorkTypes.length > 0) {
+          conditions.push({
+            OR: [
+              { workType: { in: actualWorkTypes } },
+              { workType: null }
+            ]
+          });
+        } else if (hasNullWorkType) {
+          conditions.push({ workType: null });
+        } else {
+          conditions.push({ workType: { in: actualWorkTypes } });
+        }
+      }
+    }
+
+    if (mainStationIds) {
+      const mainStationIdsList = typeof mainStationIds === 'string' ? mainStationIds.split(',') : (Array.isArray(mainStationIds) ? mainStationIds as string[] : []);
+      if (mainStationIdsList.length > 0) {
+        const hasNullStation = mainStationIdsList.includes('null') || mainStationIdsList.includes('');
+        const actualStationIds = mainStationIdsList.filter(id => id && id !== 'null');
+        
+        if (hasNullStation && actualStationIds.length > 0) {
+          conditions.push({
+            OR: [
+              { mainStationId: { in: actualStationIds } },
+              { mainStationId: null }
+            ]
+          });
+        } else if (hasNullStation) {
+          conditions.push({ mainStationId: null });
+        } else {
+          conditions.push({ mainStationId: { in: actualStationIds } });
+        }
+      }
     }
 
     if (startDate || endDate) {
-      where.pancakeCreatedAt = {};
+      const dateCond: any = {};
       if (startDate) {
-        where.pancakeCreatedAt.gte = new Date(startDate as string);
+        dateCond.gte = new Date(startDate as string);
       }
       if (endDate) {
-        where.pancakeCreatedAt.lte = new Date(endDate as string);
+        dateCond.lte = new Date(endDate as string);
       }
+      conditions.push({ pancakeCreatedAt: dateCond });
     }
 
     if (search) {
       const searchStr = String(search).trim();
-      where.OR = [
+      const searchOR: Prisma.OrderWhereInput[] = [
         { billFullName: { contains: searchStr, mode: 'insensitive' } },
         { billPhoneNumber: { contains: searchStr } },
       ];
-      // Nếu có thể parse sang int, tìm theo mã đơn Pancake
       const pancakeId = parseInt(searchStr, 10);
       if (!isNaN(pancakeId)) {
-        where.OR.push({ pancakeOrderId: pancakeId });
+        searchOR.push({ pancakeOrderId: pancakeId });
       }
+      conditions.push({ OR: searchOR });
+    }
+
+    if (conditions.length > 0) {
+      where.AND = conditions;
     }
 
     // Xây dựng điều kiện sắp xếp

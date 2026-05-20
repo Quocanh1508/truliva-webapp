@@ -56,7 +56,13 @@ export async function getOrders(params: Record<string, any> = {}) {
   const query = new URLSearchParams();
   for (const [key, value] of Object.entries(params)) {
     if (value !== undefined && value !== null && value !== '') {
-      query.append(key, String(value));
+      if (Array.isArray(value)) {
+        if (value.length > 0) {
+          query.append(key, value.join(','));
+        }
+      } else {
+        query.append(key, String(value));
+      }
     }
   }
   

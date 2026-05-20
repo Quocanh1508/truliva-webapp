@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { getOrders, updateOrder, getKtvUsers, getStations, getOrderAuditLog } from '../../api/client';
-import { Search, ChevronLeft, ChevronRight, History, Edit, XCircle } from 'lucide-react';
+import { Search, ChevronLeft, ChevronRight, History, Edit, XCircle, Filter } from 'lucide-react';
 
 
 
@@ -18,7 +18,6 @@ export default function OrderList() {
 
   // Filters
   const [search, setSearch] = useState('');
-  const [statusFilter, setStatusFilter] = useState('');
   const [sortBy] = useState('createdAt');
   const [sortOrder] = useState('desc');
   
@@ -32,10 +31,32 @@ export default function OrderList() {
   const [totalPages, setTotalPages] = useState(1);
   const [_totalItems, setTotalItems] = useState(0);
 
+  // Advanced Filtering States
+  const [filterPancakeOrderId, setFilterPancakeOrderId] = useState('');
+  const [filterAdminStatuses, setFilterAdminStatuses] = useState<string[]>([]);
+  const [filterKtvIds, setFilterKtvIds] = useState<string[]>([]);
+  const [filterWorkTypes, setFilterWorkTypes] = useState<string[]>([]);
+  const [filterMainStationIds, setFilterMainStationIds] = useState<string[]>([]);
+  const [filterCustomerName, setFilterCustomerName] = useState('');
+  const [filterCustomerPhone, setFilterCustomerPhone] = useState('');
+
+  // Dropdown / Popover states
+  const [activeDropdown, setActiveDropdown] = useState<'main' | 'pancakeOrderId' | 'adminStatuses' | 'ktvIds' | 'workTypes' | 'mainStationIds' | 'customerName' | 'customerPhone' | null>(null);
+
+  // Temporary filter states for the popover/modal
+  const [tempPancakeOrderId, setTempPancakeOrderId] = useState('');
+  const [tempAdminStatuses, setTempAdminStatuses] = useState<string[]>([]);
+  const [tempKtvIds, setTempKtvIds] = useState<string[]>([]);
+  const [tempWorkTypes, setTempWorkTypes] = useState<string[]>([]);
+  const [tempMainStationIds, setTempMainStationIds] = useState<string[]>([]);
+  const [tempCustomerName, setTempCustomerName] = useState('');
+  const [tempCustomerPhone, setTempCustomerPhone] = useState('');
+
   // Assignment Modal
   const [assignModal, setAssignModal] = useState<{isOpen: boolean; orderId: string; order: any} | null>(null);
   const [stations, setStations] = useState<any[]>([]);
   const [ktvs, setKtvs] = useState<any[]>([]);
+  const [allKtvs, setAllKtvs] = useState<any[]>([]);
   
   const [selectedMain, setSelectedMain] = useState('');
   const [selectedTech, setSelectedTech] = useState('');
@@ -103,11 +124,17 @@ export default function OrderList() {
         page, 
         limit: 20, 
         search, 
-        status: statusFilter, 
         sortBy, 
         sortOrder,
         startDate,
-        endDate
+        endDate,
+        pancakeOrderId: filterPancakeOrderId,
+        adminStatuses: filterAdminStatuses,
+        assignedKtvIds: filterKtvIds,
+        workTypes: filterWorkTypes,
+        mainStationIds: filterMainStationIds,
+        customerName: filterCustomerName,
+        customerPhone: filterCustomerPhone
       });
       setOrders(res.orders);
       setTotalPages(res.pagination.totalPages);
@@ -121,10 +148,25 @@ export default function OrderList() {
 
   useEffect(() => {
     fetchOrdersData();
-  }, [page, statusFilter, sortBy, sortOrder, datePreset, customStartDate, customEndDate]);
+  }, [
+    page, 
+    sortBy, 
+    sortOrder, 
+    datePreset, 
+    customStartDate, 
+    customEndDate,
+    filterPancakeOrderId,
+    filterAdminStatuses,
+    filterKtvIds,
+    filterWorkTypes,
+    filterMainStationIds,
+    filterCustomerName,
+    filterCustomerPhone
+  ]);
 
   useEffect(() => {
     getStations().then(data => setStations(data)).catch(console.error);
+    getKtvUsers().then(data => setAllKtvs(data)).catch(console.error);
   }, []);
 
   // Filter KTVs based on tech station
@@ -204,6 +246,44 @@ export default function OrderList() {
       alert(err.message);
     }
   };
+  const toggleDropdown = (type: 'main' | 'pancakeOrderId' | 'adminStatuses' | 'ktvIds' | 'workTypes' | 'mainStationIds' | 'customerName' | 'customerPhone') => {
+    if (activeDropdown === type) {
+      setActiveDropdown(null);
+    } else {
+      setActiveDropdown(type);
+      // Initialize temp values from current active filters
+      if (type === 'pancakeOrderId') setTempPancakeOrderId(filterPancakeOrderId);
+      if (type === 'adminStatuses') setTempAdminStatuses(filterAdminStatuses);
+      if (type === 'ktvIds') setTempKtvIds(filterKtvIds);
+      if (type === 'workTypes') setTempWorkTypes(filterWorkTypes);
+      if (type === 'mainStationIds') setTempMainStationIds(filterMainStationIds);
+      if (type === 'customerName') setTempCustomerName(filterCustomerName);
+      if (type === 'customerPhone') setTempCustomerPhone(filterCustomerPhone);
+    }
+  };
+
+  const applyFilter = (type: 'pancakeOrderId' | 'adminStatuses' | 'ktvIds' | 'workTypes' | 'mainStationIds' | 'customerName' | 'customerPhone') => {
+    setPage(1);
+    if (type === 'pancakeOrderId') setFilterPancakeOrderId(tempPancakeOrderId);
+    if (type === 'adminStatuses') setFilterAdminStatuses(tempAdminStatuses);
+    if (type === 'ktvIds') setFilterKtvIds(tempKtvIds);
+    if (type === 'workTypes') setFilterWorkTypes(tempWorkTypes);
+    if (type === 'mainStationIds') setFilterMainStationIds(tempMainStationIds);
+    if (type === 'customerName') setFilterCustomerName(tempCustomerName);
+    if (type === 'customerPhone') setFilterCustomerPhone(tempCustomerPhone);
+    setActiveDropdown(null);
+  };
+
+  const clearAllFilters = () => {
+    setPage(1);
+    setFilterPancakeOrderId('');
+    setFilterAdminStatuses([]);
+    setFilterKtvIds([]);
+    setFilterWorkTypes([]);
+    setFilterMainStationIds([]);
+    setFilterCustomerName('');
+    setFilterCustomerPhone('');
+  };
 
   const openAuditModal = async (orderId: string) => {
     setAuditModal({ isOpen: true, orderId });
@@ -238,20 +318,268 @@ export default function OrderList() {
         </div>
       </div>
 
-      {/* Toolbar */}
-      <div className="flex justify-between items-center px-4 py-3 bg-white border-b border-gray-200">
-        <form onSubmit={handleSearch} className="relative w-full max-w-sm">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
-          <input
-            type="text"
-            placeholder="Tìm theo ID, Khách hàng, SĐT..."
-            className="w-full pl-9 pr-3 py-2 text-[13px] border border-gray-300 rounded-md focus:ring-1 focus:ring-blue-500 focus:border-blue-500 transition-shadow outline-none"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-          />
-        </form>
+      {/* Advanced Filter Popover Backdrop overlay */}
+      {activeDropdown && (
+        <div className="fixed inset-0 z-40 bg-transparent" onClick={() => setActiveDropdown(null)} />
+      )}
 
-        <div className="flex items-center space-x-3">
+      {/* Toolbar */}
+      <div className="flex flex-col bg-white border-b border-gray-200">
+        <div className="flex justify-between items-center px-4 py-3">
+          <form onSubmit={handleSearch} className="relative w-full max-w-sm">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
+            <input
+              type="text"
+              placeholder="Tìm theo ID, Khách hàng, SĐT..."
+              className="w-full pl-9 pr-3 py-2 text-[13px] border border-gray-300 rounded-md focus:ring-1 focus:ring-blue-500 focus:border-blue-500 transition-shadow outline-none"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
+          </form>
+
+          <div className="flex items-center space-x-3">
+            {/* Bộ lọc button & popover container */}
+            <div className="relative z-50">
+              <button 
+                onClick={() => toggleDropdown('main')}
+                className="flex items-center space-x-1.5 px-3 py-2 text-[13px] border border-gray-300 rounded-md bg-white text-gray-700 hover:bg-gray-50 focus:outline-none font-medium"
+              >
+                <Filter size={15} />
+                <span>Bộ lọc</span>
+              </button>
+
+              {/* Popover Card */}
+              {activeDropdown && (
+                <div className="absolute right-0 mt-2 bg-white border rounded-lg shadow-xl z-50 overflow-hidden text-left min-w-[220px]">
+                  {activeDropdown === 'main' && (
+                    <div className="w-56 py-1 text-sm text-gray-700">
+                      <div className="px-3 py-2 text-xs font-semibold text-gray-400 border-b uppercase">Thêm điều kiện lọc</div>
+                      <button className="w-full text-left px-4 py-2 hover:bg-gray-100" onClick={() => toggleDropdown('pancakeOrderId')}>Mã đơn hàng</button>
+                      <button className="w-full text-left px-4 py-2 hover:bg-gray-100" onClick={() => toggleDropdown('adminStatuses')}>Trạng thái đơn</button>
+                      <button className="w-full text-left px-4 py-2 hover:bg-gray-100" onClick={() => toggleDropdown('ktvIds')}>Kỹ thuật viên</button>
+                      <button className="w-full text-left px-4 py-2 hover:bg-gray-100" onClick={() => toggleDropdown('workTypes')}>Loại công việc</button>
+                      <button className="w-full text-left px-4 py-2 hover:bg-gray-100" onClick={() => toggleDropdown('mainStationIds')}>Trạm chính</button>
+                      <button className="w-full text-left px-4 py-2 hover:bg-gray-100" onClick={() => toggleDropdown('customerName')}>Tên khách hàng</button>
+                      <button className="w-full text-left px-4 py-2 hover:bg-gray-100" onClick={() => toggleDropdown('customerPhone')}>Số điện thoại</button>
+                    </div>
+                  )}
+
+                  {activeDropdown === 'pancakeOrderId' && (
+                    <div className="p-4 w-72 space-y-3">
+                      <h4 className="font-semibold text-[14px] text-gray-800">Lọc theo Mã đơn hàng</h4>
+                      <input 
+                        type="text" 
+                        className="w-full border rounded p-2 text-sm outline-none focus:border-blue-500 text-gray-800 bg-white" 
+                        placeholder="Nhập mã đơn Pancake..." 
+                        value={tempPancakeOrderId} 
+                        onChange={e => setTempPancakeOrderId(e.target.value)} 
+                      />
+                      <div className="flex justify-between mt-2 pt-2 border-t">
+                        <button className="text-gray-500 text-xs px-2 py-1 hover:bg-gray-100 rounded" onClick={() => setActiveDropdown('main')}>Quay lại</button>
+                        <button className="bg-blue-600 text-white text-xs px-3 py-1 rounded hover:bg-blue-700 font-semibold" onClick={() => applyFilter('pancakeOrderId')}>Áp dụng</button>
+                      </div>
+                    </div>
+                  )}
+
+                  {activeDropdown === 'adminStatuses' && (
+                    <div className="p-4 w-72 space-y-3">
+                      <h4 className="font-semibold text-[14px] text-gray-800">Lọc theo Trạng thái đơn</h4>
+                      <div className="space-y-2 max-h-48 overflow-y-auto">
+                        {ROW_STATUS_OPTIONS.map(opt => (
+                          <label key={opt.value} className="flex items-center space-x-2 text-sm text-gray-700 cursor-pointer">
+                            <input 
+                              type="checkbox" 
+                              className="rounded text-blue-600 focus:ring-blue-500" 
+                              checked={tempAdminStatuses.includes(opt.value)} 
+                              onChange={e => {
+                                if (e.target.checked) {
+                                  setTempAdminStatuses([...tempAdminStatuses, opt.value]);
+                                } else {
+                                  setTempAdminStatuses(tempAdminStatuses.filter(v => v !== opt.value));
+                                }
+                              }} 
+                            />
+                            <span>{opt.label}</span>
+                          </label>
+                        ))}
+                      </div>
+                      <div className="flex justify-between mt-2 pt-2 border-t">
+                        <button className="text-gray-500 text-xs px-2 py-1 hover:bg-gray-100 rounded" onClick={() => setActiveDropdown('main')}>Quay lại</button>
+                        <button className="bg-blue-600 text-white text-xs px-3 py-1 rounded hover:bg-blue-700 font-semibold" onClick={() => applyFilter('adminStatuses')}>Áp dụng</button>
+                      </div>
+                    </div>
+                  )}
+
+                  {activeDropdown === 'ktvIds' && (
+                    <div className="p-4 w-72 space-y-3">
+                      <h4 className="font-semibold text-[14px] text-gray-800">Lọc theo Kỹ thuật viên</h4>
+                      <div className="space-y-2 max-h-48 overflow-y-auto">
+                        <label className="flex items-center space-x-2 text-sm font-medium cursor-pointer text-amber-600 border-b pb-1.5 mb-1.5">
+                          <input 
+                            type="checkbox" 
+                            className="rounded text-blue-600 focus:ring-blue-500" 
+                            checked={tempKtvIds.includes('null')} 
+                            onChange={e => {
+                              if (e.target.checked) {
+                                setTempKtvIds([...tempKtvIds, 'null']);
+                              } else {
+                                setTempKtvIds(tempKtvIds.filter(v => v !== 'null'));
+                              }
+                            }} 
+                          />
+                          <span>Chưa gán KTV (Trống)</span>
+                        </label>
+                        {allKtvs.map(k => (
+                          <label key={k.id} className="flex items-center space-x-2 text-sm text-gray-700 cursor-pointer">
+                            <input 
+                              type="checkbox" 
+                              className="rounded text-blue-600 focus:ring-blue-500" 
+                              checked={tempKtvIds.includes(k.id)} 
+                              onChange={e => {
+                                if (e.target.checked) {
+                                  setTempKtvIds([...tempKtvIds, k.id]);
+                                } else {
+                                  setTempKtvIds(tempKtvIds.filter(v => v !== k.id));
+                                }
+                              }} 
+                            />
+                            <span>{k.fullName}</span>
+                          </label>
+                        ))}
+                      </div>
+                      <div className="flex justify-between mt-2 pt-2 border-t">
+                        <button className="text-gray-500 text-xs px-2 py-1 hover:bg-gray-100 rounded" onClick={() => setActiveDropdown('main')}>Quay lại</button>
+                        <button className="bg-blue-600 text-white text-xs px-3 py-1 rounded hover:bg-blue-700 font-semibold" onClick={() => applyFilter('ktvIds')}>Áp dụng</button>
+                      </div>
+                    </div>
+                  )}
+
+                  {activeDropdown === 'workTypes' && (
+                    <div className="p-4 w-72 space-y-3">
+                      <h4 className="font-semibold text-[14px] text-gray-800">Lọc theo Loại công việc</h4>
+                      <div className="space-y-2 max-h-48 overflow-y-auto">
+                        <label className="flex items-center space-x-2 text-sm font-medium cursor-pointer text-amber-600 border-b pb-1.5 mb-1.5">
+                          <input 
+                            type="checkbox" 
+                            className="rounded text-blue-600 focus:ring-blue-500" 
+                            checked={tempWorkTypes.includes('null')} 
+                            onChange={e => {
+                              if (e.target.checked) {
+                                setTempWorkTypes([...tempWorkTypes, 'null']);
+                              } else {
+                                setTempWorkTypes(tempWorkTypes.filter(v => v !== 'null'));
+                              }
+                            }} 
+                          />
+                          <span>Chưa xác định (Trống)</span>
+                        </label>
+                        {['Giao hàng', 'Lắp đặt', 'Bảo hành', 'Thay lõi', 'Khảo sát'].map(wt => (
+                          <label key={wt} className="flex items-center space-x-2 text-sm text-gray-700 cursor-pointer">
+                            <input 
+                              type="checkbox" 
+                              className="rounded text-blue-600 focus:ring-blue-500" 
+                              checked={tempWorkTypes.includes(wt)} 
+                              onChange={e => {
+                                if (e.target.checked) {
+                                  setTempWorkTypes([...tempWorkTypes, wt]);
+                                } else {
+                                  setTempWorkTypes(tempWorkTypes.filter(v => v !== wt));
+                                }
+                              }} 
+                            />
+                            <span>{wt}</span>
+                          </label>
+                        ))}
+                      </div>
+                      <div className="flex justify-between mt-2 pt-2 border-t">
+                        <button className="text-gray-500 text-xs px-2 py-1 hover:bg-gray-100 rounded" onClick={() => setActiveDropdown('main')}>Quay lại</button>
+                        <button className="bg-blue-600 text-white text-xs px-3 py-1 rounded hover:bg-blue-700 font-semibold" onClick={() => applyFilter('workTypes')}>Áp dụng</button>
+                      </div>
+                    </div>
+                  )}
+
+                  {activeDropdown === 'mainStationIds' && (
+                    <div className="p-4 w-72 space-y-3">
+                      <h4 className="font-semibold text-[14px] text-gray-800">Lọc theo Trạm chính</h4>
+                      <div className="space-y-2 max-h-48 overflow-y-auto">
+                        <label className="flex items-center space-x-2 text-sm font-medium cursor-pointer text-amber-600 border-b pb-1.5 mb-1.5">
+                          <input 
+                            type="checkbox" 
+                            className="rounded text-blue-600 focus:ring-blue-500" 
+                            checked={tempMainStationIds.includes('null')} 
+                            onChange={e => {
+                              if (e.target.checked) {
+                                setTempMainStationIds([...tempMainStationIds, 'null']);
+                              } else {
+                                setTempMainStationIds(tempMainStationIds.filter(v => v !== 'null'));
+                              }
+                            }} 
+                          />
+                          <span>Chưa phân trạm (Trống)</span>
+                        </label>
+                        {stations.map(st => (
+                          <label key={st.id} className="flex items-center space-x-2 text-sm text-gray-700 cursor-pointer">
+                            <input 
+                              type="checkbox" 
+                              className="rounded text-blue-600 focus:ring-blue-500" 
+                              checked={tempMainStationIds.includes(st.id)} 
+                              onChange={e => {
+                                if (e.target.checked) {
+                                  setTempMainStationIds([...tempMainStationIds, st.id]);
+                                } else {
+                                  setTempMainStationIds(tempMainStationIds.filter(v => v !== st.id));
+                                }
+                              }} 
+                            />
+                            <span>{st.name}</span>
+                          </label>
+                        ))}
+                      </div>
+                      <div className="flex justify-between mt-2 pt-2 border-t">
+                        <button className="text-gray-500 text-xs px-2 py-1 hover:bg-gray-100 rounded" onClick={() => setActiveDropdown('main')}>Quay lại</button>
+                        <button className="bg-blue-600 text-white text-xs px-3 py-1 rounded hover:bg-blue-700 font-semibold" onClick={() => applyFilter('mainStationIds')}>Áp dụng</button>
+                      </div>
+                    </div>
+                  )}
+
+                  {activeDropdown === 'customerName' && (
+                    <div className="p-4 w-72 space-y-3">
+                      <h4 className="font-semibold text-[14px] text-gray-800">Lọc theo Tên khách hàng</h4>
+                      <input 
+                        type="text" 
+                        className="w-full border rounded p-2 text-sm outline-none focus:border-blue-500 text-gray-800 bg-white" 
+                        placeholder="Nhập tên khách..." 
+                        value={tempCustomerName} 
+                        onChange={e => setTempCustomerName(e.target.value)} 
+                      />
+                      <div className="flex justify-between mt-2 pt-2 border-t">
+                        <button className="text-gray-500 text-xs px-2 py-1 hover:bg-gray-100 rounded" onClick={() => setActiveDropdown('main')}>Quay lại</button>
+                        <button className="bg-blue-600 text-white text-xs px-3 py-1 rounded hover:bg-blue-700 font-semibold" onClick={() => applyFilter('customerName')}>Áp dụng</button>
+                      </div>
+                    </div>
+                  )}
+
+                  {activeDropdown === 'customerPhone' && (
+                    <div className="p-4 w-72 space-y-3">
+                      <h4 className="font-semibold text-[14px] text-gray-800">Lọc theo Số điện thoại</h4>
+                      <input 
+                        type="text" 
+                        className="w-full border rounded p-2 text-sm outline-none focus:border-blue-500 text-gray-800 bg-white" 
+                        placeholder="Nhập SĐT..." 
+                        value={tempCustomerPhone} 
+                        onChange={e => setTempCustomerPhone(e.target.value)} 
+                      />
+                      <div className="flex justify-between mt-2 pt-2 border-t">
+                        <button className="text-gray-500 text-xs px-2 py-1 hover:bg-gray-100 rounded" onClick={() => setActiveDropdown('main')}>Quay lại</button>
+                        <button className="bg-blue-600 text-white text-xs px-3 py-1 rounded hover:bg-blue-700 font-semibold" onClick={() => applyFilter('customerPhone')}>Áp dụng</button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* Existing Date Range Picker logic */}
             {datePreset === 'custom' && (
               <div className="flex items-center space-x-2">
                 <input 
@@ -282,14 +610,85 @@ export default function OrderList() {
               <option value="year">1 năm qua</option>
               <option value="custom">Tự chọn khoảng...</option>
             </select>
-            <select className="px-3 py-2 text-[13px] border border-gray-300 rounded-md bg-white text-gray-700 outline-none" value={statusFilter} onChange={(e) => {setStatusFilter(e.target.value); setPage(1);}}>
-              <option value="">Tất cả trạng thái</option>
-              <option value="chờ xử lý">Chờ xử lý</option>
-              <option value="đang thực hiện">Đang thực hiện</option>
-              <option value="hoàn thành">Hoàn thành</option>
-              <option value="hủy đơn">Hủy đơn</option>
-            </select>
+          </div>
         </div>
+
+        {/* Selected Filter Badges / Tags row */}
+        {(filterPancakeOrderId || filterAdminStatuses.length > 0 || filterKtvIds.length > 0 || filterWorkTypes.length > 0 || filterMainStationIds.length > 0 || filterCustomerName || filterCustomerPhone) && (
+          <div className="flex flex-wrap items-center gap-2 px-4 pb-3">
+            <span className="text-xs font-semibold text-gray-500 uppercase">Đang lọc:</span>
+
+            {filterPancakeOrderId && (
+              <span className="inline-flex items-center bg-gray-100 text-gray-800 text-xs font-medium px-2.5 py-1 rounded-md border border-gray-200">
+                Mã đơn: {filterPancakeOrderId}
+                <button type="button" className="ml-1.5 text-gray-400 hover:text-gray-600 outline-none" onClick={() => { setFilterPancakeOrderId(''); setPage(1); }}>
+                  <XCircle size={14} className="fill-gray-200 hover:fill-gray-300 text-gray-500" />
+                </button>
+              </span>
+            )}
+
+            {filterAdminStatuses.length > 0 && (
+              <span className="inline-flex items-center bg-gray-100 text-gray-800 text-xs font-medium px-2.5 py-1 rounded-md border border-gray-200">
+                Trạng thái: {filterAdminStatuses.map(s => ROW_STATUS_OPTIONS.find(o => o.value === s)?.label || s).join(', ')}
+                <button type="button" className="ml-1.5 text-gray-400 hover:text-gray-600 outline-none" onClick={() => { setFilterAdminStatuses([]); setPage(1); }}>
+                  <XCircle size={14} className="fill-gray-200 hover:fill-gray-300 text-gray-500" />
+                </button>
+              </span>
+            )}
+
+            {filterKtvIds.length > 0 && (
+              <span className="inline-flex items-center bg-gray-100 text-gray-800 text-xs font-medium px-2.5 py-1 rounded-md border border-gray-200">
+                KTV: {filterKtvIds.map(id => id === 'null' ? 'Chưa gán KTV' : (allKtvs.find(k => k.id === id)?.fullName || id)).join(', ')}
+                <button type="button" className="ml-1.5 text-gray-400 hover:text-gray-600 outline-none" onClick={() => { setFilterKtvIds([]); setPage(1); }}>
+                  <XCircle size={14} className="fill-gray-200 hover:fill-gray-300 text-gray-500" />
+                </button>
+              </span>
+            )}
+
+            {filterWorkTypes.length > 0 && (
+              <span className="inline-flex items-center bg-gray-100 text-gray-800 text-xs font-medium px-2.5 py-1 rounded-md border border-gray-200">
+                Loại CV: {filterWorkTypes.map(w => w === 'null' ? 'Chưa xác định' : w).join(', ')}
+                <button type="button" className="ml-1.5 text-gray-400 hover:text-gray-600 outline-none" onClick={() => { setFilterWorkTypes([]); setPage(1); }}>
+                  <XCircle size={14} className="fill-gray-200 hover:fill-gray-300 text-gray-500" />
+                </button>
+              </span>
+            )}
+
+            {filterMainStationIds.length > 0 && (
+              <span className="inline-flex items-center bg-gray-100 text-gray-800 text-xs font-medium px-2.5 py-1 rounded-md border border-gray-200">
+                Trạm chính: {filterMainStationIds.map(id => id === 'null' ? 'Chưa phân trạm' : (stations.find(s => s.id === id)?.name || id)).join(', ')}
+                <button type="button" className="ml-1.5 text-gray-400 hover:text-gray-600 outline-none" onClick={() => { setFilterMainStationIds([]); setPage(1); }}>
+                  <XCircle size={14} className="fill-gray-200 hover:fill-gray-300 text-gray-500" />
+                </button>
+              </span>
+            )}
+
+            {filterCustomerName && (
+              <span className="inline-flex items-center bg-gray-100 text-gray-800 text-xs font-medium px-2.5 py-1 rounded-md border border-gray-200">
+                Tên khách: {filterCustomerName}
+                <button type="button" className="ml-1.5 text-gray-400 hover:text-gray-600 outline-none" onClick={() => { setFilterCustomerName(''); setPage(1); }}>
+                  <XCircle size={14} className="fill-gray-200 hover:fill-gray-300 text-gray-500" />
+                </button>
+              </span>
+            )}
+
+            {filterCustomerPhone && (
+              <span className="inline-flex items-center bg-gray-100 text-gray-800 text-xs font-medium px-2.5 py-1 rounded-md border border-gray-200">
+                SĐT khách: {filterCustomerPhone}
+                <button type="button" className="ml-1.5 text-gray-400 hover:text-gray-600 outline-none" onClick={() => { setFilterCustomerPhone(''); setPage(1); }}>
+                  <XCircle size={14} className="fill-gray-200 hover:fill-gray-300 text-gray-500" />
+                </button>
+              </span>
+            )}
+
+            <button 
+              onClick={clearAllFilters}
+              className="text-xs text-red-600 hover:text-red-800 font-semibold px-2 py-1.5 rounded hover:bg-red-50 transition-colors"
+            >
+              Xóa tất cả bộ lọc
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Table Area */}
