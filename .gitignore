@@ -7,3 +7,6 @@ test.js
 testPrisma.ts
 showData.ts
 tunnel.log
+*.xlsx
+KTV flow/
+
