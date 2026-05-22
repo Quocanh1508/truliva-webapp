@@ -933,7 +933,29 @@ export default function OrderList() {
                   <label className="block text-sm text-gray-600 mb-1">Trạm kỹ thuật</label>
                   <select className="w-full border rounded p-2 text-sm outline-none focus:border-blue-500" value={selectedTech} onChange={e => {setSelectedTech(e.target.value); setSelectedKtv('');}} disabled={!selectedMain}>
                     <option value="">-- Chọn Trạm Kỹ thuật --</option>
-                    {stations.find(s => s.id === selectedMain)?.techStations?.map((t: any) => <option key={t.id} value={t.id}>{t.name}</option>)}
+                    {(() => {
+                      const currentMain = stations.find(s => s.id === selectedMain);
+                      if (!currentMain || !currentMain.techStations) return null;
+                      const isTruliva = currentMain.name?.toLowerCase() === 'truliva';
+                      const sortedTechStations = [...currentMain.techStations].sort((a, b) => {
+                        if (isTruliva) {
+                          const getPriority = (name: string) => {
+                            const n = name.toLowerCase();
+                            if (n.includes('hồ chí minh') || n.includes('hcm')) return 1;
+                            if (n.includes('hà nội')) return 2;
+                            if (n.includes('đà nẵng')) return 3;
+                            return 999;
+                          };
+                          const pA = getPriority(a.name);
+                          const pB = getPriority(b.name);
+                          if (pA !== pB) return pA - pB;
+                        }
+                        return a.name.localeCompare(b.name, 'vi', { sensitivity: 'base' });
+                      });
+                      return sortedTechStations.map((t: any) => (
+                        <option key={t.id} value={t.id}>{t.name}</option>
+                      ));
+                    })()}
                   </select>
                 </div>
 

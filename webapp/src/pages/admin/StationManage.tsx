@@ -2,6 +2,27 @@ import React, { useEffect, useState } from 'react';
 import { getStations, createMainStation, createTechStation, deleteMainStation, deleteTechStation } from '../../api/client';
 import { Building, MapPin, Users, Plus, Trash2, ChevronDown, ChevronRight } from 'lucide-react';
 
+// Helper to sort tech stations: TP.Hồ Chí Minh, Hà Nội, Đà Nẵng first, then A-Z
+function getSortedTechStations(main: any) {
+  if (!main || !main.techStations) return [];
+  const isTruliva = main.name?.toLowerCase() === 'truliva';
+  return [...main.techStations].sort((a, b) => {
+    if (isTruliva) {
+      const getPriority = (name: string) => {
+        const n = name.toLowerCase();
+        if (n.includes('hồ chí minh') || n.includes('hcm')) return 1;
+        if (n.includes('hà nội')) return 2;
+        if (n.includes('đà nẵng')) return 3;
+        return 999;
+      };
+      const pA = getPriority(a.name);
+      const pB = getPriority(b.name);
+      if (pA !== pB) return pA - pB;
+    }
+    return a.name.localeCompare(b.name, 'vi', { sensitivity: 'base' });
+  });
+}
+
 export default function StationManage() {
   const [stations, setStations] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -161,7 +182,7 @@ export default function StationManage() {
                     <div className="border-t border-gray-100 bg-gray-50 p-4 pl-12 space-y-3">
                       
                       {/* Tech Station List */}
-                      {main.techStations?.map((tech: any) => (
+                      {getSortedTechStations(main).map((tech: any) => (
                         <div key={tech.id} className="bg-white border border-gray-200 p-3 rounded-md shadow-sm flex justify-between items-start group hover:border-blue-300 transition-colors">
                           <div className="flex-1">
                             <div className="flex items-center gap-2 mb-2">

@@ -2,6 +2,27 @@ import React, { useEffect, useState, useMemo } from 'react';
 import { fetchApi, getStations } from '../../api/client';
 import { UserPlus, Lock, Unlock, KeyRound, Search, Filter, X } from 'lucide-react';
 
+// Helper to sort tech stations: TP.Hồ Chí Minh, Hà Nội, Đà Nẵng first, then A-Z
+function getSortedTechStations(main: any) {
+  if (!main || !main.techStations) return [];
+  const isTruliva = main.name?.toLowerCase() === 'truliva';
+  return [...main.techStations].sort((a, b) => {
+    if (isTruliva) {
+      const getPriority = (name: string) => {
+        const n = name.toLowerCase();
+        if (n.includes('hồ chí minh') || n.includes('hcm')) return 1;
+        if (n.includes('hà nội')) return 2;
+        if (n.includes('đà nẵng')) return 3;
+        return 999;
+      };
+      const pA = getPriority(a.name);
+      const pB = getPriority(b.name);
+      if (pA !== pB) return pA - pB;
+    }
+    return a.name.localeCompare(b.name, 'vi', { sensitivity: 'base' });
+  });
+}
+
 export default function UserManage() {
   const [users, setUsers] = useState<any[]>([]);
   const [stations, setStations] = useState<any[]>([]);
@@ -42,7 +63,7 @@ export default function UserManage() {
   const allTechStations = useMemo(() => {
     const list: { id: string; name: string; mainId: string; mainName: string }[] = [];
     stations.forEach((main: any) => {
-      (main.techStations || []).forEach((tech: any) => {
+      getSortedTechStations(main).forEach((tech: any) => {
         list.push({ id: tech.id, name: tech.name, mainId: main.id, mainName: main.name });
       });
     });
@@ -264,7 +285,7 @@ export default function UserManage() {
                 <option value="">-- Chưa gán trạm --</option>
                 {stations.map(main => (
                   <optgroup key={main.id} label={main.name}>
-                    {main.techStations?.map((tech: any) => (
+                    {getSortedTechStations(main).map((tech: any) => (
                       <option key={tech.id} value={tech.id}>{tech.name}</option>
                     ))}
                   </optgroup>
@@ -335,7 +356,7 @@ export default function UserManage() {
                         <option value="">-- Chưa gán trạm --</option>
                         {stations.map(main => (
                           <optgroup key={main.id} label={main.name}>
-                            {main.techStations?.map((tech: any) => (
+                            {getSortedTechStations(main).map((tech: any) => (
                               <option key={tech.id} value={tech.id}>{tech.name}</option>
                             ))}
                           </optgroup>
