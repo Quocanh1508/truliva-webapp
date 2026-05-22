@@ -85,6 +85,29 @@ router.post('/', async (req: Request, res: Response): Promise<void> => {
       },
     });
 
+    // Tự động chuyển trạng thái đơn hàng sang "hoàn thành" khi KTV nộp báo cáo
+    if (orderId) {
+      try {
+        await prisma.order.update({
+          where: { id: orderId },
+          data: { adminStatus: 'hoàn thành' },
+        });
+        await prisma.auditLog.create({
+          data: {
+            entityType: 'Order',
+            entityId: orderId,
+            action: 'updated',
+            changes: { adminStatus: { from: 'đang thực hiện', to: 'hoàn thành' } },
+            userId: req.user!.id,
+            userName: req.user!.fullName,
+          },
+        });
+        logger.info('Order status auto-updated to hoàn thành due to KTV report submission', { orderId });
+      } catch (err: any) {
+        logger.error('Failed to auto-update order status on report creation', { orderId, error: err.message });
+      }
+    }
+
     logger.info('Report created', { reportId: report.id, ktvId: req.user!.id });
     res.status(201).json({ report });
   } catch (error: any) {

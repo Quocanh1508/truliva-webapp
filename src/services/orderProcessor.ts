@@ -73,9 +73,11 @@ export async function processOrderEvent(rawEventId: string | null, payload: any)
     // 2. Upsert Order
     // ══════════════════════════════════════
 
-    // Parse status code từ status_history hoặc trực tiếp
+    // Parse status code từ status hoặc status_history
     let statusCode: number | null = null;
-    if (payload.status_history && payload.status_history.length > 0) {
+    if (typeof payload.status === 'number') {
+      statusCode = payload.status;
+    } else if (payload.status_history && payload.status_history.length > 0) {
       const lastStatus = payload.status_history[payload.status_history.length - 1];
       statusCode = lastStatus.status ?? null;
     }

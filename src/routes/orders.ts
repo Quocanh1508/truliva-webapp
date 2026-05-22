@@ -38,6 +38,14 @@ router.get('/', requireAuth, async (req: Request, res: Response): Promise<void> 
     // Xây dựng điều kiện tìm kiếm
     const where: Prisma.OrderWhereInput = {};
     const conditions: Prisma.OrderWhereInput[] = [];
+
+    // Chỉ hiển thị các đơn hàng đã được xác nhận bên POS (ẩn các đơn nháp status = 0)
+    conditions.push({
+      OR: [
+        { statusCode: { not: 0 } },
+        { statusCode: null }
+      ]
+    });
     
     // Nếu user là KTV, chỉ lấy các đơn hàng được giao cho KTV đó
     if (req.user?.role === 'KTV') {
