@@ -4,24 +4,74 @@ import { fetchApi, getOrders } from '../../api/client';
 import LabeledImageUploader from '../../components/LabeledImageUploader';
 import { CheckCircle, ChevronLeft, Send, AlertCircle } from 'lucide-react';
 
-// ── Danh sách loại công việc ──
-// LabeledImageUploader is resolved correctly by tsc compiler
+// ── Danh sách loại công việc (từ DS Công việc_Dịch vụ_Linh kiện.xlsx) ──
 const WORK_TYPES = [
-  'Giao hàng',
+  'Giao hàng và Lắp đặt',
   'Lắp đặt',
-  'Thay lõi lọc',
-  'Giao hàng và lắp đặt',
+  'Giao hàng',
+  'Thay lọc',
   'Bảo hành',
   'Sửa chữa',
 ];
 
-const SERVICE_TYPES = [
-  'Giao hàng',
-  'Lắp đặt',
-  'Thay lõi lọc',
-  'Giao hàng và lắp đặt',
-  'Bảo hành',
-  'Sửa chữa',
+// ── Loại dịch vụ tương ứng với Loại công việc ──
+const WORK_TYPE_SERVICES: Record<string, string[]> = {
+  'Giao hàng và Lắp đặt': ['Công việc đã bao gồm dịch vụ'],
+  'Lắp đặt': ['Công việc đã bao gồm dịch vụ'],
+  'Giao hàng': ['Công việc đã bao gồm dịch vụ'],
+  'Thay lọc': ['Công việc đã bao gồm dịch vụ'],
+  'Bảo hành': [
+    'Áp lực nước yếu', 'Bơm không hoạt động', 'Chất lượng nước sau lọc',
+    'Hỏng vòi nước', 'Lỗi biến áp', 'Lỗi cảm biến rò rỉ', 'Lỗi mạch điện',
+    'Lỗi màn hình hiển thị', 'Lỗi vòi nước', 'Lỏng vòi nước',
+    'Máy báo đỏ các đèn', 'Máy báo lỗi TDS', 'Nước thải không ngừng',
+    'Rò rỉ bên trong máy', 'Rò rỉ đường ống', 'Rò rỉ lọc thô', 'Rò rỉ từ vòi',
+    'Rò rỉ van cấp nước', 'Thiết bị hoạt động không ổn định',
+    'Thiết bị hoạt động liên tục', 'Thiết bị không hoạt động',
+    'Thiết bị lọc chậm', 'Tiếng ồn khi vận hành',
+    'Khác (phát sinh theo thực tế)',
+  ],
+  'Sửa chữa': [
+    'Áp lực nước yếu', 'Bơm không hoạt động', 'Chất lượng nước sau lọc',
+    'Đo chỉ số TDS', 'Hỏng vòi nước', 'Khảo sát vị trí', 'Lắp đặt lại máy',
+    'Lấy mẫu test nước', 'Lỗi biến áp', 'Lỗi cảm biến rò rỉ', 'Lỗi mạch điện',
+    'Lỗi màn hình hiển thị', 'Lỗi vòi nước', 'Lỏng vòi nước',
+    'Máy báo đỏ các đèn', 'Máy báo lỗi TDS', 'Nước thải không ngừng',
+    'Rò rỉ bên trong máy', 'Rò rỉ đường ống', 'Rò rỉ lọc thô', 'Rò rỉ từ vòi',
+    'Rò rỉ van cấp nước', 'Tháo máy', 'Thay đổi vị trí lắp đặt', 'Thay linh kiện',
+    'Thiết bị hoạt động không ổn định', 'Thiết bị hoạt động liên tục',
+    'Thiết bị không hoạt động', 'Thiết bị lọc chậm',
+    'Thu hồi/Đổi/Trả', 'Tiếng ồn khi vận hành',
+    'Khác (phát sinh theo thực tế)',
+  ],
+};
+
+// ── Danh sách linh kiện phát sinh (từ Excel) ──
+const SPARE_PARTS = [
+  'Bơm tăng áp', 'Van giảm áp', 'Van chia',
+  'Cụm van (2) Truliva UR3626', 'Bơm RO Truliva UR3626',
+  'Mạch điều khiển Truliva UR3626', 'Mạch đèn Truliva UR3626',
+  'Biến áp Truliva UR3626',
+  'Bộ vòi Truliva UR3626/UR5640/UR5440',
+  'Cụm van Truliva UR5676/UR5640/UR5440',
+  'Bơm RO Truliva UR5676/UR5640',
+  'Mạch điều khiển Truliva UR5676/UR5640/UR5440',
+  'Mạch đèn Truliva UR5676',
+  'Biến áp Truliva UR5676/UR5640/UR5440',
+  'Cảm biến TDS Truliva UR5676/UR61096H',
+  'Bộ vòi điện tử Truliva UR5676/UR5840',
+  'Cụm van Truliva UR5840', 'Bơm RO Truliva UR5840',
+  'Mạch điều khiển Truliva UR5840', 'Mạch đèn Truliva UR5840',
+  'Biến áp Truliva UR5840', 'Cảm biến TDS Truliva UR5840',
+  'Cụm van Truliva UR61096H', 'Bơm RO Truliva UR61096H',
+  'Mạch điều khiển Truliva UR61096H', 'Mạch đèn Truliva UR61096H',
+  'Biến áp Truliva UR61096H', 'Bộ vòi điện tử Truliva UR61096H',
+  'Khay hứng nước Truliva W6412', 'Nắp khay hứng nước Truliva W6412',
+  'Ống silicon Truliva W6412', 'Vỏ trước Truliva W6412',
+  'Bộ gia nhiệt Truliva W6412', 'Mạch điều khiển Truliva W6412',
+  'Van điện từ nước vào Truliva W6412', 'Mạch màn hình Truliva W6412',
+  'Túi đá điện tử Truliva W6412', 'Bơm đường nước lạnh Truliva W6412',
+  'Bơm đường nước nóng Truliva W6412', 'Bình chứa Truliva W6412',
 ];
 
 // ── Nguồn nước options ──
@@ -42,7 +92,7 @@ function getImageSlots(workType: string): { label: string }[] {
         { label: 'Ảnh biên bản nghiệm thu' },
         { label: 'Ảnh xác nhận thanh toán' },
       ];
-    case 'Thay lõi lọc':
+    case 'Thay lọc':
       return [
         { label: 'Ảnh trước khi thay lọc' },
         { label: 'Ảnh sau khi thay lọc' },
@@ -53,7 +103,7 @@ function getImageSlots(workType: string): { label: string }[] {
         { label: 'Ảnh biên bản nghiệm thu' },
         { label: 'Ảnh xác nhận thanh toán' },
       ];
-    case 'Giao hàng và lắp đặt':
+    case 'Giao hàng và Lắp đặt':
     case 'Lắp đặt':
       return [
         { label: 'Ảnh lắp đặt hoàn thiện' },
@@ -89,7 +139,12 @@ function getImageSlots(workType: string): { label: string }[] {
 
 // ── Kiểm tra workType có cần trường kỹ thuật không ──
 function needsTechnicalFields(workType: string): boolean {
-  return ['Thay lõi lọc', 'Lắp đặt', 'Giao hàng và lắp đặt', 'Bảo hành', 'Sửa chữa'].includes(workType);
+  return ['Thay lọc', 'Lắp đặt', 'Giao hàng và Lắp đặt', 'Bảo hành', 'Sửa chữa'].includes(workType);
+}
+
+// ── Kiểm tra workType có cần linh kiện phát sinh không ──
+function needsSpareParts(workType: string): boolean {
+  return ['Thay lọc', 'Bảo hành', 'Sửa chữa', 'Lắp đặt', 'Giao hàng và Lắp đặt'].includes(workType);
 }
 
 export default function ReportForm() {
@@ -120,6 +175,7 @@ export default function ReportForm() {
   const [tdsIn, setTdsIn] = useState('');
   const [tdsOut, setTdsOut] = useState('');
   const [waterPressure, setWaterPressure] = useState('');
+  const [spareParts, setSpareParts] = useState<string[]>([]);
 
   // ── Step 3: Ảnh ──
   const [imageUrls, setImageUrls] = useState<string[]>([]);
@@ -216,7 +272,7 @@ export default function ReportForm() {
           tdsIn: needsTechnicalFields(workType) ? tdsIn : null,
           tdsOut: needsTechnicalFields(workType) ? tdsOut : null,
           waterPressure: needsTechnicalFields(workType) ? waterPressure : null,
-          spareParts: [],
+          spareParts: needsSpareParts(workType) ? spareParts : [],
           notes,
           imageUrls,
           orderId: selectedOrderId,
@@ -336,17 +392,42 @@ export default function ReportForm() {
             <div style={{ borderTop: '1px solid #e2e8f0', margin: '20px 0', paddingTop: '16px' }}>
               <div className="form-group">
                 <label className="form-label">Loại công việc *</label>
-                <select className="form-select" value={workType} onChange={e => setWorkType(e.target.value)} required>
+                <select className="form-select" value={workType} onChange={e => {
+                  const wt = e.target.value;
+                  setWorkType(wt);
+                  // Auto-fill serviceType nếu chỉ có 1 loại dịch vụ
+                  const services = WORK_TYPE_SERVICES[wt] || [];
+                  if (services.length === 1) {
+                    setServiceType(services[0]);
+                  } else {
+                    setServiceType('');
+                  }
+                  // Reset spare parts khi đổi loại công việc
+                  setSpareParts([]);
+                }} required>
                   <option value="">Chọn loại công việc...</option>
                   {WORK_TYPES.map(w => <option key={w} value={w}>{w}</option>)}
                 </select>
               </div>
               <div className="form-group">
                 <label className="form-label">Loại dịch vụ *</label>
-                <select className="form-select" value={serviceType} onChange={e => setServiceType(e.target.value)} required>
-                  <option value="">Chọn loại dịch vụ...</option>
-                  {SERVICE_TYPES.map(s => <option key={s} value={s}>{s}</option>)}
-                </select>
+                {(() => {
+                  const services = WORK_TYPE_SERVICES[workType] || [];
+                  const isSingleService = services.length === 1 && services[0] === 'Công việc đã bao gồm dịch vụ';
+                  return isSingleService ? (
+                    <input
+                      type="text"
+                      className="form-input bg-gray-50 text-gray-500"
+                      value="Công việc đã bao gồm dịch vụ"
+                      readOnly
+                    />
+                  ) : (
+                    <select className="form-select" value={serviceType} onChange={e => setServiceType(e.target.value)} required>
+                      <option value="">Chọn loại dịch vụ...</option>
+                      {services.map(s => <option key={s} value={s}>{s}</option>)}
+                    </select>
+                  );
+                })()}
               </div>
               <div className="form-group">
                 <label className="form-label">Tên sản phẩm thực tế x Số lượng SP</label>
@@ -417,13 +498,42 @@ export default function ReportForm() {
                   <label className="form-label">Áp suất nước đầu vào (psi) *</label>
                   <input type="number" className="form-input" placeholder="Nhập số psi thực tế" value={waterPressure} onChange={e => setWaterPressure(e.target.value)} required />
                 </div>
-                {/* Linh kiện phát sinh — placeholder, sẽ update sau */}
-                {/*
-                <div className="form-group">
-                  <label className="form-label">Linh kiện phát sinh (nếu có)</label>
-                  <p className="text-xs text-gray-400">Sẽ cập nhật danh sách sau</p>
-                </div>
-                */}
+                {/* Linh kiện phát sinh */}
+                {needsSpareParts(workType) && (
+                  <div className="form-group">
+                    <label className="form-label">Linh kiện phát sinh (nếu có)</label>
+                    <div style={{
+                      maxHeight: '200px',
+                      overflowY: 'auto',
+                      border: '1px solid #e2e8f0',
+                      borderRadius: '8px',
+                      padding: '10px',
+                      background: '#fafbfc',
+                    }}>
+                      {SPARE_PARTS.map(part => (
+                        <label key={part} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '5px 0', fontSize: '13px', cursor: 'pointer' }}>
+                          <input
+                            type="checkbox"
+                            checked={spareParts.includes(part)}
+                            onChange={e => {
+                              if (e.target.checked) {
+                                setSpareParts([...spareParts, part]);
+                              } else {
+                                setSpareParts(spareParts.filter(p => p !== part));
+                              }
+                            }}
+                          />
+                          <span>{part}</span>
+                        </label>
+                      ))}
+                    </div>
+                    {spareParts.length > 0 && (
+                      <p className="text-xs text-blue-600 mt-1 font-medium">
+                        Đã chọn {spareParts.length} linh kiện
+                      </p>
+                    )}
+                  </div>
+                )}
               </>
             )}
 

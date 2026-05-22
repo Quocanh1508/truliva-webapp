@@ -473,7 +473,7 @@ export default function OrderList() {
                           />
                           <span>Chưa xác định (Trống)</span>
                         </label>
-                        {['Giao hàng', 'Lắp đặt', 'Bảo hành', 'Thay lõi', 'Khảo sát'].map(wt => (
+                        {['Giao hàng và Lắp đặt', 'Lắp đặt', 'Giao hàng', 'Thay lọc', 'Bảo hành', 'Sửa chữa'].map(wt => (
                           <label key={wt} className="flex items-center space-x-2 text-sm text-gray-700 cursor-pointer">
                             <input 
                               type="checkbox" 
@@ -842,25 +842,68 @@ export default function OrderList() {
                 
                 <div>
                   <label className="block text-sm text-gray-600 mb-1">Loại công việc</label>
-                  <select className="w-full border rounded p-2 text-sm outline-none focus:border-blue-500" value={workType} onChange={e => setWorkType(e.target.value)}>
+                  <select className="w-full border rounded p-2 text-sm outline-none focus:border-blue-500" value={workType} onChange={e => {
+                    const wt = e.target.value;
+                    setWorkType(wt);
+                    // Auto-fill serviceType for single-service work types
+                    const noServiceTypes = ['Giao hàng và Lắp đặt', 'Lắp đặt', 'Giao hàng', 'Thay lọc'];
+                    if (noServiceTypes.includes(wt)) {
+                      setServiceType('Công việc đã bao gồm dịch vụ');
+                    } else {
+                      setServiceType('');
+                    }
+                  }}>
                     <option value="">-- Chọn loại --</option>
-                    <option value="Giao hàng">Giao hàng</option>
+                    <option value="Giao hàng và Lắp đặt">Giao hàng và Lắp đặt</option>
                     <option value="Lắp đặt">Lắp đặt</option>
+                    <option value="Giao hàng">Giao hàng</option>
+                    <option value="Thay lọc">Thay lọc</option>
                     <option value="Bảo hành">Bảo hành</option>
-                    <option value="Thay lõi">Thay lõi</option>
-                    <option value="Khảo sát">Khảo sát</option>
+                    <option value="Sửa chữa">Sửa chữa</option>
                   </select>
                 </div>
                 
                 <div>
                   <label className="block text-sm text-gray-600 mb-1">Loại dịch vụ chi tiết</label>
-                  <select className="w-full border rounded p-2 text-sm outline-none focus:border-blue-500" value={serviceType} onChange={e => setServiceType(e.target.value)}>
-                    <option value="">-- Chọn dịch vụ --</option>
-                    <option value="Lắp mới RO">Lắp mới RO</option>
-                    <option value="Thay bộ 3 lõi thô">Thay bộ 3 lõi thô</option>
-                    <option value="Bảo hành bơm">Bảo hành bơm</option>
-                    <option value="Giao máy nóng lạnh">Giao máy nóng lạnh</option>
-                  </select>
+                  {['Giao hàng và Lắp đặt', 'Lắp đặt', 'Giao hàng', 'Thay lọc'].includes(workType) ? (
+                    <input type="text" className="w-full border rounded p-2 text-sm outline-none bg-gray-50 text-gray-500" value="Công việc đã bao gồm dịch vụ" readOnly />
+                  ) : workType === 'Bảo hành' ? (
+                    <select className="w-full border rounded p-2 text-sm outline-none focus:border-blue-500" value={serviceType} onChange={e => setServiceType(e.target.value)}>
+                      <option value="">-- Chọn dịch vụ --</option>
+                      {[
+                        'Áp lực nước yếu', 'Bơm không hoạt động', 'Chất lượng nước sau lọc',
+                        'Hỏng vòi nước', 'Lỗi biến áp', 'Lỗi cảm biến rò rỉ', 'Lỗi mạch điện',
+                        'Lỗi màn hình hiển thị', 'Lỗi vòi nước', 'Lỏng vòi nước',
+                        'Máy báo đỏ các đèn', 'Máy báo lỗi TDS', 'Nước thải không ngừng',
+                        'Rò rỉ bên trong máy', 'Rò rỉ đường ống', 'Rò rỉ lọc thô', 'Rò rỉ từ vòi',
+                        'Rò rỉ van cấp nước', 'Thiết bị hoạt động không ổn định',
+                        'Thiết bị hoạt động liên tục', 'Thiết bị không hoạt động',
+                        'Thiết bị lọc chậm', 'Tiếng ồn khi vận hành',
+                        'Khác (phát sinh theo thực tế)',
+                      ].map(s => <option key={s} value={s}>{s}</option>)}
+                    </select>
+                  ) : workType === 'Sửa chữa' ? (
+                    <select className="w-full border rounded p-2 text-sm outline-none focus:border-blue-500" value={serviceType} onChange={e => setServiceType(e.target.value)}>
+                      <option value="">-- Chọn dịch vụ --</option>
+                      {[
+                        'Áp lực nước yếu', 'Bơm không hoạt động', 'Chất lượng nước sau lọc',
+                        'Đo chỉ số TDS', 'Hỏng vòi nước', 'Khảo sát vị trí', 'Lắp đặt lại máy',
+                        'Lấy mẫu test nước', 'Lỗi biến áp', 'Lỗi cảm biến rò rỉ', 'Lỗi mạch điện',
+                        'Lỗi màn hình hiển thị', 'Lỗi vòi nước', 'Lỏng vòi nước',
+                        'Máy báo đỏ các đèn', 'Máy báo lỗi TDS', 'Nước thải không ngừng',
+                        'Rò rỉ bên trong máy', 'Rò rỉ đường ống', 'Rò rỉ lọc thô', 'Rò rỉ từ vòi',
+                        'Rò rỉ van cấp nước', 'Tháo máy', 'Thay đổi vị trí lắp đặt', 'Thay linh kiện',
+                        'Thiết bị hoạt động không ổn định', 'Thiết bị hoạt động liên tục',
+                        'Thiết bị không hoạt động', 'Thiết bị lọc chậm',
+                        'Thu hồi/Đổi/Trả', 'Tiếng ồn khi vận hành',
+                        'Khác (phát sinh theo thực tế)',
+                      ].map(s => <option key={s} value={s}>{s}</option>)}
+                    </select>
+                  ) : (
+                    <select className="w-full border rounded p-2 text-sm outline-none focus:border-blue-500" value={serviceType} onChange={e => setServiceType(e.target.value)} disabled={!workType}>
+                      <option value="">-- Chọn loại công việc trước --</option>
+                    </select>
+                  )}
                 </div>
 
                 <div>
