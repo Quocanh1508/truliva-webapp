@@ -6,7 +6,7 @@ import { Search, ChevronLeft, ChevronRight, History, Edit, XCircle, Filter, Refr
 
 const ROW_STATUS_OPTIONS = [
   { value: 'chờ xử lý', label: 'Chờ xử lý' },
-  { value: 'đang thực hiện', label: 'Đang thực hiện' },
+  { value: 'đang thực hiện', label: 'Đã phân công' },
   { value: 'hoàn thành', label: 'Hoàn thành' },
   { value: 'hủy đơn', label: 'Hủy đơn' },
 ];
