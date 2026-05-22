@@ -92,10 +92,37 @@ export async function processOrderEvent(rawEventId: string, payload: any): Promi
 
     let newAdminStatus = existingOrder?.adminStatus || 'chờ xử lý';
     const pStatus = (payload.status_name || '').toLowerCase();
+    const statusId = typeof payload.status === 'number' ? payload.status : statusCode;
 
-    if (pStatus === 'cancelled' || pStatus === 'returned' || pStatus === 'cancel' || pStatus.includes('hủy')) {
+    // Lọc trạng thái Hủy / Trả hàng:
+    // - statusId: 4 (Đang hoàn), 5 (Đã hoàn), 6 (Đã hủy)
+    // - Tên chữ: cancelled, returned, cancel, hoặc chứa chữ 'hủy'
+    const isCancelledOrReturned = 
+      statusId === 4 ||
+      statusId === 5 ||
+      statusId === 6 ||
+      pStatus === 'cancelled' ||
+      pStatus === 'returned' ||
+      pStatus === 'cancel' ||
+      pStatus.includes('hủy');
+
+    // Lọc trạng thái Hoàn thành:
+    // - statusId: 3 (Đã nhận / delivered), 16 (Đã thu tiền / received_money)
+    // - Tên chữ: delivered, done, received, received_money, hoặc chứa chữ 'hoàn thành', 'đã nhận', 'thu tiền'
+    const isCompleted = 
+      statusId === 3 ||
+      statusId === 16 ||
+      pStatus === 'delivered' ||
+      pStatus === 'done' ||
+      pStatus === 'received' ||
+      pStatus === 'received_money' ||
+      pStatus.includes('hoàn thành') ||
+      pStatus.includes('đã nhận') ||
+      pStatus.includes('thu tiền');
+
+    if (isCancelledOrReturned) {
       newAdminStatus = 'hủy đơn';
-    } else if (pStatus === 'delivered' || pStatus === 'done' || pStatus === 'received' || pStatus.includes('hoàn thành') || pStatus.includes('đã nhận')) {
+    } else if (isCompleted) {
       if (newAdminStatus !== 'hủy đơn') newAdminStatus = 'hoàn thành';
     }
 
