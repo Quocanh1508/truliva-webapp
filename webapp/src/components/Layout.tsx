@@ -8,6 +8,7 @@ export default function Layout() {
   const navigate = useNavigate();
   const location = useLocation();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const logoPath = user?.role === 'ADMIN' ? '/admin' : '/ktv/my-orders';
 
   const handleLogout = async () => {
     await logout();
@@ -36,9 +37,9 @@ export default function Layout() {
       {/* Desktop Sidebar Nav */}
       <aside className="app-sidebar">
         {/* Brand Logo */}
-        <div style={{ padding: '24px 16px', borderBottom: '1px solid var(--border-color)', display: 'flex', justifyContent: 'center', backgroundColor: '#fff' }}>
+        <Link to={logoPath} style={{ padding: '24px 16px', borderBottom: '1px solid var(--border-color)', display: 'flex', justifyContent: 'center', backgroundColor: '#fff' }}>
           <img src="/logo.png" alt="Truliva" style={{ height: '36px' }} />
-        </div>
+        </Link>
 
         {/* Links */}
         <nav style={{ padding: '16px 0', flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '4px' }}>
@@ -95,7 +96,9 @@ export default function Layout() {
             >
               <Menu size={24} />
             </button>
-            <img src="/logo.png" alt="Truliva" style={{ height: '32px' }} />
+            <Link to={logoPath} style={{ display: 'flex', alignItems: 'center' }}>
+              <img src="/logo.png" alt="Truliva" style={{ height: '32px' }} />
+            </Link>
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
@@ -127,7 +130,9 @@ export default function Layout() {
           >
             {/* Header of Drawer */}
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px', borderBottom: '1px solid var(--border-color)' }}>
-              <img src="/logo.png" alt="Truliva" style={{ height: '28px' }} />
+              <Link to={logoPath} onClick={closeMenu} style={{ display: 'flex', alignItems: 'center' }}>
+                <img src="/logo.png" alt="Truliva" style={{ height: '28px' }} />
+              </Link>
               <button onClick={closeMenu} style={{ background: 'transparent', color: 'var(--text-muted)', border: 'none' }}>
                 <X size={20} />
               </button>
