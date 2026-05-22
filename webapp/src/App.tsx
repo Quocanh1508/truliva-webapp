@@ -18,6 +18,7 @@ import ReportList from './pages/admin/ReportList';
 import UserManage from './pages/admin/UserManage';
 import OrderList from './pages/admin/OrderList';
 import StationManage from './pages/admin/StationManage';
+import SampleImageManage from './pages/admin/SampleImageManage';
 
 export default function App() {
   return (
@@ -41,6 +42,7 @@ export default function App() {
               <Route path="/admin/users" element={<UserManage />} />
               <Route path="/admin/stations" element={<StationManage />} />
               <Route path="/admin/orders" element={<OrderList />} />
+              <Route path="/admin/sample-images" element={<SampleImageManage />} />
             </Route>
 
             {/* Shared Routes */}

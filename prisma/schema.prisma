@@ -260,3 +260,16 @@ model ServiceReport {
 
   @@map("service_reports")
 }
+
+// ── Ảnh mẫu theo loại công việc và nhãn slot ──
+model WorkTypeSampleImage {
+  id          String   @id @default(uuid())
+  workType    String   @map("work_type")
+  slotLabel   String   @map("slot_label") // Ví dụ: "Ảnh seri sản phẩm"
+  imageUrl    String   @map("image_url")   // Đường dẫn ảnh mẫu từ Cloudinary
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@unique([workType, slotLabel])
+  @@map("work_type_sample_images")
+}

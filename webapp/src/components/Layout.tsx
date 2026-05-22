@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Outlet, useNavigate, useLocation, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { LogOut, Menu, X, FileText, List, Users, BarChart, ShoppingCart, Building, Key } from 'lucide-react';
+import { LogOut, Menu, X, FileText, List, Users, BarChart, ShoppingCart, Building, Key, Image as ImageIcon } from 'lucide-react';
 
 export default function Layout() {
   const { user, logout } = useAuth();
@@ -20,6 +20,7 @@ export default function Layout() {
     { name: 'Danh sách báo cáo', path: '/admin/reports', icon: <List size={20} /> },
     { name: 'Quản lý Trạm', path: '/admin/stations', icon: <Building size={20} /> },
     { name: 'Kỹ thuật viên', path: '/admin/users', icon: <Users size={20} /> },
+    { name: 'Ảnh mẫu báo cáo', path: '/admin/sample-images', icon: <ImageIcon size={20} /> },
     { name: 'Đổi mật khẩu', path: '/change-password', icon: <Key size={20} /> },
   ] : [
     { name: 'Đơn hàng được giao', path: '/ktv/my-orders', icon: <ShoppingCart size={20} /> },

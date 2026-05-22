@@ -16,6 +16,7 @@ import uploadRoutes from './routes/upload';
 import orderRoutes from './routes/orders';
 import stationRoutes from './routes/stations';
 import dashboardRoutes from './routes/dashboard';
+import sampleImageRoutes from './routes/sampleImages';
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -87,6 +88,7 @@ app.use('/api/orders', orderRoutes);
 app.use('/api/stations', stationRoutes);
 app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/upload', uploadRoutes);
+app.use('/api/sample-images', sampleImageRoutes);
 
 // ── Serve uploaded images ──
 app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));
