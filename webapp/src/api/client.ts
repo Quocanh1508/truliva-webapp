@@ -78,6 +78,12 @@ export async function updateOrder(id: string, data: any) {
   });
 }
 
+export async function syncOrders() {
+  return fetchApi('/orders/sync', {
+    method: 'POST',
+  });
+}
+
 export async function getKtvUsers(params: { techStationId?: string } = {}) {
   const query = new URLSearchParams();
   if (params.techStationId) query.append('techStationId', params.techStationId);

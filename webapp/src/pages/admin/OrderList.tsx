@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { getOrders, updateOrder, getKtvUsers, getStations, getOrderAuditLog } from '../../api/client';
-import { Search, ChevronLeft, ChevronRight, History, Edit, XCircle, Filter } from 'lucide-react';
+import { getOrders, updateOrder, getKtvUsers, getStations, getOrderAuditLog, syncOrders } from '../../api/client';
+import { Search, ChevronLeft, ChevronRight, History, Edit, XCircle, Filter, RefreshCw } from 'lucide-react';
 
 
 
@@ -14,6 +14,7 @@ const ROW_STATUS_OPTIONS = [
 export default function OrderList() {
   const [orders, setOrders] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [syncing, setSyncing] = useState(false);
   const [_error, setError] = useState('');
 
   // Filters
@@ -308,6 +309,19 @@ export default function OrderList() {
     }
   };
 
+  const handleSync = async () => {
+    try {
+      setSyncing(true);
+      const res = await syncOrders();
+      alert(res.message || 'Đồng bộ thành công.');
+      fetchOrdersData();
+    } catch (err: any) {
+      alert(err.message || 'Lỗi đồng bộ.');
+    } finally {
+      setSyncing(false);
+    }
+  };
+
   return (
     <div className="flex flex-col bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden h-[calc(100vh-120px)] font-sans">
       
@@ -338,6 +352,17 @@ export default function OrderList() {
           </form>
 
           <div className="flex items-center space-x-3">
+            {/* Đồng bộ từ Pancake button */}
+            <button 
+              onClick={handleSync}
+              disabled={syncing}
+              className={`flex items-center space-x-1.5 px-3 py-2 text-[13px] border border-gray-300 rounded-md bg-white text-gray-700 hover:bg-gray-50 focus:outline-none font-medium transition-colors ${syncing ? 'opacity-60 cursor-not-allowed' : ''}`}
+              title="Đồng bộ thủ công các đơn hàng mới nhất từ Pancake POS"
+            >
+              <RefreshCw size={15} className={syncing ? 'animate-spin text-blue-600' : 'text-gray-500'} />
+              <span>{syncing ? 'Đang đồng bộ...' : 'Đồng bộ Pancake'}</span>
+            </button>
+
             {/* Bộ lọc button & popover container */}
             <div className="relative z-50">
               <button 

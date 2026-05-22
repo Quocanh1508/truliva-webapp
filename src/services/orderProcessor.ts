@@ -10,13 +10,15 @@ import logger from '../utils/logger';
  *   3. Thay thế OrderItems (xóa cũ, tạo mới)
  *   4. Đánh dấu WebhookRawEvent = PROCESSED
  */
-export async function processOrderEvent(rawEventId: string, payload: any): Promise<void> {
+export async function processOrderEvent(rawEventId: string | null, payload: any): Promise<void> {
   try {
     const systemId = payload.system_id;
 
     if (!systemId) {
       logger.warn('Order event missing system_id, skipping', { rawEventId });
-      await markProcessed(rawEventId);
+      if (rawEventId) {
+        await markProcessed(rawEventId);
+      }
       return;
     }
 
@@ -188,7 +190,9 @@ export async function processOrderEvent(rawEventId: string, payload: any): Promi
     // ══════════════════════════════════════
     // 4. Đánh dấu raw event đã xử lý
     // ══════════════════════════════════════
-    await markProcessed(rawEventId);
+    if (rawEventId) {
+      await markProcessed(rawEventId);
+    }
 
     logger.info('Order processed successfully', {
       rawEventId,
@@ -205,7 +209,9 @@ export async function processOrderEvent(rawEventId: string, payload: any): Promi
       stack: error.stack,
     });
 
-    await markFailed(rawEventId, error.message);
+    if (rawEventId) {
+      await markFailed(rawEventId, error.message);
+    }
   }
 }
 

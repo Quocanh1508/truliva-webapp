@@ -3,6 +3,7 @@ import prisma from '../config/database';
 import logger from '../utils/logger';
 import { requireAuth, requireAdmin } from '../middleware/authSession';
 import { Prisma } from '@prisma/client';
+import { syncRecentOrders } from '../services/orderSyncScheduler';
 
 const router = Router();
 
@@ -328,6 +329,21 @@ router.patch('/:id', requireAuth, requireAdmin, async (req: Request, res: Respon
   } catch (error: any) {
     logger.error('Update order error', { error: error.message });
     res.status(500).json({ error: 'Lỗi cập nhật đơn hàng' });
+  }
+});
+
+/**
+ * POST /api/orders/sync
+ * Đồng bộ thủ công 50 đơn hàng gần nhất từ Pancake POS
+ */
+router.post('/sync', requireAuth, requireAdmin, async (req: Request, res: Response): Promise<void> => {
+  try {
+    logger.info('Manual orders sync initiated by admin', { userId: req.user?.id });
+    const count = await syncRecentOrders(50);
+    res.json({ success: true, message: `Đồng bộ thành công ${count} đơn hàng gần đây từ Pancake.` });
+  } catch (error: any) {
+    logger.error('Manual orders sync failed', { error: error.message });
+    res.status(500).json({ error: error.message || 'Lỗi đồng bộ đơn hàng từ Pancake' });
   }
 });
 

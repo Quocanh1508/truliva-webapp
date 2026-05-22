@@ -1,3 +1,5 @@
+import axios from 'axios';
+import prisma from '../config/database';
 import { processCustomerEvent } from './customerProcessor';
 import { processOrderEvent } from './orderProcessor';
 import logger from '../utils/logger';
@@ -31,6 +33,10 @@ async function processEventAsync(rawEventId: string, eventType: string, payload:
         await processCustomerEvent(rawEventId, payload);
         break;
 
+      case 'order_stock_update':
+        await handleOrderStockUpdateEvent(rawEventId, payload);
+        break;
+
       default:
         logger.info('Unhandled event category, raw data preserved', {
           rawEventId,
@@ -49,6 +55,65 @@ async function processEventAsync(rawEventId: string, eventType: string, payload:
 }
 
 /**
+ * Xử lý sự kiện đồng bộ hàng tồn kho (variations_warehouses) để kéo trạng thái đơn hàng.
+ * Đây là cơ chế tự phục hồi (Self-Healing Fallback) khi Pancake POS không gửi Webhook update đơn hàng.
+ */
+async function handleOrderStockUpdateEvent(rawEventId: string, payload: any): Promise<void> {
+  const orderId = payload.order_id || payload.system_id;
+  if (!orderId) {
+    logger.info('Stock update event does not contain order_id, skipping sync fallback', { rawEventId });
+    await prisma.webhookRawEvent.update({
+      where: { id: rawEventId },
+      data: { status: 'PROCESSED' },
+    });
+    return;
+  }
+
+  const apiKey = process.env.PANCAKE_API_KEY;
+  const shopId = '1635300067'; // Shop ID mặc định
+
+  if (!apiKey) {
+    logger.warn('PANCAKE_API_KEY is not defined in env, cannot run order sync fallback', { rawEventId, orderId });
+    await prisma.webhookRawEvent.update({
+      where: { id: rawEventId },
+      data: { status: 'FAILED', errorLog: 'Missing PANCAKE_API_KEY' },
+    });
+    return;
+  }
+
+  try {
+    logger.info('Running order sync fallback via stock update event', { rawEventId, orderId });
+    const response = await axios.get(`https://pos.pages.fm/api/v1/shops/${shopId}/orders/${orderId}`, {
+      params: { api_key: apiKey },
+      timeout: 10000 // 10 giây timeout
+    });
+
+    if (response.data && response.data.success && response.data.data) {
+      const orderPayload = response.data.data;
+      logger.info('Fetched latest order details, processing order update', { orderId });
+      // Tái sử dụng hàm processOrderEvent để cập nhật trạng thái đơn hàng
+      await processOrderEvent(rawEventId, orderPayload);
+    } else {
+      logger.warn('Failed to fetch order details from Pancake POS API', { orderId, data: response.data });
+      await prisma.webhookRawEvent.update({
+        where: { id: rawEventId },
+        data: { status: 'FAILED', errorLog: 'Pancake API returned success: false' },
+      });
+    }
+  } catch (error: any) {
+    logger.error('Error fetching order details in stock update fallback', {
+      rawEventId,
+      orderId,
+      error: error.message,
+    });
+    await prisma.webhookRawEvent.update({
+      where: { id: rawEventId },
+      data: { status: 'FAILED', errorLog: error.message },
+    });
+  }
+}
+
+/**
  * Phát hiện loại event dựa trên nội dung payload.
  * 
  * Logic ưu tiên:
@@ -56,11 +121,15 @@ async function processEventAsync(rawEventId: string, eventType: string, payload:
  *   2. Nếu eventType là hành động (create/update) → kiểm tra payload
  *   3. Kiểm tra các trường đặc trưng: system_id → order, id (UUID) → customer
  */
-function detectEventCategory(eventType: string, payload: any): 'order' | 'customer' | 'product' | 'unknown' {
+function detectEventCategory(eventType: string, payload: any): 'order' | 'customer' | 'product' | 'order_stock_update' | 'unknown' {
   const normalized = eventType.toLowerCase().trim();
 
   // ── Nhóm rõ ràng từ tên event hoặc payload.type ──
   const payloadType = (payload.type || '').toLowerCase();
+  
+  if (normalized === 'variations_warehouses' || payloadType === 'variations_warehouses') {
+    return 'order_stock_update';
+  }
   
   if (normalized === 'orders' || normalized === 'order' || normalized === 'order_created' || payloadType === 'orders') {
     return 'order';

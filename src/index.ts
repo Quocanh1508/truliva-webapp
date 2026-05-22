@@ -17,6 +17,7 @@ import orderRoutes from './routes/orders';
 import stationRoutes from './routes/stations';
 import dashboardRoutes from './routes/dashboard';
 import sampleImageRoutes from './routes/sampleImages';
+import { startOrderSyncScheduler } from './services/orderSyncScheduler';
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -130,6 +131,9 @@ app.listen(PORT, () => {
       'GET  /uploads',
     ],
   });
+
+  // Khởi động lập lịch đồng bộ đơn hàng tự động từ Pancake POS
+  startOrderSyncScheduler(5); // Chạy định kỳ mỗi 5 phút
 });
 
 export default app;
