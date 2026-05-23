@@ -241,7 +241,7 @@ export default function OrderList() {
     setWorkType(order.workType || '');
     setServiceType(order.serviceType || '');
 
-    // --- Smart Dispatching Logic ---
+    // --- Smart Dispatching Logic (Cải tiến) ---
     let matchedMain: any = null;
     let matchedTech: any = null;
     let bestKtv: any = null;
@@ -250,45 +250,57 @@ export default function OrderList() {
     const district = order.shippingAddress?.district_name || order.customer?.districtName || '';
     const fullAddress = order.shippingAddress?.full_address || order.customer?.fullAddress || '';
 
-    const cleanProvince = removeAccents(province);
-    const cleanDistrict = removeAccents(district);
-    const cleanFullAddress = removeAccents(fullAddress);
+    // Hàm chuẩn hóa chuỗi địa phương loại bỏ tiền tố tp., tinh, quan, huyen
+    const cleanLoc = (str: string) => {
+      if (!str) return '';
+      let clean = removeAccents(str);
+      return clean
+        .replace(/\btp\b\.?/g, '')
+        .replace(/\bthanh pho\b/g, '')
+        .replace(/\btinh\b/g, '')
+        .replace(/\bquan\b/g, '')
+        .replace(/\bhuyen\b/g, '')
+        .replace(/\bphuong\b/g, '')
+        .replace(/\bxa\b/g, '')
+        .replace(/[().-]/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+    };
 
-    // 1. Find matched main station
-    if (cleanProvince || cleanFullAddress) {
-      matchedMain = stations.find(s => {
-        const cleanName = removeAccents(s.name);
-        return (
-          (cleanProvince && (cleanProvince.includes(cleanName) || cleanName.includes(cleanProvince))) ||
-          (cleanFullAddress && cleanFullAddress.includes(cleanName))
-        );
-      }) || null;
-    }
+    const cleanProvince = cleanLoc(province);
+    const cleanDistrict = cleanLoc(district);
+    const cleanFullAddress = cleanLoc(fullAddress);
 
-    // 2. Find matched tech station
-    if (matchedMain && matchedMain.techStations && (cleanDistrict || cleanFullAddress)) {
-      matchedTech = matchedMain.techStations.find((t: any) => {
-        const cleanName = removeAccents(t.name);
-        return (
-          (cleanDistrict && (cleanDistrict.includes(cleanName) || cleanName.includes(cleanDistrict))) ||
-          (cleanFullAddress && cleanFullAddress.includes(cleanName))
-        );
-      }) || null;
-    } else if (cleanDistrict || cleanFullAddress) {
-      // Fallback search across all tech stations
-      for (const main of stations) {
-        if (main.techStations) {
-          const found = main.techStations.find((t: any) => {
-            const cleanName = removeAccents(t.name);
-            return (
-              (cleanDistrict && (cleanDistrict.includes(cleanName) || cleanName.includes(cleanDistrict))) ||
-              (cleanFullAddress && cleanFullAddress.includes(cleanName))
-            );
-          });
-          if (found) {
-            matchedTech = found;
+    // Duyệt qua tất cả các trạm kỹ thuật để tìm trạm khớp nhất với địa chỉ đơn hàng
+    let bestScore = 0;
+
+    for (const main of stations) {
+      if (main.techStations) {
+        for (const tech of main.techStations) {
+          // Lấy tên gốc của trạm (bỏ phần chú thích trong ngoặc đơn như "(Thủ Dầu Một)")
+          const baseTechName = tech.name.split('(')[0].trim();
+          const cleanTech = cleanLoc(baseTechName);
+
+          if (!cleanTech) continue;
+
+          let score = 0;
+          // Nếu địa chỉ đầy đủ chứa tên trạm kỹ thuật (độ ưu tiên cao nhất)
+          if (cleanFullAddress && cleanFullAddress.includes(cleanTech)) {
+            score = 10;
+          } 
+          // Hoặc nếu tỉnh/thành phố trùng khớp với tên trạm kỹ thuật
+          else if (cleanProvince && (cleanProvince.includes(cleanTech) || cleanTech.includes(cleanProvince))) {
+            score = 8;
+          }
+          // Hoặc quận/huyện trùng khớp
+          else if (cleanDistrict && (cleanDistrict.includes(cleanTech) || cleanTech.includes(cleanDistrict))) {
+            score = 6;
+          }
+
+          if (score > bestScore) {
+            bestScore = score;
+            matchedTech = tech;
             matchedMain = main;
-            break;
           }
         }
       }
