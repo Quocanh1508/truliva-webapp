@@ -250,18 +250,12 @@ export default function OrderList() {
     const district = order.shippingAddress?.district_name || order.customer?.districtName || '';
     const fullAddress = order.shippingAddress?.full_address || order.customer?.fullAddress || '';
 
-    // Hàm chuẩn hóa chuỗi địa phương loại bỏ tiền tố tp., tinh, quan, huyen
+    // Hàm chuẩn hóa chuỗi địa phương loại bỏ tiền tố tp., tinh, quan, huyen ở đầu chuỗi
     const cleanLoc = (str: string) => {
       if (!str) return '';
       let clean = removeAccents(str);
       return clean
-        .replace(/\btp\b\.?/g, '')
-        .replace(/\bthanh pho\b/g, '')
-        .replace(/\btinh\b/g, '')
-        .replace(/\bquan\b/g, '')
-        .replace(/\bhuyen\b/g, '')
-        .replace(/\bphuong\b/g, '')
-        .replace(/\bxa\b/g, '')
+        .replace(/^(tp\.?|thanh pho|tinh|quan|huyen|phuong|xa)\b/g, '')
         .replace(/[().-]/g, ' ')
         .replace(/\s+/g, ' ')
         .trim();
