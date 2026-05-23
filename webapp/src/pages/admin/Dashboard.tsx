@@ -53,7 +53,7 @@ export default function Dashboard() {
   // Loading & Tooltip States
   const [loadingOverview, setLoadingOverview] = useState(true);
   const [loadingAnalysis, setLoadingAnalysis] = useState(true);
-  const [tooltipContent, setTooltipContent] = useState('');
+  const [tooltipContent, setTooltipContent] = useState<React.ReactNode>('');
   const [chartType, setChartType] = useState<'stackedBar' | 'line'>('stackedBar');
 
   // Filter States
@@ -1149,8 +1149,7 @@ export default function Dashboard() {
                             const geoName = geo.properties.Name || geo.properties.name || geo.properties.ten_tinh;
                             
                             let dominantStation = 'Lack';
-                            let matchedCount = 0;
-                            
+                            let coverageDetail: any = null;
                             if (geoName) {
                               const cleanGeoName = removeVietnameseTones(geoName)
                                 .replace(/ Province| City/gi, '')
@@ -1165,8 +1164,8 @@ export default function Dashboard() {
                                 return cleanGeoName === cleanDbKey || cleanGeoName.includes(cleanDbKey) || cleanDbKey.includes(cleanGeoName);
                               });
                               if (foundKey) {
-                                dominantStation = coverage[foundKey].mainStationName;
-                                matchedCount = coverage[foundKey].count;
+                                coverageDetail = coverage[foundKey];
+                                dominantStation = coverageDetail.mainStationName;
                               }
                             }
 
@@ -1178,10 +1177,31 @@ export default function Dashboard() {
                                 stroke="#ffffff"
                                 strokeWidth={0.5}
                                 onMouseEnter={() => {
-                                  setTooltipContent(dominantStation === 'Lack' 
-                                    ? `${geoName || 'Không rõ'}: Chưa có đơn` 
-                                    : `${geoName || 'Không rõ'}: ${dominantStation} (${matchedCount} ca)`
-                                  );
+                                  if (!coverageDetail || dominantStation === 'Lack') {
+                                    setTooltipContent(`${geoName || 'Không rõ'}: Chưa có đơn`);
+                                  } else {
+                                    const sortedBreakdown = Object.entries(coverageDetail.breakdown || {})
+                                      .sort((a: any, b: any) => b[1] - a[1]);
+                                    setTooltipContent(
+                                      <div className="space-y-1.5 p-0.5 text-left font-medium min-w-[140px]">
+                                        <div className="font-bold text-[12px] border-b border-white/20 pb-1 mb-1 flex justify-between items-center gap-3">
+                                          <span>{geoName || 'Không rõ'}</span>
+                                          <span className="bg-white/20 px-1.5 py-0.5 rounded text-[10px] text-white">Tổng: {coverageDetail.total} ca</span>
+                                        </div>
+                                        <div className="space-y-1">
+                                          {sortedBreakdown.map(([station, count]) => (
+                                            <div key={station} className="flex justify-between items-center gap-4 text-[11px]">
+                                              <span className="flex items-center gap-1.5 text-gray-200">
+                                                <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: getStationColor(station) }}></span>
+                                                <span>{station}</span>
+                                              </span>
+                                              <span className="font-bold text-white">{(count as any)} ca</span>
+                                            </div>
+                                          ))}
+                                        </div>
+                                      </div>
+                                    );
+                                  }
                                 }}
                                 onMouseLeave={() => {
                                   setTooltipContent("");

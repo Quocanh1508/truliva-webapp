@@ -398,11 +398,13 @@ router.get('/dispatch-analysis', async (req: Request, res: Response): Promise<vo
       provinceToStationMap[prov][station] = (provinceToStationMap[prov][station] || 0) + 1;
     });
 
-    const mainStationCoverage: Record<string, { mainStationName: string; count: number }> = {};
+    const mainStationCoverage: Record<string, { mainStationName: string; count: number; total: number; breakdown: Record<string, number> }> = {};
     Object.entries(provinceToStationMap).forEach(([prov, stationsCountMap]) => {
       let dominantStation = 'Lack';
       let maxCount = 0;
+      let total = 0;
       Object.entries(stationsCountMap).forEach(([station, count]) => {
+        total += count;
         if (count > maxCount) {
           maxCount = count;
           dominantStation = station;
@@ -410,7 +412,9 @@ router.get('/dispatch-analysis', async (req: Request, res: Response): Promise<vo
       });
       mainStationCoverage[prov] = {
         mainStationName: dominantStation,
-        count: maxCount
+        count: maxCount,
+        total,
+        breakdown: stationsCountMap
       };
     });
 
