@@ -3,7 +3,16 @@ import { useNavigate } from 'react-router-dom';
 import { getOrders, updateOrder, getKtvUsers, getStations, getOrderAuditLog, syncOrders } from '../../api/client';
 import { Search, ChevronLeft, ChevronRight, History, Edit, XCircle, Filter, RefreshCw, FileText } from 'lucide-react';
 
-
+function removeAccents(str: string): string {
+  if (!str) return '';
+  return str
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/đ/g, 'd')
+    .replace(/Đ/g, 'D')
+    .toLowerCase()
+    .trim();
+}
 
 const ROW_STATUS_OPTIONS = [
   { value: 'chờ xử lý', label: 'Chờ xử lý' },
@@ -68,6 +77,11 @@ export default function OrderList() {
   const [rescheduleReason, setRescheduleReason] = useState('');
   const [workType, setWorkType] = useState('');
   const [serviceType, setServiceType] = useState('');
+
+  // Smart Dispatching Suggestions
+  const [suggestedMain, setSuggestedMain] = useState<any>(null);
+  const [suggestedTech, setSuggestedTech] = useState<any>(null);
+  const [suggestedKtv, setSuggestedKtv] = useState<any>(null);
 
   // Audit Log Modal
   const [auditModal, setAuditModal] = useState<{isOpen: boolean; orderId: string} | null>(null);
@@ -226,6 +240,72 @@ export default function OrderList() {
     setRescheduleReason(order.rescheduleReason || '');
     setWorkType(order.workType || '');
     setServiceType(order.serviceType || '');
+
+    // --- Smart Dispatching Logic ---
+    let matchedMain: any = null;
+    let matchedTech: any = null;
+    let bestKtv: any = null;
+
+    const province = order.shippingAddress?.province_name || order.customer?.provinceName || '';
+    const district = order.shippingAddress?.district_name || order.customer?.districtName || '';
+    const fullAddress = order.shippingAddress?.full_address || order.customer?.fullAddress || '';
+
+    const cleanProvince = removeAccents(province);
+    const cleanDistrict = removeAccents(district);
+    const cleanFullAddress = removeAccents(fullAddress);
+
+    // 1. Find matched main station
+    if (cleanProvince || cleanFullAddress) {
+      matchedMain = stations.find(s => {
+        const cleanName = removeAccents(s.name);
+        return (
+          (cleanProvince && (cleanProvince.includes(cleanName) || cleanName.includes(cleanProvince))) ||
+          (cleanFullAddress && cleanFullAddress.includes(cleanName))
+        );
+      }) || null;
+    }
+
+    // 2. Find matched tech station
+    if (matchedMain && matchedMain.techStations && (cleanDistrict || cleanFullAddress)) {
+      matchedTech = matchedMain.techStations.find((t: any) => {
+        const cleanName = removeAccents(t.name);
+        return (
+          (cleanDistrict && (cleanDistrict.includes(cleanName) || cleanName.includes(cleanDistrict))) ||
+          (cleanFullAddress && cleanFullAddress.includes(cleanName))
+        );
+      }) || null;
+    } else if (cleanDistrict || cleanFullAddress) {
+      // Fallback search across all tech stations
+      for (const main of stations) {
+        if (main.techStations) {
+          const found = main.techStations.find((t: any) => {
+            const cleanName = removeAccents(t.name);
+            return (
+              (cleanDistrict && (cleanDistrict.includes(cleanName) || cleanName.includes(cleanDistrict))) ||
+              (cleanFullAddress && cleanFullAddress.includes(cleanName))
+            );
+          });
+          if (found) {
+            matchedTech = found;
+            matchedMain = main;
+            break;
+          }
+        }
+      }
+    }
+
+    // 3. Find suggested KTV (freest KTV in matching tech station)
+    if (matchedTech) {
+      const techKtvs = allKtvs.filter(k => k.techStationId === matchedTech.id);
+      if (techKtvs.length > 0) {
+        const sorted = [...techKtvs].sort((a, b) => (a.pendingOrderCount || 0) - (b.pendingOrderCount || 0));
+        bestKtv = sorted[0];
+      }
+    }
+
+    setSuggestedMain(matchedMain);
+    setSuggestedTech(matchedTech);
+    setSuggestedKtv(bestKtv);
     
     setAssignModal({ isOpen: true, orderId: order.id, order });
   };
@@ -952,6 +1032,48 @@ export default function OrderList() {
               {/* Cột phải: Phân bổ */}
               <div className="space-y-4">
                 <h4 className="font-semibold text-gray-800 border-b pb-2">2. Phân bổ Kỹ thuật viên</h4>
+
+                {/* Gợi ý phân bổ thông minh */}
+                {(suggestedMain || suggestedTech) && (
+                  <div className="p-3 bg-blue-50 border border-blue-200 rounded-md text-sm space-y-2 col-span-2">
+                    <div className="flex items-center space-x-1 text-blue-800 font-semibold">
+                      <span>💡 Gợi ý phân bổ thông minh:</span>
+                    </div>
+                    <div className="text-gray-700 text-xs leading-relaxed">
+                      {suggestedMain && (
+                        <div>
+                          • Trạm chính gợi ý: <b>{suggestedMain.name}</b>
+                        </div>
+                      )}
+                      {suggestedTech && (
+                        <div>
+                          • Trạm kỹ thuật gợi ý: <b>{suggestedTech.name}</b>
+                        </div>
+                      )}
+                      {suggestedKtv && (
+                        <div>
+                          • KTV rảnh nhất khu vực: <b>{suggestedKtv.fullName}</b> ({suggestedKtv.pendingOrderCount || 0} đơn đang xử lý)
+                        </div>
+                      )}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (suggestedMain) setSelectedMain(suggestedMain.id);
+                        if (suggestedTech) {
+                          setSelectedTech(suggestedTech.id);
+                          if (suggestedKtv) {
+                            setKtvs([suggestedKtv]);
+                            setSelectedKtv(suggestedKtv.id);
+                          }
+                        }
+                      }}
+                      className="w-full mt-1 bg-blue-600 text-white text-xs py-1.5 px-3 rounded hover:bg-blue-700 font-semibold transition-colors focus:outline-none"
+                    >
+                      Áp dụng gợi ý trạm & KTV
+                    </button>
+                  </div>
+                )}
                 
                 <div>
                   <label className="block text-sm text-gray-600 mb-1">Trạm chính</label>
@@ -995,11 +1117,21 @@ export default function OrderList() {
                   <label className="block text-sm text-gray-600 mb-1">Kỹ thuật viên</label>
                   <select className="w-full border rounded p-2 text-sm outline-none focus:border-blue-500" value={selectedKtv} onChange={e => setSelectedKtv(e.target.value)} disabled={!selectedTech}>
                     <option value="">-- Chọn KTV --</option>
-                    {ktvs.map((k: any) => (
-                      <option key={k.id} value={k.id}>
-                        {k.fullName} — {k.pendingOrderCount || 0} đơn đang xử lý
-                      </option>
-                    ))}
+                    {(() => {
+                      const sortedKtvsForSelection = [...ktvs].sort((a: any, b: any) => {
+                        if (suggestedKtv && a.id === suggestedKtv.id) return -1;
+                        if (suggestedKtv && b.id === suggestedKtv.id) return 1;
+                        return (a.pendingOrderCount || 0) - (b.pendingOrderCount || 0);
+                      });
+                      return sortedKtvsForSelection.map((k: any) => {
+                        const isSuggested = suggestedKtv && k.id === suggestedKtv.id;
+                        return (
+                          <option key={k.id} value={k.id}>
+                            {isSuggested ? '⭐ Đề xuất: ' : ''}{k.fullName} — {k.pendingOrderCount || 0} đơn đang xử lý
+                          </option>
+                        );
+                      });
+                    })()}
                   </select>
                 </div>
 
