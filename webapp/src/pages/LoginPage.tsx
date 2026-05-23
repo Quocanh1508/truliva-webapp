@@ -27,6 +27,8 @@ export default function LoginPage() {
       
       if (data.user.role === 'ADMIN') {
         navigate('/admin');
+      } else if (data.user.role === 'DEV') {
+        navigate('/dev/feedbacks');
       } else {
         navigate('/ktv/report');
       }

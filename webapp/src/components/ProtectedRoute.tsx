@@ -22,9 +22,8 @@ export default function ProtectedRoute({ allowedRoles }: ProtectedRouteProps) {
   }
 
   if (allowedRoles && !allowedRoles.includes(user.role)) {
-    // Nếu là admin đi lạc vào route KTV thì về admin
     if (user.role === 'ADMIN') return <Navigate to="/admin" replace />;
-    // Nếu KTV đi lạc vào admin
+    if (user.role === 'DEV') return <Navigate to="/dev/feedbacks" replace />;
     return <Navigate to="/ktv/report" replace />;
   }
 

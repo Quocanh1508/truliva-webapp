@@ -20,6 +20,10 @@ import OrderList from './pages/admin/OrderList';
 import StationManage from './pages/admin/StationManage';
 import SampleImageManage from './pages/admin/SampleImageManage';
 
+// Feedback / DEV Pages
+import FeedbackPage from './pages/FeedbackPage';
+import FeedbackList from './pages/dev/FeedbackList';
+
 export default function App() {
   return (
     <AuthProvider>
@@ -45,9 +49,18 @@ export default function App() {
               <Route path="/admin/sample-images" element={<SampleImageManage />} />
             </Route>
 
+            {/* Dev Routes */}
+            <Route element={<ProtectedRoute allowedRoles={['DEV']} />}>
+              <Route path="/dev/feedbacks" element={<FeedbackList />} />
+            </Route>
+
             {/* Shared Routes */}
-            <Route element={<ProtectedRoute allowedRoles={['KTV', 'ADMIN']} />}>
+            <Route element={<ProtectedRoute allowedRoles={['KTV', 'ADMIN', 'DEV']} />}>
               <Route path="/change-password" element={<ChangePasswordPage />} />
+            </Route>
+
+            <Route element={<ProtectedRoute allowedRoles={['KTV', 'ADMIN']} />}>
+              <Route path="/feedback" element={<FeedbackPage />} />
             </Route>
           </Route>
 

@@ -1,14 +1,14 @@
 import { useState } from 'react';
 import { Outlet, useNavigate, useLocation, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { LogOut, Menu, X, FileText, List, Users, BarChart, ShoppingCart, Building, Key, Image as ImageIcon } from 'lucide-react';
+import { LogOut, Menu, X, FileText, List, Users, BarChart, ShoppingCart, Building, Key, Image as ImageIcon, MessageSquare } from 'lucide-react';
 
 export default function Layout() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const logoPath = user?.role === 'ADMIN' ? '/admin' : '/ktv/my-orders';
+  const logoPath = user?.role === 'ADMIN' ? '/admin' : (user?.role === 'DEV' ? '/dev/feedbacks' : '/ktv/my-orders');
 
   const handleLogout = async () => {
     await logout();
@@ -22,13 +22,18 @@ export default function Layout() {
     { name: 'Quản lý Trạm', path: '/admin/stations', icon: <Building size={20} /> },
     { name: 'Kỹ thuật viên', path: '/admin/users', icon: <Users size={20} /> },
     { name: 'Ảnh mẫu báo cáo', path: '/admin/sample-images', icon: <ImageIcon size={20} /> },
+    { name: 'Đóng góp ý kiến', path: '/feedback', icon: <MessageSquare size={20} /> },
+    { name: 'Đổi mật khẩu', path: '/change-password', icon: <Key size={20} /> },
+  ] : (user?.role === 'DEV' ? [
+    { name: 'Phản hồi người dùng', path: '/dev/feedbacks', icon: <MessageSquare size={20} /> },
     { name: 'Đổi mật khẩu', path: '/change-password', icon: <Key size={20} /> },
   ] : [
     { name: 'Đơn hàng được giao', path: '/ktv/my-orders', icon: <ShoppingCart size={20} /> },
     { name: 'Tạo báo cáo', path: '/ktv/report', icon: <FileText size={20} /> },
     { name: 'Báo cáo của tôi', path: '/ktv/my-reports', icon: <List size={20} /> },
+    { name: 'Đóng góp ý kiến', path: '/feedback', icon: <MessageSquare size={20} /> },
     { name: 'Đổi mật khẩu', path: '/change-password', icon: <Key size={20} /> },
-  ];
+  ]);
 
   const closeMenu = () => setMobileMenuOpen(false);
 

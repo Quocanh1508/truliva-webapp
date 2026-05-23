@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { fetchApi } from '../api/client';
 
-export type UserRole = 'KTV' | 'ADMIN';
+export type UserRole = 'KTV' | 'ADMIN' | 'DEV';
 
 export interface User {
   id: string;

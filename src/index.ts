@@ -17,6 +17,7 @@ import orderRoutes from './routes/orders';
 import stationRoutes from './routes/stations';
 import dashboardRoutes from './routes/dashboard';
 import sampleImageRoutes from './routes/sampleImages';
+import feedbackRoutes from './routes/feedbacks';
 import { startOrderSyncScheduler } from './services/orderSyncScheduler';
 
 const app = express();
@@ -90,6 +91,7 @@ app.use('/api/stations', stationRoutes);
 app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/upload', uploadRoutes);
 app.use('/api/sample-images', sampleImageRoutes);
+app.use('/api/feedbacks', feedbackRoutes);
 
 // ── Serve uploaded images ──
 app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));

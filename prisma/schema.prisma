@@ -186,6 +186,7 @@ model TechStation {
 enum UserRole {
   KTV
   ADMIN
+  DEV
 }
 
 // ── Tài khoản người dùng (KTV + Admin) ──
@@ -205,6 +206,7 @@ model User {
   serviceReports  ServiceReport[]
   assignedOrders  Order[]
   techStation     TechStation?  @relation(fields: [techStationId], references: [id])
+  feedbacks       Feedback[]
 
   @@map("users")
 }
@@ -272,4 +274,17 @@ model WorkTypeSampleImage {
 
   @@unique([workType, slotLabel])
   @@map("work_type_sample_images")
+}
+
+// ── Đóng góp ý kiến (Bug report / Feedback) ──
+model Feedback {
+  id          String   @id @default(uuid())
+  userId      String   @map("user_id")
+  content     String   @db.Text
+  imageUrls   String[] @map("image_urls")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("feedbacks")
 }

@@ -124,7 +124,7 @@ router.post('/', async (req: Request, res: Response): Promise<void> => {
         username: username.toLowerCase().trim(),
         passwordHash,
         fullName,
-        role: role === 'ADMIN' ? 'ADMIN' : 'KTV',
+        role: role === 'ADMIN' ? 'ADMIN' : (role === 'DEV' ? 'DEV' : 'KTV'),
         phoneNumber: phoneNumber || null,
         techStationId: techStationId || null,
       },
