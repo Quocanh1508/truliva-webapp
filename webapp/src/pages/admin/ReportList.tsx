@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { fetchApi } from '../../api/client';
 import { Download, CheckCircle, Clock, X, ExternalLink, Image as ImageIcon, Loader, Search } from 'lucide-react';
 
@@ -87,11 +88,14 @@ function ImageItem({ url, index }: { url: string; index: number }) {
 }
 
 export default function ReportList() {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const searchParam = searchParams.get('search') || '';
+
   const [reports, setReports] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [filterMonth, setFilterMonth] = useState('');
   const [openPopupId, setOpenPopupId] = useState<string | null>(null);
-  const [search, setSearch] = useState('');
+  const [search, setSearch] = useState(searchParam);
   const [datePreset, setDatePreset] = useState('');
   const [customStartDate, setCustomStartDate] = useState('');
   const [customEndDate, setCustomEndDate] = useState('');
@@ -128,16 +132,22 @@ export default function ReportList() {
   };
 
   useEffect(() => {
-    loadReports();
-  }, [filterMonth, datePreset, customStartDate, customEndDate]);
+    setSearch(searchParam);
+  }, [searchParam]);
 
-  const loadReports = async () => {
+  useEffect(() => {
+    loadReports(searchParam);
+  }, [filterMonth, datePreset, customStartDate, customEndDate, searchParam]);
+
+  const loadReports = async (overrideSearch?: string) => {
     setLoading(true);
     try {
       const params = new URLSearchParams();
       params.append('limit', '100');
       if (filterMonth) params.append('month', filterMonth);
-      if (search) params.append('search', search);
+      
+      const currentSearch = overrideSearch !== undefined ? overrideSearch : search;
+      if (currentSearch) params.append('search', currentSearch);
       
       const { startDate, endDate } = getDateRange();
       if (startDate) params.append('startDate', startDate);
@@ -154,7 +164,7 @@ export default function ReportList() {
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
-    loadReports();
+    setSearchParams(search ? { search } : {});
   };
 
   const handleExport = () => {

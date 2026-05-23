@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { getOrders, updateOrder, getKtvUsers, getStations, getOrderAuditLog, syncOrders } from '../../api/client';
-import { Search, ChevronLeft, ChevronRight, History, Edit, XCircle, Filter, RefreshCw } from 'lucide-react';
+import { Search, ChevronLeft, ChevronRight, History, Edit, XCircle, Filter, RefreshCw, FileText } from 'lucide-react';
 
 
 
@@ -12,6 +13,7 @@ const ROW_STATUS_OPTIONS = [
 ];
 
 export default function OrderList() {
+  const navigate = useNavigate();
   const [orders, setOrders] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
@@ -729,7 +731,7 @@ export default function OrderList() {
                 <th className="px-4 py-3 w-[80px]">Mã đơn</th>
                 <th className="px-4 py-3 w-[250px]">Khách hàng & Địa chỉ</th>
                 <th className="px-4 py-3 w-[250px]">Sản phẩm & Tiền thu</th>
-                <th className="px-4 py-3 w-[200px]">Ghi chú</th>
+                <th className="px-4 py-3 w-[320px]">Ghi chú</th>
                 <th className="px-4 py-3">Loại CV</th>
                 <th className="px-4 py-3">Ngày tạo</th>
                 <th className="px-4 py-3">Ngày hẹn</th>
@@ -771,7 +773,7 @@ export default function OrderList() {
                       <div className="text-blue-700 font-semibold mt-1">Thu: {(order.moneyToCollect || 0).toLocaleString('vi-VN')} đ</div>
                     </td>
                     <td className="px-4 py-3 whitespace-normal">
-                      <div className="text-gray-600 text-[12px] italic max-h-16 overflow-y-auto pr-1">
+                      <div className="text-gray-700 text-[13px] italic max-h-32 overflow-y-auto pr-1 whitespace-pre-wrap">
                         {order.note || '-'}
                       </div>
                     </td>
@@ -824,6 +826,11 @@ export default function OrderList() {
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex items-center justify-center gap-2">
+                        {order.serviceReports && order.serviceReports.length > 0 && (
+                          <button onClick={() => navigate(`/admin/reports?search=${order.pancakeOrderId}`)} className="p-1.5 text-emerald-600 hover:bg-emerald-50 rounded" title="Xem báo cáo dịch vụ">
+                            <FileText size={16} />
+                          </button>
+                        )}
                         <button onClick={() => openAssignModal(order)} className="p-1.5 text-blue-600 hover:bg-blue-50 rounded" title="Phân bổ / Chỉnh sửa">
                           <Edit size={16} />
                         </button>

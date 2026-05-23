@@ -213,6 +213,11 @@ router.get('/', requireAuth, async (req: Request, res: Response): Promise<void> 
                 }
               }
             }
+          },
+          serviceReports: {
+            select: {
+              id: true
+            }
           }
         }
       }),
