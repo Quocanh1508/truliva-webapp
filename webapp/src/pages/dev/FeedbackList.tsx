@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { fetchApi } from '../../api/client';
 import { MessageSquare, Trash2, Calendar, User as UserIcon, Shield, ExternalLink, X, Eye } from 'lucide-react';
 

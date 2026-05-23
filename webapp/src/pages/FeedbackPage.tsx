@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import { useState, useRef } from 'react';
 import { Camera, X, Send, CheckCircle, AlertCircle, MessageSquare } from 'lucide-react';
 import { uploadImages, fetchApi } from '../api/client';
 
