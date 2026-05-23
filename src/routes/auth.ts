@@ -1,5 +1,6 @@
 import { Router, Request, Response } from 'express';
 import bcrypt from 'bcryptjs';
+import jwt from 'jsonwebtoken';
 import prisma from '../config/database';
 import logger from '../utils/logger';
 import { requireAuth } from '../middleware/authSession';
@@ -34,15 +35,29 @@ router.post('/login', async (req: Request, res: Response): Promise<void> => {
       return;
     }
 
-    // Set session cookie (httpOnly, 7 ngày)
-    res.cookie('session_token', user.id, {
+    const jwtSecret = process.env.JWT_SECRET;
+    if (!jwtSecret) {
+      logger.error('JWT_SECRET is not configured in environment');
+      res.status(500).json({ error: 'Lỗi hệ thống' });
+      return;
+    }
+
+    // Generate JWT token
+    const token = jwt.sign(
+      { id: user.id, role: user.role },
+      jwtSecret,
+      { expiresIn: '7d' }
+    );
+
+    // Set session cookie with JWT token (httpOnly, 7 ngày)
+    res.cookie('session_token', token, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'lax',
       maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
     });
 
-    logger.info('User logged in', { userId: user.id, username: user.username });
+    logger.info('User logged in with JWT', { userId: user.id, username: user.username });
 
     res.json({
       user: {

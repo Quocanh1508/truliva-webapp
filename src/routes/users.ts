@@ -164,6 +164,10 @@ router.put('/:id', async (req: Request, res: Response): Promise<void> => {
     if (role !== undefined) updateData.role = role;
     if (techStationId !== undefined) updateData.techStationId = techStationId || null;
     if (password) {
+      if (password.length < 4) {
+        res.status(400).json({ error: 'Mật khẩu phải có ít nhất 4 ký tự' });
+        return;
+      }
       updateData.passwordHash = await bcrypt.hash(password, 10);
     }
 

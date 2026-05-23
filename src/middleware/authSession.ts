@@ -1,4 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
+import jwt from 'jsonwebtoken';
 import prisma from '../config/database';
 import logger from '../utils/logger';
 
@@ -18,7 +19,7 @@ declare global {
 
 /**
  * Middleware xác thực session.
- * Kiểm tra cookie "session_token" (chứa userId).
+ * Kiểm tra cookie "session_token" (chứa JWT).
  * Nếu hợp lệ, gắn user vào req.user.
  */
 export async function requireAuth(req: Request, res: Response, next: NextFunction): Promise<void> {
@@ -30,14 +31,34 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
       return;
     }
 
-    // Session token = userId (simple approach)
+    const jwtSecret = process.env.JWT_SECRET;
+    if (!jwtSecret) {
+      logger.error('JWT_SECRET is not configured in environment');
+      res.status(500).json({ error: 'Lỗi hệ thống' });
+      return;
+    }
+
+    let decoded: any;
+    try {
+      decoded = jwt.verify(sessionToken, jwtSecret);
+    } catch (err: any) {
+      logger.warn('Unauthorized attempt with invalid or expired JWT token', { error: err.message });
+      res.status(401).json({ error: 'Phiên đăng nhập không hợp lệ hoặc đã hết hạn' });
+      return;
+    }
+
+    if (!decoded || !decoded.id) {
+      res.status(401).json({ error: 'Phiên đăng nhập không hợp lệ' });
+      return;
+    }
+
     const user = await prisma.user.findUnique({
-      where: { id: sessionToken },
+      where: { id: decoded.id },
       select: { id: true, username: true, fullName: true, role: true, isActive: true },
     });
 
     if (!user || !user.isActive) {
-      res.status(401).json({ error: 'Phiên đăng nhập không hợp lệ' });
+      res.status(401).json({ error: 'Phiên đăng nhập không hợp lệ hoặc tài khoản đã bị vô hiệu hóa' });
       return;
     }
 
