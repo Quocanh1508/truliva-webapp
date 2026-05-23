@@ -130,3 +130,14 @@ export const getDashboardStats = async () => {
 export const deleteReport = async (id: string) => {
   return fetchApi(`/reports/${id}`, { method: 'DELETE' });
 };
+
+export const getDispatchAnalysis = async (params: Record<string, any> = {}) => {
+  const query = new URLSearchParams();
+  for (const [key, value] of Object.entries(params)) {
+    if (value !== undefined && value !== null && value !== '') {
+      query.append(key, String(value));
+    }
+  }
+  const q = query.toString();
+  return fetchApi(q ? `/dashboard/dispatch-analysis?${q}` : '/dashboard/dispatch-analysis');
+};
