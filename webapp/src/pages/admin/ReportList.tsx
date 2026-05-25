@@ -218,7 +218,8 @@ export default function ReportList() {
   };
 
   return (
-    <div className="animate-fade-in">
+    <>
+      <div className="animate-fade-in">
       <div className="flex justify-between items-center mb-6">
         <h2 className="font-bold text-2xl text-[#1B3A6B]">Danh sách báo cáo</h2>
         <button className="btn btn-outline flex items-center gap-2" onClick={handleExport}>
@@ -406,6 +407,7 @@ export default function ReportList() {
           </table>
         </div>
       )}
+      </div>
 
       {selectedDetailReport && (
         <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
@@ -626,6 +628,6 @@ export default function ReportList() {
           </div>
         </div>
       )}
-    </div>
+    </>
   );
 }
