@@ -61,8 +61,8 @@ export default function Dashboard() {
   // Filter States
   const [startDate, setStartDate] = useState(() => {
     const d = new Date();
-    // Default to 1st of current month
-    return new Date(d.getFullYear(), d.getMonth(), 1).toISOString().slice(0, 10);
+    // Default to January 1st of current year to load rich multi-month data by default
+    return new Date(d.getFullYear(), 0, 1).toISOString().slice(0, 10);
   });
   const [endDate, setEndDate] = useState(() => {
     const d = new Date();
@@ -522,7 +522,7 @@ export default function Dashboard() {
                               return <Cell key={`cell-${index}`} fill={colorsPalette[index % colorsPalette.length]} />;
                             })}
                           </Pie>
-                          <RechartsTooltip formatter={(value) => [`${value} đơn`, 'Số lượng']} />
+                          <RechartsTooltip formatter={(value, name) => [`${value} đơn`, name]} />
                         </PieChart>
                       </ResponsiveContainer>
                     )}
@@ -1048,7 +1048,7 @@ export default function Dashboard() {
                               return <Cell key={`cell-${index}`} fill={color} />;
                             })}
                           </Pie>
-                          <RechartsTooltip formatter={(value) => [`${value} đơn`, 'Số lượng']} />
+                          <RechartsTooltip formatter={(value, name) => [`${value} đơn`, name]} />
                         </PieChart>
                       </ResponsiveContainer>
                     )}
@@ -1288,7 +1288,7 @@ export default function Dashboard() {
                                 return <Cell key={`cell-${index}`} fill={getStationColor(entry.name)} />;
                               })}
                             </Pie>
-                            <RechartsTooltip formatter={(value) => [`${value} ca`, 'Khối lượng']} />
+                            <RechartsTooltip formatter={(value, name) => [`${value} ca`, name]} />
                           </PieChart>
                         </ResponsiveContainer>
                       )}
@@ -1486,7 +1486,7 @@ export default function Dashboard() {
                                 return <Cell key={`cell-${index}`} fill={colors[index % colors.length]} />;
                               })}
                             </Pie>
-                            <RechartsTooltip formatter={(value) => [`${value} ca`, 'Số lượng']} />
+                            <RechartsTooltip formatter={(value, name) => [`${value} ca`, name]} />
                           </PieChart>
                         </ResponsiveContainer>
                       )}
