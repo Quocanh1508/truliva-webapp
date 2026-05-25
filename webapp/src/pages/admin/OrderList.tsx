@@ -189,11 +189,14 @@ export default function OrderList() {
   // Filter KTVs based on tech station
   useEffect(() => {
     if (selectedTech) {
-      getKtvUsers({ techStationId: selectedTech }).then(data => setKtvs(data)).catch(console.error);
+      getKtvUsers({ 
+        techStationId: selectedTech, 
+        excludeOrderId: assignModal?.orderId 
+      }).then(data => setKtvs(data)).catch(console.error);
     } else {
       setKtvs([]);
     }
-  }, [selectedTech]);
+  }, [selectedTech, assignModal?.orderId]);
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
@@ -304,7 +307,16 @@ export default function OrderList() {
     if (matchedTech) {
       const techKtvs = allKtvs.filter(k => k.techStationId === matchedTech.id);
       if (techKtvs.length > 0) {
-        const sorted = [...techKtvs].sort((a, b) => (a.pendingOrderCount || 0) - (b.pendingOrderCount || 0));
+        // Exclude current order from counts for suggestion logic
+        const isCurrentOrderPending = order.adminStatus !== 'hủy đơn' && order.adminStatus !== 'hoàn thành' && (!order.serviceReports || order.serviceReports.length === 0);
+        const adjustedKtvs = techKtvs.map(k => {
+          let count = k.pendingOrderCount || 0;
+          if (isCurrentOrderPending && k.id === order.assignedKtvId && count > 0) {
+            count -= 1;
+          }
+          return { ...k, pendingOrderCount: count };
+        });
+        const sorted = adjustedKtvs.sort((a, b) => (a.pendingOrderCount || 0) - (b.pendingOrderCount || 0));
         bestKtv = sorted[0];
       }
     }

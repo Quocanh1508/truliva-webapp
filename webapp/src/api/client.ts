@@ -84,9 +84,10 @@ export async function syncOrders() {
   });
 }
 
-export async function getKtvUsers(params: { techStationId?: string } = {}) {
+export async function getKtvUsers(params: { techStationId?: string; excludeOrderId?: string } = {}) {
   const query = new URLSearchParams();
   if (params.techStationId) query.append('techStationId', params.techStationId);
+  if (params.excludeOrderId) query.append('excludeOrderId', params.excludeOrderId);
   const q = query.toString();
   return fetchApi(q ? `/users/ktvs?${q}` : '/users/ktvs');
 }

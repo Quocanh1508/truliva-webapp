@@ -16,7 +16,7 @@ const router = Router();
  */
 router.get('/ktvs', requireAuth, async (req: Request, res: Response): Promise<void> => {
   try {
-    const { techStationId } = req.query;
+    const { techStationId, excludeOrderId } = req.query;
     const where: any = { role: 'KTV', isActive: true };
     if (techStationId) where.techStationId = techStationId as string;
 
@@ -31,6 +31,7 @@ router.get('/ktvs', requireAuth, async (req: Request, res: Response): Promise<vo
         // Đếm đơn đang xử lý: chưa hủy VÀ chưa có báo cáo
         assignedOrders: {
           where: {
+            ...(excludeOrderId ? { id: { not: excludeOrderId as string } } : {}),
             adminStatus: { notIn: ['hủy đơn', 'hoàn thành'] },
             serviceReports: { none: {} }
           },
