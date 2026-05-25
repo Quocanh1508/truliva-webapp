@@ -871,7 +871,14 @@ export default function OrderList() {
                  
                  return (
                   <tr key={order.id} className={`${idx % 2 === 0 ? 'bg-white' : 'bg-[#fafafa]'} hover:bg-blue-50/50 transition-colors`}>
-                    <td className="px-4 py-3 font-medium">{order.pancakeOrderId}</td>
+                    <td className="px-4 py-3 font-medium">
+                      <div>#{order.pancakeOrderId}</div>
+                      {order.rawData?.id && order.rawData.id !== String(order.pancakeOrderId) && (
+                        <div className="text-[11px] font-normal text-gray-500 bg-gray-100 rounded px-1.5 py-0.5 mt-0.5 inline-block" title="Mã đơn sàn TMĐT">
+                          {order.rawData.id}
+                        </div>
+                      )}
+                    </td>
                     <td className="px-4 py-3 whitespace-normal">
                       <div className="font-medium text-gray-900">{customerName}</div>
                       <div className="text-gray-500 font-medium mb-1">{phone}</div>

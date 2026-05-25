@@ -155,6 +155,12 @@ router.get('/', requireAuth, async (req: Request, res: Response): Promise<void> 
       const searchOR: Prisma.OrderWhereInput[] = [
         { billFullName: { contains: searchStr, mode: 'insensitive' } },
         { billPhoneNumber: { contains: searchStr } },
+        {
+          rawData: {
+            path: ['id'],
+            equals: searchStr
+          }
+        }
       ];
       const pancakeId = parseInt(searchStr, 10);
       if (!isNaN(pancakeId)) {
