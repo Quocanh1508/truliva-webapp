@@ -19,6 +19,7 @@ function getRandomPhone(): string {
 }
 
 const REAL_PRODUCTS = [
+  'Máy lọc nước Truliva Premium',
   'Máy nóng lạnh treo tường Truliva W6412',
   'Máy lọc nước Truliva UR61096H',
   'Máy lọc nước Truliva UR5676',
@@ -116,9 +117,9 @@ async function main() {
         const product = REAL_PRODUCTS[Math.floor(Math.random() * REAL_PRODUCTS.length)];
         const serial = `TRL-${100000 + j}`;
         
-        // Ngày lắp đặt: ngẫu nhiên từ 01/12/2025 đến 30/03/2026
-        const start = new Date(2025, 11, 1).getTime();
-        const end = new Date(2026, 2, 30).getTime();
+        // Ngày lắp đặt: ngẫu nhiên từ 15/04/2026 đến 15/05/2026 để khớp với bộ lọc tháng 5/2026 của Dashboard
+        const start = new Date(2026, 3, 15).getTime();
+        const end = new Date(2026, 4, 15).getTime();
         const installDate = new Date(start + Math.random() * (end - start));
         
         const randomKtv = ktvs[Math.floor(Math.random() * ktvs.length)];
@@ -163,8 +164,8 @@ async function main() {
           serialNumber = vm.serial;
           province = vm.province;
           
-          // Ngày bảo hành = Ngày lắp đặt + ngẫu nhiên từ 10 đến 120 ngày
-          const daysAfter = Math.floor(Math.random() * 110) + 10;
+          // Ngày bảo hành = Ngày lắp đặt + ngẫu nhiên từ 5 đến 20 ngày (để rơi chủ yếu vào tháng 5/2026)
+          const daysAfter = Math.floor(Math.random() * 15) + 5;
           appointmentTime = new Date(vm.installDate.getTime() + daysAfter * 24 * 60 * 60 * 1000);
         } else if (i >= 110 && i < 150) {
           // Thay lọc
@@ -174,8 +175,8 @@ async function main() {
           serialNumber = vm.serial;
           province = vm.province;
           
-          // Ngày thay lọc = Ngày lắp đặt + ngẫu nhiên từ 60 đến 180 ngày
-          const daysAfter = Math.floor(Math.random() * 120) + 60;
+          // Ngày thay lọc = Ngày lắp đặt + ngẫu nhiên từ 10 đến 25 ngày (để rơi chủ yếu vào tháng 5/2026)
+          const daysAfter = Math.floor(Math.random() * 15) + 10;
           appointmentTime = new Date(vm.installDate.getTime() + daysAfter * 24 * 60 * 60 * 1000);
         } else {
           // Giao hàng thuần túy
@@ -183,9 +184,18 @@ async function main() {
           product = REAL_PRODUCTS[Math.floor(Math.random() * REAL_PRODUCTS.length)];
           serialNumber = null;
           
-          // Ngày giao hàng trong tháng 5/2026
-          const day = Math.floor(Math.random() * 31) + 1;
-          appointmentTime = new Date(2026, 4, day, 10, 0, 0);
+          // Ngày giao hàng phân bổ: 85% tháng 5/2026, 10% tháng 4/2026, 5% tháng 6/2026
+          const randMonth = Math.random();
+          if (randMonth <= 0.85) {
+            const day = Math.floor(Math.random() * 31) + 1;
+            appointmentTime = new Date(2026, 4, day, 10, 0, 0);
+          } else if (randMonth > 0.85 && randMonth <= 0.95) {
+            const day = Math.floor(Math.random() * 15) + 15;
+            appointmentTime = new Date(2026, 3, day, 10, 0, 0);
+          } else {
+            const day = Math.floor(Math.random() * 10) + 1;
+            appointmentTime = new Date(2026, 5, day, 10, 0, 0);
+          }
         }
 
         // Tỷ lệ trạng thái: 75% hoàn thành, 15% đang thực hiện, 8% chờ xử lý, 2% hủy đơn
