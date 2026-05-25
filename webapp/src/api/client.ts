@@ -165,3 +165,14 @@ export const getDispatchAnalysis = async (params: Record<string, any> = {}) => {
   const q = query.toString();
   return fetchApi(q ? `/dashboard/dispatch-analysis?${q}` : '/dashboard/dispatch-analysis');
 };
+
+export const getProductQualityAnalysis = async (params: Record<string, any> = {}) => {
+  const query = new URLSearchParams();
+  for (const [key, value] of Object.entries(params)) {
+    if (value !== undefined && value !== null && value !== '') {
+      query.append(key, String(value));
+    }
+  }
+  const q = query.toString();
+  return fetchApi(q ? `/dashboard/product-quality?${q}` : '/dashboard/product-quality');
+};

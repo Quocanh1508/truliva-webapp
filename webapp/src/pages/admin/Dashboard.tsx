@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { fetchApi, getDashboardStats, getStations, getDispatchAnalysis, getKtvUsers } from '../../api/client';
+import { fetchApi, getDashboardStats, getStations, getDispatchAnalysis, getKtvUsers, getProductQualityAnalysis } from '../../api/client';
 import { 
   FileText, CheckCircle, Clock, Building, MapPin, 
   AlertTriangle, Info, Filter, AlertCircle, RefreshCw, TrendingUp 
@@ -42,13 +42,15 @@ const STATUS_OPTIONS = [
 ];
 
 export default function Dashboard() {
-  const [activeTab, setActiveTab] = useState<'summary' | 'ontime' | 'late' | 'workload' | 'stationComp'>('summary');
+  const [activeTab, setActiveTab] = useState<'summary' | 'ontime' | 'late' | 'workload' | 'stationComp' | 'productQuality'>('summary');
   
   // Data States
   const [stats, setStats] = useState<any>(null);
   const [dashStats, setDashStats] = useState<any>(null);
   const [stationsList, setStationsList] = useState<any[]>([]);
   const [analysisData, setAnalysisData] = useState<any>(null);
+  const [qualityData, setQualityData] = useState<any>(null);
+  const [loadingQuality, setLoadingQuality] = useState(false);
   
   // Loading & Tooltip States
   const [loadingOverview, setLoadingOverview] = useState(true);
@@ -118,6 +120,24 @@ export default function Dashboard() {
       .catch(console.error)
       .finally(() => setLoadingAnalysis(false));
   }, [startDate, endDate, selectedProvince, selectedMainStation, selectedTechStation, selectedWorkType, selectedAdminStatus, selectedKtvId]);
+
+  // Fetch quality analysis data
+  useEffect(() => {
+    if (activeTab !== 'productQuality') return;
+    setLoadingQuality(true);
+    getProductQualityAnalysis({
+      startDate,
+      endDate,
+      province: selectedProvince,
+      mainStationId: selectedMainStation,
+      techStationId: selectedTechStation
+    })
+      .then(data => {
+        setQualityData(data);
+      })
+      .catch(console.error)
+      .finally(() => setLoadingQuality(false));
+  }, [activeTab, startDate, endDate, selectedProvince, selectedMainStation, selectedTechStation]);
 
   if (loadingOverview) {
     return (
@@ -347,6 +367,13 @@ export default function Dashboard() {
         >
           <Building size={15} />
           <span>Đối tác & Trạm chính</span>
+        </button>
+        <button 
+          onClick={() => setActiveTab('productQuality')}
+          className={`flex-1 md:flex-initial px-6 py-2.5 rounded-md text-sm font-semibold transition-all flex items-center justify-center space-x-1.5 ${activeTab === 'productQuality' ? 'bg-white text-orange-600 shadow-sm border border-gray-200' : 'text-gray-600 hover:text-gray-900 hover:bg-white/50'}`}
+        >
+          <AlertCircle size={15} />
+          <span>Chất lượng sản phẩm</span>
         </button>
       </div>
 
@@ -1295,6 +1322,273 @@ export default function Dashboard() {
                       })}
                     </div>
                   </div>
+                </div>
+              </div>
+            </>
+          )}
+        </div>
+      )}
+
+      {/* TAB CONTENT 6: PRODUCT QUALITY */}
+      {activeTab === 'productQuality' && (
+        <div className="space-y-6 animate-fade-in">
+          {loadingQuality ? (
+            <div className="flex flex-col items-center justify-center py-20 gap-3">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-orange-600"></div>
+              <p className="text-gray-500 text-xs">Đang phân tích chất lượng sản phẩm...</p>
+            </div>
+          ) : !qualityData ? (
+            <div className="alert alert-error">Lỗi khi tải phân tích chất lượng sản phẩm</div>
+          ) : (
+            <>
+              {/* Quality KPI Cards */}
+              <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
+                <div className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm border-l-4 border-blue-500 flex flex-col justify-between">
+                  <div className="text-gray-500 font-semibold text-xs flex items-center gap-1.5"><FileText size={14} /> TỔNG CA LẮP ĐẶT</div>
+                  <div className="text-3xl font-bold text-gray-900 mt-2">{qualityData.summary.totalInstalls}</div>
+                </div>
+                
+                <div className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm border-l-4 border-red-500 flex flex-col justify-between">
+                  <div className="text-red-600 font-semibold text-xs flex items-center gap-1.5"><AlertCircle size={14} /> TỔNG CA SỰ CỐ / LỖI</div>
+                  <div className="text-3xl font-bold text-gray-900 mt-2">{qualityData.summary.totalIssues}</div>
+                </div>
+
+                <div className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm border-l-4 border-orange-500 flex flex-col justify-between">
+                  <div className="text-orange-600 font-semibold text-xs flex items-center gap-1.5"><AlertTriangle size={14} /> MÁY GẶP SỰ CỐ SAU LẮP</div>
+                  <div className="text-3xl font-bold text-gray-900 mt-2">{qualityData.summary.machinesWithIssues}</div>
+                </div>
+
+                <div className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm border-l-4 border-emerald-500 flex flex-col justify-between col-span-2">
+                  <div className="text-emerald-600 font-semibold text-xs flex items-center gap-1.5"><Clock size={14} /> THỜI GIAN TB HỎNG SAU LẮP</div>
+                  <div className="text-3xl font-bold text-gray-900 mt-2">
+                    {qualityData.summary.avgDaysToFailure > 0 ? `${qualityData.summary.avgDaysToFailure} ngày` : 'Chưa ghi nhận'}
+                  </div>
+                  <p className="text-[10px] text-gray-400 mt-1">* Tính từ lúc lắp máy đến khi phát sinh ca bảo hành/sửa chữa đầu tiên</p>
+                </div>
+              </div>
+
+              {/* Charts Row 1: Product & Area Issues */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                {/* 1. Dòng máy thường gặp sự cố */}
+                <div className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm flex flex-col h-[350px]">
+                  <h3 className="font-bold text-sm text-gray-800 border-b pb-3 mb-4">Dòng máy thường gặp sự cố (Số ca Bảo hành/Sửa chữa)</h3>
+                  <div className="flex-1 w-full">
+                    {qualityData.productIssues.length === 0 ? (
+                      <div className="h-full flex items-center justify-center text-gray-400 text-sm">Chưa có dữ liệu sự cố dòng máy</div>
+                    ) : (
+                      <ResponsiveContainer width="100%" height="100%">
+                        <BarChart data={qualityData.productIssues.slice(0, 10)} margin={{ top: 5, right: 10, left: -25, bottom: 20 }}>
+                          <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e7eb" />
+                          <XAxis 
+                            dataKey="name" 
+                            axisLine={false} 
+                            tickLine={false} 
+                            interval={0}
+                            height={40}
+                            tick={{fill: '#6b7280', fontSize: 10}}
+                          />
+                          <YAxis axisLine={false} tickLine={false} tick={{fill: '#6b7280', fontSize: 11}} />
+                          <RechartsTooltip contentStyle={{borderRadius: '8px', border: 'none'}} />
+                          <Bar dataKey="total" name="Số ca lỗi" fill="#ef4444" radius={[4, 4, 0, 0]} />
+                        </BarChart>
+                      </ResponsiveContainer>
+                    )}
+                  </div>
+                </div>
+
+                {/* 2. Khu vực thường gặp sự cố */}
+                <div className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm flex flex-col h-[350px]">
+                  <h3 className="font-bold text-sm text-gray-800 border-b pb-3 mb-4">Khu vực thường gặp sự cố (Tỉnh / Thành phố)</h3>
+                  <div className="flex-1 w-full">
+                    {qualityData.provinceIssues.length === 0 ? (
+                      <div className="h-full flex items-center justify-center text-gray-400 text-sm">Chưa có dữ liệu sự cố theo khu vực</div>
+                    ) : (
+                      <ResponsiveContainer width="100%" height="100%">
+                        <BarChart data={qualityData.provinceIssues.slice(0, 10)} margin={{ top: 5, right: 10, left: -25, bottom: 20 }}>
+                          <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e7eb" />
+                          <XAxis 
+                            dataKey="name" 
+                            axisLine={false} 
+                            tickLine={false} 
+                            interval={0}
+                            height={40}
+                            tick={{fill: '#6b7280', fontSize: 9, angle: -15, textAnchor: 'end'}}
+                          />
+                          <YAxis axisLine={false} tickLine={false} tick={{fill: '#6b7280', fontSize: 11}} />
+                          <RechartsTooltip contentStyle={{borderRadius: '8px', border: 'none'}} />
+                          <Bar dataKey="total" name="Số ca lỗi" fill="#6366f1" radius={[4, 4, 0, 0]} />
+                        </BarChart>
+                      </ResponsiveContainer>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Charts Row 2: Monthly trend of issue types & Lifecycle distribution */}
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                {/* 3. Tỷ lệ loại sự cố theo tháng */}
+                <div className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm flex flex-col h-[400px] lg:col-span-2">
+                  <h3 className="font-bold text-sm text-gray-800 border-b pb-3 mb-4">Cơ cấu & Xu hướng loại sự cố theo Tháng</h3>
+                  <div className="flex-1 w-full">
+                    {qualityData.monthlyIssuesTrend.length === 0 ? (
+                      <div className="h-full flex items-center justify-center text-gray-400 text-sm">Chưa có dữ liệu sự cố hàng tháng</div>
+                    ) : (
+                      <ResponsiveContainer width="100%" height="100%">
+                        <BarChart 
+                          data={qualityData.monthlyIssuesTrend.map((item: any) => ({
+                            month: item.month,
+                            ...item.issues
+                          }))} 
+                          margin={{ top: 5, right: 10, left: -25, bottom: 5 }}
+                        >
+                          <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e7eb" />
+                          <XAxis dataKey="month" tickLine={false} tick={{fill: '#6b7280', fontSize: 11}} />
+                          <YAxis axisLine={false} tickLine={false} tick={{fill: '#6b7280', fontSize: 11}} />
+                          <RechartsTooltip contentStyle={{borderRadius: '8px', border: 'none'}} />
+                          <Legend wrapperStyle={{fontSize: 11, paddingTop: 10}} />
+                          {(() => {
+                            const issueKeys = Array.from(new Set(
+                              qualityData.monthlyIssuesTrend.flatMap((item: any) => Object.keys(item.issues))
+                            ));
+                            const colors = ['#0ea5e9', '#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#ef4444', '#14b8a6', '#f43f5e', '#6366f1'];
+                            return issueKeys.map((key: any, idx: number) => (
+                              <Bar key={key} dataKey={key} name={key} stackId="a" fill={colors[idx % colors.length]} />
+                            ));
+                          })()}
+                        </BarChart>
+                      </ResponsiveContainer>
+                    )}
+                  </div>
+                </div>
+
+                {/* 4. Phân bổ thời gian hỏng sau lắp */}
+                <div className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm flex flex-col h-[400px]">
+                  <h3 className="font-bold text-sm text-gray-800 border-b pb-3 mb-4">Khoảng thời gian hỏng sau khi lắp</h3>
+                  <div className="flex-1 flex flex-col justify-center items-center relative">
+                    <div className="w-full h-[200px]">
+                      {qualityData.lifecycleList.length === 0 ? (
+                        <div className="h-full flex items-center justify-center text-gray-400 text-sm">Chưa ghi nhận ca lỗi liên kết lắp đặt</div>
+                      ) : (
+                        <ResponsiveContainer width="100%" height="100%">
+                          <PieChart>
+                            <Pie
+                              data={qualityData.durationDist}
+                              cx="50%"
+                              cy="50%"
+                              innerRadius={55}
+                              outerRadius={75}
+                              paddingAngle={3}
+                              dataKey="value"
+                              nameKey="name"
+                            >
+                              {qualityData.durationDist.map((_: any, index: number) => {
+                                const colors = ['#ef4444', '#f59e0b', '#3b82f6', '#10b981'];
+                                return <Cell key={`cell-${index}`} fill={colors[index % colors.length]} />;
+                              })}
+                            </Pie>
+                            <RechartsTooltip formatter={(value) => [`${value} ca`, 'Số lượng']} />
+                          </PieChart>
+                        </ResponsiveContainer>
+                      )}
+                    </div>
+                    
+                    {/* Bảng chú thích */}
+                    <div className="w-full mt-4 space-y-1.5 text-xs text-gray-600 px-2">
+                      {qualityData.durationDist.map((entry: any, index: number) => {
+                        const colors = ['#ef4444', '#f59e0b', '#3b82f6', '#10b981'];
+                        const total = qualityData.summary.machinesWithIssues || 1;
+                        const pct = Math.round((entry.value / total) * 100);
+                        return (
+                          <div key={index} className="flex justify-between items-center border-b border-gray-50 pb-1">
+                            <div className="flex items-center space-x-2">
+                              <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: colors[index % colors.length] }}></span>
+                              <span className="font-medium text-gray-700">{entry.name}</span>
+                            </div>
+                            <div className="text-right space-x-2">
+                              <span className="font-bold text-gray-800">{entry.value} ca</span>
+                              <span className="text-gray-400">({pct}%)</span>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* BẢNG CHI TIẾT SỰ CỐ & LINH KIỆN THAY THẾ */}
+              <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden flex flex-col">
+                <div className="px-5 py-4 border-b border-gray-200 bg-gray-50/50 flex justify-between items-center">
+                  <h3 className="font-bold text-base text-gray-800 flex items-center gap-1.5">
+                    <FileText size={17} className="text-orange-500" />
+                    Báo cáo Chi tiết Sự cố & Linh kiện thay thế mỗi case
+                  </h3>
+                  <span className="bg-orange-100 text-orange-800 text-xs font-semibold px-2.5 py-0.5 rounded-full">
+                    {qualityData.cases.length} case ghi nhận
+                  </span>
+                </div>
+                
+                <div className="overflow-x-auto max-h-[450px]">
+                  {qualityData.cases.length === 0 ? (
+                    <div className="text-center py-10 text-gray-500 text-sm">Chưa ghi nhận ca thay thế linh kiện hoặc báo cáo sự cố nào.</div>
+                  ) : (
+                    <table className="w-full text-left text-xs whitespace-nowrap divide-y divide-gray-100">
+                      <thead className="bg-[#f8f9fa] text-gray-600 font-semibold uppercase tracking-wider sticky top-0">
+                        <tr>
+                          <th className="px-5 py-3">Mã đơn</th>
+                          <th className="px-5 py-3">KTV Báo Cáo</th>
+                          <th className="px-5 py-3">Số Serial Máy</th>
+                          <th className="px-5 py-3">Dòng máy</th>
+                          <th className="px-5 py-3">Khu vực</th>
+                          <th className="px-5 py-3">Nguyên nhân / Sự cố</th>
+                          <th className="px-5 py-3">Cách xử lý của KTV</th>
+                          <th className="px-5 py-3">Linh kiện thay thế</th>
+                          <th className="px-5 py-3">Thời gian tạo</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-100 bg-white">
+                        {qualityData.cases.map((c: any, index: number) => (
+                          <tr key={index} className="hover:bg-gray-50 transition-colors">
+                            <td className="px-5 py-3.5 font-bold text-blue-700">
+                              {c.pancakeOrderId ? `#${c.pancakeOrderId}` : 'Khác'}
+                            </td>
+                            <td className="px-5 py-3.5 text-gray-900 font-medium">{c.ktvName}</td>
+                            <td className="px-5 py-3.5 text-gray-700 font-mono">{c.serialNumber}</td>
+                            <td className="px-5 py-3.5 text-gray-600 max-w-[200px] overflow-hidden text-ellipsis">
+                              {c.products.join(', ')}
+                            </td>
+                            <td className="px-5 py-3.5 text-gray-500">{c.province}</td>
+                            <td className="px-5 py-3.5">
+                              <span className="inline-block px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-red-50 text-red-700 border border-red-150">
+                                {c.issueType}
+                              </span>
+                            </td>
+                            <td className="px-5 py-3.5">
+                              <span className="inline-block px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-150">
+                                {c.handlingMethod}
+                              </span>
+                            </td>
+                            <td className="px-5 py-3.5 max-w-[250px] overflow-hidden text-ellipsis">
+                              <div className="flex flex-wrap gap-1">
+                                {c.spareParts.length > 0 ? (
+                                  c.spareParts.map((p: string, pIdx: number) => (
+                                    <span key={pIdx} className="px-2 py-0.5 bg-blue-50 text-blue-700 rounded border border-blue-100 text-[10px] font-semibold">
+                                      {p}
+                                    </span>
+                                  ))
+                                ) : (
+                                  <span className="text-gray-400 italic">Không có</span>
+                                )}
+                              </div>
+                            </td>
+                            <td className="px-5 py-3.5 text-gray-400">
+                              {new Date(c.createdAt).toLocaleDateString('vi-VN')} {new Date(c.createdAt).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  )}
                 </div>
               </div>
             </>

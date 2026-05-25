@@ -42,6 +42,25 @@ const WATER_SOURCES = [
   'Nước mưa',
 ];
 
+// ── Nguyên nhân sự cố và Cách xử lý options ──
+const ISSUE_TYPES = [
+  'Rò rỉ nước',
+  'Lỗi nguồn / Mạch điện',
+  'Nước không nóng',
+  'Nước không lạnh',
+  'Bơm kêu to / Không hoạt động',
+  'Chất lượng nước đầu ra không đạt (TDS cao)',
+  'Khác (Nhập chi tiết phía dưới)',
+];
+
+const HANDLING_METHODS = [
+  'Thay thế linh kiện phát sinh',
+  'Sửa chữa mạch / Đường nước',
+  'Căn chỉnh áp suất / Vệ sinh máy',
+  'Hướng dẫn khách hàng sử dụng',
+  'Khác (Nhập chi tiết phía dưới)',
+];
+
 // ── Kiểm tra workType có cần trường kỹ thuật không ──
 function needsTechnicalFields(workType: string): boolean {
   return ['Thay lọc', 'Lắp đặt', 'Giao hàng và Lắp đặt', 'Bảo hành', 'Sửa chữa'].includes(workType);
@@ -81,6 +100,10 @@ export default function ReportForm() {
   const [tdsOut, setTdsOut] = useState('');
   const [waterPressure, setWaterPressure] = useState('');
   const [spareParts, setSpareParts] = useState<string[]>([]);
+  const [issueType, setIssueType] = useState('');
+  const [customIssueType, setCustomIssueType] = useState('');
+  const [handlingMethod, setHandlingMethod] = useState('');
+  const [customHandlingMethod, setCustomHandlingMethod] = useState('');
 
   // ── Step 3: Ảnh ──
   const [imageUrls, setImageUrls] = useState<string[]>([]);
@@ -151,6 +174,12 @@ export default function ReportForm() {
     if (needsTechnicalFields(workType)) {
       if (!waterSource || !tdsIn || !tdsOut || !waterPressure) return false;
     }
+    if (['Bảo hành', 'Sửa chữa'].includes(workType)) {
+      if (!issueType) return false;
+      if (issueType === 'Khác (Nhập chi tiết phía dưới)' && !customIssueType) return false;
+      if (!handlingMethod) return false;
+      if (handlingMethod === 'Khác (Nhập chi tiết phía dưới)' && !customHandlingMethod) return false;
+    }
     return true;
   };
 
@@ -158,6 +187,14 @@ export default function ReportForm() {
     e.preventDefault();
     setError('');
     setLoading(true);
+
+    const finalIssueType = ['Bảo hành', 'Sửa chữa'].includes(workType)
+      ? (issueType === 'Khác (Nhập chi tiết phía dưới)' ? customIssueType : issueType)
+      : null;
+
+    const finalHandlingMethod = ['Bảo hành', 'Sửa chữa'].includes(workType)
+      ? (handlingMethod === 'Khác (Nhập chi tiết phía dưới)' ? customHandlingMethod : handlingMethod)
+      : null;
 
     try {
       await fetchApi('/reports', {
@@ -178,6 +215,8 @@ export default function ReportForm() {
           tdsOut: needsTechnicalFields(workType) ? tdsOut : null,
           waterPressure: needsTechnicalFields(workType) ? waterPressure : null,
           spareParts: needsSpareParts(workType) ? spareParts : [],
+          issueType: finalIssueType,
+          handlingMethod: finalHandlingMethod,
           notes,
           imageUrls,
           orderId: selectedOrderId,
@@ -442,6 +481,73 @@ export default function ReportForm() {
               </>
             )}
 
+            {/* Nguyên nhân sự cố và Cách xử lý — chỉ dành cho Bảo hành / Sửa chữa */}
+            {['Bảo hành', 'Sửa chữa'].includes(workType) && (
+              <div style={{ borderTop: '1px dashed #cbd5e1', marginTop: '16px', paddingTop: '16px' }}>
+                <div className="form-group">
+                  <label className="form-label">Nguyên nhân / Loại sự cố *</label>
+                  <select 
+                    className="form-select" 
+                    value={issueType} 
+                    onChange={e => {
+                      setIssueType(e.target.value);
+                      if (e.target.value !== 'Khác (Nhập chi tiết phía dưới)') {
+                        setCustomIssueType('');
+                      }
+                    }} 
+                    required
+                  >
+                    <option value="">-- Chọn Nguyên nhân / Loại sự cố --</option>
+                    {ISSUE_TYPES.map(i => <option key={i} value={i}>{i}</option>)}
+                  </select>
+                </div>
+                {issueType === 'Khác (Nhập chi tiết phía dưới)' && (
+                  <div className="form-group">
+                    <label className="form-label">Chi tiết nguyên nhân sự cố *</label>
+                    <input 
+                      type="text" 
+                      className="form-input" 
+                      placeholder="Mô tả nguyên nhân lỗi..." 
+                      value={customIssueType} 
+                      onChange={e => setCustomIssueType(e.target.value)} 
+                      required 
+                    />
+                  </div>
+                )}
+
+                <div className="form-group">
+                  <label className="form-label">Cách xử lý của KTV *</label>
+                  <select 
+                    className="form-select" 
+                    value={handlingMethod} 
+                    onChange={e => {
+                      setHandlingMethod(e.target.value);
+                      if (e.target.value !== 'Khác (Nhập chi tiết phía dưới)') {
+                        setCustomHandlingMethod('');
+                      }
+                    }} 
+                    required
+                  >
+                    <option value="">-- Chọn Cách xử lý --</option>
+                    {HANDLING_METHODS.map(h => <option key={h} value={h}>{h}</option>)}
+                  </select>
+                </div>
+                {handlingMethod === 'Khác (Nhập chi tiết phía dưới)' && (
+                  <div className="form-group">
+                    <label className="form-label">Chi tiết cách xử lý *</label>
+                    <input 
+                      type="text" 
+                      className="form-input" 
+                      placeholder="Mô tả cách xử lý lỗi..." 
+                      value={customHandlingMethod} 
+                      onChange={e => setCustomHandlingMethod(e.target.value)} 
+                      required 
+                    />
+                  </div>
+                )}
+              </div>
+            )}
+
             {/* Seri sản phẩm — tất cả loại */}
             <div className="form-group">
               <label className="form-label">Seri sản phẩm *</label>
@@ -549,6 +655,18 @@ export default function ReportForm() {
                 )}
                 <span className="text-gray-500">Seri SP:</span>
                 <span className="font-medium">{serialNumber}</span>
+                {['Bảo hành', 'Sửa chữa'].includes(workType) && (
+                  <>
+                    <span className="text-gray-500">Nguyên nhân sự cố:</span>
+                    <span className="font-medium">
+                      {issueType === 'Khác (Nhập chi tiết phía dưới)' ? customIssueType : issueType}
+                    </span>
+                    <span className="text-gray-500">Cách xử lý:</span>
+                    <span className="font-medium">
+                      {handlingMethod === 'Khác (Nhập chi tiết phía dưới)' ? customHandlingMethod : handlingMethod}
+                    </span>
+                  </>
+                )}
                 {needsTechnicalFields(workType) && (
                   <>
                     <span className="text-gray-500">Nguồn nước:</span>

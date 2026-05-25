@@ -38,6 +38,8 @@ router.post('/', async (req: Request, res: Response): Promise<void> => {
       tdsOut,
       waterPressure,
       spareParts,
+      issueType,
+      handlingMethod,
     } = req.body;
 
     // Validation
@@ -79,6 +81,8 @@ router.post('/', async (req: Request, res: Response): Promise<void> => {
         tdsOut: tdsOut ? parseFloat(tdsOut) : null,
         waterPressure: waterPressure ? parseFloat(waterPressure) : null,
         spareParts: spareParts || [],
+        issueType: issueType || null,
+        handlingMethod: handlingMethod || null,
       } as any,
       include: {
         ktvUser: { select: { fullName: true } },
@@ -343,6 +347,8 @@ router.get('/export', requireAdmin, async (req: Request, res: Response): Promise
       { header: 'Sản phẩm', key: 'products', width: 40 },
       { header: 'Loại dịch vụ', key: 'serviceType', width: 25 },
       { header: 'Số serial', key: 'serialNumber', width: 22 },
+      { header: 'Nguyên nhân / Sự cố', key: 'issueType', width: 25 },
+      { header: 'Cách xử lý', key: 'handlingMethod', width: 25 },
       { header: 'Nguồn nước', key: 'waterSource', width: 20 },
       { header: 'TDS đầu vào (ppm)', key: 'tdsIn', width: 18 },
       { header: 'TDS đầu ra (ppm)', key: 'tdsOut', width: 18 },
@@ -374,6 +380,8 @@ router.get('/export', requireAdmin, async (req: Request, res: Response): Promise
         products: r.products.join(', '),
         serviceType: r.serviceType,
         serialNumber: r.serialNumber || '',
+        issueType: r.issueType || '',
+        handlingMethod: r.handlingMethod || '',
         waterSource: r.waterSource || '',
         tdsIn: r.tdsIn || '',
         tdsOut: r.tdsOut || '',

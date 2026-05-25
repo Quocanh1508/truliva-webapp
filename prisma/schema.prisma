@@ -254,6 +254,8 @@ model ServiceReport {
   tdsOut            Float?    @map("tds_out")              // TDS đầu ra (ppm)
   waterPressure     Float?    @map("water_pressure")       // Áp suất nước đầu vào (psi)
   spareParts        String[]  @map("spare_parts")          // Linh kiện phát sinh (multi-select)
+  issueType         String?   @map("issue_type")           // Loại sự cố / Nguyên nhân
+  handlingMethod    String?   @map("handling_method")      // Cách xử lý của KTV
   createdAt         DateTime  @default(now()) @map("created_at")
   updatedAt         DateTime  @updatedAt @map("updated_at")
 
