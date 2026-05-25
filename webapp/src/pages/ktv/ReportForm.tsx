@@ -2,7 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { fetchApi, getOrders } from '../../api/client';
 import LabeledImageUploader from '../../components/LabeledImageUploader';
-import { CheckCircle, ChevronLeft, Send, AlertCircle } from 'lucide-react';
+import { CheckCircle, ChevronLeft, Send, AlertCircle, Camera, Loader2 } from 'lucide-react';
+import { Html5Qrcode } from 'html5-qrcode';
 
 import { WORK_TYPES, WORK_TYPE_SERVICES, getImageSlots } from '../../utils/workTypes';
 
@@ -105,11 +106,101 @@ export default function ReportForm() {
   const [handlingMethod, setHandlingMethod] = useState('');
   const [customHandlingMethod, setCustomHandlingMethod] = useState('');
 
+  // ── Thống kê kiểm tra Serial ──
+  const [serialChecking, setSerialChecking] = useState(false);
+  const [serialInfo, setSerialInfo] = useState<any>(null);
+  const [serialWarning, setSerialWarning] = useState('');
+  const [showScanner, setShowScanner] = useState(false);
+
   // ── Step 3: Ảnh ──
   const [imageUrls, setImageUrls] = useState<string[]>([]);
 
   // ── Step 4: Ghi chú & Submit ──
   const [notes, setNotes] = useState('');
+
+  // Định dạng hiển thị Số Serial dạng: XXXX XXX XXX XXXXX
+  const formatSerialNumber = (value: string): string => {
+    const clean = value.replace(/[^a-zA-Z0-9]/g, '').substring(0, 15);
+    let formatted = '';
+    if (clean.length > 0) {
+      formatted += clean.substring(0, 4);
+    }
+    if (clean.length > 4) {
+      formatted += ' ' + clean.substring(4, 7);
+    }
+    if (clean.length > 7) {
+      formatted += ' ' + clean.substring(7, 10);
+    }
+    if (clean.length > 10) {
+      formatted += ' ' + clean.substring(10, 15);
+    }
+    return formatted.trim();
+  };
+
+  const checkSerial = async (serial: string) => {
+    const clean = serial.replace(/[^a-zA-Z0-9]/g, '');
+    if (clean.length < 5) {
+      setSerialInfo(null);
+      setSerialWarning('');
+      return;
+    }
+
+    setSerialChecking(true);
+    setSerialWarning('');
+    try {
+      const res = await fetchApi(`/reports/check-serial?serialNumber=${encodeURIComponent(clean)}`);
+      if (res && res.exists) {
+        setSerialInfo(res);
+        setSerialWarning('');
+        if (res.products && res.products.length > 0 && !products) {
+          const matchedProd = res.products[0].split('x')[0].trim();
+          setProducts(matchedProd);
+        }
+      } else {
+        setSerialInfo(null);
+        if (['Bảo hành', 'Sửa chữa'].includes(workType)) {
+          setSerialWarning('⚠️ Số Serial này chưa được ghi nhận lắp đặt trong hệ thống. Vui lòng kiểm tra kỹ lại tem máy xem có gõ sai không.');
+        }
+      }
+    } catch (err) {
+      console.error('Lỗi kiểm tra Serial', err);
+    } finally {
+      setSerialChecking(false);
+    }
+  };
+
+  // Quét mã vạch Camera Effect
+  useEffect(() => {
+    let html5QrCode: Html5Qrcode | null = null;
+    if (showScanner) {
+      html5QrCode = new Html5Qrcode("reader");
+      html5QrCode.start(
+        { facingMode: "environment" },
+        {
+          fps: 10,
+          qrbox: { width: 250, height: 100 }
+        },
+        (decodedText) => {
+          const formatted = formatSerialNumber(decodedText);
+          setSerialNumber(formatted);
+          checkSerial(formatted);
+          setShowScanner(false);
+          if (html5QrCode) {
+            html5QrCode.stop().catch(err => console.error("Lỗi đóng camera quét", err));
+          }
+        },
+        () => {}
+      ).catch(err => {
+        console.error("Lỗi khởi chạy camera", err);
+      });
+    }
+
+    return () => {
+      if (html5QrCode && html5QrCode.isScanning) {
+        html5QrCode.stop().catch(err => console.error("Lỗi đóng camera quét dọn dẹp", err));
+      }
+    };
+  }, [showScanner]);
 
   useEffect(() => {
     getOrders({ limit: 50, sortBy: 'createdAt', sortOrder: 'desc' })
@@ -550,15 +641,62 @@ export default function ReportForm() {
 
             {/* Seri sản phẩm — tất cả loại */}
             <div className="form-group">
-              <label className="form-label">Seri sản phẩm *</label>
-              <input
-                type="text"
-                className="form-input"
-                placeholder="Mẫu: 1858250822xxxxx"
-                value={serialNumber}
-                onChange={e => setSerialNumber(e.target.value)}
-                required
-              />
+              <label className="form-label flex justify-between items-center">
+                <span>Seri sản phẩm *</span>
+                <button
+                  type="button"
+                  className="text-blue-600 hover:text-blue-700 text-xs font-semibold flex items-center gap-1 bg-blue-50 px-2.5 py-1 rounded-md border border-blue-200 transition-colors"
+                  onClick={() => setShowScanner(true)}
+                >
+                  <Camera size={13} /> Quét mã vạch
+                </button>
+              </label>
+              <div className="relative">
+                <input
+                  type="text"
+                  className={`form-input pr-10 font-mono tracking-wider ${serialWarning ? 'border-amber-400 bg-amber-50/20' : ''}`}
+                  placeholder="Mẫu: 1858 260 207 00059"
+                  value={serialNumber}
+                  onChange={e => {
+                    const formatted = formatSerialNumber(e.target.value);
+                    setSerialNumber(formatted);
+                    const clean = formatted.replace(/[^a-zA-Z0-9]/g, '');
+                    if (clean.length === 15) {
+                      checkSerial(formatted);
+                    } else {
+                      setSerialInfo(null);
+                      setSerialWarning('');
+                    }
+                  }}
+                  onBlur={() => checkSerial(serialNumber)}
+                  required
+                />
+                {serialChecking && (
+                  <div className="absolute right-3 top-1/2 -translate-y-1/2 text-blue-500 animate-spin">
+                    <Loader2 size={16} />
+                  </div>
+                )}
+              </div>
+
+              {serialWarning && (
+                <div className="mt-2 text-xs text-amber-700 bg-amber-50 border border-amber-200 p-2.5 rounded-lg flex items-start gap-1.5 leading-normal">
+                  <AlertCircle size={15} className="mt-0.5 shrink-0" />
+                  <span>{serialWarning}</span>
+                </div>
+              )}
+
+              {serialInfo && (
+                <div className="mt-2 text-[11px] text-emerald-700 bg-emerald-50 border border-emerald-200 p-2.5 rounded-lg leading-normal shadow-xs">
+                  <div className="font-bold flex items-center gap-1 mb-1">
+                    <CheckCircle size={14} /> Đã khớp thiết bị lắp đặt gốc:
+                  </div>
+                  <ul className="list-disc pl-4 space-y-0.5 text-emerald-800">
+                    <li>Dòng máy: <strong>{serialInfo.products?.join(', ') || 'Chưa rõ'}</strong></li>
+                    <li>Khách hàng gốc: <strong>{serialInfo.customerName || 'Chưa rõ'}</strong></li>
+                    <li>Ngày lắp đặt: <strong>{new Date(serialInfo.installDate).toLocaleDateString('vi-VN')}</strong></li>
+                  </ul>
+                </div>
+              )}
             </div>
 
             <div className="form-group">
@@ -706,6 +844,40 @@ export default function ReportForm() {
               <button type="submit" className="btn btn-primary flex-1 flex justify-center items-center gap-2" disabled={loading}>
                 {loading ? <span className="spinner"></span> : <><Send size={16} /> Hoàn thành công việc</>}
               </button>
+            </div>
+          </div>
+        )}
+
+        {/* Modal Quét Mã Vạch */}
+        {showScanner && (
+          <div 
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4"
+            onClick={() => setShowScanner(false)}
+          >
+            <div 
+              className="bg-white rounded-2xl w-full max-w-md overflow-hidden shadow-2xl flex flex-col"
+              onClick={e => e.stopPropagation()}
+            >
+              <div className="p-4 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
+                <h3 className="font-bold text-gray-800 text-sm">Quét mã vạch sản phẩm</h3>
+                <button 
+                  type="button" 
+                  className="text-gray-400 hover:text-gray-600 text-xs font-bold"
+                  onClick={() => setShowScanner(false)}
+                >
+                  Đóng
+                </button>
+              </div>
+              <div className="p-4 flex flex-col items-center justify-center bg-white">
+                <div 
+                  id="reader" 
+                  className="w-full bg-black rounded-lg overflow-hidden border border-gray-100"
+                  style={{ minHeight: '220px' }}
+                ></div>
+                <p className="text-[11px] text-gray-500 mt-3 text-center leading-relaxed">
+                  Đưa camera điện thoại song song và căn chỉnh mã vạch vào ô quét hình chữ nhật.
+                </p>
+              </div>
             </div>
           </div>
         )}

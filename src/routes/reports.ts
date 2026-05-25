@@ -67,7 +67,7 @@ router.post('/', async (req: Request, res: Response): Promise<void> => {
         serviceType,
         imageUrls: imageUrls || [],
         notes: notes || null,
-        serialNumber: serialNumber || null,
+        serialNumber: serialNumber ? serialNumber.replace(/[^a-zA-Z0-9]/g, '').toUpperCase() : null,
         distanceKm: distanceKm ? parseFloat(distanceKm) : null,
         serviceCost: serviceCost ? parseFloat(serviceCost) : null,
         additionalCost: additionalCost ? parseFloat(additionalCost) : null,
@@ -403,6 +403,86 @@ router.get('/export', requireAdmin, async (req: Request, res: Response): Promise
   } catch (error: any) {
     logger.error('Export error', { error: error.message });
     res.status(500).json({ error: 'Lỗi xuất file' });
+  }
+});
+
+/**
+ * GET /api/reports/check-serial
+ * Kiểm tra xem Số Serial máy đã được ghi nhận lắp đặt trong hệ thống chưa.
+ * Dành cho ca Bảo hành / Sửa chữa.
+ */
+router.get('/check-serial', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { serialNumber } = req.query;
+    if (!serialNumber) {
+      res.status(400).json({ error: 'Thiếu số Serial' });
+      return;
+    }
+
+    const cleanInput = (serialNumber as string).replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
+    if (!cleanInput) {
+      res.json({ exists: false });
+      return;
+    }
+
+    // 1. Tìm chính xác tuyệt đối
+    const exactMatch = await prisma.serviceReport.findFirst({
+      where: {
+        serialNumber: {
+          mode: 'insensitive',
+          equals: (serialNumber as string).trim()
+        },
+        workType: { in: ['Lắp đặt', 'Giao hàng và Lắp đặt'] }
+      },
+      orderBy: { createdAt: 'asc' }
+    });
+
+    if (exactMatch) {
+      res.json({
+        exists: true,
+        installDate: exactMatch.createdAt,
+        customerName: exactMatch.customerName,
+        products: exactMatch.products,
+        serialNumber: exactMatch.serialNumber
+      });
+      return;
+    }
+
+    // 2. Tìm kiếm linh hoạt nếu KTV gõ có khoảng trắng/dấu gạch
+    const possibleReports = await prisma.serviceReport.findMany({
+      where: {
+        workType: { in: ['Lắp đặt', 'Giao hàng và Lắp đặt'] },
+        serialNumber: { not: null }
+      },
+      select: {
+        id: true,
+        serialNumber: true,
+        createdAt: true,
+        customerName: true,
+        products: true
+      }
+    });
+
+    const fuzzyMatch = possibleReports.find((r: any) => {
+      const cleanDb = (r.serialNumber || '').replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
+      return cleanDb === cleanInput;
+    });
+
+    if (fuzzyMatch) {
+      res.json({
+        exists: true,
+        installDate: fuzzyMatch.createdAt,
+        customerName: fuzzyMatch.customerName,
+        products: fuzzyMatch.products,
+        serialNumber: fuzzyMatch.serialNumber
+      });
+      return;
+    }
+
+    res.json({ exists: false });
+  } catch (error: any) {
+    logger.error('Check serial error', { error: error.message });
+    res.status(500).json({ error: 'Lỗi kiểm tra số Serial' });
   }
 });
 
