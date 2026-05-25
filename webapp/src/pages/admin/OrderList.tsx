@@ -853,6 +853,7 @@ export default function OrderList() {
                 <th className="px-4 py-3 w-[320px]">Ghi chú</th>
                 <th className="px-4 py-3">Loại CV</th>
                 <th className="px-4 py-3">Ngày tạo</th>
+                <th className="px-4 py-3">Người tạo</th>
                 <th className="px-4 py-3">Ngày hẹn</th>
                 <th className="px-4 py-3">Trạm - KTV</th>
                 <th className="px-4 py-3 text-center">Trạng thái</th>
@@ -914,6 +915,11 @@ export default function OrderList() {
                           </>
                         );
                       })() : '-'}
+                    </td>
+                    <td className="px-4 py-3">
+                      <span className={order.rawData?.creator?.name ? "font-medium text-gray-900" : "text-gray-400"}>
+                        {order.rawData?.creator?.name || '-'}
+                      </span>
                     </td>
                     <td className="px-4 py-3">
                       {order.appointmentTime ? (() => {
