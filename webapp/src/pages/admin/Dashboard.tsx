@@ -1377,19 +1377,31 @@ export default function Dashboard() {
                       <div className="h-full flex items-center justify-center text-gray-400 text-sm">Chưa có dữ liệu sự cố dòng máy</div>
                     ) : (
                       <ResponsiveContainer width="100%" height="100%">
-                        <BarChart data={qualityData.productIssues.slice(0, 10)} margin={{ top: 5, right: 10, left: -25, bottom: 20 }}>
-                          <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e7eb" />
-                          <XAxis 
-                            dataKey="name" 
+                        <BarChart 
+                          layout="vertical"
+                          data={qualityData.productIssues.slice(0, 10).map((item: any) => ({
+                            ...item,
+                            displayName: item.name
+                              .replace(/^(Máy lọc nước |Máy nóng lạnh treo tường |Máy lọc không khí |Bộ lọc nước tại vòi )/i, '')
+                              .trim()
+                          }))} 
+                          margin={{ top: 5, right: 15, left: -10, bottom: 5 }}
+                        >
+                          <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#e5e7eb" />
+                          <XAxis type="number" axisLine={false} tickLine={false} tick={{fill: '#6b7280', fontSize: 11}} />
+                          <YAxis 
+                            type="category" 
+                            dataKey="displayName" 
                             axisLine={false} 
                             tickLine={false} 
-                            interval={0}
-                            height={40}
+                            width={110}
                             tick={{fill: '#6b7280', fontSize: 10}}
                           />
-                          <YAxis axisLine={false} tickLine={false} tick={{fill: '#6b7280', fontSize: 11}} />
-                          <RechartsTooltip contentStyle={{borderRadius: '8px', border: 'none'}} />
-                          <Bar dataKey="total" name="Số ca lỗi" fill="#ef4444" radius={[4, 4, 0, 0]} />
+                          <RechartsTooltip 
+                            contentStyle={{borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)'}}
+                            formatter={(value, _name, props) => [`${value} ca lỗi`, props.payload.name]}
+                          />
+                          <Bar dataKey="total" fill="#ef4444" radius={[0, 4, 4, 0]} barSize={16} />
                         </BarChart>
                       </ResponsiveContainer>
                     )}
@@ -1412,7 +1424,7 @@ export default function Dashboard() {
                             tickLine={false} 
                             interval={0}
                             height={40}
-                            tick={{fill: '#6b7280', fontSize: 9, angle: -15, textAnchor: 'end'}}
+                            tick={{fill: '#6b7280', fontSize: 9, angle: -35, textAnchor: 'end'}}
                           />
                           <YAxis axisLine={false} tickLine={false} tick={{fill: '#6b7280', fontSize: 11}} />
                           <RechartsTooltip contentStyle={{borderRadius: '8px', border: 'none'}} />
