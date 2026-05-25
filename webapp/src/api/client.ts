@@ -131,6 +131,29 @@ export const deleteReport = async (id: string) => {
   return fetchApi(`/reports/${id}`, { method: 'DELETE' });
 };
 
+export const deleteReportWithReason = async (id: string, deleteReason: string) => {
+  return fetchApi(`/reports/${id}`, {
+    method: 'DELETE',
+    body: JSON.stringify({ deleteReason }),
+  });
+};
+
+export const getNotifications = async () => {
+  return fetchApi('/notifications');
+};
+
+export const markNotificationRead = async (id: string) => {
+  return fetchApi(`/notifications/${id}/read`, {
+    method: 'PATCH',
+  });
+};
+
+export const markAllNotificationsRead = async () => {
+  return fetchApi('/notifications/read-all', {
+    method: 'PATCH',
+  });
+};
+
 export const getDispatchAnalysis = async (params: Record<string, any> = {}) => {
   const query = new URLSearchParams();
   for (const [key, value] of Object.entries(params)) {

@@ -1,14 +1,33 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Outlet, useNavigate, useLocation, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { LogOut, Menu, X, FileText, List, Users, BarChart, ShoppingCart, Building, Key, Image as ImageIcon, MessageSquare } from 'lucide-react';
+import { LogOut, Menu, X, FileText, List, Users, BarChart, ShoppingCart, Building, Key, Image as ImageIcon, MessageSquare, Bell } from 'lucide-react';
+import { fetchApi } from '../api/client';
 
 export default function Layout() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [unreadCount, setUnreadCount] = useState(0);
   const logoPath = user?.role === 'ADMIN' ? '/admin' : (user?.role === 'DEV' ? '/dev/feedbacks' : '/ktv/my-orders');
+
+  useEffect(() => {
+    if (user?.role !== 'KTV') return;
+
+    const checkNotifications = async () => {
+      try {
+        const data = await fetchApi('/notifications');
+        setUnreadCount(data.unreadCount || 0);
+      } catch (e) {
+        console.error('Lỗi khi kiểm tra thông báo', e);
+      }
+    };
+
+    checkNotifications();
+    const interval = setInterval(checkNotifications, 30000); // Polling mỗi 30 giây
+    return () => clearInterval(interval);
+  }, [user]);
 
   const handleLogout = async () => {
     await logout();
@@ -29,6 +48,7 @@ export default function Layout() {
     { name: 'Đổi mật khẩu', path: '/change-password', icon: <Key size={20} /> },
   ] : [
     { name: 'Đơn hàng được giao', path: '/ktv/my-orders', icon: <ShoppingCart size={20} /> },
+    { name: 'Thông báo', path: '/ktv/notifications', icon: <Bell size={20} /> },
     { name: 'Tạo báo cáo', path: '/ktv/report', icon: <FileText size={20} /> },
     { name: 'Báo cáo của tôi', path: '/ktv/my-reports', icon: <List size={20} /> },
     { name: 'Đóng góp ý kiến', path: '/feedback', icon: <MessageSquare size={20} /> },
@@ -66,7 +86,22 @@ export default function Layout() {
               }}
             >
               {item.icon}
-              {item.name}
+              <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <span>{item.name}</span>
+                {item.path === '/ktv/notifications' && unreadCount > 0 && (
+                  <span style={{
+                    backgroundColor: '#ef4444',
+                    color: '#fff',
+                    fontSize: '11px',
+                    fontWeight: 'bold',
+                    padding: '2px 6px',
+                    borderRadius: '9999px',
+                    lineHeight: 1
+                  }}>
+                    {unreadCount}
+                  </span>
+                )}
+              </div>
             </Link>
           ))}
         </nav>
@@ -158,7 +193,22 @@ export default function Layout() {
                   }}
                 >
                   {item.icon}
-                  {item.name}
+                  <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <span>{item.name}</span>
+                    {item.path === '/ktv/notifications' && unreadCount > 0 && (
+                      <span style={{
+                        backgroundColor: '#ef4444',
+                        color: '#fff',
+                        fontSize: '11px',
+                        fontWeight: 'bold',
+                        padding: '2px 6px',
+                        borderRadius: '9999px',
+                        lineHeight: 1
+                      }}>
+                        {unreadCount}
+                      </span>
+                    )}
+                  </div>
                 </Link>
               ))}
             </nav>

@@ -1,0 +1,142 @@
+import { useEffect, useState } from 'react';
+import { getNotifications, markNotificationRead, markAllNotificationsRead } from '../../api/client';
+import { Bell, Check, Clock, Eye } from 'lucide-react';
+
+export default function Notifications() {
+  const [notifications, setNotifications] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [unreadCount, setUnreadCount] = useState(0);
+
+  useEffect(() => {
+    loadNotifications();
+  }, []);
+
+  const loadNotifications = async () => {
+    try {
+      setLoading(true);
+      const data = await getNotifications();
+      setNotifications(data.notifications);
+      setUnreadCount(data.unreadCount);
+    } catch (e) {
+      console.error('Lỗi tải thông báo', e);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleMarkAsRead = async (id: string) => {
+    try {
+      await markNotificationRead(id);
+      // Cập nhật trạng thái cục bộ
+      setNotifications(prev =>
+        prev.map(n => (n.id === id ? { ...n, isRead: true } : n))
+      );
+      setUnreadCount(prev => Math.max(0, prev - 1));
+    } catch (e) {
+      console.error('Lỗi đánh dấu đã đọc', e);
+    }
+  };
+
+  const handleMarkAllAsRead = async () => {
+    try {
+      await markAllNotificationsRead();
+      setNotifications(prev => prev.map(n => ({ ...n, isRead: true })));
+      setUnreadCount(0);
+    } catch (e) {
+      console.error('Lỗi đánh dấu đọc tất cả', e);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="text-center py-10">
+        <span className="spinner border-t-[#1B3A6B]"></span>
+      </div>
+    );
+  }
+
+  return (
+    <div className="animate-fade-in max-w-2xl mx-auto text-left">
+      <div className="flex justify-between items-center mb-6">
+        <div>
+          <h2 className="font-bold text-2xl text-[#1B3A6B] flex items-center gap-2">
+            <Bell size={24} className="text-[#1B3A6B]" /> Thông báo của tôi
+          </h2>
+          {unreadCount > 0 && (
+            <p className="text-xs text-gray-500 mt-1">
+              Bạn có <span className="font-bold text-red-500">{unreadCount}</span> thông báo chưa đọc.
+            </p>
+          )}
+        </div>
+        
+        {unreadCount > 0 && (
+          <button
+            onClick={handleMarkAllAsRead}
+            className="flex items-center gap-1 px-3 py-1.5 text-[13px] border border-blue-200 rounded-md bg-blue-50 text-blue-700 hover:bg-blue-100 transition-colors font-medium"
+          >
+            <Check size={14} /> Đánh dấu đọc tất cả
+          </button>
+        )}
+      </div>
+
+      {notifications.length === 0 ? (
+        <div className="card text-center py-12 text-gray-500 flex flex-col items-center justify-center gap-3">
+          <div className="w-12 h-12 rounded-full bg-gray-100 flex items-center justify-center text-gray-400">
+            <Bell size={24} />
+          </div>
+          <div>Không có thông báo nào.</div>
+        </div>
+      ) : (
+        <div className="flex flex-col gap-3">
+          {notifications.map((n) => (
+            <div
+              key={n.id}
+              className={`p-4 rounded-xl border transition-all duration-300 relative overflow-hidden ${
+                n.isRead
+                  ? 'bg-white border-gray-200 hover:shadow-sm'
+                  : 'bg-blue-50/40 border-blue-100 hover:bg-blue-50/70 shadow-sm'
+              }`}
+            >
+              {/* Vạch chỉ thị chưa đọc */}
+              {!n.isRead && (
+                <div className="absolute top-0 left-0 bottom-0 w-1 bg-blue-600"></div>
+              )}
+
+              <div className="flex justify-between items-start gap-4">
+                <div className="flex-1 pl-2">
+                  <div className="flex items-center gap-2 mb-1.5">
+                    <span className={`font-bold text-sm ${n.isRead ? 'text-gray-800' : 'text-blue-900'}`}>
+                      {n.title}
+                    </span>
+                    {!n.isRead && (
+                      <span className="w-2 h-2 rounded-full bg-blue-600 inline-block animate-pulse"></span>
+                    )}
+                  </div>
+                  
+                  <p className="text-[13px] text-gray-600 whitespace-pre-wrap leading-relaxed">
+                    {n.content}
+                  </p>
+                  
+                  <div className="flex items-center gap-3 mt-3 text-xs text-gray-400 font-medium">
+                    <Clock size={12} />
+                    <span>{new Date(n.createdAt).toLocaleString('vi-VN')}</span>
+                  </div>
+                </div>
+
+                {!n.isRead && (
+                  <button
+                    onClick={() => handleMarkAsRead(n.id)}
+                    className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors outline-none"
+                    title="Đánh dấu đã đọc"
+                  >
+                    <Eye size={16} />
+                  </button>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}

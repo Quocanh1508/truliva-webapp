@@ -462,9 +462,18 @@ router.put('/:id', requireAdmin, async (req: Request, res: Response): Promise<vo
 router.delete('/:id', requireAdmin, async (req: Request, res: Response): Promise<void> => {
   try {
     const reportId = req.params.id as string;
+    const { deleteReason } = req.body;
+
+    if (!deleteReason || !deleteReason.trim()) {
+      res.status(400).json({ error: 'Vui lòng nhập lý do xóa báo cáo' });
+      return;
+    }
 
     const existingReport = await prisma.serviceReport.findUnique({
       where: { id: reportId },
+      include: {
+        order: { select: { pancakeOrderId: true } },
+      }
     });
 
     if (!existingReport) {
@@ -472,11 +481,25 @@ router.delete('/:id', requireAdmin, async (req: Request, res: Response): Promise
       return;
     }
 
+    // 1. Tạo thông báo cho KTV
+    const orderNum = existingReport.order?.pancakeOrderId;
+    const orderText = orderNum ? `#${orderNum}` : '(không rõ mã đơn)';
+    const notificationContent = `Báo cáo cho đơn hàng ${orderText} của bạn đã bị Admin xóa.\nLý do: ${deleteReason.trim()}`;
+
+    await prisma.notification.create({
+      data: {
+        userId: existingReport.ktvUserId,
+        title: 'Báo cáo bị xóa',
+        content: notificationContent,
+      }
+    });
+
+    // 2. Thực hiện xóa báo cáo khỏi cơ sở dữ liệu
     await prisma.serviceReport.delete({
       where: { id: reportId },
     });
 
-    logger.info('Report deleted by Admin', { reportId, adminId: req.user!.id });
+    logger.info('Report deleted by Admin', { reportId, adminId: req.user!.id, deleteReason });
     res.json({ success: true });
   } catch (error: any) {
     logger.error('Delete report error', { error: error.message });

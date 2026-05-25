@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { fetchApi } from '../../api/client';
+import { fetchApi, deleteReportWithReason } from '../../api/client';
 import { Download, CheckCircle, Clock, X, ExternalLink, Image as ImageIcon, Loader, Search } from 'lucide-react';
 
 // Check if a URL points to a directly viewable image
@@ -100,6 +100,9 @@ export default function ReportList() {
   const [datePreset, setDatePreset] = useState('');
   const [customStartDate, setCustomStartDate] = useState('');
   const [customEndDate, setCustomEndDate] = useState('');
+  const [deleteModal, setDeleteModal] = useState<{ isOpen: boolean; reportId: string } | null>(null);
+  const [deleteReason, setDeleteReason] = useState('');
+  const [deleting, setDeleting] = useState(false);
 
   const getDateRange = () => {
     if (!datePreset) return { startDate: '', endDate: '' };
@@ -193,17 +196,24 @@ export default function ReportList() {
     }
   };
 
-  const handleDeleteReport = async (id: string) => {
-    if (!window.confirm('Bạn có chắc chắn muốn xóa báo cáo này? Thao tác này không thể hoàn tác.')) {
+  const confirmDeleteReport = async () => {
+    if (!deleteModal) return;
+    if (!deleteReason.trim()) {
+      alert('Vui lòng nhập lý do xóa báo cáo');
       return;
     }
     
+    setDeleting(true);
     try {
-      await fetchApi(`/reports/${id}`, { method: 'DELETE' });
+      await deleteReportWithReason(deleteModal.reportId, deleteReason);
       alert('Đã xóa báo cáo thành công');
+      setDeleteModal(null);
+      setDeleteReason('');
       loadReports();
     } catch (e: any) {
       alert(e.message || 'Lỗi khi xóa báo cáo');
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -348,7 +358,7 @@ export default function ReportList() {
                         )}
                         
                         <button
-                          onClick={() => handleDeleteReport(r.id)}
+                          onClick={() => setDeleteModal({ isOpen: true, reportId: r.id })}
                           className="text-sm font-medium hover:underline text-red-600"
                           style={{ background: 'none', cursor: 'pointer', whiteSpace: 'nowrap' }}
                         >
@@ -570,6 +580,47 @@ export default function ReportList() {
                 className="px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-700 font-semibold rounded-lg text-sm transition-colors"
               >
                 Đóng
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {deleteModal && deleteModal.isOpen && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-xl shadow-2xl max-w-md w-full border border-gray-100 p-6 text-left">
+            <h3 className="font-bold text-lg text-red-600 mb-4 flex items-center gap-2">
+              Xác nhận xóa báo cáo
+            </h3>
+            
+            <p className="text-sm text-gray-600 mb-4">
+              Bạn có chắc chắn muốn xóa báo cáo này? Hành động này không thể hoàn tác. Vui lòng nhập lý do xóa báo cáo để thông báo cho Kỹ thuật viên:
+            </p>
+            
+            <textarea
+              className="w-full border border-gray-300 rounded-lg p-3 text-sm focus:ring-1 focus:ring-red-500 focus:border-red-500 outline-none text-gray-800 bg-white min-h-[100px]"
+              placeholder="Nhập lý do xóa báo cáo (ví dụ: Thiếu ảnh serial sản phẩm, thông tin khách hàng không chính xác...)"
+              value={deleteReason}
+              onChange={(e) => setDeleteReason(e.target.value)}
+            />
+            
+            <div className="flex justify-end gap-3 mt-6">
+              <button 
+                onClick={() => {
+                  setDeleteModal(null);
+                  setDeleteReason('');
+                }}
+                disabled={deleting}
+                className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold rounded-lg text-sm transition-colors"
+              >
+                Hủy
+              </button>
+              <button 
+                onClick={confirmDeleteReport}
+                disabled={deleting || !deleteReason.trim()}
+                className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white font-semibold rounded-lg text-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {deleting ? 'Đang xóa...' : 'Xác nhận xóa'}
               </button>
             </div>
           </div>

@@ -11,6 +11,7 @@ import ChangePasswordPage from './pages/ChangePasswordPage';
 import ReportForm from './pages/ktv/ReportForm';
 import MyReports from './pages/ktv/MyReports';
 import MyOrders from './pages/ktv/MyOrders';
+import Notifications from './pages/ktv/Notifications';
 
 // Admin Pages
 import Dashboard from './pages/admin/Dashboard';
@@ -37,6 +38,7 @@ export default function App() {
               <Route path="/ktv/report" element={<ReportForm />} />
               <Route path="/ktv/my-reports" element={<MyReports />} />
               <Route path="/ktv/my-orders" element={<MyOrders />} />
+              <Route path="/ktv/notifications" element={<Notifications />} />
             </Route>
 
             {/* Admin Routes */}
