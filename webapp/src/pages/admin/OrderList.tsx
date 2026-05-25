@@ -230,9 +230,30 @@ export default function OrderList() {
   };
 
   const openAssignModal = (order: any) => {
-    setSelectedMain(order.mainStationId || '');
-    setSelectedTech(order.techStationId || '');
-    setSelectedKtv(order.assignedKtvId || '');
+    let initialMain = order.mainStationId || '';
+    let initialTech = order.techStationId || '';
+    const initialKtv = order.assignedKtvId || '';
+
+    if (initialKtv && (!initialMain || !initialTech)) {
+      const ktvObj = allKtvs.find(k => k.id === initialKtv);
+      if (ktvObj) {
+        if (!initialTech && ktvObj.techStationId) {
+          initialTech = ktvObj.techStationId;
+        }
+        if (initialTech && !initialMain) {
+          const mainObj = stations.find(s => 
+            s.techStations && s.techStations.some((ts: any) => ts.id === initialTech)
+          );
+          if (mainObj) {
+            initialMain = mainObj.id;
+          }
+        }
+      }
+    }
+
+    setSelectedMain(initialMain);
+    setSelectedTech(initialTech);
+    setSelectedKtv(initialKtv);
     
     // Convert UTC to local input format
     let appTime = '';
@@ -1156,7 +1177,8 @@ export default function OrderList() {
                 {/* Workload indicator */}
                 {selectedKtv && (() => {
                   const ktv = ktvs.find((k: any) => k.id === selectedKtv);
-                  const count = ktv?.pendingOrderCount || 0;
+                  if (!ktv) return null;
+                  const count = ktv.pendingOrderCount || 0;
                   const isHigh = count >= 5;
                   const isMedium = count >= 3 && count < 5;
                   return (
@@ -1165,14 +1187,14 @@ export default function OrderList() {
                         {isHigh ? '⚠️ Tải cao' : isMedium ? '⚡ Tải trung bình' : '✅ Tải nhẹ'}
                       </div>
                       <div>
-                        <b>{ktv?.fullName}</b> hiện đang có <b>{count}</b> đơn chưa hoàn thành.
+                        <b>{ktv.fullName}</b> hiện đang có <b>{count}</b> đơn chưa hoàn thành.
                         {isHigh && ' Cân nhắc giao cho KTV khác.'}
                       </div>
                     </div>
                   );
                 })()}
 
-                {selectedKtv && (
+                {selectedKtv && ktvs.some((k: any) => k.id === selectedKtv) && (
                   <div className="p-3 bg-green-50 border border-green-200 text-green-800 rounded text-sm mt-2">
                     Đơn sẽ được chuyển sang trạng thái <b>"Đang thực hiện"</b> khi lưu.
                   </div>
