@@ -182,26 +182,64 @@ export default function LabeledImageUploader({ imageSlots, workType, onUploadSuc
                     cursor: isUploading ? 'not-allowed' : 'pointer',
                     background: '#f8fafc',
                     transition: 'border-color 0.2s, background 0.2s',
+                    overflow: 'hidden',
                   }}
                   onMouseEnter={(e) => {
                     if (!isUploading) {
-                      (e.currentTarget as HTMLDivElement).style.borderColor = '#1B3A6B';
-                      (e.currentTarget as HTMLDivElement).style.background = '#eff6ff';
+                      const div = e.currentTarget as HTMLDivElement;
+                      div.style.borderColor = '#1B3A6B';
+                      div.style.background = '#eff6ff';
+                      const overlay = div.querySelector('.upload-overlay') as HTMLDivElement;
+                      if (overlay && sample?.imageUrl) {
+                        overlay.style.backgroundColor = 'rgba(239, 246, 255, 0.5)';
+                      }
                     }
                   }}
                   onMouseLeave={(e) => {
-                    (e.currentTarget as HTMLDivElement).style.borderColor = '#cbd5e1';
-                    (e.currentTarget as HTMLDivElement).style.background = '#f8fafc';
+                    const div = e.currentTarget as HTMLDivElement;
+                    div.style.borderColor = '#cbd5e1';
+                    div.style.background = '#f8fafc';
+                    const overlay = div.querySelector('.upload-overlay') as HTMLDivElement;
+                    if (overlay && sample?.imageUrl) {
+                      overlay.style.backgroundColor = 'rgba(255, 255, 255, 0.65)';
+                    }
                   }}
                 >
-                  <div style={{
-                    position: 'absolute', inset: 0,
-                    display: 'flex', flexDirection: 'column',
-                    alignItems: 'center', justifyContent: 'center',
-                    gap: '4px',
-                  }}>
-                    <Camera size={24} style={{ color: '#94a3b8' }} />
-                    <span style={{ fontSize: '10px', color: '#94a3b8', fontWeight: 500 }}>Chọn ảnh</span>
+                  {sample?.imageUrl && (
+                    <img
+                      src={sample.imageUrl}
+                      alt="Mẫu"
+                      style={{
+                        position: 'absolute',
+                        inset: 0,
+                        width: '100%',
+                        height: '100%',
+                        objectFit: 'cover',
+                        opacity: 0.4,
+                        pointerEvents: 'none',
+                      }}
+                    />
+                  )}
+                  <div 
+                    className="upload-overlay"
+                    style={{
+                      position: 'absolute', inset: 0,
+                      display: 'flex', flexDirection: 'column',
+                      alignItems: 'center', justifyContent: 'center',
+                      gap: '4px',
+                      backgroundColor: sample?.imageUrl ? 'rgba(255, 255, 255, 0.65)' : 'transparent',
+                      transition: 'background-color 0.2s',
+                      zIndex: 1,
+                    }}
+                  >
+                    <Camera size={24} style={{ color: sample?.imageUrl ? '#1e293b' : '#94a3b8' }} />
+                    <span style={{ 
+                      fontSize: '10px', 
+                      color: sample?.imageUrl ? '#1e293b' : '#94a3b8', 
+                      fontWeight: sample?.imageUrl ? 700 : 500 
+                    }}>
+                      Chọn ảnh
+                    </span>
                   </div>
                 </div>
               )}
