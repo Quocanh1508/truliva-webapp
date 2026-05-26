@@ -55,6 +55,7 @@ export default function MyOrders() {
       case 'chờ chuyển hàng': return <span className="px-2 py-1 bg-cyan-100 text-cyan-700 rounded text-xs font-medium">Chờ chuyển hàng</span>;
       case 'gửi hàng đi': return <span className="px-2 py-1 bg-emerald-100 text-emerald-700 rounded text-xs font-medium">Gửi hàng đi</span>;
       case 'hủy đơn': return <span className="px-2 py-1 bg-red-100 text-red-700 rounded text-xs font-medium">Hủy đơn</span>;
+      case 'đang thực hiện': return <span className="px-2 py-1 bg-orange-100 text-orange-700 rounded text-xs font-medium">Cần hoàn thành</span>;
       default: return <span className="px-2 py-1 bg-gray-100 text-gray-700 rounded text-xs font-medium">{status || 'Chưa cập nhật'}</span>;
     }
   };
@@ -134,9 +135,22 @@ export default function MyOrders() {
                     </td>
                     <td className="px-4 py-3">
                       {order.appointmentTime ? (
-                        <div className="font-medium text-emerald-600">
-                           {new Date(order.appointmentTime).toLocaleTimeString('vi-VN', {hour: '2-digit', minute:'2-digit'})} - {new Date(order.appointmentTime).toLocaleDateString('vi-VN')}
-                        </div>
+                        (() => {
+                          const apptDate = new Date(order.appointmentTime);
+                          const isOverdue = apptDate < new Date();
+                          return (
+                            <div className="flex flex-col gap-1">
+                              <div className={`font-medium ${isOverdue ? 'text-rose-600 font-semibold' : 'text-emerald-600'}`}>
+                                {apptDate.toLocaleTimeString('vi-VN', {hour: '2-digit', minute:'2-digit'})} - {apptDate.toLocaleDateString('vi-VN')}
+                              </div>
+                              {isOverdue && (
+                                <span className="inline-flex items-center gap-1 text-[10px] font-bold text-red-700 bg-red-50 border border-red-200 px-1.5 py-0.5 rounded w-max">
+                                  ⚠️ Trễ hẹn
+                                </span>
+                              )}
+                            </div>
+                          );
+                        })()
                       ) : <span className="text-gray-400 italic">Chưa hẹn</span>}
                     </td>
                     <td className="px-4 py-3">
