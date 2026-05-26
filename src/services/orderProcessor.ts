@@ -159,6 +159,9 @@ export async function processOrderEvent(rawEventId: string | null, payload: any)
       where: { pancakeOrderId: systemId },
       create: {
         pancakeOrderId: systemId,
+        appointmentTime: pancakeCreatedAt
+          ? new Date(pancakeCreatedAt.getTime() + 2 * 60 * 60 * 1000)
+          : new Date(Date.now() + 2 * 60 * 60 * 1000),
         ...orderData,
       },
       update: orderData,
