@@ -3,7 +3,7 @@ import { fetchApi, getDashboardStats, getStations, getDispatchAnalysis, getKtvUs
 import { 
   FileText, CheckCircle, Clock, Building, MapPin, 
   AlertTriangle, Info, Filter, AlertCircle, RefreshCw, TrendingUp,
-  ClipboardList, UserCheck
+  ClipboardList, UserCheck, XCircle
 } from 'lucide-react';
 import { 
   BarChart, Bar, XAxis, YAxis, Tooltip as RechartsTooltip, Legend, 
@@ -382,7 +382,7 @@ export default function Dashboard() {
       {activeTab === 'summary' && (
         <div className="space-y-6 animate-fade-in">
           {/* KPI Overview Cards */}
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
             <div className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm border-l-4 border-blue-500 flex flex-col justify-between animate-fade-in hover:shadow-md transition-shadow">
               <div className="text-blue-600 font-semibold text-xs flex items-center gap-1.5 uppercase"><ClipboardList size={15}/> Tổng số đơn</div>
               <div className="text-3xl font-bold text-gray-900 mt-2">{dashStats.orderStats?.total ?? 0}</div>
@@ -401,6 +401,11 @@ export default function Dashboard() {
             <div className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm border-l-4 border-emerald-500 flex flex-col justify-between animate-fade-in hover:shadow-md transition-shadow">
               <div className="text-emerald-600 font-semibold text-xs flex items-center gap-1.5 uppercase"><CheckCircle size={15}/> Đơn hoàn thành</div>
               <div className="text-3xl font-bold text-gray-900 mt-2">{dashStats.orderStats?.completed ?? 0}</div>
+            </div>
+
+            <div className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm border-l-4 border-rose-500 flex flex-col justify-between animate-fade-in hover:shadow-md transition-shadow">
+              <div className="text-rose-600 font-semibold text-xs flex items-center gap-1.5 uppercase"><XCircle size={15}/> Đơn bị hủy</div>
+              <div className="text-3xl font-bold text-gray-900 mt-2">{dashStats.orderStats?.cancelled ?? 0}</div>
             </div>
           </div>
 

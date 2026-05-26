@@ -83,16 +83,20 @@ router.get('/stats', async (_req: Request, res: Response): Promise<void> => {
     const completedOrders = await prisma.order.count({
       where: { adminStatus: 'hoàn thành' }
     });
+    const cancelledOrders = await prisma.order.count({
+      where: { adminStatus: 'hủy đơn' }
+    });
 
     res.json({
       stationStats,
       mapDensity: density,
       statusCounts,
       orderStats: {
-        total: pendingOrders + assignedOrders + completedOrders,
+        total: pendingOrders + assignedOrders + completedOrders + cancelledOrders,
         pending: pendingOrders,
         assigned: assignedOrders,
-        completed: completedOrders
+        completed: completedOrders,
+        cancelled: cancelledOrders
       }
     });
   } catch (error: any) {
