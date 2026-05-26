@@ -155,13 +155,19 @@ export async function processOrderEvent(rawEventId: string | null, payload: any)
       rawData: payload,
     };
 
+    const orderSource = (payload.order_sources_name || '').toLowerCase();
+    const isEcom = orderSource.includes('shopee') || orderSource.includes('lazada') || orderSource.includes('tiktok') || orderSource.includes('tiki');
+    const defaultAppointmentTime = isEcom
+      ? null
+      : pancakeCreatedAt
+        ? new Date(pancakeCreatedAt.getTime() + 2 * 60 * 60 * 1000)
+        : new Date(Date.now() + 2 * 60 * 60 * 1000);
+
     const order = await prisma.order.upsert({
       where: { pancakeOrderId: systemId },
       create: {
         pancakeOrderId: systemId,
-        appointmentTime: pancakeCreatedAt
-          ? new Date(pancakeCreatedAt.getTime() + 2 * 60 * 60 * 1000)
-          : new Date(Date.now() + 2 * 60 * 60 * 1000),
+        appointmentTime: defaultAppointmentTime,
         ...orderData,
       },
       update: orderData,
