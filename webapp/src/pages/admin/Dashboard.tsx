@@ -32,6 +32,66 @@ function removeVietnameseTones(str: string) {
     return str;
 }
 
+const getGroupedStats = (dailyStats: any[], mode: 'day' | 'week' | 'month') => {
+  if (!dailyStats || dailyStats.length === 0) return [];
+  
+  if (mode === 'day') {
+    return dailyStats.map(item => {
+      const total = (item.onTime || 0) + (item.late || 0);
+      return {
+        key: item.date,
+        label: item.date,
+        onTime: item.onTime,
+        late: item.late,
+        total,
+        latePercent: total > 0 ? Math.round((item.late / total) * 100) : 0
+      };
+    });
+  }
+
+  const map: Record<string, { onTime: number; late: number; total: number }> = {};
+
+  dailyStats.forEach(item => {
+    let key = '';
+    if (mode === 'week') {
+      const date = new Date(item.date);
+      const day = date.getDay();
+      const diff = date.getDate() - day + (day === 0 ? -6 : 1);
+      const monday = new Date(date.setDate(diff));
+      key = monday.toISOString().slice(0, 10);
+    } else if (mode === 'month') {
+      key = item.date.slice(0, 7); // YYYY-MM
+    }
+
+    if (!map[key]) {
+      map[key] = { onTime: 0, late: 0, total: 0 };
+    }
+    map[key].onTime += item.onTime || 0;
+    map[key].late += item.late || 0;
+    map[key].total += (item.onTime || 0) + (item.late || 0);
+  });
+
+  return Object.entries(map).map(([key, data]) => {
+    let label = key;
+    if (mode === 'week') {
+      const d = new Date(key);
+      label = `Tuần ${d.getDate().toString().padStart(2, '0')}/${(d.getMonth() + 1).toString().padStart(2, '0')}`;
+    } else if (mode === 'month') {
+      const [year, month] = key.split('-');
+      label = `Tháng ${month}/${year}`;
+    }
+
+    return {
+      key,
+      label,
+      onTime: data.onTime,
+      late: data.late,
+      total: data.total,
+      latePercent: data.total > 0 ? Math.round((data.late / data.total) * 100) : 0
+    };
+  }).sort((a, b) => a.key.localeCompare(b.key));
+};
+
 const geoUrl = '/vn-provinces.json';
 
 const WORK_TYPE_OPTIONS = ['Giao hàng và Lắp đặt', 'Lắp đặt', 'Giao hàng', 'Thay lọc', 'Bảo hành', 'Sửa chữa'];
@@ -58,6 +118,7 @@ export default function Dashboard() {
   const [loadingAnalysis, setLoadingAnalysis] = useState(true);
   const [tooltipContent, setTooltipContent] = useState<React.ReactNode>('');
   const [chartType, setChartType] = useState<'stackedBar' | 'line'>('stackedBar');
+  const [lateChartScale, setLateChartScale] = useState<'day' | 'week' | 'month'>('day');
 
   // Filter States
   const [startDate, setStartDate] = useState(() => {
@@ -804,22 +865,63 @@ export default function Dashboard() {
 
               {/* Chart: Daily On-Time vs Late percentages */}
               <div className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm flex flex-col h-[380px]">
-                <h3 className="font-bold text-base text-gray-800 border-b pb-3 mb-4">Tương quan Số ca Đúng hẹn & Trễ hẹn mỗi ngày</h3>
+                <div className="flex justify-between items-center border-b pb-3 mb-4">
+                  <div>
+                    <h3 className="font-bold text-base text-gray-800">Xu hướng Tỷ lệ Trễ hẹn</h3>
+                    <p className="text-xs text-gray-500 mt-0.5">Tỷ lệ % số ca bị trễ hẹn trên tổng số ca có lịch hẹn theo thời gian</p>
+                  </div>
+                  
+                  {/* Selector for scale */}
+                  <div className="flex bg-gray-100 p-1 rounded-lg space-x-1 border border-gray-200">
+                    <button 
+                      onClick={() => setLateChartScale('day')}
+                      className={`px-3 py-1 rounded text-xs font-semibold transition-all ${lateChartScale === 'day' ? 'bg-white text-rose-600 shadow-sm' : 'text-gray-500 hover:text-gray-800'}`}
+                    >
+                      Ngày
+                    </button>
+                    <button 
+                      onClick={() => setLateChartScale('week')}
+                      className={`px-3 py-1 rounded text-xs font-semibold transition-all ${lateChartScale === 'week' ? 'bg-white text-rose-600 shadow-sm' : 'text-gray-500 hover:text-gray-800'}`}
+                    >
+                      Tuần
+                    </button>
+                    <button 
+                      onClick={() => setLateChartScale('month')}
+                      className={`px-3 py-1 rounded text-xs font-semibold transition-all ${lateChartScale === 'month' ? 'bg-white text-rose-600 shadow-sm' : 'text-gray-500 hover:text-gray-800'}`}
+                    >
+                      Tháng
+                    </button>
+                  </div>
+                </div>
+
                 <div className="flex-1 w-full h-[260px]">
                   {analysisData.dailyStats.length === 0 ? (
                     <div className="h-full flex items-center justify-center text-gray-400 text-sm">Không có dữ liệu trong khoảng thời gian này</div>
                   ) : (
-                    <ResponsiveContainer width="100%" height="100%">
-                      <BarChart data={analysisData.dailyStats} margin={{ top: 5, right: 10, left: -25, bottom: 5 }}>
-                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e7eb" />
-                        <XAxis dataKey="date" axisLine={false} tickLine={false} tick={{fill: '#6b7280', fontSize: 11}} />
-                        <YAxis axisLine={false} tickLine={false} tick={{fill: '#6b7280', fontSize: 11}} />
-                        <RechartsTooltip contentStyle={{borderRadius: '8px', border: 'none'}} />
-                        <Legend wrapperStyle={{fontSize: 11}} />
-                        <Bar dataKey="onTime" name="Đúng hẹn" fill="#10b981" stackId="a" />
-                        <Bar dataKey="late" name="Trễ hẹn" fill="#f43f5e" stackId="a" />
-                      </BarChart>
-                    </ResponsiveContainer>
+                    (() => {
+                      const chartData = getGroupedStats(analysisData.dailyStats, lateChartScale);
+                      if (chartData.length === 0) {
+                        return <div className="h-full flex items-center justify-center text-gray-400 text-sm">Không có dữ liệu trong khoảng thời gian này</div>;
+                      }
+                      return (
+                        <ResponsiveContainer width="100%" height="100%">
+                          <LineChart data={chartData} margin={{ top: 10, right: 15, left: -20, bottom: 5 }}>
+                            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e7eb" />
+                            <XAxis dataKey="label" axisLine={false} tickLine={false} tick={{fill: '#6b7280', fontSize: 11}} />
+                            <YAxis axisLine={false} tickLine={false} domain={[0, 100]} tickFormatter={(val) => `${val}%`} tick={{fill: '#6b7280', fontSize: 11}} />
+                            <RechartsTooltip 
+                              contentStyle={{borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)'}} 
+                              formatter={(value: any, _name: any, entry: any) => [
+                                `${value}% (Trễ ${entry.payload.late}/${entry.payload.total} ca)`, 
+                                'Tỷ lệ trễ hẹn'
+                              ]}
+                            />
+                            <Legend wrapperStyle={{fontSize: 11}} />
+                            <Line type="monotone" dataKey="latePercent" name="Tỷ lệ trễ hẹn" stroke="#f43f5e" strokeWidth={3} dot={{ r: 4, stroke: '#f43f5e', strokeWidth: 2, fill: '#fff' }} activeDot={{ r: 6, fill: '#f43f5e' }} />
+                          </LineChart>
+                        </ResponsiveContainer>
+                      );
+                    })()
                   )}
                 </div>
               </div>
