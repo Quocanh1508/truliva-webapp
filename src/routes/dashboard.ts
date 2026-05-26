@@ -69,9 +69,13 @@ router.get('/stats', async (_req: Request, res: Response): Promise<void> => {
     });
 
     // 4. Thống kê theo yêu cầu của user
-    const totalOrders = await prisma.order.count();
     const pendingOrders = await prisma.order.count({
-      where: { adminStatus: 'chờ xử lý' }
+      where: {
+        OR: [
+          { adminStatus: null },
+          { adminStatus: { notIn: ['đang thực hiện', 'hoàn thành', 'hủy đơn'] } }
+        ]
+      }
     });
     const assignedOrders = await prisma.order.count({
       where: { adminStatus: 'đang thực hiện' }
@@ -85,7 +89,7 @@ router.get('/stats', async (_req: Request, res: Response): Promise<void> => {
       mapDensity: density,
       statusCounts,
       orderStats: {
-        total: totalOrders,
+        total: pendingOrders + assignedOrders + completedOrders,
         pending: pendingOrders,
         assigned: assignedOrders,
         completed: completedOrders
