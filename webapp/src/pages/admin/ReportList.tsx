@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { fetchApi, deleteReportWithReason, updateReport, uploadImages } from '../../api/client';
-import { Download, CheckCircle, Clock, X, ExternalLink, Image as ImageIcon, Loader, Search, Edit3, Save, Plus, Trash2 } from 'lucide-react';
+import { Download, X, ExternalLink, Image as ImageIcon, Loader, Search, Edit3, Save, Plus, Trash2 } from 'lucide-react';
 
 // Check if a URL points to a directly viewable image
 function isDirectImage(url: string): boolean {
@@ -193,17 +193,7 @@ export default function ReportList() {
     window.open(url, '_blank');
   };
 
-  const togglePaidStatus = async (id: string, currentStatus: boolean) => {
-    try {
-      await fetchApi(`/reports/${id}`, {
-        method: 'PUT',
-        body: JSON.stringify({ isPaid: !currentStatus })
-      });
-      loadReports();
-    } catch (e) {
-      alert('Lỗi cập nhật');
-    }
-  };
+
 
   const confirmDeleteReport = async () => {
     if (!deleteModal) return;
@@ -419,7 +409,6 @@ export default function ReportList() {
                 <th style={{ padding: '12px 16px' }}>Dịch vụ</th>
                 <th style={{ padding: '12px 16px' }}>Tỉnh/TP</th>
                 <th style={{ padding: '12px 16px' }}>Tiền thu</th>
-                <th style={{ padding: '12px 16px' }}>Trạng thái</th>
                 <th style={{ padding: '12px 16px' }}>Hành động</th>
               </tr>
             </thead>
@@ -449,14 +438,6 @@ export default function ReportList() {
                     <td style={{ padding: '12px 16px' }}>{r.province}</td>
                     <td style={{ padding: '12px 16px' }} className="font-bold">
                       {(r.actualAmount || 0).toLocaleString('vi-VN')} đ
-                    </td>
-                    <td style={{ padding: '12px 16px' }}>
-                      <button 
-                        onClick={() => togglePaidStatus(r.id, r.isPaid)}
-                        className={`px-2 py-1 text-xs rounded font-bold flex items-center gap-1 ${r.isPaid ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'}`}
-                      >
-                        {r.isPaid ? <><CheckCircle size={12}/> Đã trả</> : <><Clock size={12}/> Chưa trả</>}
-                      </button>
                     </td>
                     <td style={{ padding: '12px 16px', position: 'relative' }}>
                       <div className="flex items-center gap-3">
@@ -523,7 +504,7 @@ export default function ReportList() {
               })}
               {reports.length === 0 && (
                 <tr>
-                  <td colSpan={8} className="text-center py-8 text-gray-500">Không có dữ liệu</td>
+                  <td colSpan={7} className="text-center py-8 text-gray-500">Không có dữ liệu</td>
                 </tr>
               )}
             </tbody>
