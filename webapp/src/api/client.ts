@@ -124,8 +124,15 @@ export const deleteTechStation = async (id: string) => {
 };
 
 // --- DASHBOARD ---
-export const getDashboardStats = async () => {
-  return fetchApi('/dashboard/stats');
+export const getDashboardStats = async (params: Record<string, any> = {}) => {
+  const query = new URLSearchParams();
+  for (const [key, value] of Object.entries(params)) {
+    if (value !== undefined && value !== null && value !== '') {
+      query.append(key, String(value));
+    }
+  }
+  const q = query.toString();
+  return fetchApi(q ? `/dashboard/stats?${q}` : '/dashboard/stats');
 };
 
 export const updateReport = async (id: string, data: Record<string, any>) => {

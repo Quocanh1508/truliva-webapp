@@ -167,6 +167,21 @@ export default function Dashboard() {
   // Fetch dynamic analysis data whenever filters change
   useEffect(() => {
     setLoadingAnalysis(true);
+    
+    getDashboardStats({
+      startDate,
+      endDate,
+      province: selectedProvince,
+      mainStationId: selectedMainStation,
+      techStationId: selectedTechStation,
+      workType: selectedWorkType,
+      assignedKtvId: selectedKtvId
+    })
+      .then(data => {
+        setDashStats(data);
+      })
+      .catch(console.error);
+
     getDispatchAnalysis({
       startDate,
       endDate,

@@ -12,8 +12,18 @@ router.use(requireAuth, requireAdmin);
  * GET /api/dashboard/stats
  * Trả về dữ liệu thống kê cho Dashboard
  */
-router.get('/stats', async (_req: Request, res: Response): Promise<void> => {
+router.get('/stats', async (req: Request, res: Response): Promise<void> => {
   try {
+    const {
+      startDate,
+      endDate,
+      province,
+      mainStationId,
+      techStationId,
+      workType,
+      assignedKtvId
+    } = req.query;
+
     // 1. Thống kê số lượng đơn hàng theo Trạm (Main Station)
     const stations = await prisma.mainStation.findMany({
       where: { isActive: true },
@@ -68,23 +78,98 @@ router.get('/stats', async (_req: Request, res: Response): Promise<void> => {
       _count: { id: true }
     });
 
-    // 4. Thống kê theo yêu cầu của user
-    const pendingOrders = await prisma.order.count({
-      where: {
-        OR: [
-          { adminStatus: null },
-          { adminStatus: { notIn: ['đang thực hiện', 'hoàn thành', 'hủy đơn'] } }
-        ]
+    // 4. Thống kê theo yêu cầu của user có áp dụng bộ lọc
+    const where: any = {};
+
+    if (startDate || endDate) {
+      where.appointmentTime = {
+        not: null,
+        ...(startDate ? { gte: new Date(startDate as string) } : {}),
+        ...(endDate ? { lte: new Date(endDate as string) } : {})
+      };
+    }
+
+    if (workType) {
+      where.workType = workType as string;
+    }
+    if (assignedKtvId) {
+      where.assignedKtvId = assignedKtvId as string;
+    }
+
+    let orders = await prisma.order.findMany({
+      where,
+      select: {
+        adminStatus: true,
+        customer: { select: { provinceName: true } },
+        shippingAddress: true,
+        mainStation: { select: { name: true, isActive: true } },
+        techStation: {
+          select: {
+            name: true,
+            mainStation: { select: { name: true, isActive: true } }
+          }
+        },
+        mainStationId: true,
+        techStationId: true
       }
     });
-    const assignedOrders = await prisma.order.count({
-      where: { adminStatus: 'đang thực hiện' }
-    });
-    const completedOrders = await prisma.order.count({
-      where: { adminStatus: 'hoàn thành' }
-    });
-    const cancelledOrders = await prisma.order.count({
-      where: { adminStatus: 'hủy đơn' }
+
+    // Lọc theo tỉnh thành trong bộ nhớ
+    if (province) {
+      const searchProvince = removeAccents(province as string);
+      orders = orders.filter(order => {
+        const provName = order.customer?.provinceName || (order.shippingAddress as any)?.province_name || '';
+        return removeAccents(provName).includes(searchProvince);
+      });
+    }
+
+    // Lọc theo trạm chính / trạm kỹ thuật trong bộ nhớ
+    let filteredOrders = orders;
+    if (mainStationId) {
+      const targetMainStation = await prisma.mainStation.findUnique({
+        where: { id: mainStationId as string }
+      });
+      if (targetMainStation) {
+        filteredOrders = filteredOrders.filter(o => {
+          let mainStationName = 'Chưa phân trạm';
+          if (o.mainStation) {
+            if (o.mainStation.isActive) {
+              mainStationName = o.mainStation.name;
+            } else if (['Trạm Hồ Chí Minh', 'Trạm Đồng Nai', 'Trạm Vũng Tàu'].includes(o.mainStation.name)) {
+              mainStationName = 'Truliva';
+            }
+          }
+          if (mainStationName === 'Chưa phân trạm' && o.techStation?.mainStation) {
+            if (o.techStation.mainStation.isActive) {
+              mainStationName = o.techStation.mainStation.name;
+            } else if (['Trạm Hồ Chí Minh', 'Trạm Đồng Nai', 'Trạm Vũng Tàu'].includes(o.techStation.mainStation.name)) {
+              mainStationName = 'Truliva';
+            }
+          }
+          return mainStationName === targetMainStation.name;
+        });
+      }
+    }
+    if (techStationId) {
+      filteredOrders = filteredOrders.filter(o => o.techStationId === techStationId);
+    }
+
+    let pending = 0;
+    let assigned = 0;
+    let completed = 0;
+    let cancelled = 0;
+
+    filteredOrders.forEach(o => {
+      const status = o.adminStatus;
+      if (status === 'đang thực hiện') {
+        assigned++;
+      } else if (status === 'hoàn thành') {
+        completed++;
+      } else if (status === 'hủy đơn') {
+        cancelled++;
+      } else {
+        pending++;
+      }
     });
 
     res.json({
@@ -92,11 +177,11 @@ router.get('/stats', async (_req: Request, res: Response): Promise<void> => {
       mapDensity: density,
       statusCounts,
       orderStats: {
-        total: pendingOrders + assignedOrders + completedOrders + cancelledOrders,
-        pending: pendingOrders,
-        assigned: assignedOrders,
-        completed: completedOrders,
-        cancelled: cancelledOrders
+        total: pending + assigned + completed + cancelled,
+        pending,
+        assigned,
+        completed,
+        cancelled
       }
     });
   } catch (error: any) {
