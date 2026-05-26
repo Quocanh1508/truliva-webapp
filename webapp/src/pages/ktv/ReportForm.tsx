@@ -5,7 +5,7 @@ import LabeledImageUploader from '../../components/LabeledImageUploader';
 import { CheckCircle, ChevronLeft, Send, AlertCircle, Camera, Loader2 } from 'lucide-react';
 import { Html5Qrcode } from 'html5-qrcode';
 
-import { WORK_TYPES, WORK_TYPE_SERVICES, getImageSlots } from '../../utils/workTypes';
+import { getImageSlots } from '../../utils/workTypes';
 
 // ── Danh sách linh kiện phát sinh (từ Excel) ──
 const SPARE_PARTS = [
@@ -256,11 +256,11 @@ export default function ReportForm() {
 
   const handleUploadSuccess = (urls: string[]) => {
     setImageUrls(urls);
-    setStep(4);
+    setStep(3);
   };
 
-  // Validate Step 2 trước khi tiếp
-  const canProceedStep2 = (): boolean => {
+  // Validate Step 1 trước khi tiếp
+  const canProceedStep1 = (): boolean => {
     if (!serialNumber) return false;
     if (needsTechnicalFields(workType)) {
       if (!waterSource || !tdsIn || !tdsOut || !waterPressure) return false;
@@ -320,7 +320,7 @@ export default function ReportForm() {
     }
   };
 
-  const totalSteps = 4;
+  const totalSteps = 3;
 
   return (
     <div className="card max-w-2xl mx-auto animate-fade-in">
@@ -335,10 +335,9 @@ export default function ReportForm() {
         ></div>
 
         {[
-          { num: 1, label: 'Thông tin' },
-          { num: 2, label: 'Kỹ thuật' },
-          { num: 3, label: 'Hình ảnh' },
-          { num: 4, label: 'Xác nhận' },
+          { num: 1, label: 'Thông tin & Kỹ thuật' },
+          { num: 2, label: 'Hình ảnh' },
+          { num: 3, label: 'Xác nhận' },
         ].map(({ num, label }) => (
           <div key={num} className="flex flex-col items-center">
             <div
@@ -365,11 +364,11 @@ export default function ReportForm() {
 
       <form onSubmit={handleSubmit}>
         {/* ═══════════════════════════════════════════════ */}
-        {/* Step 1: Thông tin chung */}
+        {/* Step 1: Thông tin chung & Kỹ thuật */}
         {/* ═══════════════════════════════════════════════ */}
         {step === 1 && (
           <div className="animate-fade-in">
-            <h3 className="font-bold mb-4 text-lg">1. Thông tin chung</h3>
+            <h3 className="font-bold mb-4 text-lg">1. Thông tin chung & Kỹ thuật</h3>
 
             {/* Auto-fill từ đơn hàng */}
             <div className="form-group bg-blue-50/50 p-4 rounded-lg border border-blue-100 mb-6">
@@ -398,22 +397,72 @@ export default function ReportForm() {
               )}
             </div>
 
-            <div className="form-group">
-              <label className="form-label">Tên khách hàng *</label>
-              <input type="text" className="form-input" value={customerName} onChange={e => setCustomerName(e.target.value)} required />
-            </div>
-            <div className="form-group">
-              <label className="form-label">Số điện thoại *</label>
-              <input type="tel" className="form-input" value={customerPhone} onChange={e => setCustomerPhone(e.target.value)} required />
-            </div>
-            <div className="form-group">
-              <label className="form-label">Địa chỉ chi tiết *</label>
-              <input type="text" className="form-input" placeholder="Số nhà, đường, phường/xã..." value={address} onChange={e => setAddress(e.target.value)} required />
-            </div>
-            <div className="form-group">
-              <label className="form-label">Tỉnh / Thành phố *</label>
-              <input type="text" className="form-input" value={province} onChange={e => setProvince(e.target.value)} required />
-            </div>
+            {/* Khung thông tin tự động mapping */}
+            {selectedOrderId && (
+              <div style={{
+                background: '#f8fafc',
+                border: '1px solid #e2e8f0',
+                borderRadius: '12px',
+                padding: '16px',
+                marginBottom: '20px',
+                display: 'grid',
+                gridTemplateColumns: '1fr 1fr',
+                gap: '12px 16px',
+                fontSize: '13px'
+              }}>
+                <div style={{ gridColumn: 'span 2', borderBottom: '1px solid #e2e8f0', paddingBottom: '8px', marginBottom: '4px', fontWeight: 700, color: '#1e293b' }}>
+                  📋 Thông tin khách hàng & công việc
+                </div>
+                
+                <div>
+                  <span style={{ color: '#64748b', display: 'block', fontSize: '11px', textTransform: 'uppercase', fontWeight: 600 }}>Khách hàng</span>
+                  <strong style={{ color: '#0f172a' }}>{customerName || 'N/A'}</strong>
+                </div>
+
+                <div>
+                  <span style={{ color: '#64748b', display: 'block', fontSize: '11px', textTransform: 'uppercase', fontWeight: 600 }}>Số điện thoại</span>
+                  <strong style={{ color: '#0f172a' }}>{customerPhone || 'N/A'}</strong>
+                </div>
+
+                <div style={{ gridColumn: 'span 2' }}>
+                  <span style={{ color: '#64748b', display: 'block', fontSize: '11px', textTransform: 'uppercase', fontWeight: 600 }}>Địa chỉ</span>
+                  <strong style={{ color: '#0f172a' }}>{address || 'N/A'} {province ? `(${province})` : ''}</strong>
+                </div>
+
+                <div>
+                  <span style={{ color: '#64748b', display: 'block', fontSize: '11px', textTransform: 'uppercase', fontWeight: 600 }}>Loại công việc</span>
+                  <div>
+                    <span style={{
+                      display: 'inline-block',
+                      padding: '2px 8px',
+                      borderRadius: '6px',
+                      fontSize: '11px',
+                      fontWeight: 700,
+                      backgroundColor: '#eff6ff',
+                      color: '#2563eb',
+                      marginTop: '2px'
+                    }}>{workType || 'N/A'}</span>
+                  </div>
+                </div>
+
+                <div>
+                  <span style={{ color: '#64748b', display: 'block', fontSize: '11px', textTransform: 'uppercase', fontWeight: 600 }}>Dịch vụ</span>
+                  <strong style={{ color: '#0f172a' }}>{serviceType || 'N/A'}</strong>
+                </div>
+
+                <div style={{ gridColumn: 'span 2' }}>
+                  <span style={{ color: '#64748b', display: 'block', fontSize: '11px', textTransform: 'uppercase', fontWeight: 600 }}>Sản phẩm thực tế</span>
+                  <strong style={{ color: '#0f172a' }}>{products || 'N/A'}</strong>
+                </div>
+
+                {actualAmount && (
+                  <div>
+                    <span style={{ color: '#64748b', display: 'block', fontSize: '11px', textTransform: 'uppercase', fontWeight: 600 }}>Tiền thu thực tế</span>
+                    <strong style={{ color: '#e11d48' }}>{Number(actualAmount).toLocaleString('vi-VN')} VNĐ</strong>
+                  </div>
+                )}
+              </div>
+            )}
 
             {orderNote && (
               <div className="form-group bg-amber-50/70 p-3.5 rounded-lg border border-amber-200 mb-4">
@@ -424,308 +473,225 @@ export default function ReportForm() {
               </div>
             )}
 
-            <div style={{ borderTop: '1px solid #e2e8f0', margin: '20px 0', paddingTop: '16px' }}>
-              <div className="form-group">
-                <label className="form-label">Loại công việc *</label>
-                <select className="form-select" value={workType} onChange={e => {
-                  const wt = e.target.value;
-                  setWorkType(wt);
-                  // Auto-fill serviceType nếu chỉ có 1 loại dịch vụ
-                  const services = WORK_TYPE_SERVICES[wt] || [];
-                  if (services.length === 1) {
-                    setServiceType(services[0]);
-                  } else {
-                    setServiceType('');
-                  }
-                  // Reset spare parts khi đổi loại công việc
-                  setSpareParts([]);
-                }} required>
-                  <option value="">Chọn loại công việc...</option>
-                  {WORK_TYPES.map(w => <option key={w} value={w}>{w}</option>)}
-                </select>
-              </div>
-              <div className="form-group">
-                <label className="form-label">Loại dịch vụ *</label>
-                {(() => {
-                  const services = WORK_TYPE_SERVICES[workType] || [];
-                  const isSingleService = services.length === 1 && services[0] === 'Công việc đã bao gồm dịch vụ';
-                  return isSingleService ? (
-                    <input
-                      type="text"
-                      className="form-input bg-gray-50 text-gray-500"
-                      value="Công việc đã bao gồm dịch vụ"
-                      readOnly
-                    />
-                  ) : (
-                    <select className="form-select" value={serviceType} onChange={e => setServiceType(e.target.value)} required>
-                      <option value="">Chọn loại dịch vụ...</option>
-                      {services.map(s => <option key={s} value={s}>{s}</option>)}
-                    </select>
-                  );
-                })()}
-              </div>
-              <div className="form-group">
-                <label className="form-label">Tên sản phẩm thực tế x Số lượng SP</label>
-                <input
-                  type="text"
-                  className="form-input"
-                  placeholder="VD: UR5440 x1, Lõi lọc PGP x2"
-                  value={products}
-                  onChange={e => setProducts(e.target.value)}
-                />
-                <p className="text-xs text-gray-400 mt-1">Có thể điều chỉnh theo thực tế</p>
-              </div>
-              <div className="form-group">
-                <label className="form-label">Tiền thu thực tế (VNĐ)</label>
-                <input
-                  type="number"
-                  className="form-input"
-                  placeholder="Nhập số tiền thu được"
-                  value={actualAmount}
-                  onChange={e => setActualAmount(e.target.value)}
-                />
-                <p className="text-xs text-gray-400 mt-1">Có thể điều chỉnh theo thực tế</p>
-              </div>
-            </div>
-
-            <button
-              type="button"
-              className="btn btn-primary w-full"
-              onClick={() => setStep(2)}
-              disabled={!selectedOrderId || !customerName || !customerPhone || !province || !address || !workType || !serviceType}
-            >
-              Tiếp tục
-            </button>
-          </div>
-        )}
-
-        {/* ═══════════════════════════════════════════════ */}
-        {/* Step 2: Trường kỹ thuật (dynamic theo workType) */}
-        {/* ═══════════════════════════════════════════════ */}
-        {step === 2 && (
-          <div className="animate-fade-in">
-            <h3 className="font-bold mb-2 text-lg">2. Thông tin kỹ thuật</h3>
-            <p className="text-sm text-gray-500 mb-4">
-              Loại công việc: <span className="font-semibold text-[#1B3A6B]">{workType}</span>
-            </p>
-
-            {/* Nguồn nước — cho tất cả trừ Giao hàng */}
-            {needsTechnicalFields(workType) && (
-              <>
-                <div className="form-group">
-                  <label className="form-label">Nguồn nước *</label>
-                  <select className="form-select" value={waterSource} onChange={e => setWaterSource(e.target.value)} required>
-                    <option value="">Chọn nguồn nước...</option>
-                    {WATER_SOURCES.map(w => <option key={w} value={w}>{w}</option>)}
-                  </select>
-                </div>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-                  <div className="form-group">
-                    <label className="form-label">TDS đầu vào (ppm) *</label>
-                    <input type="number" className="form-input" placeholder="Nhập số ppm" value={tdsIn} onChange={e => setTdsIn(e.target.value)} required />
-                  </div>
-                  <div className="form-group">
-                    <label className="form-label">TDS đầu ra (ppm) *</label>
-                    <input type="number" className="form-input" placeholder="Nhập số ppm" value={tdsOut} onChange={e => setTdsOut(e.target.value)} required />
-                  </div>
-                </div>
-                <div className="form-group">
-                  <label className="form-label">Áp suất nước đầu vào (psi) *</label>
-                  <input type="number" className="form-input" placeholder="Nhập số psi thực tế" value={waterPressure} onChange={e => setWaterPressure(e.target.value)} required />
-                </div>
-                {/* Linh kiện phát sinh */}
-                {needsSpareParts(workType) && (
-                  <div className="form-group">
-                    <label className="form-label">Linh kiện phát sinh (nếu có)</label>
-                    <div style={{
-                      maxHeight: '200px',
-                      overflowY: 'auto',
-                      border: '1px solid #e2e8f0',
-                      borderRadius: '8px',
-                      padding: '10px',
-                      background: '#fafbfc',
-                    }}>
-                      {SPARE_PARTS.map(part => (
-                        <label key={part} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '5px 0', fontSize: '13px', cursor: 'pointer' }}>
-                          <input
-                            type="checkbox"
-                            checked={spareParts.includes(part)}
-                            onChange={e => {
-                              if (e.target.checked) {
-                                setSpareParts([...spareParts, part]);
-                              } else {
-                                setSpareParts(spareParts.filter(p => p !== part));
-                              }
-                            }}
-                          />
-                          <span>{part}</span>
-                        </label>
-                      ))}
+            {/* Nhập thông tin kỹ thuật */}
+            {selectedOrderId && (
+              <div style={{ borderTop: '1px solid #e2e8f0', margin: '20px 0', paddingTop: '16px' }}>
+                <h3 className="font-bold mb-4 text-md text-[#1B3A6B]">🛠️ Nhập thông tin kỹ thuật</h3>
+                
+                {/* Nguồn nước — cho tất cả trừ Giao hàng */}
+                {needsTechnicalFields(workType) && (
+                  <>
+                    <div className="form-group">
+                      <label className="form-label">Nguồn nước *</label>
+                      <select className="form-select" value={waterSource} onChange={e => setWaterSource(e.target.value)} required>
+                        <option value="">Chọn nguồn nước...</option>
+                        {WATER_SOURCES.map(w => <option key={w} value={w}>{w}</option>)}
+                      </select>
                     </div>
-                    {spareParts.length > 0 && (
-                      <p className="text-xs text-blue-600 mt-1 font-medium">
-                        Đã chọn {spareParts.length} linh kiện
-                      </p>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                      <div className="form-group">
+                        <label className="form-label">TDS đầu vào (ppm) *</label>
+                        <input type="number" className="form-input" placeholder="Nhập số ppm" value={tdsIn} onChange={e => setTdsIn(e.target.value)} required />
+                      </div>
+                      <div className="form-group">
+                        <label className="form-label">TDS đầu ra (ppm) *</label>
+                        <input type="number" className="form-input" placeholder="Nhập số ppm" value={tdsOut} onChange={e => setTdsOut(e.target.value)} required />
+                      </div>
+                    </div>
+                    <div className="form-group">
+                      <label className="form-label">Áp suất nước đầu vào (psi) *</label>
+                      <input type="number" className="form-input" placeholder="Nhập số psi thực tế" value={waterPressure} onChange={e => setWaterPressure(e.target.value)} required />
+                    </div>
+                    {/* Linh kiện phát sinh */}
+                    {needsSpareParts(workType) && (
+                      <div className="form-group">
+                        <label className="form-label">Linh kiện phát sinh (nếu có)</label>
+                        <div style={{
+                          maxHeight: '200px',
+                          overflowY: 'auto',
+                          border: '1px solid #e2e8f0',
+                          borderRadius: '8px',
+                          padding: '10px',
+                          background: '#fafbfc',
+                        }}>
+                          {SPARE_PARTS.map(part => (
+                            <label key={part} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '5px 0', fontSize: '13px', cursor: 'pointer' }}>
+                              <input
+                                type="checkbox"
+                                checked={spareParts.includes(part)}
+                                onChange={e => {
+                                  if (e.target.checked) {
+                                    setSpareParts([...spareParts, part]);
+                                  } else {
+                                    setSpareParts(spareParts.filter(p => p !== part));
+                                  }
+                                }}
+                              />
+                              <span>{part}</span>
+                            </label>
+                          ))}
+                        </div>
+                        {spareParts.length > 0 && (
+                          <p className="text-xs text-blue-600 mt-1 font-medium">
+                            Đã chọn {spareParts.length} linh kiện
+                          </p>
+                        )}
+                      </div>
+                    )}
+                  </>
+                )}
+
+                {/* Nguyên nhân sự cố và Cách xử lý — chỉ dành cho Bảo hành / Sửa chữa */}
+                {['Bảo hành', 'Sửa chữa'].includes(workType) && (
+                  <div style={{ borderTop: '1px dashed #cbd5e1', marginTop: '16px', paddingTop: '16px' }}>
+                    <div className="form-group">
+                      <label className="form-label">Nguyên nhân / Loại sự cố *</label>
+                      <select 
+                        className="form-select" 
+                        value={issueType} 
+                        onChange={e => {
+                          setIssueType(e.target.value);
+                          if (e.target.value !== 'Khác (Nhập chi tiết phía dưới)') {
+                            setCustomIssueType('');
+                          }
+                        }} 
+                        required
+                      >
+                        <option value="">-- Chọn Nguyên nhân / Loại sự cố --</option>
+                        {ISSUE_TYPES.map(i => <option key={i} value={i}>{i}</option>)}
+                      </select>
+                    </div>
+                    {issueType === 'Khác (Nhập chi tiết phía dưới)' && (
+                      <div className="form-group">
+                        <label className="form-label">Chi tiết nguyên nhân sự cố *</label>
+                        <input 
+                          type="text" 
+                          className="form-input" 
+                          placeholder="Mô tả nguyên nhân lỗi..." 
+                          value={customIssueType} 
+                          onChange={e => setCustomIssueType(e.target.value)} 
+                          required 
+                        />
+                      </div>
+                    )}
+
+                    <div className="form-group">
+                      <label className="form-label">Cách xử lý của KTV *</label>
+                      <select 
+                        className="form-select" 
+                        value={handlingMethod} 
+                        onChange={e => {
+                          setHandlingMethod(e.target.value);
+                          if (e.target.value !== 'Khác (Nhập chi tiết phía dưới)') {
+                            setCustomHandlingMethod('');
+                          }
+                        }} 
+                        required
+                      >
+                        <option value="">-- Chọn Cách xử lý --</option>
+                        {HANDLING_METHODS.map(h => <option key={h} value={h}>{h}</option>)}
+                      </select>
+                    </div>
+                    {handlingMethod === 'Khác (Nhập chi tiết phía dưới)' && (
+                      <div className="form-group">
+                        <label className="form-label">Chi tiết cách xử lý *</label>
+                        <input 
+                          type="text" 
+                          className="form-input" 
+                          placeholder="Mô tả cách xử lý lỗi..." 
+                          value={customHandlingMethod} 
+                          onChange={e => setCustomHandlingMethod(e.target.value)} 
+                          required 
+                        />
+                      </div>
                     )}
                   </div>
                 )}
-              </>
-            )}
 
-            {/* Nguyên nhân sự cố và Cách xử lý — chỉ dành cho Bảo hành / Sửa chữa */}
-            {['Bảo hành', 'Sửa chữa'].includes(workType) && (
-              <div style={{ borderTop: '1px dashed #cbd5e1', marginTop: '16px', paddingTop: '16px' }}>
-                <div className="form-group">
-                  <label className="form-label">Nguyên nhân / Loại sự cố *</label>
-                  <select 
-                    className="form-select" 
-                    value={issueType} 
-                    onChange={e => {
-                      setIssueType(e.target.value);
-                      if (e.target.value !== 'Khác (Nhập chi tiết phía dưới)') {
-                        setCustomIssueType('');
-                      }
-                    }} 
-                    required
-                  >
-                    <option value="">-- Chọn Nguyên nhân / Loại sự cố --</option>
-                    {ISSUE_TYPES.map(i => <option key={i} value={i}>{i}</option>)}
-                  </select>
-                </div>
-                {issueType === 'Khác (Nhập chi tiết phía dưới)' && (
-                  <div className="form-group">
-                    <label className="form-label">Chi tiết nguyên nhân sự cố *</label>
-                    <input 
-                      type="text" 
-                      className="form-input" 
-                      placeholder="Mô tả nguyên nhân lỗi..." 
-                      value={customIssueType} 
-                      onChange={e => setCustomIssueType(e.target.value)} 
-                      required 
+                {/* Seri sản phẩm — tất cả loại */}
+                <div className="form-group" style={{ borderTop: ['Bảo hành', 'Sửa chữa'].includes(workType) ? 'none' : '1px dashed #cbd5e1', marginTop: ['Bảo hành', 'Sửa chữa'].includes(workType) ? '0' : '16px', paddingTop: ['Bảo hành', 'Sửa chữa'].includes(workType) ? '0' : '16px' }}>
+                  <label className="form-label flex justify-between items-center">
+                    <span>Seri sản phẩm *</span>
+                    <button
+                      type="button"
+                      className="text-blue-600 hover:text-blue-700 text-xs font-semibold flex items-center gap-1 bg-blue-50 px-2.5 py-1 rounded-md border border-blue-200 transition-colors"
+                      onClick={() => setShowScanner(true)}
+                    >
+                      <Camera size={13} /> Quét mã vạch
+                    </button>
+                  </label>
+                  <div className="relative">
+                    <input
+                      type="text"
+                      className={`form-input pr-10 font-mono tracking-wider ${serialWarning ? 'border-amber-400 bg-amber-50/20' : ''}`}
+                      placeholder="Mẫu: 1858 260 207 00059"
+                      value={serialNumber}
+                      onChange={e => {
+                        const formatted = formatSerialNumber(e.target.value);
+                        setSerialNumber(formatted);
+                        const clean = formatted.replace(/[^a-zA-Z0-9]/g, '');
+                        if (clean.length === 15) {
+                          checkSerial(formatted);
+                        } else {
+                          setSerialInfo(null);
+                          setSerialWarning('');
+                        }
+                      }}
+                      onBlur={() => checkSerial(serialNumber)}
+                      required
                     />
+                    {serialChecking && (
+                      <div className="absolute right-3 top-1/2 -translate-y-1/2 text-blue-500 animate-spin">
+                        <Loader2 size={16} />
+                      </div>
+                    )}
                   </div>
-                )}
+
+                  {serialWarning && (
+                    <div className="mt-2 text-xs text-amber-700 bg-amber-50 border border-amber-200 p-2.5 rounded-lg flex items-start gap-1.5 leading-normal">
+                      <AlertCircle size={15} className="mt-0.5 shrink-0" />
+                      <span>{serialWarning}</span>
+                    </div>
+                  )}
+
+                  {serialInfo && (
+                    <div className="mt-2 text-[11px] text-emerald-700 bg-emerald-50 border border-emerald-200 p-2.5 rounded-lg leading-normal shadow-xs">
+                      <div className="font-bold flex items-center gap-1 mb-1">
+                        <CheckCircle size={14} /> Đã khớp thiết bị lắp đặt gốc:
+                      </div>
+                      <ul className="list-disc pl-4 space-y-0.5 text-emerald-800">
+                        <li>Dòng máy: <strong>{serialInfo.products?.join(', ') || 'Chưa rõ'}</strong></li>
+                        <li>Khách hàng gốc: <strong>{serialInfo.customerName || 'Chưa rõ'}</strong></li>
+                        <li>Ngày lắp đặt: <strong>{new Date(serialInfo.installDate).toLocaleDateString('vi-VN')}</strong></li>
+                      </ul>
+                    </div>
+                  )}
+                </div>
 
                 <div className="form-group">
-                  <label className="form-label">Cách xử lý của KTV *</label>
-                  <select 
-                    className="form-select" 
-                    value={handlingMethod} 
-                    onChange={e => {
-                      setHandlingMethod(e.target.value);
-                      if (e.target.value !== 'Khác (Nhập chi tiết phía dưới)') {
-                        setCustomHandlingMethod('');
-                      }
-                    }} 
-                    required
-                  >
-                    <option value="">-- Chọn Cách xử lý --</option>
-                    {HANDLING_METHODS.map(h => <option key={h} value={h}>{h}</option>)}
-                  </select>
+                  <label className="form-label">Khoảng cách di chuyển (km)</label>
+                  <input type="number" className="form-input" placeholder="Nhập khoảng cách" value={distanceKm} onChange={e => setDistanceKm(e.target.value)} />
                 </div>
-                {handlingMethod === 'Khác (Nhập chi tiết phía dưới)' && (
-                  <div className="form-group">
-                    <label className="form-label">Chi tiết cách xử lý *</label>
-                    <input 
-                      type="text" 
-                      className="form-input" 
-                      placeholder="Mô tả cách xử lý lỗi..." 
-                      value={customHandlingMethod} 
-                      onChange={e => setCustomHandlingMethod(e.target.value)} 
-                      required 
-                    />
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* Seri sản phẩm — tất cả loại */}
-            <div className="form-group">
-              <label className="form-label flex justify-between items-center">
-                <span>Seri sản phẩm *</span>
+                
                 <button
                   type="button"
-                  className="text-blue-600 hover:text-blue-700 text-xs font-semibold flex items-center gap-1 bg-blue-50 px-2.5 py-1 rounded-md border border-blue-200 transition-colors"
-                  onClick={() => setShowScanner(true)}
+                  className="btn btn-primary w-full mt-6"
+                  onClick={() => setStep(2)}
+                  disabled={!selectedOrderId || !customerName || !customerPhone || !province || !address || !workType || !serviceType || !canProceedStep1()}
                 >
-                  <Camera size={13} /> Quét mã vạch
+                  Tiếp tục
                 </button>
-              </label>
-              <div className="relative">
-                <input
-                  type="text"
-                  className={`form-input pr-10 font-mono tracking-wider ${serialWarning ? 'border-amber-400 bg-amber-50/20' : ''}`}
-                  placeholder="Mẫu: 1858 260 207 00059"
-                  value={serialNumber}
-                  onChange={e => {
-                    const formatted = formatSerialNumber(e.target.value);
-                    setSerialNumber(formatted);
-                    const clean = formatted.replace(/[^a-zA-Z0-9]/g, '');
-                    if (clean.length === 15) {
-                      checkSerial(formatted);
-                    } else {
-                      setSerialInfo(null);
-                      setSerialWarning('');
-                    }
-                  }}
-                  onBlur={() => checkSerial(serialNumber)}
-                  required
-                />
-                {serialChecking && (
-                  <div className="absolute right-3 top-1/2 -translate-y-1/2 text-blue-500 animate-spin">
-                    <Loader2 size={16} />
-                  </div>
-                )}
               </div>
-
-              {serialWarning && (
-                <div className="mt-2 text-xs text-amber-700 bg-amber-50 border border-amber-200 p-2.5 rounded-lg flex items-start gap-1.5 leading-normal">
-                  <AlertCircle size={15} className="mt-0.5 shrink-0" />
-                  <span>{serialWarning}</span>
-                </div>
-              )}
-
-              {serialInfo && (
-                <div className="mt-2 text-[11px] text-emerald-700 bg-emerald-50 border border-emerald-200 p-2.5 rounded-lg leading-normal shadow-xs">
-                  <div className="font-bold flex items-center gap-1 mb-1">
-                    <CheckCircle size={14} /> Đã khớp thiết bị lắp đặt gốc:
-                  </div>
-                  <ul className="list-disc pl-4 space-y-0.5 text-emerald-800">
-                    <li>Dòng máy: <strong>{serialInfo.products?.join(', ') || 'Chưa rõ'}</strong></li>
-                    <li>Khách hàng gốc: <strong>{serialInfo.customerName || 'Chưa rõ'}</strong></li>
-                    <li>Ngày lắp đặt: <strong>{new Date(serialInfo.installDate).toLocaleDateString('vi-VN')}</strong></li>
-                  </ul>
-                </div>
-              )}
-            </div>
-
-            <div className="form-group">
-              <label className="form-label">Khoảng cách di chuyển (km)</label>
-              <input type="number" className="form-input" placeholder="Nhập khoảng cách" value={distanceKm} onChange={e => setDistanceKm(e.target.value)} />
-            </div>
-
-            <div className="flex gap-4 mt-6">
-              <button type="button" className="btn btn-outline flex-1 flex items-center justify-center gap-2" onClick={() => setStep(1)}>
-                <ChevronLeft size={16} /> Quay lại
-              </button>
-              <button
-                type="button"
-                className="btn btn-primary flex-1"
-                onClick={() => setStep(3)}
-                disabled={!canProceedStep2()}
-              >
-                Tiếp tục
-              </button>
-            </div>
+            )}
           </div>
         )}
 
         {/* ═══════════════════════════════════════════════ */}
-        {/* Step 3: Upload ảnh theo slot labels */}
+        {/* Step 2: Upload ảnh theo slot labels */}
         {/* ═══════════════════════════════════════════════ */}
-        {step === 3 && (
+        {step === 2 && (
           <div className="animate-fade-in">
-            <h3 className="font-bold mb-2 text-lg">3. Hình ảnh xác nhận</h3>
+            <h3 className="font-bold mb-2 text-lg">2. Hình ảnh xác nhận</h3>
             <p className="text-sm text-gray-500 mb-4">
               Loại: <span className="font-semibold text-[#1B3A6B]">{workType}</span> — Cần {getImageSlots(workType).length} ảnh
             </p>
@@ -739,7 +705,7 @@ export default function ReportForm() {
                   <button type="button" className="btn btn-outline flex-1 flex items-center justify-center gap-2" onClick={() => { setImageUrls([]); }}>
                     Upload lại
                   </button>
-                  <button type="button" className="btn btn-primary flex-1" onClick={() => setStep(4)}>
+                  <button type="button" className="btn btn-primary flex-1" onClick={() => setStep(3)}>
                     Tiếp tục
                   </button>
                 </div>
@@ -752,10 +718,10 @@ export default function ReportForm() {
                   onUploadSuccess={handleUploadSuccess}
                 />
                 <div className="mt-6 flex gap-4">
-                  <button type="button" className="btn btn-outline flex-1 flex items-center justify-center gap-2" onClick={() => setStep(2)}>
+                  <button type="button" className="btn btn-outline flex-1 flex items-center justify-center gap-2" onClick={() => setStep(1)}>
                     <ChevronLeft size={16} /> Quay lại
                   </button>
-                  <button type="button" className="btn btn-outline text-gray-500 flex-1" onClick={() => setStep(4)}>
+                  <button type="button" className="btn btn-outline text-gray-500 flex-1" onClick={() => setStep(3)}>
                     Bỏ qua ảnh
                   </button>
                 </div>
@@ -765,11 +731,11 @@ export default function ReportForm() {
         )}
 
         {/* ═══════════════════════════════════════════════ */}
-        {/* Step 4: Ghi chú & Submit */}
+        {/* Step 3: Ghi chú & Submit */}
         {/* ═══════════════════════════════════════════════ */}
-        {step === 4 && (
+        {step === 3 && (
           <div className="animate-fade-in">
-            <h3 className="font-bold mb-4 text-lg">4. Xác nhận & Ghi chú</h3>
+            <h3 className="font-bold mb-4 text-lg">3. Xác nhận & Ghi chú</h3>
 
             {/* Tóm tắt thông tin */}
             <div className="bg-gray-50 rounded-lg p-4 mb-6 text-sm space-y-2">
@@ -838,7 +804,7 @@ export default function ReportForm() {
             </div>
 
             <div className="flex gap-4 mt-8">
-              <button type="button" className="btn btn-outline flex-1 flex items-center justify-center gap-2" onClick={() => setStep(3)}>
+              <button type="button" className="btn btn-outline flex-1 flex items-center justify-center gap-2" onClick={() => setStep(2)}>
                 <ChevronLeft size={16} /> Quay lại
               </button>
               <button type="submit" className="btn btn-primary flex-1 flex justify-center items-center gap-2" disabled={loading}>
