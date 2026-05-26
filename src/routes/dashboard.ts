@@ -89,11 +89,13 @@ router.get('/stats', async (req: Request, res: Response): Promise<void> => {
       };
     }
 
-    if (workType) {
-      where.workType = workType as string;
+    const workTypes = parseMultiValue(workType);
+    if (workTypes.length > 0) {
+      where.workType = workTypes.length === 1 ? workTypes[0] : { in: workTypes };
     }
-    if (assignedKtvId) {
-      where.assignedKtvId = assignedKtvId as string;
+    const ktvIds = parseMultiValue(assignedKtvId);
+    if (ktvIds.length > 0) {
+      where.assignedKtvId = ktvIds.length === 1 ? ktvIds[0] : { in: ktvIds };
     }
 
     let orders = await prisma.order.findMany({
@@ -114,44 +116,48 @@ router.get('/stats', async (req: Request, res: Response): Promise<void> => {
       }
     });
 
-    // Lọc theo tỉnh thành trong bộ nhớ
-    if (province) {
-      const searchProvince = removeAccents(province as string);
+    // Lọc theo tỉnh thành trong bộ nhớ (hỗ trợ đa chọn)
+    const provinces = parseMultiValue(province);
+    if (provinces.length > 0) {
+      const searchProvinces = provinces.map(p => removeAccents(p));
       orders = orders.filter(order => {
-        const provName = order.customer?.provinceName || (order.shippingAddress as any)?.province_name || '';
-        return removeAccents(provName).includes(searchProvince);
+        const provName = removeAccents(order.customer?.provinceName || (order.shippingAddress as any)?.province_name || '');
+        return searchProvinces.some(sp => provName.includes(sp));
       });
     }
 
-    // Lọc theo trạm chính / trạm kỹ thuật trong bộ nhớ
+    // Lọc theo trạm chính / trạm kỹ thuật trong bộ nhớ (hỗ trợ đa chọn)
     let filteredOrders = orders;
-    if (mainStationId) {
-      const targetMainStation = await prisma.mainStation.findUnique({
-        where: { id: mainStationId as string }
+    const mainStationIds = parseMultiValue(mainStationId);
+    if (mainStationIds.length > 0) {
+      const targetMainStations = await prisma.mainStation.findMany({
+        where: { id: { in: mainStationIds } }
       });
-      if (targetMainStation) {
+      const targetNames = targetMainStations.map(s => s.name);
+      if (targetNames.length > 0) {
         filteredOrders = filteredOrders.filter(o => {
-          let mainStationName = 'Chưa phân trạm';
+          let msName = 'Chưa phân trạm';
           if (o.mainStation) {
             if (o.mainStation.isActive) {
-              mainStationName = o.mainStation.name;
+              msName = o.mainStation.name;
             } else if (['Trạm Hồ Chí Minh', 'Trạm Đồng Nai', 'Trạm Vũng Tàu'].includes(o.mainStation.name)) {
-              mainStationName = 'Truliva';
+              msName = 'Truliva';
             }
           }
-          if (mainStationName === 'Chưa phân trạm' && o.techStation?.mainStation) {
+          if (msName === 'Chưa phân trạm' && o.techStation?.mainStation) {
             if (o.techStation.mainStation.isActive) {
-              mainStationName = o.techStation.mainStation.name;
+              msName = o.techStation.mainStation.name;
             } else if (['Trạm Hồ Chí Minh', 'Trạm Đồng Nai', 'Trạm Vũng Tàu'].includes(o.techStation.mainStation.name)) {
-              mainStationName = 'Truliva';
+              msName = 'Truliva';
             }
           }
-          return mainStationName === targetMainStation.name;
+          return targetNames.includes(msName);
         });
       }
     }
-    if (techStationId) {
-      filteredOrders = filteredOrders.filter(o => o.techStationId === techStationId);
+    const techStationIds = parseMultiValue(techStationId);
+    if (techStationIds.length > 0) {
+      filteredOrders = filteredOrders.filter(o => o.techStationId != null && techStationIds.includes(o.techStationId));
     }
 
     let pending = 0;
@@ -201,6 +207,11 @@ function removeAccents(str: string): string {
     .trim();
 }
 
+function parseMultiValue(param: any): string[] {
+  if (!param) return [];
+  return String(param).split(',').map(s => s.trim()).filter(Boolean);
+}
+
 /**
  * GET /api/dashboard/dispatch-analysis
  * Lấy dữ liệu phân tích đúng hẹn / trễ hẹn của đơn hàng
@@ -231,14 +242,17 @@ router.get('/dispatch-analysis', async (req: Request, res: Response): Promise<vo
       };
     }
 
-    if (workType) {
-      where.workType = workType as string;
+    const workTypes = parseMultiValue(workType);
+    if (workTypes.length > 0) {
+      where.workType = workTypes.length === 1 ? workTypes[0] : { in: workTypes };
     }
-    if (adminStatus) {
-      where.adminStatus = adminStatus as string;
+    const statuses = parseMultiValue(adminStatus);
+    if (statuses.length > 0) {
+      where.adminStatus = statuses.length === 1 ? statuses[0] : { in: statuses };
     }
-    if (assignedKtvId) {
-      where.assignedKtvId = assignedKtvId as string;
+    const ktvIds = parseMultiValue(assignedKtvId);
+    if (ktvIds.length > 0) {
+      where.assignedKtvId = ktvIds.length === 1 ? ktvIds[0] : { in: ktvIds };
     }
 
     // Lấy tất cả các đơn hàng thỏa mãn
@@ -281,12 +295,13 @@ router.get('/dispatch-analysis', async (req: Request, res: Response): Promise<vo
       }
     });
 
-    // Lọc theo province (tỉnh/thành phố) bằng JS ở bộ nhớ để tránh phức tạp hóa JSONB query
-    if (province) {
-      const searchProvince = removeAccents(province as string);
+    // Lọc theo province (tỉnh/thành phố) bằng JS ở bộ nhớ (hỗ trợ đa chọn)
+    const provinces = parseMultiValue(province);
+    if (provinces.length > 0) {
+      const searchProvinces = provinces.map(p => removeAccents(p));
       orders = orders.filter(order => {
-        const provName = order.customer?.provinceName || (order.shippingAddress as any)?.province_name || '';
-        return removeAccents(provName).includes(searchProvince);
+        const provName = removeAccents(order.customer?.provinceName || (order.shippingAddress as any)?.province_name || '');
+        return searchProvinces.some(sp => provName.includes(sp));
       });
     }
 
@@ -375,18 +390,21 @@ router.get('/dispatch-analysis', async (req: Request, res: Response): Promise<vo
       };
     });
 
-    // Apply mainStationId and techStationId filters in memory to handle mapped stations correctly
+    // Apply mainStationId and techStationId filters in memory (hỗ trợ đa chọn)
     let filteredOrders = processedOrders;
-    if (mainStationId) {
-      const targetMainStation = await prisma.mainStation.findUnique({
-        where: { id: mainStationId as string }
+    const mainStationIds = parseMultiValue(mainStationId);
+    if (mainStationIds.length > 0) {
+      const targetMainStations = await prisma.mainStation.findMany({
+        where: { id: { in: mainStationIds } }
       });
-      if (targetMainStation) {
-        filteredOrders = filteredOrders.filter(o => o.mainStationName === targetMainStation.name);
+      const targetNames = targetMainStations.map(s => s.name);
+      if (targetNames.length > 0) {
+        filteredOrders = filteredOrders.filter(o => targetNames.includes(o.mainStationName));
       }
     }
-    if (techStationId) {
-      filteredOrders = filteredOrders.filter(o => o.techStationId === techStationId);
+    const techStationIds = parseMultiValue(techStationId);
+    if (techStationIds.length > 0) {
+      filteredOrders = filteredOrders.filter(o => o.techStationId != null && techStationIds.includes(o.techStationId));
     }
 
     // 2. Tính toán Summary
@@ -597,20 +615,24 @@ router.get('/product-quality', async (req: Request, res: Response): Promise<void
       orderBy: { createdAt: 'desc' }
     });
 
-    // Lọc theo province (tỉnh/thành phố) bằng JS ở bộ nhớ
-    if (province) {
-      const searchProvince = removeAccents(province as string);
+    // Lọc theo province (tỉnh/thành phố) bằng JS ở bộ nhớ (hỗ trợ đa chọn)
+    const provinces = parseMultiValue(province);
+    if (provinces.length > 0) {
+      const searchProvinces = provinces.map(p => removeAccents(p));
       reports = reports.filter(r => {
-        return removeAccents(r.province || '').includes(searchProvince);
+        const provName = removeAccents(r.province || '');
+        return searchProvinces.some(sp => provName.includes(sp));
       });
     }
 
-    // Lọc theo trạm chính / trạm kỹ thuật
-    if (mainStationId) {
-      reports = reports.filter(r => r.order?.mainStationId === mainStationId);
+    // Lọc theo trạm chính / trạm kỹ thuật (hỗ trợ đa chọn)
+    const mainStationIds = parseMultiValue(mainStationId);
+    if (mainStationIds.length > 0) {
+      reports = reports.filter(r => r.order?.mainStationId != null && mainStationIds.includes(r.order.mainStationId));
     }
-    if (techStationId) {
-      reports = reports.filter(r => r.order?.techStationId === techStationId);
+    const techStationIds = parseMultiValue(techStationId);
+    if (techStationIds.length > 0) {
+      reports = reports.filter(r => r.order?.techStationId != null && techStationIds.includes(r.order.techStationId));
     }
 
     // ── Lấy danh sách sản phẩm duy nhất trước khi lọc sản phẩm ──
@@ -625,11 +647,15 @@ router.get('/product-quality', async (req: Request, res: Response): Promise<void
     });
     const allProducts = Array.from(productSet).sort((a, b) => a.localeCompare(b, 'vi'));
 
-    // ── Lọc theo sản phẩm (nếu có) ──
-    if (product) {
-      const searchProduct = removeAccents(product as string);
+    // ── Lọc theo sản phẩm (nếu có, hỗ trợ đa chọn) ──
+    const selectedProducts = parseMultiValue(product);
+    if (selectedProducts.length > 0) {
+      const searchProducts = selectedProducts.map(p => removeAccents(p));
       reports = reports.filter(r =>
-        r.products && r.products.some(p => removeAccents(p).includes(searchProduct))
+        r.products && r.products.some(p => {
+          const cleanP = removeAccents(p);
+          return searchProducts.some(sp => cleanP.includes(sp));
+        })
       );
     }
 

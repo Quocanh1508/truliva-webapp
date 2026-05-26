@@ -102,6 +102,132 @@ const STATUS_OPTIONS = [
   { value: 'hủy đơn', label: 'Hủy đơn' }
 ];
 
+function MultiSelect({
+  label,
+  options,
+  selectedValues,
+  onChange,
+  isOpen,
+  onToggle,
+  disabled = false,
+  placeholder = 'Tất cả'
+}: {
+  label: string;
+  options: (string | { value: string; label: string })[];
+  selectedValues: string[];
+  onChange: (values: string[]) => void;
+  isOpen: boolean;
+  onToggle: () => void;
+  disabled?: boolean;
+  placeholder?: string;
+}) {
+  const normalizedOptions = options.map(opt => {
+    if (typeof opt === 'string') {
+      return { value: opt, label: opt };
+    }
+    return opt;
+  });
+
+  const handleSelectAll = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    onChange(normalizedOptions.map(o => o.value));
+  };
+
+  const handleClear = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    onChange([]);
+  };
+
+  const handleToggleOption = (value: string) => {
+    if (selectedValues.includes(value)) {
+      onChange(selectedValues.filter(v => v !== value));
+    } else {
+      onChange([...selectedValues, value]);
+    }
+  };
+
+  const getDisplayText = () => {
+    if (selectedValues.length === 0) return placeholder;
+    if (selectedValues.length <= 2) {
+      return selectedValues
+        .map(v => normalizedOptions.find(o => o.value === v)?.label || v)
+        .join(', ');
+    }
+    return `Đã chọn (${selectedValues.length})`;
+  };
+
+  return (
+    <div className="flex flex-col relative" onClick={(e) => e.stopPropagation()}>
+      {label && <label className="text-[11px] font-semibold text-gray-500 mb-1 uppercase">{label}</label>}
+      <button
+        type="button"
+        disabled={disabled}
+        onClick={(e) => {
+          e.stopPropagation();
+          onToggle();
+        }}
+        className={`border rounded px-2.5 py-1.5 text-xs outline-none focus:border-blue-500 text-gray-700 bg-white flex justify-between items-center cursor-pointer min-h-[32px] text-left select-none transition-all ${
+          disabled ? 'opacity-50 cursor-not-allowed bg-gray-50 font-medium' : 'hover:border-gray-400 font-medium'
+        }`}
+      >
+        <span className="truncate pr-1">{getDisplayText()}</span>
+        <svg
+          className={`w-3 h-3 text-gray-400 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`}
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+        >
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
+        </svg>
+      </button>
+
+      {isOpen && !disabled && (
+        <div className="absolute top-[52px] left-0 min-w-[200px] w-full bg-white border border-gray-200 rounded-lg shadow-xl py-2 z-50 animate-fade-in flex flex-col max-h-64">
+          <div className="flex justify-between items-center px-3 pb-2 border-b border-gray-100 text-[10px] font-bold text-blue-600">
+            <button
+              type="button"
+              onClick={handleSelectAll}
+              className="hover:underline cursor-pointer"
+            >
+              Chọn tất cả
+            </button>
+            <button
+              type="button"
+              onClick={handleClear}
+              className="hover:underline text-gray-500 cursor-pointer"
+            >
+              Bỏ chọn
+            </button>
+          </div>
+          <div className="overflow-y-auto flex-1 py-1 max-h-48 custom-scrollbar">
+            {normalizedOptions.length === 0 ? (
+              <div className="text-gray-400 text-center py-4 text-xs font-medium">Không có tùy chọn</div>
+            ) : (
+              normalizedOptions.map(opt => {
+                const isChecked = selectedValues.includes(opt.value);
+                return (
+                  <label
+                    key={opt.value}
+                    className="flex items-center px-3 py-1.5 hover:bg-blue-50 cursor-pointer select-none text-xs text-gray-700 font-medium transition-colors"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={isChecked}
+                      onChange={() => handleToggleOption(opt.value)}
+                      className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 h-3.5 w-3.5 mr-2 cursor-pointer transition-all"
+                    />
+                    <span className="truncate">{opt.label}</span>
+                  </label>
+                );
+              })
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function Dashboard() {
   const [activeTab, setActiveTab] = useState<'summary' | 'ontime' | 'late' | 'workload' | 'stationComp' | 'productQuality'>('summary');
   
@@ -132,13 +258,14 @@ export default function Dashboard() {
     // Default to last day of current month
     return new Date(d.getFullYear(), d.getMonth() + 1, 0).toISOString().slice(0, 10);
   });
-  const [selectedProvince, setSelectedProvince] = useState('');
-  const [selectedMainStation, setSelectedMainStation] = useState('');
-  const [selectedTechStation, setSelectedTechStation] = useState('');
-  const [selectedWorkType, setSelectedWorkType] = useState('');
-  const [selectedAdminStatus, setSelectedAdminStatus] = useState('');
-  const [selectedKtvId, setSelectedKtvId] = useState('');
-  const [selectedProduct, setSelectedProduct] = useState('');
+  const [selectedProvinces, setSelectedProvinces] = useState<string[]>([]);
+  const [selectedMainStations, setSelectedMainStations] = useState<string[]>([]);
+  const [selectedTechStations, setSelectedTechStations] = useState<string[]>([]);
+  const [selectedWorkTypes, setSelectedWorkTypes] = useState<string[]>([]);
+  const [selectedAdminStatuses, setSelectedAdminStatuses] = useState<string[]>([]);
+  const [selectedKtvIds, setSelectedKtvIds] = useState<string[]>([]);
+  const [selectedProducts, setSelectedProducts] = useState<string[]>([]);
+  const [openDropdown, setOpenDropdown] = useState<string | null>(null);
   const [ktvList, setKtvList] = useState<any[]>([]);
 
   // Fetch static data (stations, overview stats) once on mount
@@ -156,14 +283,38 @@ export default function Dashboard() {
       .finally(() => setLoadingOverview(false));
   }, []);
 
-  // Fetch KTVs dynamically based on selectedTechStation
+  // Click outside to close active dropdown
   useEffect(() => {
-    getKtvUsers({ techStationId: selectedTechStation })
+    const handleOutsideClick = () => {
+      setOpenDropdown(null);
+    };
+    window.addEventListener('click', handleOutsideClick);
+    return () => window.removeEventListener('click', handleOutsideClick);
+  }, []);
+
+  // Update tech stations selection based on selected main stations
+  useEffect(() => {
+    if (selectedMainStations.length === 0) {
+      setSelectedTechStations([]);
+    } else {
+      const allowedIds = new Set(
+        stationsList
+          .filter(s => selectedMainStations.includes(s.id))
+          .flatMap(s => s.techStations || [])
+          .map((t: any) => t.id)
+      );
+      setSelectedTechStations(prev => prev.filter(id => allowedIds.has(id)));
+    }
+  }, [selectedMainStations, stationsList]);
+
+  // Fetch KTVs dynamically based on selectedTechStations
+  useEffect(() => {
+    getKtvUsers({ techStationId: selectedTechStations.join(',') })
       .then(data => {
         setKtvList(data);
       })
       .catch(console.error);
-  }, [selectedTechStation]);
+  }, [selectedTechStations]);
 
   // Fetch dynamic analysis data whenever filters change
   useEffect(() => {
@@ -172,11 +323,11 @@ export default function Dashboard() {
     getDashboardStats({
       startDate,
       endDate,
-      province: selectedProvince,
-      mainStationId: selectedMainStation,
-      techStationId: selectedTechStation,
-      workType: selectedWorkType,
-      assignedKtvId: selectedKtvId
+      province: selectedProvinces,
+      mainStationId: selectedMainStations,
+      techStationId: selectedTechStations,
+      workType: selectedWorkTypes,
+      assignedKtvId: selectedKtvIds
     })
       .then(data => {
         setDashStats(data);
@@ -186,19 +337,19 @@ export default function Dashboard() {
     getDispatchAnalysis({
       startDate,
       endDate,
-      province: selectedProvince,
-      mainStationId: selectedMainStation,
-      techStationId: selectedTechStation,
-      workType: selectedWorkType,
-      adminStatus: selectedAdminStatus,
-      assignedKtvId: selectedKtvId
+      province: selectedProvinces,
+      mainStationId: selectedMainStations,
+      techStationId: selectedTechStations,
+      workType: selectedWorkTypes,
+      adminStatus: selectedAdminStatuses,
+      assignedKtvId: selectedKtvIds
     })
       .then(data => {
         setAnalysisData(data);
       })
       .catch(console.error)
       .finally(() => setLoadingAnalysis(false));
-  }, [startDate, endDate, selectedProvince, selectedMainStation, selectedTechStation, selectedWorkType, selectedAdminStatus, selectedKtvId]);
+  }, [startDate, endDate, selectedProvinces, selectedMainStations, selectedTechStations, selectedWorkTypes, selectedAdminStatuses, selectedKtvIds]);
 
   // Fetch quality analysis data
   useEffect(() => {
@@ -207,17 +358,17 @@ export default function Dashboard() {
     getProductQualityAnalysis({
       startDate,
       endDate,
-      province: selectedProvince,
-      mainStationId: selectedMainStation,
-      techStationId: selectedTechStation,
-      product: selectedProduct
+      province: selectedProvinces,
+      mainStationId: selectedMainStations,
+      techStationId: selectedTechStations,
+      product: selectedProducts
     })
       .then(data => {
         setQualityData(data);
       })
       .catch(console.error)
       .finally(() => setLoadingQuality(false));
-  }, [activeTab, startDate, endDate, selectedProvince, selectedMainStation, selectedTechStation, selectedProduct]);
+  }, [activeTab, startDate, endDate, selectedProvinces, selectedMainStations, selectedTechStations, selectedProducts]);
 
   useEffect(() => {
     setSelectedLateProvince('');
@@ -241,6 +392,12 @@ export default function Dashboard() {
     stationsList.flatMap(m => (m.techStations || []).map((t: any) => t.name.split('(')[0].trim()))
   )).sort((a, b) => a.localeCompare(b, 'vi'));
 
+  const availableTechStations = selectedMainStations.length > 0
+    ? stationsList
+        .filter(s => selectedMainStations.includes(s.id))
+        .flatMap(s => s.techStations || [])
+    : [];
+
   // Expose unique provinces currently present in the late orders list
   const lateProvinces = analysisData?.lateOrders
     ? Array.from(new Set(analysisData.lateOrders.map((o: any) => o.province).filter(Boolean) as string[]))
@@ -257,13 +414,13 @@ export default function Dashboard() {
     const d = new Date();
     setStartDate(new Date(d.getFullYear(), d.getMonth(), 1).toISOString().slice(0, 10));
     setEndDate(new Date(d.getFullYear(), d.getMonth() + 1, 0).toISOString().slice(0, 10));
-    setSelectedProvince('');
-    setSelectedMainStation('');
-    setSelectedTechStation('');
-    setSelectedWorkType('');
-    setSelectedAdminStatus('');
-    setSelectedKtvId('');
-    setSelectedProduct('');
+    setSelectedProvinces([]);
+    setSelectedMainStations([]);
+    setSelectedTechStations([]);
+    setSelectedWorkTypes([]);
+    setSelectedAdminStatuses([]);
+    setSelectedKtvIds([]);
+    setSelectedProducts([]);
   };
 
   return (
@@ -332,89 +489,66 @@ export default function Dashboard() {
           </div>
 
           {/* Province */}
-          <div className="flex flex-col">
-            <label className="text-[11px] font-semibold text-gray-500 mb-1 uppercase">Tỉnh/Thành phố</label>
-            <select 
-              className="border rounded px-2 py-1.5 text-xs outline-none focus:border-blue-500 text-gray-700 bg-white"
-              value={selectedProvince}
-              onChange={e => setSelectedProvince(e.target.value)}
-            >
-              <option value="">-- Tất cả --</option>
-              {availableProvinces.map(p => <option key={p} value={p}>{p}</option>)}
-            </select>
-          </div>
+          <MultiSelect
+            label="Tỉnh/Thành phố"
+            options={availableProvinces}
+            selectedValues={selectedProvinces}
+            onChange={setSelectedProvinces}
+            isOpen={openDropdown === 'province'}
+            onToggle={() => setOpenDropdown(openDropdown === 'province' ? null : 'province')}
+          />
 
           {/* Main Station */}
-          <div className="flex flex-col">
-            <label className="text-[11px] font-semibold text-gray-500 mb-1 uppercase">Trạm chính</label>
-            <select 
-              className="border rounded px-2 py-1.5 text-xs outline-none focus:border-blue-500 text-gray-700 bg-white"
-              value={selectedMainStation}
-              onChange={e => { setSelectedMainStation(e.target.value); setSelectedTechStation(''); }}
-            >
-              <option value="">-- Tất cả --</option>
-              {stationsList.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-            </select>
-          </div>
+          <MultiSelect
+            label="Trạm chính"
+            options={stationsList.map(s => ({ value: s.id, label: s.name }))}
+            selectedValues={selectedMainStations}
+            onChange={setSelectedMainStations}
+            isOpen={openDropdown === 'mainStation'}
+            onToggle={() => setOpenDropdown(openDropdown === 'mainStation' ? null : 'mainStation')}
+          />
 
           {/* Tech Station */}
-          <div className="flex flex-col">
-            <label className="text-[11px] font-semibold text-gray-500 mb-1 uppercase">Trạm kỹ thuật</label>
-            <select 
-              className="border rounded px-2 py-1.5 text-xs outline-none focus:border-blue-500 text-gray-700 bg-white"
-              value={selectedTechStation}
-              onChange={e => setSelectedTechStation(e.target.value)}
-              disabled={!selectedMainStation}
-            >
-              <option value="">-- Tất cả --</option>
-              {(() => {
-                const current = stationsList.find(s => s.id === selectedMainStation);
-                if (!current || !current.techStations) return null;
-                return current.techStations.map((t: any) => (
-                  <option key={t.id} value={t.id}>{t.name}</option>
-                ));
-              })()}
-            </select>
-          </div>
+          <MultiSelect
+            label="Trạm kỹ thuật"
+            options={availableTechStations.map((t: any) => ({ value: t.id, label: t.name }))}
+            selectedValues={selectedTechStations}
+            onChange={setSelectedTechStations}
+            isOpen={openDropdown === 'techStation'}
+            onToggle={() => setOpenDropdown(openDropdown === 'techStation' ? null : 'techStation')}
+            disabled={selectedMainStations.length === 0}
+            placeholder={selectedMainStations.length === 0 ? 'Chọn trạm chính...' : 'Tất cả'}
+          />
 
           {/* Work Type */}
-          <div className="flex flex-col">
-            <label className="text-[11px] font-semibold text-gray-500 mb-1 uppercase">Loại công việc</label>
-            <select 
-              className="border rounded px-2 py-1.5 text-xs outline-none focus:border-blue-500 text-gray-700 bg-white"
-              value={selectedWorkType}
-              onChange={e => setSelectedWorkType(e.target.value)}
-            >
-              <option value="">-- Tất cả --</option>
-              {WORK_TYPE_OPTIONS.map(wt => <option key={wt} value={wt}>{wt}</option>)}
-            </select>
-          </div>
+          <MultiSelect
+            label="Loại công việc"
+            options={WORK_TYPE_OPTIONS}
+            selectedValues={selectedWorkTypes}
+            onChange={setSelectedWorkTypes}
+            isOpen={openDropdown === 'workType'}
+            onToggle={() => setOpenDropdown(openDropdown === 'workType' ? null : 'workType')}
+          />
 
           {/* Admin Status */}
-          <div className="flex flex-col">
-            <label className="text-[11px] font-semibold text-gray-500 mb-1 uppercase">Trạng thái đơn</label>
-            <select 
-              className="border rounded px-2 py-1.5 text-xs outline-none focus:border-blue-500 text-gray-700 bg-white"
-              value={selectedAdminStatus}
-              onChange={e => setSelectedAdminStatus(e.target.value)}
-            >
-              <option value="">-- Tất cả --</option>
-              {STATUS_OPTIONS.map(status => <option key={status.value} value={status.value}>{status.label}</option>)}
-            </select>
-          </div>
+          <MultiSelect
+            label="Trạng thái đơn"
+            options={STATUS_OPTIONS}
+            selectedValues={selectedAdminStatuses}
+            onChange={setSelectedAdminStatuses}
+            isOpen={openDropdown === 'adminStatus'}
+            onToggle={() => setOpenDropdown(openDropdown === 'adminStatus' ? null : 'adminStatus')}
+          />
 
           {/* Kỹ thuật viên */}
-          <div className="flex flex-col">
-            <label className="text-[11px] font-semibold text-gray-500 mb-1 uppercase">Kỹ thuật viên</label>
-            <select 
-              className="border rounded px-2 py-1.5 text-xs outline-none focus:border-blue-500 text-gray-700 bg-white"
-              value={selectedKtvId}
-              onChange={e => setSelectedKtvId(e.target.value)}
-            >
-              <option value="">-- Tất cả --</option>
-              {ktvList.map(ktv => <option key={ktv.id} value={ktv.id}>{ktv.fullName}</option>)}
-            </select>
-          </div>
+          <MultiSelect
+            label="Kỹ thuật viên"
+            options={ktvList.map(k => ({ value: k.id, label: k.fullName }))}
+            selectedValues={selectedKtvIds}
+            onChange={setSelectedKtvIds}
+            isOpen={openDropdown === 'ktv'}
+            onToggle={() => setOpenDropdown(openDropdown === 'ktv' ? null : 'ktv')}
+          />
 
           {/* Buttons */}
           <div className="flex items-end">
@@ -1512,26 +1646,19 @@ export default function Dashboard() {
                   <Filter size={16} />
                   <span>Bộ lọc dòng sản phẩm</span>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 relative min-w-[240px]">
                   <span className="text-xs font-semibold text-gray-500 uppercase">Chọn dòng máy:</span>
-                  <select 
-                    className="border border-gray-200 rounded-lg px-3 py-1.5 text-xs outline-none focus:border-orange-500 text-gray-700 bg-white shadow-sm font-semibold max-w-sm transition-all"
-                    value={selectedProduct}
-                    onChange={e => setSelectedProduct(e.target.value)}
-                  >
-                    <option value="">-- Tất cả sản phẩm ({qualityData.allProducts?.length || 0}) --</option>
-                    {(qualityData.allProducts || []).map((p: string) => (
-                      <option key={p} value={p}>{p}</option>
-                    ))}
-                  </select>
-                  {selectedProduct && (
-                    <button
-                      onClick={() => setSelectedProduct('')}
-                      className="text-xs text-orange-600 hover:text-white hover:bg-orange-600 font-semibold border border-orange-200 px-3 py-1.5 rounded-lg transition-all shadow-sm"
-                    >
-                      Xóa lọc
-                    </button>
-                  )}
+                  <div className="w-64">
+                    <MultiSelect
+                      label=""
+                      options={qualityData.allProducts || []}
+                      selectedValues={selectedProducts}
+                      onChange={setSelectedProducts}
+                      isOpen={openDropdown === 'product'}
+                      onToggle={() => setOpenDropdown(openDropdown === 'product' ? null : 'product')}
+                      placeholder={`Tất cả sản phẩm (${qualityData.allProducts?.length || 0})`}
+                    />
+                  </div>
                 </div>
               </div>
 

@@ -18,7 +18,12 @@ router.get('/ktvs', requireAuth, async (req: Request, res: Response): Promise<vo
   try {
     const { techStationId, excludeOrderId } = req.query;
     const where: any = { role: 'KTV', isActive: true };
-    if (techStationId) where.techStationId = techStationId as string;
+    if (techStationId) {
+      const stationIds = String(techStationId).split(',').map(s => s.trim()).filter(Boolean);
+      if (stationIds.length > 0) {
+        where.techStationId = { in: stationIds };
+      }
+    }
 
     const ktvs = await prisma.user.findMany({
       where,
