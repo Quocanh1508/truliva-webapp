@@ -565,6 +565,7 @@ router.get('/product-quality', async (req: Request, res: Response): Promise<void
       province,
       mainStationId,
       techStationId,
+      product
     } = req.query;
 
     const where: any = {};
@@ -610,6 +611,26 @@ router.get('/product-quality', async (req: Request, res: Response): Promise<void
     }
     if (techStationId) {
       reports = reports.filter(r => r.order?.techStationId === techStationId);
+    }
+
+    // ── Lấy danh sách sản phẩm duy nhất trước khi lọc sản phẩm ──
+    const productSet = new Set<string>();
+    reports.forEach(r => {
+      if (r.products && Array.isArray(r.products)) {
+        r.products.forEach(p => {
+          const cleanProd = p.split('x')[0].trim();
+          if (cleanProd) productSet.add(cleanProd);
+        });
+      }
+    });
+    const allProducts = Array.from(productSet).sort((a, b) => a.localeCompare(b, 'vi'));
+
+    // ── Lọc theo sản phẩm (nếu có) ──
+    if (product) {
+      const searchProduct = removeAccents(product as string);
+      reports = reports.filter(r =>
+        r.products && r.products.some(p => removeAccents(p).includes(searchProduct))
+      );
     }
 
     // Lọc các báo cáo là Bảo hành hoặc Sửa chữa để phân tích lỗi
@@ -766,7 +787,8 @@ router.get('/product-quality', async (req: Request, res: Response): Promise<void
         { name: '1 - 3 tháng', value: durationRanges.between30And90 },
         { name: '3 - 6 tháng', value: durationRanges.between90And180 },
         { name: 'Trên 6 tháng', value: durationRanges.over180 }
-      ]
+      ],
+      allProducts
     });
 
   } catch (error: any) {

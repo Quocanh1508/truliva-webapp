@@ -138,6 +138,7 @@ export default function Dashboard() {
   const [selectedWorkType, setSelectedWorkType] = useState('');
   const [selectedAdminStatus, setSelectedAdminStatus] = useState('');
   const [selectedKtvId, setSelectedKtvId] = useState('');
+  const [selectedProduct, setSelectedProduct] = useState('');
   const [ktvList, setKtvList] = useState<any[]>([]);
 
   // Fetch static data (stations, overview stats) once on mount
@@ -208,14 +209,15 @@ export default function Dashboard() {
       endDate,
       province: selectedProvince,
       mainStationId: selectedMainStation,
-      techStationId: selectedTechStation
+      techStationId: selectedTechStation,
+      product: selectedProduct
     })
       .then(data => {
         setQualityData(data);
       })
       .catch(console.error)
       .finally(() => setLoadingQuality(false));
-  }, [activeTab, startDate, endDate, selectedProvince, selectedMainStation, selectedTechStation]);
+  }, [activeTab, startDate, endDate, selectedProvince, selectedMainStation, selectedTechStation, selectedProduct]);
 
   useEffect(() => {
     setSelectedLateProvince('');
@@ -261,6 +263,7 @@ export default function Dashboard() {
     setSelectedWorkType('');
     setSelectedAdminStatus('');
     setSelectedKtvId('');
+    setSelectedProduct('');
   };
 
   return (
@@ -1503,6 +1506,35 @@ export default function Dashboard() {
             <div className="alert alert-error">Lỗi khi tải phân tích chất lượng sản phẩm</div>
           ) : (
             <>
+              {/* Product Filter Dropdown */}
+              <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm flex items-center justify-between gap-4 flex-wrap hover:shadow-md transition-shadow">
+                <div className="flex items-center space-x-2 text-orange-600 font-semibold text-sm">
+                  <Filter size={16} />
+                  <span>Bộ lọc dòng sản phẩm</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-semibold text-gray-500 uppercase">Chọn dòng máy:</span>
+                  <select 
+                    className="border border-gray-200 rounded-lg px-3 py-1.5 text-xs outline-none focus:border-orange-500 text-gray-700 bg-white shadow-sm font-semibold max-w-sm transition-all"
+                    value={selectedProduct}
+                    onChange={e => setSelectedProduct(e.target.value)}
+                  >
+                    <option value="">-- Tất cả sản phẩm ({qualityData.allProducts?.length || 0}) --</option>
+                    {(qualityData.allProducts || []).map((p: string) => (
+                      <option key={p} value={p}>{p}</option>
+                    ))}
+                  </select>
+                  {selectedProduct && (
+                    <button
+                      onClick={() => setSelectedProduct('')}
+                      className="text-xs text-orange-600 hover:text-white hover:bg-orange-600 font-semibold border border-orange-200 px-3 py-1.5 rounded-lg transition-all shadow-sm"
+                    >
+                      Xóa lọc
+                    </button>
+                  )}
+                </div>
+              </div>
+
               {/* Quality KPI Cards */}
               <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
                 <div className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm border-l-4 border-blue-500 flex flex-col justify-between">
