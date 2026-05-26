@@ -47,9 +47,15 @@ router.get('/', requireAuth, async (req: Request, res: Response): Promise<void> 
       ]
     });
     
-    // Nếu user là KTV, chỉ lấy các đơn hàng được giao cho KTV đó
+    // Nếu user là KTV, chỉ lấy các đơn hàng được giao cho KTV đó và chưa hoàn thành / chưa hủy
     if (req.user?.role === 'KTV') {
       conditions.push({ assignedKtvId: req.user.id });
+      conditions.push({
+        OR: [
+          { adminStatus: { notIn: ['hoàn thành', 'hủy đơn'] } },
+          { adminStatus: null }
+        ]
+      });
     }
 
     if (pancakeOrderId) {
