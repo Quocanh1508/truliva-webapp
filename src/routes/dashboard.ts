@@ -362,7 +362,7 @@ router.get('/dispatch-analysis', async (req: Request, res: Response): Promise<vo
 
     // 4. Danh sách các đơn trễ hẹn (để hiển thị bảng)
     const lateOrders = filteredOrders
-      .filter(o => o.isLate)
+      .filter(o => o.isLate && o.adminStatus !== 'hoàn thành')
       .map(o => ({
         customerName: o.customerName,
         customerPhone: o.customerPhone,

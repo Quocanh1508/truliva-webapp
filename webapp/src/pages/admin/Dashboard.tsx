@@ -119,6 +119,7 @@ export default function Dashboard() {
   const [tooltipContent, setTooltipContent] = useState<React.ReactNode>('');
   const [chartType, setChartType] = useState<'stackedBar' | 'line'>('stackedBar');
   const [lateChartScale, setLateChartScale] = useState<'day' | 'week' | 'month'>('day');
+  const [selectedLateProvince, setSelectedLateProvince] = useState<string>('');
 
   // Filter States
   const [startDate, setStartDate] = useState(() => {
@@ -201,6 +202,10 @@ export default function Dashboard() {
       .finally(() => setLoadingQuality(false));
   }, [activeTab, startDate, endDate, selectedProvince, selectedMainStation, selectedTechStation]);
 
+  useEffect(() => {
+    setSelectedLateProvince('');
+  }, [analysisData]);
+
   if (loadingOverview) {
     return (
       <div className="flex flex-col items-center justify-center py-20 gap-4">
@@ -218,6 +223,18 @@ export default function Dashboard() {
   const availableProvinces = Array.from(new Set(
     stationsList.flatMap(m => (m.techStations || []).map((t: any) => t.name.split('(')[0].trim()))
   )).sort((a, b) => a.localeCompare(b, 'vi'));
+
+  // Expose unique provinces currently present in the late orders list
+  const lateProvinces = analysisData?.lateOrders
+    ? Array.from(new Set(analysisData.lateOrders.map((o: any) => o.province).filter(Boolean) as string[]))
+        .map(p => p.trim())
+        .filter(p => p.length > 0)
+        .sort((a, b) => a.localeCompare(b, 'vi'))
+    : [];
+
+  const filteredLateOrders = selectedLateProvince && analysisData?.lateOrders
+    ? analysisData.lateOrders.filter((o: any) => o.province === selectedLateProvince)
+    : (analysisData?.lateOrders || []);
 
   const resetFilters = () => {
     const d = new Date();
@@ -981,18 +998,40 @@ export default function Dashboard() {
 
               {/* BẢNG DANH SÁCH CA TRỄ HẸN */}
               <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden flex flex-col">
-                <div className="px-5 py-4 border-b border-gray-200 bg-gray-50/50 flex justify-between items-center">
+                <div className="px-5 py-4 border-b border-gray-200 bg-gray-50/50 flex justify-between items-center flex-wrap gap-3">
                   <h3 className="font-bold text-base text-rose-600 flex items-center gap-1.5">
                     <AlertTriangle size={17} />
                     Danh sách các ca đang trễ hẹn
                   </h3>
-                  <span className="bg-rose-100 text-rose-800 text-xs font-semibold px-2.5 py-0.5 rounded-full">
-                    {analysisData.lateOrders.length} ca trễ
-                  </span>
+                  
+                  <div className="flex items-center gap-3">
+                    {/* Province Filter Dropdown for Late Orders */}
+                    {lateProvinces.length > 0 && (
+                      <div className="flex items-center gap-1.5">
+                        <label className="text-[11px] font-semibold text-gray-500 uppercase">Lọc theo Tỉnh/TP:</label>
+                        <select 
+                          className="border border-gray-200 rounded px-2.5 py-1 text-xs outline-none focus:border-rose-500 text-gray-700 bg-white shadow-sm font-semibold"
+                          value={selectedLateProvince}
+                          onChange={e => setSelectedLateProvince(e.target.value)}
+                        >
+                          <option value="">-- Tất cả ({lateProvinces.length} khu vực) --</option>
+                          {lateProvinces.map(p => (
+                            <option key={p} value={p}>
+                              {p} ({analysisData.lateOrders.filter((o: any) => o.province === p).length} ca)
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    )}
+
+                    <span className="bg-rose-100 text-rose-800 text-xs font-semibold px-2.5 py-0.5 rounded-full">
+                      {filteredLateOrders.length} ca trễ
+                    </span>
+                  </div>
                 </div>
                 
                 <div className="overflow-x-auto">
-                  {analysisData.lateOrders.length === 0 ? (
+                  {filteredLateOrders.length === 0 ? (
                     <div className="text-center py-10 text-gray-500 text-sm">Tuyệt vời! Không có ca nào bị trễ hẹn trong khoảng lọc này.</div>
                   ) : (
                     <table className="w-full text-left text-xs whitespace-nowrap divide-y divide-gray-100">
@@ -1008,7 +1047,7 @@ export default function Dashboard() {
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-gray-100 bg-white">
-                        {analysisData.lateOrders.map((o: any, index: number) => (
+                        {filteredLateOrders.map((o: any, index: number) => (
                           <tr key={index} className="hover:bg-rose-50/20 transition-colors">
                             <td className="px-5 py-3.5 font-medium text-gray-900">{o.customerName}</td>
                             <td className="px-5 py-3.5 text-gray-500">{o.customerPhone || '-'}</td>
