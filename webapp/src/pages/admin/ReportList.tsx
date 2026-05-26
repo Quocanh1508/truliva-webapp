@@ -1,7 +1,7 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { fetchApi, deleteReportWithReason } from '../../api/client';
-import { Download, CheckCircle, Clock, X, ExternalLink, Image as ImageIcon, Loader, Search } from 'lucide-react';
+import { fetchApi, deleteReportWithReason, updateReport, uploadImages } from '../../api/client';
+import { Download, CheckCircle, Clock, X, ExternalLink, Image as ImageIcon, Loader, Search, Edit3, Save, Plus, Trash2 } from 'lucide-react';
 
 // Check if a URL points to a directly viewable image
 function isDirectImage(url: string): boolean {
@@ -103,6 +103,15 @@ export default function ReportList() {
   const [deleteModal, setDeleteModal] = useState<{ isOpen: boolean; reportId: string } | null>(null);
   const [deleteReason, setDeleteReason] = useState('');
   const [deleting, setDeleting] = useState(false);
+
+  // ── Edit mode state ──
+  const [isEditing, setIsEditing] = useState(false);
+  const [editData, setEditData] = useState<any>({});
+  const [editSaving, setEditSaving] = useState(false);
+  const [editImageFiles, setEditImageFiles] = useState<File[]>([]);
+  const [editImagePreviews, setEditImagePreviews] = useState<string[]>([]);
+  const [editUploadingImages, setEditUploadingImages] = useState(false);
+  const editFileInputRef = useRef<HTMLInputElement>(null);
 
   const getDateRange = () => {
     if (!datePreset) return { startDate: '', endDate: '' };
@@ -214,6 +223,120 @@ export default function ReportList() {
       alert(e.message || 'Lỗi khi xóa báo cáo');
     } finally {
       setDeleting(false);
+    }
+  };
+
+  // ── Edit mode helpers ──
+  const startEditing = () => {
+    const r = selectedDetailReport;
+    if (!r) return;
+    setEditData({
+      customerName: r.customerName || '',
+      customerPhone: r.customerPhone || '',
+      address: r.address || '',
+      province: r.province || '',
+      workType: r.workType || '',
+      serviceType: r.serviceType || '',
+      products: r.products?.join(', ') || '',
+      actualAmount: r.actualAmount ?? '',
+      serialNumber: r.serialNumber || '',
+      distanceKm: r.distanceKm ?? '',
+      waterSource: r.waterSource || '',
+      tdsIn: r.tdsIn ?? '',
+      tdsOut: r.tdsOut ?? '',
+      waterPressure: r.waterPressure ?? '',
+      spareParts: r.spareParts || [],
+      issueType: r.issueType || '',
+      handlingMethod: r.handlingMethod || '',
+      notes: r.notes || '',
+      imageUrls: r.imageUrls ? [...r.imageUrls] : [],
+    });
+    setEditImageFiles([]);
+    setEditImagePreviews([]);
+    setIsEditing(true);
+  };
+
+  const cancelEditing = () => {
+    setIsEditing(false);
+    setEditData({});
+    editImagePreviews.forEach(p => URL.revokeObjectURL(p));
+    setEditImageFiles([]);
+    setEditImagePreviews([]);
+  };
+
+  const handleEditField = (field: string, value: any) => {
+    setEditData((prev: any) => ({ ...prev, [field]: value }));
+  };
+
+  const handleRemoveExistingImage = (idx: number) => {
+    setEditData((prev: any) => ({
+      ...prev,
+      imageUrls: prev.imageUrls.filter((_: string, i: number) => i !== idx),
+    }));
+  };
+
+  const handleAddNewImages = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!e.target.files) return;
+    const newFiles = Array.from(e.target.files);
+    setEditImageFiles(prev => [...prev, ...newFiles]);
+    setEditImagePreviews(prev => [...prev, ...newFiles.map(f => URL.createObjectURL(f))]);
+    if (editFileInputRef.current) editFileInputRef.current.value = '';
+  };
+
+  const handleRemoveNewImage = (idx: number) => {
+    URL.revokeObjectURL(editImagePreviews[idx]);
+    setEditImageFiles(prev => prev.filter((_, i) => i !== idx));
+    setEditImagePreviews(prev => prev.filter((_, i) => i !== idx));
+  };
+
+  const handleSaveEdit = async () => {
+    if (!selectedDetailReport) return;
+    setEditSaving(true);
+    try {
+      let finalImageUrls = [...editData.imageUrls];
+
+      // Upload ảnh mới nếu có
+      if (editImageFiles.length > 0) {
+        setEditUploadingImages(true);
+        try {
+          const newUrls = await uploadImages(editImageFiles);
+          finalImageUrls = [...finalImageUrls, ...newUrls];
+        } finally {
+          setEditUploadingImages(false);
+        }
+      }
+
+      const payload: any = {
+        customerName: editData.customerName,
+        customerPhone: editData.customerPhone,
+        address: editData.address,
+        province: editData.province,
+        workType: editData.workType,
+        serviceType: editData.serviceType,
+        products: editData.products ? editData.products.split(',').map((s: string) => s.trim()).filter(Boolean) : [],
+        actualAmount: editData.actualAmount,
+        serialNumber: editData.serialNumber,
+        distanceKm: editData.distanceKm,
+        waterSource: editData.waterSource,
+        tdsIn: editData.tdsIn,
+        tdsOut: editData.tdsOut,
+        waterPressure: editData.waterPressure,
+        spareParts: editData.spareParts,
+        issueType: editData.issueType,
+        handlingMethod: editData.handlingMethod,
+        notes: editData.notes,
+        imageUrls: finalImageUrls,
+      };
+
+      await updateReport(selectedDetailReport.id, payload);
+      alert('Đã cập nhật báo cáo thành công!');
+      cancelEditing();
+      setSelectedDetailReport(null);
+      loadReports();
+    } catch (err: any) {
+      alert(err.message || 'Lỗi khi cập nhật báo cáo');
+    } finally {
+      setEditSaving(false);
     }
   };
 
@@ -415,10 +538,10 @@ export default function ReportList() {
             {/* Modal Header */}
             <div className="flex justify-between items-center p-5 border-b border-gray-200 sticky top-0 bg-white z-10">
               <h3 className="font-bold text-lg text-[#1B3A6B]">
-                Chi tiết báo cáo {selectedDetailReport.order?.pancakeOrderId ? `#${selectedDetailReport.order.pancakeOrderId}` : ''}
+                {isEditing ? 'Sửa' : 'Chi tiết'} báo cáo {selectedDetailReport.order?.pancakeOrderId ? `#${selectedDetailReport.order.pancakeOrderId}` : ''}
               </h3>
               <button 
-                onClick={() => setSelectedDetailReport(null)}
+                onClick={() => { cancelEditing(); setSelectedDetailReport(null); }}
                 className="text-gray-400 hover:text-gray-600 p-1.5 rounded-full hover:bg-gray-100 transition-colors"
               >
                 <X size={20} />
@@ -427,162 +550,404 @@ export default function ReportList() {
             
             {/* Modal Content */}
             <div className="p-6 space-y-6 text-left">
-              {/* Step 1: Thông tin chung */}
-              <div>
-                <h4 className="font-bold text-sm text-gray-800 border-l-4 border-blue-600 pl-2 mb-3 uppercase tracking-wider">
-                  Bước 1: Thông tin chung
-                </h4>
-                <div className="bg-gray-50 rounded-lg p-4 grid grid-cols-2 gap-y-3 gap-x-6 text-sm">
+
+              {/* ═══════════ VIEW MODE ═══════════ */}
+              {!isEditing ? (
+                <>
+                  {/* Step 1: Thông tin chung */}
                   <div>
-                    <span className="text-gray-500 block text-xs">Khách hàng</span>
-                    <span className="font-semibold text-gray-800">{selectedDetailReport.customerName}</span>
-                  </div>
-                  <div>
-                    <span className="text-gray-500 block text-xs">Số điện thoại</span>
-                    <span className="font-semibold text-gray-800">{selectedDetailReport.customerPhone}</span>
-                  </div>
-                  <div className="col-span-2">
-                    <span className="text-gray-500 block text-xs">Địa chỉ chi tiết</span>
-                    <span className="font-medium text-gray-800">{selectedDetailReport.address || '-'}</span>
-                  </div>
-                  <div>
-                    <span className="text-gray-500 block text-xs">Tỉnh / Thành phố</span>
-                    <span className="font-medium text-gray-800">{selectedDetailReport.province}</span>
-                  </div>
-                  <div>
-                    <span className="text-gray-500 block text-xs">Kỹ thuật viên</span>
-                    <span className="font-medium text-gray-800">{selectedDetailReport.ktvUser?.fullName}</span>
-                  </div>
-                  <div>
-                    <span className="text-gray-500 block text-xs">Loại công việc</span>
-                    <span className="font-semibold text-[#1B3A6B]">{selectedDetailReport.workType || '-'}</span>
-                  </div>
-                  <div>
-                    <span className="text-gray-500 block text-xs">Loại dịch vụ</span>
-                    <span className="font-medium text-gray-800">{selectedDetailReport.serviceType}</span>
-                  </div>
-                  <div className="col-span-2">
-                    <span className="text-gray-500 block text-xs">Sản phẩm thực tế</span>
-                    <span className="font-medium text-gray-800">{selectedDetailReport.products?.join(', ') || '-'}</span>
-                  </div>
-                  <div>
-                    <span className="text-gray-500 block text-xs">Số tiền thu thực tế</span>
-                    <span className="font-bold text-emerald-600 text-base">
-                      {(selectedDetailReport.actualAmount || 0).toLocaleString('vi-VN')} đ
-                    </span>
-                  </div>
-                  <div>
-                    <span className="text-gray-500 block text-xs">Tháng báo cáo</span>
-                    <span className="font-medium text-gray-800">{selectedDetailReport.month}</span>
-                  </div>
-                </div>
-              </div>
-              
-              {/* Step 2: Thông tin kỹ thuật */}
-              <div>
-                <h4 className="font-bold text-sm text-gray-800 border-l-4 border-blue-600 pl-2 mb-3 uppercase tracking-wider">
-                  Bước 2: Thông tin kỹ thuật
-                </h4>
-                <div className="bg-gray-50 rounded-lg p-4 grid grid-cols-2 gap-y-3 gap-x-6 text-sm">
-                  <div>
-                    <span className="text-gray-500 block text-xs">Seri sản phẩm</span>
-                    <span className="font-semibold text-gray-800">{selectedDetailReport.serialNumber || '-'}</span>
-                  </div>
-                  <div>
-                    <span className="text-gray-500 block text-xs">Khoảng cách di chuyển</span>
-                    <span className="font-medium text-gray-800">
-                      {selectedDetailReport.distanceKm ? `${selectedDetailReport.distanceKm} km` : '-'}
-                    </span>
-                  </div>
-                  
-                  {/* Trường kỹ thuật có điều kiện */}
-                  {selectedDetailReport.waterSource && (
-                    <>
+                    <h4 className="font-bold text-sm text-gray-800 border-l-4 border-blue-600 pl-2 mb-3 uppercase tracking-wider">
+                      Bước 1: Thông tin chung
+                    </h4>
+                    <div className="bg-gray-50 rounded-lg p-4 grid grid-cols-2 gap-y-3 gap-x-6 text-sm">
                       <div>
-                        <span className="text-gray-500 block text-xs">Nguồn nước</span>
-                        <span className="font-medium text-gray-800">{selectedDetailReport.waterSource}</span>
+                        <span className="text-gray-500 block text-xs">Khách hàng</span>
+                        <span className="font-semibold text-gray-800">{selectedDetailReport.customerName}</span>
                       </div>
                       <div>
-                        <span className="text-gray-500 block text-xs">Áp suất nước đầu vào</span>
-                        <span className="font-medium text-gray-800">
-                          {selectedDetailReport.waterPressure ? `${selectedDetailReport.waterPressure} psi` : '-'}
+                        <span className="text-gray-500 block text-xs">Số điện thoại</span>
+                        <span className="font-semibold text-gray-800">{selectedDetailReport.customerPhone}</span>
+                      </div>
+                      <div className="col-span-2">
+                        <span className="text-gray-500 block text-xs">Địa chỉ chi tiết</span>
+                        <span className="font-medium text-gray-800">{selectedDetailReport.address || '-'}</span>
+                      </div>
+                      <div>
+                        <span className="text-gray-500 block text-xs">Tỉnh / Thành phố</span>
+                        <span className="font-medium text-gray-800">{selectedDetailReport.province}</span>
+                      </div>
+                      <div>
+                        <span className="text-gray-500 block text-xs">Kỹ thuật viên</span>
+                        <span className="font-medium text-gray-800">{selectedDetailReport.ktvUser?.fullName}</span>
+                      </div>
+                      <div>
+                        <span className="text-gray-500 block text-xs">Loại công việc</span>
+                        <span className="font-semibold text-[#1B3A6B]">{selectedDetailReport.workType || '-'}</span>
+                      </div>
+                      <div>
+                        <span className="text-gray-500 block text-xs">Loại dịch vụ</span>
+                        <span className="font-medium text-gray-800">{selectedDetailReport.serviceType}</span>
+                      </div>
+                      <div className="col-span-2">
+                        <span className="text-gray-500 block text-xs">Sản phẩm thực tế</span>
+                        <span className="font-medium text-gray-800">{selectedDetailReport.products?.join(', ') || '-'}</span>
+                      </div>
+                      <div>
+                        <span className="text-gray-500 block text-xs">Số tiền thu thực tế</span>
+                        <span className="font-bold text-emerald-600 text-base">
+                          {(selectedDetailReport.actualAmount || 0).toLocaleString('vi-VN')} đ
                         </span>
                       </div>
                       <div>
-                        <span className="text-gray-500 block text-xs">Chỉ số TDS vào</span>
-                        <span className="font-semibold text-gray-800">{selectedDetailReport.tdsIn || 0} ppm</span>
+                        <span className="text-gray-500 block text-xs">Tháng báo cáo</span>
+                        <span className="font-medium text-gray-800">{selectedDetailReport.month}</span>
                       </div>
-                      <div>
-                        <span className="text-gray-500 block text-xs">Chỉ số TDS ra</span>
-                        <span className="font-semibold text-gray-800">{selectedDetailReport.tdsOut || 0} ppm</span>
-                      </div>
-                    </>
-                  )}
-                  
-                  <div className="col-span-2">
-                    <span className="text-gray-500 block text-xs">Linh kiện phát sinh</span>
-                    <div className="mt-1 flex flex-wrap gap-1.5">
-                      {selectedDetailReport.spareParts && selectedDetailReport.spareParts.length > 0 ? (
-                        selectedDetailReport.spareParts.map((part: string, index: number) => (
-                          <span key={index} className="px-2 py-1 bg-blue-50 text-blue-700 text-xs font-semibold rounded border border-blue-100">
-                            {part}
-                          </span>
-                        ))
-                      ) : (
-                        <span className="text-gray-500 italic">Không có linh kiện phát sinh</span>
-                      )}
                     </div>
                   </div>
-                </div>
-              </div>
-              
-              {/* Step 3: Hình ảnh xác nhận */}
-              <div>
-                <h4 className="font-bold text-sm text-gray-800 border-l-4 border-blue-600 pl-2 mb-3 uppercase tracking-wider">
-                  Bước 3: Hình ảnh xác nhận
-                </h4>
-                {selectedDetailReport.imageUrls && selectedDetailReport.imageUrls.length > 0 ? (
-                  <div className="grid grid-cols-2 gap-3">
-                    {selectedDetailReport.imageUrls.map((url: string, index: number) => (
-                      <div key={index} className="relative group border border-gray-200 rounded-lg overflow-hidden bg-gray-100">
-                        <img 
-                          src={url} 
-                          alt={`Báo cáo ảnh ${index + 1}`} 
-                          className="w-full h-40 object-cover cursor-pointer hover:scale-105 transition-transform duration-300"
-                          onClick={() => window.open(url, '_blank')}
-                        />
-                        <div className="absolute bottom-0 left-0 right-0 bg-black bg-opacity-65 text-white text-xs px-2 py-1 font-medium text-center">
-                          Ảnh {index + 1} (Click để mở rộng)
+                  
+                  {/* Step 2: Thông tin kỹ thuật */}
+                  <div>
+                    <h4 className="font-bold text-sm text-gray-800 border-l-4 border-blue-600 pl-2 mb-3 uppercase tracking-wider">
+                      Bước 2: Thông tin kỹ thuật
+                    </h4>
+                    <div className="bg-gray-50 rounded-lg p-4 grid grid-cols-2 gap-y-3 gap-x-6 text-sm">
+                      <div>
+                        <span className="text-gray-500 block text-xs">Seri sản phẩm</span>
+                        <span className="font-semibold text-gray-800">{selectedDetailReport.serialNumber || '-'}</span>
+                      </div>
+                      <div>
+                        <span className="text-gray-500 block text-xs">Khoảng cách di chuyển</span>
+                        <span className="font-medium text-gray-800">
+                          {selectedDetailReport.distanceKm ? `${selectedDetailReport.distanceKm} km` : '-'}
+                        </span>
+                      </div>
+                      
+                      {selectedDetailReport.waterSource && (
+                        <>
+                          <div>
+                            <span className="text-gray-500 block text-xs">Nguồn nước</span>
+                            <span className="font-medium text-gray-800">{selectedDetailReport.waterSource}</span>
+                          </div>
+                          <div>
+                            <span className="text-gray-500 block text-xs">Áp suất nước đầu vào</span>
+                            <span className="font-medium text-gray-800">
+                              {selectedDetailReport.waterPressure ? `${selectedDetailReport.waterPressure} psi` : '-'}
+                            </span>
+                          </div>
+                          <div>
+                            <span className="text-gray-500 block text-xs">Chỉ số TDS vào</span>
+                            <span className="font-semibold text-gray-800">{selectedDetailReport.tdsIn || 0} ppm</span>
+                          </div>
+                          <div>
+                            <span className="text-gray-500 block text-xs">Chỉ số TDS ra</span>
+                            <span className="font-semibold text-gray-800">{selectedDetailReport.tdsOut || 0} ppm</span>
+                          </div>
+                        </>
+                      )}
+                      
+                      {selectedDetailReport.issueType && (
+                        <div>
+                          <span className="text-gray-500 block text-xs">Nguyên nhân / Sự cố</span>
+                          <span className="font-medium text-gray-800">{selectedDetailReport.issueType}</span>
+                        </div>
+                      )}
+                      {selectedDetailReport.handlingMethod && (
+                        <div>
+                          <span className="text-gray-500 block text-xs">Cách xử lý</span>
+                          <span className="font-medium text-gray-800">{selectedDetailReport.handlingMethod}</span>
+                        </div>
+                      )}
+                      
+                      <div className="col-span-2">
+                        <span className="text-gray-500 block text-xs">Linh kiện phát sinh</span>
+                        <div className="mt-1 flex flex-wrap gap-1.5">
+                          {selectedDetailReport.spareParts && selectedDetailReport.spareParts.length > 0 ? (
+                            selectedDetailReport.spareParts.map((part: string, index: number) => (
+                              <span key={index} className="px-2 py-1 bg-blue-50 text-blue-700 text-xs font-semibold rounded border border-blue-100">
+                                {part}
+                              </span>
+                            ))
+                          ) : (
+                            <span className="text-gray-500 italic">Không có linh kiện phát sinh</span>
+                          )}
                         </div>
                       </div>
-                    ))}
+                    </div>
                   </div>
-                ) : (
-                  <div className="bg-gray-50 text-gray-500 text-sm p-4 rounded-lg italic text-center">
-                    Không có hình ảnh xác nhận
+                  
+                  {/* Step 3: Hình ảnh xác nhận */}
+                  <div>
+                    <h4 className="font-bold text-sm text-gray-800 border-l-4 border-blue-600 pl-2 mb-3 uppercase tracking-wider">
+                      Bước 3: Hình ảnh xác nhận
+                    </h4>
+                    {selectedDetailReport.imageUrls && selectedDetailReport.imageUrls.length > 0 ? (
+                      <div className="grid grid-cols-2 gap-3">
+                        {selectedDetailReport.imageUrls.map((url: string, index: number) => (
+                          <div key={index} className="relative group border border-gray-200 rounded-lg overflow-hidden bg-gray-100">
+                            <img 
+                              src={url} 
+                              alt={`Báo cáo ảnh ${index + 1}`} 
+                              className="w-full h-40 object-cover cursor-pointer hover:scale-105 transition-transform duration-300"
+                              onClick={() => window.open(url, '_blank')}
+                            />
+                            <div className="absolute bottom-0 left-0 right-0 bg-black bg-opacity-65 text-white text-xs px-2 py-1 font-medium text-center">
+                              Ảnh {index + 1} (Click để mở rộng)
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="bg-gray-50 text-gray-500 text-sm p-4 rounded-lg italic text-center">
+                        Không có hình ảnh xác nhận
+                      </div>
+                    )}
                   </div>
-                )}
-              </div>
-              
-              {/* Step 4: Ghi chú */}
-              <div>
-                <h4 className="font-bold text-sm text-gray-800 border-l-4 border-blue-600 pl-2 mb-3 uppercase tracking-wider">
-                  Bước 4: Xác nhận & Ghi chú của KTV
-                </h4>
-                <div className="bg-gray-50 rounded-lg p-4 text-sm whitespace-pre-wrap italic text-gray-700 border-l-2 border-gray-300">
-                  {selectedDetailReport.notes || 'Kỹ thuật viên không để lại ghi chú nào.'}
-                </div>
-              </div>
+                  
+                  {/* Step 4: Ghi chú */}
+                  <div>
+                    <h4 className="font-bold text-sm text-gray-800 border-l-4 border-blue-600 pl-2 mb-3 uppercase tracking-wider">
+                      Bước 4: Xác nhận & Ghi chú của KTV
+                    </h4>
+                    <div className="bg-gray-50 rounded-lg p-4 text-sm whitespace-pre-wrap italic text-gray-700 border-l-2 border-gray-300">
+                      {selectedDetailReport.notes || 'Kỹ thuật viên không để lại ghi chú nào.'}
+                    </div>
+                  </div>
+                </>
+              ) : (
+                /* ═══════════ EDIT MODE ═══════════ */
+                <>
+                  {/* Thông tin chung */}
+                  <div>
+                    <h4 className="font-bold text-sm text-gray-800 border-l-4 border-amber-500 pl-2 mb-3 uppercase tracking-wider">
+                      Thông tin chung
+                    </h4>
+                    <div className="bg-amber-50 rounded-lg p-4 grid grid-cols-2 gap-y-4 gap-x-6 text-sm border border-amber-200">
+                      <div>
+                        <label className="text-gray-600 block text-xs font-semibold mb-1">Khách hàng</label>
+                        <input type="text" className="w-full border border-gray-300 rounded-md px-3 py-1.5 text-sm focus:ring-1 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                          value={editData.customerName} onChange={e => handleEditField('customerName', e.target.value)} />
+                      </div>
+                      <div>
+                        <label className="text-gray-600 block text-xs font-semibold mb-1">Số điện thoại</label>
+                        <input type="text" className="w-full border border-gray-300 rounded-md px-3 py-1.5 text-sm focus:ring-1 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                          value={editData.customerPhone} onChange={e => handleEditField('customerPhone', e.target.value)} />
+                      </div>
+                      <div className="col-span-2">
+                        <label className="text-gray-600 block text-xs font-semibold mb-1">Địa chỉ chi tiết</label>
+                        <input type="text" className="w-full border border-gray-300 rounded-md px-3 py-1.5 text-sm focus:ring-1 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                          value={editData.address} onChange={e => handleEditField('address', e.target.value)} />
+                      </div>
+                      <div>
+                        <label className="text-gray-600 block text-xs font-semibold mb-1">Tỉnh / Thành phố</label>
+                        <input type="text" className="w-full border border-gray-300 rounded-md px-3 py-1.5 text-sm focus:ring-1 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                          value={editData.province} onChange={e => handleEditField('province', e.target.value)} />
+                      </div>
+                      <div>
+                        <label className="text-gray-600 block text-xs font-semibold mb-1">Loại công việc</label>
+                        <input type="text" className="w-full border border-gray-300 rounded-md px-3 py-1.5 text-sm focus:ring-1 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                          value={editData.workType} onChange={e => handleEditField('workType', e.target.value)} />
+                      </div>
+                      <div>
+                        <label className="text-gray-600 block text-xs font-semibold mb-1">Loại dịch vụ</label>
+                        <input type="text" className="w-full border border-gray-300 rounded-md px-3 py-1.5 text-sm focus:ring-1 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                          value={editData.serviceType} onChange={e => handleEditField('serviceType', e.target.value)} />
+                      </div>
+                      <div className="col-span-2">
+                        <label className="text-gray-600 block text-xs font-semibold mb-1">Sản phẩm (phân cách bằng dấu phẩy)</label>
+                        <input type="text" className="w-full border border-gray-300 rounded-md px-3 py-1.5 text-sm focus:ring-1 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                          value={editData.products} onChange={e => handleEditField('products', e.target.value)} />
+                      </div>
+                      <div>
+                        <label className="text-gray-600 block text-xs font-semibold mb-1">Số tiền thu thực tế (đ)</label>
+                        <input type="number" className="w-full border border-gray-300 rounded-md px-3 py-1.5 text-sm focus:ring-1 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                          value={editData.actualAmount} onChange={e => handleEditField('actualAmount', e.target.value)} />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Thông tin kỹ thuật */}
+                  <div>
+                    <h4 className="font-bold text-sm text-gray-800 border-l-4 border-amber-500 pl-2 mb-3 uppercase tracking-wider">
+                      Thông tin kỹ thuật
+                    </h4>
+                    <div className="bg-amber-50 rounded-lg p-4 grid grid-cols-2 gap-y-4 gap-x-6 text-sm border border-amber-200">
+                      <div>
+                        <label className="text-gray-600 block text-xs font-semibold mb-1">Seri sản phẩm</label>
+                        <input type="text" className="w-full border border-gray-300 rounded-md px-3 py-1.5 text-sm focus:ring-1 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                          value={editData.serialNumber} onChange={e => handleEditField('serialNumber', e.target.value)} />
+                      </div>
+                      <div>
+                        <label className="text-gray-600 block text-xs font-semibold mb-1">Khoảng cách (km)</label>
+                        <input type="number" step="0.1" className="w-full border border-gray-300 rounded-md px-3 py-1.5 text-sm focus:ring-1 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                          value={editData.distanceKm} onChange={e => handleEditField('distanceKm', e.target.value)} />
+                      </div>
+                      <div>
+                        <label className="text-gray-600 block text-xs font-semibold mb-1">Nguồn nước</label>
+                        <input type="text" className="w-full border border-gray-300 rounded-md px-3 py-1.5 text-sm focus:ring-1 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                          value={editData.waterSource} onChange={e => handleEditField('waterSource', e.target.value)} />
+                      </div>
+                      <div>
+                        <label className="text-gray-600 block text-xs font-semibold mb-1">Áp suất nước (psi)</label>
+                        <input type="number" step="0.1" className="w-full border border-gray-300 rounded-md px-3 py-1.5 text-sm focus:ring-1 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                          value={editData.waterPressure} onChange={e => handleEditField('waterPressure', e.target.value)} />
+                      </div>
+                      <div>
+                        <label className="text-gray-600 block text-xs font-semibold mb-1">TDS đầu vào (ppm)</label>
+                        <input type="number" className="w-full border border-gray-300 rounded-md px-3 py-1.5 text-sm focus:ring-1 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                          value={editData.tdsIn} onChange={e => handleEditField('tdsIn', e.target.value)} />
+                      </div>
+                      <div>
+                        <label className="text-gray-600 block text-xs font-semibold mb-1">TDS đầu ra (ppm)</label>
+                        <input type="number" className="w-full border border-gray-300 rounded-md px-3 py-1.5 text-sm focus:ring-1 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                          value={editData.tdsOut} onChange={e => handleEditField('tdsOut', e.target.value)} />
+                      </div>
+                      <div>
+                        <label className="text-gray-600 block text-xs font-semibold mb-1">Nguyên nhân / Sự cố</label>
+                        <input type="text" className="w-full border border-gray-300 rounded-md px-3 py-1.5 text-sm focus:ring-1 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                          value={editData.issueType} onChange={e => handleEditField('issueType', e.target.value)} />
+                      </div>
+                      <div>
+                        <label className="text-gray-600 block text-xs font-semibold mb-1">Cách xử lý</label>
+                        <input type="text" className="w-full border border-gray-300 rounded-md px-3 py-1.5 text-sm focus:ring-1 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                          value={editData.handlingMethod} onChange={e => handleEditField('handlingMethod', e.target.value)} />
+                      </div>
+                      <div className="col-span-2">
+                        <label className="text-gray-600 block text-xs font-semibold mb-1">Linh kiện phát sinh (phân cách bằng dấu phẩy)</label>
+                        <input type="text" className="w-full border border-gray-300 rounded-md px-3 py-1.5 text-sm focus:ring-1 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                          value={editData.spareParts?.join(', ') || ''}
+                          onChange={e => handleEditField('spareParts', e.target.value.split(',').map((s: string) => s.trim()).filter(Boolean))} />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Hình ảnh */}
+                  <div>
+                    <h4 className="font-bold text-sm text-gray-800 border-l-4 border-amber-500 pl-2 mb-3 uppercase tracking-wider">
+                      Hình ảnh xác nhận
+                    </h4>
+                    <div className="bg-amber-50 rounded-lg p-4 border border-amber-200">
+                      {/* Ảnh hiện tại */}
+                      {editData.imageUrls && editData.imageUrls.length > 0 && (
+                        <div className="mb-3">
+                          <span className="text-xs font-semibold text-gray-600 block mb-2">Ảnh hiện tại ({editData.imageUrls.length})</span>
+                          <div className="grid grid-cols-3 gap-2">
+                            {editData.imageUrls.map((url: string, idx: number) => (
+                              <div key={idx} className="relative group border border-gray-200 rounded-lg overflow-hidden bg-gray-100">
+                                <img src={url} alt={`Ảnh ${idx + 1}`} className="w-full h-24 object-cover" />
+                                <button
+                                  type="button"
+                                  onClick={() => handleRemoveExistingImage(idx)}
+                                  className="absolute top-1 right-1 bg-red-600 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"
+                                  title="Xóa ảnh này"
+                                >
+                                  <Trash2 size={12} />
+                                </button>
+                                <div className="absolute bottom-0 left-0 right-0 bg-black bg-opacity-60 text-white text-[10px] px-1 py-0.5 text-center">
+                                  Ảnh {idx + 1}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Ảnh mới thêm */}
+                      {editImagePreviews.length > 0 && (
+                        <div className="mb-3">
+                          <span className="text-xs font-semibold text-green-700 block mb-2">Ảnh mới thêm ({editImagePreviews.length})</span>
+                          <div className="grid grid-cols-3 gap-2">
+                            {editImagePreviews.map((preview, idx) => (
+                              <div key={idx} className="relative group border-2 border-green-400 rounded-lg overflow-hidden bg-green-50">
+                                <img src={preview} alt={`Ảnh mới ${idx + 1}`} className="w-full h-24 object-cover" />
+                                <button
+                                  type="button"
+                                  onClick={() => handleRemoveNewImage(idx)}
+                                  className="absolute top-1 right-1 bg-red-600 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"
+                                  title="Xóa ảnh mới này"
+                                >
+                                  <Trash2 size={12} />
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Nút thêm ảnh */}
+                      <button
+                        type="button"
+                        onClick={() => editFileInputRef.current?.click()}
+                        disabled={editSaving}
+                        className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-blue-700 bg-blue-50 border border-blue-200 rounded-lg hover:bg-blue-100 transition-colors"
+                      >
+                        <Plus size={16} /> Thêm ảnh mới
+                      </button>
+                      <input
+                        type="file"
+                        multiple
+                        accept="image/*"
+                        className="hidden"
+                        ref={editFileInputRef}
+                        onChange={handleAddNewImages}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Ghi chú */}
+                  <div>
+                    <h4 className="font-bold text-sm text-gray-800 border-l-4 border-amber-500 pl-2 mb-3 uppercase tracking-wider">
+                      Ghi chú của KTV
+                    </h4>
+                    <textarea
+                      className="w-full border border-gray-300 rounded-lg p-3 text-sm focus:ring-1 focus:ring-blue-500 focus:border-blue-500 outline-none text-gray-800 bg-white min-h-[80px]"
+                      value={editData.notes}
+                      onChange={e => handleEditField('notes', e.target.value)}
+                      placeholder="Ghi chú..."
+                    />
+                  </div>
+                </>
+              )}
             </div>
             
             {/* Modal Footer */}
-            <div className="p-4 border-t border-gray-200 bg-gray-50 flex justify-end">
-              <button 
-                onClick={() => setSelectedDetailReport(null)}
-                className="px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-700 font-semibold rounded-lg text-sm transition-colors"
-              >
-                Đóng
-              </button>
+            <div className="p-4 border-t border-gray-200 bg-gray-50 flex justify-end gap-3">
+              {!isEditing ? (
+                <>
+                  <button 
+                    onClick={startEditing}
+                    className="px-4 py-2 bg-amber-500 hover:bg-amber-600 text-white font-semibold rounded-lg text-sm transition-colors flex items-center gap-2"
+                  >
+                    <Edit3 size={15} /> Sửa báo cáo
+                  </button>
+                  <button 
+                    onClick={() => setSelectedDetailReport(null)}
+                    className="px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-700 font-semibold rounded-lg text-sm transition-colors"
+                  >
+                    Đóng
+                  </button>
+                </>
+              ) : (
+                <>
+                  <button 
+                    onClick={cancelEditing}
+                    disabled={editSaving}
+                    className="px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-700 font-semibold rounded-lg text-sm transition-colors"
+                  >
+                    Hủy
+                  </button>
+                  <button 
+                    onClick={handleSaveEdit}
+                    disabled={editSaving}
+                    className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg text-sm transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {editSaving ? (
+                      <>{editUploadingImages ? 'Đang upload ảnh...' : 'Đang lưu...'}</>  
+                    ) : (
+                      <><Save size={15} /> Lưu thay đổi</>
+                    )}
+                  </button>
+                </>
+              )}
             </div>
           </div>
         </div>

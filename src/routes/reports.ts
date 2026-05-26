@@ -517,11 +517,20 @@ router.get('/:id', async (req: Request, res: Response): Promise<void> => {
 
 /**
  * PUT /api/reports/:id
- * Admin cập nhật báo cáo (isPaid, serviceCost, etc.)
+ * Admin cập nhật báo cáo — hỗ trợ sửa toàn bộ trường.
+ * Khi admin sửa, KTV sẽ nhận thông báo.
  */
 router.put('/:id', requireAdmin, async (req: Request, res: Response): Promise<void> => {
   try {
-    const { isPaid, serviceCost, additionalCost, notes } = req.body;
+    const {
+      isPaid, serviceCost, additionalCost, notes,
+      customerName, customerPhone, province, address,
+      products, serviceType, workType,
+      serialNumber, distanceKm, actualAmount,
+      waterSource, tdsIn, tdsOut, waterPressure,
+      spareParts, issueType, handlingMethod,
+      imageUrls,
+    } = req.body;
 
     const updateData: any = {};
     if (isPaid !== undefined) updateData.isPaid = isPaid;
@@ -529,13 +538,66 @@ router.put('/:id', requireAdmin, async (req: Request, res: Response): Promise<vo
     if (additionalCost !== undefined) updateData.additionalCost = parseFloat(additionalCost);
     if (notes !== undefined) updateData.notes = notes;
 
+    // ── Trường thông tin chung ──
+    if (customerName !== undefined) updateData.customerName = customerName;
+    if (customerPhone !== undefined) updateData.customerPhone = customerPhone;
+    if (province !== undefined) updateData.province = province;
+    if (address !== undefined) updateData.address = address;
+    if (products !== undefined) updateData.products = products;
+    if (serviceType !== undefined) updateData.serviceType = serviceType;
+    if (workType !== undefined) updateData.workType = workType;
+    if (actualAmount !== undefined) updateData.actualAmount = actualAmount !== null && actualAmount !== '' ? parseFloat(actualAmount) : null;
+
+    // ── Trường kỹ thuật ──
+    if (serialNumber !== undefined) updateData.serialNumber = serialNumber ? serialNumber.replace(/[^a-zA-Z0-9]/g, '').toUpperCase() : null;
+    if (distanceKm !== undefined) updateData.distanceKm = distanceKm !== null && distanceKm !== '' ? parseFloat(distanceKm) : null;
+    if (waterSource !== undefined) updateData.waterSource = waterSource || null;
+    if (tdsIn !== undefined) updateData.tdsIn = tdsIn !== null && tdsIn !== '' ? parseFloat(tdsIn) : null;
+    if (tdsOut !== undefined) updateData.tdsOut = tdsOut !== null && tdsOut !== '' ? parseFloat(tdsOut) : null;
+    if (waterPressure !== undefined) updateData.waterPressure = waterPressure !== null && waterPressure !== '' ? parseFloat(waterPressure) : null;
+    if (spareParts !== undefined) updateData.spareParts = spareParts || [];
+    if (issueType !== undefined) updateData.issueType = issueType || null;
+    if (handlingMethod !== undefined) updateData.handlingMethod = handlingMethod || null;
+
+    // ── Hình ảnh ──
+    if (imageUrls !== undefined) updateData.imageUrls = imageUrls || [];
+
+    // Lấy báo cáo hiện tại để biết ktvUserId và thông tin đơn hàng
+    const existingReport = await prisma.serviceReport.findUnique({
+      where: { id: req.params.id as string },
+      include: { order: { select: { pancakeOrderId: true } } },
+    });
+
+    if (!existingReport) {
+      res.status(404).json({ error: 'Không tìm thấy báo cáo' });
+      return;
+    }
+
     const report = await prisma.serviceReport.update({
       where: { id: req.params.id as string },
       data: updateData,
       include: { ktvUser: { select: { fullName: true } } },
     });
 
-    logger.info('Report updated', { reportId: report.id, by: req.user!.id });
+    // ── Gửi thông báo cho KTV nếu admin sửa nội dung (không chỉ isPaid) ──
+    const hasContentEdit = Object.keys(updateData).some(k => k !== 'isPaid');
+    if (hasContentEdit) {
+      try {
+        const orderNum = existingReport.order?.pancakeOrderId;
+        const orderText = orderNum ? `#${orderNum}` : '(không rõ mã đơn)';
+        await prisma.notification.create({
+          data: {
+            userId: existingReport.ktvUserId,
+            title: 'Báo cáo đã được Admin chỉnh sửa',
+            content: `Báo cáo cho đơn hàng ${orderText} của bạn đã được Admin sửa thông tin.`,
+          },
+        });
+      } catch (notifErr: any) {
+        logger.error('Failed to create edit notification', { error: notifErr.message });
+      }
+    }
+
+    logger.info('Report updated by admin', { reportId: report.id, by: req.user!.id, fieldsUpdated: Object.keys(updateData) });
     res.json({ report });
   } catch (error: any) {
     logger.error('Update report error', { error: error.message });

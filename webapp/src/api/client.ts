@@ -128,6 +128,13 @@ export const getDashboardStats = async () => {
   return fetchApi('/dashboard/stats');
 };
 
+export const updateReport = async (id: string, data: Record<string, any>) => {
+  return fetchApi(`/reports/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(data),
+  });
+};
+
 export const deleteReport = async (id: string) => {
   return fetchApi(`/reports/${id}`, { method: 'DELETE' });
 };
