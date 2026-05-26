@@ -144,7 +144,14 @@ export default function MyOrders() {
                         <div className="w-6 h-6 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center font-bold text-[11px] shrink-0">
                           {customerName.charAt(0).toUpperCase()}
                         </div>
-                        <span className="text-gray-800 font-medium">{customerName}</span>
+                        <div className="flex flex-col">
+                          <span className="text-gray-800 font-medium">{customerName}</span>
+                          {order.note && (
+                            <span className="text-[11px] text-amber-700 bg-amber-50 border border-amber-100 px-2 py-0.5 rounded font-normal inline-block mt-1 whitespace-normal break-words max-w-[250px]" title="Lời nhắn từ Pancake">
+                              💬 {order.note}
+                            </span>
+                          )}
+                        </div>
                       </div>
                     </td>
                     <td className="px-4 py-3 text-gray-700 font-medium">
@@ -153,7 +160,7 @@ export default function MyOrders() {
                     <td className="px-4 py-3">
                       {getStatusBadge(order.adminStatus)}
                     </td>
-                    <td className="px-4 py-3 text-gray-600 truncate max-w-[200px]" title={address}>
+                    <td className="px-4 py-3 text-gray-600 whitespace-normal break-words max-w-[300px]">
                       {address}
                     </td>
                   </tr>
