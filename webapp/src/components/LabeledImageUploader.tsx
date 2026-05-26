@@ -215,7 +215,7 @@ export default function LabeledImageUploader({ imageSlots, workType, onUploadSuc
                         width: '100%',
                         height: '100%',
                         objectFit: 'cover',
-                        opacity: 0.85,
+                        opacity: 0.95,
                         pointerEvents: 'none',
                       }}
                     />
