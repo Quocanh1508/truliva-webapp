@@ -229,8 +229,17 @@ export default function ReportForm() {
       setProvince(order.shippingAddress?.province_name || order.customer?.provinceName || '');
       const fullAddr = order.shippingAddress?.full_address || order.customer?.fullAddress || '';
       setAddress(fullAddr);
-      if (order.workType) setWorkType(order.workType);
-      if (order.serviceType) setServiceType(order.serviceType);
+      if (order.workType) {
+        setWorkType(order.workType);
+        const noServiceTypes = ['Giao hàng và Lắp đặt', 'Lắp đặt', 'Giao hàng', 'Thay lọc'];
+        if (noServiceTypes.includes(order.workType) && !order.serviceType) {
+          setServiceType('Công việc đã bao gồm dịch vụ');
+        } else {
+          setServiceType(order.serviceType || '');
+        }
+      } else {
+        setServiceType(order.serviceType || '');
+      }
 
       // ── Mapping sản phẩm x số lượng từ items ──
       if (order.items && order.items.length > 0) {
@@ -677,7 +686,7 @@ export default function ReportForm() {
                   type="button"
                   className="btn btn-primary w-full mt-6"
                   onClick={() => setStep(2)}
-                  disabled={!selectedOrderId || !customerName || !customerPhone || !province || !address || !workType || !serviceType || !canProceedStep1()}
+                  disabled={!selectedOrderId || !customerName || !customerPhone || !province || !address || !workType || (!['Giao hàng và Lắp đặt', 'Lắp đặt', 'Giao hàng', 'Thay lọc'].includes(workType) && !serviceType) || !canProceedStep1()}
                 >
                   Tiếp tục
                 </button>
