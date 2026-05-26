@@ -924,9 +924,24 @@ export default function OrderList() {
                       })() : '-'}
                     </td>
                     <td className="px-4 py-3">
-                      <span className={order.rawData?.creator?.name ? "font-medium text-gray-900" : "text-gray-400"}>
-                        {order.rawData?.creator?.name || '-'}
-                      </span>
+                      {(() => {
+                        const creatorName = order.rawData?.creator?.name;
+                        if (creatorName) {
+                          return (
+                            <span className="font-medium text-gray-900">{creatorName}</span>
+                          );
+                        }
+                        const source = (order.orderSource || order.rawData?.order_sources_name || '').toLowerCase();
+                        const isEcom = source.includes('shopee') || source.includes('lazada') || source.includes('tiktok') || source.includes('tiki');
+                        if (isEcom) {
+                          return (
+                            <span className="font-medium text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded text-[11px]" title="Đơn đồng bộ tự động từ sàn TMĐT">
+                              Hệ thống
+                            </span>
+                          );
+                        }
+                        return <span className="text-gray-400">-</span>;
+                      })()}
                     </td>
                     <td className="px-4 py-3">
                       {order.appointmentTime ? (() => {
