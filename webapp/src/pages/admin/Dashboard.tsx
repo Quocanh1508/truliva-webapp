@@ -2,7 +2,8 @@ import { useEffect, useState } from 'react';
 import { fetchApi, getDashboardStats, getStations, getDispatchAnalysis, getKtvUsers, getProductQualityAnalysis } from '../../api/client';
 import { 
   FileText, CheckCircle, Clock, Building, MapPin, 
-  AlertTriangle, Info, Filter, AlertCircle, RefreshCw, TrendingUp 
+  AlertTriangle, Info, Filter, AlertCircle, RefreshCw, TrendingUp,
+  ClipboardList, UserCheck
 } from 'lucide-react';
 import { 
   BarChart, Bar, XAxis, YAxis, Tooltip as RechartsTooltip, Legend, 
@@ -382,24 +383,24 @@ export default function Dashboard() {
         <div className="space-y-6 animate-fade-in">
           {/* KPI Overview Cards */}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-            <div className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm border-l-4 border-blue-500 flex flex-col justify-between">
-              <div className="text-gray-500 font-semibold text-xs flex items-center gap-1.5"><FileText size={15}/> TỔNG BÁO CÁO KTV</div>
-              <div className="text-3xl font-bold text-gray-900 mt-2">{stats.totalReports}</div>
+            <div className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm border-l-4 border-blue-500 flex flex-col justify-between animate-fade-in hover:shadow-md transition-shadow">
+              <div className="text-blue-600 font-semibold text-xs flex items-center gap-1.5 uppercase"><ClipboardList size={15}/> Tổng số đơn</div>
+              <div className="text-3xl font-bold text-gray-900 mt-2">{dashStats.orderStats?.total ?? 0}</div>
             </div>
             
-            <div className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm border-l-4 border-emerald-500 flex flex-col justify-between">
-              <div className="text-emerald-600 font-semibold text-xs flex items-center gap-1.5"><CheckCircle size={15}/> ĐÃ THANH TOÁN CÔNG</div>
-              <div className="text-3xl font-bold text-gray-900 mt-2">{stats.totalPaid}</div>
+            <div className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm border-l-4 border-amber-500 flex flex-col justify-between animate-fade-in hover:shadow-md transition-shadow">
+              <div className="text-amber-600 font-semibold text-xs flex items-center gap-1.5 uppercase"><Clock size={15}/> Đơn chờ xử lý</div>
+              <div className="text-3xl font-bold text-gray-900 mt-2">{dashStats.orderStats?.pending ?? 0}</div>
             </div>
 
-            <div className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm border-l-4 border-amber-500 flex flex-col justify-between">
-              <div className="text-amber-600 font-semibold text-xs flex items-center gap-1.5"><Clock size={15}/> CHỜ DUYỆT THANH TOÁN</div>
-              <div className="text-3xl font-bold text-gray-900 mt-2">{stats.totalUnpaid}</div>
+            <div className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm border-l-4 border-indigo-500 flex flex-col justify-between animate-fade-in hover:shadow-md transition-shadow">
+              <div className="text-indigo-600 font-semibold text-xs flex items-center gap-1.5 uppercase"><UserCheck size={15}/> Đơn đã phân công</div>
+              <div className="text-3xl font-bold text-gray-900 mt-2">{dashStats.orderStats?.assigned ?? 0}</div>
             </div>
 
-            <div className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm border-l-4 border-purple-500 flex flex-col justify-between">
-              <div className="text-purple-600 font-semibold text-xs flex items-center gap-1.5"><Building size={15}/> TRẠM ĐỐI TÁC CHÍNH</div>
-              <div className="text-3xl font-bold text-gray-900 mt-2">{dashStats.stationStats.length}</div>
+            <div className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm border-l-4 border-emerald-500 flex flex-col justify-between animate-fade-in hover:shadow-md transition-shadow">
+              <div className="text-emerald-600 font-semibold text-xs flex items-center gap-1.5 uppercase"><CheckCircle size={15}/> Đơn hoàn thành</div>
+              <div className="text-3xl font-bold text-gray-900 mt-2">{dashStats.orderStats?.completed ?? 0}</div>
             </div>
           </div>
 

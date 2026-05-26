@@ -68,10 +68,28 @@ router.get('/stats', async (_req: Request, res: Response): Promise<void> => {
       _count: { id: true }
     });
 
+    // 4. Thống kê theo yêu cầu của user
+    const totalOrders = await prisma.order.count();
+    const pendingOrders = await prisma.order.count({
+      where: { adminStatus: 'chờ xử lý' }
+    });
+    const assignedOrders = await prisma.order.count({
+      where: { adminStatus: 'đang thực hiện' }
+    });
+    const completedOrders = await prisma.order.count({
+      where: { adminStatus: 'hoàn thành' }
+    });
+
     res.json({
       stationStats,
       mapDensity: density,
-      statusCounts
+      statusCounts,
+      orderStats: {
+        total: totalOrders,
+        pending: pendingOrders,
+        assigned: assignedOrders,
+        completed: completedOrders
+      }
     });
   } catch (error: any) {
     logger.error('Get dashboard stats error', { error: error.message });
