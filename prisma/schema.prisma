@@ -199,6 +199,13 @@ model User {
   phoneNumber     String?      @map("phone_number")
   techStationId   String?      @map("tech_station_id")  // KTV thuộc trạm kỹ thuật nào
   isActive        Boolean      @default(true) @map("is_active")
+  address         String?
+  cccdNumber      String?      @map("cccd_number")
+  cccdDate        String?      @map("cccd_date")
+  cccdPlace       String?      @map("cccd_place")
+  bankAccount     String?      @map("bank_account")
+  bankName        String?      @map("bank_name")
+  email           String?
   createdAt       DateTime     @default(now()) @map("created_at")
   updatedAt       DateTime     @updatedAt @map("updated_at")
 

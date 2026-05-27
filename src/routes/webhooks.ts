@@ -144,7 +144,7 @@ router.get('/test-notes', async (req: Request, res: Response): Promise<void> => 
       orderBy: { receivedAt: 'desc' },
       take: 10
     });
-    
+
     const testerEvent = events.find(e => {
       const p: any = e.payload;
       return p.bill_full_name === 'Tester' || (p.shipping_address && p.shipping_address.full_name === 'Tester');

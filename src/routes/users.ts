@@ -84,8 +84,15 @@ router.get('/', async (_req: Request, res: Response): Promise<void> => {
         techStation: { select: { name: true, mainStation: { select: { name: true } } } },
         isActive: true,
         createdAt: true,
+        address: true,
+        cccdNumber: true,
+        cccdDate: true,
+        cccdPlace: true,
+        bankAccount: true,
+        bankName: true,
+        email: true,
         _count: { select: { serviceReports: true } },
-      },
+      } as any,
       orderBy: { createdAt: 'desc' },
     });
 
@@ -102,7 +109,10 @@ router.get('/', async (_req: Request, res: Response): Promise<void> => {
  */
 router.post('/', async (req: Request, res: Response): Promise<void> => {
   try {
-    const { username, password, fullName, role, phoneNumber, techStationId } = req.body;
+    const { 
+      username, password, fullName, role, phoneNumber, techStationId,
+      address, cccdNumber, cccdDate, cccdPlace, bankAccount, bankName, email 
+    } = req.body;
 
     if (!username || !password || !fullName) {
       res.status(400).json({ error: 'Vui lòng nhập đầy đủ thông tin' });
@@ -133,6 +143,13 @@ router.post('/', async (req: Request, res: Response): Promise<void> => {
         role: role === 'ADMIN' ? 'ADMIN' : (role === 'DEV' ? 'DEV' : 'KTV'),
         phoneNumber: phoneNumber || null,
         techStationId: techStationId || null,
+        address: address || null,
+        cccdNumber: cccdNumber || null,
+        cccdDate: cccdDate || null,
+        cccdPlace: cccdPlace || null,
+        bankAccount: bankAccount || null,
+        bankName: bankName || null,
+        email: email || null,
       },
       select: {
         id: true,
@@ -143,7 +160,14 @@ router.post('/', async (req: Request, res: Response): Promise<void> => {
         techStationId: true,
         isActive: true,
         createdAt: true,
-      },
+        address: true,
+        cccdNumber: true,
+        cccdDate: true,
+        cccdPlace: true,
+        bankAccount: true,
+        bankName: true,
+        email: true,
+      } as any,
     });
 
     logger.info('User created', { userId: user.id, by: req.user?.id });
@@ -161,7 +185,10 @@ router.post('/', async (req: Request, res: Response): Promise<void> => {
 router.put('/:id', async (req: Request, res: Response): Promise<void> => {
   try {
     const id = req.params.id as string;
-    const { fullName, phoneNumber, password, isActive, role, techStationId } = req.body;
+    const { 
+      fullName, phoneNumber, password, isActive, role, techStationId,
+      address, cccdNumber, cccdDate, cccdPlace, bankAccount, bankName, email 
+    } = req.body;
 
     const updateData: any = {};
     if (fullName !== undefined) updateData.fullName = fullName;
@@ -169,6 +196,15 @@ router.put('/:id', async (req: Request, res: Response): Promise<void> => {
     if (isActive !== undefined) updateData.isActive = isActive;
     if (role !== undefined) updateData.role = role;
     if (techStationId !== undefined) updateData.techStationId = techStationId || null;
+    
+    if (address !== undefined) updateData.address = address || null;
+    if (cccdNumber !== undefined) updateData.cccdNumber = cccdNumber || null;
+    if (cccdDate !== undefined) updateData.cccdDate = cccdDate || null;
+    if (cccdPlace !== undefined) updateData.cccdPlace = cccdPlace || null;
+    if (bankAccount !== undefined) updateData.bankAccount = bankAccount || null;
+    if (bankName !== undefined) updateData.bankName = bankName || null;
+    if (email !== undefined) updateData.email = email || null;
+
     if (password) {
       if (password.length < 4) {
         res.status(400).json({ error: 'Mật khẩu phải có ít nhất 4 ký tự' });
@@ -188,7 +224,14 @@ router.put('/:id', async (req: Request, res: Response): Promise<void> => {
         phoneNumber: true,
         techStationId: true,
         isActive: true,
-      },
+        address: true,
+        cccdNumber: true,
+        cccdDate: true,
+        cccdPlace: true,
+        bankAccount: true,
+        bankName: true,
+        email: true,
+      } as any,
     });
 
     logger.info('User updated', { userId: id, by: req.user?.id });

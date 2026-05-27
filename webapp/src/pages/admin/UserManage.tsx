@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useMemo } from 'react';
+import { createPortal } from 'react-dom';
 import { fetchApi, getStations } from '../../api/client';
-import { UserPlus, Lock, Unlock, KeyRound, Search, Filter, X } from 'lucide-react';
+import { UserPlus, Lock, Unlock, KeyRound, Search, Filter, X, Pencil } from 'lucide-react';
 
 // Helper to sort tech stations: TP.Hồ Chí Minh, Hà Nội, Đà Nẵng first, then A-Z
 function getSortedTechStations(main: any) {
@@ -34,14 +35,71 @@ export default function UserManage() {
   const [filterTechStation, setFilterTechStation] = useState('');
   const [filterStatus, setFilterStatus] = useState<'all' | 'active' | 'inactive'>('all');
 
-  // Create form state
-  const [showCreate, setShowCreate] = useState(false);
+  // Form Modal state
+  const [modalOpen, setModalOpen] = useState(false);
+  const [modalMode, setModalMode] = useState<'create' | 'edit'>('create');
+  const [editingUserId, setEditingUserId] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<'basic' | 'personal'>('basic');
+
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [fullName, setFullName] = useState('');
   const [phone, setPhone] = useState('');
   const [techStationId, setTechStationId] = useState('');
+  const [isActive, setIsActive] = useState(true);
+
+  // New profile fields
+  const [address, setAddress] = useState('');
+  const [cccdNumber, setCccdNumber] = useState('');
+  const [cccdDate, setCccdDate] = useState('');
+  const [cccdPlace, setCccdPlace] = useState('');
+  const [bankAccount, setBankAccount] = useState('');
+  const [bankName, setBankName] = useState('');
+  const [email, setEmail] = useState('');
+
   const [error, setError] = useState('');
+
+  const openCreateModal = () => {
+    setModalMode('create');
+    setEditingUserId(null);
+    setUsername('');
+    setPassword('');
+    setFullName('');
+    setPhone('');
+    setTechStationId('');
+    setAddress('');
+    setCccdNumber('');
+    setCccdDate('');
+    setCccdPlace('');
+    setBankAccount('');
+    setBankName('');
+    setEmail('');
+    setIsActive(true);
+    setActiveTab('basic');
+    setError('');
+    setModalOpen(true);
+  };
+
+  const openEditModal = (user: any) => {
+    setModalMode('edit');
+    setEditingUserId(user.id);
+    setUsername(user.username || '');
+    setPassword(''); // Trống khi sửa đổi
+    setFullName(user.fullName || '');
+    setPhone(user.phoneNumber || '');
+    setTechStationId(user.techStationId || '');
+    setAddress(user.address || '');
+    setCccdNumber(user.cccdNumber || '');
+    setCccdDate(user.cccdDate || '');
+    setCccdPlace(user.cccdPlace || '');
+    setBankAccount(user.bankAccount || '');
+    setBankName(user.bankName || '');
+    setEmail(user.email || '');
+    setIsActive(user.isActive !== false);
+    setActiveTab('basic');
+    setError('');
+    setModalOpen(true);
+  };
 
   useEffect(() => {
     loadUsers();
@@ -122,16 +180,29 @@ export default function UserManage() {
     setFilterStatus('all');
   };
 
-  const handleCreate = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
     try {
-      await fetchApi('/users', {
-        method: 'POST',
-        body: JSON.stringify({ username, password, fullName, phoneNumber: phone, role: 'KTV', techStationId })
-      });
-      setShowCreate(false);
-      setUsername(''); setPassword(''); setFullName(''); setPhone(''); setTechStationId('');
+      if (modalMode === 'create') {
+        await fetchApi('/users', {
+          method: 'POST',
+          body: JSON.stringify({
+            username, password, fullName, phoneNumber: phone, role: 'KTV', techStationId,
+            address, cccdNumber, cccdDate, cccdPlace, bankAccount, bankName, email
+          })
+        });
+      } else {
+        await fetchApi(`/users/${editingUserId}`, {
+          method: 'PUT',
+          body: JSON.stringify({
+            fullName, phoneNumber: phone, role: 'KTV', techStationId, isActive,
+            password: password.trim() || undefined,
+            address, cccdNumber, cccdDate, cccdPlace, bankAccount, bankName, email
+          })
+        });
+      }
+      setModalOpen(false);
       loadUsers();
     } catch (err: any) {
       setError(err.message);
@@ -184,7 +255,7 @@ export default function UserManage() {
     <div className="animate-fade-in">
       <div className="flex justify-between items-center mb-6">
         <h2 className="font-bold text-2xl text-[#1B3A6B]">Quản lý Kỹ Thuật Viên</h2>
-        <button className="btn btn-primary flex items-center gap-2" onClick={() => setShowCreate(!showCreate)}>
+        <button className="btn btn-primary flex items-center gap-2" onClick={openCreateModal}>
           <UserPlus size={18} /> Thêm KTV
         </button>
       </div>
@@ -266,46 +337,210 @@ export default function UserManage() {
         </div>
       </div>
 
-      {showCreate && (
-        <div className="card mb-8 animate-fade-in border-2 border-blue-100">
-          <h3 className="font-bold mb-4">Tạo tài khoản KTV mới</h3>
-          {error && <div className="alert alert-error">{error}</div>}
-          <form onSubmit={handleCreate} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
-            <div className="form-group mb-0">
-              <label className="form-label text-sm">Họ tên KTV *</label>
-              <input type="text" className="form-input" value={fullName} onChange={e => setFullName(e.target.value)} required />
+      {modalOpen && createPortal(
+        <div className="fixed inset-0 bg-black bg-opacity-50 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-fade-in">
+          <div className="bg-white rounded-xl shadow-2xl max-w-2xl w-full overflow-hidden border border-slate-100 flex flex-col max-h-[90vh]">
+            {/* Header */}
+            <div className="px-6 py-4 bg-[#1B3A6B] text-white flex justify-between items-center">
+              <h3 className="font-bold text-lg">
+                {modalMode === 'create' ? 'Thêm Kỹ Thuật Viên Mới' : `Sửa Thông Tin KTV: ${fullName}`}
+              </h3>
+              <button onClick={() => setModalOpen(false)} className="text-white hover:text-gray-200 transition-colors">
+                <X size={20} />
+              </button>
             </div>
-            <div className="form-group mb-0">
-              <label className="form-label text-sm">Số điện thoại</label>
-              <input type="tel" className="form-input" value={phone} onChange={e => setPhone(e.target.value)} />
+
+            {/* Tabs */}
+            <div className="flex border-b border-gray-200 bg-slate-50">
+              <button
+                type="button"
+                onClick={() => setActiveTab('basic')}
+                className={`flex-1 py-3 text-center font-semibold text-sm border-b-2 transition-all ${
+                  activeTab === 'basic'
+                    ? 'border-[#1B3A6B] text-[#1B3A6B] bg-white'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:bg-gray-100'
+                }`}
+              >
+                1. Tài khoản & Trạm
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveTab('personal')}
+                className={`flex-1 py-3 text-center font-semibold text-sm border-b-2 transition-all ${
+                  activeTab === 'personal'
+                    ? 'border-[#1B3A6B] text-[#1B3A6B] bg-white'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:bg-gray-100'
+                }`}
+              >
+                2. Cá nhân & Thanh toán
+              </button>
             </div>
-            <div className="form-group mb-0">
-              <label className="form-label text-sm">Trạm trực thuộc (KTV)</label>
-              <select className="form-input bg-white" value={techStationId} onChange={e => setTechStationId(e.target.value)}>
-                <option value="">-- Chưa gán trạm --</option>
-                {stations.map(main => (
-                  <optgroup key={main.id} label={main.name}>
-                    {getSortedTechStations(main).map((tech: any) => (
-                      <option key={tech.id} value={tech.id}>{tech.name}</option>
-                    ))}
-                  </optgroup>
-                ))}
-              </select>
-            </div>
-            <div className="form-group mb-0">
-              <label className="form-label text-sm">Username đăng nhập *</label>
-              <input type="text" className="form-input" value={username} onChange={e => setUsername(e.target.value)} required />
-            </div>
-            <div className="form-group mb-0">
-              <label className="form-label text-sm">Mật khẩu *</label>
-              <input type="text" className="form-input" value={password} onChange={e => setPassword(e.target.value)} required />
-            </div>
-            <div style={{ gridColumn: '1 / -1', display: 'flex', justifyContent: 'flex-end', gap: '12px', marginTop: '8px' }}>
-              <button type="button" className="btn btn-outline" onClick={() => setShowCreate(false)}>Hủy</button>
-              <button type="submit" className="btn btn-primary">Tạo tài khoản</button>
-            </div>
-          </form>
-        </div>
+
+            {/* Form Content */}
+            <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-6 flex flex-col gap-4">
+              {error && <div className="alert alert-error">{error}</div>}
+
+              {activeTab === 'basic' ? (
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                  <div className="form-group mb-0">
+                    <label className="form-label text-xs font-semibold text-gray-700">Họ tên KTV *</label>
+                    <input
+                      type="text"
+                      className="form-input"
+                      value={fullName}
+                      onChange={e => setFullName(e.target.value)}
+                      required
+                    />
+                  </div>
+                  <div className="form-group mb-0">
+                    <label className="form-label text-xs font-semibold text-gray-700">Số điện thoại *</label>
+                    <input
+                      type="tel"
+                      className="form-input"
+                      value={phone}
+                      onChange={e => setPhone(e.target.value)}
+                      required
+                    />
+                  </div>
+                  <div className="form-group mb-0">
+                    <label className="form-label text-xs font-semibold text-gray-700">Trạm trực thuộc (KTV)</label>
+                    <select
+                      className="form-input bg-white"
+                      value={techStationId}
+                      onChange={e => setTechStationId(e.target.value)}
+                    >
+                      <option value="">-- Chưa gán trạm --</option>
+                      {stations.map(main => (
+                        <optgroup key={main.id} label={main.name}>
+                          {getSortedTechStations(main).map((tech: any) => (
+                            <option key={tech.id} value={tech.id}>{tech.name}</option>
+                          ))}
+                        </optgroup>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="form-group mb-0">
+                    <label className="form-label text-xs font-semibold text-gray-700">Username đăng nhập *</label>
+                    <input
+                      type="text"
+                      className="form-input"
+                      value={username}
+                      onChange={e => setUsername(e.target.value)}
+                      disabled={modalMode === 'edit'}
+                      required
+                    />
+                  </div>
+                  <div className="form-group mb-0">
+                    <label className="form-label text-xs font-semibold text-gray-700">
+                      {modalMode === 'create' ? 'Mật khẩu *' : 'Mật khẩu mới (để trống nếu giữ nguyên)'}
+                    </label>
+                    <input
+                      type="text"
+                      className="form-input"
+                      value={password}
+                      onChange={e => setPassword(e.target.value)}
+                      required={modalMode === 'create'}
+                    />
+                  </div>
+                  {modalMode === 'edit' && (
+                    <div className="form-group mb-0">
+                      <label className="form-label text-xs font-semibold text-gray-700">Trạng thái hoạt động</label>
+                      <select
+                        className="form-input bg-white"
+                        value={isActive ? 'true' : 'false'}
+                        onChange={e => setIsActive(e.target.value === 'true')}
+                      >
+                        <option value="true">Hoạt động</option>
+                        <option value="false">Đã khóa</option>
+                      </select>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }} className="animate-fade-in">
+                  <div className="form-group mb-0" style={{ gridColumn: '1 / -1' }}>
+                    <label className="form-label text-xs font-semibold text-gray-700">Địa chỉ liên hệ</label>
+                    <input
+                      type="text"
+                      className="form-input"
+                      value={address}
+                      onChange={e => setAddress(e.target.value)}
+                      placeholder="Số nhà, đường, phường/xã, quận/huyện, tỉnh/TP"
+                    />
+                  </div>
+                  <div className="form-group mb-0" style={{ gridColumn: '1 / -1' }}>
+                    <label className="form-label text-xs font-semibold text-gray-700">Email liên hệ</label>
+                    <input
+                      type="email"
+                      className="form-input"
+                      value={email}
+                      onChange={e => setEmail(e.target.value)}
+                      placeholder="email@example.com"
+                    />
+                  </div>
+                  <div className="form-group mb-0">
+                    <label className="form-label text-xs font-semibold text-gray-700">Số CCCD</label>
+                    <input
+                      type="text"
+                      className="form-input"
+                      value={cccdNumber}
+                      onChange={e => setCccdNumber(e.target.value)}
+                      placeholder="Số CCCD"
+                    />
+                  </div>
+                  <div className="form-group mb-0">
+                    <label className="form-label text-xs font-semibold text-gray-700">Ngày cấp CCCD</label>
+                    <input
+                      type="date"
+                      className="form-input"
+                      value={cccdDate}
+                      onChange={e => setCccdDate(e.target.value)}
+                    />
+                  </div>
+                  <div className="form-group mb-0" style={{ gridColumn: '1 / -1' }}>
+                    <label className="form-label text-xs font-semibold text-gray-700">Nơi cấp CCCD</label>
+                    <input
+                      type="text"
+                      className="form-input"
+                      value={cccdPlace}
+                      onChange={e => setCccdPlace(e.target.value)}
+                      placeholder="Ví dụ: Cục Cảnh sát QLHC về trật tự xã hội"
+                    />
+                  </div>
+                  <div className="form-group mb-0">
+                    <label className="form-label text-xs font-semibold text-gray-700">Số tài khoản thanh toán</label>
+                    <input
+                      type="text"
+                      className="form-input"
+                      value={bankAccount}
+                      onChange={e => setBankAccount(e.target.value)}
+                      placeholder="Số tài khoản thanh toán"
+                    />
+                  </div>
+                  <div className="form-group mb-0">
+                    <label className="form-label text-xs font-semibold text-gray-700">Ngân hàng thanh toán</label>
+                    <input
+                      type="text"
+                      className="form-input"
+                      value={bankName}
+                      onChange={e => setBankName(e.target.value)}
+                      placeholder="Tên ngân hàng (ví dụ: Vietcombank)"
+                    />
+                  </div>
+                </div>
+              )}
+
+              {/* Modal Footer */}
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', marginTop: '16px' }}>
+                <button type="button" className="btn btn-outline" onClick={() => setModalOpen(false)}>Hủy</button>
+                <button type="submit" className="btn btn-primary">
+                  {modalMode === 'create' ? 'Tạo KTV' : 'Lưu Thay Đổi'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>,
+        document.body
       )}
 
       {loading ? (
@@ -371,6 +606,13 @@ export default function UserManage() {
                   <td style={{ padding: '12px 16px' }}>
                     {u.role !== 'ADMIN' && (
                       <div style={{ display: 'flex', gap: '4px' }}>
+                        <button 
+                          onClick={() => openEditModal(u)}
+                          className="p-2 rounded text-sm text-blue-600 hover:bg-blue-50"
+                          title="Chỉnh sửa thông tin"
+                        >
+                          <Pencil size={18} />
+                        </button>
                         <button 
                           onClick={() => toggleActive(u.id, u.isActive)}
                           className={`p-2 rounded text-sm ${u.isActive ? 'text-red-600 hover:bg-red-50' : 'text-green-600 hover:bg-green-50'}`}

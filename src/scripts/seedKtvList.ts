@@ -5,16 +5,47 @@ import { Pool } from 'pg';
 import { PrismaPg } from '@prisma/adapter-pg';
 import bcrypt from 'bcryptjs';
 
-function getCellString(row: any, index: number): string {
+function getCellValue(row: any, index: number): any {
   const cell = row.getCell(index);
-  if (!cell || cell.value === null || cell.value === undefined) return '';
+  if (!cell || cell.value === null || cell.value === undefined) return null;
   
-  if (typeof cell.value === 'object') {
-    if (cell.value.richText) return cell.value.richText.map((rt: any) => rt.text).join('');
-    if (cell.value.text) return String(cell.value.text);
-    return JSON.stringify(cell.value);
+  let val = cell.value;
+  // Handle formula
+  if (typeof val === 'object' && val !== null && 'formula' in val) {
+    val = (val as any).result;
   }
-  return String(cell.value).trim();
+  
+  // Handle richText
+  if (typeof val === 'object' && val !== null && (val as any).richText) {
+    return (val as any).richText.map((rt: any) => rt.text).join('').trim();
+  }
+  
+  // Handle hyperlink / object with text
+  if (typeof val === 'object' && val !== null && 'text' in val) {
+    val = (val as any).text;
+  }
+  
+  // Handle Date
+  if (val instanceof Date) {
+    const y = val.getFullYear();
+    const m = String(val.getMonth() + 1).padStart(2, '0');
+    const d = String(val.getDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
+  }
+  
+  return val;
+}
+
+function getCellStringFormatted(row: any, index: number): string | null {
+  const val = getCellValue(row, index);
+  if (val === null || val === undefined) return null;
+  const str = String(val).trim();
+  return str || null;
+}
+
+function getCellString(row: any, index: number): string {
+  const str = getCellStringFormatted(row, index);
+  return str || '';
 }
 
 async function run() {
@@ -76,6 +107,15 @@ async function run() {
 
       const isActive = statusText.toLowerCase() === 'hoạt động';
 
+      // Đọc các trường thông tin chi tiết mới
+      const address = getCellStringFormatted(row, 6);
+      const cccdNumber = getCellStringFormatted(row, 7);
+      const cccdDate = getCellStringFormatted(row, 8);
+      const cccdPlace = getCellStringFormatted(row, 9);
+      const bankAccount = getCellStringFormatted(row, 10);
+      const bankName = getCellStringFormatted(row, 11);
+      const email = getCellStringFormatted(row, 12);
+
       // ── 1. Đảm bảo có MainStation ──
       const mainKey = mainStationName.toLowerCase().trim();
       let mainStationId = mainStationCache.get(mainKey);
@@ -119,8 +159,15 @@ async function run() {
             fullName: ktvName.trim(),
             phoneNumber: phone,
             techStationId: techStationId,
-            isActive: isActive
-          }
+            isActive: isActive,
+            address,
+            cccdNumber,
+            cccdDate,
+            cccdPlace,
+            bankAccount,
+            bankName,
+            email
+          } as any
         });
         usersUpdated++;
       } else {
@@ -132,8 +179,15 @@ async function run() {
             role: 'KTV',
             phoneNumber: phone,
             techStationId: techStationId,
-            isActive: isActive
-          }
+            isActive: isActive,
+            address,
+            cccdNumber,
+            cccdDate,
+            cccdPlace,
+            bankAccount,
+            bankName,
+            email
+          } as any
         });
         usersCreated++;
         console.log(`    * Tạo KTV: ${ktvName} - SĐT: ${phone} (${isActive ? 'Hoạt động' : 'Ngưng HĐ'})`);
