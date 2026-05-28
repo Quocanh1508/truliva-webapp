@@ -117,6 +117,7 @@ export default function MyOrders() {
                 <th className="px-4 py-3">Mã Đơn</th>
                 <th className="px-4 py-3">Giờ Hẹn</th>
                 <th className="px-4 py-3">Khách hàng</th>
+                <th className="px-4 py-3">Sản phẩm</th>
                 <th className="px-4 py-3">SĐT</th>
                 <th className="px-4 py-3">Trạng thái</th>
                 <th className="px-4 py-3">Địa chỉ</th>
@@ -166,6 +167,18 @@ export default function MyOrders() {
                             </span>
                           )}
                         </div>
+                      </div>
+                    </td>
+                    <td className="px-4 py-3 whitespace-normal break-words max-w-[220px]">
+                      <div className="flex flex-col gap-1">
+                        {order.items?.map((item: any, itemIdx: number) => (
+                          <div key={item.id || itemIdx} className="text-[12px] text-gray-700 font-medium">
+                            • {item.productName} <span className="text-gray-500 font-bold">x{item.quantity || 1}</span>
+                          </div>
+                        ))}
+                        {(!order.items || order.items.length === 0) && (
+                          <span className="text-gray-400 italic">Không có sản phẩm</span>
+                        )}
                       </div>
                     </td>
                     <td className="px-4 py-3 text-gray-700 font-medium">
