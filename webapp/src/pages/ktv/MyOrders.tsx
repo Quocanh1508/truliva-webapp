@@ -60,6 +60,27 @@ export default function MyOrders() {
     }
   };
 
+  const getWorkTypeBadge = (workType: string) => {
+    if (!workType) return null;
+    const wt = workType.toLowerCase();
+    if (wt.includes('lắp đặt') && wt.includes('giao')) {
+      return <span className="inline-flex px-1.5 py-0.5 bg-blue-50 text-blue-700 border border-blue-200 rounded text-[10px] font-bold mt-1 w-max">Giao & Lắp đặt</span>;
+    }
+    if (wt.includes('lắp đặt')) {
+      return <span className="inline-flex px-1.5 py-0.5 bg-sky-50 text-sky-700 border border-sky-200 rounded text-[10px] font-bold mt-1 w-max">Lắp đặt</span>;
+    }
+    if (wt.includes('bảo hành') || wt.includes('sửa')) {
+      return <span className="inline-flex px-1.5 py-0.5 bg-red-50 text-red-700 border border-red-200 rounded text-[10px] font-bold mt-1 w-max">Bảo hành / Sửa</span>;
+    }
+    if (wt.includes('thay lọc') || wt.includes('thay lõi')) {
+      return <span className="inline-flex px-1.5 py-0.5 bg-indigo-50 text-indigo-700 border border-indigo-200 rounded text-[10px] font-bold mt-1 w-max">Thay lọc</span>;
+    }
+    if (wt.includes('giao hàng')) {
+      return <span className="inline-flex px-1.5 py-0.5 bg-teal-50 text-teal-700 border border-teal-200 rounded text-[10px] font-bold mt-1 w-max">Giao hàng</span>;
+    }
+    return <span className="inline-flex px-1.5 py-0.5 bg-gray-50 text-gray-700 border border-gray-200 rounded text-[10px] font-bold mt-1 w-max">{workType}</span>;
+  };
+
   return (
     <div className="flex flex-col bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden h-[calc(100vh-80px)] font-sans">
       
@@ -131,8 +152,11 @@ export default function MyOrders() {
                  
                  return (
                   <tr key={order.id} className={`${idx % 2 === 0 ? 'bg-white' : 'bg-[#fafafa]'} hover:bg-blue-50/50 transition-colors`}>
-                    <td className="px-4 py-3 text-blue-600 font-medium">
-                      #{order.pancakeOrderId}
+                    <td className="px-4 py-3">
+                      <div className="flex flex-col">
+                        <span className="text-blue-600 font-semibold">#{order.pancakeOrderId}</span>
+                        {getWorkTypeBadge(order.workType)}
+                      </div>
                     </td>
                     <td className="px-4 py-3">
                       {order.appointmentTime ? (
