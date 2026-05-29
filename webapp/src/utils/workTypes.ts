@@ -47,9 +47,6 @@ export const WARRANTY_SERVICE_GROUPS: Record<string, string[]> = {
     'Thiết bị lọc chậm',
     'Tiếng ồn khi vận hành',
   ],
-  'Khác': [
-    'Khác (phát sinh theo thực tế)',
-  ],
 };
 
 // ── Chi tiết dịch vụ Sửa chữa theo nhóm lỗi ──
@@ -102,7 +99,6 @@ export const REPAIR_SERVICE_GROUPS: Record<string, string[]> = {
   ],
   'Khác': [
     'Thu hồi/Đổi/Trả',
-    'Khác (phát sinh theo thực tế)',
   ],
 };
 

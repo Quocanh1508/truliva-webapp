@@ -78,6 +78,7 @@ export default function OrderList() {
   const [rescheduleReason, setRescheduleReason] = useState('');
   const [workType, setWorkType] = useState('');
   const [serviceType, setServiceType] = useState('');
+  const [showServiceDropdown, setShowServiceDropdown] = useState(false);
 
   // Smart Dispatching Suggestions
   const [suggestedMain, setSuggestedMain] = useState<any>(null);
@@ -396,12 +397,58 @@ export default function OrderList() {
 
   const submitAssign = async () => {
     if (!assignModal) return;
+
+    if (!workType) {
+      alert('Vui lòng chọn loại công việc.');
+      return;
+    }
+    if (!serviceType || !serviceType.trim()) {
+      alert('Vui lòng chọn/nhập loại dịch vụ chi tiết.');
+      return;
+    }
+
+    if (workType === 'Bảo hành') {
+      const validWarrantyServices = Object.values(WARRANTY_SERVICE_GROUPS).flat();
+      if (!validWarrantyServices.includes(serviceType)) {
+        alert('Loại dịch vụ chi tiết không hợp lệ. Vui lòng chọn một gợi ý trong danh mục.');
+        return;
+      }
+    } else if (workType === 'Sửa chữa') {
+      const validRepairServices = Object.values(REPAIR_SERVICE_GROUPS).flat();
+      if (!validRepairServices.includes(serviceType)) {
+        alert('Loại dịch vụ chi tiết không hợp lệ. Vui lòng chọn một gợi ý trong danh mục.');
+        return;
+      }
+    }
+
+    if (!appointment) {
+      alert('Vui lòng chọn thời gian hẹn khách.');
+      return;
+    }
+
+    let finalAppointment = appointment;
+    const hasTimePartZero = appointment.endsWith('T00:00') || appointment.endsWith(' 00:00');
+    if (hasTimePartZero) {
+      finalAppointment = appointment.replace(/T00:00$/, 'T08:30').replace(/ 00:00$/, 'T08:30');
+    }
+
+    const appointmentDate = new Date(finalAppointment);
+    if (isNaN(appointmentDate.getTime())) {
+      alert('Thời gian hẹn khách không hợp lệ.');
+      return;
+    }
+
+    if (appointmentDate < new Date()) {
+      alert('Thời gian hẹn khách không được ở trong quá khứ.');
+      return;
+    }
+
     try {
       await updateOrder(assignModal.orderId, {
         mainStationId: selectedMain || null,
         techStationId: selectedTech || null,
         assignedKtvId: selectedKtv || null,
-        appointmentTime: appointment ? new Date(appointment).toISOString() : null,
+        appointmentTime: appointmentDate.toISOString(),
         rescheduleReason: rescheduleReason || null,
         workType: workType || null,
         serviceType: serviceType || null,
@@ -1173,32 +1220,68 @@ export default function OrderList() {
                   <label className="block text-sm text-gray-600 mb-1">Loại dịch vụ chi tiết *</label>
                   {['Giao hàng và Lắp đặt', 'Lắp đặt', 'Giao hàng', 'Thay lọc'].includes(workType) ? (
                     <input type="text" className="w-full border rounded p-2 text-sm outline-none bg-gray-50 text-gray-500" value="Công việc đã bao gồm dịch vụ" readOnly />
-                  ) : workType === 'Bảo hành' ? (
-                    <select className="w-full border rounded p-2 text-sm outline-none focus:border-blue-500 text-gray-800 bg-white" value={serviceType} onChange={e => setServiceType(e.target.value)}>
-                      <option value="">-- Chọn dịch vụ bảo hành --</option>
-                      {Object.entries(WARRANTY_SERVICE_GROUPS).map(([groupName, services]) => (
-                        <optgroup key={groupName} label={groupName} className="font-semibold text-gray-900 bg-gray-50">
-                          {services.map(s => (
-                            <option key={s} value={s} className="font-normal text-gray-700 bg-white">{s}</option>
-                          ))}
-                        </optgroup>
-                      ))}
-                    </select>
-                  ) : workType === 'Sửa chữa' ? (
-                    <select className="w-full border rounded p-2 text-sm outline-none focus:border-blue-500 text-gray-800 bg-white" value={serviceType} onChange={e => setServiceType(e.target.value)}>
-                      <option value="">-- Chọn dịch vụ sửa chữa --</option>
-                      {Object.entries(REPAIR_SERVICE_GROUPS).map(([groupName, services]) => (
-                        <optgroup key={groupName} label={groupName} className="font-semibold text-gray-900 bg-gray-50">
-                          {services.map(s => (
-                            <option key={s} value={s} className="font-normal text-gray-700 bg-white">{s}</option>
-                          ))}
-                        </optgroup>
-                      ))}
-                    </select>
+                  ) : (workType === 'Bảo hành' || workType === 'Sửa chữa') ? (
+                    <div className="relative">
+                      <input 
+                        type="text"
+                        className="w-full border rounded p-2 text-sm outline-none focus:border-blue-500 text-gray-800 bg-white"
+                        placeholder="Gõ để tìm kiếm & chọn dịch vụ..."
+                        value={serviceType}
+                        onChange={e => setServiceType(e.target.value)}
+                        onFocus={() => setShowServiceDropdown(true)}
+                        onBlur={() => setTimeout(() => setShowServiceDropdown(false), 200)}
+                      />
+                      <div className="absolute right-2 top-2.5 text-gray-400 pointer-events-none">
+                        <Search size={16} />
+                      </div>
+                      {showServiceDropdown && (
+                        <div className="absolute left-0 right-0 z-50 mt-1 bg-white border border-gray-200 rounded-md shadow-lg max-h-60 overflow-y-auto">
+                          {(() => {
+                            const options = workType === 'Bảo hành' 
+                              ? Object.values(WARRANTY_SERVICE_GROUPS).flat() 
+                              : Object.values(REPAIR_SERVICE_GROUPS).flat();
+                            const query = removeAccents(serviceType || '');
+                            const filteredOptions = options.filter(opt => 
+                              removeAccents(opt).includes(query)
+                            );
+
+                            if (filteredOptions.length === 0) {
+                              return <div className="px-3 py-2 text-sm text-gray-400 italic">Không tìm thấy dịch vụ nào</div>;
+                            }
+
+                            const groups = workType === 'Bảo hành' ? WARRANTY_SERVICE_GROUPS : REPAIR_SERVICE_GROUPS;
+                            return Object.entries(groups).map(([groupName, services]) => {
+                              const matchingServices = services.filter(s => filteredOptions.includes(s));
+                              if (matchingServices.length === 0) return null;
+                              return (
+                                <div key={groupName} className="border-b border-gray-100 last:border-0">
+                                  <div className="px-3 py-1 text-xs font-semibold text-gray-500 bg-gray-50">
+                                    {groupName}
+                                  </div>
+                                  <div className="divide-y divide-gray-50">
+                                    {matchingServices.map(s => (
+                                      <button
+                                        key={s}
+                                        type="button"
+                                        className="w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-700 transition-colors"
+                                        onClick={() => {
+                                          setServiceType(s);
+                                          setShowServiceDropdown(false);
+                                        }}
+                                      >
+                                        {s}
+                                      </button>
+                                    ))}
+                                  </div>
+                                </div>
+                              );
+                            });
+                          })()}
+                        </div>
+                      )}
+                    </div>
                   ) : (
-                    <select className="w-full border rounded p-2 text-sm outline-none focus:border-blue-500 text-gray-500 bg-white" value={serviceType} onChange={e => setServiceType(e.target.value)} disabled={!workType}>
-                      <option value="">-- Chọn loại công việc trước --</option>
-                    </select>
+                    <input type="text" className="w-full border rounded p-2 text-sm outline-none bg-gray-100 text-gray-400 cursor-not-allowed" value="Vui lòng chọn loại công việc trước" disabled />
                   )}
                 </div>
 
