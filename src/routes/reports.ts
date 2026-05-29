@@ -94,7 +94,10 @@ router.post('/', async (req: Request, res: Response): Promise<void> => {
       try {
         await prisma.order.update({
           where: { id: orderId },
-          data: { adminStatus: 'hoàn thành' },
+          data: { 
+            adminStatus: 'hoàn thành',
+            serviceType: serviceType || undefined
+          },
         });
         await prisma.auditLog.create({
           data: {

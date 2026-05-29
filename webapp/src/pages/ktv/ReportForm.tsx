@@ -5,7 +5,7 @@ import LabeledImageUploader from '../../components/LabeledImageUploader';
 import { CheckCircle, ChevronLeft, Send, AlertCircle, Camera, Loader2, ChevronDown, ChevronUp } from 'lucide-react';
 import { Html5Qrcode } from 'html5-qrcode';
 
-import { getImageSlots } from '../../utils/workTypes';
+import { getImageSlots, WARRANTY_SERVICE_GROUPS, REPAIR_SERVICE_GROUPS } from '../../utils/workTypes';
 
 // ── Cấu trúc linh kiện phân loại theo dòng máy ──
 const SPARE_PARTS_GROUPS = [
@@ -511,8 +511,42 @@ export default function ReportForm() {
                 </div>
 
                 <div>
-                  <span style={{ color: '#64748b', display: 'block', fontSize: '11px', textTransform: 'uppercase', fontWeight: 600 }}>Dịch vụ</span>
-                  <strong style={{ color: '#0f172a' }}>{serviceType || 'N/A'}</strong>
+                  <span style={{ color: '#64748b', display: 'block', fontSize: '11px', textTransform: 'uppercase', fontWeight: 600 }}>Dịch vụ *</span>
+                  {workType === 'Bảo hành' ? (
+                    <select
+                      className="form-select bg-white border-blue-200 focus:border-blue-500 focus:ring-blue-500 text-xs py-1 px-2 mt-1 w-full max-w-[240px]"
+                      value={serviceType}
+                      onChange={e => setServiceType(e.target.value)}
+                      required
+                    >
+                      <option value="">-- Chọn dịch vụ bảo hành --</option>
+                      {Object.entries(WARRANTY_SERVICE_GROUPS).map(([groupName, services]) => (
+                        <optgroup key={groupName} label={groupName} className="font-semibold text-gray-900 bg-gray-50">
+                          {services.map(s => (
+                            <option key={s} value={s} className="font-normal text-gray-700 bg-white">{s}</option>
+                          ))}
+                        </optgroup>
+                      ))}
+                    </select>
+                  ) : workType === 'Sửa chữa' ? (
+                    <select
+                      className="form-select bg-white border-blue-200 focus:border-blue-500 focus:ring-blue-500 text-xs py-1 px-2 mt-1 w-full max-w-[240px]"
+                      value={serviceType}
+                      onChange={e => setServiceType(e.target.value)}
+                      required
+                    >
+                      <option value="">-- Chọn dịch vụ sửa chữa --</option>
+                      {Object.entries(REPAIR_SERVICE_GROUPS).map(([groupName, services]) => (
+                        <optgroup key={groupName} label={groupName} className="font-semibold text-gray-900 bg-gray-50">
+                          {services.map(s => (
+                            <option key={s} value={s} className="font-normal text-gray-700 bg-white">{s}</option>
+                          ))}
+                        </optgroup>
+                      ))}
+                    </select>
+                  ) : (
+                    <strong style={{ color: '#0f172a' }}>{serviceType || 'N/A'}</strong>
+                  )}
                 </div>
 
                 <div style={{ gridColumn: 'span 2' }}>
