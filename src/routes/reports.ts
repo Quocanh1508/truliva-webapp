@@ -43,7 +43,7 @@ router.post('/', async (req: Request, res: Response): Promise<void> => {
     } = req.body;
 
     // Validation
-    if (!customerName || !customerPhone || !province || !serviceType) {
+    if (!customerName || !customerPhone || !serviceType) {
       res.status(400).json({ error: 'Vui lòng điền đầy đủ thông tin bắt buộc' });
       return;
     }
@@ -62,7 +62,7 @@ router.post('/', async (req: Request, res: Response): Promise<void> => {
         ktvUserId: req.user!.id,
         customerName,
         customerPhone,
-        province,
+        province: province || 'N/A',
         products: products || [],
         serviceType,
         imageUrls: imageUrls || [],
