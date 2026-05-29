@@ -889,13 +889,13 @@ export default function OrderList() {
           <table className="w-full text-left text-[13px]">
             <thead className="sticky top-0 bg-[#f8f9fa] text-gray-600 font-semibold border-b border-gray-200 z-10">
               <tr>
-                <th className="px-4 py-3 w-[80px]">Mã đơn</th>
-                <th className="px-4 py-3 w-[250px]">Khách hàng</th>
-                <th className="px-4 py-3 w-[280px]">Công việc</th>
-                <th className="px-4 py-3">Ghi chú</th>
-                <th className="px-4 py-3 text-center w-[160px]">Thao tác</th>
-                <th className="px-4 py-3 w-[220px]">Trạm - KTV</th>
-                <th className="px-4 py-3 w-[180px]">Tạo bởi - lúc</th>
+                <th className="px-4 py-3 w-[70px]">Mã đơn</th>
+                <th className="px-4 py-3 w-[180px]">Khách hàng</th>
+                <th className="px-4 py-3 w-[220px]">Công việc</th>
+                <th className="px-4 py-3 min-w-[320px]">Ghi chú</th>
+                <th className="px-4 py-3 text-center w-[140px]">Thao tác</th>
+                <th className="px-4 py-3 w-[160px]">Trạm - KTV</th>
+                <th className="px-4 py-3 w-[130px]">Tạo bởi - lúc</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
@@ -916,8 +916,8 @@ export default function OrderList() {
                     <td className="px-4 py-3 font-medium align-top">
                       <div>#{order.pancakeOrderId}</div>
                       {order.rawData?.id && order.rawData.id !== String(order.pancakeOrderId) && (
-                        <div className="text-[11px] font-normal text-gray-500 bg-gray-100 rounded px-1.5 py-0.5 mt-0.5 inline-block" title="Mã đơn sàn TMĐT">
-                          {order.rawData.id}
+                        <div className="text-[10px] font-bold text-blue-600 bg-blue-50 border border-blue-100 rounded px-1.5 py-0.5 mt-0.5 inline-block cursor-help" title={`Mã đơn sàn TMĐT: ${order.rawData.id}`}>
+                          Đơn Ecom
                         </div>
                       )}
                     </td>
@@ -990,7 +990,7 @@ export default function OrderList() {
 
                     {/* 4. Ghi chú (Hiển thị full) */}
                     <td className="px-4 py-3 whitespace-normal align-top">
-                      <div className="text-gray-700 text-[13px] italic whitespace-pre-wrap leading-relaxed max-w-sm">
+                      <div className="text-gray-700 text-[13px] italic whitespace-pre-wrap leading-relaxed">
                         {order.note || '-'}
                       </div>
                     </td>
