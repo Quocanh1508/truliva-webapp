@@ -583,6 +583,14 @@ export default function ReportList() {
                         <span className="text-gray-500 block text-xs">Tháng báo cáo</span>
                         <span className="font-medium text-gray-800">{selectedDetailReport.month}</span>
                       </div>
+                      {selectedDetailReport.order?.ktvCalledAt && (
+                        <div className="col-span-2">
+                          <span className="text-gray-500 block text-xs">Thời gian KTV gọi khách</span>
+                          <span className="font-semibold text-emerald-600 bg-emerald-50 border border-emerald-200 px-2.5 py-1 rounded-md mt-1 w-max flex items-center gap-1 text-[13px]">
+                            📞 Đã gọi lúc {new Date(selectedDetailReport.order.ktvCalledAt).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })} - {new Date(selectedDetailReport.order.ktvCalledAt).toLocaleDateString('vi-VN')}
+                          </span>
+                        </div>
+                      )}
                     </div>
                   </div>
                   

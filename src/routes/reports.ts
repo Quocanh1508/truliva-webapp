@@ -210,7 +210,7 @@ router.get('/', async (req: Request, res: Response): Promise<void> => {
         where,
         include: {
           ktvUser: { select: { fullName: true, username: true } },
-          order: { select: { pancakeOrderId: true } },
+          order: { select: { pancakeOrderId: true, ktvCalledAt: true } },
         },
         orderBy: { createdAt: 'desc' },
         skip,
@@ -341,7 +341,7 @@ router.get('/export', requireAdmin, async (req: Request, res: Response): Promise
       where,
       include: { 
         ktvUser: { select: { fullName: true } },
-        order: { select: { pancakeOrderId: true } }
+        order: { select: { pancakeOrderId: true, ktvCalledAt: true } }
       },
       orderBy: { createdAt: 'asc' },
     });
