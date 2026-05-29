@@ -540,6 +540,14 @@ export default function OrderList() {
     }
   };
 
+  const todayStr = (() => {
+    const d = new Date();
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  })();
+
   return (
     <div className="flex flex-col bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden h-[calc(100vh-120px)] font-sans">
 
@@ -1298,6 +1306,7 @@ export default function OrderList() {
                         type="date" 
                         className="w-full border rounded p-2 text-sm outline-none focus:border-blue-500 text-gray-800 bg-white" 
                         value={appointmentDate} 
+                        min={todayStr}
                         onChange={e => {
                           setAppointmentDate(e.target.value);
                           setAppointmentTime('08:30');
