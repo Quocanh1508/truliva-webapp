@@ -92,13 +92,25 @@ router.post('/', async (req: Request, res: Response): Promise<void> => {
     // Tự động chuyển trạng thái đơn hàng sang "hoàn thành" khi KTV nộp báo cáo
     if (orderId) {
       try {
-        await prisma.order.update({
-          where: { id: orderId },
-          data: { 
-            adminStatus: 'hoàn thành',
-            serviceType: serviceType || undefined
-          },
-        });
+        const order = await prisma.order.findUnique({ where: { id: orderId } });
+        if (order) {
+          const currentShippingAddress = (order.shippingAddress as any) || {};
+          const updatedShippingAddress = {
+            ...currentShippingAddress,
+            province_name: province || currentShippingAddress.province_name,
+            full_address: address || currentShippingAddress.full_address,
+          };
+          await prisma.order.update({
+            where: { id: orderId },
+            data: { 
+              adminStatus: 'hoàn thành',
+              serviceType: serviceType || undefined,
+              billFullName: customerName || undefined,
+              billPhoneNumber: customerPhone || undefined,
+              shippingAddress: updatedShippingAddress,
+            },
+          });
+        }
         await prisma.auditLog.create({
           data: {
             entityType: 'Order',

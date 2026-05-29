@@ -480,18 +480,49 @@ export default function ReportForm() {
                 </div>
                 
                 <div>
-                  <span style={{ color: '#64748b', display: 'block', fontSize: '11px', textTransform: 'uppercase', fontWeight: 600 }}>Khách hàng</span>
-                  <strong style={{ color: '#0f172a' }}>{customerName || 'N/A'}</strong>
+                  <span style={{ color: '#64748b', display: 'block', fontSize: '11px', textTransform: 'uppercase', fontWeight: 600 }}>Khách hàng *</span>
+                  <input
+                    type="text"
+                    className="form-input text-xs py-1 px-2 mt-1 w-full bg-white border border-gray-300 rounded focus:border-blue-500 focus:ring-blue-500 outline-none"
+                    value={customerName}
+                    onChange={e => setCustomerName(e.target.value)}
+                    required
+                  />
                 </div>
 
                 <div>
-                  <span style={{ color: '#64748b', display: 'block', fontSize: '11px', textTransform: 'uppercase', fontWeight: 600 }}>Số điện thoại</span>
-                  <strong style={{ color: '#0f172a' }}>{customerPhone || 'N/A'}</strong>
+                  <span style={{ color: '#64748b', display: 'block', fontSize: '11px', textTransform: 'uppercase', fontWeight: 600 }}>Số điện thoại *</span>
+                  <input
+                    type="text"
+                    className="form-input text-xs py-1 px-2 mt-1 w-full bg-white border border-gray-300 rounded focus:border-blue-500 focus:ring-blue-500 outline-none"
+                    value={customerPhone}
+                    onChange={e => setCustomerPhone(e.target.value)}
+                    required
+                  />
+                </div>
+
+                <div>
+                  <span style={{ color: '#64748b', display: 'block', fontSize: '11px', textTransform: 'uppercase', fontWeight: 600 }}>Tỉnh/Thành phố *</span>
+                  <input
+                    type="text"
+                    className="form-input text-xs py-1 px-2 mt-1 w-full bg-white border border-gray-300 rounded focus:border-blue-500 focus:ring-blue-500 outline-none"
+                    value={province}
+                    onChange={e => setProvince(e.target.value)}
+                    required
+                    placeholder="Ví dụ: Hồ Chí Minh"
+                  />
                 </div>
 
                 <div style={{ gridColumn: 'span 2' }}>
-                  <span style={{ color: '#64748b', display: 'block', fontSize: '11px', textTransform: 'uppercase', fontWeight: 600 }}>Địa chỉ</span>
-                  <strong style={{ color: '#0f172a' }}>{address || 'N/A'} {province ? `(${province})` : ''}</strong>
+                  <span style={{ color: '#64748b', display: 'block', fontSize: '11px', textTransform: 'uppercase', fontWeight: 600 }}>Địa chỉ chi tiết *</span>
+                  <input
+                    type="text"
+                    className="form-input text-xs py-1 px-2 mt-1 w-full bg-white border border-gray-300 rounded focus:border-blue-500 focus:ring-blue-500 outline-none"
+                    value={address}
+                    onChange={e => setAddress(e.target.value)}
+                    required
+                    placeholder="Số nhà, tên đường, phường/xã..."
+                  />
                 </div>
 
                 <div>
