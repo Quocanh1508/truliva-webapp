@@ -1062,10 +1062,31 @@ export default function OrderList() {
                         </div>
                       )}
                     </td>
-                        </button>
-                        <button onClick={() => openAuditModal(order.id)} className="p-1.5 text-gray-600 hover:bg-gray-100 rounded" title="Lịch sử">
-                          <History size={16} />
-                        </button>
+
+                    {/* 7. Tạo bởi - lúc */}
+                    <td className="px-4 py-3 whitespace-normal align-top text-[12px]">
+                      {order.pancakeCreatedAt ? (() => {
+                        const date = new Date(order.pancakeCreatedAt);
+                        return (
+                          <div className="font-medium text-gray-700">
+                            {date.toLocaleTimeString('vi-VN', {hour: '2-digit', minute:'2-digit'})} - {date.toLocaleDateString('vi-VN')}
+                          </div>
+                        );
+                      })() : <div className="text-gray-400">-</div>}
+                      
+                      <div className="text-[11px] text-gray-400 mt-0.5">
+                        {(() => {
+                          const creatorName = order.rawData?.creator?.name;
+                          if (creatorName) {
+                            return <span className="font-medium text-gray-600">{creatorName}</span>;
+                          }
+                          const source = (order.orderSource || order.rawData?.order_sources_name || '').toLowerCase();
+                          const isEcom = source.includes('shopee') || source.includes('lazada') || source.includes('tiktok') || source.includes('tiki');
+                          if (isEcom) {
+                            return <span className="text-blue-600 bg-blue-50 px-1 py-0.2 rounded text-[10px] font-semibold">Hệ thống</span>;
+                          }
+                          return <span>-</span>;
+                        })()}
                       </div>
                     </td>
                   </tr>
