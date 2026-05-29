@@ -511,42 +511,8 @@ export default function ReportForm() {
                 </div>
 
                 <div>
-                  <span style={{ color: '#64748b', display: 'block', fontSize: '11px', textTransform: 'uppercase', fontWeight: 600 }}>Dịch vụ *</span>
-                  {workType === 'Bảo hành' ? (
-                    <select
-                      className="form-select bg-white border-blue-200 focus:border-blue-500 focus:ring-blue-500 text-xs py-1 px-2 mt-1 w-full max-w-[240px]"
-                      value={serviceType}
-                      onChange={e => setServiceType(e.target.value)}
-                      required
-                    >
-                      <option value="">-- Chọn dịch vụ bảo hành --</option>
-                      {Object.entries(WARRANTY_SERVICE_GROUPS).map(([groupName, services]) => (
-                        <optgroup key={groupName} label={groupName} className="font-semibold text-gray-900 bg-gray-50">
-                          {services.map(s => (
-                            <option key={s} value={s} className="font-normal text-gray-700 bg-white">{s}</option>
-                          ))}
-                        </optgroup>
-                      ))}
-                    </select>
-                  ) : workType === 'Sửa chữa' ? (
-                    <select
-                      className="form-select bg-white border-blue-200 focus:border-blue-500 focus:ring-blue-500 text-xs py-1 px-2 mt-1 w-full max-w-[240px]"
-                      value={serviceType}
-                      onChange={e => setServiceType(e.target.value)}
-                      required
-                    >
-                      <option value="">-- Chọn dịch vụ sửa chữa --</option>
-                      {Object.entries(REPAIR_SERVICE_GROUPS).map(([groupName, services]) => (
-                        <optgroup key={groupName} label={groupName} className="font-semibold text-gray-900 bg-gray-50">
-                          {services.map(s => (
-                            <option key={s} value={s} className="font-normal text-gray-700 bg-white">{s}</option>
-                          ))}
-                        </optgroup>
-                      ))}
-                    </select>
-                  ) : (
-                    <strong style={{ color: '#0f172a' }}>{serviceType || 'N/A'}</strong>
-                  )}
+                  <span style={{ color: '#64748b', display: 'block', fontSize: '11px', textTransform: 'uppercase', fontWeight: 600 }}>Dịch vụ</span>
+                  <strong style={{ color: '#0f172a' }}>{serviceType || 'N/A'}</strong>
                 </div>
 
                 <div style={{ gridColumn: 'span 2' }}>
@@ -809,7 +775,7 @@ export default function ReportForm() {
                   type="button"
                   className="btn btn-primary w-full mt-6"
                   onClick={() => setStep(2)}
-                  disabled={!selectedOrderId || !customerName || !customerPhone || !workType || (!['Giao hàng và Lắp đặt', 'Lắp đặt', 'Giao hàng', 'Thay lọc'].includes(workType) && !serviceType) || !canProceedStep1()}
+                  disabled={!selectedOrderId || !customerName || !customerPhone || !workType || !canProceedStep1()}
                 >
                   Tiếp tục
                 </button>

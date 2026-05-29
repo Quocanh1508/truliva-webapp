@@ -43,7 +43,7 @@ router.post('/', async (req: Request, res: Response): Promise<void> => {
     } = req.body;
 
     // Validation
-    if (!customerName || !customerPhone || !serviceType) {
+    if (!customerName || !customerPhone) {
       res.status(400).json({ error: 'Vui lòng điền đầy đủ thông tin bắt buộc' });
       return;
     }
@@ -64,7 +64,7 @@ router.post('/', async (req: Request, res: Response): Promise<void> => {
         customerPhone,
         province: province || 'N/A',
         products: products || [],
-        serviceType,
+        serviceType: serviceType || 'N/A',
         imageUrls: imageUrls || [],
         notes: notes || null,
         serialNumber: serialNumber ? serialNumber.replace(/[^a-zA-Z0-9]/g, '').toUpperCase() : null,
