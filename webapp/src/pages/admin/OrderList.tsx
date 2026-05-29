@@ -33,8 +33,8 @@ export default function OrderList() {
 
   // Filters
   const [search, setSearch] = useState('');
-  const [sortBy] = useState('createdAt');
-  const [sortOrder] = useState('desc');
+  const [sortBy, setSortBy] = useState('createdAt');
+  const [sortOrder, setSortOrder] = useState('desc');
 
   // Date Filters
   const [datePreset, setDatePreset] = useState('');
@@ -1058,6 +1058,24 @@ export default function OrderList() {
                 />
               </div>
             )}
+            <select
+              className="px-3 py-2 text-[13px] border border-gray-300 rounded-md bg-white text-gray-700 outline-none font-medium"
+              value={`${sortBy}-${sortOrder}`}
+              onChange={(e) => {
+                const [newSortBy, newSortOrder] = e.target.value.split('-');
+                setSortBy(newSortBy);
+                setSortOrder(newSortOrder);
+                setPage(1);
+              }}
+            >
+              <option value="createdAt-desc">Ngày tạo mới nhất</option>
+              <option value="createdAt-asc">Ngày tạo cũ nhất</option>
+              <option value="updatedAt-desc">Ngày hoàn thành mới nhất</option>
+              <option value="updatedAt-asc">Ngày hoàn thành cũ nhất</option>
+              <option value="appointmentTime-asc">Thời gian hẹn khách gần nhất</option>
+              <option value="appointmentTime-desc">Thời gian hẹn khách xa nhất</option>
+            </select>
+
             <select
               className="px-3 py-2 text-[13px] border border-gray-300 rounded-md bg-white text-gray-700 outline-none font-medium"
               value={dateType}
