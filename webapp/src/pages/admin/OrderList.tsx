@@ -554,7 +554,7 @@ export default function OrderList() {
       {/* Top Tabs */}
       <div className="flex justify-between border-b border-gray-200 bg-gray-50 px-4 pt-1">
         <div className="flex space-x-1">
-          <button className="px-5 py-2.5 text-[14px] font-medium text-blue-600 border-b-2 border-blue-600 bg-white -mb-[1px]">Đơn hàng</button>
+          <button className="px-5 py-2.5 text-[14px] font-medium text-blue-600 border-b-2 border-blue-600 bg-white -mb-[1px]">Yêu cầu dịch vụ</button>
         </div>
       </div>
 
