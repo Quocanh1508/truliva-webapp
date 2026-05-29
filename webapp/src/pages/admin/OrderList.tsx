@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getOrders, updateOrder, getKtvUsers, getStations, getOrderAuditLog, syncOrders } from '../../api/client';
-import { Search, ChevronLeft, ChevronRight, History, Edit, XCircle, Filter, RefreshCw, FileText } from 'lucide-react';
+import { Search, ChevronLeft, ChevronRight, History, Edit, XCircle, Filter, RefreshCw, FileText, CheckCircle2, RotateCcw, Copy, UserPlus } from 'lucide-react';
 import { WARRANTY_SERVICE_GROUPS, REPAIR_SERVICE_GROUPS } from '../../utils/workTypes';
 
 function removeAccents(str: string): string {
@@ -228,6 +228,47 @@ export default function OrderList() {
     } catch (err: any) {
       alert(err.message);
     }
+  };
+
+  const handleReopenOrder = async (order: any) => {
+    const confirmReopen = window.confirm(`Bạn có chắc chắn muốn mở lại đơn #${order.pancakeOrderId}? Hành động này sẽ chuyển trạng thái về "Chờ xử lý" và xóa thông tin phân bổ trạm/KTV hiện tại.`);
+    if (!confirmReopen) return;
+    try {
+      await updateOrder(order.id, {
+        adminStatus: 'chờ xử lý',
+        mainStationId: null,
+        techStationId: null,
+        assignedKtvId: null,
+        appointmentTime: null,
+        rescheduleReason: null
+      });
+      fetchOrdersData();
+    } catch (err: any) {
+      alert(err.message || 'Lỗi khi mở lại đơn');
+    }
+  };
+
+  const handleCopyOrderInfo = (order: any) => {
+    const customerName = order.billFullName || order.customer?.fullName || 'Khách lẻ';
+    const phone = order.billPhoneNumber || order.customer?.phoneNumber || '';
+    const address = order.shippingAddress?.full_address || order.customer?.fullAddress || 'Không có';
+    const notes = order.note || 'Không có';
+    const workTypeStr = order.workType || 'Chưa xác định';
+    const serviceTypeStr = order.serviceType || 'Chưa xác định';
+    const itemsStr = order.items && order.items.length > 0 
+      ? order.items.map((item: any) => `- ${item.productName || item.rawData?.variation_info?.name || item.rawData?.name || 'Sản phẩm'} x${item.quantity}`).join('\n')
+      : 'Chưa có sản phẩm';
+
+    const text = `Mã đơn: #${order.pancakeOrderId}\nKhách hàng: ${customerName}\nSĐT: ${phone}\nĐịa chỉ: ${address}\nCông việc: ${workTypeStr} - ${serviceTypeStr}\nSản phẩm:\n${itemsStr}\nGhi chú: ${notes}`;
+    
+    navigator.clipboard.writeText(text)
+      .then(() => {
+        alert(`Đã copy thông tin đơn #${order.pancakeOrderId} thành công!`);
+      })
+      .catch(err => {
+        console.error('Không thể copy', err);
+        alert('Có lỗi khi copy thông tin.');
+      });
   };
 
   const openAssignModal = (order: any) => {
@@ -824,41 +865,16 @@ export default function OrderList() {
                 SĐT khách: {filterCustomerPhone}
                 <button type="button" className="ml-1.5 text-gray-400 hover:text-gray-600 outline-none" onClick={() => { setFilterCustomerPhone(''); setPage(1); }}>
                   <XCircle size={14} className="fill-gray-200 hover:fill-gray-300 text-gray-500" />
-                </button>
-              </span>
-            )}
-
-            <button 
-              onClick={clearAllFilters}
-              className="text-xs text-red-600 hover:text-red-800 font-semibold px-2 py-1.5 rounded hover:bg-red-50 transition-colors"
-            >
-              Xóa tất cả bộ lọc
-            </button>
-          </div>
-        )}
-      </div>
-
-      {/* Table Area */}
-      <div className="flex-1 overflow-auto bg-white">
-        {loading ? (
-          <div className="flex justify-center py-12"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div></div>
-        ) : orders.length === 0 ? (
-          <div className="text-center py-12 text-gray-400">Không tìm thấy yêu cầu nào</div>
-        ) : (
-          <table className="w-full text-left text-[13px] whitespace-nowrap">
+<table className="w-full text-left text-[13px]">
             <thead className="sticky top-0 bg-[#f8f9fa] text-gray-600 font-semibold border-b border-gray-200 z-10">
               <tr>
                 <th className="px-4 py-3 w-[80px]">Mã đơn</th>
-                <th className="px-4 py-3 w-[250px]">Khách hàng & Địa chỉ</th>
-                <th className="px-4 py-3 w-[250px]">Sản phẩm & Tiền thu</th>
-                <th className="px-4 py-3 w-[320px]">Ghi chú</th>
-                <th className="px-4 py-3">Loại CV</th>
-                <th className="px-4 py-3">Ngày tạo</th>
-                <th className="px-4 py-3">Người tạo</th>
-                <th className="px-4 py-3">Ngày hẹn</th>
-                <th className="px-4 py-3">Trạm - KTV</th>
-                <th className="px-4 py-3 text-center">Trạng thái</th>
-                <th className="px-4 py-3 text-center">Thao tác</th>
+                <th className="px-4 py-3 w-[250px]">Khách hàng</th>
+                <th className="px-4 py-3 w-[280px]">Công việc</th>
+                <th className="px-4 py-3">Ghi chú</th>
+                <th className="px-4 py-3 text-center w-[160px]">Thao tác</th>
+                <th className="px-4 py-3 w-[220px]">Trạm - KTV</th>
+                <th className="px-4 py-3 w-[180px]">Tạo bởi - lúc</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
@@ -869,10 +885,14 @@ export default function OrderList() {
                  const mainStationName = order.mainStation?.name 
                     || order.assignedKtv?.techStation?.mainStation?.name 
                     || '';
+                 const techStationName = order.techStation?.name 
+                    || order.assignedKtv?.techStation?.name 
+                    || '';
                  
                  return (
                   <tr key={order.id} className={`${idx % 2 === 0 ? 'bg-white' : 'bg-[#fafafa]'} hover:bg-blue-50/50 transition-colors`}>
-                    <td className="px-4 py-3 font-medium">
+                    {/* 1. Mã đơn */}
+                    <td className="px-4 py-3 font-medium align-top">
                       <div>#{order.pancakeOrderId}</div>
                       {order.rawData?.id && order.rawData.id !== String(order.pancakeOrderId) && (
                         <div className="text-[11px] font-normal text-gray-500 bg-gray-100 rounded px-1.5 py-0.5 mt-0.5 inline-block" title="Mã đơn sàn TMĐT">
@@ -880,112 +900,168 @@ export default function OrderList() {
                         </div>
                       )}
                     </td>
-                    <td className="px-4 py-3 whitespace-normal">
-                      <div className="font-medium text-gray-900">{customerName}</div>
-                      <div className="text-gray-500 font-medium mb-1">{phone}</div>
+
+                    {/* 2. Khách hàng */}
+                    <td className="px-4 py-3 whitespace-normal align-top">
+                      <div className="font-bold text-gray-900 text-[14px]">{customerName}</div>
+                      <div className="text-gray-700 font-semibold text-[13px] my-0.5">{phone}</div>
                       <div className="text-gray-500 text-[12px] leading-tight">{order.shippingAddress?.full_address || order.customer?.fullAddress || 'Không có địa chỉ'}</div>
                     </td>
-                    <td className="px-4 py-3 whitespace-normal">
-                      <div className="text-gray-900 text-[12px] mb-1 leading-tight">
+
+                    {/* 3. Công việc */}
+                    <td className="px-4 py-3 whitespace-normal align-top">
+                      {/* Trạng thái */}
+                      <div className="mb-1.5">
+                        <span className={`inline-block text-[11px] font-bold px-2 py-0.5 rounded text-white capitalize ${getStatusStyle(order.adminStatus || 'chờ xử lý')}`}>
+                          {order.adminStatus || 'chờ xử lý'}
+                        </span>
+                      </div>
+
+                      {/* Ngày hẹn */}
+                      {order.appointmentTime ? (() => {
+                        const isOverdue = new Date(order.appointmentTime) < new Date() && order.adminStatus !== 'hoàn thành' && order.adminStatus !== 'hủy đơn';
+                        return (
+                          <div className="text-[12px] mb-1">
+                            <span className="text-gray-400">Hẹn: </span>
+                            <span className={`font-semibold ${isOverdue ? 'text-red-600' : 'text-blue-700'}`}>
+                              {new Date(order.appointmentTime).toLocaleTimeString('vi-VN', {hour: '2-digit', minute:'2-digit'})} - {new Date(order.appointmentTime).toLocaleDateString('vi-VN')}
+                            </span>
+                            {order.rescheduleReason && (
+                              <div className="text-[11px] text-red-500 italic mt-0.5 leading-tight">
+                                Lý do hẹn lại: {order.rescheduleReason}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })() : (
+                        <div className="text-[12px] text-gray-400 italic mb-1">Chưa hẹn lịch</div>
+                      )}
+
+                      {/* Loại công việc & dịch vụ */}
+                      <div className="text-[12px] my-1 font-medium text-gray-800">
+                        <div>Loại CV: <span className="font-semibold text-blue-800">{order.workType || 'Chưa xác định'}</span></div>
+                        {order.serviceType && order.serviceType !== 'Công việc đã bao gồm dịch vụ' && (
+                          <div className="text-[11px] text-gray-500">Dịch vụ: {order.serviceType}</div>
+                        )}
+                      </div>
+
+                      {/* Sản phẩm */}
+                      <div className="text-gray-700 text-[12px] my-1 leading-tight">
                         {order.items && order.items.length > 0 ? (
-                          <ul className="list-disc pl-4">
+                          <ul className="list-disc pl-4 text-gray-600 space-y-0.5">
                             {order.items.map((item: any, i: number) => {
-                              const pName = item.productName || item.rawData?.variation_info?.name || item.rawData?.name || 'Sản phẩm không tên';
+                              const pName = item.productName || item.rawData?.variation_info?.name || item.rawData?.name || 'Sản phẩm';
                               return (
                                 <li key={i}>{pName} <span className="font-semibold">x{item.quantity}</span></li>
                               )
                             })}
                           </ul>
-                        ) : 'Chưa có SP'}
+                        ) : (
+                          <span className="text-gray-400 italic">Chưa có sản phẩm</span>
+                        )}
                       </div>
-                      <div className="text-blue-700 font-semibold mt-1">Thu: {(order.moneyToCollect || 0).toLocaleString('vi-VN')} đ</div>
+
+                      {/* Tiền thu */}
+                      <div className="text-blue-700 font-bold text-[12px] mt-1.5">
+                        Thu: {(order.moneyToCollect || 0).toLocaleString('vi-VN')} đ
+                      </div>
                     </td>
-                    <td className="px-4 py-3 whitespace-normal">
-                      <div className="text-gray-700 text-[13px] italic max-h-32 overflow-y-auto pr-1 whitespace-pre-wrap">
+
+                    {/* 4. Ghi chú (Hiển thị full) */}
+                    <td className="px-4 py-3 whitespace-normal align-top">
+                      <div className="text-gray-700 text-[13px] italic whitespace-pre-wrap leading-relaxed max-w-sm">
                         {order.note || '-'}
                       </div>
                     </td>
-                    <td className="px-4 py-3">
-                      <div className="font-medium text-gray-800">{order.workType || '-'}</div>
-                      <div className="text-gray-500">{order.serviceType || '-'}</div>
+
+                    {/* 5. Thao tác */}
+                    <td className="px-4 py-3 align-top">
+                      <div className="flex items-center justify-center flex-wrap gap-1.5">
+                        {/* Phân công */}
+                        <button 
+                          onClick={() => openAssignModal(order)} 
+                          className="p-1.5 text-blue-600 hover:bg-blue-50 rounded border border-transparent hover:border-blue-100 transition-colors" 
+                          title="Phân loại & Phân công"
+                        >
+                          <UserPlus size={15} />
+                        </button>
+
+                        {/* Hoàn thành (chỉ hiện khi chưa hoàn thành/hủy) */}
+                        {order.adminStatus !== 'hoàn thành' && order.adminStatus !== 'hủy đơn' && (
+                          <button 
+                            onClick={() => handleStatusChange(order.id, 'hoàn thành')} 
+                            className="p-1.5 text-emerald-600 hover:bg-emerald-50 rounded border border-transparent hover:border-emerald-100 transition-colors" 
+                            title="Xác nhận Hoàn thành"
+                          >
+                            <CheckCircle2 size={15} />
+                          </button>
+                        )}
+
+                        {/* Hủy đơn (chỉ hiện khi chưa hoàn thành/hủy) */}
+                        {order.adminStatus !== 'hoàn thành' && order.adminStatus !== 'hủy đơn' && (
+                          <button 
+                            onClick={() => handleStatusChange(order.id, 'hủy đơn')} 
+                            className="p-1.5 text-red-600 hover:bg-red-50 rounded border border-transparent hover:border-red-100 transition-colors" 
+                            title="Hủy đơn hàng"
+                          >
+                            <XCircle size={15} />
+                          </button>
+                        )}
+
+                        {/* Mở lại đơn (chỉ hiện khi đơn đã hoàn thành/hủy) */}
+                        {(order.adminStatus === 'hoàn thành' || order.adminStatus === 'hủy đơn') && (
+                          <button 
+                            onClick={() => handleReopenOrder(order)} 
+                            className="p-1.5 text-amber-600 hover:bg-amber-50 rounded border border-transparent hover:border-amber-100 transition-colors" 
+                            title="Mở lại đơn (Về Chờ xử lý & xóa phân công)"
+                          >
+                            <RotateCcw size={15} />
+                          </button>
+                        )}
+
+                        {/* Copy nhanh thông tin đi Zalo */}
+                        <button 
+                          onClick={() => handleCopyOrderInfo(order)} 
+                          className="p-1.5 text-indigo-600 hover:bg-indigo-50 rounded border border-transparent hover:border-indigo-100 transition-colors" 
+                          title="Copy thông tin gửi Zalo"
+                        >
+                          <Copy size={15} />
+                        </button>
+
+                        {/* Xem báo cáo dịch vụ (nếu có) */}
+                        {order.serviceReports && order.serviceReports.length > 0 && (
+                          <button 
+                            onClick={() => navigate(`/admin/reports?search=${order.pancakeOrderId}`)} 
+                            className="p-1.5 text-teal-600 hover:bg-teal-50 rounded border border-transparent hover:border-teal-100 transition-colors" 
+                            title="Xem báo cáo của KTV"
+                          >
+                            <FileText size={15} />
+                          </button>
+                        )}
+
+                        {/* Nhật ký lịch sử đơn */}
+                        <button 
+                          onClick={() => openAuditModal(order.id)} 
+                          className="p-1.5 text-gray-500 hover:bg-gray-100 rounded border border-transparent hover:border-gray-200 transition-colors" 
+                          title="Lịch sử thay đổi đơn"
+                        >
+                          <History size={15} />
+                        </button>
+                      </div>
                     </td>
-                    <td className="px-4 py-3">
-                      {order.pancakeCreatedAt ? (() => {
-                        const date = new Date(order.pancakeCreatedAt);
-                        return (
-                          <>
-                            <div className="font-medium text-gray-800">
-                              {date.toLocaleTimeString('vi-VN', {hour: '2-digit', minute:'2-digit'})}
-                            </div>
-                            <div className="text-gray-500">
-                              {date.toLocaleDateString('vi-VN')}
-                            </div>
-                          </>
-                        );
-                      })() : '-'}
-                    </td>
-                    <td className="px-4 py-3">
-                      {(() => {
-                        const creatorName = order.rawData?.creator?.name;
-                        if (creatorName) {
-                          return (
-                            <span className="font-medium text-gray-900">{creatorName}</span>
-                          );
-                        }
-                        const source = (order.orderSource || order.rawData?.order_sources_name || '').toLowerCase();
-                        const isEcom = source.includes('shopee') || source.includes('lazada') || source.includes('tiktok') || source.includes('tiki');
-                        if (isEcom) {
-                          return (
-                            <span className="font-medium text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded text-[11px]" title="Đơn đồng bộ tự động từ sàn TMĐT">
-                              Hệ thống
-                            </span>
-                          );
-                        }
-                        return <span className="text-gray-400">-</span>;
-                      })()}
-                    </td>
-                    <td className="px-4 py-3">
-                      {order.appointmentTime ? (() => {
-                        const isOverdue = new Date(order.appointmentTime) < new Date() && order.adminStatus !== 'hoàn thành' && order.adminStatus !== 'hủy đơn';
-                        return (
-                        <>
-                          <div className={`font-medium ${isOverdue ? 'text-red-600' : 'text-blue-700'}`}>
-                            {new Date(order.appointmentTime).toLocaleTimeString('vi-VN', {hour: '2-digit', minute:'2-digit'})}
-                          </div>
-                          <div className={isOverdue ? 'text-red-500' : 'text-gray-500'}>
-                            {new Date(order.appointmentTime).toLocaleDateString('vi-VN')}
-                          </div>
-                        </>
-                        );
-                      })() : '-'}
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="font-medium text-gray-900">{mainStationName || 'Chưa phân trạm'}</div>
-                      <div className="text-gray-500">KTV: {ktvName}</div>
+
+                    {/* 6. Trạm - KTV */}
+                    <td className="px-4 py-3 whitespace-normal align-top">
+                      <div className="font-bold text-gray-800 text-[12px]">{mainStationName || 'Chưa phân trạm chính'}</div>
+                      {techStationName && <div className="text-[11px] text-gray-600 font-medium">{techStationName}</div>}
+                      <div className="text-gray-500 text-[11px] mt-0.5">KTV: <span className="font-semibold text-gray-700">{ktvName}</span></div>
+                      
                       {order.ktvCalledAt && (
-                        <div className="text-[10px] text-emerald-600 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded mt-1 w-max font-medium">
+                        <div className="text-[10px] text-emerald-600 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded mt-1.5 w-max font-medium">
                           📞 Đã gọi khách lúc {new Date(order.ktvCalledAt).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })} - {new Date(order.ktvCalledAt).toLocaleDateString('vi-VN')}
                         </div>
                       )}
                     </td>
-                    <td className="px-4 py-3 text-center">
-                      <select
-                        className={`appearance-none text-white font-medium rounded px-3 py-1 text-[12px] outline-none cursor-pointer ${getStatusStyle(order.adminStatus || 'chờ xử lý')}`}
-                        value={order.adminStatus || 'chờ xử lý'}
-                        onChange={(e) => handleStatusChange(order.id, e.target.value)}
-                      >
-                        {ROW_STATUS_OPTIONS.map(opt => <option key={opt.value} value={opt.value} className="text-black bg-white">{opt.label}</option>)}
-                      </select>
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="flex items-center justify-center gap-2">
-                        {order.serviceReports && order.serviceReports.length > 0 && (
-                          <button onClick={() => navigate(`/admin/reports?search=${order.pancakeOrderId}`)} className="p-1.5 text-emerald-600 hover:bg-emerald-50 rounded" title="Xem báo cáo dịch vụ">
-                            <FileText size={16} />
-                          </button>
-                        )}
-                        <button onClick={() => openAssignModal(order)} className="p-1.5 text-blue-600 hover:bg-blue-50 rounded" title="Phân bổ / Chỉnh sửa">
-                          <Edit size={16} />
                         </button>
                         <button onClick={() => openAuditModal(order.id)} className="p-1.5 text-gray-600 hover:bg-gray-100 rounded" title="Lịch sử">
                           <History size={16} />
