@@ -251,15 +251,18 @@ export default function OrderList() {
   const handleCopyOrderInfo = (order: any) => {
     const customerName = order.billFullName || order.customer?.fullName || 'Khách lẻ';
     const phone = order.billPhoneNumber || order.customer?.phoneNumber || '';
-    const address = order.shippingAddress?.full_address || order.customer?.fullAddress || 'Không có';
+    const address = order.shippingAddress?.full_address || order.customer?.fullAddress || 'Không có địa chỉ';
     const notes = order.note || 'Không có';
-    const workTypeStr = order.workType || 'Chưa xác định';
-    const serviceTypeStr = order.serviceType || 'Chưa xác định';
-    const itemsStr = order.items && order.items.length > 0
-      ? order.items.map((item: any) => `- ${item.productName || item.rawData?.variation_info?.name || item.rawData?.name || 'Sản phẩm'} x${item.quantity}`).join('\n')
-      : 'Chưa có sản phẩm';
 
-    const text = `Mã đơn: #${order.pancakeOrderId}\nKhách hàng: ${customerName}\nSĐT: ${phone}\nĐịa chỉ: ${address}\nCông việc: ${workTypeStr} - ${serviceTypeStr}\nSản phẩm:\n${itemsStr}\nGhi chú: ${notes}`;
+    let appTimeStr = 'Hẹn: Chưa hẹn lịch';
+    if (order.appointmentTime) {
+      const date = new Date(order.appointmentTime);
+      const timePart = date.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
+      const datePart = date.toLocaleDateString('vi-VN');
+      appTimeStr = `Hẹn: ${timePart} - ${datePart}`;
+    }
+
+    const text = `Khách hàng: ${customerName}\nSĐT: ${phone}\nĐịa chỉ: ${address}\n${appTimeStr}\nGhi chú: ${notes}`;
 
     navigator.clipboard.writeText(text)
       .then(() => {
