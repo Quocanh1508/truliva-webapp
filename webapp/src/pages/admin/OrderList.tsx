@@ -865,7 +865,28 @@ export default function OrderList() {
                 SĐT khách: {filterCustomerPhone}
                 <button type="button" className="ml-1.5 text-gray-400 hover:text-gray-600 outline-none" onClick={() => { setFilterCustomerPhone(''); setPage(1); }}>
                   <XCircle size={14} className="fill-gray-200 hover:fill-gray-300 text-gray-500" />
-<table className="w-full text-left text-[13px]">
+                </button>
+              </span>
+            )}
+
+            <button 
+              onClick={clearAllFilters}
+              className="text-xs text-red-600 hover:text-red-800 font-semibold px-2 py-1.5 rounded hover:bg-red-50 transition-colors"
+            >
+              Xóa tất cả bộ lọc
+            </button>
+          </div>
+        )}
+      </div>
+
+      {/* Table Area */}
+      <div className="flex-1 overflow-auto bg-white">
+        {loading ? (
+          <div className="flex justify-center py-12"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div></div>
+        ) : orders.length === 0 ? (
+          <div className="text-center py-12 text-gray-400">Không tìm thấy yêu cầu nào</div>
+        ) : (
+          <table className="w-full text-left text-[13px]">
             <thead className="sticky top-0 bg-[#f8f9fa] text-gray-600 font-semibold border-b border-gray-200 z-10">
               <tr>
                 <th className="px-4 py-3 w-[80px]">Mã đơn</th>
