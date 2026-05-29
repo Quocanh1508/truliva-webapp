@@ -33,12 +33,12 @@ export default function OrderList() {
   const [search, setSearch] = useState('');
   const [sortBy] = useState('createdAt');
   const [sortOrder] = useState('desc');
-  
+
   // Date Filters
   const [datePreset, setDatePreset] = useState('');
   const [customStartDate, setCustomStartDate] = useState('');
   const [customEndDate, setCustomEndDate] = useState('');
-  
+
   // Pagination
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
@@ -66,11 +66,11 @@ export default function OrderList() {
   const [tempCustomerPhone, setTempCustomerPhone] = useState('');
 
   // Assignment Modal
-  const [assignModal, setAssignModal] = useState<{isOpen: boolean; orderId: string; order: any} | null>(null);
+  const [assignModal, setAssignModal] = useState<{ isOpen: boolean; orderId: string; order: any } | null>(null);
   const [stations, setStations] = useState<any[]>([]);
   const [ktvs, setKtvs] = useState<any[]>([]);
   const [allKtvs, setAllKtvs] = useState<any[]>([]);
-  
+
   const [selectedMain, setSelectedMain] = useState('');
   const [selectedTech, setSelectedTech] = useState('');
   const [selectedKtv, setSelectedKtv] = useState('');
@@ -85,52 +85,52 @@ export default function OrderList() {
   const [suggestedKtv, setSuggestedKtv] = useState<any>(null);
 
   // Audit Log Modal
-  const [auditModal, setAuditModal] = useState<{isOpen: boolean; orderId: string} | null>(null);
+  const [auditModal, setAuditModal] = useState<{ isOpen: boolean; orderId: string } | null>(null);
   const [auditLogs, setAuditLogs] = useState<any[]>([]);
   const [loadingAudit, setLoadingAudit] = useState(false);
 
   // Cancel Modal
-  const [cancelModal, setCancelModal] = useState<{isOpen: boolean; orderId: string} | null>(null);
+  const [cancelModal, setCancelModal] = useState<{ isOpen: boolean; orderId: string } | null>(null);
   const [cancelReason, setCancelReason] = useState('');
 
   const getDateRange = () => {
     if (!datePreset) return { startDate: '', endDate: '' };
-    
+
     const now = new Date();
-    
+
     if (datePreset === 'today') {
       const start = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0);
       const end = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
       return { startDate: start.toISOString(), endDate: end.toISOString() };
     }
-    
+
     if (datePreset === 'yesterday') {
       const start = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1, 0, 0, 0, 0);
       const end = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1, 23, 59, 59, 999);
       return { startDate: start.toISOString(), endDate: end.toISOString() };
     }
-    
+
     if (datePreset === 'week') {
       const start = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
       return { startDate: start.toISOString(), endDate: now.toISOString() };
     }
-    
+
     if (datePreset === 'month') {
       const start = new Date(now.getFullYear(), now.getMonth() - 1, now.getDate(), 0, 0, 0, 0);
       return { startDate: start.toISOString(), endDate: now.toISOString() };
     }
-    
+
     if (datePreset === 'year') {
       const start = new Date(now.getFullYear() - 1, now.getMonth(), now.getDate(), 0, 0, 0, 0);
       return { startDate: start.toISOString(), endDate: now.toISOString() };
     }
-    
+
     if (datePreset === 'custom') {
       const start = customStartDate ? new Date(customStartDate + 'T00:00:00').toISOString() : '';
       const end = customEndDate ? new Date(customEndDate + 'T23:59:59').toISOString() : '';
       return { startDate: start, endDate: end };
     }
-    
+
     return { startDate: '', endDate: '' };
   };
 
@@ -139,10 +139,10 @@ export default function OrderList() {
       setLoading(true);
       const { startDate, endDate } = getDateRange();
       const res = await getOrders({
-        page, 
-        limit: 20, 
-        search, 
-        sortBy, 
+        page,
+        limit: 20,
+        search,
+        sortBy,
         sortOrder,
         startDate,
         endDate,
@@ -167,11 +167,11 @@ export default function OrderList() {
   useEffect(() => {
     fetchOrdersData();
   }, [
-    page, 
-    sortBy, 
-    sortOrder, 
-    datePreset, 
-    customStartDate, 
+    page,
+    sortBy,
+    sortOrder,
+    datePreset,
+    customStartDate,
     customEndDate,
     filterPancakeOrderId,
     filterAdminStatuses,
@@ -190,9 +190,9 @@ export default function OrderList() {
   // Filter KTVs based on tech station
   useEffect(() => {
     if (selectedTech) {
-      getKtvUsers({ 
-        techStationId: selectedTech, 
-        excludeOrderId: assignModal?.orderId 
+      getKtvUsers({
+        techStationId: selectedTech,
+        excludeOrderId: assignModal?.orderId
       }).then(data => setKtvs(data)).catch(console.error);
     } else {
       setKtvs([]);
@@ -255,12 +255,12 @@ export default function OrderList() {
     const notes = order.note || 'Không có';
     const workTypeStr = order.workType || 'Chưa xác định';
     const serviceTypeStr = order.serviceType || 'Chưa xác định';
-    const itemsStr = order.items && order.items.length > 0 
+    const itemsStr = order.items && order.items.length > 0
       ? order.items.map((item: any) => `- ${item.productName || item.rawData?.variation_info?.name || item.rawData?.name || 'Sản phẩm'} x${item.quantity}`).join('\n')
       : 'Chưa có sản phẩm';
 
     const text = `Mã đơn: #${order.pancakeOrderId}\nKhách hàng: ${customerName}\nSĐT: ${phone}\nĐịa chỉ: ${address}\nCông việc: ${workTypeStr} - ${serviceTypeStr}\nSản phẩm:\n${itemsStr}\nGhi chú: ${notes}`;
-    
+
     navigator.clipboard.writeText(text)
       .then(() => {
         alert(`Đã copy thông tin đơn #${order.pancakeOrderId} thành công!`);
@@ -283,7 +283,7 @@ export default function OrderList() {
           initialTech = ktvObj.techStationId;
         }
         if (initialTech && !initialMain) {
-          const mainObj = stations.find(s => 
+          const mainObj = stations.find(s =>
             s.techStations && s.techStations.some((ts: any) => ts.id === initialTech)
           );
           if (mainObj) {
@@ -296,11 +296,11 @@ export default function OrderList() {
     setSelectedMain(initialMain);
     setSelectedTech(initialTech);
     setSelectedKtv(initialKtv);
-    
+
     // Convert UTC to local input format
     let appTime = '';
     if (order.appointmentTime) {
-      appTime = new Date(new Date(order.appointmentTime).getTime() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0,16);
+      appTime = new Date(new Date(order.appointmentTime).getTime() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 16);
     }
     setAppointment(appTime);
     setRescheduleReason(order.rescheduleReason || '');
@@ -347,7 +347,7 @@ export default function OrderList() {
           // Nếu địa chỉ đầy đủ chứa tên trạm kỹ thuật (độ ưu tiên cao nhất)
           if (cleanFullAddress && cleanFullAddress.includes(cleanTech)) {
             score = 10;
-          } 
+          }
           // Hoặc nếu tỉnh/thành phố trùng khớp với tên trạm kỹ thuật
           else if (cleanProvince && (cleanProvince.includes(cleanTech) || cleanTech.includes(cleanProvince))) {
             score = 8;
@@ -387,7 +387,7 @@ export default function OrderList() {
     setSuggestedMain(matchedMain);
     setSuggestedTech(matchedTech);
     setSuggestedKtv(bestKtv);
-    
+
     setAssignModal({ isOpen: true, orderId: order.id, order });
   };
 
@@ -463,7 +463,7 @@ export default function OrderList() {
   };
 
   const getStatusStyle = (status: string) => {
-    switch(status) {
+    switch (status) {
       case 'chờ xử lý': return 'bg-amber-500 hover:bg-amber-600 focus:ring-amber-500';
       case 'đang thực hiện': return 'bg-blue-500 hover:bg-blue-600 focus:ring-blue-500';
       case 'hoàn thành': return 'bg-emerald-500 hover:bg-emerald-600 focus:ring-emerald-500';
@@ -487,7 +487,7 @@ export default function OrderList() {
 
   return (
     <div className="flex flex-col bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden h-[calc(100vh-120px)] font-sans">
-      
+
       {/* Top Tabs */}
       <div className="flex justify-between border-b border-gray-200 bg-gray-50 px-4 pt-1">
         <div className="flex space-x-1">
@@ -516,7 +516,7 @@ export default function OrderList() {
 
           <div className="flex items-center space-x-3">
             {/* Đồng bộ từ Pancake button */}
-            <button 
+            <button
               onClick={handleSync}
               disabled={syncing}
               className={`flex items-center space-x-1.5 px-3 py-2 text-[13px] border border-gray-300 rounded-md bg-white text-gray-700 hover:bg-gray-50 focus:outline-none font-medium transition-colors ${syncing ? 'opacity-60 cursor-not-allowed' : ''}`}
@@ -528,7 +528,7 @@ export default function OrderList() {
 
             {/* Bộ lọc button & popover container */}
             <div className="relative z-50">
-              <button 
+              <button
                 onClick={() => toggleDropdown('main')}
                 className="flex items-center space-x-1.5 px-3 py-2 text-[13px] border border-gray-300 rounded-md bg-white text-gray-700 hover:bg-gray-50 focus:outline-none font-medium"
               >
@@ -555,12 +555,12 @@ export default function OrderList() {
                   {activeDropdown === 'pancakeOrderId' && (
                     <div className="p-4 w-72 space-y-3">
                       <h4 className="font-semibold text-[14px] text-gray-800">Lọc theo Mã đơn hàng</h4>
-                      <input 
-                        type="text" 
-                        className="w-full border rounded p-2 text-sm outline-none focus:border-blue-500 text-gray-800 bg-white" 
-                        placeholder="Nhập mã đơn Pancake..." 
-                        value={tempPancakeOrderId} 
-                        onChange={e => setTempPancakeOrderId(e.target.value)} 
+                      <input
+                        type="text"
+                        className="w-full border rounded p-2 text-sm outline-none focus:border-blue-500 text-gray-800 bg-white"
+                        placeholder="Nhập mã đơn Pancake..."
+                        value={tempPancakeOrderId}
+                        onChange={e => setTempPancakeOrderId(e.target.value)}
                       />
                       <div className="flex justify-between mt-2 pt-2 border-t">
                         <button className="text-gray-500 text-xs px-2 py-1 hover:bg-gray-100 rounded" onClick={() => setActiveDropdown('main')}>Quay lại</button>
@@ -575,17 +575,17 @@ export default function OrderList() {
                       <div className="space-y-2 max-h-48 overflow-y-auto">
                         {ROW_STATUS_OPTIONS.map(opt => (
                           <label key={opt.value} className="flex items-center space-x-2 text-sm text-gray-700 cursor-pointer">
-                            <input 
-                              type="checkbox" 
-                              className="rounded text-blue-600 focus:ring-blue-500" 
-                              checked={tempAdminStatuses.includes(opt.value)} 
+                            <input
+                              type="checkbox"
+                              className="rounded text-blue-600 focus:ring-blue-500"
+                              checked={tempAdminStatuses.includes(opt.value)}
                               onChange={e => {
                                 if (e.target.checked) {
                                   setTempAdminStatuses([...tempAdminStatuses, opt.value]);
                                 } else {
                                   setTempAdminStatuses(tempAdminStatuses.filter(v => v !== opt.value));
                                 }
-                              }} 
+                              }}
                             />
                             <span>{opt.label}</span>
                           </label>
@@ -603,33 +603,33 @@ export default function OrderList() {
                       <h4 className="font-semibold text-[14px] text-gray-800">Lọc theo Kỹ thuật viên</h4>
                       <div className="space-y-2 max-h-48 overflow-y-auto">
                         <label className="flex items-center space-x-2 text-sm font-medium cursor-pointer text-amber-600 border-b pb-1.5 mb-1.5">
-                          <input 
-                            type="checkbox" 
-                            className="rounded text-blue-600 focus:ring-blue-500" 
-                            checked={tempKtvIds.includes('null')} 
+                          <input
+                            type="checkbox"
+                            className="rounded text-blue-600 focus:ring-blue-500"
+                            checked={tempKtvIds.includes('null')}
                             onChange={e => {
                               if (e.target.checked) {
                                 setTempKtvIds([...tempKtvIds, 'null']);
                               } else {
                                 setTempKtvIds(tempKtvIds.filter(v => v !== 'null'));
                               }
-                            }} 
+                            }}
                           />
                           <span>Chưa gán KTV (Trống)</span>
                         </label>
                         {allKtvs.map(k => (
                           <label key={k.id} className="flex items-center space-x-2 text-sm text-gray-700 cursor-pointer">
-                            <input 
-                              type="checkbox" 
-                              className="rounded text-blue-600 focus:ring-blue-500" 
-                              checked={tempKtvIds.includes(k.id)} 
+                            <input
+                              type="checkbox"
+                              className="rounded text-blue-600 focus:ring-blue-500"
+                              checked={tempKtvIds.includes(k.id)}
                               onChange={e => {
                                 if (e.target.checked) {
                                   setTempKtvIds([...tempKtvIds, k.id]);
                                 } else {
                                   setTempKtvIds(tempKtvIds.filter(v => v !== k.id));
                                 }
-                              }} 
+                              }}
                             />
                             <span>{k.fullName}</span>
                           </label>
@@ -647,33 +647,33 @@ export default function OrderList() {
                       <h4 className="font-semibold text-[14px] text-gray-800">Lọc theo Loại công việc</h4>
                       <div className="space-y-2 max-h-48 overflow-y-auto">
                         <label className="flex items-center space-x-2 text-sm font-medium cursor-pointer text-amber-600 border-b pb-1.5 mb-1.5">
-                          <input 
-                            type="checkbox" 
-                            className="rounded text-blue-600 focus:ring-blue-500" 
-                            checked={tempWorkTypes.includes('null')} 
+                          <input
+                            type="checkbox"
+                            className="rounded text-blue-600 focus:ring-blue-500"
+                            checked={tempWorkTypes.includes('null')}
                             onChange={e => {
                               if (e.target.checked) {
                                 setTempWorkTypes([...tempWorkTypes, 'null']);
                               } else {
                                 setTempWorkTypes(tempWorkTypes.filter(v => v !== 'null'));
                               }
-                            }} 
+                            }}
                           />
                           <span>Chưa xác định (Trống)</span>
                         </label>
                         {['Giao hàng và Lắp đặt', 'Lắp đặt', 'Giao hàng', 'Thay lọc', 'Bảo hành', 'Sửa chữa'].map(wt => (
                           <label key={wt} className="flex items-center space-x-2 text-sm text-gray-700 cursor-pointer">
-                            <input 
-                              type="checkbox" 
-                              className="rounded text-blue-600 focus:ring-blue-500" 
-                              checked={tempWorkTypes.includes(wt)} 
+                            <input
+                              type="checkbox"
+                              className="rounded text-blue-600 focus:ring-blue-500"
+                              checked={tempWorkTypes.includes(wt)}
                               onChange={e => {
                                 if (e.target.checked) {
                                   setTempWorkTypes([...tempWorkTypes, wt]);
                                 } else {
                                   setTempWorkTypes(tempWorkTypes.filter(v => v !== wt));
                                 }
-                              }} 
+                              }}
                             />
                             <span>{wt}</span>
                           </label>
@@ -691,33 +691,33 @@ export default function OrderList() {
                       <h4 className="font-semibold text-[14px] text-gray-800">Lọc theo Trạm chính</h4>
                       <div className="space-y-2 max-h-48 overflow-y-auto">
                         <label className="flex items-center space-x-2 text-sm font-medium cursor-pointer text-amber-600 border-b pb-1.5 mb-1.5">
-                          <input 
-                            type="checkbox" 
-                            className="rounded text-blue-600 focus:ring-blue-500" 
-                            checked={tempMainStationIds.includes('null')} 
+                          <input
+                            type="checkbox"
+                            className="rounded text-blue-600 focus:ring-blue-500"
+                            checked={tempMainStationIds.includes('null')}
                             onChange={e => {
                               if (e.target.checked) {
                                 setTempMainStationIds([...tempMainStationIds, 'null']);
                               } else {
                                 setTempMainStationIds(tempMainStationIds.filter(v => v !== 'null'));
                               }
-                            }} 
+                            }}
                           />
                           <span>Chưa phân trạm (Trống)</span>
                         </label>
                         {stations.map(st => (
                           <label key={st.id} className="flex items-center space-x-2 text-sm text-gray-700 cursor-pointer">
-                            <input 
-                              type="checkbox" 
-                              className="rounded text-blue-600 focus:ring-blue-500" 
-                              checked={tempMainStationIds.includes(st.id)} 
+                            <input
+                              type="checkbox"
+                              className="rounded text-blue-600 focus:ring-blue-500"
+                              checked={tempMainStationIds.includes(st.id)}
                               onChange={e => {
                                 if (e.target.checked) {
                                   setTempMainStationIds([...tempMainStationIds, st.id]);
                                 } else {
                                   setTempMainStationIds(tempMainStationIds.filter(v => v !== st.id));
                                 }
-                              }} 
+                              }}
                             />
                             <span>{st.name}</span>
                           </label>
@@ -733,12 +733,12 @@ export default function OrderList() {
                   {activeDropdown === 'customerName' && (
                     <div className="p-4 w-72 space-y-3">
                       <h4 className="font-semibold text-[14px] text-gray-800">Lọc theo Tên khách hàng</h4>
-                      <input 
-                        type="text" 
-                        className="w-full border rounded p-2 text-sm outline-none focus:border-blue-500 text-gray-800 bg-white" 
-                        placeholder="Nhập tên khách..." 
-                        value={tempCustomerName} 
-                        onChange={e => setTempCustomerName(e.target.value)} 
+                      <input
+                        type="text"
+                        className="w-full border rounded p-2 text-sm outline-none focus:border-blue-500 text-gray-800 bg-white"
+                        placeholder="Nhập tên khách..."
+                        value={tempCustomerName}
+                        onChange={e => setTempCustomerName(e.target.value)}
                       />
                       <div className="flex justify-between mt-2 pt-2 border-t">
                         <button className="text-gray-500 text-xs px-2 py-1 hover:bg-gray-100 rounded" onClick={() => setActiveDropdown('main')}>Quay lại</button>
@@ -750,12 +750,12 @@ export default function OrderList() {
                   {activeDropdown === 'customerPhone' && (
                     <div className="p-4 w-72 space-y-3">
                       <h4 className="font-semibold text-[14px] text-gray-800">Lọc theo Số điện thoại</h4>
-                      <input 
-                        type="text" 
-                        className="w-full border rounded p-2 text-sm outline-none focus:border-blue-500 text-gray-800 bg-white" 
-                        placeholder="Nhập SĐT..." 
-                        value={tempCustomerPhone} 
-                        onChange={e => setTempCustomerPhone(e.target.value)} 
+                      <input
+                        type="text"
+                        className="w-full border rounded p-2 text-sm outline-none focus:border-blue-500 text-gray-800 bg-white"
+                        placeholder="Nhập SĐT..."
+                        value={tempCustomerPhone}
+                        onChange={e => setTempCustomerPhone(e.target.value)}
                       />
                       <div className="flex justify-between mt-2 pt-2 border-t">
                         <button className="text-gray-500 text-xs px-2 py-1 hover:bg-gray-100 rounded" onClick={() => setActiveDropdown('main')}>Quay lại</button>
@@ -770,22 +770,22 @@ export default function OrderList() {
             {/* Existing Date Range Picker logic */}
             {datePreset === 'custom' && (
               <div className="flex items-center space-x-2">
-                <input 
-                  type="date" 
+                <input
+                  type="date"
                   className="px-3 py-1.5 text-[13px] border border-gray-300 rounded-md outline-none text-gray-700 bg-white"
                   value={customStartDate}
                   onChange={(e) => { setCustomStartDate(e.target.value); setPage(1); }}
                 />
                 <span className="text-gray-400">đến</span>
-                <input 
-                  type="date" 
+                <input
+                  type="date"
                   className="px-3 py-1.5 text-[13px] border border-gray-300 rounded-md outline-none text-gray-700 bg-white"
                   value={customEndDate}
                   onChange={(e) => { setCustomEndDate(e.target.value); setPage(1); }}
                 />
               </div>
             )}
-            <select 
+            <select
               className="px-3 py-2 text-[13px] border border-gray-300 rounded-md bg-white text-gray-700 outline-none"
               value={datePreset}
               onChange={(e) => { setDatePreset(e.target.value); setPage(1); }}
@@ -869,7 +869,7 @@ export default function OrderList() {
               </span>
             )}
 
-            <button 
+            <button
               onClick={clearAllFilters}
               className="text-xs text-red-600 hover:text-red-800 font-semibold px-2 py-1.5 rounded hover:bg-red-50 transition-colors"
             >
@@ -900,23 +900,23 @@ export default function OrderList() {
             </thead>
             <tbody className="divide-y divide-gray-100">
               {orders.map((order, idx) => {
-                 const customerName = order.billFullName || order.customer?.fullName || 'Khách lẻ';
-                 const phone = order.billPhoneNumber || order.customer?.phoneNumber || '';
-                 const ktvName = order.assignedKtv?.fullName || 'Chưa gán';
-                 const mainStationName = order.mainStation?.name 
-                    || order.assignedKtv?.techStation?.mainStation?.name 
-                    || '';
-                 const techStationName = order.techStation?.name 
-                    || order.assignedKtv?.techStation?.name 
-                    || '';
-                 
-                 return (
+                const customerName = order.billFullName || order.customer?.fullName || 'Khách lẻ';
+                const phone = order.billPhoneNumber || order.customer?.phoneNumber || '';
+                const ktvName = order.assignedKtv?.fullName || 'Chưa gán';
+                const mainStationName = order.mainStation?.name
+                  || order.assignedKtv?.techStation?.mainStation?.name
+                  || '';
+                const techStationName = order.techStation?.name
+                  || order.assignedKtv?.techStation?.name
+                  || '';
+
+                return (
                   <tr key={order.id} className={`${idx % 2 === 0 ? 'bg-white' : 'bg-[#fafafa]'} hover:bg-blue-50/50 transition-colors`}>
                     {/* 1. Mã đơn */}
                     <td className="px-4 py-3 font-medium align-top">
                       <div>#{order.pancakeOrderId}</div>
-                      {order.rawData?.id && order.rawData.id !== String(order.pancakeOrderId) && (
-                        <div className="text-[10px] font-bold text-blue-600 bg-blue-50 border border-blue-100 rounded px-1.5 py-0.5 mt-0.5 inline-block cursor-help" title={`Mã đơn sàn TMĐT: ${order.rawData.id}`}>
+                      {order.orderSource && /shopee|lazada|tiktok|tiki/i.test(order.orderSource) && (
+                        <div className="text-[10px] font-bold text-blue-600 bg-blue-50 border border-blue-100 rounded px-1.5 py-0.5 mt-0.5 inline-block cursor-help" title={`Nguồn: ${order.orderSource}`}>
                           Đơn Ecom
                         </div>
                       )}
@@ -945,7 +945,7 @@ export default function OrderList() {
                           <div className="text-[12px] mb-1">
                             <span className="text-gray-400">Hẹn: </span>
                             <span className={`font-semibold ${isOverdue ? 'text-red-600' : 'text-blue-700'}`}>
-                              {new Date(order.appointmentTime).toLocaleTimeString('vi-VN', {hour: '2-digit', minute:'2-digit'})} - {new Date(order.appointmentTime).toLocaleDateString('vi-VN')}
+                              {new Date(order.appointmentTime).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })} - {new Date(order.appointmentTime).toLocaleDateString('vi-VN')}
                             </span>
                             {order.rescheduleReason && (
                               <div className="text-[11px] text-red-500 italic mt-0.5 leading-tight">
@@ -999,9 +999,9 @@ export default function OrderList() {
                     <td className="px-4 py-3 align-top">
                       <div className="flex items-center justify-center flex-wrap gap-1.5">
                         {/* Phân công */}
-                        <button 
-                          onClick={() => openAssignModal(order)} 
-                          className="p-1.5 text-blue-600 hover:bg-blue-50 rounded border border-transparent hover:border-blue-100 transition-colors" 
+                        <button
+                          onClick={() => openAssignModal(order)}
+                          className="p-1.5 text-blue-600 hover:bg-blue-50 rounded border border-transparent hover:border-blue-100 transition-colors"
                           title="Phân loại & Phân công"
                         >
                           <UserPlus size={15} />
@@ -1009,9 +1009,9 @@ export default function OrderList() {
 
                         {/* Hoàn thành (chỉ hiện khi chưa hoàn thành/hủy) */}
                         {order.adminStatus !== 'hoàn thành' && order.adminStatus !== 'hủy đơn' && (
-                          <button 
-                            onClick={() => handleStatusChange(order.id, 'hoàn thành')} 
-                            className="p-1.5 text-emerald-600 hover:bg-emerald-50 rounded border border-transparent hover:border-emerald-100 transition-colors" 
+                          <button
+                            onClick={() => handleStatusChange(order.id, 'hoàn thành')}
+                            className="p-1.5 text-emerald-600 hover:bg-emerald-50 rounded border border-transparent hover:border-emerald-100 transition-colors"
                             title="Xác nhận Hoàn thành"
                           >
                             <CheckCircle2 size={15} />
@@ -1020,9 +1020,9 @@ export default function OrderList() {
 
                         {/* Hủy đơn (chỉ hiện khi chưa hoàn thành/hủy) */}
                         {order.adminStatus !== 'hoàn thành' && order.adminStatus !== 'hủy đơn' && (
-                          <button 
-                            onClick={() => handleStatusChange(order.id, 'hủy đơn')} 
-                            className="p-1.5 text-red-600 hover:bg-red-50 rounded border border-transparent hover:border-red-100 transition-colors" 
+                          <button
+                            onClick={() => handleStatusChange(order.id, 'hủy đơn')}
+                            className="p-1.5 text-red-600 hover:bg-red-50 rounded border border-transparent hover:border-red-100 transition-colors"
                             title="Hủy đơn hàng"
                           >
                             <XCircle size={15} />
@@ -1031,9 +1031,9 @@ export default function OrderList() {
 
                         {/* Mở lại đơn (chỉ hiện khi đơn đã hoàn thành/hủy) */}
                         {(order.adminStatus === 'hoàn thành' || order.adminStatus === 'hủy đơn') && (
-                          <button 
-                            onClick={() => handleReopenOrder(order)} 
-                            className="p-1.5 text-amber-600 hover:bg-amber-50 rounded border border-transparent hover:border-amber-100 transition-colors" 
+                          <button
+                            onClick={() => handleReopenOrder(order)}
+                            className="p-1.5 text-amber-600 hover:bg-amber-50 rounded border border-transparent hover:border-amber-100 transition-colors"
                             title="Mở lại đơn (Về Chờ xử lý & xóa phân công)"
                           >
                             <RotateCcw size={15} />
@@ -1041,19 +1041,19 @@ export default function OrderList() {
                         )}
 
                         {/* Copy nhanh thông tin đi Zalo */}
-                        <button 
-                          onClick={() => handleCopyOrderInfo(order)} 
-                          className="p-1.5 text-indigo-600 hover:bg-indigo-50 rounded border border-transparent hover:border-indigo-100 transition-colors" 
-                          title="Copy thông tin gửi Zalo"
+                        <button
+                          onClick={() => handleCopyOrderInfo(order)}
+                          className="p-1.5 text-indigo-600 hover:bg-indigo-50 rounded border border-transparent hover:border-indigo-100 transition-colors"
+                          title="Copy thông tin"
                         >
                           <Copy size={15} />
                         </button>
 
                         {/* Xem báo cáo dịch vụ (nếu có) */}
                         {order.serviceReports && order.serviceReports.length > 0 && (
-                          <button 
-                            onClick={() => navigate(`/admin/reports?search=${order.pancakeOrderId}`)} 
-                            className="p-1.5 text-teal-600 hover:bg-teal-50 rounded border border-transparent hover:border-teal-100 transition-colors" 
+                          <button
+                            onClick={() => navigate(`/admin/reports?search=${order.pancakeOrderId}`)}
+                            className="p-1.5 text-teal-600 hover:bg-teal-50 rounded border border-transparent hover:border-teal-100 transition-colors"
                             title="Xem báo cáo của KTV"
                           >
                             <FileText size={15} />
@@ -1061,9 +1061,9 @@ export default function OrderList() {
                         )}
 
                         {/* Nhật ký lịch sử đơn */}
-                        <button 
-                          onClick={() => openAuditModal(order.id)} 
-                          className="p-1.5 text-gray-500 hover:bg-gray-100 rounded border border-transparent hover:border-gray-200 transition-colors" 
+                        <button
+                          onClick={() => openAuditModal(order.id)}
+                          className="p-1.5 text-gray-500 hover:bg-gray-100 rounded border border-transparent hover:border-gray-200 transition-colors"
                           title="Lịch sử thay đổi đơn"
                         >
                           <History size={15} />
@@ -1076,7 +1076,7 @@ export default function OrderList() {
                       <div className="font-bold text-gray-800 text-[12px]">{mainStationName || 'Chưa phân trạm chính'}</div>
                       {techStationName && <div className="text-[11px] text-gray-600 font-medium">{techStationName}</div>}
                       <div className="text-gray-500 text-[11px] mt-0.5">KTV: <span className="font-semibold text-gray-700">{ktvName}</span></div>
-                      
+
                       {order.ktvCalledAt && (
                         <div className="text-[10px] text-emerald-600 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded mt-1.5 w-max font-medium">
                           📞 Đã gọi khách lúc {new Date(order.ktvCalledAt).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })} - {new Date(order.ktvCalledAt).toLocaleDateString('vi-VN')}
@@ -1090,11 +1090,11 @@ export default function OrderList() {
                         const date = new Date(order.pancakeCreatedAt);
                         return (
                           <div className="font-medium text-gray-700">
-                            {date.toLocaleTimeString('vi-VN', {hour: '2-digit', minute:'2-digit'})} - {date.toLocaleDateString('vi-VN')}
+                            {date.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })} - {date.toLocaleDateString('vi-VN')}
                           </div>
                         );
                       })() : <div className="text-gray-400">-</div>}
-                      
+
                       <div className="text-[11px] text-gray-400 mt-0.5">
                         {(() => {
                           const creatorName = order.rawData?.creator?.name;
@@ -1121,11 +1121,11 @@ export default function OrderList() {
       {/* Pagination */}
       {!loading && totalPages > 1 && (
         <div className="flex justify-between items-center px-4 py-3 border-t border-gray-200">
-           <span>Trang {page} / {totalPages}</span>
-           <div className="flex gap-2">
-             <button disabled={page === 1} onClick={() => setPage(p => p - 1)} className="p-1.5 border rounded"><ChevronLeft size={16}/></button>
-             <button disabled={page === totalPages} onClick={() => setPage(p => p + 1)} className="p-1.5 border rounded"><ChevronRight size={16}/></button>
-           </div>
+          <span>Trang {page} / {totalPages}</span>
+          <div className="flex gap-2">
+            <button disabled={page === 1} onClick={() => setPage(p => p - 1)} className="p-1.5 border rounded"><ChevronLeft size={16} /></button>
+            <button disabled={page === totalPages} onClick={() => setPage(p => p + 1)} className="p-1.5 border rounded"><ChevronRight size={16} /></button>
+          </div>
         </div>
       )}
 
@@ -1135,14 +1135,14 @@ export default function OrderList() {
           <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl overflow-hidden flex flex-col max-h-[90vh]">
             <div className="px-6 py-4 border-b border-gray-200 bg-gray-50 flex justify-between items-center">
               <h3 className="text-lg font-bold text-gray-900">Chi tiết & Phân bổ Yêu cầu #{assignModal.order.pancakeOrderId}</h3>
-              <button onClick={() => setAssignModal(null)} className="text-gray-400 hover:text-gray-600"><XCircle size={24}/></button>
+              <button onClick={() => setAssignModal(null)} className="text-gray-400 hover:text-gray-600"><XCircle size={24} /></button>
             </div>
-            
+
             <div className="p-6 overflow-auto flex-1 grid grid-cols-2 gap-6">
               {/* Cột trái: Phân loại */}
               <div className="space-y-4">
                 <h4 className="font-semibold text-gray-800 border-b pb-2">1. Phân loại Yêu cầu</h4>
-                
+
                 <div>
                   <label className="block text-sm text-gray-600 mb-1">Loại công việc</label>
                   <select className="w-full border rounded p-2 text-sm outline-none focus:border-blue-500" value={workType} onChange={e => {
@@ -1165,7 +1165,7 @@ export default function OrderList() {
                     <option value="Sửa chữa">Sửa chữa</option>
                   </select>
                 </div>
-                
+
                 <div>
                   <label className="block text-sm text-gray-600 mb-1">Loại dịch vụ chi tiết</label>
                   {['Giao hàng và Lắp đặt', 'Lắp đặt', 'Giao hàng', 'Thay lọc'].includes(workType) ? (
@@ -1203,7 +1203,7 @@ export default function OrderList() {
                   <label className="block text-sm text-gray-600 mb-1">Thời gian hẹn khách</label>
                   <input type="datetime-local" className="w-full border rounded p-2 text-sm outline-none focus:border-blue-500" value={appointment} onChange={e => setAppointment(e.target.value)} />
                 </div>
-                
+
                 <div>
                   <label className="block text-sm text-gray-600 mb-1">Lý do hẹn lại (nếu có)</label>
                   <textarea rows={2} className="w-full border rounded p-2 text-sm outline-none focus:border-blue-500" value={rescheduleReason} onChange={e => setRescheduleReason(e.target.value)} placeholder="Khách bận, KTV kẹt lịch..."></textarea>
@@ -1255,18 +1255,18 @@ export default function OrderList() {
                     </button>
                   </div>
                 )}
-                
+
                 <div>
                   <label className="block text-sm text-gray-600 mb-1">Trạm chính</label>
-                  <select className="w-full border rounded p-2 text-sm outline-none focus:border-blue-500" value={selectedMain} onChange={e => {setSelectedMain(e.target.value); setSelectedTech(''); setSelectedKtv('');}}>
+                  <select className="w-full border rounded p-2 text-sm outline-none focus:border-blue-500" value={selectedMain} onChange={e => { setSelectedMain(e.target.value); setSelectedTech(''); setSelectedKtv(''); }}>
                     <option value="">-- Chọn Trạm chính --</option>
                     {stations.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
                   </select>
                 </div>
-                
+
                 <div>
                   <label className="block text-sm text-gray-600 mb-1">Trạm kỹ thuật</label>
-                  <select className="w-full border rounded p-2 text-sm outline-none focus:border-blue-500" value={selectedTech} onChange={e => {setSelectedTech(e.target.value); setSelectedKtv('');}} disabled={!selectedMain}>
+                  <select className="w-full border rounded p-2 text-sm outline-none focus:border-blue-500" value={selectedTech} onChange={e => { setSelectedTech(e.target.value); setSelectedKtv(''); }} disabled={!selectedMain}>
                     <option value="">-- Chọn Trạm Kỹ thuật --</option>
                     {(() => {
                       const currentMain = stations.find(s => s.id === selectedMain);
@@ -1358,7 +1358,7 @@ export default function OrderList() {
           <div className="bg-white rounded-lg p-6 w-[400px]">
             <h3 className="text-lg font-bold text-red-600 mb-4">Hủy yêu cầu dịch vụ</h3>
             <label className="block text-sm mb-2 text-gray-700">Lý do hủy (bắt buộc)</label>
-            <textarea className="w-full border p-2 rounded mb-4 outline-none focus:border-red-500" rows={3} value={cancelReason} onChange={e=>setCancelReason(e.target.value)} placeholder="Nhập lý do..."></textarea>
+            <textarea className="w-full border p-2 rounded mb-4 outline-none focus:border-red-500" rows={3} value={cancelReason} onChange={e => setCancelReason(e.target.value)} placeholder="Nhập lý do..."></textarea>
             <div className="flex justify-end gap-2">
               <button onClick={() => setCancelModal(null)} className="px-4 py-2 border rounded">Đóng</button>
               <button onClick={submitCancel} disabled={!cancelReason.trim()} className="px-4 py-2 bg-red-600 text-white rounded disabled:opacity-50">Xác nhận hủy</button>
@@ -1373,9 +1373,9 @@ export default function OrderList() {
           <div className="bg-white rounded-lg p-6 w-[600px] max-h-[80vh] flex flex-col">
             <div className="flex justify-between items-center mb-4">
               <h3 className="text-lg font-bold text-gray-900">Lịch sử thay đổi yêu cầu</h3>
-              <button onClick={() => setAuditModal(null)}><XCircle size={20} className="text-gray-500"/></button>
+              <button onClick={() => setAuditModal(null)}><XCircle size={20} className="text-gray-500" /></button>
             </div>
-            
+
             <div className="flex-1 overflow-auto bg-gray-50 p-4 rounded border">
               {loadingAudit ? (
                 <div className="text-center py-8">Đang tải...</div>
