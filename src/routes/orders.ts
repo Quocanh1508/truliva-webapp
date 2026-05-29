@@ -28,7 +28,13 @@ router.get('/', requireAuth, async (req: Request, res: Response): Promise<void> 
       mainStationIds,
       customerName,
       customerPhone,
-      pancakeOrderId
+      pancakeOrderId,
+      serviceTypes,
+      productCategories,
+      productNames,
+      techStationIds,
+      provinces,
+      dateType
     } = req.query;
 
     const pageNumber = parseInt(page as string, 10);
@@ -153,7 +159,85 @@ router.get('/', requireAuth, async (req: Request, res: Response): Promise<void> 
       if (endDate) {
         dateCond.lte = new Date(endDate as string);
       }
-      conditions.push({ pancakeCreatedAt: dateCond });
+      
+      const type = (dateType as string) || 'createdAt';
+      if (type === 'appointmentTime') {
+        conditions.push({ appointmentTime: dateCond });
+      } else if (type === 'completedAt') {
+        conditions.push({ 
+          adminStatus: 'hoàn thành',
+          updatedAt: dateCond 
+        });
+      } else if (type === 'updatedAt') {
+        conditions.push({ pancakeUpdatedAt: dateCond });
+      } else {
+        conditions.push({ pancakeCreatedAt: dateCond });
+      }
+    }
+
+    if (serviceTypes) {
+      const list = typeof serviceTypes === 'string' ? serviceTypes.split(',') : (Array.isArray(serviceTypes) ? serviceTypes as string[] : []);
+      if (list.length > 0) {
+        conditions.push({ serviceType: { in: list } });
+      }
+    }
+
+    if (techStationIds) {
+      const list = typeof techStationIds === 'string' ? techStationIds.split(',') : (Array.isArray(techStationIds) ? techStationIds as string[] : []);
+      if (list.length > 0) {
+        conditions.push({ techStationId: { in: list } });
+      }
+    }
+
+    if (provinces) {
+      const list = typeof provinces === 'string' ? provinces.split(',') : (Array.isArray(provinces) ? provinces as string[] : []);
+      if (list.length > 0) {
+        const orConds: Prisma.OrderWhereInput[] = list.map(prov => ({
+          OR: [
+            { customer: { provinceName: { contains: prov, mode: 'insensitive' } } },
+            { shippingAddress: { path: ['province'], equals: prov } },
+            { shippingAddress: { path: ['city'], equals: prov } },
+            { shippingAddress: { path: ['province_name'], equals: prov } }
+          ]
+        }));
+        conditions.push({ OR: orConds });
+      }
+    }
+
+    if (productCategories) {
+      const list = typeof productCategories === 'string' ? productCategories.split(',') : (Array.isArray(productCategories) ? productCategories as string[] : []);
+      if (list.length > 0) {
+        const matchedProducts = await prisma.product.findMany({
+          where: { category: { in: list } },
+          select: { sku: true, name: true }
+        });
+        const skus = matchedProducts.map(p => p.sku).filter(Boolean) as string[];
+        const names = matchedProducts.map(p => p.name).filter(Boolean) as string[];
+        
+        conditions.push({
+          items: {
+            some: {
+              OR: [
+                { sku: { in: skus } },
+                { productName: { in: names } }
+              ]
+            }
+          }
+        });
+      }
+    }
+
+    if (productNames) {
+      const list = typeof productNames === 'string' ? productNames.split(',') : (Array.isArray(productNames) ? productNames as string[] : []);
+      if (list.length > 0) {
+        conditions.push({
+          items: {
+            some: {
+              productName: { in: list }
+            }
+          }
+        });
+      }
     }
 
     if (search) {
@@ -256,6 +340,44 @@ router.get('/', requireAuth, async (req: Request, res: Response): Promise<void> 
   } catch (error: any) {
     logger.error('Get orders error', { error: error.message });
     res.status(500).json({ error: 'Lỗi lấy danh sách đơn hàng' });
+  }
+});
+
+/**
+ * GET /api/orders/filters-data
+ * Lấy danh sách các dữ liệu phục vụ bộ lọc
+ */
+router.get('/filters-data', requireAuth, async (req: Request, res: Response): Promise<void> => {
+  try {
+    const [products, stations, customers] = await Promise.all([
+      prisma.product.findMany({
+        where: { isActive: true },
+        select: { name: true, category: true }
+      }),
+      prisma.techStation.findMany({
+        where: { isActive: true },
+        select: { id: true, name: true }
+      }),
+      prisma.customer.findMany({
+        where: { provinceName: { not: null } },
+        select: { provinceName: true },
+        distinct: ['provinceName']
+      })
+    ]);
+
+    const categories = Array.from(new Set(products.map(p => p.category).filter(Boolean))) as string[];
+    const productNames = Array.from(new Set(products.map(p => p.name).filter(Boolean))) as string[];
+    const provinces = Array.from(new Set(customers.map(c => c.provinceName).filter(Boolean))) as string[];
+
+    res.json({
+      categories,
+      productNames,
+      techStations: stations,
+      provinces
+    });
+  } catch (error: any) {
+    logger.error('Get filters data error', { error: error.message });
+    res.status(500).json({ error: 'Lỗi lấy dữ liệu bộ lọc' });
   }
 });
 

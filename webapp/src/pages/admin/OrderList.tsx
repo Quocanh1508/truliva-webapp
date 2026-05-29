@@ -1,8 +1,10 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { getOrders, updateOrder, getKtvUsers, getStations, getOrderAuditLog, syncOrders } from '../../api/client';
+import { getOrders, updateOrder, getKtvUsers, getStations, getOrderAuditLog, syncOrders, getFiltersData } from '../../api/client';
 import { Search, ChevronLeft, ChevronRight, History, XCircle, Filter, RefreshCw, FileText, CheckCircle2, RotateCcw, Copy, UserPlus } from 'lucide-react';
-import { WARRANTY_SERVICE_GROUPS, REPAIR_SERVICE_GROUPS } from '../../utils/workTypes';
+import { WARRANTY_SERVICE_GROUPS, REPAIR_SERVICE_GROUPS, WORK_TYPE_SERVICES } from '../../utils/workTypes';
+
+const ALL_SERVICE_TYPES = Array.from(new Set(Object.values(WORK_TYPE_SERVICES).flat()));
 
 function removeAccents(str: string): string {
   if (!str) return '';
@@ -53,8 +55,16 @@ export default function OrderList() {
   const [filterCustomerName, setFilterCustomerName] = useState('');
   const [filterCustomerPhone, setFilterCustomerPhone] = useState('');
 
+  // Added filters
+  const [dateType, setDateType] = useState('createdAt');
+  const [filterServiceTypes, setFilterServiceTypes] = useState<string[]>([]);
+  const [filterProductCategories, setFilterProductCategories] = useState<string[]>([]);
+  const [filterProductNames, setFilterProductNames] = useState<string[]>([]);
+  const [filterTechStationIds, setFilterTechStationIds] = useState<string[]>([]);
+  const [filterProvinces, setFilterProvinces] = useState<string[]>([]);
+
   // Dropdown / Popover states
-  const [activeDropdown, setActiveDropdown] = useState<'main' | 'pancakeOrderId' | 'adminStatuses' | 'ktvIds' | 'workTypes' | 'mainStationIds' | 'customerName' | 'customerPhone' | null>(null);
+  const [activeDropdown, setActiveDropdown] = useState<'main' | 'pancakeOrderId' | 'adminStatuses' | 'ktvIds' | 'workTypes' | 'mainStationIds' | 'customerName' | 'customerPhone' | 'serviceTypes' | 'productCategories' | 'productNames' | 'techStationIds' | 'provinces' | null>(null);
 
   // Temporary filter states for the popover/modal
   const [tempPancakeOrderId, setTempPancakeOrderId] = useState('');
@@ -64,6 +74,24 @@ export default function OrderList() {
   const [tempMainStationIds, setTempMainStationIds] = useState<string[]>([]);
   const [tempCustomerName, setTempCustomerName] = useState('');
   const [tempCustomerPhone, setTempCustomerPhone] = useState('');
+
+  const [tempServiceTypes, setTempServiceTypes] = useState<string[]>([]);
+  const [tempProductCategories, setTempProductCategories] = useState<string[]>([]);
+  const [tempProductNames, setTempProductNames] = useState<string[]>([]);
+  const [tempTechStationIds, setTempTechStationIds] = useState<string[]>([]);
+  const [tempProvinces, setTempProvinces] = useState<string[]>([]);
+
+  const [dbFilterOptions, setDbFilterOptions] = useState<{
+    categories: string[];
+    productNames: string[];
+    techStations: any[];
+    provinces: string[];
+  }>({
+    categories: [],
+    productNames: [],
+    techStations: [],
+    provinces: []
+  });
 
   // Assignment Modal
   const [assignModal, setAssignModal] = useState<{ isOpen: boolean; orderId: string; order: any } | null>(null);
@@ -154,7 +182,13 @@ export default function OrderList() {
         workTypes: filterWorkTypes,
         mainStationIds: filterMainStationIds,
         customerName: filterCustomerName,
-        customerPhone: filterCustomerPhone
+        customerPhone: filterCustomerPhone,
+        serviceTypes: filterServiceTypes,
+        productCategories: filterProductCategories,
+        productNames: filterProductNames,
+        techStationIds: filterTechStationIds,
+        provinces: filterProvinces,
+        dateType: dateType
       });
       setOrders(res.orders);
       setTotalPages(res.pagination.totalPages);
@@ -181,12 +215,19 @@ export default function OrderList() {
     filterWorkTypes,
     filterMainStationIds,
     filterCustomerName,
-    filterCustomerPhone
+    filterCustomerPhone,
+    filterServiceTypes,
+    filterProductCategories,
+    filterProductNames,
+    filterTechStationIds,
+    filterProvinces,
+    dateType
   ]);
 
   useEffect(() => {
     getStations().then(data => setStations(data)).catch(console.error);
     getKtvUsers().then(data => setAllKtvs(data)).catch(console.error);
+    getFiltersData().then(data => setDbFilterOptions(data)).catch(console.error);
   }, []);
 
   // Filter KTVs based on tech station
@@ -465,7 +506,7 @@ export default function OrderList() {
       alert(err.message);
     }
   };
-  const toggleDropdown = (type: 'main' | 'pancakeOrderId' | 'adminStatuses' | 'ktvIds' | 'workTypes' | 'mainStationIds' | 'customerName' | 'customerPhone') => {
+  const toggleDropdown = (type: 'main' | 'pancakeOrderId' | 'adminStatuses' | 'ktvIds' | 'workTypes' | 'mainStationIds' | 'customerName' | 'customerPhone' | 'serviceTypes' | 'productCategories' | 'productNames' | 'techStationIds' | 'provinces') => {
     if (activeDropdown === type) {
       setActiveDropdown(null);
     } else {
@@ -478,10 +519,15 @@ export default function OrderList() {
       if (type === 'mainStationIds') setTempMainStationIds(filterMainStationIds);
       if (type === 'customerName') setTempCustomerName(filterCustomerName);
       if (type === 'customerPhone') setTempCustomerPhone(filterCustomerPhone);
+      if (type === 'serviceTypes') setTempServiceTypes(filterServiceTypes);
+      if (type === 'productCategories') setTempProductCategories(filterProductCategories);
+      if (type === 'productNames') setTempProductNames(filterProductNames);
+      if (type === 'techStationIds') setTempTechStationIds(filterTechStationIds);
+      if (type === 'provinces') setTempProvinces(filterProvinces);
     }
   };
 
-  const applyFilter = (type: 'pancakeOrderId' | 'adminStatuses' | 'ktvIds' | 'workTypes' | 'mainStationIds' | 'customerName' | 'customerPhone') => {
+  const applyFilter = (type: 'pancakeOrderId' | 'adminStatuses' | 'ktvIds' | 'workTypes' | 'mainStationIds' | 'customerName' | 'customerPhone' | 'serviceTypes' | 'productCategories' | 'productNames' | 'techStationIds' | 'provinces') => {
     setPage(1);
     if (type === 'pancakeOrderId') setFilterPancakeOrderId(tempPancakeOrderId);
     if (type === 'adminStatuses') setFilterAdminStatuses(tempAdminStatuses);
@@ -490,6 +536,11 @@ export default function OrderList() {
     if (type === 'mainStationIds') setFilterMainStationIds(tempMainStationIds);
     if (type === 'customerName') setFilterCustomerName(tempCustomerName);
     if (type === 'customerPhone') setFilterCustomerPhone(tempCustomerPhone);
+    if (type === 'serviceTypes') setFilterServiceTypes(tempServiceTypes);
+    if (type === 'productCategories') setFilterProductCategories(tempProductCategories);
+    if (type === 'productNames') setFilterProductNames(tempProductNames);
+    if (type === 'techStationIds') setFilterTechStationIds(tempTechStationIds);
+    if (type === 'provinces') setFilterProvinces(tempProvinces);
     setActiveDropdown(null);
   };
 
@@ -502,6 +553,14 @@ export default function OrderList() {
     setFilterMainStationIds([]);
     setFilterCustomerName('');
     setFilterCustomerPhone('');
+    setFilterServiceTypes([]);
+    setFilterProductCategories([]);
+    setFilterProductNames([]);
+    setFilterTechStationIds([]);
+    setFilterProvinces([]);
+    setDatePreset('');
+    setCustomStartDate('');
+    setCustomEndDate('');
   };
 
   const openAuditModal = async (orderId: string) => {
@@ -603,13 +662,18 @@ export default function OrderList() {
               {activeDropdown && (
                 <div className="absolute right-0 mt-2 bg-white border rounded-lg shadow-xl z-50 overflow-hidden text-left min-w-[220px]">
                   {activeDropdown === 'main' && (
-                    <div className="w-56 py-1 text-sm text-gray-700">
+                    <div className="w-56 py-1 text-sm text-gray-700 max-h-96 overflow-y-auto">
                       <div className="px-3 py-2 text-xs font-semibold text-gray-400 border-b uppercase">Thêm điều kiện lọc</div>
                       <button className="w-full text-left px-4 py-2 hover:bg-gray-100" onClick={() => toggleDropdown('pancakeOrderId')}>Mã đơn hàng</button>
                       <button className="w-full text-left px-4 py-2 hover:bg-gray-100" onClick={() => toggleDropdown('adminStatuses')}>Trạng thái đơn</button>
-                      <button className="w-full text-left px-4 py-2 hover:bg-gray-100" onClick={() => toggleDropdown('ktvIds')}>Kỹ thuật viên</button>
                       <button className="w-full text-left px-4 py-2 hover:bg-gray-100" onClick={() => toggleDropdown('workTypes')}>Loại công việc</button>
+                      <button className="w-full text-left px-4 py-2 hover:bg-gray-100" onClick={() => toggleDropdown('serviceTypes')}>Loại dịch vụ</button>
+                      <button className="w-full text-left px-4 py-2 hover:bg-gray-100" onClick={() => toggleDropdown('productCategories')}>Danh mục sản phẩm</button>
+                      <button className="w-full text-left px-4 py-2 hover:bg-gray-100" onClick={() => toggleDropdown('productNames')}>Sản phẩm</button>
                       <button className="w-full text-left px-4 py-2 hover:bg-gray-100" onClick={() => toggleDropdown('mainStationIds')}>Trạm chính</button>
+                      <button className="w-full text-left px-4 py-2 hover:bg-gray-100" onClick={() => toggleDropdown('techStationIds')}>Trạm kỹ thuật</button>
+                      <button className="w-full text-left px-4 py-2 hover:bg-gray-100" onClick={() => toggleDropdown('ktvIds')}>Kỹ thuật viên</button>
+                      <button className="w-full text-left px-4 py-2 hover:bg-gray-100" onClick={() => toggleDropdown('provinces')}>Tỉnh/Thành phố</button>
                       <button className="w-full text-left px-4 py-2 hover:bg-gray-100" onClick={() => toggleDropdown('customerName')}>Tên khách hàng</button>
                       <button className="w-full text-left px-4 py-2 hover:bg-gray-100" onClick={() => toggleDropdown('customerPhone')}>Số điện thoại</button>
                     </div>
@@ -826,6 +890,152 @@ export default function OrderList() {
                       </div>
                     </div>
                   )}
+
+                  {activeDropdown === 'serviceTypes' && (
+                    <div className="p-4 w-72 space-y-3">
+                      <h4 className="font-semibold text-[14px] text-gray-800">Lọc theo Loại dịch vụ</h4>
+                      <div className="space-y-2 max-h-48 overflow-y-auto">
+                        {ALL_SERVICE_TYPES.map(st => (
+                          <label key={st} className="flex items-center space-x-2 text-sm text-gray-700 cursor-pointer">
+                            <input
+                              type="checkbox"
+                              className="rounded text-blue-600 focus:ring-blue-500"
+                              checked={tempServiceTypes.includes(st)}
+                              onChange={e => {
+                                if (e.target.checked) {
+                                  setTempServiceTypes([...tempServiceTypes, st]);
+                                } else {
+                                  setTempServiceTypes(tempServiceTypes.filter(v => v !== st));
+                                }
+                              }}
+                            />
+                            <span>{st}</span>
+                          </label>
+                        ))}
+                      </div>
+                      <div className="flex justify-between mt-2 pt-2 border-t">
+                        <button className="text-gray-500 text-xs px-2 py-1 hover:bg-gray-100 rounded" onClick={() => setActiveDropdown('main')}>Quay lại</button>
+                        <button className="bg-blue-600 text-white text-xs px-3 py-1 rounded hover:bg-blue-700 font-semibold" onClick={() => applyFilter('serviceTypes')}>Áp dụng</button>
+                      </div>
+                    </div>
+                  )}
+
+                  {activeDropdown === 'productCategories' && (
+                    <div className="p-4 w-72 space-y-3">
+                      <h4 className="font-semibold text-[14px] text-gray-800">Lọc theo Danh mục sản phẩm</h4>
+                      <div className="space-y-2 max-h-48 overflow-y-auto">
+                        {dbFilterOptions.categories.map(cat => (
+                          <label key={cat} className="flex items-center space-x-2 text-sm text-gray-700 cursor-pointer">
+                            <input
+                              type="checkbox"
+                              className="rounded text-blue-600 focus:ring-blue-500"
+                              checked={tempProductCategories.includes(cat)}
+                              onChange={e => {
+                                if (e.target.checked) {
+                                  setTempProductCategories([...tempProductCategories, cat]);
+                                } else {
+                                  setTempProductCategories(tempProductCategories.filter(v => v !== cat));
+                                }
+                              }}
+                            />
+                            <span>{cat}</span>
+                          </label>
+                        ))}
+                      </div>
+                      <div className="flex justify-between mt-2 pt-2 border-t">
+                        <button className="text-gray-500 text-xs px-2 py-1 hover:bg-gray-100 rounded" onClick={() => setActiveDropdown('main')}>Quay lại</button>
+                        <button className="bg-blue-600 text-white text-xs px-3 py-1 rounded hover:bg-blue-700 font-semibold" onClick={() => applyFilter('productCategories')}>Áp dụng</button>
+                      </div>
+                    </div>
+                  )}
+
+                  {activeDropdown === 'productNames' && (
+                    <div className="p-4 w-72 space-y-3">
+                      <h4 className="font-semibold text-[14px] text-gray-800">Lọc theo Sản phẩm</h4>
+                      <div className="space-y-2 max-h-48 overflow-y-auto">
+                        {dbFilterOptions.productNames.map(prod => (
+                          <label key={prod} className="flex items-center space-x-2 text-sm text-gray-700 cursor-pointer">
+                            <input
+                              type="checkbox"
+                              className="rounded text-blue-600 focus:ring-blue-500"
+                              checked={tempProductNames.includes(prod)}
+                              onChange={e => {
+                                if (e.target.checked) {
+                                  setTempProductNames([...tempProductNames, prod]);
+                                } else {
+                                  setTempProductNames(tempProductNames.filter(v => v !== prod));
+                                }
+                              }}
+                            />
+                            <span>{prod}</span>
+                          </label>
+                        ))}
+                      </div>
+                      <div className="flex justify-between mt-2 pt-2 border-t">
+                        <button className="text-gray-500 text-xs px-2 py-1 hover:bg-gray-100 rounded" onClick={() => setActiveDropdown('main')}>Quay lại</button>
+                        <button className="bg-blue-600 text-white text-xs px-3 py-1 rounded hover:bg-blue-700 font-semibold" onClick={() => applyFilter('productNames')}>Áp dụng</button>
+                      </div>
+                    </div>
+                  )}
+
+                  {activeDropdown === 'techStationIds' && (
+                    <div className="p-4 w-72 space-y-3">
+                      <h4 className="font-semibold text-[14px] text-gray-800">Lọc theo Trạm kỹ thuật</h4>
+                      <div className="space-y-2 max-h-48 overflow-y-auto">
+                        {dbFilterOptions.techStations.map(station => (
+                          <label key={station.id} className="flex items-center space-x-2 text-sm text-gray-700 cursor-pointer">
+                            <input
+                              type="checkbox"
+                              className="rounded text-blue-600 focus:ring-blue-500"
+                              checked={tempTechStationIds.includes(station.id)}
+                              onChange={e => {
+                                if (e.target.checked) {
+                                  setTempTechStationIds([...tempTechStationIds, station.id]);
+                                } else {
+                                  setTempTechStationIds(tempTechStationIds.filter(v => v !== station.id));
+                                }
+                              }}
+                            />
+                            <span>{station.name}</span>
+                          </label>
+                        ))}
+                      </div>
+                      <div className="flex justify-between mt-2 pt-2 border-t">
+                        <button className="text-gray-500 text-xs px-2 py-1 hover:bg-gray-100 rounded" onClick={() => setActiveDropdown('main')}>Quay lại</button>
+                        <button className="bg-blue-600 text-white text-xs px-3 py-1 rounded hover:bg-blue-700 font-semibold" onClick={() => applyFilter('techStationIds')}>Áp dụng</button>
+                      </div>
+                    </div>
+                  )}
+
+                  {activeDropdown === 'provinces' && (
+                    <div className="p-4 w-72 space-y-3">
+                      <h4 className="font-semibold text-[14px] text-gray-800">Lọc theo Tỉnh/Thành phố</h4>
+                      <div className="space-y-2 max-h-48 overflow-y-auto">
+                        {dbFilterOptions.provinces.map(prov => (
+                          <label key={prov} className="flex items-center space-x-2 text-sm text-gray-700 cursor-pointer">
+                            <input
+                              type="checkbox"
+                              className="rounded text-blue-600 focus:ring-blue-500"
+                              checked={tempProvinces.includes(prov)}
+                              onChange={e => {
+                                if (e.target.checked) {
+                                  setTempProvinces([...tempProvinces, prov]);
+                                } else {
+                                  setTempProvinces(tempProvinces.filter(v => v !== prov));
+                                }
+                              }}
+                            />
+                            <span>{prov}</span>
+                          </label>
+                        ))}
+                      </div>
+                      <div className="flex justify-between mt-2 pt-2 border-t">
+                        <button className="text-gray-500 text-xs px-2 py-1 hover:bg-gray-100 rounded" onClick={() => setActiveDropdown('main')}>Quay lại</button>
+                        <button className="bg-blue-600 text-white text-xs px-3 py-1 rounded hover:bg-blue-700 font-semibold" onClick={() => applyFilter('provinces')}>Áp dụng</button>
+                      </div>
+                    </div>
+                  )}
+
                 </div>
               )}
             </div>
@@ -849,6 +1059,17 @@ export default function OrderList() {
               </div>
             )}
             <select
+              className="px-3 py-2 text-[13px] border border-gray-300 rounded-md bg-white text-gray-700 outline-none font-medium"
+              value={dateType}
+              onChange={(e) => { setDateType(e.target.value); setPage(1); }}
+            >
+              <option value="createdAt">Thời gian tạo</option>
+              <option value="appointmentTime">Thời gian khách hẹn</option>
+              <option value="completedAt">Thời gian hoàn thành</option>
+              <option value="updatedAt">Thời gian cập nhật</option>
+            </select>
+
+            <select
               className="px-3 py-2 text-[13px] border border-gray-300 rounded-md bg-white text-gray-700 outline-none"
               value={datePreset}
               onChange={(e) => { setDatePreset(e.target.value); setPage(1); }}
@@ -865,7 +1086,7 @@ export default function OrderList() {
         </div>
 
         {/* Selected Filter Badges / Tags row */}
-        {(filterPancakeOrderId || filterAdminStatuses.length > 0 || filterKtvIds.length > 0 || filterWorkTypes.length > 0 || filterMainStationIds.length > 0 || filterCustomerName || filterCustomerPhone) && (
+        {(filterPancakeOrderId || filterAdminStatuses.length > 0 || filterKtvIds.length > 0 || filterWorkTypes.length > 0 || filterMainStationIds.length > 0 || filterCustomerName || filterCustomerPhone || filterServiceTypes.length > 0 || filterProductCategories.length > 0 || filterProductNames.length > 0 || filterTechStationIds.length > 0 || filterProvinces.length > 0) && (
           <div className="flex flex-wrap items-center gap-2 px-4 pb-3">
             <span className="text-xs font-semibold text-gray-500 uppercase">Đang lọc:</span>
 
@@ -927,6 +1148,51 @@ export default function OrderList() {
               <span className="inline-flex items-center bg-gray-100 text-gray-800 text-xs font-medium px-2.5 py-1 rounded-md border border-gray-200">
                 SĐT khách: {filterCustomerPhone}
                 <button type="button" className="ml-1.5 text-gray-400 hover:text-gray-600 outline-none" onClick={() => { setFilterCustomerPhone(''); setPage(1); }}>
+                  <XCircle size={14} className="fill-gray-200 hover:fill-gray-300 text-gray-500" />
+                </button>
+              </span>
+            )}
+
+            {filterServiceTypes.length > 0 && (
+              <span className="inline-flex items-center bg-gray-100 text-gray-800 text-xs font-medium px-2.5 py-1 rounded-md border border-gray-200">
+                Dịch vụ: {filterServiceTypes.join(', ')}
+                <button type="button" className="ml-1.5 text-gray-400 hover:text-gray-600 outline-none" onClick={() => { setFilterServiceTypes([]); setPage(1); }}>
+                  <XCircle size={14} className="fill-gray-200 hover:fill-gray-300 text-gray-500" />
+                </button>
+              </span>
+            )}
+
+            {filterProductCategories.length > 0 && (
+              <span className="inline-flex items-center bg-gray-100 text-gray-800 text-xs font-medium px-2.5 py-1 rounded-md border border-gray-200">
+                Danh mục: {filterProductCategories.join(', ')}
+                <button type="button" className="ml-1.5 text-gray-400 hover:text-gray-600 outline-none" onClick={() => { setFilterProductCategories([]); setPage(1); }}>
+                  <XCircle size={14} className="fill-gray-200 hover:fill-gray-300 text-gray-500" />
+                </button>
+              </span>
+            )}
+
+            {filterProductNames.length > 0 && (
+              <span className="inline-flex items-center bg-gray-100 text-gray-800 text-xs font-medium px-2.5 py-1 rounded-md border border-gray-200">
+                Sản phẩm: {filterProductNames.join(', ')}
+                <button type="button" className="ml-1.5 text-gray-400 hover:text-gray-600 outline-none" onClick={() => { setFilterProductNames([]); setPage(1); }}>
+                  <XCircle size={14} className="fill-gray-200 hover:fill-gray-300 text-gray-500" />
+                </button>
+              </span>
+            )}
+
+            {filterTechStationIds.length > 0 && (
+              <span className="inline-flex items-center bg-gray-100 text-gray-800 text-xs font-medium px-2.5 py-1 rounded-md border border-gray-200">
+                Trạm KT: {filterTechStationIds.map(id => dbFilterOptions.techStations.find(ts => ts.id === id)?.name || id).join(', ')}
+                <button type="button" className="ml-1.5 text-gray-400 hover:text-gray-600 outline-none" onClick={() => { setFilterTechStationIds([]); setPage(1); }}>
+                  <XCircle size={14} className="fill-gray-200 hover:fill-gray-300 text-gray-500" />
+                </button>
+              </span>
+            )}
+
+            {filterProvinces.length > 0 && (
+              <span className="inline-flex items-center bg-gray-100 text-gray-800 text-xs font-medium px-2.5 py-1 rounded-md border border-gray-200">
+                Tỉnh/TP: {filterProvinces.join(', ')}
+                <button type="button" className="ml-1.5 text-gray-400 hover:text-gray-600 outline-none" onClick={() => { setFilterProvinces([]); setPage(1); }}>
                   <XCircle size={14} className="fill-gray-200 hover:fill-gray-300 text-gray-500" />
                 </button>
               </span>

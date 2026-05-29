@@ -84,6 +84,15 @@ export async function syncOrders() {
   });
 }
 
+export async function getFiltersData(): Promise<{
+  categories: string[];
+  productNames: string[];
+  techStations: any[];
+  provinces: string[];
+}> {
+  return fetchApi('/orders/filters-data');
+}
+
 export async function getKtvUsers(params: { techStationId?: string; excludeOrderId?: string } = {}) {
   const query = new URLSearchParams();
   if (params.techStationId) query.append('techStationId', params.techStationId);
