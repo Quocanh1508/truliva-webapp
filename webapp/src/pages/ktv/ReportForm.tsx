@@ -2,37 +2,81 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { fetchApi, getOrders } from '../../api/client';
 import LabeledImageUploader from '../../components/LabeledImageUploader';
-import { CheckCircle, ChevronLeft, Send, AlertCircle, Camera, Loader2 } from 'lucide-react';
+import { CheckCircle, ChevronLeft, Send, AlertCircle, Camera, Loader2, ChevronDown, ChevronUp } from 'lucide-react';
 import { Html5Qrcode } from 'html5-qrcode';
 
 import { getImageSlots } from '../../utils/workTypes';
 
-// ── Danh sách linh kiện phát sinh (từ Excel) ──
-const SPARE_PARTS = [
-  'Bơm tăng áp', 'Van giảm áp', 'Van chia',
-  'Cụm van (2) Truliva UR3626', 'Bơm RO Truliva UR3626',
-  'Mạch điều khiển Truliva UR3626', 'Mạch đèn Truliva UR3626',
-  'Biến áp Truliva UR3626',
-  'Bộ vòi Truliva UR3626/UR5640/UR5440',
-  'Cụm van Truliva UR5676/UR5640/UR5440',
-  'Bơm RO Truliva UR5676/UR5640',
-  'Mạch điều khiển Truliva UR5676/UR5640/UR5440',
-  'Mạch đèn Truliva UR5676',
-  'Biến áp Truliva UR5676/UR5640/UR5440',
-  'Cảm biến TDS Truliva UR5676/UR61096H',
-  'Bộ vòi điện tử Truliva UR5676/UR5840',
-  'Cụm van Truliva UR5840', 'Bơm RO Truliva UR5840',
-  'Mạch điều khiển Truliva UR5840', 'Mạch đèn Truliva UR5840',
-  'Biến áp Truliva UR5840', 'Cảm biến TDS Truliva UR5840',
-  'Cụm van Truliva UR61096H', 'Bơm RO Truliva UR61096H',
-  'Mạch điều khiển Truliva UR61096H', 'Mạch đèn Truliva UR61096H',
-  'Biến áp Truliva UR61096H', 'Bộ vòi điện tử Truliva UR61096H',
-  'Khay hứng nước Truliva W6412', 'Nắp khay hứng nước Truliva W6412',
-  'Ống silicon Truliva W6412', 'Vỏ trước Truliva W6412',
-  'Bộ gia nhiệt Truliva W6412', 'Mạch điều khiển Truliva W6412',
-  'Van điện từ nước vào Truliva W6412', 'Mạch màn hình Truliva W6412',
-  'Túi đá điện tử Truliva W6412', 'Bơm đường nước lạnh Truliva W6412',
-  'Bơm đường nước nóng Truliva W6412', 'Bình chứa Truliva W6412',
+// ── Cấu trúc linh kiện phân loại theo dòng máy ──
+const SPARE_PARTS_GROUPS = [
+  {
+    name: 'Linh kiện chung / Khác',
+    parts: ['Bơm tăng áp', 'Van giảm áp', 'Van chia']
+  },
+  {
+    name: 'Dòng máy UR3626',
+    parts: [
+      'Cụm van (2) Truliva UR3626',
+      'Bơm RO Truliva UR3626',
+      'Mạch điều khiển Truliva UR3626',
+      'Mạch đèn Truliva UR3626',
+      'Biến áp Truliva UR3626',
+      'Bộ vòi Truliva UR3626/UR5640/UR5440'
+    ]
+  },
+  {
+    name: 'Dòng máy UR5676',
+    parts: [
+      'Cụm van Truliva UR5676/UR5640/UR5440',
+      'Bơm RO Truliva UR5676/UR5640',
+      'Mạch điều khiển Truliva UR5676/UR5640/UR5440',
+      'Mạch đèn Truliva UR5676',
+      'Biến áp Truliva UR5676/UR5640/UR5440',
+      'Cảm biến TDS Truliva UR5676/UR61096H',
+      'Bộ vòi điện tử Truliva UR5676/UR5840'
+    ]
+  },
+  {
+    name: 'Dòng máy UR5840',
+    parts: [
+      'Cụm van Truliva UR5840',
+      'Bơm RO Truliva UR5840',
+      'Mạch điều khiển Truliva UR5840',
+      'Mạch đèn Truliva UR5840',
+      'Biến áp Truliva UR5840',
+      'Cảm biến TDS Truliva UR5840',
+      'Bộ vòi điện tử Truliva UR5676/UR5840'
+    ]
+  },
+  {
+    name: 'Dòng máy UR61096H',
+    parts: [
+      'Cụm van Truliva UR61096H',
+      'Bơm RO Truliva UR61096H',
+      'Mạch điều khiển Truliva UR61096H',
+      'Mạch đèn Truliva UR61096H',
+      'Biến áp Truliva UR61096H',
+      'Bộ vòi điện tử Truliva UR61096H',
+      'Cảm biến TDS Truliva UR5676/UR61096H'
+    ]
+  },
+  {
+    name: 'Dòng máy W6412',
+    parts: [
+      'Khay hứng nước Truliva W6412',
+      'Nắp khay hứng nước Truliva W6412',
+      'Ống silicon Truliva W6412',
+      'Vỏ trước Truliva W6412',
+      'Bộ gia nhiệt Truliva W6412',
+      'Mạch điều khiển Truliva W6412',
+      'Van điện từ nước vào Truliva W6412',
+      'Mạch màn hình Truliva W6412',
+      'Túi đá điện tử Truliva W6412',
+      'Bơm đường nước lạnh Truliva W6412',
+      'Bơm đường nước nóng Truliva W6412',
+      'Bình chứa Truliva W6412'
+    ]
+  }
 ];
 
 // ── Nguồn nước options ──
@@ -101,6 +145,7 @@ export default function ReportForm() {
   const [tdsOut, setTdsOut] = useState('');
   const [waterPressure, setWaterPressure] = useState('');
   const [spareParts, setSpareParts] = useState<string[]>([]);
+  const [expandedGroups, setExpandedGroups] = useState<string[]>(['Linh kiện chung / Khác']);
   const [issueType, setIssueType] = useState('');
   const [customIssueType, setCustomIssueType] = useState('');
   const [handlingMethod, setHandlingMethod] = useState('');
@@ -242,8 +287,9 @@ export default function ReportForm() {
       }
 
       // ── Mapping sản phẩm x số lượng từ items ──
+      let prodStr = '';
       if (order.items && order.items.length > 0) {
-        const prodStr = order.items.map((item: any) => {
+        prodStr = order.items.map((item: any) => {
           // Lấy tên đầy đủ nhất có thể
           const name = item.productName
             || item.variationInfo?.name
@@ -253,6 +299,16 @@ export default function ReportForm() {
         }).join(', ');
         setProducts(prodStr);
       }
+
+      // Tự động mở rộng nhóm linh kiện tương ứng dựa trên tên dòng máy
+      const matchingGroups: string[] = ['Linh kiện chung / Khác'];
+      const pStrLower = prodStr.toLowerCase();
+      if (pStrLower.includes('3626')) matchingGroups.push('Dòng máy UR3626');
+      if (pStrLower.includes('5676') || pStrLower.includes('5640') || pStrLower.includes('5440')) matchingGroups.push('Dòng máy UR5676');
+      if (pStrLower.includes('5840')) matchingGroups.push('Dòng máy UR5840');
+      if (pStrLower.includes('61096')) matchingGroups.push('Dòng máy UR61096H');
+      if (pStrLower.includes('6412') || pStrLower.includes('w6412')) matchingGroups.push('Dòng máy W6412');
+      setExpandedGroups(matchingGroups);
 
       // ── Mapping tiền thu thực tế (moneyToCollect hoặc totalPrice) ──
       const amount = order.moneyToCollect || order.totalPrice || 0;
@@ -515,34 +571,67 @@ export default function ReportForm() {
                     {needsSpareParts(workType) && (
                       <div className="form-group">
                         <label className="form-label">Linh kiện phát sinh (nếu có)</label>
-                        <div style={{
-                          maxHeight: '200px',
-                          overflowY: 'auto',
-                          border: '1px solid #e2e8f0',
-                          borderRadius: '8px',
-                          padding: '10px',
-                          background: '#fafbfc',
-                        }}>
-                          {SPARE_PARTS.map(part => (
-                            <label key={part} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '5px 0', fontSize: '13px', cursor: 'pointer' }}>
-                              <input
-                                type="checkbox"
-                                checked={spareParts.includes(part)}
-                                onChange={e => {
-                                  if (e.target.checked) {
-                                    setSpareParts([...spareParts, part]);
-                                  } else {
-                                    setSpareParts(spareParts.filter(p => p !== part));
-                                  }
-                                }}
-                              />
-                              <span>{part}</span>
-                            </label>
-                          ))}
+                        <div className="flex flex-col gap-2">
+                          {SPARE_PARTS_GROUPS.map((group) => {
+                            const isExpanded = expandedGroups.includes(group.name);
+                            const selectedCount = spareParts.filter(p => group.parts.includes(p)).length;
+                            
+                            return (
+                              <div key={group.name} className="border border-gray-200 rounded-lg overflow-hidden bg-white shadow-xs">
+                                {/* Group Header */}
+                                <button
+                                  type="button"
+                                  className="w-full px-4 py-2.5 bg-slate-50 hover:bg-slate-100 flex items-center justify-between transition-colors border-b border-gray-150"
+                                  onClick={() => {
+                                    if (isExpanded) {
+                                      setExpandedGroups(expandedGroups.filter(g => g !== group.name));
+                                    } else {
+                                      setExpandedGroups([...expandedGroups, group.name]);
+                                    }
+                                  }}
+                                >
+                                  <div className="flex items-center gap-2">
+                                    <span className="font-semibold text-[13px] text-gray-800">{group.name}</span>
+                                    {selectedCount > 0 && (
+                                      <span className="px-2 py-0.5 text-[10px] font-bold bg-green-100 text-green-700 rounded-full">
+                                        Đã chọn {selectedCount}
+                                      </span>
+                                    )}
+                                  </div>
+                                  <div className="text-gray-400">
+                                    {isExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                                  </div>
+                                </button>
+
+                                {/* Group Body (Parts Checklist) */}
+                                {isExpanded && (
+                                  <div className="p-3 bg-white flex flex-col gap-2 max-h-[180px] overflow-y-auto animate-fade-in">
+                                    {group.parts.map((part) => (
+                                      <label key={part} className="flex items-center gap-2.5 py-1 text-[13px] text-gray-700 cursor-pointer hover:text-gray-900 select-none">
+                                        <input
+                                          type="checkbox"
+                                          className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 w-4 h-4"
+                                          checked={spareParts.includes(part)}
+                                          onChange={e => {
+                                            if (e.target.checked) {
+                                              setSpareParts([...spareParts, part]);
+                                            } else {
+                                              setSpareParts(spareParts.filter(p => p !== part));
+                                            }
+                                          }}
+                                        />
+                                        <span>{part}</span>
+                                      </label>
+                                    ))}
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })}
                         </div>
                         {spareParts.length > 0 && (
-                          <p className="text-xs text-blue-600 mt-1 font-medium">
-                            Đã chọn {spareParts.length} linh kiện
+                          <p className="text-xs text-blue-600 mt-2.5 font-semibold flex items-center gap-1">
+                            <CheckCircle size={14} className="text-emerald-500" /> Tổng cộng đã chọn {spareParts.length} linh kiện
                           </p>
                         )}
                       </div>
