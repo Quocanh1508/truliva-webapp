@@ -937,7 +937,7 @@ export default function OrderList() {
                       {/* Trạng thái */}
                       <div className="mb-1.5">
                         <span className={`inline-block text-[11px] font-bold px-2 py-0.5 rounded text-white capitalize ${getStatusStyle(order.adminStatus || 'chờ xử lý')}`}>
-                          {order.adminStatus || 'chờ xử lý'}
+                          {order.adminStatus === 'đang thực hiện' ? 'đã phân công' : (order.adminStatus || 'chờ xử lý')}
                         </span>
                       </div>
 
@@ -1147,7 +1147,7 @@ export default function OrderList() {
                 <h4 className="font-semibold text-gray-800 border-b pb-2">1. Phân loại Yêu cầu</h4>
 
                 <div>
-                  <label className="block text-sm text-gray-600 mb-1">Loại công việc</label>
+                  <label className="block text-sm text-gray-600 mb-1">Loại công việc *</label>
                   <select className="w-full border rounded p-2 text-sm outline-none focus:border-blue-500" value={workType} onChange={e => {
                     const wt = e.target.value;
                     setWorkType(wt);
@@ -1170,7 +1170,7 @@ export default function OrderList() {
                 </div>
 
                 <div>
-                  <label className="block text-sm text-gray-600 mb-1">Loại dịch vụ chi tiết</label>
+                  <label className="block text-sm text-gray-600 mb-1">Loại dịch vụ chi tiết *</label>
                   {['Giao hàng và Lắp đặt', 'Lắp đặt', 'Giao hàng', 'Thay lọc'].includes(workType) ? (
                     <input type="text" className="w-full border rounded p-2 text-sm outline-none bg-gray-50 text-gray-500" value="Công việc đã bao gồm dịch vụ" readOnly />
                   ) : workType === 'Bảo hành' ? (
@@ -1203,7 +1203,7 @@ export default function OrderList() {
                 </div>
 
                 <div>
-                  <label className="block text-sm text-gray-600 mb-1">Thời gian hẹn khách</label>
+                  <label className="block text-sm text-gray-600 mb-1">Thời gian hẹn khách *</label>
                   <input type="datetime-local" className="w-full border rounded p-2 text-sm outline-none focus:border-blue-500" value={appointment} onChange={e => setAppointment(e.target.value)} />
                 </div>
 
