@@ -25,8 +25,13 @@ export default function Layout() {
     };
 
     checkNotifications();
+    window.addEventListener('notifications-updated', checkNotifications);
+
     const interval = setInterval(checkNotifications, 30000); // Polling mỗi 30 giây
-    return () => clearInterval(interval);
+    return () => {
+      window.removeEventListener('notifications-updated', checkNotifications);
+      clearInterval(interval);
+    };
   }, [user]);
 
   const handleLogout = async () => {

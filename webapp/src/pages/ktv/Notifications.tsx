@@ -32,6 +32,7 @@ export default function Notifications() {
         prev.map(n => (n.id === id ? { ...n, isRead: true } : n))
       );
       setUnreadCount(prev => Math.max(0, prev - 1));
+      window.dispatchEvent(new CustomEvent('notifications-updated'));
     } catch (e) {
       console.error('Lỗi đánh dấu đã đọc', e);
     }
@@ -42,6 +43,7 @@ export default function Notifications() {
       await markAllNotificationsRead();
       setNotifications(prev => prev.map(n => ({ ...n, isRead: true })));
       setUnreadCount(0);
+      window.dispatchEvent(new CustomEvent('notifications-updated'));
     } catch (e) {
       console.error('Lỗi đánh dấu đọc tất cả', e);
     }
@@ -91,10 +93,11 @@ export default function Notifications() {
           {notifications.map((n) => (
             <div
               key={n.id}
+              onClick={() => !n.isRead && handleMarkAsRead(n.id)}
               className={`p-4 rounded-xl border transition-all duration-300 relative overflow-hidden ${
                 n.isRead
                   ? 'bg-white border-gray-200 hover:shadow-sm'
-                  : 'bg-blue-50/40 border-blue-100 hover:bg-blue-50/70 shadow-sm'
+                  : 'bg-blue-50/40 border-blue-100 hover:bg-blue-50/70 shadow-sm cursor-pointer'
               }`}
             >
               {/* Vạch chỉ thị chưa đọc */}
@@ -125,7 +128,10 @@ export default function Notifications() {
 
                 {!n.isRead && (
                   <button
-                    onClick={() => handleMarkAsRead(n.id)}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleMarkAsRead(n.id);
+                    }}
                     className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors outline-none"
                     title="Đánh dấu đã đọc"
                   >
