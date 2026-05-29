@@ -5,7 +5,7 @@ import LabeledImageUploader from '../../components/LabeledImageUploader';
 import { CheckCircle, ChevronLeft, Send, AlertCircle, Camera, Loader2, ChevronDown, ChevronUp } from 'lucide-react';
 import { Html5Qrcode } from 'html5-qrcode';
 
-import { getImageSlots, WARRANTY_SERVICE_GROUPS, REPAIR_SERVICE_GROUPS } from '../../utils/workTypes';
+import { getImageSlots } from '../../utils/workTypes';
 
 // ── Cấu trúc linh kiện phân loại theo dòng máy ──
 const SPARE_PARTS_GROUPS = [
