@@ -1298,7 +1298,10 @@ export default function OrderList() {
                         type="date" 
                         className="w-full border rounded p-2 text-sm outline-none focus:border-blue-500 text-gray-800 bg-white" 
                         value={appointmentDate} 
-                        onChange={e => setAppointmentDate(e.target.value)} 
+                        onChange={e => {
+                          setAppointmentDate(e.target.value);
+                          setAppointmentTime('08:30');
+                        }} 
                       />
                     </div>
                     <div>
