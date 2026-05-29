@@ -204,6 +204,8 @@ router.get('/', requireAuth, async (req: Request, res: Response): Promise<void> 
               fullName: true,
               phoneNumber: true,
               fullAddress: true,
+              provinceName: true,
+              districtName: true,
             }
           },
           mainStation: {
