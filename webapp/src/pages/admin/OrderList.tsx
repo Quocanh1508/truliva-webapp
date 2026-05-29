@@ -962,6 +962,11 @@ export default function OrderList() {
                     <td className="px-4 py-3">
                       <div className="font-medium text-gray-900">{mainStationName || 'Chưa phân trạm'}</div>
                       <div className="text-gray-500">KTV: {ktvName}</div>
+                      {order.ktvCalledAt && (
+                        <div className="text-[10px] text-emerald-600 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded mt-1 w-max font-medium">
+                          📞 Đã gọi khách lúc {new Date(order.ktvCalledAt).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })} - {new Date(order.ktvCalledAt).toLocaleDateString('vi-VN')}
+                        </div>
+                      )}
                     </td>
                     <td className="px-4 py-3 text-center">
                       <select

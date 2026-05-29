@@ -93,6 +93,7 @@ model Order {
   techStationId       String?   @map("tech_station_id")           // Trạm kỹ thuật được gán
   rescheduleReason    String?   @map("reschedule_reason")         // Lý do hẹn lại
   cancelReason        String?   @map("cancel_reason")             // Lý do hủy
+  ktvCalledAt         DateTime? @map("ktv_called_at")             // Thời gian KTV nhấn nút gọi khách
   rawData             Json?     @map("raw_data")
   createdAt           DateTime  @default(now()) @map("created_at")
   updatedAt           DateTime  @updatedAt @map("updated_at")

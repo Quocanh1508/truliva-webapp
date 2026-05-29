@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { getOrders } from '../../api/client';
-import { Search, ChevronLeft, ChevronRight } from 'lucide-react';
+import { getOrders, callCustomer } from '../../api/client';
+import { Search, ChevronLeft, ChevronRight, Phone } from 'lucide-react';
 
 export default function MyOrders() {
   const [orders, setOrders] = useState<any[]>([]);
@@ -15,6 +15,7 @@ export default function MyOrders() {
   // Pagination
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
+  const [callingOrderId, setCallingOrderId] = useState<string | null>(null);
 
   const fetchOrdersData = async () => {
     try {
@@ -44,6 +45,24 @@ export default function MyOrders() {
     e.preventDefault();
     setPage(1);
     fetchOrdersData();
+  };
+
+  const handleCallCustomer = async (orderId: string, phone: string) => {
+    if (!phone || callingOrderId) return;
+    try {
+      setCallingOrderId(orderId);
+      const result = await callCustomer(orderId);
+      // Update local state to reflect the call timestamp
+      setOrders(prev => prev.map(o =>
+        o.id === orderId ? { ...o, ktvCalledAt: result.ktvCalledAt } : o
+      ));
+      // Open phone dialer
+      window.location.href = `tel:${phone}`;
+    } catch (err: any) {
+      console.error('Call customer error:', err);
+    } finally {
+      setCallingOrderId(null);
+    }
   };
 
   const getStatusBadge = (status: string) => {
@@ -142,6 +161,7 @@ export default function MyOrders() {
                 <th className="px-4 py-3">SĐT</th>
                 <th className="px-4 py-3">Trạng thái</th>
                 <th className="px-4 py-3">Địa chỉ</th>
+                <th className="px-4 py-3 text-center">Thao tác</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
@@ -213,6 +233,28 @@ export default function MyOrders() {
                     </td>
                     <td className="px-4 py-3 text-gray-600 whitespace-normal break-words max-w-[300px]">
                       {address}
+                    </td>
+                    <td className="px-4 py-3 text-center">
+                      <div className="flex flex-col items-center gap-1">
+                        {phone ? (
+                          <button
+                            onClick={(e) => { e.stopPropagation(); handleCallCustomer(order.id, phone); }}
+                            disabled={callingOrderId === order.id}
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-500 hover:bg-emerald-600 text-white text-[12px] font-semibold rounded-md shadow-sm transition-all disabled:opacity-50 disabled:cursor-wait cursor-pointer"
+                            title={`Gọi ${phone}`}
+                          >
+                            <Phone size={13} />
+                            {callingOrderId === order.id ? 'Đang gọi...' : 'Gọi khách'}
+                          </button>
+                        ) : (
+                          <span className="text-gray-400 text-[11px] italic">Không có SĐT</span>
+                        )}
+                        {order.ktvCalledAt && (
+                          <span className="text-[10px] text-emerald-600 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded font-medium">
+                            📞 Đã gọi lúc {new Date(order.ktvCalledAt).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })} - {new Date(order.ktvCalledAt).toLocaleDateString('vi-VN')}
+                          </span>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 );

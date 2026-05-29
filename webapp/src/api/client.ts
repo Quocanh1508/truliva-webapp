@@ -96,6 +96,12 @@ export const getOrderAuditLog = async (id: string) => {
   return fetchApi(`/orders/${id}/audit`);
 };
 
+export const callCustomer = async (orderId: string) => {
+  return fetchApi(`/orders/${orderId}/call-customer`, {
+    method: 'POST',
+  });
+};
+
 // --- STATIONS ---
 export const getStations = async () => {
   return fetchApi('/stations');

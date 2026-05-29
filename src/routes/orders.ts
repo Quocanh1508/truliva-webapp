@@ -270,6 +270,43 @@ router.get('/:id/audit', requireAuth, async (req: Request, res: Response): Promi
 });
 
 /**
+ * POST /api/orders/:id/call-customer
+ * KTV nhấn nút "Gọi khách hàng" → ghi nhận mốc thời gian
+ * Chỉ KTV được phân công đơn mới có quyền gọi
+ */
+router.post('/:id/call-customer', requireAuth, async (req: Request, res: Response): Promise<void> => {
+  try {
+    const id = req.params.id as string;
+
+    // Tìm đơn hàng
+    const order = await prisma.order.findUnique({ where: { id } });
+    if (!order) {
+      res.status(404).json({ error: 'Không tìm thấy đơn hàng' });
+      return;
+    }
+
+    // Chỉ KTV được phân công mới được gọi
+    if (req.user?.role === 'KTV' && order.assignedKtvId !== req.user.id) {
+      res.status(403).json({ error: 'Bạn không được phân công đơn hàng này' });
+      return;
+    }
+
+    // Cập nhật thời gian gọi khách (luôn update theo lần nhấn cuối)
+    const now = new Date();
+    const updated = await prisma.order.update({
+      where: { id },
+      data: { ktvCalledAt: now },
+    });
+
+    logger.info('KTV called customer', { orderId: id, ktvId: req.user?.id, calledAt: now.toISOString() });
+    res.json({ ktvCalledAt: updated.ktvCalledAt });
+  } catch (error: any) {
+    logger.error('Call customer error', { error: error.message });
+    res.status(500).json({ error: 'Lỗi ghi nhận gọi khách' });
+  }
+});
+
+/**
  * PATCH /api/orders/:id
  * Cập nhật đơn hàng (trạng thái, phân công, loại CV, trạm, hủy/khôi phục...)
  */
