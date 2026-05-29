@@ -38,7 +38,11 @@ router.get('/ktvs', requireAuth, async (req: Request, res: Response): Promise<vo
           where: {
             ...(excludeOrderId ? { id: { not: excludeOrderId as string } } : {}),
             adminStatus: { notIn: ['hủy đơn', 'hoàn thành'] },
-            serviceReports: { none: {} }
+            serviceReports: { none: {} },
+            OR: [
+              { statusCode: { not: 0 } },
+              { statusCode: null }
+            ]
           },
           select: { id: true }
         }

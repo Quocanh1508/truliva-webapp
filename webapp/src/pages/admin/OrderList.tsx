@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getOrders, updateOrder, getKtvUsers, getStations, getOrderAuditLog, syncOrders } from '../../api/client';
 import { Search, ChevronLeft, ChevronRight, History, Edit, XCircle, Filter, RefreshCw, FileText } from 'lucide-react';
+import { WARRANTY_SERVICE_GROUPS, REPAIR_SERVICE_GROUPS } from '../../utils/workTypes';
 
 function removeAccents(str: string): string {
   if (!str) return '';
@@ -1047,39 +1048,29 @@ export default function OrderList() {
                   {['Giao hàng và Lắp đặt', 'Lắp đặt', 'Giao hàng', 'Thay lọc'].includes(workType) ? (
                     <input type="text" className="w-full border rounded p-2 text-sm outline-none bg-gray-50 text-gray-500" value="Công việc đã bao gồm dịch vụ" readOnly />
                   ) : workType === 'Bảo hành' ? (
-                    <select className="w-full border rounded p-2 text-sm outline-none focus:border-blue-500" value={serviceType} onChange={e => setServiceType(e.target.value)}>
-                      <option value="">-- Chọn dịch vụ --</option>
-                      {[
-                        'Áp lực nước yếu', 'Bơm không hoạt động', 'Chất lượng nước sau lọc',
-                        'Hỏng vòi nước', 'Lỗi biến áp', 'Lỗi cảm biến rò rỉ', 'Lỗi mạch điện',
-                        'Lỗi màn hình hiển thị', 'Lỗi vòi nước', 'Lỏng vòi nước',
-                        'Máy báo đỏ các đèn', 'Máy báo lỗi TDS', 'Nước thải không ngừng',
-                        'Rò rỉ bên trong máy', 'Rò rỉ đường ống', 'Rò rỉ lọc thô', 'Rò rỉ từ vòi',
-                        'Rò rỉ van cấp nước', 'Thiết bị hoạt động không ổn định',
-                        'Thiết bị hoạt động liên tục', 'Thiết bị không hoạt động',
-                        'Thiết bị lọc chậm', 'Tiếng ồn khi vận hành',
-                        'Khác (phát sinh theo thực tế)',
-                      ].map(s => <option key={s} value={s}>{s}</option>)}
+                    <select className="w-full border rounded p-2 text-sm outline-none focus:border-blue-500 text-gray-800 bg-white" value={serviceType} onChange={e => setServiceType(e.target.value)}>
+                      <option value="">-- Chọn dịch vụ bảo hành --</option>
+                      {Object.entries(WARRANTY_SERVICE_GROUPS).map(([groupName, services]) => (
+                        <optgroup key={groupName} label={groupName} className="font-semibold text-gray-900 bg-gray-50">
+                          {services.map(s => (
+                            <option key={s} value={s} className="font-normal text-gray-700 bg-white">{s}</option>
+                          ))}
+                        </optgroup>
+                      ))}
                     </select>
                   ) : workType === 'Sửa chữa' ? (
-                    <select className="w-full border rounded p-2 text-sm outline-none focus:border-blue-500" value={serviceType} onChange={e => setServiceType(e.target.value)}>
-                      <option value="">-- Chọn dịch vụ --</option>
-                      {[
-                        'Áp lực nước yếu', 'Bơm không hoạt động', 'Chất lượng nước sau lọc',
-                        'Đo chỉ số TDS', 'Hỏng vòi nước', 'Khảo sát vị trí', 'Lắp đặt lại máy',
-                        'Lấy mẫu test nước', 'Lỗi biến áp', 'Lỗi cảm biến rò rỉ', 'Lỗi mạch điện',
-                        'Lỗi màn hình hiển thị', 'Lỗi vòi nước', 'Lỏng vòi nước',
-                        'Máy báo đỏ các đèn', 'Máy báo lỗi TDS', 'Nước thải không ngừng',
-                        'Rò rỉ bên trong máy', 'Rò rỉ đường ống', 'Rò rỉ lọc thô', 'Rò rỉ từ vòi',
-                        'Rò rỉ van cấp nước', 'Tháo máy', 'Thay đổi vị trí lắp đặt', 'Thay linh kiện',
-                        'Thiết bị hoạt động không ổn định', 'Thiết bị hoạt động liên tục',
-                        'Thiết bị không hoạt động', 'Thiết bị lọc chậm',
-                        'Thu hồi/Đổi/Trả', 'Tiếng ồn khi vận hành',
-                        'Khác (phát sinh theo thực tế)',
-                      ].map(s => <option key={s} value={s}>{s}</option>)}
+                    <select className="w-full border rounded p-2 text-sm outline-none focus:border-blue-500 text-gray-800 bg-white" value={serviceType} onChange={e => setServiceType(e.target.value)}>
+                      <option value="">-- Chọn dịch vụ sửa chữa --</option>
+                      {Object.entries(REPAIR_SERVICE_GROUPS).map(([groupName, services]) => (
+                        <optgroup key={groupName} label={groupName} className="font-semibold text-gray-900 bg-gray-50">
+                          {services.map(s => (
+                            <option key={s} value={s} className="font-normal text-gray-700 bg-white">{s}</option>
+                          ))}
+                        </optgroup>
+                      ))}
                     </select>
                   ) : (
-                    <select className="w-full border rounded p-2 text-sm outline-none focus:border-blue-500" value={serviceType} onChange={e => setServiceType(e.target.value)} disabled={!workType}>
+                    <select className="w-full border rounded p-2 text-sm outline-none focus:border-blue-500 text-gray-500 bg-white" value={serviceType} onChange={e => setServiceType(e.target.value)} disabled={!workType}>
                       <option value="">-- Chọn loại công việc trước --</option>
                     </select>
                   )}

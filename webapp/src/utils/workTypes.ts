@@ -12,36 +12,108 @@ export const WORK_TYPES = [
   'Sửa chữa',
 ];
 
+// ── Chi tiết dịch vụ Bảo hành theo nhóm lỗi ──
+export const WARRANTY_SERVICE_GROUPS: Record<string, string[]> = {
+  'Lỗi Rò rỉ & Đường nước': [
+    'Rò rỉ bên trong máy',
+    'Rò rỉ đường ống',
+    'Rò rỉ lọc thô',
+    'Rò rỉ van cấp nước',
+    'Nước thải không ngừng',
+  ],
+  'Lỗi Vòi nước': [
+    'Hỏng vòi nước',
+    'Lỗi vòi nước',
+    'Lỏng vòi nước',
+    'Rò rỉ từ vòi',
+  ],
+  'Lỗi Điện & Động cơ': [
+    'Bơm không hoạt động',
+    'Lỗi biến áp',
+    'Lỗi mạch điện',
+  ],
+  'Hiển thị & Cảnh báo': [
+    'Lỗi cảm biến rò rỉ',
+    'Lỗi màn hình hiển thị',
+    'Máy báo đỏ các đèn',
+    'Máy báo lỗi TDS',
+  ],
+  'Vấn đề Hoạt động & Chất lượng': [
+    'Áp lực nước yếu',
+    'Chất lượng nước sau lọc',
+    'Thiết bị hoạt động không ổn định',
+    'Thiết bị hoạt động liên tục',
+    'Thiết bị không hoạt động',
+    'Thiết bị lọc chậm',
+    'Tiếng ồn khi vận hành',
+  ],
+  'Khác': [
+    'Khác (phát sinh theo thực tế)',
+  ],
+};
+
+// ── Chi tiết dịch vụ Sửa chữa theo nhóm lỗi ──
+export const REPAIR_SERVICE_GROUPS: Record<string, string[]> = {
+  'Lắp đặt & Di dời': [
+    'Lắp đặt lại máy',
+    'Tháo máy',
+    'Thay đổi vị trí lắp đặt',
+  ],
+  'Khảo sát & Đo đạc': [
+    'Khảo sát vị trí',
+    'Lấy mẫu test nước',
+    'Đo chỉ số TDS',
+  ],
+  'Linh kiện': [
+    'Thay linh kiện',
+  ],
+  'Lỗi Rò rỉ & Đường nước': [
+    'Rò rỉ bên trong máy',
+    'Rò rỉ đường ống',
+    'Rò rỉ lọc thô',
+    'Rò rỉ van cấp nước',
+    'Nước thải không ngừng',
+  ],
+  'Lỗi Vòi nước': [
+    'Hỏng vòi nước',
+    'Lỗi vòi nước',
+    'Lỏng vòi nước',
+    'Rò rỉ từ vòi',
+  ],
+  'Lỗi Điện & Động cơ': [
+    'Bơm không hoạt động',
+    'Lỗi biến áp',
+    'Lỗi mạch điện',
+  ],
+  'Hiển thị & Cảnh báo': [
+    'Lỗi cảm biến rò rỉ',
+    'Lỗi màn hình hiển thị',
+    'Máy báo đỏ các đèn',
+    'Máy báo lỗi TDS',
+  ],
+  'Vấn đề Hoạt động & Chất lượng': [
+    'Áp lực nước yếu',
+    'Chất lượng nước sau lọc',
+    'Thiết bị hoạt động không ổn định',
+    'Thiết bị hoạt động liên tục',
+    'Thiết bị không hoạt động',
+    'Thiết bị lọc chậm',
+    'Tiếng ồn khi vận hành',
+  ],
+  'Khác': [
+    'Thu hồi/Đổi/Trả',
+    'Khác (phát sinh theo thực tế)',
+  ],
+};
+
 // ── Loại dịch vụ tương ứng với Loại công việc ──
 export const WORK_TYPE_SERVICES: Record<string, string[]> = {
   'Giao hàng và Lắp đặt': ['Công việc đã bao gồm dịch vụ'],
   'Lắp đặt': ['Công việc đã bao gồm dịch vụ'],
   'Giao hàng': ['Công việc đã bao gồm dịch vụ'],
   'Thay lọc': ['Công việc đã bao gồm dịch vụ'],
-  'Bảo hành': [
-    'Áp lực nước yếu', 'Bơm không hoạt động', 'Chất lượng nước sau lọc',
-    'Hỏng vòi nước', 'Lỗi biến áp', 'Lỗi cảm biến rò rỉ', 'Lỗi mạch điện',
-    'Lỗi màn hình hiển thị', 'Lỗi vòi nước', 'Lỏng vòi nước',
-    'Máy báo đỏ các đèn', 'Máy báo lỗi TDS', 'Nước thải không ngừng',
-    'Rò rỉ bên trong máy', 'Rò rỉ đường ống', 'Rò rỉ lọc thô', 'Rò rỉ từ vòi',
-    'Rò rỉ van cấp nước', 'Thiết bị hoạt động không ổn định',
-    'Thiết bị hoạt động liên tục', 'Thiết bị không hoạt động',
-    'Thiết bị lọc chậm', 'Tiếng ồn khi vận hành',
-    'Khác (phát sinh theo thực tế)',
-  ],
-  'Sửa chữa': [
-    'Áp lực nước yếu', 'Bơm không hoạt động', 'Chất lượng nước sau lọc',
-    'Đo chỉ số TDS', 'Hỏng vòi nước', 'Khảo sát vị trí', 'Lắp đặt lại máy',
-    'Lấy mẫu test nước', 'Lỗi biến áp', 'Lỗi cảm biến rò rỉ', 'Lỗi mạch điện',
-    'Lỗi màn hình hiển thị', 'Lỗi vòi nước', 'Lỏng vòi nước',
-    'Máy báo đỏ các đèn', 'Máy báo lỗi TDS', 'Nước thải không ngừng',
-    'Rò rỉ bên trong máy', 'Rò rỉ đường ống', 'Rò rỉ lọc thô', 'Rò rỉ từ vòi',
-    'Rò rỉ van cấp nước', 'Tháo máy', 'Thay đổi vị trí lắp đặt', 'Thay linh kiện',
-    'Thiết bị hoạt động không ổn định', 'Thiết bị hoạt động liên tục',
-    'Thiết bị không hoạt động', 'Thiết bị lọc chậm',
-    'Thu hồi/Đổi/Trả', 'Tiếng ồn khi vận hành',
-    'Khác (phát sinh theo thực tế)',
-  ],
+  'Bảo hành': Object.values(WARRANTY_SERVICE_GROUPS).flat(),
+  'Sửa chữa': Object.values(REPAIR_SERVICE_GROUPS).flat(),
 };
 
 // ── Image slots theo loại công việc ──
