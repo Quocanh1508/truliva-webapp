@@ -74,7 +74,8 @@ export default function OrderList() {
   const [selectedMain, setSelectedMain] = useState('');
   const [selectedTech, setSelectedTech] = useState('');
   const [selectedKtv, setSelectedKtv] = useState('');
-  const [appointment, setAppointment] = useState('');
+  const [appointmentDate, setAppointmentDate] = useState('');
+  const [appointmentTime, setAppointmentTime] = useState('08:30');
   const [rescheduleReason, setRescheduleReason] = useState('');
   const [workType, setWorkType] = useState('');
   const [serviceType, setServiceType] = useState('');
@@ -302,11 +303,17 @@ export default function OrderList() {
     setSelectedKtv(initialKtv);
 
     // Convert UTC to local input format
-    let appTime = '';
+    let appDateStr = '';
+    let appTimeStr = '08:30';
     if (order.appointmentTime) {
-      appTime = new Date(new Date(order.appointmentTime).getTime() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+      const d = new Date(order.appointmentTime);
+      const localDate = new Date(d.getTime() - d.getTimezoneOffset() * 60000);
+      const iso = localDate.toISOString();
+      appDateStr = iso.slice(0, 10);
+      appTimeStr = iso.slice(11, 16);
     }
-    setAppointment(appTime);
+    setAppointmentDate(appDateStr);
+    setAppointmentTime(appTimeStr);
     setRescheduleReason(order.rescheduleReason || '');
     setWorkType(order.workType || '');
     setServiceType(order.serviceType || '');
@@ -421,24 +428,22 @@ export default function OrderList() {
       }
     }
 
-    if (!appointment) {
-      alert('Vui lòng chọn thời gian hẹn khách.');
+    if (!appointmentDate) {
+      alert('Vui lòng chọn ngày hẹn khách.');
       return;
     }
 
-    let finalAppointment = appointment;
-    const hasTimePartZero = appointment.endsWith('T00:00') || appointment.endsWith(' 00:00');
-    if (hasTimePartZero) {
-      finalAppointment = appointment.replace(/T00:00$/, 'T08:30').replace(/ 00:00$/, 'T08:30');
-    }
+    // Default time to 08:30 if not selected/specified
+    const finalTime = appointmentTime ? appointmentTime.trim() : '08:30';
 
-    const appointmentDate = new Date(finalAppointment);
-    if (isNaN(appointmentDate.getTime())) {
+    const appointmentDateTimeStr = `${appointmentDate}T${finalTime}`;
+    const appointmentDateObj = new Date(appointmentDateTimeStr);
+    if (isNaN(appointmentDateObj.getTime())) {
       alert('Thời gian hẹn khách không hợp lệ.');
       return;
     }
 
-    if (appointmentDate < new Date()) {
+    if (appointmentDateObj < new Date()) {
       alert('Thời gian hẹn khách không được ở trong quá khứ.');
       return;
     }
@@ -448,7 +453,7 @@ export default function OrderList() {
         mainStationId: selectedMain || null,
         techStationId: selectedTech || null,
         assignedKtvId: selectedKtv || null,
-        appointmentTime: appointmentDate.toISOString(),
+        appointmentTime: appointmentDateObj.toISOString(),
         rescheduleReason: rescheduleReason || null,
         workType: workType || null,
         serviceType: serviceType || null,
@@ -1287,7 +1292,24 @@ export default function OrderList() {
 
                 <div>
                   <label className="block text-sm text-gray-600 mb-1">Thời gian hẹn khách *</label>
-                  <input type="datetime-local" className="w-full border rounded p-2 text-sm outline-none focus:border-blue-500" value={appointment} onChange={e => setAppointment(e.target.value)} />
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <input 
+                        type="date" 
+                        className="w-full border rounded p-2 text-sm outline-none focus:border-blue-500 text-gray-800 bg-white" 
+                        value={appointmentDate} 
+                        onChange={e => setAppointmentDate(e.target.value)} 
+                      />
+                    </div>
+                    <div>
+                      <input 
+                        type="time" 
+                        className="w-full border rounded p-2 text-sm outline-none focus:border-blue-500 text-gray-800 bg-white" 
+                        value={appointmentTime} 
+                        onChange={e => setAppointmentTime(e.target.value)} 
+                      />
+                    </div>
+                  </div>
                 </div>
 
                 <div>
