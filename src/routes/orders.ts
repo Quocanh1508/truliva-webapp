@@ -83,10 +83,29 @@ router.get('/', requireAuth, async (req: Request, res: Response): Promise<void> 
     if (adminStatuses) {
       const statusesList = typeof adminStatuses === 'string' ? adminStatuses.split(',') : (Array.isArray(adminStatuses) ? adminStatuses as string[] : []);
       if (statusesList.length > 0) {
-        conditions.push({ adminStatus: { in: statusesList } });
+        const hasPending = statusesList.includes('chờ xử lý');
+        if (hasPending) {
+          conditions.push({
+            OR: [
+              { adminStatus: { in: statusesList } },
+              { adminStatus: null }
+            ]
+          });
+        } else {
+          conditions.push({ adminStatus: { in: statusesList } });
+        }
       }
     } else if (status) {
-      conditions.push({ adminStatus: status as string });
+      if (status === 'chờ xử lý') {
+        conditions.push({
+          OR: [
+            { adminStatus: 'chờ xử lý' },
+            { adminStatus: null }
+          ]
+        });
+      } else {
+        conditions.push({ adminStatus: status as string });
+      }
     }
 
     if (assignedKtvIds) {
@@ -450,10 +469,29 @@ router.get('/export', requireAuth, requireAdmin, async (req: Request, res: Respo
     if (adminStatuses) {
       const statusesList = typeof adminStatuses === 'string' ? adminStatuses.split(',') : (Array.isArray(adminStatuses) ? adminStatuses as string[] : []);
       if (statusesList.length > 0) {
-        conditions.push({ adminStatus: { in: statusesList } });
+        const hasPending = statusesList.includes('chờ xử lý');
+        if (hasPending) {
+          conditions.push({
+            OR: [
+              { adminStatus: { in: statusesList } },
+              { adminStatus: null }
+            ]
+          });
+        } else {
+          conditions.push({ adminStatus: { in: statusesList } });
+        }
       }
     } else if (status) {
-      conditions.push({ adminStatus: status as string });
+      if (status === 'chờ xử lý') {
+        conditions.push({
+          OR: [
+            { adminStatus: 'chờ xử lý' },
+            { adminStatus: null }
+          ]
+        });
+      } else {
+        conditions.push({ adminStatus: status as string });
+      }
     }
 
     if (assignedKtvIds) {
