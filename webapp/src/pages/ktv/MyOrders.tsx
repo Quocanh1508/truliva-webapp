@@ -1,8 +1,10 @@
 import React, { useEffect, useState } from 'react';
-import { getOrders, callCustomer } from '../../api/client';
-import { Search, ChevronLeft, ChevronRight, Phone } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { getOrders, callCustomer, rescheduleOrder } from '../../api/client';
+import { Search, ChevronLeft, ChevronRight, Phone, Calendar, FileText } from 'lucide-react';
 
 export default function MyOrders() {
+  const navigate = useNavigate();
   const [orders, setOrders] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -16,6 +18,12 @@ export default function MyOrders() {
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [callingOrderId, setCallingOrderId] = useState<string | null>(null);
+
+  // Reschedule Modal state
+  const [rescheduleModalOrder, setRescheduleModalOrder] = useState<any | null>(null);
+  const [newApptTime, setNewApptTime] = useState('');
+  const [rescheduleReason, setRescheduleReason] = useState('');
+  const [resubmitLoading, setResubmitLoading] = useState(false);
 
   const fetchOrdersData = async () => {
     try {
@@ -50,12 +58,17 @@ export default function MyOrders() {
   const handleCallCustomer = async (orderId: string, phone: string) => {
     if (!phone || callingOrderId) return;
     try {
+      // Copy to clipboard
+      await navigator.clipboard.writeText(phone);
+      
       setCallingOrderId(orderId);
-      const result = await callCustomer(orderId);
-      // Update local state to reflect the call timestamp
+      await callCustomer(orderId);
+      
+      // Update local state
       setOrders(prev => prev.map(o =>
-        o.id === orderId ? { ...o, ktvCalledAt: result.ktvCalledAt } : o
+        o.id === orderId ? { ...o, ktvCalledAt: new Date().toISOString() } : o
       ));
+      
       // Open phone dialer
       window.location.href = `tel:${phone}`;
     } catch (err: any) {
@@ -65,19 +78,24 @@ export default function MyOrders() {
     }
   };
 
-  const getStatusBadge = (status: string) => {
-    switch(status) {
-      case 'chờ hàng': return <span className="px-2 py-1 bg-amber-100 text-amber-700 rounded text-xs font-medium">Chờ hàng</span>;
-      case 'ưu tiên xuất đơn': return <span className="px-2 py-1 bg-purple-100 text-purple-700 rounded text-xs font-medium">Ưu tiên xuất đơn</span>;
-      case 'xác nhận đơn hàng': return <span className="px-2 py-1 bg-blue-100 text-blue-700 rounded text-xs font-medium">Xác nhận</span>;
-      case 'đang đóng hàng': return <span className="px-2 py-1 bg-indigo-100 text-indigo-700 rounded text-xs font-medium">Đang đóng hàng</span>;
-      case 'chờ chuyển hàng': return <span className="px-2 py-1 bg-cyan-100 text-cyan-700 rounded text-xs font-medium">Chờ chuyển hàng</span>;
-      case 'gửi hàng đi': return <span className="px-2 py-1 bg-emerald-100 text-emerald-700 rounded text-xs font-medium">Gửi hàng đi</span>;
-      case 'hủy đơn': return <span className="px-2 py-1 bg-red-100 text-red-700 rounded text-xs font-medium">Hủy đơn</span>;
-      case 'đang thực hiện': return <span className="px-2 py-1 bg-orange-100 text-orange-700 rounded text-xs font-medium">Cần hoàn thành</span>;
-      default: return <span className="px-2 py-1 bg-gray-100 text-gray-700 rounded text-xs font-medium">{status || 'Chưa cập nhật'}</span>;
+  const handleRescheduleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!rescheduleModalOrder || !newApptTime || !rescheduleReason) return;
+    try {
+      setResubmitLoading(true);
+      await rescheduleOrder(rescheduleModalOrder.id, newApptTime, rescheduleReason);
+      setRescheduleModalOrder(null);
+      setNewApptTime('');
+      setRescheduleReason('');
+      fetchOrdersData();
+    } catch (err: any) {
+      alert(err.message || 'Lỗi khi hẹn lại lịch');
+    } finally {
+      setResubmitLoading(false);
     }
   };
+
+
 
   const getWorkTypeBadge = (workType: string) => {
     if (!workType) return null;
@@ -104,7 +122,7 @@ export default function MyOrders() {
     <div className="flex flex-col bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden h-[calc(100vh-80px)] font-sans">
       
       <div className="px-4 py-4 border-b border-gray-200 bg-gray-50 flex justify-between items-center">
-        <h2 className="text-lg font-bold text-gray-800">Đơn Hàng Được Giao</h2>
+        <h2 className="text-lg font-bold text-gray-800">Dịch vụ được giao</h2>
       </div>
 
       {/* Toolbar */}
@@ -149,19 +167,16 @@ export default function MyOrders() {
         ) : error ? (
           <div className="text-center py-12 text-red-500 font-medium">{error}</div>
         ) : orders.length === 0 ? (
-          <div className="text-center py-12 text-gray-400">Bạn chưa được giao đơn hàng nào</div>
+          <div className="text-center py-12 text-gray-400">Bạn chưa được giao dịch vụ nào</div>
         ) : (
-          <table className="w-full text-left text-[13px] whitespace-nowrap">
+          <table className="w-full text-left text-[13px] border-collapse">
             <thead className="sticky top-0 bg-[#f8f9fa] text-gray-600 font-semibold border-b border-gray-200 z-10 shadow-sm">
               <tr>
-                <th className="px-4 py-3">Mã Đơn</th>
-                <th className="px-4 py-3">Giờ Hẹn</th>
-                <th className="px-4 py-3">Khách hàng</th>
-                <th className="px-4 py-3">Sản phẩm</th>
-                <th className="px-4 py-3">SĐT</th>
-                <th className="px-4 py-3">Trạng thái</th>
-                <th className="px-4 py-3">Địa chỉ</th>
-                <th className="px-4 py-3 text-center">Thao tác</th>
+                <th className="px-4 py-3 w-[100px]">Mã đơn</th>
+                <th className="px-4 py-3 w-[250px]">Khách hàng</th>
+                <th className="px-4 py-3 w-[350px]">Công việc</th>
+                <th className="px-4 py-3">Ghi chú</th>
+                <th className="px-4 py-3 text-center w-[150px]">Thao tác</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
@@ -172,88 +187,117 @@ export default function MyOrders() {
                  
                  return (
                   <tr key={order.id} className={`${idx % 2 === 0 ? 'bg-white' : 'bg-[#fafafa]'} hover:bg-blue-50/50 transition-colors`}>
-                    <td className="px-4 py-3">
+                    {/* Mã đơn */}
+                    <td className="px-4 py-3 align-top">
                       <div className="flex flex-col">
-                        <span className="text-blue-600 font-semibold">#{order.pancakeOrderId}</span>
+                        <span className="text-blue-600 font-semibold text-[14px]">#{order.pancakeOrderId}</span>
                         {getWorkTypeBadge(order.workType)}
                       </div>
                     </td>
-                    <td className="px-4 py-3">
-                      {order.appointmentTime ? (
-                        (() => {
-                          const apptDate = new Date(order.appointmentTime);
-                          const isOverdue = apptDate < new Date();
-                          return (
-                            <div className="flex flex-col gap-1">
-                              <div className={`font-medium ${isOverdue ? 'text-rose-600 font-semibold' : 'text-emerald-600'}`}>
-                                {apptDate.toLocaleTimeString('vi-VN', {hour: '2-digit', minute:'2-digit'})} - {apptDate.toLocaleDateString('vi-VN')}
-                              </div>
-                              {isOverdue && (
-                                <span className="inline-flex items-center gap-1 text-[10px] font-bold text-red-700 bg-red-50 border border-red-200 px-1.5 py-0.5 rounded w-max">
-                                  ⚠️ Trễ hẹn
-                                </span>
-                              )}
-                            </div>
-                          );
-                        })()
-                      ) : <span className="text-gray-400 italic">Chưa hẹn</span>}
+
+                    {/* Khách hàng */}
+                    <td className="px-4 py-3 align-top whitespace-normal break-words">
+                      <div className="flex flex-col gap-0.5">
+                        <span className="text-gray-900 font-bold text-[13px]">{customerName}</span>
+                        <span className="text-gray-700 font-semibold">{phone}</span>
+                        <span className="text-gray-500 text-[11px] leading-tight">{address}</span>
+                      </div>
                     </td>
-                    <td className="px-4 py-3">
-                      <div className="flex items-center gap-2">
-                        <div className="w-6 h-6 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center font-bold text-[11px] shrink-0">
-                          {customerName.charAt(0).toUpperCase()}
-                        </div>
-                        <div className="flex flex-col">
-                          <span className="text-gray-800 font-medium">{customerName}</span>
-                          {order.note && (
-                            <span className="text-[11px] text-amber-700 bg-amber-50 border border-amber-100 px-2 py-0.5 rounded font-normal inline-block mt-1 whitespace-normal break-words max-w-[250px]" title="Lời nhắn từ Pancake">
-                              💬 {order.note}
-                            </span>
+
+                    {/* Công việc */}
+                    <td className="px-4 py-3 align-top whitespace-normal break-words">
+                      <div className="flex flex-col gap-1">
+                        {/* Hẹn khách */}
+                        {order.appointmentTime ? (
+                          (() => {
+                            const apptDate = new Date(order.appointmentTime);
+                            const isOverdue = apptDate < new Date();
+                            return (
+                              <div className={`font-semibold text-[12px] flex items-center gap-1.5 ${isOverdue ? 'text-rose-600' : 'text-emerald-600'}`}>
+                                📅 {apptDate.toLocaleTimeString('vi-VN', {hour: '2-digit', minute:'2-digit'})} - {apptDate.toLocaleDateString('vi-VN')}
+                                {isOverdue && (
+                                  <span className="text-[10px] text-red-700 bg-red-50 border border-red-200 px-1 py-0.5 rounded font-bold">
+                                    Trễ hẹn
+                                  </span>
+                                )}
+                              </div>
+                            );
+                          })()
+                        ) : <span className="text-gray-400 italic">Chưa hẹn lịch</span>}
+
+                        {/* Loại công việc & dịch vụ */}
+                        <div className="text-[12px] text-gray-700 flex flex-wrap gap-x-1.5 gap-y-0.5 items-center mt-0.5">
+                          <span className="font-semibold text-gray-800">Công việc:</span>
+                          <span>{order.workType || 'Chưa cập nhật'}</span>
+                          {order.serviceType && (
+                            <>
+                              <span className="text-gray-300">|</span>
+                              <span className="font-semibold text-gray-800">Dịch vụ:</span>
+                              <span className="text-blue-600 font-medium">{order.serviceType}</span>
+                            </>
                           )}
                         </div>
+
+                        {/* Sản phẩm */}
+                        <div className="flex flex-col gap-0.5 mt-1 border-t border-gray-100 pt-1">
+                          {order.items?.map((item: any, itemIdx: number) => (
+                            <div key={item.id || itemIdx} className="text-[12px] text-gray-600">
+                              • {item.productName} <span className="text-gray-900 font-bold">x{item.quantity || 1}</span>
+                            </div>
+                          ))}
+                          {(!order.items || order.items.length === 0) && (
+                            <span className="text-gray-400 italic">Không có sản phẩm</span>
+                          )}
+                        </div>
+
+                        {/* Tiền cần thu */}
+                        <div className="text-[12px] font-bold text-gray-800 mt-1">
+                          Thu: <span className="text-amber-600">{order.moneyToCollect ? order.moneyToCollect.toLocaleString('vi-VN') + ' đ' : '0 đ'}</span>
+                        </div>
                       </div>
                     </td>
-                    <td className="px-4 py-3 whitespace-normal break-words max-w-[220px]">
-                      <div className="flex flex-col gap-1">
-                        {order.items?.map((item: any, itemIdx: number) => (
-                          <div key={item.id || itemIdx} className="text-[12px] text-gray-700 font-medium">
-                            • {item.productName} <span className="text-gray-500 font-bold">x{item.quantity || 1}</span>
-                          </div>
-                        ))}
-                        {(!order.items || order.items.length === 0) && (
-                          <span className="text-gray-400 italic">Không có sản phẩm</span>
-                        )}
-                      </div>
+
+                    {/* Ghi chú */}
+                    <td className="px-4 py-3 align-top whitespace-normal break-words text-gray-600 text-[12px]">
+                      {order.note || <span className="text-gray-400 italic">Không có ghi chú</span>}
                     </td>
-                    <td className="px-4 py-3 text-gray-700 font-medium">
-                      {phone}
-                    </td>
-                    <td className="px-4 py-3">
-                      {getStatusBadge(order.adminStatus)}
-                    </td>
-                    <td className="px-4 py-3 text-gray-600 whitespace-normal break-words max-w-[300px]">
-                      {address}
-                    </td>
-                    <td className="px-4 py-3 text-center">
-                      <div className="flex flex-col items-center gap-1">
+
+                    {/* Thao tác */}
+                    <td className="px-4 py-3 align-top text-center">
+                      <div className="flex items-center justify-center gap-2 mt-1">
+                        {/* Gọi khách */}
                         {phone ? (
                           <button
                             onClick={(e) => { e.stopPropagation(); handleCallCustomer(order.id, phone); }}
                             disabled={callingOrderId === order.id}
-                            className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-500 hover:bg-emerald-600 text-white text-[12px] font-semibold rounded-md shadow-sm transition-all disabled:opacity-50 disabled:cursor-wait cursor-pointer"
-                            title={`Gọi ${phone}`}
+                            className="p-2 bg-emerald-500 hover:bg-emerald-600 text-white rounded-full shadow-sm hover:shadow transition-all disabled:opacity-50 cursor-pointer flex items-center justify-center shrink-0"
+                            title="Gọi khách (Copy SĐT & quay số)"
                           >
-                            <Phone size={13} />
-                            {callingOrderId === order.id ? 'Đang gọi...' : 'Gọi khách'}
+                            <Phone size={14} />
                           </button>
                         ) : (
-                          <span className="text-gray-400 text-[11px] italic">Không có SĐT</span>
+                          <div className="p-2 bg-gray-100 text-gray-400 rounded-full cursor-not-allowed shrink-0" title="Không có SĐT">
+                            <Phone size={14} />
+                          </div>
                         )}
-                        {order.ktvCalledAt && (
-                          <span className="text-[10px] text-emerald-600 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded font-medium">
-                            📞 Đã gọi lúc {new Date(order.ktvCalledAt).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })} - {new Date(order.ktvCalledAt).toLocaleDateString('vi-VN')}
-                          </span>
-                        )}
+
+                        {/* Khách hẹn lại */}
+                        <button
+                          onClick={(e) => { e.stopPropagation(); setRescheduleModalOrder(order); }}
+                          className="p-2 bg-amber-500 hover:bg-amber-600 text-white rounded-full shadow-sm hover:shadow transition-all cursor-pointer flex items-center justify-center shrink-0"
+                          title="Khách hẹn lại lịch"
+                        >
+                          <Calendar size={14} />
+                        </button>
+
+                        {/* Tạo báo cáo */}
+                        <button
+                          onClick={(e) => { e.stopPropagation(); navigate('/ktv/report', { state: { order } }); }}
+                          className="p-2 bg-blue-600 hover:bg-blue-700 text-white rounded-full shadow-sm hover:shadow transition-all cursor-pointer flex items-center justify-center shrink-0"
+                          title="Tạo báo cáo"
+                        >
+                          <FileText size={14} />
+                        </button>
                       </div>
                     </td>
                   </tr>
@@ -288,6 +332,67 @@ export default function MyOrders() {
           </div>
         </div>
       )}
+
+      {/* Reschedule Modal */}
+      {rescheduleModalOrder && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-xl border max-w-md w-full overflow-hidden animate-fade-in">
+            <div className="px-6 py-4 bg-gray-50 border-b border-gray-200 flex justify-between items-center">
+              <h3 className="text-base font-bold text-gray-900">Hẹn lại lịch dịch vụ #{rescheduleModalOrder.pancakeOrderId}</h3>
+              <button 
+                onClick={() => setRescheduleModalOrder(null)} 
+                className="text-gray-400 hover:text-gray-600 outline-none text-xl font-medium"
+              >
+                &times;
+              </button>
+            </div>
+            <form onSubmit={handleRescheduleSubmit} className="p-6 space-y-4">
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-1">Thời gian hẹn mới *</label>
+                <input
+                  type="datetime-local"
+                  required
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-1 focus:ring-blue-500 outline-none text-sm"
+                  value={newApptTime}
+                  onChange={(e) => setNewApptTime(e.target.value)}
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-1">Lý do hẹn lại *</label>
+                <textarea
+                  required
+                  rows={3}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-1 focus:ring-blue-500 outline-none text-sm"
+                  placeholder="Nhập lý do khách hàng yêu cầu hẹn lại lịch..."
+                  value={rescheduleReason}
+                  onChange={(e) => setRescheduleReason(e.target.value)}
+                />
+              </div>
+              <div className="bg-amber-50 border border-amber-200 rounded p-3 text-[12px] text-amber-800">
+                ⚠️ <strong>Lưu ý:</strong> Khi xác nhận hẹn lại lịch, dịch vụ này sẽ tự động chuyển trạng thái thành <strong>"Chờ xử lý"</strong>, gỡ bỏ phân công của bạn và chuyển trả ca về cho Admin xử lý lại.
+              </div>
+              <div className="flex justify-end gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setRescheduleModalOrder(null)}
+                  className="px-4 py-2 border border-gray-300 rounded-md text-sm text-gray-700 hover:bg-gray-50"
+                  disabled={resubmitLoading}
+                >
+                  Hủy bỏ
+                </button>
+                <button
+                  type="submit"
+                  className="px-4 py-2 bg-amber-500 hover:bg-amber-600 text-white font-semibold rounded-md text-sm flex items-center gap-1.5"
+                  disabled={resubmitLoading}
+                >
+                  {resubmitLoading ? 'Đang cập nhật...' : 'Xác nhận hẹn lại'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }

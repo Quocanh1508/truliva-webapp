@@ -893,6 +893,79 @@ router.post('/:id/call-customer', requireAuth, async (req: Request, res: Respons
 });
 
 /**
+ * POST /api/orders/:id/reschedule
+ * KTV yêu cầu hẹn lại lịch làm việc với khách hàng:
+ * - Cập nhật appointmentTime mới
+ * - Cập nhật lý do hẹn lại rescheduleReason
+ * - Trạng thái chuyển về "chờ xử lý"
+ * - Thu hồi phân bổ assignedKtvId = null (trả ca về cho Admin)
+ * - Tạo Audit Log ghi nhận hành động hẹn lại
+ */
+router.post('/:id/reschedule', requireAuth, async (req: Request, res: Response): Promise<void> => {
+  try {
+    const id = req.params.id as string;
+    const { appointmentTime, rescheduleReason } = req.body;
+
+    if (!appointmentTime || !rescheduleReason) {
+      res.status(400).json({ error: 'Thiếu thời gian hẹn mới hoặc lý do hẹn lại' });
+      return;
+    }
+
+    // Tìm đơn hàng
+    const order = await prisma.order.findUnique({ where: { id } });
+    if (!order) {
+      res.status(404).json({ error: 'Không tìm thấy đơn hàng' });
+      return;
+    }
+
+    // Chỉ KTV được phân công đơn mới được hẹn lại
+    if (req.user?.role === 'KTV' && order.assignedKtvId !== req.user.id) {
+      res.status(403).json({ error: 'Bạn không được phân công đơn hàng này' });
+      return;
+    }
+
+    const newApptTime = new Date(appointmentTime);
+
+    // Cập nhật đơn hàng
+    const updatedOrder = await prisma.order.update({
+      where: { id },
+      data: {
+        appointmentTime: newApptTime,
+        rescheduleReason: rescheduleReason,
+        adminStatus: 'chờ xử lý',
+        assignedKtvId: null,
+      },
+    });
+
+    // Ghi nhận Audit Log
+    const changes = [
+      { field: 'appointmentTime', from: order.appointmentTime, to: newApptTime },
+      { field: 'rescheduleReason', from: order.rescheduleReason, to: rescheduleReason },
+      { field: 'adminStatus', from: order.adminStatus, to: 'chờ xử lý' },
+      { field: 'assignedKtvId', from: order.assignedKtvId, to: null },
+    ];
+
+    await prisma.auditLog.create({
+      data: {
+        entityType: 'Order',
+        entityId: id,
+        action: 'rescheduled',
+        changes,
+        userId: req.user!.id,
+        userName: req.user!.fullName,
+      },
+    });
+
+    logger.info('Order rescheduled by KTV', { orderId: id, ktvId: req.user?.id, newTime: newApptTime, reason: rescheduleReason });
+    res.json({ success: true, message: 'Đã hẹn lại lịch và trả đơn hàng về Admin xử lý.', order: updatedOrder });
+  } catch (error: any) {
+    logger.error('Reschedule order error', { error: error.message });
+    res.status(500).json({ error: 'Lỗi ghi nhận hẹn lại lịch làm việc' });
+  }
+});
+
+
+/**
  * PATCH /api/orders/:id
  * Cập nhật đơn hàng (trạng thái, phân công, loại CV, trạm, hủy/khôi phục...)
  */

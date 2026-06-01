@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { fetchApi, getOrders } from '../../api/client';
 import LabeledImageUploader from '../../components/LabeledImageUploader';
 import { CheckCircle, ChevronLeft, Send, AlertCircle, Camera, Loader2, ChevronDown, ChevronUp } from 'lucide-react';
@@ -118,6 +118,7 @@ function needsSpareParts(workType: string): boolean {
 
 export default function ReportForm() {
   const navigate = useNavigate();
+  const location = useLocation();
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -249,9 +250,58 @@ export default function ReportForm() {
 
   useEffect(() => {
     getOrders({ limit: 50, sortBy: 'createdAt', sortOrder: 'desc' })
-      .then(res => setOrders(res.orders))
+      .then(res => {
+        let list = res.orders;
+        const stateOrder = location.state?.order;
+        if (stateOrder) {
+          if (!list.some((o: any) => o.id === stateOrder.id)) {
+            list = [stateOrder, ...list];
+          }
+          setOrders(list);
+          setSelectedOrderId(stateOrder.id);
+          
+          setCustomerName(stateOrder.billFullName || stateOrder.customer?.fullName || '');
+          setCustomerPhone(stateOrder.billPhoneNumber || stateOrder.customer?.phoneNumber || '');
+          setProvince(stateOrder.shippingAddress?.province_name || stateOrder.customer?.provinceName || '');
+          setAddress(stateOrder.shippingAddress?.full_address || stateOrder.customer?.fullAddress || '');
+          
+          if (stateOrder.workType) {
+            setWorkType(stateOrder.workType);
+            const noServiceTypes = ['Giao hàng và Lắp đặt', 'Lắp đặt', 'Giao hàng', 'Thay lọc'];
+            if (noServiceTypes.includes(stateOrder.workType) && !stateOrder.serviceType) {
+              setServiceType('Công việc đã bao gồm dịch vụ');
+            } else {
+              setServiceType(stateOrder.serviceType || '');
+            }
+          } else {
+            setServiceType(stateOrder.serviceType || '');
+          }
+
+          let prodStr = '';
+          if (stateOrder.items && stateOrder.items.length > 0) {
+            prodStr = stateOrder.items.map((item: any) => {
+              const name = item.productName
+                || item.variationInfo?.name
+                || (item.sku ? `Sản phẩm (${item.sku})` : 'Sản phẩm không tên');
+              const qty = item.quantity || 1;
+              return `${name} x${qty}`;
+            }).join(', ');
+            setProducts(prodStr);
+          }
+          
+          if (stateOrder.moneyToCollect !== undefined && stateOrder.moneyToCollect !== null) {
+            setActualAmount(String(stateOrder.moneyToCollect));
+          }
+          
+          if (stateOrder.note) {
+            setOrderNote(stateOrder.note);
+          }
+        } else {
+          setOrders(list);
+        }
+      })
       .catch(err => console.error('Lỗi tải đơn hàng', err));
-  }, []);
+  }, [location.state]);
 
   const handleOrderSelect = (orderId: string) => {
     setSelectedOrderId(orderId);

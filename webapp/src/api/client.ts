@@ -238,3 +238,11 @@ export const getProductQualityAnalysis = async (params: Record<string, any> = {}
   const q = query.toString();
   return fetchApi(q ? `/dashboard/product-quality?${q}` : '/dashboard/product-quality');
 };
+
+export const rescheduleOrder = async (orderId: string, appointmentTime: string, rescheduleReason: string) => {
+  return fetchApi(`/orders/${orderId}/reschedule`, {
+    method: 'POST',
+    body: JSON.stringify({ appointmentTime, rescheduleReason }),
+  });
+};
+
