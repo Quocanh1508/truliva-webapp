@@ -32,12 +32,14 @@ export const sendPasswordResetEmail = async (
     }
 
     const smtpFromName = process.env.SMTP_FROM_NAME || 'Truliva System';
+    const appUrl = process.env.APP_URL || 'http://localhost:5173';
     
     // HTML email template
     const html = `
       <div style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e0e0e0; border-radius: 8px; background-color: #ffffff; color: #333333;">
         <div style="text-align: center; margin-bottom: 24px; border-bottom: 2px solid #1B3A6B; padding-bottom: 16px;">
-          <h2 style="color: #1B3A6B; margin: 0; font-size: 24px;">Hệ thống Quản lý Truliva</h2>
+          <img src="${appUrl}/logo.png" alt="Truliva Logo" style="height: 50px; margin-bottom: 10px; display: inline-block;" />
+          <h2 style="color: #1B3A6B; margin: 0; font-size: 22px;">Hệ thống Quản lý Truliva</h2>
         </div>
         
         <p>Xin chào <strong>${fullName}</strong>,</p>
