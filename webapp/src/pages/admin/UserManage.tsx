@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { fetchApi, getStations } from '../../api/client';
-import { UserPlus, Lock, Unlock, KeyRound, Search, Filter, X, Pencil } from 'lucide-react';
+import { UserPlus, Lock, Unlock, Search, Filter, X, Pencil, Download } from 'lucide-react';
 
 // Helper to sort tech stations: TP.Hồ Chí Minh, Hà Nội, Đà Nẵng first, then A-Z
 function getSortedTechStations(main: any) {
@@ -222,22 +222,6 @@ export default function UserManage() {
     }
   };
 
-  const resetPassword = async (id: string, name: string) => {
-    const newPassword = window.prompt(
-      `Đặt lại mật khẩu cho KTV "${name}"\nNhập mật khẩu mới (để trống = Truliva@2025):`
-    );
-    if (newPassword === null) return;
-    const passwordToSet = newPassword.trim() || 'Truliva@2025';
-    try {
-      await fetchApi(`/users/${id}`, {
-        method: 'PUT',
-        body: JSON.stringify({ password: passwordToSet })
-      });
-      alert(`Đã đặt lại mật khẩu cho "${name}" thành công!`);
-    } catch (err: any) {
-      alert('Lỗi: ' + err.message);
-    }
-  };
 
   const handleChangeStation = async (id: string, newStationId: string) => {
     try {
@@ -251,13 +235,29 @@ export default function UserManage() {
     }
   };
 
+  const handleExportExcel = () => {
+    const query = new URLSearchParams();
+    if (searchText.trim()) query.append('search', searchText.trim());
+    if (filterMainStation) query.append('mainStationId', filterMainStation);
+    if (filterTechStation) query.append('techStationId', filterTechStation);
+    if (filterStatus === 'active') query.append('status', 'active');
+    if (filterStatus === 'inactive') query.append('status', 'inactive');
+
+    window.open(`/api/users/export?${query.toString()}`, '_blank');
+  };
+
   return (
     <div className="animate-fade-in">
       <div className="flex justify-between items-center mb-6">
         <h2 className="font-bold text-2xl text-[#1B3A6B]">Quản lý Kỹ Thuật Viên</h2>
-        <button className="btn btn-primary flex items-center gap-2" onClick={openCreateModal}>
-          <UserPlus size={18} /> Thêm KTV
-        </button>
+        <div className="flex items-center gap-2">
+          <button className="btn btn-outline flex items-center gap-2" onClick={handleExportExcel} title="Xuất file Excel theo bộ lọc">
+            <Download size={18} /> Xuất Excel
+          </button>
+          <button className="btn btn-primary flex items-center gap-2" onClick={openCreateModal}>
+            <UserPlus size={18} /> Thêm KTV
+          </button>
+        </div>
       </div>
 
       {/* ── Filter Bar ── */}
@@ -413,7 +413,7 @@ export default function UserManage() {
                       {stations.map(main => (
                         <optgroup key={main.id} label={main.name}>
                           {getSortedTechStations(main).map((tech: any) => (
-                            <option key={tech.id} value={tech.id}>{tech.name}</option>
+                            <option key={tech.id} value={tech.id}>{main.name} | {tech.name}</option>
                           ))}
                         </optgroup>
                       ))}
@@ -592,7 +592,7 @@ export default function UserManage() {
                         {stations.map(main => (
                           <optgroup key={main.id} label={main.name}>
                             {getSortedTechStations(main).map((tech: any) => (
-                              <option key={tech.id} value={tech.id}>{tech.name}</option>
+                              <option key={tech.id} value={tech.id}>{main.name} | {tech.name}</option>
                             ))}
                           </optgroup>
                         ))}
@@ -619,13 +619,6 @@ export default function UserManage() {
                           title={u.isActive ? "Khóa tài khoản" : "Mở khóa tài khoản"}
                         >
                           {u.isActive ? <Lock size={18} /> : <Unlock size={18} />}
-                        </button>
-                        <button 
-                          onClick={() => resetPassword(u.id, u.fullName)}
-                          className="p-2 rounded text-sm text-amber-600 hover:bg-amber-50"
-                          title="Đặt lại mật khẩu"
-                        >
-                          <KeyRound size={18} />
                         </button>
                       </div>
                     )}

@@ -468,7 +468,7 @@ export default function Dashboard() {
         <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-9 gap-3">
           {/* Start Date */}
           <div className="flex flex-col">
-            <label className="text-[11px] font-semibold text-gray-500 mb-1 uppercase">Hẹn từ ngày</label>
+            <label className="text-[11px] font-semibold text-gray-500 mb-1 uppercase">Tạo từ ngày</label>
             <input 
               type="date" 
               className="border rounded px-2.5 py-1.5 text-xs outline-none focus:border-blue-500 text-gray-700 bg-white" 
@@ -479,7 +479,7 @@ export default function Dashboard() {
 
           {/* End Date */}
           <div className="flex flex-col">
-            <label className="text-[11px] font-semibold text-gray-500 mb-1 uppercase">Hẹn đến ngày</label>
+            <label className="text-[11px] font-semibold text-gray-500 mb-1 uppercase">Tạo đến ngày</label>
             <input 
               type="date" 
               className="border rounded px-2.5 py-1.5 text-xs outline-none focus:border-blue-500 text-gray-700 bg-white" 
@@ -560,6 +560,18 @@ export default function Dashboard() {
               <span>Xóa bộ lọc</span>
             </button>
           </div>
+        </div>
+      </div>
+
+      {/* DATA SOURCE EXPLANATION BANNER */}
+      <div className="bg-blue-50/60 border border-blue-100 text-[#1B3A6B] px-4 py-3.5 rounded-xl flex items-start space-x-3 shadow-sm animate-fade-in">
+        <Info className="text-blue-600 mt-0.5 flex-shrink-0" size={16} />
+        <div className="text-xs space-y-1">
+          <p className="font-bold text-[13px] text-[#1B3A6B]">Thông tin nguồn dữ liệu & bộ lọc:</p>
+          <p className="text-gray-600 leading-relaxed font-medium">
+            Bộ lọc thời gian trên Dashboard được áp dụng theo <b>Ngày tạo đơn hàng trên Pancake</b>. 
+            Các chỉ số hiệu suất, tỷ lệ Đúng/Trễ hẹn và các biểu đồ phân tích liên quan được tính toán dựa trên <b>Ngày hẹn khách hàng</b> (hệ thống tự động thiết lập hoặc điều phối viên gán).
+          </p>
         </div>
       </div>
 

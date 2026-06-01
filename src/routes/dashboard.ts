@@ -78,14 +78,20 @@ router.get('/stats', async (req: Request, res: Response): Promise<void> => {
       _count: { id: true }
     });
 
-    // 4. Thống kê theo yêu cầu của user có áp dụng bộ lọc
+    // 4. Thống kê theo yêu cầu của user có áp dụng bộ lọc (Lọc theo Ngày tạo đơn hàng trên Pancake)
     const where: any = {};
 
+    // Chỉ hiển thị các đơn hàng đã được xác nhận bên POS (ẩn các đơn nháp status = 0)
+    where.OR = [
+      { statusCode: { not: 0 } },
+      { statusCode: null }
+    ];
+
     if (startDate || endDate) {
-      where.appointmentTime = {
+      where.pancakeCreatedAt = {
         not: null,
-        ...(startDate ? { gte: new Date(startDate as string) } : {}),
-        ...(endDate ? { lte: new Date(endDate as string) } : {})
+        ...(startDate ? { gte: new Date(`${startDate}T00:00:00.000Z`) } : {}),
+        ...(endDate ? { lte: new Date(`${endDate}T23:59:59.999Z`) } : {})
       };
     }
 
@@ -229,16 +235,20 @@ router.get('/dispatch-analysis', async (req: Request, res: Response): Promise<vo
       assignedKtvId
     } = req.query;
 
-    const where: any = {
-      appointmentTime: { not: null },
-    };
+    const where: any = {};
 
-    // Áp dụng bộ lọc thời gian hẹn khách
+    // Chỉ hiển thị các đơn hàng đã được xác nhận bên POS (ẩn các đơn nháp status = 0)
+    where.OR = [
+      { statusCode: { not: 0 } },
+      { statusCode: null }
+    ];
+
+    // Áp dụng bộ lọc thời gian tạo đơn hàng trên Pancake
     if (startDate || endDate) {
-      where.appointmentTime = {
+      where.pancakeCreatedAt = {
         not: null,
-        ...(startDate ? { gte: new Date(startDate as string) } : {}),
-        ...(endDate ? { lte: new Date(endDate as string) } : {})
+        ...(startDate ? { gte: new Date(`${startDate}T00:00:00.000Z`) } : {}),
+        ...(endDate ? { lte: new Date(`${endDate}T23:59:59.999Z`) } : {})
       };
     }
 
@@ -309,10 +319,15 @@ router.get('/dispatch-analysis', async (req: Request, res: Response): Promise<vo
     const todayStr = now.toISOString().slice(0, 10);
     const todayTime = new Date(todayStr).getTime();
 
-    // 1. Phân loại đúng/trễ cho từng đơn hàng
+    // 1. Phân loại đúng/trễ cho từng đơn hàng (Xử lý trường hợp chưa xếp lịch hẹn)
     const processedOrders = orders.map(order => {
-      const appointmentDateStr = order.appointmentTime!.toISOString().slice(0, 10);
-      const appointmentTimeMs = new Date(appointmentDateStr).getTime();
+      const hasAppointment = order.appointmentTime != null;
+      const appointmentDateStr = hasAppointment 
+        ? order.appointmentTime!.toISOString().slice(0, 10) 
+        : 'Chưa xếp lịch';
+      const appointmentTimeMs = hasAppointment 
+        ? new Date(appointmentDateStr).getTime() 
+        : 0;
       
       const hasReport = order.serviceReports && order.serviceReports.length > 0;
       const isCompleted = order.adminStatus === 'hoàn thành' || hasReport;
@@ -332,18 +347,20 @@ router.get('/dispatch-analysis', async (req: Request, res: Response): Promise<vo
       let isLate = false;
       let delayDays = 0;
       
-      if (isCompleted) {
-        if (completionTimeMs <= appointmentTimeMs) {
-          isOnTime = true;
-        } else {
-          isLate = true;
-          delayDays = Math.max(0, Math.floor((completionTimeMs - appointmentTimeMs) / (24 * 60 * 60 * 1000)));
-        }
-      } else {
-        if (order.adminStatus !== 'hủy đơn') {
-          if (todayTime > appointmentTimeMs) {
+      if (hasAppointment) {
+        if (isCompleted) {
+          if (completionTimeMs <= appointmentTimeMs) {
+            isOnTime = true;
+          } else {
             isLate = true;
-            delayDays = Math.max(0, Math.floor((todayTime - appointmentTimeMs) / (24 * 60 * 60 * 1000)));
+            delayDays = Math.max(0, Math.floor((completionTimeMs - appointmentTimeMs) / (24 * 60 * 60 * 1000)));
+          }
+        } else {
+          if (order.adminStatus !== 'hủy đơn') {
+            if (todayTime > appointmentTimeMs) {
+              isLate = true;
+              delayDays = Math.max(0, Math.floor((todayTime - appointmentTimeMs) / (24 * 60 * 60 * 1000)));
+            }
           }
         }
       }
@@ -407,16 +424,17 @@ router.get('/dispatch-analysis', async (req: Request, res: Response): Promise<vo
       filteredOrders = filteredOrders.filter(o => o.techStationId != null && techStationIds.includes(o.techStationId));
     }
 
-    // 2. Tính toán Summary
-    const totalWithAppointments = filteredOrders.length;
+    // 2. Tính toán Summary (chỉ tính đối với các đơn đã xếp lịch hẹn)
+    const totalWithAppointments = filteredOrders.filter(o => o.appointmentDateStr !== 'Chưa xếp lịch').length;
     const totalOnTime = filteredOrders.filter(o => o.isOnTime).length;
     const totalLate = filteredOrders.filter(o => o.isLate).length;
     const onTimeRate = totalWithAppointments > 0 ? Math.round((totalOnTime / totalWithAppointments) * 100) : 100;
 
-    // 3. Gom nhóm theo Ngày hẹn (Daily Stats)
+    // 3. Gom nhóm theo Ngày hẹn (Daily Stats - bỏ qua đơn chưa xếp lịch)
     const dailyMap: Record<string, { date: string; onTime: number; late: number; total: number }> = {};
     filteredOrders.forEach(o => {
       const d = o.appointmentDateStr;
+      if (d === 'Chưa xếp lịch') return;
       if (!dailyMap[d]) {
         dailyMap[d] = { date: d, onTime: 0, late: 0, total: 0 };
       }
@@ -439,8 +457,8 @@ router.get('/dispatch-analysis', async (req: Request, res: Response): Promise<vo
         if (o.isOnTime) map[val].onTime++;
         if (o.isLate) map[val].late++;
         
-        // Tính thời gian xử lý trung bình đối với ca đã hoàn thành
-        if (o.isCompleted && o.completionDateStr) {
+        // Tính thời gian xử lý trung bình đối với ca đã hoàn thành (chỉ tính khi đã xếp lịch hẹn)
+        if (o.isCompleted && o.completionDateStr && o.appointmentDateStr !== 'Chưa xếp lịch') {
           const compTime = new Date(o.completionDateStr).getTime();
           const appTime = new Date(o.appointmentDateStr).getTime();
           const diffDays = Math.floor((compTime - appTime) / (24 * 60 * 60 * 1000));
@@ -482,6 +500,7 @@ router.get('/dispatch-analysis', async (req: Request, res: Response): Promise<vo
     const monthlyWorkTypeMap: Record<string, any> = {};
     
     filteredOrders.forEach(o => {
+      if (o.appointmentDateStr === 'Chưa xếp lịch') return;
       const monthStr = o.appointmentDateStr.slice(0, 7); // Lấy "YYYY-MM"
       if (!monthlyWorkTypeMap[monthStr]) {
         monthlyWorkTypeMap[monthStr] = { month: monthStr };

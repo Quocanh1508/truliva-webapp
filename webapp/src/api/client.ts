@@ -112,8 +112,9 @@ export const callCustomer = async (orderId: string) => {
 };
 
 // --- STATIONS ---
-export const getStations = async () => {
-  return fetchApi('/stations');
+export const getStations = async (status?: string) => {
+  const query = status ? `?status=${status}` : '';
+  return fetchApi(`/stations${query}`);
 };
 
 export const createMainStation = async (name: string) => {
@@ -127,6 +128,20 @@ export const createTechStation = async (name: string, mainStationId: string) => 
   return fetchApi('/stations/tech', {
     method: 'POST',
     body: JSON.stringify({ name, mainStationId }),
+  });
+};
+
+export const updateMainStation = async (id: string, data: { name?: string; isActive?: boolean }) => {
+  return fetchApi(`/stations/main/${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify(data),
+  });
+};
+
+export const updateTechStation = async (id: string, data: { name?: string; isActive?: boolean; mainStationId?: string }) => {
+  return fetchApi(`/stations/tech/${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify(data),
   });
 };
 

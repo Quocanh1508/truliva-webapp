@@ -1,5 +1,6 @@
 import { Router, Request, Response } from 'express';
 import bcrypt from 'bcryptjs';
+import ExcelJS from 'exceljs';
 import prisma from '../config/database';
 import logger from '../utils/logger';
 import { requireAuth, requireAdmin } from '../middleware/authSession';
@@ -70,6 +71,147 @@ router.get('/ktvs', requireAuth, async (req: Request, res: Response): Promise<vo
 // ADMIN ROUTES
 // ==========================================
 router.use(requireAuth, requireAdmin);
+
+/**
+ * GET /api/users/export
+ * Xuất Excel danh sách KTV theo bộ lọc (Admin only)
+ */
+router.get('/export', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { search, mainStationId, techStationId, status } = req.query;
+
+    const where: any = {};
+
+    // 1. Tìm kiếm text
+    if (search) {
+      const q = String(search).trim();
+      where.OR = [
+        { fullName: { contains: q, mode: 'insensitive' } },
+        { phoneNumber: { contains: q, mode: 'insensitive' } },
+        { username: { contains: q, mode: 'insensitive' } }
+      ];
+    }
+
+    // 2. Lọc theo trạm chính / trạm kỹ thuật
+    if (techStationId) {
+      where.techStationId = String(techStationId);
+    } else if (mainStationId) {
+      const techStations = await prisma.techStation.findMany({
+        where: { mainStationId: String(mainStationId) },
+        select: { id: true }
+      });
+      const techStationIds = techStations.map(ts => ts.id);
+      where.techStationId = { in: techStationIds };
+    }
+
+    // 3. Lọc theo tình trạng
+    if (status === 'active') {
+      where.isActive = true;
+    } else if (status === 'inactive') {
+      where.isActive = false;
+    }
+
+    const users = await prisma.user.findMany({
+      where,
+      select: {
+        username: true,
+        fullName: true,
+        role: true,
+        phoneNumber: true,
+        techStation: {
+          select: {
+            name: true,
+            mainStation: {
+              select: {
+                name: true
+              }
+            }
+          }
+        },
+        isActive: true,
+        address: true,
+        cccdNumber: true,
+        cccdDate: true,
+        cccdPlace: true,
+        bankAccount: true,
+        bankName: true,
+        email: true,
+        _count: { select: { serviceReports: true } },
+        createdAt: true
+      },
+      orderBy: { createdAt: 'desc' }
+    });
+
+    const workbook = new ExcelJS.Workbook();
+    const worksheet = workbook.addWorksheet('Danh sách KTV');
+
+    worksheet.columns = [
+      { header: 'Họ và tên', key: 'fullName', width: 25 },
+      { header: 'Số điện thoại', key: 'phoneNumber', width: 15 },
+      { header: 'Username', key: 'username', width: 20 },
+      { header: 'Vai trò', key: 'role', width: 12 },
+      { header: 'Trạm chính', key: 'mainStation', width: 25 },
+      { header: 'Trạm kỹ thuật', key: 'techStation', width: 25 },
+      { header: 'Số báo cáo', key: 'reportCount', width: 15 },
+      { header: 'Trạng thái', key: 'status', width: 15 },
+      { header: 'Email', key: 'email', width: 25 },
+      { header: 'Địa chỉ', key: 'address', width: 35 },
+      { header: 'Số CCCD', key: 'cccdNumber', width: 18 },
+      { header: 'Ngày cấp CCCD', key: 'cccdDate', width: 15 },
+      { header: 'Nơi cấp CCCD', key: 'cccdPlace', width: 30 },
+      { header: 'Số tài khoản', key: 'bankAccount', width: 20 },
+      { header: 'Ngân hàng', key: 'bankName', width: 25 },
+    ];
+
+    const headerRow = worksheet.getRow(1);
+    headerRow.font = { name: 'Arial', size: 11, bold: true, color: { argb: 'FFFFFFFF' } };
+    headerRow.fill = {
+      type: 'pattern',
+      pattern: 'solid',
+      fgColor: { argb: 'FF1B3A6B' }
+    };
+    headerRow.alignment = { vertical: 'middle', horizontal: 'left' };
+    headerRow.height = 25;
+
+    users.forEach(u => {
+      const row = worksheet.addRow({
+        fullName: u.fullName || '',
+        phoneNumber: u.phoneNumber || '',
+        username: u.username || '',
+        role: u.role || '',
+        mainStation: u.techStation?.mainStation?.name || '',
+        techStation: u.techStation?.name || '',
+        reportCount: u._count.serviceReports || 0,
+        status: u.isActive ? 'Hoạt động' : 'Đã khóa',
+        email: u.email || '',
+        address: u.address || '',
+        cccdNumber: u.cccdNumber || '',
+        cccdDate: u.cccdDate || '',
+        cccdPlace: u.cccdPlace || '',
+        bankAccount: u.bankAccount || '',
+        bankName: u.bankName || '',
+      });
+
+      row.getCell('status').alignment = { horizontal: 'center' };
+      row.getCell('reportCount').alignment = { horizontal: 'right' };
+    });
+
+    res.setHeader(
+      'Content-Type',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    );
+    res.setHeader(
+      'Content-Disposition',
+      'attachment; filename=' + encodeURIComponent('Danh_sach_KTV.xlsx')
+    );
+
+    await workbook.xlsx.write(res);
+    res.end();
+  } catch (error: any) {
+    logger.error('Export KTVs error', { error: error.message });
+    res.status(500).json({ error: 'Lỗi xuất file Excel' });
+  }
+});
 
 /**
  * GET /api/users

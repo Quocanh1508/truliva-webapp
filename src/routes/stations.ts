@@ -13,13 +13,43 @@ router.use(requireAuth);
  * Lấy danh sách Trạm chính + Trạm kỹ thuật (cascade)
  * Dành cho mọi role đã đăng nhập
  */
-router.get('/', async (_req: Request, res: Response): Promise<void> => {
+router.get('/', async (req: Request, res: Response): Promise<void> => {
   try {
+    const status = req.query.status as string; // 'active' | 'locked' | 'all'
+    let mainWhere: any = {};
+    let techWhere: any = {};
+
+    if (status === 'locked') {
+      mainWhere = {
+        OR: [
+          { isActive: false },
+          {
+            techStations: {
+              some: { isActive: false }
+            }
+          }
+        ]
+      };
+      techWhere = {
+        OR: [
+          { isActive: false },
+          { mainStation: { isActive: false } }
+        ]
+      };
+    } else if (status === 'all') {
+      mainWhere = {};
+      techWhere = {};
+    } else {
+      // default: active
+      mainWhere = { isActive: true };
+      techWhere = { isActive: true };
+    }
+
     const mainStations = await prisma.mainStation.findMany({
-      where: { isActive: true },
+      where: mainWhere,
       include: {
         techStations: {
-          where: { isActive: true },
+          where: techWhere,
           include: {
             users: {
               where: { isActive: true, role: 'KTV' },
@@ -128,6 +158,91 @@ router.delete('/tech/:id', async (req: Request, res: Response): Promise<void> =>
   } catch (error: any) {
     logger.error('Delete tech station error', { error: error.message });
     res.status(500).json({ error: 'Lỗi vô hiệu hóa' });
+  }
+});
+
+/**
+ * PATCH /api/stations/main/:id
+ * Cập nhật trạm chính (tên và/hoặc tình trạng isActive)
+ */
+router.patch('/main/:id', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { name, isActive } = req.body;
+    const { id } = req.params;
+
+    const data: any = {};
+    if (name !== undefined) {
+      if (!name.trim()) {
+        res.status(400).json({ error: 'Tên trạm chính không được trống' });
+        return;
+      }
+      data.name = name.trim();
+    }
+    if (isActive !== undefined) {
+      data.isActive = !!isActive;
+    }
+
+    if (Object.keys(data).length === 0) {
+      res.status(400).json({ error: 'Không có thông tin cập nhật' });
+      return;
+    }
+
+    const updated = await prisma.mainStation.update({
+      where: { id: id as string },
+      data
+    });
+
+    logger.info('MainStation updated', { id: updated.id, data, by: req.user?.id });
+    res.json(updated);
+  } catch (error: any) {
+    if (error.code === 'P2002') {
+      res.status(409).json({ error: 'Tên trạm chính đã tồn tại' });
+      return;
+    }
+    logger.error('Update main station error', { error: error.message });
+    res.status(500).json({ error: 'Lỗi cập nhật trạm chính' });
+  }
+});
+
+/**
+ * PATCH /api/stations/tech/:id
+ * Cập nhật trạm kỹ thuật (tên và/hoặc tình trạng isActive)
+ */
+router.patch('/tech/:id', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { name, isActive, mainStationId } = req.body;
+    const { id } = req.params;
+
+    const data: any = {};
+    if (name !== undefined) {
+      if (!name.trim()) {
+        res.status(400).json({ error: 'Tên trạm kỹ thuật không được trống' });
+        return;
+      }
+      data.name = name.trim();
+    }
+    if (isActive !== undefined) {
+      data.isActive = !!isActive;
+    }
+    if (mainStationId !== undefined) {
+      data.mainStationId = mainStationId;
+    }
+
+    if (Object.keys(data).length === 0) {
+      res.status(400).json({ error: 'Không có thông tin cập nhật' });
+      return;
+    }
+
+    const updated = await prisma.techStation.update({
+      where: { id: id as string },
+      data
+    });
+
+    logger.info('TechStation updated', { id: updated.id, data, by: req.user?.id });
+    res.json(updated);
+  } catch (error: any) {
+    logger.error('Update tech station error', { error: error.message });
+    res.status(500).json({ error: 'Lỗi cập nhật trạm kỹ thuật' });
   }
 });
 
