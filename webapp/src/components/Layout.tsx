@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Outlet, useNavigate, useLocation, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { LogOut, Menu, X, FileText, List, Users, BarChart, ShoppingCart, Building, Key, Image as ImageIcon, MessageSquare, Bell, Wrench } from 'lucide-react';
+import { LogOut, Menu, X, FileText, List, Users, BarChart, ShoppingCart, Building, Key, Image as ImageIcon, MessageSquare, Bell, Wrench, User } from 'lucide-react';
 import { fetchApi } from '../api/client';
 
 export default function Layout() {
@@ -47,9 +47,11 @@ export default function Layout() {
     { name: 'Kỹ thuật viên', path: '/admin/users', icon: <Users size={20} /> },
     { name: 'Ảnh mẫu báo cáo', path: '/admin/sample-images', icon: <ImageIcon size={20} /> },
     { name: 'Đóng góp ý kiến', path: '/feedback', icon: <MessageSquare size={20} /> },
+    { name: 'Thông tin cá nhân', path: '/profile', icon: <User size={20} /> },
     { name: 'Đổi mật khẩu', path: '/change-password', icon: <Key size={20} /> },
   ] : (user?.role === 'DEV' ? [
     { name: 'Phản hồi người dùng', path: '/dev/feedbacks', icon: <MessageSquare size={20} /> },
+    { name: 'Thông tin cá nhân', path: '/profile', icon: <User size={20} /> },
     { name: 'Đổi mật khẩu', path: '/change-password', icon: <Key size={20} /> },
   ] : [
     { name: 'Đơn hàng được giao', path: '/ktv/my-orders', icon: <ShoppingCart size={20} /> },
@@ -57,6 +59,7 @@ export default function Layout() {
     { name: 'Tạo báo cáo', path: '/ktv/report', icon: <FileText size={20} /> },
     { name: 'Báo cáo của tôi', path: '/ktv/my-reports', icon: <List size={20} /> },
     { name: 'Đóng góp ý kiến', path: '/feedback', icon: <MessageSquare size={20} /> },
+    { name: 'Thông tin cá nhân', path: '/profile', icon: <User size={20} /> },
     { name: 'Đổi mật khẩu', path: '/change-password', icon: <Key size={20} /> },
   ]);
 

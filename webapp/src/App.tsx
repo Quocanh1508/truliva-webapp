@@ -1,11 +1,14 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
 import LoginPage from './pages/LoginPage';
+import ForgotPasswordPage from './pages/ForgotPasswordPage';
+import ResetPasswordPage from './pages/ResetPasswordPage';
 import ProtectedRoute from './components/ProtectedRoute';
 import Layout from './components/Layout';
 
 // Shared Pages
 import ChangePasswordPage from './pages/ChangePasswordPage';
+import ProfilePage from './pages/ProfilePage';
 
 // KTV Pages
 import ReportForm from './pages/ktv/ReportForm';
@@ -31,6 +34,8 @@ export default function App() {
       <BrowserRouter>
         <Routes>
           <Route path="/login" element={<LoginPage />} />
+          <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+          <Route path="/reset-password" element={<ResetPasswordPage />} />
           
           <Route element={<Layout />}>
             {/* KTV Routes */}
@@ -58,6 +63,7 @@ export default function App() {
 
             {/* Shared Routes */}
             <Route element={<ProtectedRoute allowedRoles={['KTV', 'ADMIN', 'DEV']} />}>
+              <Route path="/profile" element={<ProfilePage />} />
               <Route path="/change-password" element={<ChangePasswordPage />} />
             </Route>
 

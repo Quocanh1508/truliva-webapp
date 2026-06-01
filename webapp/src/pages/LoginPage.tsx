@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { LogIn } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { fetchApi } from '../api/client';
@@ -63,7 +63,12 @@ export default function LoginPage() {
           </div>
 
           <div className="form-group mb-6">
-            <label className="form-label">Mật khẩu</label>
+            <div className="flex justify-between items-center mb-2">
+              <label className="form-label mb-0">Mật khẩu</label>
+              <Link to="/forgot-password" style={{ color: '#00A3FF' }} className="text-sm font-semibold hover:underline">
+                Quên mật khẩu?
+              </Link>
+            </div>
             <input
               type="password"
               className="form-input"

@@ -1,6 +1,6 @@
 import dotenv from 'dotenv';
 // ── Load biến môi trường ──
-dotenv.config();
+dotenv.config(); // Load environment variables
 
 import express from 'express';
 import helmet from 'helmet';
