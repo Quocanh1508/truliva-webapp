@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { fetchApi, getOrders } from '../../api/client';
+import { fetchApi, getOrders, getFiltersData } from '../../api/client';
 import LabeledImageUploader from '../../components/LabeledImageUploader';
-import { CheckCircle, ChevronLeft, Send, AlertCircle, Camera, Loader2, ChevronDown, ChevronUp } from 'lucide-react';
+import { CheckCircle, ChevronLeft, Send, AlertCircle, Camera, Loader2, ChevronDown, ChevronUp, Search, X } from 'lucide-react';
 import { Html5Qrcode } from 'html5-qrcode';
 
-import { getImageSlots } from '../../utils/workTypes';
+import { getImageSlots, WARRANTY_SERVICE_GROUPS, REPAIR_SERVICE_GROUPS, WORK_TYPE_SERVICES } from '../../utils/workTypes';
 
 // ── Cấu trúc linh kiện phân loại theo dòng máy ──
 const SPARE_PARTS_GROUPS = [
@@ -14,7 +14,7 @@ const SPARE_PARTS_GROUPS = [
     parts: ['Bơm tăng áp', 'Van giảm áp', 'Van chia']
   },
   {
-    name: 'Dòng máy UR3626',
+    name: 'Linh kiện UR3626',
     parts: [
       'Cụm van (2) Truliva UR3626',
       'Bơm RO Truliva UR3626',
@@ -25,7 +25,7 @@ const SPARE_PARTS_GROUPS = [
     ]
   },
   {
-    name: 'Dòng máy UR5676',
+    name: 'Linh kiện UR5676',
     parts: [
       'Cụm van Truliva UR5676/UR5640/UR5440',
       'Bơm RO Truliva UR5676/UR5640',
@@ -37,7 +37,7 @@ const SPARE_PARTS_GROUPS = [
     ]
   },
   {
-    name: 'Dòng máy UR5840',
+    name: 'Linh kiện UR5840',
     parts: [
       'Cụm van Truliva UR5840',
       'Bơm RO Truliva UR5840',
@@ -49,7 +49,7 @@ const SPARE_PARTS_GROUPS = [
     ]
   },
   {
-    name: 'Dòng máy UR61096H',
+    name: 'Linh kiện UR61096H',
     parts: [
       'Cụm van Truliva UR61096H',
       'Bơm RO Truliva UR61096H',
@@ -61,7 +61,7 @@ const SPARE_PARTS_GROUPS = [
     ]
   },
   {
-    name: 'Dòng máy W6412',
+    name: 'Linh kiện W6412',
     parts: [
       'Khay hứng nước Truliva W6412',
       'Nắp khay hứng nước Truliva W6412',
@@ -133,9 +133,15 @@ export default function ReportForm() {
   const [address, setAddress] = useState('');
   const [province, setProvince] = useState('');
   const [workType, setWorkType] = useState('');
-  const [serviceType, setServiceType] = useState('');
-  const [products, setProducts] = useState('');
   const [actualAmount, setActualAmount] = useState('');
+
+  // ── Multi-select custom dropdown states ──
+  const [catalogProducts, setCatalogProducts] = useState<string[]>([]);
+  const [selectedServices, setSelectedServices] = useState<string[]>([]);
+  const [selectedProducts, setSelectedProducts] = useState<string[]>([]);
+  const [showServiceDropdown, setShowServiceDropdown] = useState(false);
+  const [showProductDropdown, setShowProductDropdown] = useState(false);
+  const [productSearch, setProductSearch] = useState('');
 
   // ── Step 2: Trường kỹ thuật (dynamic) ──
   const [serialNumber, setSerialNumber] = useState('');
@@ -162,6 +168,67 @@ export default function ReportForm() {
 
   // ── Step 4: Ghi chú & Submit ──
   const [notes, setNotes] = useState('');
+
+  // Tải danh mục sản phẩm từ Database
+  useEffect(() => {
+    getFiltersData()
+      .then(res => {
+        if (res && res.productNames) {
+          setCatalogProducts(res.productNames);
+        }
+      })
+      .catch(err => console.error('Lỗi tải danh mục sản phẩm', err));
+  }, []);
+
+  const getServiceOptions = (): string[] => {
+    let options: string[] = [];
+    if (workType === 'Bảo hành') {
+      options = Object.values(WARRANTY_SERVICE_GROUPS).flat();
+    } else if (workType === 'Sửa chữa') {
+      options = Object.values(REPAIR_SERVICE_GROUPS).flat();
+    } else {
+      options = WORK_TYPE_SERVICES[workType] || ['Công việc đã bao gồm dịch vụ'];
+    }
+
+    // Luôn bổ sung dịch vụ từ admin đã đặt nếu chưa có
+    if (selectedOrderId) {
+      const order = orders.find(o => o.id === selectedOrderId);
+      if (order?.serviceType) {
+        const list = order.serviceType.split(',').map((s: string) => s.trim()).filter(Boolean);
+        list.forEach((s: string) => {
+          if (!options.includes(s)) {
+            options.push(s);
+          }
+        });
+      }
+    }
+
+    return Array.from(new Set(options));
+  };
+
+  const getProductOptions = (): string[] => {
+    const optionsSet = new Set<string>();
+    
+    // 1. Sản phẩm từ đơn hàng gốc
+    if (selectedOrderId) {
+      const order = orders.find(o => o.id === selectedOrderId);
+      if (order?.items) {
+        order.items.forEach((item: any) => {
+          const name = item.productName
+            || item.variationInfo?.name
+            || (item.sku ? `Sản phẩm (${item.sku})` : 'Sản phẩm không tên');
+          const qty = item.quantity || 1;
+          optionsSet.add(`${name} x${qty}`);
+          optionsSet.add(name);
+        });
+      }
+    }
+    
+    // 2. Danh mục sản phẩm active trong DB
+    catalogProducts.forEach(p => optionsSet.add(p));
+    
+    return Array.from(optionsSet);
+  };
 
   // Định dạng hiển thị Số Serial dạng: XXXX XXX XXX XXXXX
   const formatSerialNumber = (value: string): string => {
@@ -197,9 +264,9 @@ export default function ReportForm() {
       if (res && res.exists) {
         setSerialInfo(res);
         setSerialWarning('');
-        if (res.products && res.products.length > 0 && !products) {
+        if (res.products && res.products.length > 0 && selectedProducts.length === 0) {
           const matchedProd = res.products[0].split('x')[0].trim();
-          setProducts(matchedProd);
+          setSelectedProducts([matchedProd]);
         }
       } else {
         setSerialInfo(null);
@@ -268,30 +335,41 @@ export default function ReportForm() {
             setWorkType(stateOrder.workType);
             const noServiceTypes = ['Giao hàng và Lắp đặt', 'Lắp đặt', 'Giao hàng', 'Thay lọc'];
             if (noServiceTypes.includes(stateOrder.workType) && !stateOrder.serviceType) {
-              setServiceType('Công việc đã bao gồm dịch vụ');
+              setSelectedServices(['Công việc đã bao gồm dịch vụ']);
             } else {
-              setServiceType(stateOrder.serviceType || '');
+              setSelectedServices(stateOrder.serviceType ? stateOrder.serviceType.split(',').map((s: string) => s.trim()).filter(Boolean) : []);
             }
           } else {
-            setServiceType(stateOrder.serviceType || '');
+            setSelectedServices(stateOrder.serviceType ? stateOrder.serviceType.split(',').map((s: string) => s.trim()).filter(Boolean) : []);
           }
 
+          let orderProducts: string[] = [];
           let prodStr = '';
           if (stateOrder.items && stateOrder.items.length > 0) {
-            prodStr = stateOrder.items.map((item: any) => {
+            orderProducts = stateOrder.items.map((item: any) => {
               const name = item.productName
                 || item.variationInfo?.name
                 || (item.sku ? `Sản phẩm (${item.sku})` : 'Sản phẩm không tên');
               const qty = item.quantity || 1;
               return `${name} x${qty}`;
-            }).join(', ');
-            setProducts(prodStr);
+            });
+            prodStr = orderProducts.join(', ');
+            setSelectedProducts(orderProducts);
           }
           
           if (stateOrder.moneyToCollect !== undefined && stateOrder.moneyToCollect !== null) {
             setActualAmount(String(stateOrder.moneyToCollect));
           }
-          
+
+          // Tự động mở rộng nhóm linh kiện tương ứng dựa trên tên dòng máy
+          const matchingGroups: string[] = ['Linh kiện chung / Khác'];
+          const pStrLower = prodStr.toLowerCase();
+          if (pStrLower.includes('3626')) matchingGroups.push('Linh kiện UR3626');
+          if (pStrLower.includes('5676') || pStrLower.includes('5640') || pStrLower.includes('5440')) matchingGroups.push('Linh kiện UR5676');
+          if (pStrLower.includes('5840')) matchingGroups.push('Linh kiện UR5840');
+          if (pStrLower.includes('61096')) matchingGroups.push('Linh kiện UR61096H');
+          if (pStrLower.includes('6412') || pStrLower.includes('w6412')) matchingGroups.push('Linh kiện W6412');
+          setExpandedGroups(matchingGroups);
 
         } else {
           setOrders(list);
@@ -308,8 +386,8 @@ export default function ReportForm() {
       setAddress('');
       setProvince('');
       setWorkType('');
-      setServiceType('');
-      setProducts('');
+      setSelectedServices([]);
+      setSelectedProducts([]);
       setActualAmount('');
       return;
     }
@@ -324,36 +402,38 @@ export default function ReportForm() {
         setWorkType(order.workType);
         const noServiceTypes = ['Giao hàng và Lắp đặt', 'Lắp đặt', 'Giao hàng', 'Thay lọc'];
         if (noServiceTypes.includes(order.workType) && !order.serviceType) {
-          setServiceType('Công việc đã bao gồm dịch vụ');
+          setSelectedServices(['Công việc đã bao gồm dịch vụ']);
         } else {
-          setServiceType(order.serviceType || '');
+          setSelectedServices(order.serviceType ? order.serviceType.split(',').map((s: string) => s.trim()).filter(Boolean) : []);
         }
       } else {
-        setServiceType(order.serviceType || '');
+        setSelectedServices(order.serviceType ? order.serviceType.split(',').map((s: string) => s.trim()).filter(Boolean) : []);
       }
 
       // ── Mapping sản phẩm x số lượng từ items ──
       let prodStr = '';
       if (order.items && order.items.length > 0) {
-        prodStr = order.items.map((item: any) => {
-          // Lấy tên đầy đủ nhất có thể
+        const itemNames = order.items.map((item: any) => {
           const name = item.productName
             || item.variationInfo?.name
             || (item.sku ? `Sản phẩm (${item.sku})` : 'Sản phẩm không tên');
           const qty = item.quantity || 1;
           return `${name} x${qty}`;
-        }).join(', ');
-        setProducts(prodStr);
+        });
+        prodStr = itemNames.join(', ');
+        setSelectedProducts(itemNames);
+      } else {
+        setSelectedProducts([]);
       }
 
       // Tự động mở rộng nhóm linh kiện tương ứng dựa trên tên dòng máy
       const matchingGroups: string[] = ['Linh kiện chung / Khác'];
       const pStrLower = prodStr.toLowerCase();
-      if (pStrLower.includes('3626')) matchingGroups.push('Dòng máy UR3626');
-      if (pStrLower.includes('5676') || pStrLower.includes('5640') || pStrLower.includes('5440')) matchingGroups.push('Dòng máy UR5676');
-      if (pStrLower.includes('5840')) matchingGroups.push('Dòng máy UR5840');
-      if (pStrLower.includes('61096')) matchingGroups.push('Dòng máy UR61096H');
-      if (pStrLower.includes('6412') || pStrLower.includes('w6412')) matchingGroups.push('Dòng máy W6412');
+      if (pStrLower.includes('3626')) matchingGroups.push('Linh kiện UR3626');
+      if (pStrLower.includes('5676') || pStrLower.includes('5640') || pStrLower.includes('5440')) matchingGroups.push('Linh kiện UR5676');
+      if (pStrLower.includes('5840')) matchingGroups.push('Linh kiện UR5840');
+      if (pStrLower.includes('61096')) matchingGroups.push('Linh kiện UR61096H');
+      if (pStrLower.includes('6412') || pStrLower.includes('w6412')) matchingGroups.push('Linh kiện W6412');
       setExpandedGroups(matchingGroups);
 
       // ── Mapping tiền thu thực tế (moneyToCollect hoặc totalPrice) ──
@@ -372,6 +452,9 @@ export default function ReportForm() {
   // Validate Step 1 trước khi tiếp
   const canProceedStep1 = (): boolean => {
     if (!serialNumber) return false;
+    if (selectedServices.length === 0) return false;
+    if (selectedProducts.length === 0) return false;
+    if (actualAmount === '') return false;
     if (needsTechnicalFields(workType)) {
       if (!waterSource || !tdsIn || !tdsOut || !waterPressure) return false;
     }
@@ -405,8 +488,8 @@ export default function ReportForm() {
           customerPhone,
           province,
           address,
-          products: products ? [products] : [],
-          serviceType,
+          products: selectedProducts,
+          serviceType: selectedServices.join(', '),
           workType,
           serialNumber,
           distanceKm,
@@ -557,12 +640,12 @@ export default function ReportForm() {
 
                 <div>
                   <span style={{ color: '#64748b', display: 'block', fontSize: '11px', textTransform: 'uppercase', fontWeight: 600 }}>Dịch vụ</span>
-                  <strong style={{ color: '#0f172a' }}>{serviceType || 'N/A'}</strong>
+                  <strong style={{ color: '#0f172a' }}>{selectedServices.join(', ') || 'N/A'}</strong>
                 </div>
 
                 <div style={{ gridColumn: 'span 2' }}>
                   <span style={{ color: '#64748b', display: 'block', fontSize: '11px', textTransform: 'uppercase', fontWeight: 600 }}>Sản phẩm thực tế</span>
-                  <strong style={{ color: '#0f172a' }}>{products || 'N/A'}</strong>
+                  <strong style={{ color: '#0f172a' }}>{selectedProducts.join(', ') || 'N/A'}</strong>
                 </div>
 
                 {actualAmount && (
@@ -580,6 +663,150 @@ export default function ReportForm() {
             {selectedOrderId && (
               <div style={{ borderTop: '1px solid #e2e8f0', margin: '20px 0', paddingTop: '16px' }}>
                 <h3 className="font-bold mb-4 text-md text-[#1B3A6B]">🛠️ Nhập thông tin kỹ thuật</h3>
+
+                {/* Dịch vụ thực tế - Multi-select */}
+                <div className="form-group relative">
+                  <label className="form-label font-semibold text-gray-700">Dịch vụ thực tế *</label>
+                  <button
+                    type="button"
+                    className="w-full min-h-[42px] px-3 py-2 bg-white border border-gray-300 rounded-lg text-left text-sm flex justify-between items-center focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
+                    onClick={() => setShowServiceDropdown(!showServiceDropdown)}
+                  >
+                    <span className="text-gray-800 line-clamp-2">
+                      {selectedServices.length > 0
+                        ? selectedServices.join(', ')
+                        : '-- Chọn loại dịch vụ --'}
+                    </span>
+                    <ChevronDown size={18} className="text-gray-400 shrink-0 ml-2" />
+                  </button>
+                  
+                  {showServiceDropdown && (
+                    <>
+                      <div className="fixed inset-0 z-20" onClick={() => setShowServiceDropdown(false)} />
+                      <div className="absolute z-30 mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg max-h-60 overflow-y-auto p-2 flex flex-col gap-1">
+                        {getServiceOptions().map((service) => {
+                          const isChecked = selectedServices.includes(service);
+                          return (
+                            <label
+                              key={service}
+                              className={`flex items-center gap-2.5 px-3 py-2 rounded-md cursor-pointer select-none text-[13px] transition-colors ${
+                                isChecked ? 'bg-blue-50/70 text-blue-900 font-medium' : 'text-gray-700 hover:bg-gray-50'
+                              }`}
+                            >
+                              <input
+                                type="checkbox"
+                                className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 w-4 h-4"
+                                checked={isChecked}
+                                onChange={() => {
+                                  if (isChecked) {
+                                    setSelectedServices(selectedServices.filter(s => s !== service));
+                                  } else {
+                                    setSelectedServices([...selectedServices, service]);
+                                  }
+                                }}
+                              />
+                              <span>{service}</span>
+                            </label>
+                          );
+                        })}
+                      </div>
+                    </>
+                  )}
+                </div>
+
+                {/* Danh sách sản phẩm thực tế - Multi-select */}
+                <div className="form-group relative">
+                  <label className="form-label font-semibold text-gray-700">Sản phẩm thực tế *</label>
+                  <button
+                    type="button"
+                    className="w-full min-h-[42px] px-3 py-2 bg-white border border-gray-300 rounded-lg text-left text-sm flex justify-between items-center focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
+                    onClick={() => setShowProductDropdown(!showProductDropdown)}
+                  >
+                    <span className="text-gray-800 line-clamp-2">
+                      {selectedProducts.length > 0
+                        ? selectedProducts.join(', ')
+                        : '-- Chọn danh sách sản phẩm --'}
+                    </span>
+                    <ChevronDown size={18} className="text-gray-400 shrink-0 ml-2" />
+                  </button>
+                  
+                  {showProductDropdown && (
+                    <>
+                      <div className="fixed inset-0 z-20" onClick={() => setShowProductDropdown(false)} />
+                      <div className="absolute z-30 mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg max-h-72 overflow-y-auto p-2 flex flex-col gap-1">
+                        <div className="sticky top-0 bg-white pb-2 mb-1 border-b border-gray-100 flex items-center gap-2 px-1">
+                          <div className="relative w-full">
+                            <span className="absolute inset-y-0 left-0 flex items-center pl-2.5 pointer-events-none text-gray-400">
+                              <Search size={14} />
+                            </span>
+                            <input
+                              type="text"
+                              className="w-full pl-8 pr-7 py-1.5 text-xs border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+                              placeholder="Tìm sản phẩm..."
+                              value={productSearch}
+                              onChange={e => setProductSearch(e.target.value)}
+                            />
+                            {productSearch && (
+                              <button
+                                type="button"
+                                className="absolute inset-y-0 right-0 flex items-center pr-2 text-gray-400 hover:text-gray-600"
+                                onClick={() => setProductSearch('')}
+                              >
+                                <X size={14} />
+                              </button>
+                            )}
+                          </div>
+                        </div>
+
+                        {getProductOptions()
+                          .filter(p => !productSearch || p.toLowerCase().includes(productSearch.toLowerCase()))
+                          .map((prod) => {
+                            const isChecked = selectedProducts.includes(prod);
+                            return (
+                              <label
+                                key={prod}
+                                className={`flex items-center gap-2.5 px-3 py-2 rounded-md cursor-pointer select-none text-[13px] transition-colors ${
+                                  isChecked ? 'bg-blue-50/70 text-blue-900 font-medium' : 'text-gray-700 hover:bg-gray-50'
+                                }`}
+                              >
+                                <input
+                                  type="checkbox"
+                                  className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 w-4 h-4"
+                                  checked={isChecked}
+                                  onChange={() => {
+                                    if (isChecked) {
+                                      setSelectedProducts(selectedProducts.filter(p => p !== prod));
+                                    } else {
+                                      setSelectedProducts([...selectedProducts, prod]);
+                                    }
+                                  }}
+                                />
+                                <span>{prod}</span>
+                              </label>
+                            );
+                          })}
+                        {getProductOptions().filter(p => !productSearch || p.toLowerCase().includes(productSearch.toLowerCase())).length === 0 && (
+                          <div className="text-center py-4 text-xs text-gray-400">
+                            Không tìm thấy sản phẩm phù hợp
+                          </div>
+                        )}
+                      </div>
+                    </>
+                  )}
+                </div>
+
+                {/* Tiền thu thực tế */}
+                <div className="form-group">
+                  <label className="form-label font-semibold text-gray-700">Tiền thu thực tế (VNĐ) *</label>
+                  <input
+                    type="number"
+                    className="form-input"
+                    placeholder="Nhập số tiền thu thực tế"
+                    value={actualAmount}
+                    onChange={e => setActualAmount(e.target.value)}
+                    required
+                  />
+                </div>
                 
                 {/* Nguồn nước — cho tất cả trừ Giao hàng */}
                 {needsTechnicalFields(workType) && (
@@ -760,7 +987,7 @@ export default function ReportForm() {
                     <input
                       type="text"
                       className={`form-input pr-10 font-mono tracking-wider ${serialWarning ? 'border-amber-400 bg-amber-50/20' : ''}`}
-                      placeholder="Mẫu: 1858 260 207 00059"
+                      placeholder="Mẫu: 1858 260 207 *****"
                       value={serialNumber}
                       onChange={e => {
                         const formatted = formatSerialNumber(e.target.value);
@@ -886,11 +1113,11 @@ export default function ReportForm() {
                 <span className="text-gray-500">Loại công việc:</span>
                 <span className="font-medium">{workType}</span>
                 <span className="text-gray-500">Loại dịch vụ:</span>
-                <span className="font-medium">{serviceType}</span>
-                {products && (
+                <span className="font-medium">{selectedServices.join(', ')}</span>
+                {selectedProducts.length > 0 && (
                   <>
                     <span className="text-gray-500">Sản phẩm:</span>
-                    <span className="font-medium">{products}</span>
+                    <span className="font-medium">{selectedProducts.join(', ')}</span>
                   </>
                 )}
                 <span className="text-gray-500">Seri SP:</span>
