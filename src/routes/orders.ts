@@ -4,6 +4,7 @@ import logger from '../utils/logger';
 import { requireAuth, requireAdmin } from '../middleware/authSession';
 import { Prisma } from '@prisma/client';
 import { syncRecentOrders } from '../services/orderSyncScheduler';
+import ExcelJS from 'exceljs';
 
 const router = Router();
 
@@ -245,6 +246,18 @@ router.get('/', requireAuth, async (req: Request, res: Response): Promise<void> 
       const searchOR: Prisma.OrderWhereInput[] = [
         { billFullName: { contains: searchStr, mode: 'insensitive' } },
         { billPhoneNumber: { contains: searchStr } },
+        { note: { contains: searchStr, mode: 'insensitive' } },
+        {
+          shippingAddress: {
+            path: ['full_address'],
+            string_contains: searchStr
+          }
+        },
+        {
+          customer: {
+            fullAddress: { contains: searchStr, mode: 'insensitive' }
+          }
+        },
         {
           rawData: {
             path: ['id'],
@@ -275,7 +288,11 @@ router.get('/', requireAuth, async (req: Request, res: Response): Promise<void> 
       orderBy.createdAt = orderDirection;
     }
 
-    const [orders, total] = await Promise.all([
+    // Build statsWhere ignoring adminStatus filter to show counts of all statuses matching other active filters
+    const statsConditions = conditions.filter(cond => !('adminStatus' in cond));
+    const statsWhere: Prisma.OrderWhereInput = statsConditions.length > 0 ? { AND: statsConditions } : {};
+
+    const [orders, total, statsResult] = await Promise.all([
       prisma.order.findMany({
         where,
         orderBy,
@@ -325,8 +342,35 @@ router.get('/', requireAuth, async (req: Request, res: Response): Promise<void> 
           }
         }
       }),
-      prisma.order.count({ where })
+      prisma.order.count({ where }),
+      prisma.order.groupBy({
+        by: ['adminStatus'],
+        where: statsWhere,
+        _count: true
+      })
     ]);
+
+    let totalStatsCount = 0;
+    let pendingCount = 0;
+    let assignedCount = 0;
+    let completedCount = 0;
+    let cancelledCount = 0;
+
+    statsResult.forEach(item => {
+      const count = item._count;
+      totalStatsCount += count;
+      if (item.adminStatus === 'chờ xử lý' || !item.adminStatus) {
+        pendingCount += count;
+      } else if (item.adminStatus === 'đang thực hiện') {
+        assignedCount += count;
+      } else if (item.adminStatus === 'hoàn thành') {
+        completedCount += count;
+      } else if (item.adminStatus === 'hủy đơn') {
+        cancelledCount += count;
+      } else {
+        pendingCount += count;
+      }
+    });
 
     res.json({
       orders,
@@ -335,11 +379,385 @@ router.get('/', requireAuth, async (req: Request, res: Response): Promise<void> 
         page: pageNumber,
         limit: limitNumber,
         totalPages: Math.ceil(total / limitNumber)
+      },
+      stats: {
+        total: totalStatsCount,
+        pending: pendingCount,
+        assigned: assignedCount,
+        completed: completedCount,
+        cancelled: cancelledCount
       }
     });
   } catch (error: any) {
     logger.error('Get orders error', { error: error.message });
     res.status(500).json({ error: 'Lỗi lấy danh sách đơn hàng' });
+  }
+});
+
+/**
+ * GET /api/orders/export
+ * Xuất Excel danh sách đơn hàng theo bộ lọc (Admin only)
+ */
+router.get('/export', requireAuth, requireAdmin, async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { 
+      sortBy = 'createdAt',
+      sortOrder = 'desc',
+      status,
+      search,
+      startDate,
+      endDate,
+      adminStatuses,
+      assignedKtvIds,
+      workTypes,
+      mainStationIds,
+      customerName,
+      customerPhone,
+      pancakeOrderId,
+      serviceTypes,
+      productCategories,
+      productNames,
+      techStationIds,
+      provinces,
+      dateType
+    } = req.query;
+
+    const conditions: Prisma.OrderWhereInput[] = [];
+
+    // Chỉ hiển thị các đơn hàng đã được xác nhận bên POS (ẩn các đơn nháp status = 0)
+    conditions.push({
+      OR: [
+        { statusCode: { not: 0 } },
+        { statusCode: null }
+      ]
+    });
+
+    if (pancakeOrderId) {
+      const parsedId = parseInt(pancakeOrderId as string, 10);
+      if (!isNaN(parsedId)) {
+        conditions.push({ pancakeOrderId: parsedId });
+      }
+    }
+
+    if (customerName) {
+      conditions.push({ billFullName: { contains: customerName as string, mode: 'insensitive' } });
+    }
+
+    if (customerPhone) {
+      conditions.push({ billPhoneNumber: { contains: customerPhone as string } });
+    }
+
+    if (adminStatuses) {
+      const statusesList = typeof adminStatuses === 'string' ? adminStatuses.split(',') : (Array.isArray(adminStatuses) ? adminStatuses as string[] : []);
+      if (statusesList.length > 0) {
+        conditions.push({ adminStatus: { in: statusesList } });
+      }
+    } else if (status) {
+      conditions.push({ adminStatus: status as string });
+    }
+
+    if (assignedKtvIds) {
+      const ktvIdsList = typeof assignedKtvIds === 'string' ? assignedKtvIds.split(',') : (Array.isArray(assignedKtvIds) ? assignedKtvIds as string[] : []);
+      if (ktvIdsList.length > 0) {
+        const hasNullKtv = ktvIdsList.includes('null') || ktvIdsList.includes('');
+        const actualKtvIds = ktvIdsList.filter(id => id && id !== 'null');
+        
+        if (hasNullKtv && actualKtvIds.length > 0) {
+          conditions.push({
+            OR: [
+              { assignedKtvId: { in: actualKtvIds } },
+              { assignedKtvId: null }
+            ]
+          });
+        } else if (hasNullKtv) {
+          conditions.push({ assignedKtvId: null });
+        } else {
+          conditions.push({ assignedKtvId: { in: actualKtvIds } });
+        }
+      }
+    }
+
+    if (workTypes) {
+      const workTypesList = typeof workTypes === 'string' ? workTypes.split(',') : (Array.isArray(workTypes) ? workTypes as string[] : []);
+      if (workTypesList.length > 0) {
+        const hasNullWorkType = workTypesList.includes('null') || workTypesList.includes('');
+        const actualWorkTypes = workTypesList.filter(w => w && w !== 'null');
+        
+        if (hasNullWorkType && actualWorkTypes.length > 0) {
+          conditions.push({
+            OR: [
+              { workType: { in: actualWorkTypes } },
+              { workType: null }
+            ]
+          });
+        } else if (hasNullWorkType) {
+          conditions.push({ workType: null });
+        } else {
+          conditions.push({ workType: { in: actualWorkTypes } });
+        }
+      }
+    }
+
+    if (mainStationIds) {
+      const mainStationIdsList = typeof mainStationIds === 'string' ? mainStationIds.split(',') : (Array.isArray(mainStationIds) ? mainStationIds as string[] : []);
+      if (mainStationIdsList.length > 0) {
+        const hasNullStation = mainStationIdsList.includes('null') || mainStationIdsList.includes('');
+        const actualStationIds = mainStationIdsList.filter(id => id && id !== 'null');
+        
+        if (hasNullStation && actualStationIds.length > 0) {
+          conditions.push({
+            OR: [
+              { mainStationId: { in: actualStationIds } },
+              { mainStationId: null }
+            ]
+          });
+        } else if (hasNullStation) {
+          conditions.push({ mainStationId: null });
+        } else {
+          conditions.push({ mainStationId: { in: actualStationIds } });
+        }
+      }
+    }
+
+    if (startDate || endDate) {
+      const dateCond: any = {};
+      if (startDate) {
+        dateCond.gte = new Date(startDate as string);
+      }
+      if (endDate) {
+        dateCond.lte = new Date(endDate as string);
+      }
+      
+      const type = (dateType as string) || 'createdAt';
+      if (type === 'appointmentTime') {
+        conditions.push({ appointmentTime: dateCond });
+      } else if (type === 'completedAt') {
+        conditions.push({ 
+          adminStatus: 'hoàn thành',
+          updatedAt: dateCond 
+        });
+      } else if (type === 'updatedAt') {
+        conditions.push({ pancakeUpdatedAt: dateCond });
+      } else {
+        conditions.push({ pancakeCreatedAt: dateCond });
+      }
+    }
+
+    if (serviceTypes) {
+      const list = typeof serviceTypes === 'string' ? serviceTypes.split(',') : (Array.isArray(serviceTypes) ? serviceTypes as string[] : []);
+      if (list.length > 0) {
+        conditions.push({ serviceType: { in: list } });
+      }
+    }
+
+    if (techStationIds) {
+      const list = typeof techStationIds === 'string' ? techStationIds.split(',') : (Array.isArray(techStationIds) ? techStationIds as string[] : []);
+      if (list.length > 0) {
+        conditions.push({ techStationId: { in: list } });
+      }
+    }
+
+    if (provinces) {
+      const list = typeof provinces === 'string' ? provinces.split(',') : (Array.isArray(provinces) ? provinces as string[] : []);
+      if (list.length > 0) {
+        const orConds: Prisma.OrderWhereInput[] = list.map(prov => ({
+          OR: [
+            { customer: { provinceName: { contains: prov, mode: 'insensitive' } } },
+            { shippingAddress: { path: ['province'], equals: prov } },
+            { shippingAddress: { path: ['city'], equals: prov } },
+            { shippingAddress: { path: ['province_name'], equals: prov } }
+          ]
+        }));
+        conditions.push({ OR: orConds });
+      }
+    }
+
+    if (productCategories) {
+      const list = typeof productCategories === 'string' ? productCategories.split(',') : (Array.isArray(productCategories) ? productCategories as string[] : []);
+      if (list.length > 0) {
+        const matchedProducts = await prisma.product.findMany({
+          where: { category: { in: list } },
+          select: { sku: true, name: true }
+        });
+        const skus = matchedProducts.map(p => p.sku).filter(Boolean) as string[];
+        const names = matchedProducts.map(p => p.name).filter(Boolean) as string[];
+        
+        conditions.push({
+          items: {
+            some: {
+              OR: [
+                { sku: { in: skus } },
+                { productName: { in: names } }
+              ]
+            }
+          }
+        });
+      }
+    }
+
+    if (productNames) {
+      const list = typeof productNames === 'string' ? productNames.split(',') : (Array.isArray(productNames) ? productNames as string[] : []);
+      if (list.length > 0) {
+        conditions.push({
+          items: {
+            some: {
+              productName: { in: list }
+            }
+          }
+        });
+      }
+    }
+
+    if (search) {
+      const searchStr = String(search).trim();
+      const searchOR: Prisma.OrderWhereInput[] = [
+        { billFullName: { contains: searchStr, mode: 'insensitive' } },
+        { billPhoneNumber: { contains: searchStr } },
+        { note: { contains: searchStr, mode: 'insensitive' } },
+        {
+          shippingAddress: {
+            path: ['full_address'],
+            string_contains: searchStr
+          }
+        },
+        {
+          customer: {
+            fullAddress: { contains: searchStr, mode: 'insensitive' }
+          }
+        },
+        {
+          rawData: {
+            path: ['id'],
+            equals: searchStr
+          }
+        }
+      ];
+      const pancakeId = parseInt(searchStr, 10);
+      if (!isNaN(pancakeId)) {
+        searchOR.push({ pancakeOrderId: pancakeId });
+      }
+      conditions.push({ OR: searchOR });
+    }
+
+    const where: Prisma.OrderWhereInput = {};
+    if (conditions.length > 0) {
+      where.AND = conditions;
+    }
+
+    const orderBy: Prisma.OrderOrderByWithRelationInput = {};
+    const orderDirection = sortOrder === 'asc' ? 'asc' : 'desc';
+    
+    if (sortBy === 'appointmentTime') {
+      orderBy.appointmentTime = orderDirection;
+    } else if (sortBy === 'updatedAt') {
+      orderBy.updatedAt = orderDirection;
+    } else {
+      orderBy.createdAt = orderDirection;
+    }
+
+    const orders = await prisma.order.findMany({
+      where,
+      orderBy,
+      include: {
+        items: true,
+        customer: {
+          select: {
+            fullName: true,
+            phoneNumber: true,
+            fullAddress: true,
+            provinceName: true,
+            districtName: true,
+          }
+        },
+        mainStation: {
+          select: {
+            name: true,
+          }
+        },
+        techStation: {
+          select: {
+            name: true,
+          }
+        },
+        assignedKtv: {
+          select: {
+            fullName: true,
+          }
+        }
+      }
+    });
+
+    const workbook = new ExcelJS.Workbook();
+    const sheet = workbook.addWorksheet('Danh sách Đơn hàng');
+
+    sheet.columns = [
+      { header: 'Mã đơn Pancake', key: 'pancakeOrderId', width: 18 },
+      { header: 'Họ tên khách hàng', key: 'customerName', width: 25 },
+      { header: 'Số điện thoại', key: 'customerPhone', width: 18 },
+      { header: 'Địa chỉ chi tiết', key: 'address', width: 35 },
+      { header: 'Trạng thái xử lý', key: 'adminStatus', width: 18 },
+      { header: 'Loại công việc', key: 'workType', width: 22 },
+      { header: 'Loại dịch vụ chi tiết', key: 'serviceType', width: 25 },
+      { header: 'Danh sách sản phẩm', key: 'products', width: 35 },
+      { header: 'Tiền cần thu (COD)', key: 'moneyToCollect', width: 20 },
+      { header: 'Trạm chính', key: 'mainStation', width: 20 },
+      { header: 'Trạm kỹ thuật', key: 'techStation', width: 20 },
+      { header: 'Kỹ thuật viên gán', key: 'ktv', width: 22 },
+      { header: 'Thời gian hẹn khách', key: 'appointmentTime', width: 22 },
+      { header: 'Ngày tạo hệ thống', key: 'createdAt', width: 22 },
+      { header: 'Ngày cập nhật cuối', key: 'updatedAt', width: 22 },
+      { header: 'Ghi chú', key: 'note', width: 30 },
+      { header: 'Lý do hẹn lại', key: 'rescheduleReason', width: 25 },
+      { header: 'Lý do hủy đơn', key: 'cancelReason', width: 25 },
+    ];
+
+    // Style header row
+    const headerRow = sheet.getRow(1);
+    headerRow.font = { bold: true, color: { argb: 'FFFFFFFF' } };
+    headerRow.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1B3A6B' } };
+
+    orders.forEach((o: any) => {
+      const customerName = o.billFullName || o.customer?.fullName || 'Khách lẻ';
+      const phone = o.billPhoneNumber || o.customer?.phoneNumber || '';
+      const address = o.shippingAddress?.full_address || o.customer?.fullAddress || '';
+      const productsList = o.items.map((i: any) => i.productName).join(', ');
+
+      sheet.addRow({
+        pancakeOrderId: o.pancakeOrderId,
+        customerName,
+        customerPhone: phone,
+        address,
+        adminStatus: o.adminStatus || 'chờ xử lý',
+        workType: o.workType || '',
+        serviceType: o.serviceType || '',
+        products: productsList,
+        moneyToCollect: o.moneyToCollect ?? 0,
+        mainStation: o.mainStation?.name || '',
+        techStation: o.techStation?.name || '',
+        ktv: o.assignedKtv?.fullName || '',
+        appointmentTime: o.appointmentTime ? new Date(o.appointmentTime).toLocaleString('vi-VN') : '',
+        createdAt: o.pancakeCreatedAt ? new Date(o.pancakeCreatedAt).toLocaleString('vi-VN') : new Date(o.createdAt).toLocaleString('vi-VN'),
+        updatedAt: o.updatedAt ? new Date(o.updatedAt).toLocaleString('vi-VN') : '',
+        note: o.note || '',
+        rescheduleReason: o.rescheduleReason || '',
+        cancelReason: o.cancelReason || '',
+      });
+    });
+
+    res.setHeader(
+      'Content-Type',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    );
+    res.setHeader(
+      'Content-Disposition',
+      `attachment; filename=danh_sach_don_hang_${Date.now()}.xlsx`
+    );
+
+    await workbook.xlsx.write(res);
+    res.end();
+  } catch (error: any) {
+    logger.error('Export orders error', { error: error.message });
+    res.status(500).json({ error: 'Lỗi xuất file Excel' });
   }
 });
 

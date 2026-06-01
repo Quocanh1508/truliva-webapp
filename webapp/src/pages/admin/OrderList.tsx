@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getOrders, updateOrder, getKtvUsers, getStations, getOrderAuditLog, syncOrders, getFiltersData } from '../../api/client';
-import { Search, ChevronLeft, ChevronRight, History, XCircle, Filter, RefreshCw, FileText, CheckCircle2, RotateCcw, Copy, UserPlus } from 'lucide-react';
+import { Search, ChevronLeft, ChevronRight, History, XCircle, Filter, RefreshCw, FileText, CheckCircle2, RotateCcw, Copy, UserPlus, Download } from 'lucide-react';
 import { WARRANTY_SERVICE_GROUPS, REPAIR_SERVICE_GROUPS, WORK_TYPE_SERVICES } from '../../utils/workTypes';
 
 const ALL_SERVICE_TYPES = Array.from(new Set(Object.values(WORK_TYPE_SERVICES).flat()));
@@ -91,6 +91,20 @@ export default function OrderList() {
     productNames: [],
     techStations: [],
     provinces: []
+  });
+
+  const [stats, setStats] = useState<{
+    total: number;
+    pending: number;
+    assigned: number;
+    completed: number;
+    cancelled: number;
+  }>({
+    total: 0,
+    pending: 0,
+    assigned: 0,
+    completed: 0,
+    cancelled: 0
   });
 
   // Assignment Modal
@@ -193,6 +207,9 @@ export default function OrderList() {
       setOrders(res.orders);
       setTotalPages(res.pagination.totalPages);
       setTotalItems(res.pagination.total);
+      if (res.stats) {
+        setStats(res.stats);
+      }
     } catch (err: any) {
       setError(err.message || 'Lỗi tải danh sách');
     } finally {
@@ -586,6 +603,47 @@ export default function OrderList() {
     }
   };
 
+  const handleExportExcel = () => {
+    const { startDate, endDate } = getDateRange();
+    const query = new URLSearchParams();
+    
+    const params: Record<string, any> = {
+      search,
+      sortBy,
+      sortOrder,
+      startDate,
+      endDate,
+      pancakeOrderId: filterPancakeOrderId,
+      adminStatuses: filterAdminStatuses,
+      assignedKtvIds: filterKtvIds,
+      workTypes: filterWorkTypes,
+      mainStationIds: filterMainStationIds,
+      customerName: filterCustomerName,
+      customerPhone: filterCustomerPhone,
+      serviceTypes: filterServiceTypes,
+      productCategories: filterProductCategories,
+      productNames: filterProductNames,
+      techStationIds: filterTechStationIds,
+      provinces: filterProvinces,
+      dateType: dateType
+    };
+
+    for (const [key, value] of Object.entries(params)) {
+      if (value !== undefined && value !== null && value !== '') {
+        if (Array.isArray(value)) {
+          if (value.length > 0) {
+            query.append(key, value.join(','));
+          }
+        } else {
+          query.append(key, String(value));
+        }
+      }
+    }
+
+    const url = `/api/orders/export?${query.toString()}`;
+    window.open(url, '_blank');
+  };
+
   const handleSync = async () => {
     try {
       setSyncing(true);
@@ -646,6 +704,16 @@ export default function OrderList() {
             >
               <RefreshCw size={15} className={syncing ? 'animate-spin text-blue-600' : 'text-gray-500'} />
               <span>{syncing ? 'Đang đồng bộ...' : 'Đồng bộ Pancake'}</span>
+            </button>
+
+            {/* Xuất Excel button */}
+            <button
+              onClick={handleExportExcel}
+              className="flex items-center space-x-1.5 px-3 py-2 text-[13px] border border-gray-300 rounded-md bg-white text-gray-700 hover:bg-gray-50 focus:outline-none font-medium transition-colors"
+              title="Xuất file Excel danh sách đơn hàng theo bộ lọc đang chọn"
+            >
+              <Download size={15} className="text-gray-500" />
+              <span>Xuất Excel</span>
             </button>
 
             {/* Bộ lọc button & popover container */}
@@ -1224,6 +1292,30 @@ export default function OrderList() {
             </button>
           </div>
         )}
+      </div>
+
+      {/* Quick Stats Summary */}
+      <div className="grid grid-cols-5 gap-4 px-4 py-3 bg-gray-50 border-b border-gray-200">
+        <div className="bg-white p-3 rounded-lg border border-gray-200 shadow-sm flex flex-col">
+          <span className="text-[12px] font-semibold text-gray-500 uppercase tracking-wider">Tổng số đơn</span>
+          <span className="text-xl font-bold text-gray-900 mt-1">{stats.total}</span>
+        </div>
+        <div className="bg-white p-3 rounded-lg border border-gray-200 shadow-sm flex flex-col border-l-4 border-l-amber-500">
+          <span className="text-[12px] font-semibold text-amber-600 uppercase tracking-wider">Chờ xử lý</span>
+          <span className="text-xl font-bold text-gray-900 mt-1">{stats.pending}</span>
+        </div>
+        <div className="bg-white p-3 rounded-lg border border-gray-200 shadow-sm flex flex-col border-l-4 border-l-blue-500">
+          <span className="text-[12px] font-semibold text-blue-600 uppercase tracking-wider">Đã phân công</span>
+          <span className="text-xl font-bold text-gray-900 mt-1">{stats.assigned}</span>
+        </div>
+        <div className="bg-white p-3 rounded-lg border border-gray-200 shadow-sm flex flex-col border-l-4 border-l-emerald-500">
+          <span className="text-[12px] font-semibold text-emerald-600 uppercase tracking-wider">Hoàn thành</span>
+          <span className="text-xl font-bold text-gray-900 mt-1">{stats.completed}</span>
+        </div>
+        <div className="bg-white p-3 rounded-lg border border-gray-200 shadow-sm flex flex-col border-l-4 border-l-red-500">
+          <span className="text-[12px] font-semibold text-red-600 uppercase tracking-wider">Hủy đơn</span>
+          <span className="text-xl font-bold text-gray-900 mt-1">{stats.cancelled}</span>
+        </div>
       </div>
 
       {/* Table Area */}
