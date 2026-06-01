@@ -1886,11 +1886,22 @@ export default function OrderList() {
                         <span>{new Date(log.createdAt).toLocaleString('vi-VN')}</span>
                       </div>
                       <div className="text-blue-600 font-medium mb-1">Hành động: {log.action}</div>
-                      {log.changes && log.changes.map((c: any, i: number) => (
-                        <div key={i} className="text-gray-600">
-                          - <span className="font-medium text-gray-800">{c.field}</span>: <span className="line-through text-red-400">{String(c.from || 'Trống')}</span> &rarr; <span className="text-green-600 font-medium">{String(c.to || 'Trống')}</span>
-                        </div>
-                      ))}
+                      {log.changes && (() => {
+                        let changesArr: any[] = [];
+                        if (Array.isArray(log.changes)) {
+                          changesArr = log.changes;
+                        } else if (typeof log.changes === 'string') {
+                          try { changesArr = JSON.parse(log.changes); } catch { changesArr = []; }
+                          if (!Array.isArray(changesArr)) changesArr = [changesArr];
+                        } else if (typeof log.changes === 'object' && log.changes !== null) {
+                          changesArr = [log.changes];
+                        }
+                        return changesArr.map((c: any, i: number) => (
+                          <div key={i} className="text-gray-600">
+                            - <span className="font-medium text-gray-800">{c.field || Object.keys(c)[0] || 'N/A'}</span>: <span className="line-through text-red-400">{String(c.from ?? c[Object.keys(c)[0]] ?? 'Trống')}</span> &rarr; <span className="text-green-600 font-medium">{String(c.to ?? 'Trống')}</span>
+                          </div>
+                        ));
+                      })()}
                     </div>
                   ))}
                 </div>
