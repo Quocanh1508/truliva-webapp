@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { fetchApi, deleteReportWithReason, updateReport, uploadImages } from '../../api/client';
-import { Download, X, ExternalLink, Image as ImageIcon, Loader, Search, Edit3, Save, Plus, Trash2 } from 'lucide-react';
+import { Download, X, ExternalLink, Image as ImageIcon, Loader, Search, Edit3, Save, Plus, Trash2, SlidersHorizontal, RotateCcw, Calendar } from 'lucide-react';
 
 // Check if a URL points to a directly viewable image
 function isDirectImage(url: string): boolean {
@@ -87,6 +87,171 @@ function ImageItem({ url, index }: { url: string; index: number }) {
   );
 }
 
+interface FilterOptionsState {
+  workTypes: string[];
+  serviceTypes: string[];
+  products: string[];
+  categories: string[];
+  mainStations: { id: string; name: string }[];
+  techStations: { id: string; name: string; mainStationId: string }[];
+  ktvs: { id: string; name: string; techStationId: string }[];
+  provinces: string[];
+}
+
+function MultiSelectDropdown({
+  label,
+  options,
+  selected,
+  onChange,
+  placeholder = "Tất cả"
+}: {
+  label: string;
+  options: string[];
+  selected: string[];
+  onChange: (vals: string[]) => void;
+  placeholder?: string;
+}) {
+  const [isOpen, setIsOpen] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
+        setIsOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  const toggleOption = (opt: string) => {
+    if (selected.includes(opt)) {
+      onChange(selected.filter(item => item !== opt));
+    } else {
+      onChange([...selected, opt]);
+    }
+  };
+
+  return (
+    <div className="flex flex-col gap-1 relative w-full text-left" ref={containerRef}>
+      <label className="text-[11px] font-bold text-gray-500 uppercase tracking-wider">{label}</label>
+      <div 
+        onClick={() => setIsOpen(!isOpen)}
+        className="w-full bg-white border border-gray-300 rounded-md px-3 py-2 text-[13px] text-gray-700 cursor-pointer flex justify-between items-center hover:border-blue-400 focus:border-blue-500 transition-colors"
+      >
+        <span className="truncate">
+          {selected.length === 0 
+            ? placeholder 
+            : `${selected.length} đã chọn (${selected.slice(0, 2).join(', ')}${selected.length > 2 ? '...' : ''})`}
+        </span>
+        <span className="text-[10px] text-gray-400">▼</span>
+      </div>
+      {isOpen && (
+        <div className="absolute top-[100%] left-0 right-0 z-30 mt-1 bg-white border border-gray-200 rounded-md shadow-lg max-h-48 overflow-y-auto p-2 flex flex-col gap-1.5">
+          {options.map(opt => {
+            const isChecked = selected.includes(opt);
+            return (
+              <label key={opt} className="flex items-center gap-2 px-2 py-1 hover:bg-gray-50 rounded cursor-pointer select-none text-[13px]">
+                <input
+                  type="checkbox"
+                  checked={isChecked}
+                  onChange={() => toggleOption(opt)}
+                  className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 w-4 h-4 cursor-pointer"
+                />
+                <span className="text-gray-750 font-medium">{opt}</span>
+              </label>
+            );
+          })}
+          {options.length === 0 && (
+            <span className="text-xs text-gray-400 italic p-2 text-center">Không có lựa chọn</span>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function MultiSelectObjectDropdown({
+  label,
+  options,
+  selectedIds,
+  onChange,
+  placeholder = "Tất cả"
+}: {
+  label: string;
+  options: { id: string; name: string }[];
+  selectedIds: string[];
+  onChange: (ids: string[]) => void;
+  placeholder?: string;
+}) {
+  const [isOpen, setIsOpen] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
+        setIsOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  const toggleOption = (id: string) => {
+    if (selectedIds.includes(id)) {
+      onChange(selectedIds.filter(item => item !== id));
+    } else {
+      onChange([...selectedIds, id]);
+    }
+  };
+
+  const getSelectedNames = () => {
+    return options
+      .filter(opt => selectedIds.includes(opt.id))
+      .map(opt => opt.name);
+  };
+
+  const selectedNames = getSelectedNames();
+
+  return (
+    <div className="flex flex-col gap-1 relative w-full text-left" ref={containerRef}>
+      <label className="text-[11px] font-bold text-gray-500 uppercase tracking-wider">{label}</label>
+      <div 
+        onClick={() => setIsOpen(!isOpen)}
+        className="w-full bg-white border border-gray-300 rounded-md px-3 py-2 text-[13px] text-gray-700 cursor-pointer flex justify-between items-center hover:border-blue-400 focus:border-blue-500 transition-colors"
+      >
+        <span className="truncate">
+          {selectedIds.length === 0 
+            ? placeholder 
+            : `${selectedIds.length} đã chọn (${selectedNames.slice(0, 2).join(', ')}${selectedNames.length > 2 ? '...' : ''})`}
+        </span>
+        <span className="text-[10px] text-gray-400">▼</span>
+      </div>
+      {isOpen && (
+        <div className="absolute top-[100%] left-0 right-0 z-30 mt-1 bg-white border border-gray-200 rounded-md shadow-lg max-h-48 overflow-y-auto p-2 flex flex-col gap-1.5">
+          {options.map(opt => {
+            const isChecked = selectedIds.includes(opt.id);
+            return (
+              <label key={opt.id} className="flex items-center gap-2 px-2 py-1 hover:bg-gray-50 rounded cursor-pointer select-none text-[13px]">
+                <input
+                  type="checkbox"
+                  checked={isChecked}
+                  onChange={() => toggleOption(opt.id)}
+                  className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 w-4 h-4 cursor-pointer"
+                />
+                <span className="text-gray-750 font-medium">{opt.name}</span>
+              </label>
+            );
+          })}
+          {options.length === 0 && (
+            <span className="text-xs text-gray-400 italic p-2 text-center">Không có lựa chọn</span>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function ReportList() {
   const [searchParams, setSearchParams] = useSearchParams();
   const searchParam = searchParams.get('search') || '';
@@ -134,6 +299,44 @@ export default function ReportList() {
   const [deleteReason, setDeleteReason] = useState('');
   const [deleting, setDeleting] = useState(false);
 
+  // ── Advanced Filters State ──
+  const [showFilters, setShowFilters] = useState(false);
+  const [filterOptions, setFilterOptions] = useState<FilterOptionsState | null>(null);
+
+  // Temporary filter selections in panel
+  const [tempWorkTypes, setTempWorkTypes] = useState<string[]>([]);
+  const [tempServiceTypes, setTempServiceTypes] = useState<string[]>([]);
+  const [tempCategories, setTempCategories] = useState<string[]>([]);
+  const [tempProducts, setTempProducts] = useState<string[]>([]);
+  const [tempMainStationId, setTempMainStationId] = useState('');
+  const [tempTechStations, setTempTechStations] = useState<string[]>([]);
+  const [tempKtvs, setTempKtvs] = useState<string[]>([]);
+  const [tempProvince, setTempProvince] = useState('');
+  const [tempCompletedStart, setTempCompletedStart] = useState('');
+  const [tempCompletedEnd, setTempCompletedEnd] = useState('');
+  const [tempCreatedStart, setTempCreatedStart] = useState('');
+  const [tempCreatedEnd, setTempCreatedEnd] = useState('');
+  const [tempUpdatedStart, setTempUpdatedStart] = useState('');
+  const [tempUpdatedEnd, setTempUpdatedEnd] = useState('');
+
+  // Applied filter parameters sent to API
+  const [appliedFilters, setAppliedFilters] = useState({
+    workTypes: [] as string[],
+    serviceTypes: [] as string[],
+    categories: [] as string[],
+    products: [] as string[],
+    mainStationId: '',
+    techStations: [] as string[],
+    ktvs: [] as string[],
+    province: '',
+    completedStart: '',
+    completedEnd: '',
+    createdStart: '',
+    createdEnd: '',
+    updatedStart: '',
+    updatedEnd: ''
+  });
+
   // ── Edit mode state ──
   const [isEditing, setIsEditing] = useState(false);
   const [editData, setEditData] = useState<any>({});
@@ -179,8 +382,20 @@ export default function ReportList() {
   }, [searchParam]);
 
   useEffect(() => {
+    const loadFilters = async () => {
+      try {
+        const data = await fetchApi('/reports/filter-options');
+        setFilterOptions(data);
+      } catch (err) {
+        console.error('Lỗi lấy danh mục bộ lọc:', err);
+      }
+    };
+    loadFilters();
+  }, []);
+
+  useEffect(() => {
     loadReports(searchParam);
-  }, [filterMonth, datePreset, customStartDate, customEndDate, searchParam]);
+  }, [filterMonth, datePreset, customStartDate, customEndDate, searchParam, appliedFilters]);
 
   const loadReports = async (overrideSearch?: string) => {
     setLoading(true);
@@ -196,6 +411,50 @@ export default function ReportList() {
       if (startDate) params.append('startDate', startDate);
       if (endDate) params.append('endDate', endDate);
 
+      // Append advanced filters
+      if (appliedFilters.workTypes.length > 0) {
+        params.append('workTypes', appliedFilters.workTypes.join(','));
+      }
+      if (appliedFilters.serviceTypes.length > 0) {
+        params.append('serviceTypes', appliedFilters.serviceTypes.join(','));
+      }
+      if (appliedFilters.categories.length > 0) {
+        params.append('productCategories', appliedFilters.categories.join(','));
+      }
+      if (appliedFilters.products.length > 0) {
+        params.append('products', appliedFilters.products.join(','));
+      }
+      if (appliedFilters.mainStationId) {
+        params.append('mainStationId', appliedFilters.mainStationId);
+      }
+      if (appliedFilters.techStations.length > 0) {
+        params.append('techStationIds', appliedFilters.techStations.join(','));
+      }
+      if (appliedFilters.ktvs.length > 0) {
+        params.append('ktvIds', appliedFilters.ktvs.join(','));
+      }
+      if (appliedFilters.province) {
+        params.append('province', appliedFilters.province);
+      }
+      if (appliedFilters.completedStart) {
+        params.append('completedStart', appliedFilters.completedStart);
+      }
+      if (appliedFilters.completedEnd) {
+        params.append('completedEnd', appliedFilters.completedEnd);
+      }
+      if (appliedFilters.createdStart) {
+        params.append('createdStart', appliedFilters.createdStart);
+      }
+      if (appliedFilters.createdEnd) {
+        params.append('createdEnd', appliedFilters.createdEnd);
+      }
+      if (appliedFilters.updatedStart) {
+        params.append('updatedStart', appliedFilters.updatedStart);
+      }
+      if (appliedFilters.updatedEnd) {
+        params.append('updatedEnd', appliedFilters.updatedEnd);
+      }
+
       const data = await fetchApi(`/reports?${params.toString()}`);
       setReports(data.reports);
     } catch (e) {
@@ -210,6 +469,77 @@ export default function ReportList() {
     setSearchParams(search ? { search } : {});
   };
 
+  const handleMainStationChange = (id: string) => {
+    setTempMainStationId(id);
+    setTempTechStations([]);
+    setTempKtvs([]);
+  };
+
+  const handleTechStationsChange = (ids: string[]) => {
+    setTempTechStations(ids);
+    if (ids.length > 0 && filterOptions?.ktvs) {
+      // Keep only KTVs that belong to one of the selected tech stations
+      const validKtvs = tempKtvs.filter(ktvId => {
+        const ktv = filterOptions.ktvs.find(k => k.id === ktvId);
+        return ktv && ids.includes(ktv.techStationId);
+      });
+      setTempKtvs(validKtvs);
+    }
+  };
+
+  const applyFilters = () => {
+    setAppliedFilters({
+      workTypes: tempWorkTypes,
+      serviceTypes: tempServiceTypes,
+      categories: tempCategories,
+      products: tempProducts,
+      mainStationId: tempMainStationId,
+      techStations: tempTechStations,
+      ktvs: tempKtvs,
+      province: tempProvince,
+      completedStart: tempCompletedStart,
+      completedEnd: tempCompletedEnd,
+      createdStart: tempCreatedStart,
+      createdEnd: tempCreatedEnd,
+      updatedStart: tempUpdatedStart,
+      updatedEnd: tempUpdatedEnd
+    });
+  };
+
+  const resetFilters = () => {
+    setTempWorkTypes([]);
+    setTempServiceTypes([]);
+    setTempCategories([]);
+    setTempProducts([]);
+    setTempMainStationId('');
+    setTempTechStations([]);
+    setTempKtvs([]);
+    setTempProvince('');
+    setTempCompletedStart('');
+    setTempCompletedEnd('');
+    setTempCreatedStart('');
+    setTempCreatedEnd('');
+    setTempUpdatedStart('');
+    setTempUpdatedEnd('');
+
+    setAppliedFilters({
+      workTypes: [],
+      serviceTypes: [],
+      categories: [],
+      products: [],
+      mainStationId: '',
+      techStations: [],
+      ktvs: [],
+      province: '',
+      completedStart: '',
+      completedEnd: '',
+      createdStart: '',
+      createdEnd: '',
+      updatedStart: '',
+      updatedEnd: ''
+    });
+  };
+
   const handleExport = () => {
     const params = new URLSearchParams();
     if (filterMonth) params.append('month', filterMonth);
@@ -218,6 +548,50 @@ export default function ReportList() {
     const { startDate, endDate } = getDateRange();
     if (startDate) params.append('startDate', startDate);
     if (endDate) params.append('endDate', endDate);
+
+    // Advanced filters
+    if (appliedFilters.workTypes.length > 0) {
+      params.append('workTypes', appliedFilters.workTypes.join(','));
+    }
+    if (appliedFilters.serviceTypes.length > 0) {
+      params.append('serviceTypes', appliedFilters.serviceTypes.join(','));
+    }
+    if (appliedFilters.categories.length > 0) {
+      params.append('productCategories', appliedFilters.categories.join(','));
+    }
+    if (appliedFilters.products.length > 0) {
+      params.append('products', appliedFilters.products.join(','));
+    }
+    if (appliedFilters.mainStationId) {
+      params.append('mainStationId', appliedFilters.mainStationId);
+    }
+    if (appliedFilters.techStations.length > 0) {
+      params.append('techStationIds', appliedFilters.techStations.join(','));
+    }
+    if (appliedFilters.ktvs.length > 0) {
+      params.append('ktvIds', appliedFilters.ktvs.join(','));
+    }
+    if (appliedFilters.province) {
+      params.append('province', appliedFilters.province);
+    }
+    if (appliedFilters.completedStart) {
+      params.append('completedStart', appliedFilters.completedStart);
+    }
+    if (appliedFilters.completedEnd) {
+      params.append('completedEnd', appliedFilters.completedEnd);
+    }
+    if (appliedFilters.createdStart) {
+      params.append('createdStart', appliedFilters.createdStart);
+    }
+    if (appliedFilters.createdEnd) {
+      params.append('createdEnd', appliedFilters.createdEnd);
+    }
+    if (appliedFilters.updatedStart) {
+      params.append('updatedStart', appliedFilters.updatedStart);
+    }
+    if (appliedFilters.updatedEnd) {
+      params.append('updatedEnd', appliedFilters.updatedEnd);
+    }
 
     const url = `/api/reports/export?${params.toString()}`;
     window.open(url, '_blank');
@@ -423,8 +797,207 @@ export default function ReportList() {
             value={filterMonth}
             onChange={e => setFilterMonth(e.target.value)}
           />
+
+          <button 
+            type="button"
+            onClick={() => setShowFilters(!showFilters)}
+            className={`flex items-center gap-2 px-3 py-2 text-[13px] border rounded-md font-medium transition-colors ${
+              showFilters 
+                ? 'bg-blue-50 text-blue-750 border-blue-300 hover:bg-blue-100' 
+                : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+            }`}
+          >
+            <SlidersHorizontal size={14} />
+            Bộ lọc nâng cao
+          </button>
         </div>
       </div>
+
+      {showFilters && (
+        <div className="bg-white p-5 rounded-lg border border-gray-200 mb-6 shadow-sm flex flex-col gap-5 animate-fade-in text-left">
+          {/* Row 1: Công việc & Sản phẩm */}
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <MultiSelectDropdown
+              label="Loại công việc"
+              options={filterOptions?.workTypes || []}
+              selected={tempWorkTypes}
+              onChange={setTempWorkTypes}
+            />
+            <MultiSelectDropdown
+              label="Loại dịch vụ"
+              options={filterOptions?.serviceTypes || []}
+              selected={tempServiceTypes}
+              onChange={setTempServiceTypes}
+            />
+            <MultiSelectDropdown
+              label="Danh mục sản phẩm"
+              options={filterOptions?.categories || []}
+              selected={tempCategories}
+              onChange={setTempCategories}
+            />
+            <MultiSelectDropdown
+              label="Sản phẩm"
+              options={filterOptions?.products || []}
+              selected={tempProducts}
+              onChange={setTempProducts}
+            />
+          </div>
+
+          {/* Row 2: Trạm & KTV & Tỉnh */}
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            {/* Trạm chính (Single Select) */}
+            <div className="flex flex-col gap-1 relative w-full text-left">
+              <label className="text-[11px] font-bold text-gray-500 uppercase tracking-wider">Trạm chính</label>
+              <select
+                value={tempMainStationId}
+                onChange={(e) => handleMainStationChange(e.target.value)}
+                className="w-full bg-white border border-gray-300 rounded-md px-3 py-2 text-[13px] text-gray-700 outline-none hover:border-blue-400 focus:border-blue-500 transition-colors"
+              >
+                <option value="">Tất cả</option>
+                {filterOptions?.mainStations.map(station => (
+                  <option key={station.id} value={station.id}>{station.name}</option>
+                ))}
+              </select>
+            </div>
+
+            {/* Trạm kỹ thuật (Multi Select cascading) */}
+            <MultiSelectObjectDropdown
+              label="Trạm kỹ thuật"
+              options={
+                tempMainStationId
+                  ? (filterOptions?.techStations.filter(t => t.mainStationId === tempMainStationId) || [])
+                  : (filterOptions?.techStations || [])
+              }
+              selectedIds={tempTechStations}
+              onChange={handleTechStationsChange}
+            />
+
+            {/* KTV (Multi Select cascading) */}
+            <MultiSelectObjectDropdown
+              label="Kỹ thuật viên (KTV)"
+              options={
+                tempTechStations.length > 0
+                  ? (filterOptions?.ktvs.filter(k => tempTechStations.includes(k.techStationId)) || [])
+                  : (tempMainStationId
+                      ? (filterOptions?.ktvs.filter(k => {
+                          const ts = filterOptions?.techStations.find(t => t.id === k.techStationId);
+                          return ts && ts.mainStationId === tempMainStationId;
+                        }) || [])
+                      : (filterOptions?.ktvs || [])
+                    )
+              }
+              selectedIds={tempKtvs}
+              onChange={setTempKtvs}
+            />
+
+            {/* Tỉnh / Thành phố */}
+            <div className="flex flex-col gap-1 relative w-full text-left">
+              <label className="text-[11px] font-bold text-gray-500 uppercase tracking-wider">Tỉnh / Thành phố</label>
+              <select
+                value={tempProvince}
+                onChange={(e) => setTempProvince(e.target.value)}
+                className="w-full bg-white border border-gray-300 rounded-md px-3 py-2 text-[13px] text-gray-700 outline-none hover:border-blue-400 focus:border-blue-500 transition-colors"
+              >
+                <option value="">Tất cả</option>
+                {filterOptions?.provinces.map(p => (
+                  <option key={p} value={p}>{p}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          {/* Row 3: Các mốc thời gian */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {/* Thời gian hoàn thành */}
+            <div className="bg-gray-50 p-3 rounded-md border border-gray-100 flex flex-col gap-2">
+              <span className="text-[11px] font-bold text-gray-500 uppercase tracking-wider flex items-center gap-1.5">
+                <Calendar size={12} className="text-gray-400" />
+                Thời gian hoàn thành
+              </span>
+              <div className="flex items-center gap-2">
+                <input
+                  type="date"
+                  className="w-full px-2.5 py-1.5 text-[12px] border border-gray-300 rounded-md outline-none text-gray-700 bg-white"
+                  value={tempCompletedStart}
+                  onChange={(e) => setTempCompletedStart(e.target.value)}
+                />
+                <span className="text-gray-400 text-xs">đến</span>
+                <input
+                  type="date"
+                  className="w-full px-2.5 py-1.5 text-[12px] border border-gray-300 rounded-md outline-none text-gray-700 bg-white"
+                  value={tempCompletedEnd}
+                  onChange={(e) => setTempCompletedEnd(e.target.value)}
+                />
+              </div>
+            </div>
+
+            {/* Thời gian tạo đơn */}
+            <div className="bg-gray-50 p-3 rounded-md border border-gray-100 flex flex-col gap-2">
+              <span className="text-[11px] font-bold text-gray-500 uppercase tracking-wider flex items-center gap-1.5">
+                <Calendar size={12} className="text-gray-400" />
+                Thời gian tạo đơn
+              </span>
+              <div className="flex items-center gap-2">
+                <input
+                  type="date"
+                  className="w-full px-2.5 py-1.5 text-[12px] border border-gray-300 rounded-md outline-none text-gray-700 bg-white"
+                  value={tempCreatedStart}
+                  onChange={(e) => setTempCreatedStart(e.target.value)}
+                />
+                <span className="text-gray-400 text-xs">đến</span>
+                <input
+                  type="date"
+                  className="w-full px-2.5 py-1.5 text-[12px] border border-gray-300 rounded-md outline-none text-gray-700 bg-white"
+                  value={tempCreatedEnd}
+                  onChange={(e) => setTempCreatedEnd(e.target.value)}
+                />
+              </div>
+            </div>
+
+            {/* Thời gian cập nhật */}
+            <div className="bg-gray-50 p-3 rounded-md border border-gray-100 flex flex-col gap-2">
+              <span className="text-[11px] font-bold text-gray-500 uppercase tracking-wider flex items-center gap-1.5">
+                <Calendar size={12} className="text-gray-400" />
+                Thời gian cập nhật
+              </span>
+              <div className="flex items-center gap-2">
+                <input
+                  type="date"
+                  className="w-full px-2.5 py-1.5 text-[12px] border border-gray-300 rounded-md outline-none text-gray-700 bg-white"
+                  value={tempUpdatedStart}
+                  onChange={(e) => setTempUpdatedStart(e.target.value)}
+                />
+                <span className="text-gray-400 text-xs">đến</span>
+                <input
+                  type="date"
+                  className="w-full px-2.5 py-1.5 text-[12px] border border-gray-300 rounded-md outline-none text-gray-700 bg-white"
+                  value={tempUpdatedEnd}
+                  onChange={(e) => setTempUpdatedEnd(e.target.value)}
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Buttons: Apply / Reset */}
+          <div className="flex justify-end gap-3 pt-2 border-t border-gray-150">
+            <button
+              type="button"
+              onClick={resetFilters}
+              className="flex items-center gap-1.5 px-4 py-2 text-[13px] text-gray-600 bg-gray-100 rounded-md hover:bg-gray-200 transition-colors font-medium cursor-pointer"
+            >
+              <RotateCcw size={14} />
+              Đặt lại
+            </button>
+            <button
+              type="button"
+              onClick={applyFilters}
+              className="flex items-center gap-1.5 px-5 py-2 text-[13px] text-white bg-blue-600 rounded-md hover:bg-blue-700 transition-colors font-semibold cursor-pointer"
+            >
+              Áp dụng
+            </button>
+          </div>
+        </div>
+      )}
 
       {loading ? (
         <div className="text-center py-10"><span className="spinner border-t-[#1B3A6B]"></span></div>

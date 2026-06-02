@@ -6,6 +6,185 @@ import ExcelJS from 'exceljs';
 
 const router = Router();
 
+// Reusable function to build standard & advanced report filter queries
+async function buildReportFilter(query: any, user: any): Promise<any> {
+  const {
+    month,
+    ktvId,
+    province,
+    serviceType,
+    isPaid,
+    search,
+    startDate,
+    endDate,
+    workTypes,
+    serviceTypes,
+    productCategories,
+    products,
+    mainStationId,
+    techStationIds,
+    ktvIds,
+    completedStart,
+    completedEnd,
+    createdStart,
+    createdEnd,
+    updatedStart,
+    updatedEnd
+  } = query;
+
+  const where: any = {};
+
+  // Phân quyền: KTV chỉ thấy của mình
+  if (user.role === 'KTV') {
+    where.ktvUserId = user.id;
+  } else if (ktvId) {
+    where.ktvUserId = ktvId;
+  } else if (ktvIds) {
+    const list = (ktvIds as string).split(',').map((s: string) => s.trim()).filter(Boolean);
+    if (list.length > 0) {
+      where.ktvUserId = { in: list };
+    }
+  }
+
+  if (month) where.month = month;
+  if (province) where.province = { contains: province as string, mode: 'insensitive' };
+  
+  // Lọc Loại công việc (chọn nhiều)
+  if (workTypes) {
+    const list = (workTypes as string).split(',').map((s: string) => s.trim()).filter(Boolean);
+    if (list.length > 0) {
+      where.workType = { in: list };
+    }
+  }
+
+  // Lọc Loại dịch vụ (chọn nhiều)
+  if (serviceTypes) {
+    const list = (serviceTypes as string).split(',').map((s: string) => s.trim()).filter(Boolean);
+    if (list.length > 0) {
+      where.serviceType = { in: list };
+    }
+  } else if (serviceType) {
+    where.serviceType = serviceType;
+  }
+
+  if (isPaid !== undefined) where.isPaid = isPaid === 'true';
+
+  // Lọc Danh mục sản phẩm (chọn nhiều)
+  if (productCategories) {
+    const categories = (productCategories as string).split(',').map((s: string) => s.trim()).filter(Boolean);
+    if (categories.length > 0) {
+      const dbProducts = await prisma.product.findMany({
+        where: { category: { in: categories, mode: 'insensitive' } },
+        select: { name: true }
+      });
+      const productNames = dbProducts.map((p: any) => p.name);
+      if (productNames.length > 0) {
+        where.products = {
+          hasSome: productNames
+        };
+      } else {
+        where.id = 'none'; // force return nothing
+      }
+    }
+  }
+
+  // Lọc Sản phẩm (chọn nhiều)
+  if (products) {
+    const list = (products as string).split(',').map((s: string) => s.trim()).filter(Boolean);
+    if (list.length > 0) {
+      where.products = {
+        hasSome: list
+      };
+    }
+  }
+
+  // Lọc Trạm chính, Trạm kỹ thuật
+  const orConditions: any[] = [];
+  if (mainStationId) {
+    orConditions.push(
+      { order: { mainStationId } },
+      { ktvUser: { techStation: { mainStationId } } }
+    );
+  }
+  if (techStationIds) {
+    const list = (techStationIds as string).split(',').map((s: string) => s.trim()).filter(Boolean);
+    if (list.length > 0) {
+      orConditions.push(
+        { order: { techStationId: { in: list } } },
+        { ktvUser: { techStationId: { in: list } } }
+      );
+    }
+  }
+
+  if (orConditions.length > 0) {
+    where.AND = where.AND || [];
+    where.AND.push({ OR: orConditions });
+  }
+
+  // Lọc tìm kiếm tổng hợp
+  if (search) {
+    const searchStr = search as string;
+    const parsedOrderId = parseInt(searchStr);
+    
+    const searchConditions: any[] = [
+      { customerName: { contains: searchStr, mode: 'insensitive' } },
+      { customerPhone: { contains: searchStr } },
+      { ktvUser: { fullName: { contains: searchStr, mode: 'insensitive' } } }
+    ];
+    
+    if (!isNaN(parsedOrderId)) {
+      searchConditions.push({
+        order: {
+          pancakeOrderId: parsedOrderId
+        }
+      });
+    }
+
+    where.AND = where.AND || [];
+    where.AND.push({ OR: searchConditions });
+  }
+
+  // Lọc theo Khoảng thời gian hoàn thành (ServiceReport.createdAt)
+  const compStart = completedStart || startDate;
+  const compEnd = completedEnd || endDate;
+  if (compStart || compEnd) {
+    where.createdAt = {};
+    if (compStart) {
+      where.createdAt.gte = new Date(`${compStart}T00:00:00.000Z`);
+    }
+    if (compEnd) {
+      where.createdAt.lte = new Date(`${compEnd}T23:59:59.999Z`);
+    }
+  }
+
+  // Lọc theo Khoảng thời gian tạo đơn (Order.pancakeCreatedAt hoặc Order.createdAt)
+  if (createdStart || createdEnd) {
+    const orderDateFilter: any = {};
+    if (createdStart) {
+      orderDateFilter.gte = new Date(`${createdStart}T00:00:00.000Z`);
+    }
+    if (createdEnd) {
+      orderDateFilter.lte = new Date(`${createdEnd}T23:59:59.999Z`);
+    }
+    
+    where.order = where.order || {};
+    where.order.pancakeCreatedAt = orderDateFilter;
+  }
+
+  // Lọc theo Khoảng thời gian cập nhật báo cáo (ServiceReport.updatedAt)
+  if (updatedStart || updatedEnd) {
+    where.updatedAt = {};
+    if (updatedStart) {
+      where.updatedAt.gte = new Date(`${updatedStart}T00:00:00.000Z`);
+    }
+    if (updatedEnd) {
+      where.updatedAt.lte = new Date(`${updatedEnd}T23:59:59.999Z`);
+    }
+  }
+
+  return where;
+}
+
 // Tất cả routes cần đăng nhập
 router.use(requireAuth);
 
@@ -144,62 +323,11 @@ router.post('/', async (req: Request, res: Response): Promise<void> => {
 router.get('/', async (req: Request, res: Response): Promise<void> => {
   try {
     const { 
-      month, 
-      ktvId, 
-      province, 
-      serviceType, 
-      isPaid, 
       page = '1', 
-      limit = '20',
-      search,
-      startDate,
-      endDate
+      limit = '20'
     } = req.query;
 
-    const where: any = {};
-
-    // KTV chỉ thấy báo cáo của mình
-    if (req.user!.role === 'KTV') {
-      where.ktvUserId = req.user!.id;
-    } else if (ktvId) {
-      where.ktvUserId = ktvId;
-    }
-
-    if (month) where.month = month;
-    if (province) where.province = { contains: province as string, mode: 'insensitive' };
-    if (serviceType) where.serviceType = serviceType;
-    if (isPaid !== undefined) where.isPaid = isPaid === 'true';
-
-    // Tìm kiếm tổng hợp
-    if (search) {
-      const searchStr = search as string;
-      const parsedOrderId = parseInt(searchStr);
-      
-      where.OR = [
-        { customerName: { contains: searchStr, mode: 'insensitive' } },
-        { customerPhone: { contains: searchStr } },
-        { ktvUser: { fullName: { contains: searchStr, mode: 'insensitive' } } }
-      ];
-      
-      if (!isNaN(parsedOrderId)) {
-        where.OR.push({
-          order: {
-            pancakeOrderId: parsedOrderId
-          }
-        });
-      }
-    }
-
-    // Lọc theo khoảng thời gian tạo báo cáo
-    if (startDate || endDate) {
-      where.createdAt = {};
-      if (startDate) {
-        where.createdAt.gte = new Date(`${startDate}T00:00:00.000Z`);
-      }
-      if (endDate) {
-        where.createdAt.lte = new Date(`${endDate}T23:59:59.999Z`);
-      }
-    }
+    const where = await buildReportFilter(req.query, req.user);
 
     const pageNum = parseInt(page as string) || 1;
     const limitNum = Math.min(parseInt(limit as string) || 20, 100);
@@ -480,6 +608,52 @@ router.get('/my-stats', requireAuth, async (req: Request, res: Response): Promis
 });
 
 /**
+ * GET /api/reports/filter-options
+ * Lấy các tùy chọn cho bộ lọc nâng cao (Admin only)
+ */
+router.get('/filter-options', requireAdmin, async (req: Request, res: Response): Promise<void> => {
+  try {
+    const [
+      workTypes,
+      serviceTypes,
+      products,
+      categories,
+      mainStations,
+      techStations,
+      ktvs,
+      provinces
+    ] = await Promise.all([
+      prisma.serviceReport.findMany({ select: { workType: true }, distinct: ['workType'] }),
+      prisma.serviceReport.findMany({ select: { serviceType: true }, distinct: ['serviceType'] }),
+      prisma.product.findMany({ select: { name: true }, orderBy: { name: 'asc' } }),
+      prisma.product.findMany({ select: { category: true }, distinct: ['category'] }),
+      prisma.mainStation.findMany({ select: { id: true, name: true }, orderBy: { name: 'asc' } }),
+      prisma.techStation.findMany({ select: { id: true, name: true, mainStationId: true }, orderBy: { name: 'asc' } }),
+      prisma.user.findMany({
+        where: { role: 'KTV', isActive: true },
+        select: { id: true, fullName: true, techStationId: true },
+        orderBy: { fullName: 'asc' }
+      }),
+      prisma.serviceReport.findMany({ select: { province: true }, distinct: ['province'] })
+    ]);
+
+    res.json({
+      workTypes: workTypes.map((w: any) => w.workType).filter(Boolean),
+      serviceTypes: serviceTypes.map((s: any) => s.serviceType).filter(Boolean),
+      products: products.map((p: any) => p.name).filter(Boolean),
+      categories: categories.map((c: any) => c.category).filter(Boolean),
+      mainStations,
+      techStations,
+      ktvs,
+      provinces: provinces.map((p: any) => p.province).filter(Boolean)
+    });
+  } catch (error: any) {
+    logger.error('Get filter options error', { error: error.message });
+    res.status(500).json({ error: 'Lỗi lấy danh mục bộ lọc' });
+  }
+});
+
+/**
  * GET /api/reports/stats
  * Thống kê tổng hợp (Admin only)
  */
@@ -532,55 +706,8 @@ router.get('/stats', requireAdmin, async (req: Request, res: Response): Promise<
  */
 router.get('/export', requireAdmin, async (req: Request, res: Response): Promise<void> => {
   try {
-    const { 
-      month, 
-      ktvId, 
-      province, 
-      serviceType, 
-      isPaid, 
-      search,
-      startDate,
-      endDate
-    } = req.query;
-
-    const where: any = {};
-
-    if (ktvId) where.ktvUserId = ktvId as string;
-    if (month) where.month = month as string;
-    if (province) where.province = { contains: province as string, mode: 'insensitive' };
-    if (serviceType) where.serviceType = serviceType as string;
-    if (isPaid !== undefined) where.isPaid = isPaid === 'true';
-
-    // Tìm kiếm tổng hợp
-    if (search) {
-      const searchStr = search as string;
-      const parsedOrderId = parseInt(searchStr);
-      
-      where.OR = [
-        { customerName: { contains: searchStr, mode: 'insensitive' } },
-        { customerPhone: { contains: searchStr } },
-        { ktvUser: { fullName: { contains: searchStr, mode: 'insensitive' } } }
-      ];
-      
-      if (!isNaN(parsedOrderId)) {
-        where.OR.push({
-          order: {
-            pancakeOrderId: parsedOrderId
-          }
-        });
-      }
-    }
-
-    // Lọc theo khoảng thời gian tạo báo cáo
-    if (startDate || endDate) {
-      where.createdAt = {};
-      if (startDate) {
-        where.createdAt.gte = new Date(`${startDate}T00:00:00.000Z`);
-      }
-      if (endDate) {
-        where.createdAt.lte = new Date(`${endDate}T23:59:59.999Z`);
-      }
-    }
+    const { month } = req.query;
+    const where = await buildReportFilter(req.query, req.user);
 
     const reports = await prisma.serviceReport.findMany({
       where,
