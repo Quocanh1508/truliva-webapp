@@ -1081,11 +1081,8 @@ export default function ReportForm() {
                   onUploadSuccess={handleUploadSuccess}
                 />
                 <div className="mt-6 flex gap-4">
-                  <button type="button" className="btn btn-outline flex-1 flex items-center justify-center gap-2" onClick={() => setStep(1)}>
+                  <button type="button" className="btn btn-outline w-full flex items-center justify-center gap-2" onClick={() => setStep(1)}>
                     <ChevronLeft size={16} /> Quay lại
-                  </button>
-                  <button type="button" className="btn btn-outline text-gray-500 flex-1" onClick={() => setStep(3)}>
-                    Bỏ qua ảnh
                   </button>
                 </div>
               </>

@@ -1,5 +1,6 @@
 export interface ImageSlot {
   label: string;
+  isRequired?: boolean;
 }
 
 // ── Danh sách loại công việc ──
@@ -117,50 +118,50 @@ export function getImageSlots(workType: string): ImageSlot[] {
   switch (workType) {
     case 'Giao hàng':
       return [
-        { label: 'Ảnh giao hàng cho khách' },
-        { label: 'Ảnh seri sản phẩm' },
-        { label: 'Ảnh biên bản nghiệm thu' },
+        { label: 'Ảnh giao hàng cho khách', isRequired: true },
+        { label: 'Ảnh biên bản nghiệm thu', isRequired: true },
+        { label: 'Ảnh seri sản phẩm', isRequired: true },
         { label: 'Ảnh xác nhận thanh toán' },
       ];
     case 'Thay lọc':
       return [
-        { label: 'Ảnh trước khi thay lọc' },
-        { label: 'Ảnh sau khi thay lọc' },
+        { label: 'Ảnh trước khi thay lọc', isRequired: true },
+        { label: 'Ảnh sau khi thay lọc', isRequired: true },
+        { label: 'Ảnh biên bản nghiệm thu', isRequired: true },
+        { label: 'Ảnh seri sản phẩm', isRequired: true },
         { label: 'Ảnh đo TDS đầu vào' },
         { label: 'Ảnh đo TDS đầu ra' },
         { label: 'Ảnh đo áp suất nước' },
-        { label: 'Ảnh seri sản phẩm' },
-        { label: 'Ảnh biên bản nghiệm thu' },
         { label: 'Ảnh xác nhận thanh toán' },
       ];
     case 'Giao hàng và Lắp đặt':
     case 'Lắp đặt':
       return [
-        { label: 'Ảnh lắp đặt hoàn thiện' },
+        { label: 'Ảnh lắp đặt hoàn thiện', isRequired: true },
+        { label: 'Ảnh biên bản nghiệm thu', isRequired: true },
+        { label: 'Ảnh seri sản phẩm', isRequired: true },
         { label: 'Ảnh treo biến áp/kết nối điện nước' },
         { label: 'Ảnh đo TDS đầu vào' },
         { label: 'Ảnh đo TDS đầu ra' },
         { label: 'Ảnh đo áp suất nước' },
-        { label: 'Ảnh seri sản phẩm' },
-        { label: 'Ảnh biên bản nghiệm thu' },
         { label: 'Ảnh xác nhận thanh toán' },
       ];
     case 'Bảo hành':
     case 'Sửa chữa':
       return [
-        { label: 'Ảnh trước khi xử lý' },
-        { label: 'Ảnh sau khi xử lý' },
+        { label: 'Ảnh trước khi xử lý', isRequired: true },
+        { label: 'Ảnh sau khi xử lý', isRequired: true },
+        { label: 'Ảnh biên bản nghiệm thu', isRequired: true },
+        { label: 'Ảnh seri sản phẩm', isRequired: true },
         { label: 'Ảnh linh kiện thay thế' },
         { label: 'Ảnh đo TDS' },
         { label: 'Ảnh đo áp suất nước' },
-        { label: 'Ảnh seri sản phẩm' },
-        { label: 'Ảnh biên bản nghiệm thu' },
         { label: 'Ảnh xác nhận thanh toán' },
       ];
     default:
       return [
-        { label: 'Ảnh xác nhận 1' },
-        { label: 'Ảnh xác nhận 2' },
+        { label: 'Ảnh xác nhận 1', isRequired: true },
+        { label: 'Ảnh xác nhận 2', isRequired: true },
         { label: 'Ảnh xác nhận 3' },
         { label: 'Ảnh xác nhận 4' },
       ];

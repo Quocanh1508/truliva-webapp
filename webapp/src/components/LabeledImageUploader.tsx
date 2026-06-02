@@ -4,6 +4,7 @@ import { uploadImages, fetchApi } from '../api/client';
 
 interface ImageSlot {
   label: string;
+  isRequired?: boolean;
 }
 
 interface Props {
@@ -74,6 +75,19 @@ export default function LabeledImageUploader({ imageSlots, workType, onUploadSuc
   const filledCount = slotFiles.filter(f => f !== null).length;
 
   const handleUpload = async () => {
+    // Check if all required slots are filled
+    const missingRequiredLabels: string[] = [];
+    imageSlots.forEach((slot, index) => {
+      if (slot.isRequired && !slotFiles[index]) {
+        missingRequiredLabels.push(slot.label);
+      }
+    });
+
+    if (missingRequiredLabels.length > 0) {
+      setError(`Vui lòng tải lên các ảnh bắt buộc: ${missingRequiredLabels.join(', ')}`);
+      return;
+    }
+
     const files = slotFiles.filter((f): f is File => f !== null);
     if (files.length === 0) {
       setError('Vui lòng chọn ít nhất 1 ảnh');
@@ -112,7 +126,9 @@ export default function LabeledImageUploader({ imageSlots, workType, onUploadSuc
                   display: 'flex',
                   alignItems: 'center',
                 }}>
-                  {slotFiles[index] ? '✅ ' : `${index + 1}. `}{slot.label}
+                  {slotFiles[index] ? '✅ ' : `${index + 1}. `}
+                  {slot.label}
+                  {slot.isRequired && <span style={{ color: '#ef4444', marginLeft: '2px' }}>*</span>}
                 </span>
                 
                 {/* Xem mẫu Button */}
