@@ -209,8 +209,28 @@ router.get('/', async (req: Request, res: Response): Promise<void> => {
       prisma.serviceReport.findMany({
         where,
         include: {
-          ktvUser: { select: { fullName: true, username: true } },
-          order: { select: { pancakeOrderId: true, ktvCalledAt: true } },
+          ktvUser: { 
+            select: { 
+              fullName: true, 
+              username: true,
+              techStation: {
+                select: {
+                  name: true,
+                  mainStation: { select: { name: true } }
+                }
+              }
+            } 
+          },
+          order: { 
+            select: { 
+              pancakeOrderId: true, 
+              ktvCalledAt: true,
+              appointmentTime: true,
+              adminStatus: true,
+              mainStation: { select: { name: true } },
+              techStation: { select: { name: true } }
+            } 
+          },
         },
         orderBy: { createdAt: 'desc' },
         skip,

@@ -91,6 +91,36 @@ export default function ReportList() {
   const [searchParams, setSearchParams] = useSearchParams();
   const searchParam = searchParams.get('search') || '';
 
+  const formatDate = (dateVal: any) => {
+    if (!dateVal) return '---';
+    return new Date(dateVal).toLocaleDateString('vi-VN');
+  };
+
+  const formatDateTime = (dateVal: any) => {
+    if (!dateVal) return '---';
+    const date = new Date(dateVal);
+    const dateStr = date.toLocaleDateString('vi-VN');
+    const timeStr = date.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
+    return `${timeStr} - ${dateStr}`;
+  };
+
+  const getStatusBadge = (status: string) => {
+    const s = (status || 'hoàn thành').toLowerCase();
+    if (s === 'hoàn thành') {
+      return <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-200">Hoàn thành</span>;
+    }
+    if (s === 'đang thực hiện' || s === 'đang làm') {
+      return <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">Đang thực hiện</span>;
+    }
+    if (s === 'chưa làm' || s === 'chờ xử lý') {
+      return <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200">Chưa làm</span>;
+    }
+    if (s === 'hủy đơn' || s === 'hủy') {
+      return <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-red-50 text-red-750 border border-red-200">Hủy đơn</span>;
+    }
+    return <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-gray-50 text-gray-700 border border-gray-200 capitalize">{status}</span>;
+  };
+
   const [reports, setReports] = useState<any[]>([]);
   const [selectedDetailReport, setSelectedDetailReport] = useState<any | null>(null);
   const [loading, setLoading] = useState(true);
@@ -399,17 +429,17 @@ export default function ReportList() {
       {loading ? (
         <div className="text-center py-10"><span className="spinner border-t-[#1B3A6B]"></span></div>
       ) : (
-        <div className="card table-container" style={{ padding: 0 }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+        <div className="card table-container" style={{ padding: 0, overflowX: 'auto' }}>
+          <table style={{ width: '100%', minWidth: '1000px', borderCollapse: 'collapse', textAlign: 'left' }}>
             <thead>
               <tr style={{ borderBottom: '2px solid var(--border-color)' }}>
-                <th style={{ padding: '12px 16px' }}>Mã đơn</th>
-                <th style={{ padding: '12px 16px' }}>KTV</th>
-                <th style={{ padding: '12px 16px' }}>Khách hàng</th>
-                <th style={{ padding: '12px 16px' }}>Dịch vụ</th>
-                <th style={{ padding: '12px 16px' }}>Tỉnh/TP</th>
-                <th style={{ padding: '12px 16px' }}>Tiền thu</th>
-                <th style={{ padding: '12px 16px' }}>Hành động</th>
+                <th style={{ padding: '12px 16px', minWidth: '80px' }}>Mã đơn</th>
+                <th style={{ padding: '12px 16px', minWidth: '150px' }}>Khách hàng</th>
+                <th style={{ padding: '12px 16px', minWidth: '220px' }}>Công việc</th>
+                <th style={{ padding: '12px 16px', minWidth: '200px' }}>Ghi chú</th>
+                <th style={{ padding: '12px 16px', minWidth: '110px' }}>Thao tác</th>
+                <th style={{ padding: '12px 16px', minWidth: '180px' }}>Trạm-KTV</th>
+                <th style={{ padding: '12px 16px', minWidth: '140px' }}>Tạo bởi - lúc</th>
               </tr>
             </thead>
             <tbody>
@@ -419,57 +449,77 @@ export default function ReportList() {
 
                 return (
                   <tr key={r.id} style={{ borderBottom: '1px solid var(--border-color)' }} className="hover:bg-gray-50">
+                    {/* Mã đơn */}
                     <td style={{ padding: '12px 16px' }}>
                       {r.order?.pancakeOrderId ? (
                         <span className="font-bold text-blue-700">#{r.order.pancakeOrderId}</span>
                       ) : (
-                        <span className="text-gray-400 text-sm">---</span>
+                        <span className="text-gray-400 font-semibold text-[10px] bg-gray-100 px-2 py-0.5 rounded">Đơn lẻ</span>
                       )}
                     </td>
-                    <td style={{ padding: '12px 16px' }} className="font-medium">{r.ktvUser.fullName}</td>
+
+                    {/* Khách hàng */}
                     <td style={{ padding: '12px 16px' }}>
-                      <div>{r.customerName}</div>
-                      <div className="text-xs text-gray-500">{r.customerPhone}</div>
+                      <div className="font-bold text-gray-800">{r.customerName}</div>
+                      <div className="text-xs text-blue-600 font-semibold mt-0.5">{r.customerPhone}</div>
+                      <div className="text-xs text-gray-500 mt-1 max-w-[150px] leading-relaxed truncate" title={r.address}>{r.address || '---'}</div>
                     </td>
+
+                    {/* Công việc */}
+                    <td style={{ padding: '12px 16px' }} className="text-xs leading-relaxed text-gray-700">
+                      <div className="mb-1">{getStatusBadge(r.order?.adminStatus)}</div>
+                      <div><span className="text-gray-400">Hẹn khách:</span> <span className="font-medium">{formatDate(r.order?.appointmentTime)}</span></div>
+                      <div><span className="text-gray-400">Hoàn thành:</span> <span className="font-semibold text-gray-800">{formatDateTime(r.createdAt)}</span></div>
+                      {r.workType && <div><span className="text-gray-400">Công việc:</span> <span className="font-semibold text-purple-750 bg-purple-50 px-1.5 py-0.5 rounded border border-purple-100 inline-block mt-0.5">{r.workType}</span></div>}
+                      {r.serviceType && <div><span className="text-gray-400">Dịch vụ:</span> <span className="font-medium text-gray-800">{r.serviceType}</span></div>}
+                      {r.products && r.products.length > 0 && (
+                        <div className="max-w-[200px] truncate" title={r.products.join(', ')}>
+                          <span className="text-gray-400">Sản phẩm:</span> <span className="font-medium text-gray-600">{r.products.join(', ')}</span>
+                        </div>
+                      )}
+                      <div className="mt-0.5"><span className="text-gray-400">Thu:</span> <span className="font-extrabold text-emerald-600">{(r.actualAmount || 0).toLocaleString('vi-VN')} đ</span></div>
+                    </td>
+
+                    {/* Ghi chú */}
                     <td style={{ padding: '12px 16px' }}>
-                      <div>{r.serviceType}</div>
-                      <div className="text-xs text-gray-500">{new Date(r.createdAt).toLocaleDateString('vi-VN')}</div>
+                      <div 
+                        className="whitespace-pre-wrap text-xs text-gray-600 max-w-[200px] max-h-[140px] overflow-y-auto leading-relaxed italic bg-yellow-50/40 p-2 rounded border border-yellow-100/70"
+                        title="Ghi chú của KTV"
+                      >
+                        {r.notes || <span className="text-gray-300 not-italic">---</span>}
+                      </div>
                     </td>
-                    <td style={{ padding: '12px 16px' }}>{r.province}</td>
-                    <td style={{ padding: '12px 16px' }} className="font-bold">
-                      {(r.actualAmount || 0).toLocaleString('vi-VN')} đ
-                    </td>
+
+                    {/* Thao tác */}
                     <td style={{ padding: '12px 16px', position: 'relative' }}>
-                      <div className="flex items-center gap-3">
+                      <div className="flex flex-col gap-1.5 text-xs font-semibold">
                         <button 
                           onClick={() => setSelectedDetailReport(r)}
-                          className="text-sm font-medium hover:underline text-blue-600"
-                          style={{ background: 'none', cursor: 'pointer', whiteSpace: 'nowrap' }}
+                          className="text-left text-blue-600 hover:text-blue-800 hover:underline"
+                          style={{ background: 'none', cursor: 'pointer' }}
                         >
-                          Chi tiết
+                          • Chi tiết
                         </button>
                         
                         {urls.length > 0 && (
                           <button 
                             onClick={() => setOpenPopupId(isPopupOpen ? null : r.id)}
-                            className="text-sm font-medium hover:underline"
-                            style={{ 
-                              color: 'var(--primary)', background: 'none', 
-                              cursor: 'pointer', whiteSpace: 'nowrap' 
-                            }}
+                            className="text-left text-blue-800 hover:text-blue-950 hover:underline"
+                            style={{ background: 'none', cursor: 'pointer' }}
                           >
-                            Xem ảnh
+                            • Xem ảnh
                           </button>
                         )}
                         
                         <button
                           onClick={() => setDeleteModal({ isOpen: true, reportId: r.id })}
-                          className="text-sm font-medium hover:underline text-red-600"
-                          style={{ background: 'none', cursor: 'pointer', whiteSpace: 'nowrap' }}
+                          className="text-left text-red-655 hover:text-red-805 hover:underline"
+                          style={{ background: 'none', cursor: 'pointer' }}
                         >
-                          Xóa
+                          • Xóa
                         </button>
                       </div>
+                      
                       {isPopupOpen && urls.length > 0 && (
                         <div style={{
                           position: 'absolute',
@@ -498,6 +548,31 @@ export default function ReportList() {
                           </div>
                         </div>
                       )}
+                    </td>
+
+                    {/* Trạm-KTV */}
+                    <td style={{ padding: '12px 16px' }} className="text-xs leading-relaxed text-gray-700">
+                      <div>
+                        <span className="text-gray-400">Trạm chính:</span>{' '}
+                        <span className="font-semibold text-gray-800">
+                          {r.order?.mainStation?.name || r.ktvUser?.techStation?.mainStation?.name || '---'}
+                        </span>
+                      </div>
+                      <div>
+                        <span className="text-gray-400">Trạm Kỹ thuật:</span>{' '}
+                        <span className="font-semibold text-gray-800">
+                          {r.order?.techStation?.name || r.ktvUser?.techStation?.name || '---'}
+                        </span>
+                      </div>
+                      <div className="mt-1 font-bold text-blue-750">
+                        KTV: {r.ktvUser.fullName}
+                      </div>
+                    </td>
+
+                    {/* Tạo bởi - lúc */}
+                    <td style={{ padding: '12px 16px' }} className="text-xs leading-relaxed text-gray-600">
+                      <div className="font-bold text-gray-800">{formatDateTime(r.createdAt)}</div>
+                      <div className="mt-0.5 text-gray-400">Tạo bởi: <span className="font-semibold text-gray-700">{r.ktvUser.fullName}</span></div>
                     </td>
                   </tr>
                 );
