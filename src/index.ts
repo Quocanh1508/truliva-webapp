@@ -20,6 +20,7 @@ import sampleImageRoutes from './routes/sampleImages';
 import feedbackRoutes from './routes/feedbacks';
 import notificationRoutes from './routes/notifications';
 import { startOrderSyncScheduler } from './services/orderSyncScheduler';
+import { startReportCleanupScheduler } from './services/reportCleanupScheduler';
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -138,6 +139,9 @@ app.listen(PORT, () => {
 
   // Khởi động lập lịch đồng bộ đơn hàng tự động từ Pancake POS
   startOrderSyncScheduler(5); // Chạy định kỳ mỗi 5 phút
+
+  // Khởi động lập lịch dọn dẹp báo cáo KTV cũ hơn 60 ngày
+  startReportCleanupScheduler();
 });
 
 export default app;

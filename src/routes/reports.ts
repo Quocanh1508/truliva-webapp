@@ -235,6 +235,231 @@ router.get('/', async (req: Request, res: Response): Promise<void> => {
 });
 
 /**
+ * GET /api/reports/my-stats
+ * Thống kê cá nhân của KTV
+ */
+router.get('/my-stats', requireAuth, async (req: Request, res: Response): Promise<void> => {
+  try {
+    const ktvUserId = req.user!.id;
+    const { startDate, endDate } = req.query;
+
+    const start = startDate ? new Date(`${startDate}T00:00:00.000Z`) : null;
+    const end = endDate ? new Date(`${endDate}T23:59:59.999Z`) : null;
+
+    // Lấy tất cả các đơn hàng trong vòng 90 ngày qua được gán cho KTV này
+    const orders = await prisma.order.findMany({
+      where: {
+        assignedKtvId: ktvUserId,
+        createdAt: {
+          gte: new Date(Date.now() - 90 * 24 * 60 * 60 * 1000)
+        }
+      },
+      include: {
+        serviceReports: {
+          orderBy: { createdAt: 'asc' },
+          take: 1
+        }
+      }
+    });
+
+    const now = new Date();
+    const todayStr = now.toISOString().slice(0, 10);
+    const todayTime = new Date(todayStr).getTime();
+
+    const processed = orders.map(order => {
+      const hasReport = order.serviceReports && order.serviceReports.length > 0;
+      const isCompleted = order.adminStatus === 'hoàn thành' || hasReport;
+      
+      let status: 'chưa làm' | 'đang làm' | 'hoàn thành' | 'hủy' = 'chưa làm';
+      if (isCompleted) {
+        status = 'hoàn thành';
+      } else if (order.adminStatus === 'hủy đơn') {
+        status = 'hủy';
+      } else if (order.ktvCalledAt !== null) {
+        status = 'đang làm';
+      } else {
+        status = 'chưa làm';
+      }
+
+      // Lấy ngày hoàn thành hoặc ngày hẹn/ngày tạo
+      let filterDate: Date;
+      if (isCompleted) {
+        filterDate = hasReport ? order.serviceReports[0].createdAt : order.updatedAt;
+      } else {
+        filterDate = order.appointmentTime || order.createdAt;
+      }
+
+      // Phân loại đúng hẹn / trễ hẹn
+      let isOnTime = false;
+      let isLate = false;
+      const hasAppointment = order.appointmentTime !== null;
+      if (hasAppointment) {
+        const appointmentDateStr = order.appointmentTime!.toISOString().slice(0, 10);
+        const appointmentTimeMs = new Date(appointmentDateStr).getTime();
+        
+        let completionTimeMs = 0;
+        if (hasReport) {
+          const completionDateStr = order.serviceReports[0].createdAt.toISOString().slice(0, 10);
+          completionTimeMs = new Date(completionDateStr).getTime();
+        } else if (order.adminStatus === 'hoàn thành') {
+          const completionDateStr = order.updatedAt.toISOString().slice(0, 10);
+          completionTimeMs = new Date(completionDateStr).getTime();
+        }
+
+        if (isCompleted) {
+          if (completionTimeMs <= appointmentTimeMs) {
+            isOnTime = true;
+          } else {
+            isLate = true;
+          }
+        } else if (order.adminStatus !== 'hủy đơn') {
+          if (todayTime > appointmentTimeMs) {
+            isLate = true;
+          } else {
+            isOnTime = true;
+          }
+        }
+      }
+
+      return {
+        id: order.id,
+        workType: order.workType || 'Chưa xác định',
+        status,
+        filterDate,
+        isOnTime,
+        isLate,
+        hasAppointment
+      };
+    });
+
+    // Lọc theo khoảng thời gian
+    const filtered = processed.filter(item => {
+      if (start && item.filterDate < start) return false;
+      if (end && item.filterDate > end) return false;
+      return true;
+    });
+
+    // Thống kê tổng quan trạng thái
+    let total = 0;
+    let pending = 0;
+    let progress = 0;
+    let completed = 0;
+
+    filtered.forEach(item => {
+      if (item.status === 'hủy') return;
+      total++;
+      if (item.status === 'chưa làm') pending++;
+      else if (item.status === 'đang làm') progress++;
+      else if (item.status === 'hoàn thành') completed++;
+    });
+
+    // Thống kê theo loại công việc (trạng thái)
+    const workTypeMap: Record<string, { pending: number, progress: number, completed: number }> = {};
+    filtered.forEach(item => {
+      if (item.status === 'hủy') return;
+      if (!workTypeMap[item.workType]) {
+        workTypeMap[item.workType] = { pending: 0, progress: 0, completed: 0 };
+      }
+      if (item.status === 'chưa làm') workTypeMap[item.workType].pending++;
+      else if (item.status === 'đang làm') workTypeMap[item.workType].progress++;
+      else if (item.status === 'hoàn thành') workTypeMap[item.workType].completed++;
+    });
+
+    const workTypeStats = Object.entries(workTypeMap).map(([name, counts]) => ({
+      name,
+      ...counts
+    }));
+
+    // Thống kê đúng/trễ hẹn
+    let onTimeCount = 0;
+    let lateCount = 0;
+    filtered.forEach(item => {
+      if (item.status === 'hủy' || !item.hasAppointment) return;
+      if (item.isOnTime) onTimeCount++;
+      if (item.isLate) lateCount++;
+    });
+
+    const totalAppointed = onTimeCount + lateCount;
+    const onTimePercent = totalAppointed > 0 ? Math.round((onTimeCount / totalAppointed) * 100) : 100;
+    const latePercent = totalAppointed > 0 ? 100 - onTimePercent : 0;
+
+    // Thống kê đúng/trễ hẹn theo loại công việc
+    const delayMap: Record<string, { onTime: number, late: number }> = {};
+    filtered.forEach(item => {
+      if (item.status === 'hủy' || !item.hasAppointment) return;
+      if (!delayMap[item.workType]) {
+        delayMap[item.workType] = { onTime: 0, late: 0 };
+      }
+      if (item.isOnTime) delayMap[item.workType].onTime++;
+      if (item.isLate) delayMap[item.workType].late++;
+    });
+
+    const delayStats = Object.entries(delayMap).map(([name, counts]) => ({
+      name,
+      ...counts
+    }));
+
+    // Thống kê số ca hoàn thành mỗi ngày trong tháng và loại công việc
+    const dailyCompleted: Record<string, Record<string, number>> = {};
+    filtered.forEach(item => {
+      if (item.status === 'hoàn thành') {
+        const d = item.filterDate;
+        const dayStr = String(d.getDate()).padStart(2, '0');
+        const monthStr = String(d.getMonth() + 1).padStart(2, '0');
+        const yearStr = d.getFullYear();
+        const dateStr = `${dayStr}/${monthStr}/${yearStr}`;
+
+        if (!dailyCompleted[dateStr]) {
+          dailyCompleted[dateStr] = {};
+        }
+        if (!dailyCompleted[dateStr][item.workType]) {
+          dailyCompleted[dateStr][item.workType] = 0;
+        }
+        dailyCompleted[dateStr][item.workType]++;
+      }
+    });
+
+    const dailyBreakdown = Object.entries(dailyCompleted).map(([date, workTypes]) => {
+      const totalCount = Object.values(workTypes).reduce((a, b) => a + b, 0);
+      const details = Object.entries(workTypes).map(([wt, count]) => `${wt}: ${count}`).join(', ');
+      return {
+        date,
+        total: totalCount,
+        details,
+        workTypes: Object.entries(workTypes).map(([name, count]) => ({ name, count }))
+      };
+    }).sort((a, b) => {
+      const [dayA, monthA, yearA] = a.date.split('/').map(Number);
+      const [dayB, monthB, yearB] = b.date.split('/').map(Number);
+      const dateA = new Date(yearA, monthA - 1, dayA);
+      const dateB = new Date(yearB, monthB - 1, dayB);
+      return dateB.getTime() - dateA.getTime();
+    });
+
+    res.json({
+      summary: {
+        total,
+        pending,
+        progress,
+        completed
+      },
+      workTypeStats,
+      delaySummary: {
+        onTime: onTimeCount,
+        onTimePercent,
+        late: lateCount,
+        latePercent
+      },
+      delayStats,
+      dailyBreakdown
+    });
+  } catch (error: any) {
+    logger.error('Get KTV stats error', { error: error.message });
+    res.status(500).json({ error: 'Lỗi lấy thống kê báo cáo' });
+  }
+});
+
+/**
  * GET /api/reports/stats
  * Thống kê tổng hợp (Admin only)
  */
