@@ -2,8 +2,10 @@ import { useState, useEffect } from 'react';
 import { fetchApi, uploadImage } from '../../api/client';
 import { WORK_TYPES, getImageSlots } from '../../utils/workTypes';
 import { UploadCloud, Trash2, CheckCircle, AlertCircle, Loader2 } from 'lucide-react';
+import { useConfirm } from '../../context/ConfirmContext';
 
 export default function SampleImageManage() {
+  const { confirm } = useConfirm();
   const [selectedWorkType, setSelectedWorkType] = useState(WORK_TYPES[0]);
   const [samples, setSamples] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -62,7 +64,14 @@ export default function SampleImageManage() {
   };
 
   const handleDelete = async (sampleId: string, slotLabel: string) => {
-    if (!window.confirm(`Bạn có chắc chắn muốn xóa ảnh mẫu cho "${slotLabel}"?`)) return;
+    const isConfirmed = await confirm({
+      title: 'Xóa ảnh mẫu',
+      message: `Bạn có chắc chắn muốn xóa ảnh mẫu cho "${slotLabel}"?`,
+      confirmText: 'Xóa',
+      cancelText: 'Hủy bỏ',
+      type: 'danger'
+    });
+    if (!isConfirmed) return;
     setMessage(null);
 
     try {

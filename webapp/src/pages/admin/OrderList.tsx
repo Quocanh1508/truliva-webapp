@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { getOrders, updateOrder, getKtvUsers, getStations, getOrderAuditLog, syncOrders, getFiltersData } from '../../api/client';
 import { Search, ChevronLeft, ChevronRight, History, XCircle, Filter, RefreshCw, FileText, CheckCircle2, RotateCcw, Copy, UserPlus, Download } from 'lucide-react';
 import { WARRANTY_SERVICE_GROUPS, REPAIR_SERVICE_GROUPS, WORK_TYPE_SERVICES } from '../../utils/workTypes';
+import { useConfirm } from '../../context/ConfirmContext';
 
 const ALL_SERVICE_TYPES = Array.from(new Set(Object.values(WORK_TYPE_SERVICES).flat()));
 
@@ -25,6 +26,7 @@ const ROW_STATUS_OPTIONS = [
 ];
 
 export default function OrderList() {
+  const { confirm } = useConfirm();
   const navigate = useNavigate();
   const [orders, setOrders] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -291,8 +293,14 @@ export default function OrderList() {
   };
 
   const handleReopenOrder = async (order: any) => {
-    const confirmReopen = window.confirm(`Bạn có chắc chắn muốn mở lại đơn #${order.pancakeOrderId}? Hành động này sẽ chuyển trạng thái về "Chờ xử lý" và xóa thông tin phân bổ trạm/KTV hiện tại.`);
-    if (!confirmReopen) return;
+    const isConfirmed = await confirm({
+      title: 'Mở lại đơn hàng',
+      message: `Bạn có chắc chắn muốn mở lại đơn #${order.pancakeOrderId}? Hành động này sẽ chuyển trạng thái về "Chờ xử lý" và xóa thông tin phân bổ trạm/KTV hiện tại.`,
+      confirmText: 'Mở lại',
+      cancelText: 'Hủy bỏ',
+      type: 'warning'
+    });
+    if (!isConfirmed) return;
     try {
       await updateOrder(order.id, {
         adminStatus: 'chờ xử lý',

@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { getStations, createMainStation, createTechStation, updateMainStation, updateTechStation } from '../../api/client';
 import { Building, MapPin, Users, Plus, ChevronDown, ChevronRight, Edit2, Check, X, Lock, Unlock } from 'lucide-react';
+import { useConfirm } from '../../context/ConfirmContext';
 
 // Helper to sort tech stations: TP.Hồ Chí Minh, Hà Nội, Đà Nẵng first, then A-Z
 function getSortedTechStations(main: any) {
@@ -24,6 +25,7 @@ function getSortedTechStations(main: any) {
 }
 
 export default function StationManage() {
+  const { confirm } = useConfirm();
   const [stations, setStations] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -125,11 +127,17 @@ export default function StationManage() {
   };
 
   const handleToggleMainActive = async (id: string, currentActive: boolean) => {
-    const confirmMessage = currentActive
-      ? 'Bạn có chắc chắn muốn khóa trạm chính này? Các trạm kỹ thuật bên trong cũng sẽ không hoạt động.'
-      : 'Bạn có chắc chắn muốn mở khóa trạm chính này?';
+    const isConfirmed = await confirm({
+      title: currentActive ? 'Khóa trạm chính' : 'Mở khóa trạm chính',
+      message: currentActive
+        ? 'Bạn có chắc chắn muốn khóa trạm chính này? Các trạm kỹ thuật bên trong cũng sẽ không hoạt động.'
+        : 'Bạn có chắc chắn muốn mở khóa trạm chính này?',
+      confirmText: currentActive ? 'Khóa' : 'Mở khóa',
+      cancelText: 'Hủy bỏ',
+      type: 'warning'
+    });
 
-    if (!window.confirm(confirmMessage)) return;
+    if (!isConfirmed) return;
 
     try {
       await updateMainStation(id, { isActive: !currentActive });
@@ -140,11 +148,17 @@ export default function StationManage() {
   };
 
   const handleToggleTechActive = async (id: string, currentActive: boolean) => {
-    const confirmMessage = currentActive
-      ? 'Bạn có chắc chắn muốn khóa trạm kỹ thuật này?'
-      : 'Bạn có chắc chắn muốn mở khóa trạm kỹ thuật này?';
+    const isConfirmed = await confirm({
+      title: currentActive ? 'Khóa trạm kỹ thuật' : 'Mở khóa trạm kỹ thuật',
+      message: currentActive
+        ? 'Bạn có chắc chắn muốn khóa trạm kỹ thuật này?'
+        : 'Bạn có chắc chắn muốn mở khóa trạm kỹ thuật này?',
+      confirmText: currentActive ? 'Khóa' : 'Mở khóa',
+      cancelText: 'Hủy bỏ',
+      type: 'warning'
+    });
 
-    if (!window.confirm(confirmMessage)) return;
+    if (!isConfirmed) return;
 
     try {
       await updateTechStation(id, { isActive: !currentActive });

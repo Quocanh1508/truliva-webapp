@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { fetchApi } from '../../api/client';
 import { MessageSquare, Trash2, Calendar, User as UserIcon, Shield, ExternalLink, X, Eye } from 'lucide-react';
+import { useConfirm } from '../../context/ConfirmContext';
 
 interface Feedback {
   id: string;
@@ -15,6 +16,7 @@ interface Feedback {
 }
 
 export default function FeedbackList() {
+  const { confirm } = useConfirm();
   const [feedbacks, setFeedbacks] = useState<Feedback[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -41,7 +43,15 @@ export default function FeedbackList() {
   }, []);
 
   const handleDelete = async (id: string) => {
-    if (!window.confirm('Bạn có chắc chắn muốn xóa phản hồi này không?')) return;
+    const isConfirmed = await confirm({
+      title: 'Xóa phản hồi',
+      message: 'Bạn có chắc chắn muốn xóa phản hồi này không? Hành động này không thể hoàn tác.',
+      confirmText: 'Xóa',
+      cancelText: 'Hủy bỏ',
+      type: 'danger'
+    });
+    
+    if (!isConfirmed) return;
     
     setDeleteLoadingId(id);
     try {

@@ -2,6 +2,7 @@ import React, { useEffect, useState, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { fetchApi, getStations } from '../../api/client';
 import { UserPlus, Lock, Unlock, Search, Filter, X, Pencil, Download } from 'lucide-react';
+import { useConfirm } from '../../context/ConfirmContext';
 
 // Helper to sort tech stations: TP.Hồ Chí Minh, Hà Nội, Đà Nẵng first, then A-Z
 function getSortedTechStations(main: any) {
@@ -25,6 +26,7 @@ function getSortedTechStations(main: any) {
 }
 
 export default function UserManage() {
+  const { confirm } = useConfirm();
   const [users, setUsers] = useState<any[]>([]);
   const [stations, setStations] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -210,7 +212,16 @@ export default function UserManage() {
   };
 
   const toggleActive = async (id: string, current: boolean) => {
-    if (!window.confirm(`Bạn muốn ${current ? 'Khóa' : 'Mở khóa'} tài khoản này?`)) return;
+    const isConfirmed = await confirm({
+      title: current ? 'Khóa tài khoản' : 'Mở khóa tài khoản',
+      message: `Bạn có chắc chắn muốn ${current ? 'Khóa' : 'Mở khóa'} tài khoản này không? KTV sẽ không thể đăng nhập cho đến khi tài khoản được mở lại.`,
+      confirmText: current ? 'Khóa' : 'Mở khóa',
+      cancelText: 'Hủy',
+      type: 'warning'
+    });
+    
+    if (!isConfirmed) return;
+    
     try {
       await fetchApi(`/users/${id}`, {
         method: 'PUT',
