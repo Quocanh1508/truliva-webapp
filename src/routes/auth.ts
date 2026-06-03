@@ -97,6 +97,23 @@ router.get('/me', requireAuth, async (req: Request, res: Response): Promise<void
         role: true,
         email: true,
         phoneNumber: true,
+        address: true,
+        cccdNumber: true,
+        cccdDate: true,
+        cccdPlace: true,
+        bankAccount: true,
+        bankName: true,
+        techStationId: true,
+        techStation: {
+          select: {
+            name: true,
+            mainStation: {
+              select: {
+                name: true
+              }
+            }
+          }
+        }
       },
     });
 
@@ -114,11 +131,21 @@ router.get('/me', requireAuth, async (req: Request, res: Response): Promise<void
 
 /**
  * PUT /api/auth/profile
- * Cập nhật thông tin cá nhân (Họ tên, email, số điện thoại)
+ * Cập nhật thông tin cá nhân đầy đủ
  */
 router.put('/profile', requireAuth, async (req: Request, res: Response): Promise<void> => {
   try {
-    const { fullName, email, phoneNumber } = req.body;
+    const { 
+      fullName, 
+      email, 
+      phoneNumber,
+      address,
+      cccdNumber,
+      cccdDate,
+      cccdPlace,
+      bankAccount,
+      bankName
+    } = req.body;
 
     if (!fullName || !fullName.trim()) {
       res.status(400).json({ error: 'Họ và tên không được để trống' });
@@ -131,6 +158,12 @@ router.put('/profile', requireAuth, async (req: Request, res: Response): Promise
         fullName: fullName.trim(),
         email: email ? email.trim() : null,
         phoneNumber: phoneNumber ? phoneNumber.trim() : null,
+        address: address !== undefined ? (address.trim() || null) : undefined,
+        cccdNumber: cccdNumber !== undefined ? (cccdNumber.trim() || null) : undefined,
+        cccdDate: cccdDate !== undefined ? (cccdDate.trim() || null) : undefined,
+        cccdPlace: cccdPlace !== undefined ? (cccdPlace.trim() || null) : undefined,
+        bankAccount: bankAccount !== undefined ? (bankAccount.trim() || null) : undefined,
+        bankName: bankName !== undefined ? (bankName.trim() || null) : undefined,
       },
       select: {
         id: true,
@@ -139,6 +172,23 @@ router.put('/profile', requireAuth, async (req: Request, res: Response): Promise
         role: true,
         email: true,
         phoneNumber: true,
+        address: true,
+        cccdNumber: true,
+        cccdDate: true,
+        cccdPlace: true,
+        bankAccount: true,
+        bankName: true,
+        techStationId: true,
+        techStation: {
+          select: {
+            name: true,
+            mainStation: {
+              select: {
+                name: true
+              }
+            }
+          }
+        }
       },
     });
 
