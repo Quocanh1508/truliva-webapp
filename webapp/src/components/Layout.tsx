@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Outlet, useNavigate, useLocation, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { LogOut, Menu, X, FileText, List, Users, BarChart, Building, Key, Image as ImageIcon, MessageSquare, Bell, Wrench, User } from 'lucide-react';
+import { LogOut, Menu, X, FileText, List, Users, BarChart, Building, Key, Image as ImageIcon, MessageSquare, Bell, Wrench, User, Warehouse } from 'lucide-react';
 import { fetchApi } from '../api/client';
 
 export default function Layout() {
@@ -41,6 +41,7 @@ export default function Layout() {
 
   const navItems = user?.role === 'ADMIN' ? [
     { name: 'Dashboard', path: '/admin', icon: <BarChart size={20} /> },
+    { name: 'Quản lý kho', path: '/admin/inventory', icon: <Warehouse size={20} /> },
     { name: 'Quản lý dịch vụ', path: '/admin/orders', icon: <Wrench size={20} /> },
     { name: 'Danh sách báo cáo', path: '/admin/reports', icon: <List size={20} /> },
     { name: 'Quản lý Trạm', path: '/admin/stations', icon: <Building size={20} /> },

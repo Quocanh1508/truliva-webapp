@@ -59,6 +59,54 @@ async function processEventAsync(rawEventId: string, eventType: string, payload:
  * Đây là cơ chế tự phục hồi (Self-Healing Fallback) khi Pancake POS không gửi Webhook update đơn hàng.
  */
 async function handleOrderStockUpdateEvent(rawEventId: string, payload: any): Promise<void> {
+  // --- Cập nhật số lượng tồn kho sản phẩm thời gian thực ---
+  if (payload.variation_id) {
+    try {
+      const product = await prisma.product.findUnique({
+        where: { pancakeProductId: String(payload.variation_id) }
+      });
+
+      if (product) {
+        let rawData: any = product.rawData || {};
+        let vwList: any[] = rawData.variations_warehouses || [];
+        const newRemain = Number(payload.remain_quantity) || 0;
+        
+        const vwIndex = vwList.findIndex((w: any) => w.warehouse_id === payload.warehouse_id);
+        if (vwIndex !== -1) {
+          vwList[vwIndex].remain_quantity = newRemain;
+          vwList[vwIndex].actual_remain_quantity = Number(payload.actual_remain_quantity) || newRemain;
+        } else if (payload.warehouse_id) {
+          vwList.push({
+            warehouse_id: payload.warehouse_id,
+            remain_quantity: newRemain,
+            actual_remain_quantity: Number(payload.actual_remain_quantity) || newRemain,
+            total_quantity: newRemain
+          });
+        }
+        
+        rawData.variations_warehouses = vwList;
+
+        await prisma.product.update({
+          where: { id: product.id },
+          data: {
+            availableStock: newRemain,
+            rawData: rawData
+          }
+        });
+        logger.info('Product stock updated in real-time from webhook', {
+          pancakeProductId: payload.variation_id,
+          warehouseId: payload.warehouse_id,
+          remain: newRemain
+        });
+      }
+    } catch (err: any) {
+      logger.error('Failed to update product stock from webhook event', {
+        variationId: payload.variation_id,
+        error: err.message
+      });
+    }
+  }
+
   const orderId = payload.order_id || payload.system_id;
   if (!orderId) {
     logger.info('Stock update event does not contain order_id, skipping sync fallback', { rawEventId });

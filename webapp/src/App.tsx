@@ -24,6 +24,7 @@ import UserManage from './pages/admin/UserManage';
 import OrderList from './pages/admin/OrderList';
 import StationManage from './pages/admin/StationManage';
 import SampleImageManage from './pages/admin/SampleImageManage';
+import InventoryManage from './pages/admin/InventoryManage';
 
 // Feedback / DEV Pages
 import FeedbackPage from './pages/FeedbackPage';
@@ -51,6 +52,7 @@ export default function App() {
             {/* Admin Routes */}
             <Route element={<ProtectedRoute allowedRoles={['ADMIN']} />}>
               <Route path="/admin" element={<Dashboard />} />
+              <Route path="/admin/inventory" element={<InventoryManage />} />
               <Route path="/admin/reports" element={<ReportList />} />
               <Route path="/admin/users" element={<UserManage />} />
               <Route path="/admin/stations" element={<StationManage />} />

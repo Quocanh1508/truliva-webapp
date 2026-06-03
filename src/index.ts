@@ -19,6 +19,7 @@ import dashboardRoutes from './routes/dashboard';
 import sampleImageRoutes from './routes/sampleImages';
 import feedbackRoutes from './routes/feedbacks';
 import notificationRoutes from './routes/notifications';
+import inventoryRoutes from './routes/inventory';
 import { startOrderSyncScheduler } from './services/orderSyncScheduler';
 import { startReportCleanupScheduler } from './services/reportCleanupScheduler';
 
@@ -107,6 +108,7 @@ app.use('/api/upload', uploadRoutes);
 app.use('/api/sample-images', sampleImageRoutes);
 app.use('/api/feedbacks', feedbackRoutes);
 app.use('/api/notifications', notificationRoutes);
+app.use('/api/inventory', inventoryRoutes);
 
 // ── Serve uploaded images ──
 app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));
