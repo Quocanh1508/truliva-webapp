@@ -1,0 +1,21 @@
+{
+  "short_name": "truliva",
+  "name": "truliva",
+  "icons": [
+    {
+      "src": "icon-192.png",
+      "type": "image/png",
+      "sizes": "192x192"
+    },
+    {
+      "src": "icon-512.png",
+      "type": "image/png",
+      "sizes": "512x512"
+    }
+  ],
+  "start_url": "/",
+  "background_color": "#1B3A6B",
+  "theme_color": "#1B3A6B",
+  "display": "standalone",
+  "orientation": "portrait"
+}
