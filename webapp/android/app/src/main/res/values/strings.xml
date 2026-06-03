@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">truliva</string>
+    <string name="title_activity_main">truliva</string>
+    <string name="package_name">com.truliva.app</string>
+    <string name="custom_url_scheme">com.truliva.app</string>
+</resources>

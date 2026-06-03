@@ -32,8 +32,20 @@ app.set('trust proxy', 1);
 app.use(helmet({
   contentSecurityPolicy: false, // Cho phép load ảnh từ Cloudinary/Local
 }));
+const allowedOrigins = [
+  'http://localhost:5173',
+  'http://localhost',
+  'capacitor://localhost'
+];
+
 app.use(cors({
-  origin: process.env.NODE_ENV === 'production' ? true : 'http://localhost:5173',
+  origin: (origin, callback) => {
+    if (!origin || allowedOrigins.indexOf(origin) !== -1 || process.env.NODE_ENV === 'production') {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
   credentials: true,
 }));
 
