@@ -20,8 +20,10 @@ interface ProductStock {
   costPrice: number;
   sellingPrice: number;
   availableStock: number;
+  totalStock: number;
   isActive: boolean;
   stocks: Record<string, number>;
+  actualStocks: Record<string, number>;
 }
 
 export default function InventoryManage() {
@@ -270,16 +272,26 @@ export default function InventoryManage() {
         </div>
 
         {/* Legend chú thích */}
-        <div className="text-xs text-slate-500 flex flex-wrap items-center gap-4 mt-1 border-t border-slate-100 pt-3">
-          <span className="font-semibold text-slate-700">Chú thích hiển thị:</span>
-          <span className="flex items-center gap-1.5">
-            <span className="w-5 h-3.5 bg-red-100 border border-red-200 rounded"></span>
-            Tồn kho ≤ {lowStockThreshold} sản phẩm (Sắp hết hàng)
-          </span>
-          <span className="flex items-center gap-1.5">
-            <span className="w-5 h-3.5 bg-white border border-slate-200 rounded"></span>
-            Còn hàng (&gt; {lowStockThreshold} sản phẩm)
-          </span>
+        <div className="text-xs text-slate-500 flex flex-col gap-2 mt-1 border-t border-slate-100 pt-3">
+          <div className="flex flex-wrap items-center gap-4">
+            <span className="font-semibold text-slate-700">Trạng thái:</span>
+            <span className="flex items-center gap-1.5">
+              <span className="w-5 h-3.5 bg-red-100 border border-red-200 rounded"></span>
+              Có thể bán ≤ {lowStockThreshold} sản phẩm (Sắp hết hàng)
+            </span>
+            <span className="flex items-center gap-1.5">
+              <span className="w-5 h-3.5 bg-white border border-slate-200 rounded"></span>
+              Còn hàng (&gt; {lowStockThreshold} sản phẩm)
+            </span>
+          </div>
+          <div className="flex flex-col md:flex-row md:items-center gap-x-6 gap-y-1 text-[11px] text-slate-400 mt-1 border-t border-slate-50 pt-2">
+            <span>
+              <strong className="text-slate-600">Có thể bán (Số bên trên)</strong>: Số lượng hàng khả dụng để bán/tạo đơn (đã trừ đi lượng giữ hàng trong đơn chưa giao).
+            </span>
+            <span>
+              <strong className="text-slate-600">Tồn thực tế (Số bên dưới, màu nhạt)</strong>: Số lượng hàng vật lý thực tế trong kho (chỉ bị trừ khi đơn giao thành công).
+            </span>
+          </div>
         </div>
       </div>
 
@@ -290,14 +302,7 @@ export default function InventoryManage() {
             <span className="spinner mb-3" style={{ borderColor: 'rgba(27, 58, 107, 0.2)', borderTopColor: '#1B3A6B' }}></span>
             <span className="text-slate-500 text-sm font-semibold">Đang tải bảng tồn kho...</span>
           </div>
-        ) : filteredProducts.length === 0 ? (
-          <div className="text-center p-16 text-slate-500">
-            <div className="text-lg font-bold mb-2">Không tìm thấy sản phẩm nào</div>
-            <p className="text-sm">Hãy thử thay đổi từ khóa tìm kiếm, danh mục hoặc bộ lọc kho hàng.</p>
-          </div>
-        ) : (
-          <div className="overflow-x-auto" style={{ maxWidth: '100%' }}>
-            <table className="w-full text-left border-collapse table-auto">
+                  <table className="w-full text-left border-collapse table-auto">
               <thead>
                 <tr className="bg-slate-50 border-b border-slate-200 text-slate-600 text-xs font-bold uppercase tracking-wider">
                   <th className="px-6 py-4 sticky left-0 bg-slate-50 z-10 border-r border-slate-200 shadow-[2px_0_5px_rgba(0,0,0,0.03)]" style={{ minWidth: '240px' }}>
@@ -313,8 +318,11 @@ export default function InventoryManage() {
                     </th>
                   ))}
                   
-                  <th className="px-6 py-4 text-center bg-slate-100 font-bold text-slate-800" style={{ width: '140px' }}>
-                    Tổng tồn hệ thống
+                  <th className="px-4 py-4 text-center bg-slate-100 font-bold text-slate-800 border-l border-slate-200" style={{ width: '120px' }}>
+                    Tổng có thể bán
+                  </th>
+                  <th className="px-4 py-4 text-center bg-slate-50 font-bold text-slate-700 border-l border-slate-200" style={{ width: '120px' }}>
+                    Tổng tồn thực tế
                   </th>
                 </tr>
               </thead>
@@ -332,38 +340,44 @@ export default function InventoryManage() {
                           )}
                         </div>
                       </td>
-
+ 
                       {/* Mã SKU & Danh mục */}
                       <td className="px-4 py-3.5 text-center border-r border-slate-200 whitespace-nowrap">
                         <div className="font-bold text-xs text-slate-600">{p.sku || '-'}</div>
                         <div className="text-[11px] text-slate-400 mt-0.5">{p.category || '-'}</div>
                       </td>
-
+ 
                       {/* Các cột kho hàng hiển thị tồn kho tương ứng */}
                       {warehouses.filter(w => selectedWarehouses.includes(w.id)).map((w) => {
                         const stockQty = p.stocks[w.id] ?? 0;
+                        const actualStockQty = p.actualStocks ? (p.actualStocks[w.id] ?? stockQty) : stockQty;
                         const isLowStock = stockQty <= lowStockThreshold;
                         return (
                           <td 
                             key={w.id} 
-                            className={`px-4 py-3.5 text-center border-r border-slate-100 font-bold transition-all ${
+                            className={`px-4 py-2 text-center border-r border-slate-100 font-bold transition-all ${
                               isLowStock 
                                 ? 'bg-red-50 text-red-600 border-red-200/50 shadow-inner' 
                                 : 'text-slate-800'
                             }`}
                           >
-                            <span className={isLowStock ? 'text-base font-extrabold' : ''}>
-                              {stockQty}
-                            </span>
+                            <div className="flex flex-col items-center">
+                              <span className={isLowStock ? 'text-base font-extrabold' : ''}>
+                                {stockQty}
+                              </span>
+                              <span className="text-xs text-slate-400 font-normal mt-0.5 border-t border-slate-100 w-full pt-0.5">
+                                {actualStockQty}
+                              </span>
+                            </div>
                             {isLowStock && (
                               <div className="text-[9px] text-red-500 font-bold uppercase tracking-wide mt-0.5">Sắp hết</div>
                             )}
                           </td>
                         );
                       })}
-
-                      {/* Cột Tổng tồn hệ thống */}
-                      <td className={`px-6 py-3.5 text-center font-extrabold border-l border-slate-200 text-base transition-all ${
+ 
+                      {/* Cột Tổng có thể bán */}
+                      <td className={`px-4 py-3.5 text-center font-extrabold border-l border-slate-200 text-sm transition-all ${
                         systemTotal <= lowStockThreshold
                           ? 'bg-red-100 text-red-700 border-red-200/50 shadow-inner'
                           : 'bg-slate-100 text-slate-800'
@@ -372,6 +386,11 @@ export default function InventoryManage() {
                         {systemTotal <= lowStockThreshold && (
                           <div className="text-[9px] text-red-600 font-bold uppercase tracking-wide mt-0.5">Sắp hết</div>
                         )}
+                      </td>
+
+                      {/* Cột Tổng tồn thực tế */}
+                      <td className="px-4 py-3.5 text-center font-bold text-slate-700 bg-slate-50 border-l border-slate-200 text-sm">
+                        <span>{p.totalStock ?? 0}</span>
                       </td>
                     </tr>
                   );

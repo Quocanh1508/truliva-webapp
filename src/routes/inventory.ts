@@ -71,9 +71,11 @@ router.get('/stock', async (req: Request, res: Response): Promise<void> => {
       
       // Ánh xạ tồn kho của từng kho
       const stocks: Record<string, number> = {};
+      const actualStocks: Record<string, number> = {};
       vwList.forEach((vw: any) => {
         if (vw.warehouse_id) {
           stocks[vw.warehouse_id] = Number(vw.remain_quantity) || 0;
+          actualStocks[vw.warehouse_id] = Number(vw.actual_remain_quantity) || Number(vw.remain_quantity) || 0;
         }
       });
 
@@ -87,8 +89,10 @@ router.get('/stock', async (req: Request, res: Response): Promise<void> => {
         costPrice: p.costPrice,
         sellingPrice: p.sellingPrice,
         availableStock: p.availableStock ?? 0,
+        totalStock: p.totalStock ?? 0,
         isActive: p.isActive,
-        stocks // { [warehouse_id]: remain_quantity }
+        stocks, // { [warehouse_id]: remain_quantity }
+        actualStocks // { [warehouse_id]: actual_remain_quantity }
       };
     });
 
