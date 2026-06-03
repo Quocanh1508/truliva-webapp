@@ -44,11 +44,11 @@ export default function LoginPage() {
       login(data.user);
       
       if (data.user.role === 'ADMIN') {
-        navigate('/admin');
+        navigate('/admin/orders');
       } else if (data.user.role === 'DEV') {
         navigate('/dev/feedbacks');
       } else {
-        navigate('/ktv/report');
+        navigate('/ktv/my-orders');
       }
     } catch (err: any) {
       setError(err.message);

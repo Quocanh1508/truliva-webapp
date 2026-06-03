@@ -22,9 +22,9 @@ export default function ProtectedRoute({ allowedRoles }: ProtectedRouteProps) {
   }
 
   if (allowedRoles && !allowedRoles.includes(user.role)) {
-    if (user.role === 'ADMIN') return <Navigate to="/admin" replace />;
+    if (user.role === 'ADMIN') return <Navigate to="/admin/orders" replace />;
     if (user.role === 'DEV') return <Navigate to="/dev/feedbacks" replace />;
-    return <Navigate to="/ktv/report" replace />;
+    return <Navigate to="/ktv/my-orders" replace />;
   }
 
   return <Outlet />;

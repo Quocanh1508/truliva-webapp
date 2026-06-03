@@ -10,7 +10,7 @@ export default function Layout() {
   const location = useLocation();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
-  const logoPath = user?.role === 'ADMIN' ? '/admin' : (user?.role === 'DEV' ? '/dev/feedbacks' : '/ktv/my-orders');
+  const logoPath = user?.role === 'ADMIN' ? '/admin/orders' : (user?.role === 'DEV' ? '/dev/feedbacks' : '/ktv/my-orders');
 
   useEffect(() => {
     if (user?.role !== 'KTV') return;
