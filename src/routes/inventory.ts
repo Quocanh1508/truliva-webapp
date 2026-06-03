@@ -3,6 +3,7 @@ import axios from 'axios';
 import prisma from '../config/database';
 import logger from '../utils/logger';
 import { requireAuth, requireAdmin } from '../middleware/authSession';
+import { syncProducts } from '../scripts/syncProducts';
 
 const router = Router();
 const SHOP_ID = '1635300067';
@@ -27,7 +28,7 @@ async function fetchPancakeWarehouses(): Promise<any[]> {
     });
 
     if (response.data && response.data.success) {
-      return response.data.warehouses || [];
+      return response.data.data || response.data.warehouses || [];
     }
     return [];
   } catch (error: any) {
@@ -105,6 +106,20 @@ router.get('/stock', async (req: Request, res: Response): Promise<void> => {
   } catch (error: any) {
     logger.error('Get inventory stock error', { error: error.message });
     res.status(500).json({ error: 'Lỗi lấy tổng hợp dữ liệu tồn kho' });
+  }
+});
+
+/**
+ * POST /api/inventory/sync
+ * Kích hoạt đồng bộ sản phẩm từ Pancake POS trong nền
+ */
+router.post('/sync', async (req: Request, res: Response): Promise<void> => {
+  try {
+    syncProducts().catch((err) => logger.error('Sync products in background failed', { error: err.message }));
+    res.status(200).json({ message: 'Sync process started in the background.' });
+  } catch (error: any) {
+    logger.error('Sync products route error', { error: error.message });
+    res.status(500).json({ error: error.message });
   }
 });
 

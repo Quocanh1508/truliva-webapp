@@ -86,17 +86,25 @@ async function handleOrderStockUpdateEvent(rawEventId: string, payload: any): Pr
         
         rawData.variations_warehouses = vwList;
 
+        const totalAvailable = vwList.reduce((sum: number, w: any) => sum + (Number(w.remain_quantity) || 0), 0);
+        const totalStockVal = vwList.reduce((sum: number, w: any) => sum + (Number(w.actual_remain_quantity) || Number(w.remain_quantity) || 0), 0);
+        const totalImportedVal = vwList.reduce((sum: number, w: any) => sum + (Number(w.total_quantity) || 0), 0);
+
         await prisma.product.update({
           where: { id: product.id },
           data: {
-            availableStock: newRemain,
+            availableStock: totalAvailable,
+            totalStock: totalStockVal,
+            totalImported: totalImportedVal,
             rawData: rawData
           }
         });
         logger.info('Product stock updated in real-time from webhook', {
           pancakeProductId: payload.variation_id,
           warehouseId: payload.warehouse_id,
-          remain: newRemain
+          warehouseRemain: newRemain,
+          totalAvailable,
+          totalStockVal
         });
       }
     } catch (err: any) {

@@ -70,7 +70,7 @@ export default function InventoryManage() {
     setError('');
     setSuccessMsg('');
     try {
-      await fetchApi('/webhooks/sync-products');
+      await fetchApi('/inventory/sync', { method: 'POST' });
       setSuccessMsg('Đang kích hoạt tiến trình đồng bộ sản phẩm từ Pancake POS trong nền. Vui lòng đợi 5-10 giây rồi tải lại trang.');
       setTimeout(() => {
         loadData();
@@ -363,8 +363,15 @@ export default function InventoryManage() {
                       })}
 
                       {/* Cột Tổng tồn hệ thống */}
-                      <td className="px-6 py-3.5 text-center bg-slate-100 font-extrabold text-slate-800 border-l border-slate-200 text-base">
-                        {systemTotal}
+                      <td className={`px-6 py-3.5 text-center font-extrabold border-l border-slate-200 text-base transition-all ${
+                        systemTotal <= lowStockThreshold
+                          ? 'bg-red-100 text-red-700 border-red-200/50 shadow-inner'
+                          : 'bg-slate-100 text-slate-800'
+                      }`}>
+                        <span>{systemTotal}</span>
+                        {systemTotal <= lowStockThreshold && (
+                          <div className="text-[9px] text-red-600 font-bold uppercase tracking-wide mt-0.5">Sắp hết</div>
+                        )}
                       </td>
                     </tr>
                   );

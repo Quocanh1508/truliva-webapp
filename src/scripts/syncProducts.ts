@@ -1,6 +1,6 @@
+import 'dotenv/config';
 import axios from 'axios';
 import prisma from '../config/database';
-import 'dotenv/config';
 
 const SHOP_ID = '1635300067';
 const API_KEY = process.env.PANCAKE_API_KEY;
@@ -21,14 +21,15 @@ export async function syncProducts() {
     // Kéo toàn bộ sản phẩm (mỗi trang 100 cái)
     while (hasMore) {
       const response = await axios.get(`https://pos.pages.fm/api/v1/shops/${SHOP_ID}/products/variations`, {
-        params: { api_key: API_KEY, per_page: 100, page: page }
+        params: { api_key: API_KEY, page_size: 100, page: page }
       });
 
       if (response.data.success) {
-        const items = response.data.data;
+        const items = response.data.data || [];
         allProducts = allProducts.concat(items);
         
-        if (items.length < 100) {
+        const totalPages = response.data.total_pages || 1;
+        if (page >= totalPages || items.length === 0) {
           hasMore = false; // Đã hết
         } else {
           page++;
@@ -57,7 +58,12 @@ export async function syncProducts() {
         const costPrice = Number(item.last_imported_price) || 0;
         const sellingPrice = Number(item.retail_price) || 0;
         const availableStock = Number(item.remain_quantity) || 0;
-        const totalImported = Number(item.total_purchase_price) || 0;
+
+        // Tính tổng nhập và tổng tồn kho thực tế từ danh sách các kho của variation
+        const vwList = item.variations_warehouses || [];
+        const totalImported = vwList.reduce((sum: number, vw: any) => sum + (Number(vw.total_quantity) || 0), 0);
+        const totalStock = vwList.reduce((sum: number, vw: any) => sum + (Number(vw.actual_remain_quantity) || Number(vw.remain_quantity) || 0), 0);
+
         const isActive = !(item.is_hidden || item.is_removed);
 
         await prisma.product.upsert({
@@ -70,6 +76,7 @@ export async function syncProducts() {
             sellingPrice,
             availableStock,
             totalImported,
+            totalStock,
             rawData: item,
             isActive
           },
@@ -82,6 +89,7 @@ export async function syncProducts() {
             sellingPrice,
             availableStock,
             totalImported,
+            totalStock,
             rawData: item,
             isActive
           }
