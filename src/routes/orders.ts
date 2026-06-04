@@ -5,6 +5,7 @@ import { requireAuth, requireAdmin } from '../middleware/authSession';
 import { Prisma } from '@prisma/client';
 import { syncRecentOrders } from '../services/orderSyncScheduler';
 import ExcelJS from 'exceljs';
+import axios from 'axios';
 
 const router = Router();
 
@@ -975,7 +976,7 @@ router.patch('/:id', requireAuth, requireAdmin, async (req: Request, res: Respon
     const {
       adminStatus, appointmentTime, assignedKtvId,
       workType, serviceType, mainStationId, techStationId,
-      rescheduleReason, cancelReason, note
+      rescheduleReason, cancelReason, note, warehouseId
     } = req.body;
 
     // Lấy order hiện tại để so sánh cho audit
@@ -987,6 +988,62 @@ router.patch('/:id', requireAuth, requireAdmin, async (req: Request, res: Respon
 
     const updateData: any = {};
     const changes: any[] = [];
+
+    if (warehouseId !== undefined && warehouseId !== oldOrder.warehouseId) {
+      const apiKey = process.env.PANCAKE_API_KEY;
+      const shopId = '1635300067';
+      if (!apiKey) {
+        res.status(500).json({ error: 'Thiếu cấu hình PANCAKE_API_KEY trên máy chủ.' });
+        return;
+      }
+
+      try {
+        logger.info('Syncing warehouse change to Pancake POS', { pancakeOrderId: oldOrder.pancakeOrderId, warehouseId });
+        const updateResponse = await axios.patch(
+          `https://pos.pages.fm/api/v1/shops/${shopId}/orders/${oldOrder.pancakeOrderId}`,
+          {
+            warehouse_id: warehouseId
+          },
+          {
+            params: { api_key: apiKey },
+            headers: { 'Content-Type': 'application/json' },
+            timeout: 10000
+          }
+        );
+
+        if (!updateResponse.data || !updateResponse.data.success) {
+          throw new Error(updateResponse.data?.message || 'Yêu cầu đổi kho thất bại trên Pancake POS');
+        }
+
+        // Fetch warehouses to get the name of new warehouse
+        let warehouseName = 'Kho hàng';
+        try {
+          const whResponse = await axios.get(`https://pos.pages.fm/api/v1/shops/${shopId}/warehouses`, {
+            params: { api_key: apiKey },
+            timeout: 5000
+          });
+          const whs = whResponse.data?.data || whResponse.data?.warehouses || [];
+          const matchedWh = whs.find((w: any) => String(w.id) === String(warehouseId));
+          if (matchedWh) {
+            warehouseName = matchedWh.name;
+          }
+        } catch (whErr) {
+          logger.warn('Failed to fetch warehouse name from Pancake POS API, using default name', whErr);
+        }
+
+        updateData.warehouseId = warehouseId;
+        updateData.warehouseInfo = { id: warehouseId, name: warehouseName };
+        updateData.pancakeSyncStatus = 'SUCCESS';
+
+        changes.push({ field: 'warehouseId', from: oldOrder.warehouseId, to: warehouseId });
+        changes.push({ field: 'warehouseInfo', from: oldOrder.warehouseInfo, to: updateData.warehouseInfo });
+      } catch (err: any) {
+        logger.error('Failed to sync warehouse update to Pancake POS API', { error: err.message });
+        const errorMsg = err.response?.data?.message || err.message || 'Lỗi không xác định từ Pancake POS';
+        res.status(400).json({ error: `Không thể đồng bộ thay đổi kho xuất hàng sang Pancake: ${errorMsg}` });
+        return;
+      }
+    }
 
     // Helper ghi nhận thay đổi
     const track = (field: string, newVal: any) => {

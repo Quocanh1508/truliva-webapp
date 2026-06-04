@@ -40,6 +40,7 @@ export default function InventoryManage() {
   const [selectedWarehouses, setSelectedWarehouses] = useState<string[]>([]);
   const [lowStockThreshold, setLowStockThreshold] = useState<number>(2); // Ngưỡng mặc định bằng 2 theo yêu cầu
   const [showOnlyLowStock, setShowOnlyLowStock] = useState(false);
+  const [showOnlyInStock, setShowOnlyInStock] = useState(false);
 
   // UI Dropdowns
   const [showWarehouseFilterDropdown, setShowWarehouseFilterDropdown] = useState(false);
@@ -123,7 +124,16 @@ export default function InventoryManage() {
       });
     }
 
-    return matchSearch && matchCategory && matchLowStock;
+    // 4. Lọc theo trạng thái Còn hàng (tồn tại ít nhất 1 kho đang xem có tồn kho > ngưỡng)
+    let matchInStock = true;
+    if (showOnlyInStock) {
+      matchInStock = selectedWarehouses.some(wId => {
+        const qty = p.stocks[wId] ?? 0;
+        return qty > lowStockThreshold;
+      });
+    }
+
+    return matchSearch && matchCategory && matchLowStock && matchInStock;
   });
 
   return (
@@ -169,7 +179,7 @@ export default function InventoryManage() {
         <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-end">
           
           {/* Ô Tìm kiếm sản phẩm */}
-          <div className="md:col-span-4 form-group mb-0">
+          <div className="md:col-span-3 form-group mb-0">
             <label className="form-label text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1.5 flex items-center gap-1">
               <Search size={14} /> Tìm sản phẩm
             </label>
@@ -241,31 +251,48 @@ export default function InventoryManage() {
           </div>
 
           {/* Ô Nhập ngưỡng cảnh báo sắp hết hàng */}
-          <div className="md:col-span-3 form-group mb-0">
+          <div className="md:col-span-4 form-group mb-0">
             <label className="form-label text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1.5 flex items-center justify-between">
               <span className="text-red-600 flex items-center gap-1 font-bold">
                 <AlertTriangle size={14} /> Ngưỡng báo hết hàng
               </span>
             </label>
-            <div className="flex gap-2">
+            <div className="flex gap-2 flex-wrap md:flex-nowrap">
               <input
                 type="number"
                 min="0"
-                className="form-input text-sm text-center font-bold"
-                style={{ width: '80px' }}
+                className="form-input text-sm text-center font-bold shrink-0 px-2"
+                style={{ width: '70px' }}
                 value={lowStockThreshold}
                 onChange={(e) => setLowStockThreshold(Math.max(0, parseInt(e.target.value) || 0))}
               />
               <button
-                onClick={() => setShowOnlyLowStock(!showOnlyLowStock)}
-                className={`flex-1 text-xs font-bold rounded-lg border px-3 flex items-center justify-center gap-1 transition-all ${
+                onClick={() => {
+                  setShowOnlyLowStock(!showOnlyLowStock);
+                  if (!showOnlyLowStock) setShowOnlyInStock(false);
+                }}
+                className={`flex-1 text-[11px] font-bold rounded-lg border px-2 py-1.5 flex items-center justify-center gap-1 transition-all whitespace-nowrap ${
                   showOnlyLowStock 
                     ? 'bg-red-50 border-red-300 text-red-700' 
                     : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
                 }`}
               >
-                {showOnlyLowStock ? <CheckSquare size={16} /> : <Square size={16} />}
-                Chỉ hiện SP hết hàng
+                {showOnlyLowStock ? <CheckSquare size={14} /> : <Square size={14} />}
+                Chỉ SP hết hàng
+              </button>
+              <button
+                onClick={() => {
+                  setShowOnlyInStock(!showOnlyInStock);
+                  if (!showOnlyInStock) setShowOnlyLowStock(false);
+                }}
+                className={`flex-1 text-[11px] font-bold rounded-lg border px-2 py-1.5 flex items-center justify-center gap-1 transition-all whitespace-nowrap ${
+                  showOnlyInStock 
+                    ? 'bg-emerald-50 border-emerald-300 text-emerald-700' 
+                    : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
+                }`}
+              >
+                {showOnlyInStock ? <CheckSquare size={14} /> : <Square size={14} />}
+                Chỉ SP còn hàng
               </button>
             </div>
           </div>
@@ -302,7 +329,9 @@ export default function InventoryManage() {
             <span className="spinner mb-3" style={{ borderColor: 'rgba(27, 58, 107, 0.2)', borderTopColor: '#1B3A6B' }}></span>
             <span className="text-slate-500 text-sm font-semibold">Đang tải bảng tồn kho...</span>
           </div>
-                  <table className="w-full text-left border-collapse table-auto">
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-left border-collapse table-auto">
               <thead>
                 <tr className="bg-slate-50 border-b border-slate-200 text-slate-600 text-xs font-bold uppercase tracking-wider">
                   <th className="px-6 py-4 sticky left-0 bg-slate-50 z-10 border-r border-slate-200 shadow-[2px_0_5px_rgba(0,0,0,0.03)]" style={{ minWidth: '240px' }}>

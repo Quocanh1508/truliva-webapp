@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { getOrders, updateOrder, getKtvUsers, getStations, getOrderAuditLog, syncOrders, getFiltersData } from '../../api/client';
+import { getOrders, updateOrder, getKtvUsers, getStations, getOrderAuditLog, syncOrders, getFiltersData, fetchApi } from '../../api/client';
 import { Search, ChevronLeft, ChevronRight, History, XCircle, Filter, RefreshCw, FileText, CheckCircle2, RotateCcw, Copy, UserPlus, Download } from 'lucide-react';
 import { WARRANTY_SERVICE_GROUPS, REPAIR_SERVICE_GROUPS, WORK_TYPE_SERVICES } from '../../utils/workTypes';
 import { useConfirm } from '../../context/ConfirmContext';
@@ -124,6 +124,10 @@ export default function OrderList() {
   const [workType, setWorkType] = useState('');
   const [serviceType, setServiceType] = useState('');
   const [showServiceDropdown, setShowServiceDropdown] = useState(false);
+  const [warehouses, setWarehouses] = useState<any[]>([]);
+  const [productsStock, setProductsStock] = useState<any[]>([]);
+  const [selectedWarehouseId, setSelectedWarehouseId] = useState<string>('');
+  const [loadingInventory, setLoadingInventory] = useState<boolean>(false);
 
   // Smart Dispatching Suggestions
   const [suggestedMain, setSuggestedMain] = useState<any>(null);
@@ -465,6 +469,52 @@ export default function OrderList() {
     setSuggestedTech(matchedTech);
     setSuggestedKtv(bestKtv);
 
+    // Kéo thông tin tồn kho
+    setLoadingInventory(true);
+    fetchApi('/inventory/stock')
+      .then(invData => {
+        const whs = invData.warehouses || [];
+        const prods = invData.products || [];
+        setWarehouses(whs);
+        setProductsStock(prods);
+
+        // Thiết lập kho mặc định
+        let defaultWhId = '';
+        if (order.warehouseId) {
+          defaultWhId = order.warehouseId;
+        } else if (order.warehouseInfo?.id) {
+          defaultWhId = order.warehouseInfo.id;
+        } else if (order.warehouseInfo?.name) {
+          // Đối chiếu tìm kho bằng tên từ danh sách kho của Pancake
+          const matchedWh = whs.find((w: any) => w.name === order.warehouseInfo.name);
+          if (matchedWh) {
+            defaultWhId = matchedWh.id;
+          }
+        }
+
+        if (!defaultWhId) {
+          // Tự động tìm kho khớp trạm gợi ý
+          const targetSearchName = matchedTech ? matchedTech.name : (matchedMain ? matchedMain.name : '');
+          if (targetSearchName) {
+            const cleanStationName = removeAccents(targetSearchName);
+            const foundWh = whs.find((w: any) => {
+              const cleanWhName = removeAccents(w.name);
+              return cleanWhName.includes(cleanStationName) || cleanStationName.includes(cleanWhName);
+            });
+            if (foundWh) {
+              defaultWhId = foundWh.id;
+            }
+          }
+        }
+        setSelectedWarehouseId(defaultWhId);
+      })
+      .catch(err => {
+        console.error('Failed to load inventory stock info', err);
+      })
+      .finally(() => {
+        setLoadingInventory(false);
+      });
+
     setAssignModal({ isOpen: true, orderId: order.id, order });
   };
 
@@ -523,7 +573,8 @@ export default function OrderList() {
         rescheduleReason: rescheduleReason || null,
         workType: workType || null,
         serviceType: serviceType || null,
-        adminStatus: selectedKtv ? 'đang thực hiện' : 'chờ xử lý' // auto update status
+        adminStatus: selectedKtv ? 'đang thực hiện' : 'chờ xử lý', // auto update status
+        warehouseId: selectedWarehouseId || null
       });
       setAssignModal(null);
       fetchOrdersData();
@@ -1711,6 +1762,84 @@ export default function OrderList() {
                 <div>
                   <label className="block text-sm text-gray-600 mb-1">Lý do hẹn lại (nếu có)</label>
                   <textarea rows={2} className="w-full border rounded p-2 text-sm outline-none focus:border-blue-500" value={rescheduleReason} onChange={e => setRescheduleReason(e.target.value)} placeholder="Khách bận, KTV kẹt lịch..."></textarea>
+                </div>
+
+                {/* Phần 3: Kho xuất hàng & Đối chiếu tồn kho */}
+                <div className="border-t pt-4 mt-4 space-y-3">
+                  <h4 className="font-semibold text-gray-800 flex items-center gap-1.5">
+                    3. Kho hàng xuất vật tư
+                  </h4>
+                  
+                  <div>
+                    <label className="block text-xs text-gray-500 mb-1">Chọn kho xuất hàng</label>
+                    <select 
+                      className="w-full border rounded p-2 text-sm outline-none focus:border-blue-500 bg-white text-gray-800 font-medium" 
+                      value={selectedWarehouseId} 
+                      onChange={e => setSelectedWarehouseId(e.target.value)}
+                    >
+                      <option value="">-- Chọn Kho hàng --</option>
+                      {warehouses.map(w => (
+                        <option key={w.id} value={w.id}>{w.name}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* Danh sách đối chiếu tồn kho */}
+                  {selectedWarehouseId && (
+                    <div className="space-y-2">
+                      <label className="block text-xs font-semibold text-gray-600">Đối chiếu tồn kho tại trạm/kho:</label>
+                      {loadingInventory ? (
+                        <div className="text-xs text-gray-400 italic">Đang đối chiếu tồn kho...</div>
+                      ) : assignModal.order.items && assignModal.order.items.length > 0 ? (
+                        <div className="space-y-1.5 max-h-40 overflow-y-auto pr-1">
+                          {assignModal.order.items.map((item: any, i: number) => {
+                            const pName = item.productName || item.rawData?.variation_info?.name || item.rawData?.name || 'Sản phẩm';
+                            const itemSku = item.sku || item.rawData?.sku || '';
+                            
+                            // Tìm sản phẩm trong danh sách tồn kho
+                            const stockProd = productsStock.find(p => 
+                              (itemSku && p.sku === itemSku) || 
+                              p.name.toLowerCase() === pName.toLowerCase() ||
+                              (item.rawData?.variation_id && String(p.pancakeProductId) === String(item.rawData.variation_id))
+                            );
+
+                            const available = stockProd ? (stockProd.stocks[selectedWarehouseId] ?? 0) : 0;
+                            const actual = stockProd ? (stockProd.actualStocks[selectedWarehouseId] ?? 0) : 0;
+                            const requiredQty = item.quantity || 1;
+
+                            const isOutOfStock = available === 0;
+                            const isLowStock = available > 0 && available <= 2;
+
+                            let bgClass = 'bg-green-50 border-green-100 text-green-800';
+                            let statusText = 'Còn hàng';
+                            if (isOutOfStock) {
+                              bgClass = 'bg-red-50 border-red-200 text-red-700 font-medium';
+                              statusText = 'HẾT HÀNG';
+                            } else if (isLowStock) {
+                              bgClass = 'bg-amber-50 border-amber-200 text-amber-700 font-medium';
+                              statusText = 'Sắp hết';
+                            }
+
+                            return (
+                              <div key={i} className={`p-2 rounded border text-xs flex justify-between items-center transition-colors ${bgClass}`}>
+                                <div className="flex-1 min-w-0 mr-2">
+                                  <div className="font-semibold truncate" title={pName}>{pName}</div>
+                                  <div className="text-[10px] text-gray-500">Mã: {itemSku || 'N/A'} | Cần: x{requiredQty}</div>
+                                </div>
+                                <div className="text-right shrink-0">
+                                  <div className="font-bold">Có thể bán: {available}</div>
+                                  <div className="text-[10px] text-gray-500">Tồn thực tế: {actual}</div>
+                                  <div className="text-[9px] uppercase font-bold tracking-wider mt-0.5">{statusText}</div>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      ) : (
+                        <div className="text-xs text-gray-400 italic">Đơn hàng không có sản phẩm nào để đối chiếu</div>
+                      )}
+                    </div>
+                  )}
                 </div>
               </div>
 

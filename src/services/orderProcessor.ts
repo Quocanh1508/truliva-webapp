@@ -144,6 +144,7 @@ export async function processOrderEvent(rawEventId: string | null, payload: any)
       orderLink: payload.order_link || null,
       shippingAddress: payload.shipping_address || null,
       warehouseInfo: payload.warehouse_info || null,
+      warehouseId: payload.warehouse_id ? String(payload.warehouse_id) : null,
       billFullName: billName,
       billPhoneNumber: billPhone,
       note: payload.note || null,
