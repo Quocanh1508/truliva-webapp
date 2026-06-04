@@ -108,4 +108,31 @@ router.patch('/:id/read', async (req: Request, res: Response): Promise<void> => 
   }
 });
 
+/**
+ * POST /api/notifications/register-token
+ * Lưu mã Push Token của thiết bị KTV
+ */
+router.post('/register-token', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { token } = req.body;
+    const userId = req.user!.id;
+
+    if (!token) {
+      res.status(400).json({ error: 'Thiếu Push Token' });
+      return;
+    }
+
+    await prisma.user.update({
+      where: { id: userId },
+      data: { pushToken: token },
+    });
+
+    logger.info('Registered push token successfully', { userId });
+    res.json({ success: true, message: 'Đăng ký Push Token thành công' });
+  } catch (error: any) {
+    logger.error('Register push token error', { error: error.message });
+    res.status(500).json({ error: 'Lỗi khi đăng ký Push Token' });
+  }
+});
+
 export default router;

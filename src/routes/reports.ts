@@ -2,6 +2,7 @@ import { Router, Request, Response } from 'express';
 import prisma from '../config/database';
 import logger from '../utils/logger';
 import { requireAuth, requireAdmin } from '../middleware/authSession';
+import { sendPushNotification } from '../services/notificationService';
 import ExcelJS from 'exceljs';
 
 const router = Router();
@@ -972,12 +973,23 @@ router.put('/:id', requireAdmin, async (req: Request, res: Response): Promise<vo
       try {
         const orderNum = existingReport.order?.pancakeOrderId;
         const orderText = orderNum ? `#${orderNum}` : '(không rõ mã đơn)';
+        const title = 'Báo cáo đã được Admin chỉnh sửa';
+        const content = `Báo cáo cho đơn hàng ${orderText} của bạn đã được Admin sửa thông tin.`;
+
         await prisma.notification.create({
           data: {
             userId: existingReport.ktvUserId,
-            title: 'Báo cáo đã được Admin chỉnh sửa',
-            content: `Báo cáo cho đơn hàng ${orderText} của bạn đã được Admin sửa thông tin.`,
+            title,
+            content,
           },
+        });
+
+        sendPushNotification(existingReport.ktvUserId, title, content, {
+          type: 'REPORT_UPDATED',
+          reportId: report.id,
+          orderId: report.orderId || ''
+        }).catch(err => {
+          logger.error('Failed to trigger push notification for report update', { error: err.message });
         });
       } catch (notifErr: any) {
         logger.error('Failed to create edit notification', { error: notifErr.message });
@@ -1022,13 +1034,22 @@ router.delete('/:id', requireAdmin, async (req: Request, res: Response): Promise
     const orderNum = existingReport.order?.pancakeOrderId;
     const orderText = orderNum ? `#${orderNum}` : '(không rõ mã đơn)';
     const notificationContent = `Báo cáo cho đơn hàng ${orderText} của bạn đã bị Admin xóa.\nLý do: ${deleteReason.trim()}`;
+    const title = 'Báo cáo bị xóa';
 
     await prisma.notification.create({
       data: {
         userId: existingReport.ktvUserId,
-        title: 'Báo cáo bị xóa',
+        title,
         content: notificationContent,
       }
+    });
+
+    sendPushNotification(existingReport.ktvUserId, title, notificationContent, {
+      type: 'REPORT_DELETED',
+      reportId: existingReport.id,
+      orderId: existingReport.orderId || ''
+    }).catch(err => {
+      logger.error('Failed to trigger push notification for report deletion', { error: err.message });
     });
 
     // 2. Thực hiện xóa báo cáo khỏi cơ sở dữ liệu

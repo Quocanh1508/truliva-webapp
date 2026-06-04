@@ -10,7 +10,10 @@ export default function MyOrders() {
   const [error, setError] = useState('');
 
   // Filters
-  const [search, setSearch] = useState('');
+  const [search, setSearch] = useState(() => {
+    const params = new URLSearchParams(window.location.search);
+    return params.get('search') || '';
+  });
   const [sortBy, setSortBy] = useState('appointmentTime');
   const [sortOrder, setSortOrder] = useState('desc');
   

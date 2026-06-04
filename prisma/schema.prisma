@@ -209,6 +209,7 @@ model User {
   bankAccount     String?      @map("bank_account")
   bankName        String?      @map("bank_name")
   email           String?
+  pushToken       String?      @map("push_token")
   createdAt       DateTime     @default(now()) @map("created_at")
   updatedAt       DateTime     @updatedAt @map("updated_at")
 

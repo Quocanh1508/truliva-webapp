@@ -4,6 +4,7 @@ import logger from '../utils/logger';
 import { requireAuth, requireAdmin } from '../middleware/authSession';
 import { Prisma } from '@prisma/client';
 import { syncRecentOrders } from '../services/orderSyncScheduler';
+import { sendPushNotification } from '../services/notificationService';
 import ExcelJS from 'exceljs';
 import axios from 'axios';
 
@@ -1099,6 +1100,22 @@ router.patch('/:id', requireAuth, requireAdmin, async (req: Request, res: Respon
           userId: req.user!.id,
           userName: req.user!.fullName
         }
+      });
+    }
+
+    // Gửi thông báo đẩy cho KTV nếu có gán KTV mới
+    if (assignedKtvId && assignedKtvId !== oldOrder.assignedKtvId) {
+      const customerName = order.billFullName || 'Khách hàng';
+      const workTypeText = order.workType || 'công việc';
+      const title = 'Đơn hàng mới được phân công';
+      const body = `Bạn vừa được gán đơn hàng mới #${order.pancakeOrderId} (${workTypeText}) từ khách hàng ${customerName}.`;
+
+      sendPushNotification(assignedKtvId, title, body, {
+        type: 'ORDER_ASSIGNED',
+        orderId: order.id,
+        pancakeOrderId: String(order.pancakeOrderId)
+      }).catch(err => {
+        logger.error('Failed to trigger push notification for KTV assignment', { error: err.message });
       });
     }
 

@@ -10,4 +10,5 @@ tunnel.log
 *.xlsx
 KTV flow/
 scratch/
+firebase-service-account.json
 
