@@ -135,4 +135,49 @@ router.post('/register-token', async (req: Request, res: Response): Promise<void
   }
 });
 
+/**
+ * GET /api/notifications/vapid-public-key
+ * Trả về VAPID Public Key cho Frontend đăng ký Web Push
+ */
+router.get('/vapid-public-key', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const publicKey = process.env.VAPID_PUBLIC_KEY;
+    if (!publicKey) {
+      res.status(500).json({ error: 'Chưa cấu hình VAPID Public Key trên Server' });
+      return;
+    }
+    res.json({ publicKey });
+  } catch (error: any) {
+    logger.error('Get VAPID public key error', { error: error.message });
+    res.status(500).json({ error: 'Lỗi lấy VAPID Public Key' });
+  }
+});
+
+/**
+ * POST /api/notifications/subscribe
+ * Lưu đối tượng PushSubscription của trình duyệt Web KTV
+ */
+router.post('/subscribe', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const subscription = req.body;
+    const userId = req.user!.id;
+
+    if (!subscription || !subscription.endpoint) {
+      res.status(400).json({ error: 'Thiếu thông tin đăng ký PushSubscription' });
+      return;
+    }
+
+    await prisma.user.update({
+      where: { id: userId },
+      data: { webPushSubscription: subscription as any },
+    });
+
+    logger.info('Registered web push subscription successfully', { userId });
+    res.json({ success: true, message: 'Đăng ký nhận thông báo đẩy Web thành công' });
+  } catch (error: any) {
+    logger.error('Register web push subscription error', { error: error.message });
+    res.status(500).json({ error: 'Lỗi đăng ký nhận thông báo đẩy Web' });
+  }
+});
+
 export default router;

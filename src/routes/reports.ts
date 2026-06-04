@@ -3,6 +3,7 @@ import prisma from '../config/database';
 import logger from '../utils/logger';
 import { requireAuth, requireAdmin } from '../middleware/authSession';
 import { sendPushNotification } from '../services/notificationService';
+import { sendWebPushNotification } from '../services/webPushService';
 import ExcelJS from 'exceljs';
 
 const router = Router();
@@ -984,12 +985,22 @@ router.put('/:id', requireAdmin, async (req: Request, res: Response): Promise<vo
           },
         });
 
+        // 1. Gửi qua FCM Native
         sendPushNotification(existingReport.ktvUserId, title, content, {
           type: 'REPORT_UPDATED',
           reportId: report.id,
           orderId: report.orderId || ''
         }).catch(err => {
           logger.error('Failed to trigger push notification for report update', { error: err.message });
+        });
+
+        // 2. Gửi qua Web Push PWA
+        sendWebPushNotification(existingReport.ktvUserId, title, content, {
+          type: 'REPORT_UPDATED',
+          reportId: report.id,
+          orderId: report.orderId || ''
+        }).catch(err => {
+          logger.error('Failed to trigger Web Push notification for report update', { error: err.message });
         });
       } catch (notifErr: any) {
         logger.error('Failed to create edit notification', { error: notifErr.message });
@@ -1044,12 +1055,22 @@ router.delete('/:id', requireAdmin, async (req: Request, res: Response): Promise
       }
     });
 
+    // 1. Gửi qua FCM Native
     sendPushNotification(existingReport.ktvUserId, title, notificationContent, {
       type: 'REPORT_DELETED',
       reportId: existingReport.id,
       orderId: existingReport.orderId || ''
     }).catch(err => {
       logger.error('Failed to trigger push notification for report deletion', { error: err.message });
+    });
+
+    // 2. Gửi qua Web Push PWA
+    sendWebPushNotification(existingReport.ktvUserId, title, notificationContent, {
+      type: 'REPORT_DELETED',
+      reportId: existingReport.id,
+      orderId: existingReport.orderId || ''
+    }).catch(err => {
+      logger.error('Failed to trigger Web Push notification for report deletion', { error: err.message });
     });
 
     // 2. Thực hiện xóa báo cáo khỏi cơ sở dữ liệu

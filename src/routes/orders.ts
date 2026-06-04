@@ -5,6 +5,7 @@ import { requireAuth, requireAdmin } from '../middleware/authSession';
 import { Prisma } from '@prisma/client';
 import { syncRecentOrders } from '../services/orderSyncScheduler';
 import { sendPushNotification } from '../services/notificationService';
+import { sendWebPushNotification } from '../services/webPushService';
 import ExcelJS from 'exceljs';
 import axios from 'axios';
 
@@ -1110,12 +1111,22 @@ router.patch('/:id', requireAuth, requireAdmin, async (req: Request, res: Respon
       const title = 'Đơn hàng mới được phân công';
       const body = `Bạn vừa được gán đơn hàng mới #${order.pancakeOrderId} (${workTypeText}) từ khách hàng ${customerName}.`;
 
+      // 1. Gửi qua FCM Native
       sendPushNotification(assignedKtvId, title, body, {
         type: 'ORDER_ASSIGNED',
         orderId: order.id,
         pancakeOrderId: String(order.pancakeOrderId)
       }).catch(err => {
         logger.error('Failed to trigger push notification for KTV assignment', { error: err.message });
+      });
+
+      // 2. Gửi qua Web Push PWA
+      sendWebPushNotification(assignedKtvId, title, body, {
+        type: 'ORDER_ASSIGNED',
+        orderId: order.id,
+        pancakeOrderId: String(order.pancakeOrderId)
+      }).catch(err => {
+        logger.error('Failed to trigger Web Push notification for KTV assignment', { error: err.message });
       });
     }
 

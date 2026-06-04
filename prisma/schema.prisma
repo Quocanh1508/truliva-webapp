@@ -210,6 +210,7 @@ model User {
   bankName        String?      @map("bank_name")
   email           String?
   pushToken       String?      @map("push_token")
+  webPushSubscription Json?   @map("web_push_subscription")
   createdAt       DateTime     @default(now()) @map("created_at")
   updatedAt       DateTime     @updatedAt @map("updated_at")
 
