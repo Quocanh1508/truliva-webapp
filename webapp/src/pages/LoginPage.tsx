@@ -3,6 +3,7 @@ import { useNavigate, Link } from 'react-router-dom';
 import { LogIn, Download, Smartphone, X, Share2, PlusSquare, Monitor } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { fetchApi } from '../api/client';
+import { Capacitor } from '@capacitor/core';
 
 export default function LoginPage() {
   const [username, setUsername] = useState('');
@@ -19,7 +20,7 @@ export default function LoginPage() {
   const navigate = useNavigate();
 
   // Detect if running inside the Capacitor mobile app shell
-  const isApp = window.hasOwnProperty('Capacitor') || (window as any).Capacitor !== undefined;
+  const isApp = Capacitor.isNativePlatform();
 
   useEffect(() => {
     const handler = (e: Event) => {
