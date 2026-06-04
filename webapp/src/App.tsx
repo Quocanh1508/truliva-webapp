@@ -170,6 +170,14 @@ function PushNotificationManager({ children }: { children: React.ReactNode }) {
       const permission = supportsNotifications ? Notification.permission : 'denied';
 
       // Chỉ kích hoạt banner và đăng ký với tài khoản KTV
+      console.log('PushNotificationManager Web Check:', {
+        role: user.role,
+        isIOS,
+        isStandalone,
+        supportsNotifications,
+        permission,
+      });
+
       if (user.role === 'KTV') {
         if (isIOS && !isStandalone) {
           // iPhone/iPad nhưng đang mở bằng tab Safari thường (chưa Add to Home Screen)
@@ -181,6 +189,8 @@ function PushNotificationManager({ children }: { children: React.ReactNode }) {
           // Quyền đã cấp sẵn, tự động đăng ký/cập nhật ngầm mà không cần click
           setBannerType('NONE');
           doRegisterWebPush();
+        } else {
+          console.warn('Web Push permission is denied or unsupported.');
         }
       }
 
