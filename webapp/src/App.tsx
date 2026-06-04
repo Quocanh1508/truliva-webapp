@@ -90,6 +90,7 @@ function PushNotificationManager({ children }: { children: React.ReactNode }) {
       console.log('Đăng ký Web Push PWA lên database thành công.');
     } catch (err) {
       console.error('Lỗi chi tiết khi đăng ký Web Push PWA:', err);
+      throw err; // Ném lỗi để bên gọi biết và xử lý/hiển thị
     }
   };
 
@@ -227,9 +228,9 @@ function PushNotificationManager({ children }: { children: React.ReactNode }) {
         alert('Bạn đã từ chối quyền. Vui lòng cho phép quyền thông báo trong cài đặt Safari/Trình duyệt của bạn để nhận tin đơn hàng mới.');
         setBannerType('NONE');
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error('Lỗi khi kích hoạt quyền thông báo:', err);
-      alert('Không thể kích hoạt quyền thông báo. Hãy đảm bảo bạn đã cài đặt ứng dụng làm PWA và đang mở từ Màn hình chính.');
+      alert(`Không thể bật thông báo: ${err.message || err}`);
     }
   };
 
