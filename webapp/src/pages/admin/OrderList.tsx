@@ -58,7 +58,7 @@ export default function OrderList() {
   const [filterCustomerPhone, setFilterCustomerPhone] = useState('');
 
   // Added filters
-  const [dateType, setDateType] = useState('createdAt');
+  const dateType = 'createdAt';
   const [filterServiceTypes, setFilterServiceTypes] = useState<string[]>([]);
   const [filterProductCategories, setFilterProductCategories] = useState<string[]>([]);
   const [filterProductNames, setFilterProductNames] = useState<string[]>([]);
