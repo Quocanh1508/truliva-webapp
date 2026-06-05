@@ -1204,17 +1204,6 @@ export default function OrderList() {
             </select>
 
             <select
-              className="px-3 py-2 text-[13px] border border-gray-300 rounded-md bg-white text-gray-700 outline-none font-medium"
-              value={dateType}
-              onChange={(e) => { setDateType(e.target.value); setPage(1); }}
-            >
-              <option value="createdAt">Thời gian tạo</option>
-              <option value="appointmentTime">Thời gian khách hẹn</option>
-              <option value="completedAt">Thời gian hoàn thành</option>
-              <option value="updatedAt">Thời gian cập nhật</option>
-            </select>
-
-            <select
               className="px-3 py-2 text-[13px] border border-gray-300 rounded-md bg-white text-gray-700 outline-none"
               value={datePreset}
               onChange={(e) => { setDatePreset(e.target.value); setPage(1); }}
