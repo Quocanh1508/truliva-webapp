@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { fetchApi } from '../../api/client';
-import { Warehouse, RefreshCw, Search, AlertTriangle, CheckSquare, Square, Info } from 'lucide-react';
+import { Warehouse, RefreshCw, Search, AlertTriangle, CheckSquare, Square, Info, Download } from 'lucide-react';
 import CategoryTreeSelect from '../../components/CategoryTreeSelect';
 
 interface WarehouseData {
@@ -86,6 +86,18 @@ export default function InventoryManage() {
     }
   };
 
+  const handleExportExcel = () => {
+    const query = new URLSearchParams();
+    if (searchTerm.trim()) query.append('search', searchTerm.trim());
+    if (selectedCategories.length > 0) query.append('categories', selectedCategories.join(','));
+    if (selectedWarehouses.length > 0) query.append('warehouses', selectedWarehouses.join(','));
+    query.append('lowStockThreshold', String(lowStockThreshold));
+    if (showOnlyLowStock) query.append('showOnlyLowStock', 'true');
+    if (showOnlyInStock) query.append('showOnlyInStock', 'true');
+
+    window.open(`/api/inventory/export?${query.toString()}`, '_blank');
+  };
+
   // Lấy danh sách Categories duy nhất để lọc
   const rawCategories = Array.from(new Set(products.map(p => p.category).filter(Boolean))) as string[];
 
@@ -150,15 +162,25 @@ export default function InventoryManage() {
             Tổng hợp lượng hàng tồn kho thực tế của KTV và các trạm dịch vụ từ Pancake POS.
           </p>
         </div>
-        
-        <button
-          onClick={handleSyncPancake}
-          disabled={syncing || loading}
-          className="btn btn-primary flex items-center justify-center gap-2 px-4 py-2 bg-[#1B3A6B] hover:bg-[#152e55] text-white rounded-lg transition-colors font-semibold"
-        >
-          <RefreshCw className={syncing ? 'animate-spin' : ''} size={18} />
-          {syncing ? 'Đang đồng bộ...' : 'Đồng bộ từ Pancake'}
-        </button>
+        <div className="flex items-center gap-2.5 shrink-0">
+          <button
+            onClick={handleExportExcel}
+            className="btn btn-outline flex items-center justify-center gap-2 px-4 py-2 border-slate-200 text-slate-700 hover:bg-slate-50 rounded-lg transition-colors font-semibold"
+            title="Xuất file Excel tồn kho theo bộ lọc đang chọn"
+          >
+            <Download size={18} />
+            Xuất Excel
+          </button>
+
+          <button
+            onClick={handleSyncPancake}
+            disabled={syncing || loading}
+            className="btn btn-primary flex items-center justify-center gap-2 px-4 py-2 bg-[#1B3A6B] hover:bg-[#152e55] text-white rounded-lg transition-colors font-semibold"
+          >
+            <RefreshCw className={syncing ? 'animate-spin' : ''} size={18} />
+            {syncing ? 'Đang đồng bộ...' : 'Đồng bộ từ Pancake'}
+          </button>
+        </div>
       </div>
 
       {/* Messages */}
