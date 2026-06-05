@@ -5,6 +5,7 @@ import { Search, ChevronLeft, ChevronRight, History, XCircle, Filter, RefreshCw,
 import { WARRANTY_SERVICE_GROUPS, REPAIR_SERVICE_GROUPS, WORK_TYPE_SERVICES } from '../../utils/workTypes';
 import { useConfirm } from '../../context/ConfirmContext';
 import DateRangePicker from '../../components/DateRangePicker';
+import CategoryTreeSelect from '../../components/CategoryTreeSelect';
 
 const ALL_SERVICE_TYPES = Array.from(new Set(Object.values(WORK_TYPE_SERVICES).flat()));
 
@@ -1253,25 +1254,12 @@ export default function OrderList() {
                   {activeDropdown === 'productCategories' && (
                     <div className="p-4 w-72 space-y-3">
                       <h4 className="font-semibold text-[14px] text-gray-800">Lọc theo Danh mục sản phẩm</h4>
-                      <div className="space-y-2 max-h-48 overflow-y-auto">
-                        {dbFilterOptions.categories.map(cat => (
-                          <label key={cat} className="flex items-center space-x-2 text-sm text-gray-700 cursor-pointer">
-                            <input
-                              type="checkbox"
-                              className="rounded text-blue-600 focus:ring-blue-500"
-                              checked={tempProductCategories.includes(cat)}
-                              onChange={e => {
-                                if (e.target.checked) {
-                                  setTempProductCategories([...tempProductCategories, cat]);
-                                } else {
-                                  setTempProductCategories(tempProductCategories.filter(v => v !== cat));
-                                }
-                              }}
-                            />
-                            <span>{cat}</span>
-                          </label>
-                        ))}
-                      </div>
+                      <CategoryTreeSelect
+                        categories={dbFilterOptions.categories}
+                        selected={tempProductCategories}
+                        onChange={setTempProductCategories}
+                        renderInline
+                      />
                       <div className="flex justify-between mt-2 pt-2 border-t">
                         <button className="text-gray-500 text-xs px-2 py-1 hover:bg-gray-100 rounded" onClick={() => setActiveDropdown('main')}>Quay lại</button>
                         <button className="bg-blue-600 text-white text-xs px-3 py-1 rounded hover:bg-blue-700 font-semibold" onClick={() => applyFilter('productCategories')}>Áp dụng</button>

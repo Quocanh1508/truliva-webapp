@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { fetchApi } from '../../api/client';
-import { Warehouse, RefreshCw, Search, Filter, AlertTriangle, CheckSquare, Square, Info } from 'lucide-react';
+import { Warehouse, RefreshCw, Search, AlertTriangle, CheckSquare, Square, Info } from 'lucide-react';
+import CategoryTreeSelect from '../../components/CategoryTreeSelect';
 
 interface WarehouseData {
   id: string;
@@ -36,7 +37,7 @@ export default function InventoryManage() {
 
   // Filters & Settings
   const [searchTerm, setSearchTerm] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState('ALL');
+  const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
   const [selectedWarehouses, setSelectedWarehouses] = useState<string[]>([]);
   const [lowStockThreshold, setLowStockThreshold] = useState<number>(2); // Ngưỡng mặc định bằng 2 theo yêu cầu
   const [showOnlyLowStock, setShowOnlyLowStock] = useState(false);
@@ -86,7 +87,7 @@ export default function InventoryManage() {
   };
 
   // Lấy danh sách Categories duy nhất để lọc
-  const categories = ['ALL', ...Array.from(new Set(products.map(p => p.category).filter(Boolean))) as string[]];
+  const rawCategories = Array.from(new Set(products.map(p => p.category).filter(Boolean))) as string[];
 
   // Toggle chọn/hủy chọn kho hàng trong bộ lọc
   const toggleWarehouseSelection = (id: string) => {
@@ -113,7 +114,7 @@ export default function InventoryManage() {
       (p.sku && p.sku.toLowerCase().includes(searchTerm.toLowerCase()));
 
     // 2. Lọc theo Danh mục
-    const matchCategory = selectedCategory === 'ALL' || p.category === selectedCategory;
+    const matchCategory = selectedCategories.length === 0 || (p.category && selectedCategories.includes(p.category));
 
     // 3. Lọc theo trạng thái Sắp hết hàng (tồn tại ít nhất 1 kho đang xem có tồn kho <= ngưỡng)
     let matchLowStock = true;
@@ -194,20 +195,13 @@ export default function InventoryManage() {
 
           {/* Ô Lọc danh mục */}
           <div className="md:col-span-2 form-group mb-0">
-            <label className="form-label text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1.5 flex items-center gap-1">
-              <Filter size={14} /> Danh mục
-            </label>
-            <select
-              className="form-input text-sm"
-              value={selectedCategory}
-              onChange={(e) => setSelectedCategory(e.target.value)}
-            >
-              {categories.map((cat) => (
-                <option key={cat} value={cat}>
-                  {cat === 'ALL' ? 'Tất cả danh mục' : cat}
-                </option>
-              ))}
-            </select>
+            <CategoryTreeSelect
+              label="Danh mục"
+              categories={rawCategories}
+              selected={selectedCategories}
+              onChange={setSelectedCategories}
+              placeholder="Tất cả danh mục"
+            />
           </div>
 
           {/* Dropdown Bộ lọc Kho hàng */}

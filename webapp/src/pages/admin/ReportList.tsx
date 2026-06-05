@@ -2,6 +2,7 @@ import { useEffect, useState, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { fetchApi, deleteReportWithReason, updateReport, uploadImages } from '../../api/client';
 import { Download, X, ExternalLink, Image as ImageIcon, Loader, Search, Edit3, Save, Plus, Trash2, SlidersHorizontal, RotateCcw, Calendar } from 'lucide-react';
+import CategoryTreeSelect from '../../components/CategoryTreeSelect';
 
 // Check if a URL points to a directly viewable image
 function isDirectImage(url: string): boolean {
@@ -829,9 +830,9 @@ export default function ReportList() {
               selected={tempServiceTypes}
               onChange={setTempServiceTypes}
             />
-            <MultiSelectDropdown
+            <CategoryTreeSelect
               label="Danh mục sản phẩm"
-              options={filterOptions?.categories || []}
+              categories={filterOptions?.categories || []}
               selected={tempCategories}
               onChange={setTempCategories}
             />
