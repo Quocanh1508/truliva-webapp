@@ -21,6 +21,10 @@ export default function PullToRefresh({
   const stateRef = useRef(refreshState);
   stateRef.current = refreshState;
 
+  // Stale closure prevention using refs
+  const onRefreshRef = useRef(onRefresh);
+  onRefreshRef.current = onRefresh;
+
   // Helper to find the nearest scrollable parent element
   const getScrollParent = (node: HTMLElement | null): HTMLElement => {
     if (!node) return document.documentElement;
@@ -38,11 +42,33 @@ export default function PullToRefresh({
     return document.documentElement;
   };
 
+  const triggerRefresh = async () => {
+    setRefreshState('refreshing');
+    setPullOffset(55); // Hold indicator at 55px while loading data
+    
+    try {
+      await onRefreshRef.current();
+    } catch (err) {
+      console.error('Pull-to-refresh action error:', err);
+    } finally {
+      // Return back to top smoothly
+      setPullOffset(0);
+      setRefreshState('idle');
+    }
+  };
+
+  const triggerRefreshRef = useRef(triggerRefresh);
+  triggerRefreshRef.current = triggerRefresh;
+
   useEffect(() => {
     const container = containerRef.current;
     if (!container) return;
 
     const scrollParent = getScrollParent(container);
+
+    // Prevent default browser-managed pull-to-refresh on this container
+    const originalOverscroll = scrollParent.style.overscrollBehaviorY;
+    scrollParent.style.overscrollBehaviorY = 'contain';
 
     const handleTouchStart = (e: TouchEvent) => {
       // Do not pull if currently refreshing
@@ -74,7 +100,7 @@ export default function PullToRefresh({
 
       // Only pull down vertically, check if vertical pull is dominant
       if (diffY > 0 && Math.abs(diffY) > Math.abs(diffX)) {
-        // Prevent default browser-managed pull-to-refresh
+        // Prevent browser overscroll/refresh gestures
         if (e.cancelable) {
           e.preventDefault();
         }
@@ -97,7 +123,7 @@ export default function PullToRefresh({
       isPullingRef.current = false;
 
       if (stateRef.current === 'release') {
-        triggerRefresh();
+        triggerRefreshRef.current();
       } else {
         // Return back to top smoothly
         setPullOffset(0);
@@ -113,23 +139,9 @@ export default function PullToRefresh({
       container.removeEventListener('touchstart', handleTouchStart);
       container.removeEventListener('touchmove', handleTouchMove);
       container.removeEventListener('touchend', handleTouchEnd);
+      scrollParent.style.overscrollBehaviorY = originalOverscroll;
     };
   }, [pullThreshold]);
-
-  const triggerRefresh = async () => {
-    setRefreshState('refreshing');
-    setPullOffset(55); // Hold indicator at 55px while loading data
-    
-    try {
-      await onRefresh();
-    } catch (err) {
-      console.error('Pull-to-refresh action error:', err);
-    } finally {
-      // Return back to top smoothly
-      setPullOffset(0);
-      setRefreshState('idle');
-    }
-  };
 
   // Rotate the refresh icon as the user pulls down
   const rotationAngle = Math.min(pullOffset * 4, 360);
@@ -138,26 +150,26 @@ export default function PullToRefresh({
     <div ref={containerRef} className="relative w-full overflow-hidden">
       {/* Pull indicator */}
       <div 
-        className="absolute left-0 right-0 flex items-center justify-center bg-gray-50 border-b border-gray-150 z-20"
+        className="absolute top-0 left-0 right-0 flex items-end justify-center bg-gray-55 border-b border-gray-150 z-20 overflow-hidden"
         style={{ 
-          top: '-50px',
-          height: '50px',
-          transform: `translateY(${pullOffset}px)`,
+          height: `${pullOffset}px`,
           opacity: pullOffset > 0 ? 1 : 0,
           transition: refreshState === 'idle' || refreshState === 'refreshing' 
-            ? 'transform 0.25s cubic-bezier(0.1, 0.8, 0.3, 1), opacity 0.25s' 
+            ? 'height 0.25s cubic-bezier(0.1, 0.8, 0.3, 1), opacity 0.25s' 
             : 'none'
         }}
       >
-        <div className="flex items-center gap-2 text-xs font-semibold text-gray-500">
-          <RefreshCw 
-            size={14} 
-            className={`text-blue-600 ${refreshState === 'refreshing' ? 'animate-spin' : ''}`}
+        <div className="flex items-center justify-center gap-2 text-xs font-semibold text-gray-500 h-[50px] w-full pb-3">
+          <div 
+            className={refreshState === 'refreshing' ? 'animate-spin' : ''}
             style={{ 
               transform: refreshState === 'refreshing' ? undefined : `rotate(${rotationAngle}deg)`,
-              transition: refreshState === 'refreshing' ? undefined : 'transform 0.05s linear'
+              transition: refreshState === 'refreshing' ? undefined : 'transform 0.1s ease-out',
+              display: 'inline-flex'
             }}
-          />
+          >
+            <RefreshCw size={14} className="text-blue-600" />
+          </div>
           <span>
             {refreshState === 'pull' && 'Kéo xuống để cập nhật'}
             {refreshState === 'release' && 'Thả ra để cập nhật'}
