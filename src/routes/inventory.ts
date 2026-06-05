@@ -129,10 +129,26 @@ router.post('/sync', requireAdmin, async (req: Request, res: Response): Promise<
 
 /**
  * GET /api/inventory/export
- * Xuất Excel báo cáo tồn kho hàng có áp dụng bộ lọc (Admin only)
+ * Xuất Excel báo cáo tồn kho hàng có áp dụng bộ lọc (Admin hoặc KTV)
  */
-router.get('/export', requireAdmin, async (req: Request, res: Response): Promise<void> => {
+router.get('/export', async (req: Request, res: Response): Promise<void> => {
   try {
+    const userId = req.user?.id;
+    if (!userId) {
+      res.status(401).json({ error: 'Chưa đăng nhập' });
+      return;
+    }
+
+    const userDb = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { warehouseId: true, role: true }
+    });
+
+    if (!userDb) {
+      res.status(401).json({ error: 'Người dùng không hợp lệ' });
+      return;
+    }
+
     const { 
       search, 
       categories, 
@@ -184,10 +200,18 @@ router.get('/export', requireAdmin, async (req: Request, res: Response): Promise
 
     // 4. Xác định các kho hàng cần xuất cột
     let selectedWarehouseIds: string[] = [];
-    if (warehouses) {
-      selectedWarehouseIds = String(warehouses).split(',').map(s => s.trim()).filter(Boolean);
+    if (userDb.role === 'KTV') {
+      if (!userDb.warehouseId) {
+        res.status(400).json({ error: 'Tài khoản của bạn chưa được gán kho hàng trên hệ thống.' });
+        return;
+      }
+      selectedWarehouseIds = [userDb.warehouseId];
     } else {
-      selectedWarehouseIds = allWarehouses.map((w: any) => String(w.id));
+      if (warehouses) {
+        selectedWarehouseIds = String(warehouses).split(',').map(s => s.trim()).filter(Boolean);
+      } else {
+        selectedWarehouseIds = allWarehouses.map((w: any) => String(w.id));
+      }
     }
 
     const exportWarehouses = allWarehouses.filter((w: any) => selectedWarehouseIds.includes(String(w.id)));
