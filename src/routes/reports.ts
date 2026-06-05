@@ -358,7 +358,10 @@ router.get('/', async (req: Request, res: Response): Promise<void> => {
               appointmentTime: true,
               adminStatus: true,
               mainStation: { select: { name: true } },
-              techStation: { select: { name: true } }
+              techStation: { select: { name: true } },
+              pancakeCreatedAt: true,
+              rawData: true,
+              orderSource: true
             } 
           },
         },

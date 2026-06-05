@@ -1007,7 +1007,6 @@ export default function ReportList() {
                 <th style={{ padding: '12px 16px', minWidth: '80px' }}>Mã đơn</th>
                 <th style={{ padding: '12px 16px', minWidth: '150px' }}>Khách hàng</th>
                 <th style={{ padding: '12px 16px', minWidth: '220px' }}>Công việc</th>
-                <th style={{ padding: '12px 16px', minWidth: '200px' }}>Ghi chú</th>
                 <th style={{ padding: '12px 16px', minWidth: '110px' }}>Thao tác</th>
                 <th style={{ padding: '12px 16px', minWidth: '180px' }}>Trạm-KTV</th>
                 <th style={{ padding: '12px 16px', minWidth: '140px' }}>Tạo bởi - lúc</th>
@@ -1051,15 +1050,6 @@ export default function ReportList() {
                       <div className="mt-0.5"><span className="text-gray-400">Thu:</span> <span className="font-extrabold text-emerald-600">{(r.actualAmount || 0).toLocaleString('vi-VN')} đ</span></div>
                     </td>
 
-                    {/* Ghi chú */}
-                    <td style={{ padding: '12px 16px' }}>
-                      <div 
-                        className="whitespace-pre-wrap text-xs text-gray-600 max-w-[200px] max-h-[140px] overflow-y-auto leading-relaxed italic bg-yellow-50/40 p-2 rounded border border-yellow-100/70"
-                        title="Ghi chú của KTV"
-                      >
-                        {r.notes || <span className="text-gray-300 not-italic">---</span>}
-                      </div>
-                    </td>
 
                     {/* Thao tác */}
                     <td style={{ padding: '12px 16px', position: 'relative' }}>
@@ -1141,16 +1131,46 @@ export default function ReportList() {
                     </td>
 
                     {/* Tạo bởi - lúc */}
-                    <td style={{ padding: '12px 16px' }} className="text-xs leading-relaxed text-gray-600">
-                      <div className="font-bold text-gray-800">{formatDateTime(r.createdAt)}</div>
-                      <div className="mt-0.5 text-gray-400">Tạo bởi: <span className="font-semibold text-gray-700">{r.ktvUser.fullName}</span></div>
+                    <td style={{ padding: '12px 16px' }} className="text-xs leading-relaxed text-gray-600 whitespace-normal">
+                      {r.order?.pancakeCreatedAt ? (() => {
+                        const date = new Date(r.order.pancakeCreatedAt);
+                        return (
+                          <div className="font-bold text-gray-800">
+                            {date.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })} - {date.toLocaleDateString('vi-VN')}
+                          </div>
+                        );
+                      })() : <div className="text-gray-400 font-medium">-</div>}
+
+                      <div className="mt-0.5 text-gray-400 text-[10px]">
+                        Tạo bởi:{' '}
+                        {(() => {
+                          let raw = r.order?.rawData;
+                          if (typeof raw === 'string') {
+                            try {
+                              raw = JSON.parse(raw);
+                            } catch (e) {
+                              raw = null;
+                            }
+                          }
+                          const creatorName = raw?.creator?.name;
+                          if (creatorName) {
+                            return <span className="font-semibold text-gray-700">{creatorName}</span>;
+                          }
+                          const source = (r.order?.orderSource || raw?.order_sources_name || '').toLowerCase();
+                          const isEcom = source.includes('shopee') || source.includes('lazada') || source.includes('tiktok') || source.includes('tiki');
+                          if (isEcom) {
+                            return <span className="text-blue-600 bg-blue-50 px-1 py-0.2 rounded text-[10px] font-semibold">Hệ thống</span>;
+                          }
+                          return <span className="text-gray-500">-</span>;
+                        })()}
+                      </div>
                     </td>
                   </tr>
                 );
               })}
               {reports.length === 0 && (
                 <tr>
-                  <td colSpan={7} className="text-center py-8 text-gray-500">Không có dữ liệu</td>
+                  <td colSpan={6} className="text-center py-8 text-gray-500">Không có dữ liệu</td>
                 </tr>
               )}
             </tbody>
