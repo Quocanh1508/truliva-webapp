@@ -19,6 +19,12 @@ function removeAccents(str: string): string {
     .trim();
 }
 
+function formatDate(dateStr: string): string {
+  if (!dateStr) return '';
+  const [y, m, d] = dateStr.split('-');
+  return `${d}/${m}/${y}`;
+}
+
 const ROW_STATUS_OPTIONS = [
   { value: 'chờ xử lý', label: 'Chờ xử lý' },
   { value: 'đang thực hiện', label: 'Đã phân công' },
@@ -58,7 +64,9 @@ export default function OrderList() {
   const [filterCustomerPhone, setFilterCustomerPhone] = useState('');
 
   // Added filters
-  const dateType = 'createdAt';
+  const [dateType, setDateType] = useState<string>('createdAt');
+  const [ktvSearch, setKtvSearch] = useState('');
+  const [techStationSearch, setTechStationSearch] = useState('');
   const [filterServiceTypes, setFilterServiceTypes] = useState<string[]>([]);
   const [filterProductCategories, setFilterProductCategories] = useState<string[]>([]);
   const [filterProductNames, setFilterProductNames] = useState<string[]>([]);
@@ -66,7 +74,7 @@ export default function OrderList() {
   const [filterProvinces, setFilterProvinces] = useState<string[]>([]);
 
   // Dropdown / Popover states
-  const [activeDropdown, setActiveDropdown] = useState<'main' | 'pancakeOrderId' | 'adminStatuses' | 'ktvIds' | 'workTypes' | 'mainStationIds' | 'customerName' | 'customerPhone' | 'serviceTypes' | 'productCategories' | 'productNames' | 'techStationIds' | 'provinces' | null>(null);
+  const [activeDropdown, setActiveDropdown] = useState<'main' | 'pancakeOrderId' | 'adminStatuses' | 'ktvIds' | 'workTypes' | 'mainStationIds' | 'customerName' | 'customerPhone' | 'serviceTypes' | 'productCategories' | 'productNames' | 'techStationIds' | 'provinces' | 'appointmentTimeFilter' | 'completedTimeFilter' | 'createdTimeFilter' | 'updatedTimeFilter' | null>(null);
 
   // Temporary filter states for the popover/modal
   const [tempPancakeOrderId, setTempPancakeOrderId] = useState('');
@@ -228,6 +236,11 @@ export default function OrderList() {
       setKtvs([]);
     }
   }, [selectedTech, assignModal?.orderId]);
+
+  useEffect(() => {
+    setKtvSearch('');
+    setTechStationSearch('');
+  }, [activeDropdown]);
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
@@ -546,7 +559,7 @@ export default function OrderList() {
       alert(err.message);
     }
   };
-  const toggleDropdown = (type: 'main' | 'pancakeOrderId' | 'adminStatuses' | 'ktvIds' | 'workTypes' | 'mainStationIds' | 'customerName' | 'customerPhone' | 'serviceTypes' | 'productCategories' | 'productNames' | 'techStationIds' | 'provinces') => {
+  const toggleDropdown = (type: 'main' | 'pancakeOrderId' | 'adminStatuses' | 'ktvIds' | 'workTypes' | 'mainStationIds' | 'customerName' | 'customerPhone' | 'serviceTypes' | 'productCategories' | 'productNames' | 'techStationIds' | 'provinces' | 'appointmentTimeFilter' | 'completedTimeFilter' | 'createdTimeFilter' | 'updatedTimeFilter') => {
     if (activeDropdown === type) {
       setActiveDropdown(null);
     } else {
@@ -600,6 +613,7 @@ export default function OrderList() {
     setFilterProvinces([]);
     setCustomStartDate('');
     setCustomEndDate('');
+    setDateType('createdAt');
   };
 
   const openAuditModal = async (orderId: string) => {
@@ -750,11 +764,10 @@ export default function OrderList() {
 
               {/* Popover Card */}
               {activeDropdown && (
-                <div className="absolute right-0 mt-2 bg-white border rounded-lg shadow-xl z-50 overflow-hidden text-left min-w-[220px]">
+                <div className="absolute right-0 mt-2 bg-white border rounded-lg shadow-xl z-50 text-left min-w-[240px]">
                   {activeDropdown === 'main' && (
-                    <div className="w-56 py-1 text-sm text-gray-700 max-h-96 overflow-y-auto">
+                    <div className="w-60 py-1 text-sm text-gray-700 max-h-96 overflow-y-auto">
                       <div className="px-3 py-2 text-xs font-semibold text-gray-400 border-b uppercase">Thêm điều kiện lọc</div>
-                      <button className="w-full text-left px-4 py-2 hover:bg-gray-100" onClick={() => toggleDropdown('pancakeOrderId')}>Mã đơn hàng</button>
                       <button className="w-full text-left px-4 py-2 hover:bg-gray-100" onClick={() => toggleDropdown('adminStatuses')}>Trạng thái đơn</button>
                       <button className="w-full text-left px-4 py-2 hover:bg-gray-100" onClick={() => toggleDropdown('workTypes')}>Loại công việc</button>
                       <button className="w-full text-left px-4 py-2 hover:bg-gray-100" onClick={() => toggleDropdown('serviceTypes')}>Loại dịch vụ</button>
@@ -764,25 +777,11 @@ export default function OrderList() {
                       <button className="w-full text-left px-4 py-2 hover:bg-gray-100" onClick={() => toggleDropdown('techStationIds')}>Trạm kỹ thuật</button>
                       <button className="w-full text-left px-4 py-2 hover:bg-gray-100" onClick={() => toggleDropdown('ktvIds')}>Kỹ thuật viên</button>
                       <button className="w-full text-left px-4 py-2 hover:bg-gray-100" onClick={() => toggleDropdown('provinces')}>Tỉnh/Thành phố</button>
-                      <button className="w-full text-left px-4 py-2 hover:bg-gray-100" onClick={() => toggleDropdown('customerName')}>Tên khách hàng</button>
-                      <button className="w-full text-left px-4 py-2 hover:bg-gray-100" onClick={() => toggleDropdown('customerPhone')}>Số điện thoại</button>
-                    </div>
-                  )}
-
-                  {activeDropdown === 'pancakeOrderId' && (
-                    <div className="p-4 w-72 space-y-3">
-                      <h4 className="font-semibold text-[14px] text-gray-800">Lọc theo Mã đơn hàng</h4>
-                      <input
-                        type="text"
-                        className="w-full border rounded p-2 text-sm outline-none focus:border-blue-500 text-gray-800 bg-white"
-                        placeholder="Nhập mã đơn Pancake..."
-                        value={tempPancakeOrderId}
-                        onChange={e => setTempPancakeOrderId(e.target.value)}
-                      />
-                      <div className="flex justify-between mt-2 pt-2 border-t">
-                        <button className="text-gray-500 text-xs px-2 py-1 hover:bg-gray-100 rounded" onClick={() => setActiveDropdown('main')}>Quay lại</button>
-                        <button className="bg-blue-600 text-white text-xs px-3 py-1 rounded hover:bg-blue-700 font-semibold" onClick={() => applyFilter('pancakeOrderId')}>Áp dụng</button>
-                      </div>
+                      <div className="h-px bg-gray-200 my-1"></div>
+                      <button className="w-full text-left px-4 py-2 hover:bg-gray-100 text-blue-600 font-medium" onClick={() => toggleDropdown('appointmentTimeFilter')}>📅 Hẹn khách</button>
+                      <button className="w-full text-left px-4 py-2 hover:bg-gray-100 text-blue-600 font-medium" onClick={() => toggleDropdown('completedTimeFilter')}>📅 Hoàn thành</button>
+                      <button className="w-full text-left px-4 py-2 hover:bg-gray-100 text-blue-600 font-medium" onClick={() => toggleDropdown('createdTimeFilter')}>📅 Ngày tạo</button>
+                      <button className="w-full text-left px-4 py-2 hover:bg-gray-100 text-blue-600 font-medium" onClick={() => toggleDropdown('updatedTimeFilter')}>📅 Cập nhật</button>
                     </div>
                   )}
 
@@ -818,6 +817,13 @@ export default function OrderList() {
                   {activeDropdown === 'ktvIds' && (
                     <div className="p-4 w-72 space-y-3">
                       <h4 className="font-semibold text-[14px] text-gray-800">Lọc theo Kỹ thuật viên</h4>
+                      <input
+                        type="text"
+                        placeholder="Tìm KTV..."
+                        className="w-full px-2.5 py-1.5 text-xs border border-gray-300 rounded-md outline-none focus:border-blue-500 bg-white text-gray-800"
+                        value={ktvSearch}
+                        onChange={(e) => setKtvSearch(e.target.value)}
+                      />
                       <div className="space-y-2 max-h-48 overflow-y-auto">
                         <label className="flex items-center space-x-2 text-sm font-medium cursor-pointer text-amber-600 border-b pb-1.5 mb-1.5">
                           <input
@@ -834,27 +840,105 @@ export default function OrderList() {
                           />
                           <span>Chưa gán KTV (Trống)</span>
                         </label>
-                        {allKtvs.map(k => (
-                          <label key={k.id} className="flex items-center space-x-2 text-sm text-gray-700 cursor-pointer">
-                            <input
-                              type="checkbox"
-                              className="rounded text-blue-600 focus:ring-blue-500"
-                              checked={tempKtvIds.includes(k.id)}
-                              onChange={e => {
-                                if (e.target.checked) {
-                                  setTempKtvIds([...tempKtvIds, k.id]);
-                                } else {
-                                  setTempKtvIds(tempKtvIds.filter(v => v !== k.id));
-                                }
-                              }}
-                            />
-                            <span>{k.fullName}</span>
-                          </label>
-                        ))}
+                        {allKtvs
+                          .filter(k => removeAccents(k.fullName).includes(removeAccents(ktvSearch)))
+                          .map(k => (
+                            <label key={k.id} className="flex items-center space-x-2 text-sm text-gray-700 cursor-pointer">
+                              <input
+                                type="checkbox"
+                                className="rounded text-blue-600 focus:ring-blue-500"
+                                checked={tempKtvIds.includes(k.id)}
+                                onChange={e => {
+                                  if (e.target.checked) {
+                                    setTempKtvIds([...tempKtvIds, k.id]);
+                                  } else {
+                                    setTempKtvIds(tempKtvIds.filter(v => v !== k.id));
+                                  }
+                                }}
+                              />
+                              <span>{k.fullName}</span>
+                            </label>
+                          ))}
                       </div>
                       <div className="flex justify-between mt-2 pt-2 border-t">
                         <button className="text-gray-500 text-xs px-2 py-1 hover:bg-gray-100 rounded" onClick={() => setActiveDropdown('main')}>Quay lại</button>
                         <button className="bg-blue-600 text-white text-xs px-3 py-1 rounded hover:bg-blue-700 font-semibold" onClick={() => applyFilter('ktvIds')}>Áp dụng</button>
+                      </div>
+                    </div>
+                  )}
+
+                  {activeDropdown === 'appointmentTimeFilter' && (
+                    <div className="p-4 w-[280px] space-y-3">
+                      <h4 className="font-semibold text-[14px] text-gray-800">Lọc theo Hẹn khách</h4>
+                      <DateRangePicker
+                        startDate={dateType === 'appointmentTime' ? customStartDate : ''}
+                        endDate={dateType === 'appointmentTime' ? customEndDate : ''}
+                        onChange={(start, end) => {
+                          setDateType('appointmentTime');
+                          setCustomStartDate(start);
+                          setCustomEndDate(end);
+                        }}
+                      />
+                      <div className="flex justify-between mt-2 pt-2 border-t">
+                        <button className="text-gray-500 text-xs px-2 py-1 hover:bg-gray-100 rounded" onClick={() => setActiveDropdown('main')}>Quay lại</button>
+                        <button className="bg-blue-600 text-white text-xs px-3 py-1 rounded hover:bg-blue-700 font-semibold" onClick={() => setActiveDropdown(null)}>Đóng</button>
+                      </div>
+                    </div>
+                  )}
+
+                  {activeDropdown === 'completedTimeFilter' && (
+                    <div className="p-4 w-[280px] space-y-3">
+                      <h4 className="font-semibold text-[14px] text-gray-800">Lọc theo Hoàn thành</h4>
+                      <DateRangePicker
+                        startDate={dateType === 'completedAt' ? customStartDate : ''}
+                        endDate={dateType === 'completedAt' ? customEndDate : ''}
+                        onChange={(start, end) => {
+                          setDateType('completedAt');
+                          setCustomStartDate(start);
+                          setCustomEndDate(end);
+                        }}
+                      />
+                      <div className="flex justify-between mt-2 pt-2 border-t">
+                        <button className="text-gray-500 text-xs px-2 py-1 hover:bg-gray-100 rounded" onClick={() => setActiveDropdown('main')}>Quay lại</button>
+                        <button className="bg-blue-600 text-white text-xs px-3 py-1 rounded hover:bg-blue-700 font-semibold" onClick={() => setActiveDropdown(null)}>Đóng</button>
+                      </div>
+                    </div>
+                  )}
+
+                  {activeDropdown === 'createdTimeFilter' && (
+                    <div className="p-4 w-[280px] space-y-3">
+                      <h4 className="font-semibold text-[14px] text-gray-800">Lọc theo Ngày tạo</h4>
+                      <DateRangePicker
+                        startDate={dateType === 'createdAt' ? customStartDate : ''}
+                        endDate={dateType === 'createdAt' ? customEndDate : ''}
+                        onChange={(start, end) => {
+                          setDateType('createdAt');
+                          setCustomStartDate(start);
+                          setCustomEndDate(end);
+                        }}
+                      />
+                      <div className="flex justify-between mt-2 pt-2 border-t">
+                        <button className="text-gray-500 text-xs px-2 py-1 hover:bg-gray-100 rounded" onClick={() => setActiveDropdown('main')}>Quay lại</button>
+                        <button className="bg-blue-600 text-white text-xs px-3 py-1 rounded hover:bg-blue-700 font-semibold" onClick={() => setActiveDropdown(null)}>Đóng</button>
+                      </div>
+                    </div>
+                  )}
+
+                  {activeDropdown === 'updatedTimeFilter' && (
+                    <div className="p-4 w-[280px] space-y-3">
+                      <h4 className="font-semibold text-[14px] text-gray-800">Lọc theo Cập nhật</h4>
+                      <DateRangePicker
+                        startDate={dateType === 'updatedAt' ? customStartDate : ''}
+                        endDate={dateType === 'updatedAt' ? customEndDate : ''}
+                        onChange={(start, end) => {
+                          setDateType('updatedAt');
+                          setCustomStartDate(start);
+                          setCustomEndDate(end);
+                        }}
+                      />
+                      <div className="flex justify-between mt-2 pt-2 border-t">
+                        <button className="text-gray-500 text-xs px-2 py-1 hover:bg-gray-100 rounded" onClick={() => setActiveDropdown('main')}>Quay lại</button>
+                        <button className="bg-blue-600 text-white text-xs px-3 py-1 rounded hover:bg-blue-700 font-semibold" onClick={() => setActiveDropdown(null)}>Đóng</button>
                       </div>
                     </div>
                   )}
@@ -947,39 +1031,7 @@ export default function OrderList() {
                     </div>
                   )}
 
-                  {activeDropdown === 'customerName' && (
-                    <div className="p-4 w-72 space-y-3">
-                      <h4 className="font-semibold text-[14px] text-gray-800">Lọc theo Tên khách hàng</h4>
-                      <input
-                        type="text"
-                        className="w-full border rounded p-2 text-sm outline-none focus:border-blue-500 text-gray-800 bg-white"
-                        placeholder="Nhập tên khách..."
-                        value={tempCustomerName}
-                        onChange={e => setTempCustomerName(e.target.value)}
-                      />
-                      <div className="flex justify-between mt-2 pt-2 border-t">
-                        <button className="text-gray-500 text-xs px-2 py-1 hover:bg-gray-100 rounded" onClick={() => setActiveDropdown('main')}>Quay lại</button>
-                        <button className="bg-blue-600 text-white text-xs px-3 py-1 rounded hover:bg-blue-700 font-semibold" onClick={() => applyFilter('customerName')}>Áp dụng</button>
-                      </div>
-                    </div>
-                  )}
-
-                  {activeDropdown === 'customerPhone' && (
-                    <div className="p-4 w-72 space-y-3">
-                      <h4 className="font-semibold text-[14px] text-gray-800">Lọc theo Số điện thoại</h4>
-                      <input
-                        type="text"
-                        className="w-full border rounded p-2 text-sm outline-none focus:border-blue-500 text-gray-800 bg-white"
-                        placeholder="Nhập SĐT..."
-                        value={tempCustomerPhone}
-                        onChange={e => setTempCustomerPhone(e.target.value)}
-                      />
-                      <div className="flex justify-between mt-2 pt-2 border-t">
-                        <button className="text-gray-500 text-xs px-2 py-1 hover:bg-gray-100 rounded" onClick={() => setActiveDropdown('main')}>Quay lại</button>
-                        <button className="bg-blue-600 text-white text-xs px-3 py-1 rounded hover:bg-blue-700 font-semibold" onClick={() => applyFilter('customerPhone')}>Áp dụng</button>
-                      </div>
-                    </div>
-                  )}
+                  // Customer filters removed from popover (now handled via the main search bar)
 
                   {activeDropdown === 'serviceTypes' && (
                     <div className="p-4 w-72 space-y-3">
@@ -1071,24 +1123,33 @@ export default function OrderList() {
                   {activeDropdown === 'techStationIds' && (
                     <div className="p-4 w-72 space-y-3">
                       <h4 className="font-semibold text-[14px] text-gray-800">Lọc theo Trạm kỹ thuật</h4>
+                      <input
+                        type="text"
+                        placeholder="Tìm trạm kỹ thuật..."
+                        className="w-full px-2.5 py-1.5 text-xs border border-gray-300 rounded-md outline-none focus:border-blue-500 bg-white text-gray-800"
+                        value={techStationSearch}
+                        onChange={(e) => setTechStationSearch(e.target.value)}
+                      />
                       <div className="space-y-2 max-h-48 overflow-y-auto">
-                        {dbFilterOptions.techStations.map(station => (
-                          <label key={station.id} className="flex items-center space-x-2 text-sm text-gray-700 cursor-pointer">
-                            <input
-                              type="checkbox"
-                              className="rounded text-blue-600 focus:ring-blue-500"
-                              checked={tempTechStationIds.includes(station.id)}
-                              onChange={e => {
-                                if (e.target.checked) {
-                                  setTempTechStationIds([...tempTechStationIds, station.id]);
-                                } else {
-                                  setTempTechStationIds(tempTechStationIds.filter(v => v !== station.id));
-                                }
-                              }}
-                            />
-                            <span>{station.name}</span>
-                          </label>
-                        ))}
+                        {dbFilterOptions.techStations
+                          .filter(station => removeAccents(station.name).includes(removeAccents(techStationSearch)))
+                          .map(station => (
+                            <label key={station.id} className="flex items-center space-x-2 text-sm text-gray-700 cursor-pointer">
+                              <input
+                                type="checkbox"
+                                className="rounded text-blue-600 focus:ring-blue-500"
+                                checked={tempTechStationIds.includes(station.id)}
+                                onChange={e => {
+                                  if (e.target.checked) {
+                                    setTempTechStationIds([...tempTechStationIds, station.id]);
+                                  } else {
+                                    setTempTechStationIds(tempTechStationIds.filter(v => v !== station.id));
+                                  }
+                                }}
+                              />
+                              <span>{station.name}</span>
+                            </label>
+                          ))}
                       </div>
                       <div className="flex justify-between mt-2 pt-2 border-t">
                         <button className="text-gray-500 text-xs px-2 py-1 hover:bg-gray-100 rounded" onClick={() => setActiveDropdown('main')}>Quay lại</button>
@@ -1130,16 +1191,6 @@ export default function OrderList() {
               )}
             </div>
 
-            <DateRangePicker
-              startDate={customStartDate}
-              endDate={customEndDate}
-              onChange={(start, end) => {
-                setCustomStartDate(start);
-                setCustomEndDate(end);
-                setPage(1);
-              }}
-            />
-
             <select
               className="px-3 py-2 text-[13px] border border-gray-300 rounded-md bg-white text-gray-700 outline-none font-medium"
               value={`${sortBy}-${sortOrder}`}
@@ -1161,9 +1212,22 @@ export default function OrderList() {
         </div>
 
         {/* Selected Filter Badges / Tags row */}
-        {(filterPancakeOrderId || filterAdminStatuses.length > 0 || filterKtvIds.length > 0 || filterWorkTypes.length > 0 || filterMainStationIds.length > 0 || filterCustomerName || filterCustomerPhone || filterServiceTypes.length > 0 || filterProductCategories.length > 0 || filterProductNames.length > 0 || filterTechStationIds.length > 0 || filterProvinces.length > 0) && (
+        {(filterPancakeOrderId || filterAdminStatuses.length > 0 || filterKtvIds.length > 0 || filterWorkTypes.length > 0 || filterMainStationIds.length > 0 || filterCustomerName || filterCustomerPhone || filterServiceTypes.length > 0 || filterProductCategories.length > 0 || filterProductNames.length > 0 || filterTechStationIds.length > 0 || filterProvinces.length > 0 || customStartDate || customEndDate) && (
           <div className="flex flex-wrap items-center gap-2 px-4 pb-3">
             <span className="text-xs font-semibold text-gray-500 uppercase">Đang lọc:</span>
+
+            {(customStartDate || customEndDate) && (
+              <span className="inline-flex items-center bg-gray-100 text-gray-800 text-xs font-medium px-2.5 py-1 rounded-md border border-gray-200">
+                {dateType === 'createdAt' && 'Ngày tạo'}
+                {dateType === 'appointmentTime' && 'Hẹn khách'}
+                {dateType === 'completedAt' && 'Hoàn thành'}
+                {dateType === 'updatedAt' && 'Cập nhật'}
+                : {formatDate(customStartDate)} - {formatDate(customEndDate)}
+                <button type="button" className="ml-1.5 text-gray-400 hover:text-gray-600 outline-none p-0.5 rounded-full hover:bg-gray-200" onClick={() => { setCustomStartDate(''); setCustomEndDate(''); setPage(1); }}>
+                  <XCircle size={14} className="fill-gray-200 hover:fill-gray-300 text-gray-500" />
+                </button>
+              </span>
+            )}
 
             {filterPancakeOrderId && (
               <span className="inline-flex items-center bg-gray-100 text-gray-800 text-xs font-medium px-2.5 py-1 rounded-md border border-gray-200">
