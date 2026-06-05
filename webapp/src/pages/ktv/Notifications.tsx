@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { getNotifications, markNotificationRead, markAllNotificationsRead } from '../../api/client';
 import { Bell, Check, Clock, Eye } from 'lucide-react';
+import PullToRefresh from '../../components/PullToRefresh';
 
 export default function Notifications() {
   const [notifications, setNotifications] = useState<any[]>([]);
@@ -11,16 +12,16 @@ export default function Notifications() {
     loadNotifications();
   }, []);
 
-  const loadNotifications = async () => {
+  const loadNotifications = async (silent = false) => {
     try {
-      setLoading(true);
+      if (!silent) setLoading(true);
       const data = await getNotifications();
       setNotifications(data.notifications);
       setUnreadCount(data.unreadCount);
     } catch (e) {
       console.error('Lỗi tải thông báo', e);
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   };
 
@@ -58,7 +59,8 @@ export default function Notifications() {
   }
 
   return (
-    <div className="animate-fade-in max-w-2xl mx-auto text-left">
+    <PullToRefresh onRefresh={() => loadNotifications(true)}>
+      <div className="animate-fade-in max-w-2xl mx-auto text-left">
       <div className="flex justify-between items-center mb-6">
         <div>
           <h2 className="font-bold text-2xl text-[#1B3A6B] flex items-center gap-2">
@@ -144,5 +146,6 @@ export default function Notifications() {
         </div>
       )}
     </div>
+    </PullToRefresh>
   );
 }

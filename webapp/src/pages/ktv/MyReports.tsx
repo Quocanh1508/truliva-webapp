@@ -14,6 +14,7 @@ import {
   FileText,
   BarChart3
 } from 'lucide-react';
+import PullToRefresh from '../../components/PullToRefresh';
 
 const getFirstDayOfMonth = () => {
   const now = new Date();
@@ -75,6 +76,14 @@ export default function MyReports() {
       loadStats();
     }
   }, [activeTab, startDate, endDate]);
+
+  const handleRefresh = async () => {
+    if (activeTab === 'list') {
+      await loadReports();
+    } else {
+      await loadStats();
+    }
+  };
 
   const toggleExpand = (id: string) => {
     setExpandedReports(prev => ({
@@ -188,10 +197,11 @@ export default function MyReports() {
   if (loading) return <div className="text-center py-10"><span className="spinner border-t-[#1B3A6B]"></span></div>;
 
   return (
-    <div className="animate-fade-in max-w-2xl mx-auto px-4 pb-10">
-      <h2 className="font-bold text-2xl mb-6 text-[#1B3A6B] flex items-center gap-2">
-        <FileText className="w-6 h-6" /> Báo cáo công việc
-      </h2>
+    <PullToRefresh onRefresh={handleRefresh}>
+      <div className="animate-fade-in max-w-2xl mx-auto px-4 pb-10">
+        <h2 className="font-bold text-2xl mb-6 text-[#1B3A6B] flex items-center gap-2">
+          <FileText className="w-6 h-6" /> Báo cáo công việc
+        </h2>
 
       {/* Tabs */}
       <div className="flex bg-gray-100 p-1.5 rounded-xl mb-6 shadow-inner">
@@ -825,5 +835,6 @@ export default function MyReports() {
         </div>
       )}
     </div>
+    </PullToRefresh>
   );
 }
