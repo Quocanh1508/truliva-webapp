@@ -206,10 +206,8 @@ export default function ReportForm() {
     return Array.from(new Set(options));
   };
 
-  const getProductOptions = (): string[] => {
-    const optionsSet = new Set<string>();
-    
-    // 1. Sản phẩm từ đơn hàng gốc
+  const getSuggestedProducts = (): string[] => {
+    const suggestions = new Set<string>();
     if (selectedOrderId) {
       const order = orders.find(o => o.id === selectedOrderId);
       if (order?.items) {
@@ -218,16 +216,17 @@ export default function ReportForm() {
             || item.variationInfo?.name
             || (item.sku ? `Sản phẩm (${item.sku})` : 'Sản phẩm không tên');
           const qty = item.quantity || 1;
-          optionsSet.add(`${name} x${qty}`);
-          optionsSet.add(name);
+          suggestions.add(`${name} x${qty}`);
+          suggestions.add(name);
         });
       }
     }
-    
-    // 2. Danh mục sản phẩm active trong DB
-    catalogProducts.forEach(p => optionsSet.add(p));
-    
-    return Array.from(optionsSet);
+    return Array.from(suggestions);
+  };
+
+  const getCatalogProductsOnly = (): string[] => {
+    const suggestions = new Set(getSuggestedProducts());
+    return catalogProducts.filter(p => !suggestions.has(p));
   };
 
   // Định dạng hiển thị Số Serial dạng: XXXX XXX XXX XXXXX
@@ -604,7 +603,7 @@ export default function ReportForm() {
                 fontSize: '13px'
               }}>
                 <div style={{ gridColumn: 'span 2', borderBottom: '1px solid #e2e8f0', paddingBottom: '8px', marginBottom: '4px', fontWeight: 700, color: '#1e293b' }}>
-                  📋 Thông tin khách hàng & công việc
+                  📋 Thông tin khách hàng
                 </div>
                 
                 <div>
@@ -616,44 +615,6 @@ export default function ReportForm() {
                   <span style={{ color: '#64748b', display: 'block', fontSize: '11px', textTransform: 'uppercase', fontWeight: 600 }}>Số điện thoại</span>
                   <strong style={{ color: '#0f172a' }}>{customerPhone || 'N/A'}</strong>
                 </div>
-
-                <div style={{ gridColumn: 'span 2' }}>
-                  <span style={{ color: '#64748b', display: 'block', fontSize: '11px', textTransform: 'uppercase', fontWeight: 600 }}>Địa chỉ</span>
-                  <strong style={{ color: '#0f172a' }}>{address || 'N/A'} {province ? `(${province})` : ''}</strong>
-                </div>
-
-                <div>
-                  <span style={{ color: '#64748b', display: 'block', fontSize: '11px', textTransform: 'uppercase', fontWeight: 600 }}>Loại công việc</span>
-                  <div>
-                    <span style={{
-                      display: 'inline-block',
-                      padding: '2px 8px',
-                      borderRadius: '6px',
-                      fontSize: '11px',
-                      fontWeight: 700,
-                      backgroundColor: '#eff6ff',
-                      color: '#2563eb',
-                      marginTop: '2px'
-                    }}>{workType || 'N/A'}</span>
-                  </div>
-                </div>
-
-                <div>
-                  <span style={{ color: '#64748b', display: 'block', fontSize: '11px', textTransform: 'uppercase', fontWeight: 600 }}>Dịch vụ</span>
-                  <strong style={{ color: '#0f172a' }}>{selectedServices.join(', ') || 'N/A'}</strong>
-                </div>
-
-                <div style={{ gridColumn: 'span 2' }}>
-                  <span style={{ color: '#64748b', display: 'block', fontSize: '11px', textTransform: 'uppercase', fontWeight: 600 }}>Sản phẩm thực tế</span>
-                  <strong style={{ color: '#0f172a' }}>{selectedProducts.join(', ') || 'N/A'}</strong>
-                </div>
-
-                {actualAmount && (
-                  <div>
-                    <span style={{ color: '#64748b', display: 'block', fontSize: '11px', textTransform: 'uppercase', fontWeight: 600 }}>Tiền thu thực tế</span>
-                    <strong style={{ color: '#e11d48' }}>{Number(actualAmount).toLocaleString('vi-VN')} VNĐ</strong>
-                  </div>
-                )}
               </div>
             )}
 
@@ -664,26 +625,42 @@ export default function ReportForm() {
               <div style={{ borderTop: '1px solid #e2e8f0', margin: '20px 0', paddingTop: '16px' }}>
                 <h3 className="font-bold mb-4 text-md text-[#1B3A6B]">🛠️ Nhập thông tin kỹ thuật</h3>
 
-                {/* Dịch vụ thực tế - Multi-select */}
+                {/* Dịch vụ thực tế - Multi-select (Tag-based) */}
                 <div className="form-group relative">
                   <label className="form-label font-semibold text-gray-700">Dịch vụ thực tế *</label>
-                  <button
-                    type="button"
-                    className="w-full min-h-[42px] px-3 py-2 bg-white border border-gray-300 rounded-lg text-left text-sm flex justify-between items-center focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
+                  <div
                     onClick={() => setShowServiceDropdown(!showServiceDropdown)}
+                    className="w-full min-h-[42px] px-3 py-2 bg-white border border-gray-300 rounded-lg text-left text-sm flex flex-wrap gap-1.5 items-center cursor-pointer focus-within:ring-2 focus-within:ring-blue-500 focus-within:border-blue-500 transition-all"
                   >
-                    <span className="text-gray-800 line-clamp-2">
-                      {selectedServices.length > 0
-                        ? selectedServices.join(', ')
-                        : '-- Chọn loại dịch vụ --'}
-                    </span>
-                    <ChevronDown size={18} className="text-gray-400 shrink-0 ml-2" />
-                  </button>
+                    {selectedServices.length > 0 ? (
+                      selectedServices.map(service => (
+                        <span
+                          key={service}
+                          className="inline-flex items-center gap-1 bg-blue-50 text-blue-700 border border-blue-200 px-2 py-0.5 rounded-md text-xs font-semibold"
+                        >
+                          {service}
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setSelectedServices(selectedServices.filter(s => s !== service));
+                            }}
+                            className="text-blue-500 hover:text-blue-800 font-bold ml-0.5 text-sm"
+                          >
+                            &times;
+                          </button>
+                        </span>
+                      ))
+                    ) : (
+                      <span className="text-gray-400 text-sm">-- Chọn loại dịch vụ --</span>
+                    )}
+                    <ChevronDown size={18} className="text-gray-400 shrink-0 ml-auto" />
+                  </div>
                   
                   {showServiceDropdown && (
                     <>
                       <div className="fixed inset-0 z-20" onClick={() => setShowServiceDropdown(false)} />
-                      <div className="absolute z-30 mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg max-h-60 overflow-y-auto p-2 flex flex-col gap-1">
+                      <div className="absolute z-35 mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg max-h-60 overflow-y-auto p-2 flex flex-col gap-1">
                         {getServiceOptions().map((service) => {
                           const isChecked = selectedServices.includes(service);
                           return (
@@ -714,26 +691,42 @@ export default function ReportForm() {
                   )}
                 </div>
 
-                {/* Danh sách sản phẩm thực tế - Multi-select */}
+                {/* Danh sách sản phẩm thực tế - Multi-select (Tag-based) */}
                 <div className="form-group relative">
                   <label className="form-label font-semibold text-gray-700">Sản phẩm thực tế *</label>
-                  <button
-                    type="button"
-                    className="w-full min-h-[42px] px-3 py-2 bg-white border border-gray-300 rounded-lg text-left text-sm flex justify-between items-center focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all"
+                  <div
                     onClick={() => setShowProductDropdown(!showProductDropdown)}
+                    className="w-full min-h-[42px] px-3 py-2 bg-white border border-gray-300 rounded-lg text-left text-sm flex flex-wrap gap-1.5 items-center cursor-pointer focus-within:ring-2 focus-within:ring-blue-500 focus-within:border-blue-500 transition-all"
                   >
-                    <span className="text-gray-800 line-clamp-2">
-                      {selectedProducts.length > 0
-                        ? selectedProducts.join(', ')
-                        : '-- Chọn danh sách sản phẩm --'}
-                    </span>
-                    <ChevronDown size={18} className="text-gray-400 shrink-0 ml-2" />
-                  </button>
+                    {selectedProducts.length > 0 ? (
+                      selectedProducts.map(prod => (
+                        <span
+                          key={prod}
+                          className="inline-flex items-center gap-1 bg-blue-50 text-blue-700 border border-blue-200 px-2 py-0.5 rounded-md text-xs font-semibold"
+                        >
+                          {prod}
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setSelectedProducts(selectedProducts.filter(p => p !== prod));
+                            }}
+                            className="text-blue-500 hover:text-blue-800 font-bold ml-0.5 text-sm"
+                          >
+                            &times;
+                          </button>
+                        </span>
+                      ))
+                    ) : (
+                      <span className="text-gray-400 text-sm">-- Chọn danh sách sản phẩm --</span>
+                    )}
+                    <ChevronDown size={18} className="text-gray-400 shrink-0 ml-auto" />
+                  </div>
                   
                   {showProductDropdown && (
                     <>
                       <div className="fixed inset-0 z-20" onClick={() => setShowProductDropdown(false)} />
-                      <div className="absolute z-30 mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg max-h-72 overflow-y-auto p-2 flex flex-col gap-1">
+                      <div className="absolute z-35 mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg max-h-72 overflow-y-auto p-2 flex flex-col gap-1.5">
                         <div className="sticky top-0 bg-white pb-2 mb-1 border-b border-gray-100 flex items-center gap-2 px-1">
                           <div className="relative w-full">
                             <span className="absolute inset-y-0 left-0 flex items-center pl-2.5 pointer-events-none text-gray-400">
@@ -758,38 +751,88 @@ export default function ReportForm() {
                           </div>
                         </div>
 
-                        {getProductOptions()
-                          .filter(p => !productSearch || p.toLowerCase().includes(productSearch.toLowerCase()))
-                          .map((prod) => {
-                            const isChecked = selectedProducts.includes(prod);
+                        {(() => {
+                          const suggestedProds = getSuggestedProducts().filter(p => !productSearch || p.toLowerCase().includes(productSearch.toLowerCase()));
+                          const catalogProdsOnly = getCatalogProductsOnly().filter(p => !productSearch || p.toLowerCase().includes(productSearch.toLowerCase()));
+                          
+                          if (suggestedProds.length === 0 && catalogProdsOnly.length === 0) {
                             return (
-                              <label
-                                key={prod}
-                                className={`flex items-center gap-2.5 px-3 py-2 rounded-md cursor-pointer select-none text-[13px] transition-colors ${
-                                  isChecked ? 'bg-blue-50/70 text-blue-900 font-medium' : 'text-gray-700 hover:bg-gray-50'
-                                }`}
-                              >
-                                <input
-                                  type="checkbox"
-                                  className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 w-4 h-4"
-                                  checked={isChecked}
-                                  onChange={() => {
-                                    if (isChecked) {
-                                      setSelectedProducts(selectedProducts.filter(p => p !== prod));
-                                    } else {
-                                      setSelectedProducts([...selectedProducts, prod]);
-                                    }
-                                  }}
-                                />
-                                <span>{prod}</span>
-                              </label>
+                              <div className="text-center py-4 text-xs text-gray-400">
+                                Không tìm thấy sản phẩm phù hợp
+                              </div>
                             );
-                          })}
-                        {getProductOptions().filter(p => !productSearch || p.toLowerCase().includes(productSearch.toLowerCase())).length === 0 && (
-                          <div className="text-center py-4 text-xs text-gray-400">
-                            Không tìm thấy sản phẩm phù hợp
-                          </div>
-                        )}
+                          }
+
+                          return (
+                            <div className="flex flex-col gap-2.5">
+                              {suggestedProds.length > 0 && (
+                                <div className="flex flex-col gap-1">
+                                  <div className="px-2.5 py-1 text-[11px] font-bold text-blue-600 bg-blue-50/50 rounded-md">
+                                    💡 Sản phẩm từ đơn hàng (Gợi ý)
+                                  </div>
+                                  {suggestedProds.map((prod) => {
+                                    const isChecked = selectedProducts.includes(prod);
+                                    return (
+                                      <label
+                                        key={`suggest-${prod}`}
+                                        className={`flex items-center gap-2.5 px-3 py-2 rounded-md cursor-pointer select-none text-[13px] transition-colors ${
+                                          isChecked ? 'bg-blue-50/70 text-blue-900 font-medium' : 'text-gray-700 hover:bg-gray-50'
+                                        }`}
+                                      >
+                                        <input
+                                          type="checkbox"
+                                          className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 w-4 h-4"
+                                          checked={isChecked}
+                                          onChange={() => {
+                                            if (isChecked) {
+                                              setSelectedProducts(selectedProducts.filter(p => p !== prod));
+                                            } else {
+                                              setSelectedProducts([...selectedProducts, prod]);
+                                            }
+                                          }}
+                                        />
+                                        <span>{prod}</span>
+                                      </label>
+                                    );
+                                  })}
+                                </div>
+                              )}
+
+                              {catalogProdsOnly.length > 0 && (
+                                <div className="flex flex-col gap-1">
+                                  <div className="px-2.5 py-1 text-[11px] font-bold text-gray-500 bg-gray-50 rounded-md">
+                                    📦 Tất cả sản phẩm
+                                  </div>
+                                  {catalogProdsOnly.map((prod) => {
+                                    const isChecked = selectedProducts.includes(prod);
+                                    return (
+                                      <label
+                                        key={`catalog-${prod}`}
+                                        className={`flex items-center gap-2.5 px-3 py-2 rounded-md cursor-pointer select-none text-[13px] transition-colors ${
+                                          isChecked ? 'bg-blue-50/70 text-blue-900 font-medium' : 'text-gray-700 hover:bg-gray-50'
+                                        }`}
+                                      >
+                                        <input
+                                          type="checkbox"
+                                          className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 w-4 h-4"
+                                          checked={isChecked}
+                                          onChange={() => {
+                                            if (isChecked) {
+                                              setSelectedProducts(selectedProducts.filter(p => p !== prod));
+                                            } else {
+                                              setSelectedProducts([...selectedProducts, prod]);
+                                            }
+                                          }}
+                                        />
+                                        <span>{prod}</span>
+                                      </label>
+                                    );
+                                  })}
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })()}
                       </div>
                     </>
                   )}

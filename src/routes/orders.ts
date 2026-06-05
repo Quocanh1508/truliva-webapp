@@ -978,7 +978,8 @@ router.patch('/:id', requireAuth, requireAdmin, async (req: Request, res: Respon
     const {
       adminStatus, appointmentTime, assignedKtvId,
       workType, serviceType, mainStationId, techStationId,
-      rescheduleReason, cancelReason, note, warehouseId
+      rescheduleReason, cancelReason, note, warehouseId,
+      items
     } = req.body;
 
     // Lấy order hiện tại để so sánh cho audit
@@ -1076,6 +1077,36 @@ router.patch('/:id', requireAuth, requireAdmin, async (req: Request, res: Respon
       if (String(val) !== String(oldOrder.appointmentTime)) {
         changes.push({ field: 'appointmentTime', from: oldOrder.appointmentTime, to: val });
       }
+    }
+
+    if (items !== undefined && Array.isArray(items)) {
+      // Xóa các items cũ
+      await prisma.orderItem.deleteMany({
+        where: { orderId: id }
+      });
+
+      // Tạo các items mới
+      if (items.length > 0) {
+        const newItemsData = items.map((item: any) => {
+          return {
+            orderId: id,
+            productName: item.productName || 'Sản phẩm',
+            sku: item.sku || null,
+            quantity: Number(item.quantity) || 1,
+            price: Number(item.price) || 0,
+            discount: Number(item.discount) || 0
+          };
+        });
+
+        await prisma.orderItem.createMany({
+          data: newItemsData
+        });
+      }
+
+      // Cập nhật totalQuantity
+      const totalQuantity = items.reduce((acc: number, curr: any) => acc + (Number(curr.quantity) || 1), 0);
+      updateData.totalQuantity = totalQuantity;
+      changes.push({ field: 'items', from: oldOrder.totalQuantity, to: totalQuantity });
     }
 
     // Thực hiện cập nhật

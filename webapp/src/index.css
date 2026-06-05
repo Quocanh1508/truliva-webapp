@@ -241,7 +241,7 @@ button {
 
 .app-main {
   flex: 1;
-  padding: 24px 16px;
+  padding: 16px 12px;
   width: 100%;
 }
 
@@ -269,7 +269,7 @@ button {
   
   .app-main {
     margin-left: 260px;
-    padding: 32px;
+    padding: 20px 24px;
     width: calc(100% - 260px);
     max-width: 1440px;
   }

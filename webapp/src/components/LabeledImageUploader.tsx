@@ -1,6 +1,8 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Camera, X, UploadCloud, Eye } from 'lucide-react';
+import { Camera, X, UploadCloud } from 'lucide-react';
 import { uploadImages, fetchApi } from '../api/client';
+import { Capacitor } from '@capacitor/core';
+import { Camera as CapCamera, CameraResultType, CameraSource } from '@capacitor/camera';
 
 interface ImageSlot {
   label: string;
@@ -23,8 +25,6 @@ export default function LabeledImageUploader({ imageSlots, workType, onUploadSuc
 
   // Ảnh mẫu tải từ server
   const [samples, setSamples] = useState<any[]>([]);
-  const [activeSampleUrl, setActiveSampleUrl] = useState<string | null>(null);
-  const [activeSampleLabel, setActiveSampleLabel] = useState<string>('');
 
   useEffect(() => {
     // Reset file/previews khi số lượng slots thay đổi
@@ -48,7 +48,7 @@ export default function LabeledImageUploader({ imageSlots, workType, onUploadSuc
       setSlotFiles(newFiles);
 
       // Revoke old preview if exists
-      if (slotPreviews[index]) {
+      if (slotPreviews[index] && slotPreviews[index]!.startsWith('blob:')) {
         URL.revokeObjectURL(slotPreviews[index]!);
       }
 
@@ -59,12 +59,53 @@ export default function LabeledImageUploader({ imageSlots, workType, onUploadSuc
     }
   };
 
+  const handleChoosePhoto = async (index: number) => {
+    if (isUploading) return;
+
+    if (Capacitor.isNativePlatform()) {
+      try {
+        const photo = await CapCamera.getPhoto({
+          quality: 90,
+          allowEditing: false,
+          resultType: CameraResultType.Uri,
+          source: CameraSource.Prompt,
+          saveToGallery: true,
+          promptLabelHeader: 'Tải ảnh báo cáo',
+          promptLabelPhoto: 'Chọn từ thư viện ảnh',
+          promptLabelPicture: 'Chụp ảnh mới'
+        });
+
+        if (photo.webPath) {
+          const response = await fetch(photo.webPath);
+          const blob = await response.blob();
+          const file = new File([blob], `photo_${index}.${photo.format || 'jpeg'}`, { type: blob.type || `image/${photo.format || 'jpeg'}` });
+
+          const newFiles = [...slotFiles];
+          newFiles[index] = file;
+          setSlotFiles(newFiles);
+
+          const newPreviews = [...slotPreviews];
+          newPreviews[index] = photo.webPath;
+          setSlotPreviews(newPreviews);
+          setError('');
+        }
+      } catch (err: any) {
+        console.error('Lỗi khi chụp/chọn ảnh Capacitor:', err);
+        if (err.message && !err.message.includes('cancelled')) {
+          setError(err.message || 'Lỗi chụp hoặc chọn ảnh');
+        }
+      }
+    } else {
+      fileInputRefs.current[index]?.click();
+    }
+  };
+
   const removeFile = (index: number) => {
     const newFiles = [...slotFiles];
     newFiles[index] = null;
     setSlotFiles(newFiles);
 
-    if (slotPreviews[index]) {
+    if (slotPreviews[index] && slotPreviews[index]!.startsWith('blob:')) {
       URL.revokeObjectURL(slotPreviews[index]!);
     }
     const newPreviews = [...slotPreviews];
@@ -130,42 +171,6 @@ export default function LabeledImageUploader({ imageSlots, workType, onUploadSuc
                   {slot.label}
                   {slot.isRequired && <span style={{ color: '#ef4444', marginLeft: '2px' }}>*</span>}
                 </span>
-                
-                {/* Xem mẫu Button */}
-                {sample && (
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setActiveSampleUrl(sample.imageUrl);
-                      setActiveSampleLabel(slot.label);
-                    }}
-                    style={{
-                      marginTop: '4px',
-                      alignSelf: 'flex-start',
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: '4px',
-                      fontSize: '10px',
-                      fontWeight: 700,
-                      color: '#2563eb',
-                      backgroundColor: '#eff6ff',
-                      border: '1px solid #bfdbfe',
-                      borderRadius: '4px',
-                      padding: '2px 6px',
-                      cursor: 'pointer',
-                      transition: 'all 0.15s ease'
-                    }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.backgroundColor = '#dbeafe';
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.backgroundColor = '#eff6ff';
-                    }}
-                  >
-                    <Eye size={10} /> Xem mẫu
-                  </button>
-                )}
               </div>
 
               {/* Upload area / Preview */}
@@ -191,7 +196,7 @@ export default function LabeledImageUploader({ imageSlots, workType, onUploadSuc
                 </div>
               ) : (
                 <div
-                  onClick={() => !isUploading && fileInputRefs.current[index]?.click()}
+                  onClick={() => handleChoosePhoto(index)}
                   style={{
                     width: '100%', paddingBottom: '100%', position: 'relative',
                     borderRadius: '10px', border: '2px dashed #cbd5e1',
@@ -287,70 +292,6 @@ export default function LabeledImageUploader({ imageSlots, workType, onUploadSuc
         </button>
       </div>
 
-      {/* Lightbox Modal */}
-      {activeSampleUrl && (
-        <div 
-          style={{
-            position: 'fixed', inset: 0, zIndex: 1000,
-            backgroundColor: 'rgba(0,0,0,0.8)',
-            display: 'flex', flexDirection: 'column',
-            alignItems: 'center', justifyContent: 'center',
-            padding: '16px'
-          }}
-          onClick={() => setActiveSampleUrl(null)}
-        >
-          <div 
-            style={{
-              position: 'relative', width: '100%', maxWidth: '450px',
-              backgroundColor: '#fff', borderRadius: '16px', overflow: 'hidden',
-              boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
-              display: 'flex', flexDirection: 'column'
-            }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            {/* Modal Header */}
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px', borderBottom: '1px solid #f1f5f9' }}>
-              <span style={{ fontWeight: 700, fontSize: '15px', color: '#1e293b' }}>
-                Ảnh mẫu chụp
-              </span>
-              <button 
-                type="button"
-                onClick={() => setActiveSampleUrl(null)}
-                style={{ background: '#f1f5f9', border: 'none', cursor: 'pointer', padding: '6px', color: '#475569', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-              >
-                <X size={16} />
-              </button>
-            </div>
-            
-            {/* Modal Title Banner */}
-            <div style={{ padding: '12px 16px', backgroundColor: '#eff6ff', borderBottom: '1px solid #dbeafe' }}>
-              <span style={{ fontSize: '13px', fontWeight: 600, color: '#1e40af' }}>
-                {activeSampleLabel}
-              </span>
-            </div>
-
-            {/* Modal Body */}
-            <div style={{ overflow: 'auto', display: 'flex', justifyContent: 'center', alignItems: 'center', padding: '16px', backgroundColor: '#f8fafc', minHeight: '300px' }}>
-              <img 
-                src={activeSampleUrl} 
-                alt="Ảnh mẫu" 
-                style={{ maxWidth: '100%', maxHeight: '45vh', objectFit: 'contain', borderRadius: '8px', border: '1px solid #e2e8f0' }} 
-              />
-            </div>
-
-            {/* Modal Footer */}
-            <div style={{ padding: '16px', textAlign: 'center', backgroundColor: '#fff', borderTop: '1px solid #f1f5f9' }}>
-              <button 
-                type="button" 
-                onClick={() => setActiveSampleUrl(null)} 
-                className="btn btn-primary text-sm w-full py-2.5"
-              >
-                Đóng
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getOrders, updateOrder, getKtvUsers, getStations, getOrderAuditLog, syncOrders, getFiltersData, fetchApi } from '../../api/client';
-import { Search, ChevronLeft, ChevronRight, History, XCircle, Filter, RefreshCw, FileText, CheckCircle2, RotateCcw, Copy, UserPlus, Download } from 'lucide-react';
+import { Search, ChevronLeft, ChevronRight, History, XCircle, Filter, RefreshCw, FileText, CheckCircle2, RotateCcw, Copy, UserPlus, Download, Wrench, Settings, FolderOpen, Package, Building2, MapPin, Users, Calendar } from 'lucide-react';
 import { WARRANTY_SERVICE_GROUPS, REPAIR_SERVICE_GROUPS, WORK_TYPE_SERVICES } from '../../utils/workTypes';
 import { useConfirm } from '../../context/ConfirmContext';
 import DateRangePicker from '../../components/DateRangePicker';
@@ -136,6 +136,14 @@ export default function OrderList() {
   const [productsStock, setProductsStock] = useState<any[]>([]);
   const [selectedWarehouseId, setSelectedWarehouseId] = useState<string>('');
   const [loadingInventory, setLoadingInventory] = useState<boolean>(false);
+  const [warehouseSearch, setWarehouseSearch] = useState('');
+  const [showWarehouseDropdown, setShowWarehouseDropdown] = useState(false);
+  const [tempItems, setTempItems] = useState<any[]>([]);
+
+  useEffect(() => {
+    const selectedWh = warehouses.find(w => w.id === selectedWarehouseId);
+    setWarehouseSearch(selectedWh ? selectedWh.name : '');
+  }, [selectedWarehouseId, warehouses]);
 
   // Smart Dispatching Suggestions
   const [suggestedMain, setSuggestedMain] = useState<any>(null);
@@ -492,6 +500,14 @@ export default function OrderList() {
         setLoadingInventory(false);
       });
 
+    setTempItems(order.items ? order.items.map((it: any) => ({
+      productName: it.productName || it.rawData?.variation_info?.name || it.rawData?.name || 'Sản phẩm',
+      sku: it.sku || it.rawData?.sku || '',
+      quantity: it.quantity || 1,
+      price: it.price || 0,
+      discount: it.discount || 0
+    })) : []);
+
     setAssignModal({ isOpen: true, orderId: order.id, order });
   };
 
@@ -551,7 +567,8 @@ export default function OrderList() {
         workType: workType || null,
         serviceType: serviceType || null,
         adminStatus: selectedKtv ? 'đang thực hiện' : 'chờ xử lý', // auto update status
-        warehouseId: selectedWarehouseId || null
+        warehouseId: selectedWarehouseId || null,
+        items: tempItems
       });
       setAssignModal(null);
       fetchOrdersData();
@@ -702,7 +719,7 @@ export default function OrderList() {
   })();
 
   return (
-    <div className="flex flex-col bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden h-[calc(100vh-120px)] font-sans">
+    <div className="flex flex-col bg-white rounded-lg shadow-sm border border-gray-200 font-sans">
 
       {/* Top Tabs */}
       <div className="flex justify-between border-b border-gray-200 bg-gray-50 px-4 pt-1">
@@ -768,20 +785,59 @@ export default function OrderList() {
                   {activeDropdown === 'main' && (
                     <div className="w-60 py-1 text-sm text-gray-700 max-h-96 overflow-y-auto">
                       <div className="px-3 py-2 text-xs font-semibold text-gray-400 border-b uppercase">Thêm điều kiện lọc</div>
-                      <button className="w-full text-left px-4 py-2 hover:bg-gray-100" onClick={() => toggleDropdown('adminStatuses')}>Trạng thái đơn</button>
-                      <button className="w-full text-left px-4 py-2 hover:bg-gray-100" onClick={() => toggleDropdown('workTypes')}>Loại công việc</button>
-                      <button className="w-full text-left px-4 py-2 hover:bg-gray-100" onClick={() => toggleDropdown('serviceTypes')}>Loại dịch vụ</button>
-                      <button className="w-full text-left px-4 py-2 hover:bg-gray-100" onClick={() => toggleDropdown('productCategories')}>Danh mục sản phẩm</button>
-                      <button className="w-full text-left px-4 py-2 hover:bg-gray-100" onClick={() => toggleDropdown('productNames')}>Sản phẩm</button>
-                      <button className="w-full text-left px-4 py-2 hover:bg-gray-100" onClick={() => toggleDropdown('mainStationIds')}>Trạm chính</button>
-                      <button className="w-full text-left px-4 py-2 hover:bg-gray-100" onClick={() => toggleDropdown('techStationIds')}>Trạm kỹ thuật</button>
-                      <button className="w-full text-left px-4 py-2 hover:bg-gray-100" onClick={() => toggleDropdown('ktvIds')}>Kỹ thuật viên</button>
-                      <button className="w-full text-left px-4 py-2 hover:bg-gray-100" onClick={() => toggleDropdown('provinces')}>Tỉnh/Thành phố</button>
+                      <button className="w-full flex items-center space-x-2.5 px-4 py-2 hover:bg-gray-50 text-indigo-700 font-medium transition-colors text-[13px]" onClick={() => toggleDropdown('adminStatuses')}>
+                        <CheckCircle2 size={15} className="text-indigo-500" />
+                        <span>Trạng thái đơn</span>
+                      </button>
+                      <button className="w-full flex items-center space-x-2.5 px-4 py-2 hover:bg-gray-50 text-amber-700 font-medium transition-colors text-[13px]" onClick={() => toggleDropdown('workTypes')}>
+                        <Wrench size={15} className="text-amber-500" />
+                        <span>Loại công việc</span>
+                      </button>
+                      <button className="w-full flex items-center space-x-2.5 px-4 py-2 hover:bg-gray-50 text-teal-700 font-medium transition-colors text-[13px]" onClick={() => toggleDropdown('serviceTypes')}>
+                        <Settings size={15} className="text-teal-500" />
+                        <span>Loại dịch vụ</span>
+                      </button>
+                      <button className="w-full flex items-center space-x-2.5 px-4 py-2 hover:bg-gray-50 text-purple-700 font-medium transition-colors text-[13px]" onClick={() => toggleDropdown('productCategories')}>
+                        <FolderOpen size={15} className="text-purple-500" />
+                        <span>Danh mục sản phẩm</span>
+                      </button>
+                      <button className="w-full flex items-center space-x-2.5 px-4 py-2 hover:bg-gray-50 text-pink-700 font-medium transition-colors text-[13px]" onClick={() => toggleDropdown('productNames')}>
+                        <Package size={15} className="text-pink-500" />
+                        <span>Sản phẩm</span>
+                      </button>
+                      <button className="w-full flex items-center space-x-2.5 px-4 py-2 hover:bg-gray-50 text-sky-700 font-medium transition-colors text-[13px]" onClick={() => toggleDropdown('mainStationIds')}>
+                        <Building2 size={15} className="text-sky-500" />
+                        <span>Trạm chính</span>
+                      </button>
+                      <button className="w-full flex items-center space-x-2.5 px-4 py-2 hover:bg-gray-50 text-cyan-700 font-medium transition-colors text-[13px]" onClick={() => toggleDropdown('techStationIds')}>
+                        <Building2 size={15} className="text-cyan-500" />
+                        <span>Trạm kỹ thuật</span>
+                      </button>
+                      <button className="w-full flex items-center space-x-2.5 px-4 py-2 hover:bg-gray-50 text-emerald-700 font-medium transition-colors text-[13px]" onClick={() => toggleDropdown('ktvIds')}>
+                        <Users size={15} className="text-emerald-500" />
+                        <span>Kỹ thuật viên</span>
+                      </button>
+                      <button className="w-full flex items-center space-x-2.5 px-4 py-2 hover:bg-gray-50 text-rose-700 font-medium transition-colors text-[13px]" onClick={() => toggleDropdown('provinces')}>
+                        <MapPin size={15} className="text-rose-500" />
+                        <span>Tỉnh/Thành phố</span>
+                      </button>
                       <div className="h-px bg-gray-200 my-1"></div>
-                      <button className="w-full text-left px-4 py-2 hover:bg-gray-100 text-blue-600 font-medium" onClick={() => toggleDropdown('appointmentTimeFilter')}>📅 Hẹn khách</button>
-                      <button className="w-full text-left px-4 py-2 hover:bg-gray-100 text-blue-600 font-medium" onClick={() => toggleDropdown('completedTimeFilter')}>📅 Hoàn thành</button>
-                      <button className="w-full text-left px-4 py-2 hover:bg-gray-100 text-blue-600 font-medium" onClick={() => toggleDropdown('createdTimeFilter')}>📅 Ngày tạo</button>
-                      <button className="w-full text-left px-4 py-2 hover:bg-gray-100 text-blue-600 font-medium" onClick={() => toggleDropdown('updatedTimeFilter')}>📅 Cập nhật</button>
+                      <button className="w-full flex items-center space-x-2.5 px-4 py-2 hover:bg-gray-50 text-blue-700 font-medium transition-colors text-[13px]" onClick={() => toggleDropdown('appointmentTimeFilter')}>
+                        <Calendar size={15} className="text-blue-500" />
+                        <span>Hẹn khách</span>
+                      </button>
+                      <button className="w-full flex items-center space-x-2.5 px-4 py-2 hover:bg-gray-50 text-blue-700 font-medium transition-colors text-[13px]" onClick={() => toggleDropdown('completedTimeFilter')}>
+                        <Calendar size={15} className="text-blue-500" />
+                        <span>Hoàn thành</span>
+                      </button>
+                      <button className="w-full flex items-center space-x-2.5 px-4 py-2 hover:bg-gray-50 text-blue-700 font-medium transition-colors text-[13px]" onClick={() => toggleDropdown('createdTimeFilter')}>
+                        <Calendar size={15} className="text-blue-500" />
+                        <span>Ngày tạo</span>
+                      </button>
+                      <button className="w-full flex items-center space-x-2.5 px-4 py-2 hover:bg-gray-50 text-blue-700 font-medium transition-colors text-[13px]" onClick={() => toggleDropdown('updatedTimeFilter')}>
+                        <Calendar size={15} className="text-blue-500" />
+                        <span>Cập nhật</span>
+                      </button>
                     </div>
                   )}
 
@@ -879,6 +935,39 @@ export default function OrderList() {
                           setCustomEndDate(end);
                         }}
                       />
+                      <div className="space-y-1.5 pt-1 border-t">
+                        <span className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider">Thứ tự sắp xếp</span>
+                        <div className="flex space-x-2">
+                          <button
+                            className={`flex-1 py-1.5 px-2 text-xs border rounded-md font-medium transition-colors ${
+                              sortBy === 'appointmentTime' && sortOrder === 'asc'
+                                ? 'bg-blue-50 border-blue-200 text-blue-600'
+                                : 'bg-white border-gray-200 text-gray-700 hover:bg-gray-50'
+                            }`}
+                            onClick={() => {
+                              setDateType('appointmentTime');
+                              setSortBy('appointmentTime');
+                              setSortOrder('asc');
+                            }}
+                          >
+                            Hẹn gần nhất
+                          </button>
+                          <button
+                            className={`flex-1 py-1.5 px-2 text-xs border rounded-md font-medium transition-colors ${
+                              sortBy === 'appointmentTime' && sortOrder === 'desc'
+                                ? 'bg-blue-50 border-blue-200 text-blue-600'
+                                : 'bg-white border-gray-200 text-gray-700 hover:bg-gray-50'
+                            }`}
+                            onClick={() => {
+                              setDateType('appointmentTime');
+                              setSortBy('appointmentTime');
+                              setSortOrder('desc');
+                            }}
+                          >
+                            Hẹn xa nhất
+                          </button>
+                        </div>
+                      </div>
                       <div className="flex justify-between mt-2 pt-2 border-t">
                         <button className="text-gray-500 text-xs px-2 py-1 hover:bg-gray-100 rounded" onClick={() => setActiveDropdown('main')}>Quay lại</button>
                         <button className="bg-blue-600 text-white text-xs px-3 py-1 rounded hover:bg-blue-700 font-semibold" onClick={() => setActiveDropdown(null)}>Đóng</button>
@@ -898,6 +987,39 @@ export default function OrderList() {
                           setCustomEndDate(end);
                         }}
                       />
+                      <div className="space-y-1.5 pt-1 border-t">
+                        <span className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider">Thứ tự sắp xếp</span>
+                        <div className="flex space-x-2">
+                          <button
+                            className={`flex-1 py-1.5 px-2 text-xs border rounded-md font-medium transition-colors ${
+                              sortBy === 'updatedAt' && sortOrder === 'desc'
+                                ? 'bg-blue-50 border-blue-200 text-blue-600'
+                                : 'bg-white border-gray-200 text-gray-700 hover:bg-gray-50'
+                            }`}
+                            onClick={() => {
+                              setDateType('completedAt');
+                              setSortBy('updatedAt');
+                              setSortOrder('desc');
+                            }}
+                          >
+                            Hoàn thành mới nhất
+                          </button>
+                          <button
+                            className={`flex-1 py-1.5 px-2 text-xs border rounded-md font-medium transition-colors ${
+                              sortBy === 'updatedAt' && sortOrder === 'asc'
+                                ? 'bg-blue-50 border-blue-200 text-blue-600'
+                                : 'bg-white border-gray-200 text-gray-700 hover:bg-gray-50'
+                            }`}
+                            onClick={() => {
+                              setDateType('completedAt');
+                              setSortBy('updatedAt');
+                              setSortOrder('asc');
+                            }}
+                          >
+                            Hoàn thành cũ nhất
+                          </button>
+                        </div>
+                      </div>
                       <div className="flex justify-between mt-2 pt-2 border-t">
                         <button className="text-gray-500 text-xs px-2 py-1 hover:bg-gray-100 rounded" onClick={() => setActiveDropdown('main')}>Quay lại</button>
                         <button className="bg-blue-600 text-white text-xs px-3 py-1 rounded hover:bg-blue-700 font-semibold" onClick={() => setActiveDropdown(null)}>Đóng</button>
@@ -917,6 +1039,39 @@ export default function OrderList() {
                           setCustomEndDate(end);
                         }}
                       />
+                      <div className="space-y-1.5 pt-1 border-t">
+                        <span className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider">Thứ tự sắp xếp</span>
+                        <div className="flex space-x-2">
+                          <button
+                            className={`flex-1 py-1.5 px-2 text-xs border rounded-md font-medium transition-colors ${
+                              sortBy === 'createdAt' && sortOrder === 'desc'
+                                ? 'bg-blue-50 border-blue-200 text-blue-600'
+                                : 'bg-white border-gray-200 text-gray-700 hover:bg-gray-50'
+                            }`}
+                            onClick={() => {
+                              setDateType('createdAt');
+                              setSortBy('createdAt');
+                              setSortOrder('desc');
+                            }}
+                          >
+                            Tạo mới nhất
+                          </button>
+                          <button
+                            className={`flex-1 py-1.5 px-2 text-xs border rounded-md font-medium transition-colors ${
+                              sortBy === 'createdAt' && sortOrder === 'asc'
+                                ? 'bg-blue-50 border-blue-200 text-blue-600'
+                                : 'bg-white border-gray-200 text-gray-700 hover:bg-gray-50'
+                            }`}
+                            onClick={() => {
+                              setDateType('createdAt');
+                              setSortBy('createdAt');
+                              setSortOrder('asc');
+                            }}
+                          >
+                            Tạo cũ nhất
+                          </button>
+                        </div>
+                      </div>
                       <div className="flex justify-between mt-2 pt-2 border-t">
                         <button className="text-gray-500 text-xs px-2 py-1 hover:bg-gray-100 rounded" onClick={() => setActiveDropdown('main')}>Quay lại</button>
                         <button className="bg-blue-600 text-white text-xs px-3 py-1 rounded hover:bg-blue-700 font-semibold" onClick={() => setActiveDropdown(null)}>Đóng</button>
@@ -936,6 +1091,39 @@ export default function OrderList() {
                           setCustomEndDate(end);
                         }}
                       />
+                      <div className="space-y-1.5 pt-1 border-t">
+                        <span className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider">Thứ tự sắp xếp</span>
+                        <div className="flex space-x-2">
+                          <button
+                            className={`flex-1 py-1.5 px-2 text-xs border rounded-md font-medium transition-colors ${
+                              sortBy === 'updatedAt' && sortOrder === 'desc'
+                                ? 'bg-blue-50 border-blue-200 text-blue-600'
+                                : 'bg-white border-gray-200 text-gray-700 hover:bg-gray-50'
+                            }`}
+                            onClick={() => {
+                              setDateType('updatedAt');
+                              setSortBy('updatedAt');
+                              setSortOrder('desc');
+                            }}
+                          >
+                            Cập nhật mới nhất
+                          </button>
+                          <button
+                            className={`flex-1 py-1.5 px-2 text-xs border rounded-md font-medium transition-colors ${
+                              sortBy === 'updatedAt' && sortOrder === 'asc'
+                                ? 'bg-blue-50 border-blue-200 text-blue-600'
+                                : 'bg-white border-gray-200 text-gray-700 hover:bg-gray-50'
+                            }`}
+                            onClick={() => {
+                              setDateType('updatedAt');
+                              setSortBy('updatedAt');
+                              setSortOrder('asc');
+                            }}
+                          >
+                            Cập nhật cũ nhất
+                          </button>
+                        </div>
+                      </div>
                       <div className="flex justify-between mt-2 pt-2 border-t">
                         <button className="text-gray-500 text-xs px-2 py-1 hover:bg-gray-100 rounded" onClick={() => setActiveDropdown('main')}>Quay lại</button>
                         <button className="bg-blue-600 text-white text-xs px-3 py-1 rounded hover:bg-blue-700 font-semibold" onClick={() => setActiveDropdown(null)}>Đóng</button>
@@ -1031,7 +1219,7 @@ export default function OrderList() {
                     </div>
                   )}
 
-                  // Customer filters removed from popover (now handled via the main search bar)
+                  {/* Customer filters removed from popover (now handled via the main search bar) */}
 
                   {activeDropdown === 'serviceTypes' && (
                     <div className="p-4 w-72 space-y-3">
@@ -1190,24 +1378,6 @@ export default function OrderList() {
                 </div>
               )}
             </div>
-
-            <select
-              className="px-3 py-2 text-[13px] border border-gray-300 rounded-md bg-white text-gray-700 outline-none font-medium"
-              value={`${sortBy}-${sortOrder}`}
-              onChange={(e) => {
-                const [newSortBy, newSortOrder] = e.target.value.split('-');
-                setSortBy(newSortBy);
-                setSortOrder(newSortOrder);
-                setPage(1);
-              }}
-            >
-              <option value="createdAt-desc">Ngày tạo mới nhất</option>
-              <option value="createdAt-asc">Ngày tạo cũ nhất</option>
-              <option value="updatedAt-desc">Ngày hoàn thành mới nhất</option>
-              <option value="updatedAt-asc">Ngày hoàn thành cũ nhất</option>
-              <option value="appointmentTime-asc">Thời gian hẹn khách gần nhất</option>
-              <option value="appointmentTime-desc">Thời gian hẹn khách xa nhất</option>
-            </select>
           </div>
         </div>
 
@@ -1348,46 +1518,46 @@ export default function OrderList() {
       </div>
 
       {/* Quick Stats Summary */}
-      <div className="grid grid-cols-5 gap-4 px-4 py-3 bg-gray-50 border-b border-gray-200">
-        <div className="bg-white p-3 rounded-lg border border-gray-200 shadow-sm flex flex-col">
-          <span className="text-[12px] font-semibold text-gray-500 uppercase tracking-wider">Tổng số đơn</span>
-          <span className="text-xl font-bold text-gray-900 mt-1">{stats.total}</span>
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-2.5 px-4 py-1.5 bg-gray-50 border-b border-gray-200">
+        <div className="bg-white px-3 py-1.5 rounded-lg border border-gray-200 shadow-sm flex flex-row items-center justify-between">
+          <span className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Tổng số đơn</span>
+          <span className="text-[17px] font-bold text-gray-900">{stats.total}</span>
         </div>
-        <div className="bg-white p-3 rounded-lg border border-gray-200 shadow-sm flex flex-col border-l-4 border-l-amber-500">
-          <span className="text-[12px] font-semibold text-amber-600 uppercase tracking-wider">Chờ xử lý</span>
-          <span className="text-xl font-bold text-gray-900 mt-1">{stats.pending}</span>
+        <div className="bg-white px-3 py-1.5 rounded-lg border border-gray-200 shadow-sm flex flex-row items-center justify-between border-l-4 border-l-amber-500">
+          <span className="text-[11px] font-semibold text-amber-600 uppercase tracking-wider">Chờ xử lý</span>
+          <span className="text-[17px] font-bold text-gray-900">{stats.pending}</span>
         </div>
-        <div className="bg-white p-3 rounded-lg border border-gray-200 shadow-sm flex flex-col border-l-4 border-l-blue-500">
-          <span className="text-[12px] font-semibold text-blue-600 uppercase tracking-wider">Đã phân công</span>
-          <span className="text-xl font-bold text-gray-900 mt-1">{stats.assigned}</span>
+        <div className="bg-white px-3 py-1.5 rounded-lg border border-gray-200 shadow-sm flex flex-row items-center justify-between border-l-4 border-l-blue-500">
+          <span className="text-[11px] font-semibold text-blue-600 uppercase tracking-wider">Đã phân công</span>
+          <span className="text-[17px] font-bold text-gray-900">{stats.assigned}</span>
         </div>
-        <div className="bg-white p-3 rounded-lg border border-gray-200 shadow-sm flex flex-col border-l-4 border-l-emerald-500">
-          <span className="text-[12px] font-semibold text-emerald-600 uppercase tracking-wider">Hoàn thành</span>
-          <span className="text-xl font-bold text-gray-900 mt-1">{stats.completed}</span>
+        <div className="bg-white px-3 py-1.5 rounded-lg border border-gray-200 shadow-sm flex flex-row items-center justify-between border-l-4 border-l-emerald-500">
+          <span className="text-[11px] font-semibold text-emerald-600 uppercase tracking-wider">Hoàn thành</span>
+          <span className="text-[17px] font-bold text-gray-900">{stats.completed}</span>
         </div>
-        <div className="bg-white p-3 rounded-lg border border-gray-200 shadow-sm flex flex-col border-l-4 border-l-red-500">
-          <span className="text-[12px] font-semibold text-red-600 uppercase tracking-wider">Hủy đơn</span>
-          <span className="text-xl font-bold text-gray-900 mt-1">{stats.cancelled}</span>
+        <div className="bg-white px-3 py-1.5 rounded-lg border border-gray-200 shadow-sm flex flex-row items-center justify-between border-l-4 border-l-red-500">
+          <span className="text-[11px] font-semibold text-red-600 uppercase tracking-wider">Hủy đơn</span>
+          <span className="text-[17px] font-bold text-gray-900">{stats.cancelled}</span>
         </div>
       </div>
 
       {/* Table Area */}
-      <div className="flex-1 overflow-auto bg-white">
+      <div className="flex-1 bg-white">
         {loading ? (
           <div className="flex justify-center py-12"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div></div>
         ) : orders.length === 0 ? (
           <div className="text-center py-12 text-gray-400">Không tìm thấy yêu cầu nào</div>
         ) : (
           <table className="w-full text-left text-[13px]">
-            <thead className="sticky top-0 bg-[#f8f9fa] text-gray-600 font-semibold border-b border-gray-200 z-10">
+            <thead className="sticky top-[64px] lg:top-0 bg-[#f8f9fa] text-gray-600 font-semibold border-b border-gray-200 z-20">
               <tr>
-                <th className="px-4 py-3 w-[70px]">Mã đơn</th>
-                <th className="px-4 py-3 w-[180px]">Khách hàng</th>
-                <th className="px-4 py-3 w-[220px]">Công việc</th>
-                <th className="px-4 py-3 min-w-[320px]">Ghi chú</th>
-                <th className="px-4 py-3 text-center w-[140px]">Thao tác</th>
-                <th className="px-4 py-3 w-[160px]">Trạm - KTV</th>
-                <th className="px-4 py-3 w-[130px]">Tạo bởi - lúc</th>
+                <th className="px-4 py-2 w-[70px]">Mã đơn</th>
+                <th className="px-4 py-2 w-[180px]">Khách hàng</th>
+                <th className="px-4 py-2 w-[220px]">Công việc</th>
+                <th className="px-4 py-2 min-w-[320px]">Ghi chú</th>
+                <th className="px-4 py-2 text-center w-[140px]">Thao tác</th>
+                <th className="px-4 py-2 w-[160px]">Trạm - KTV</th>
+                <th className="px-4 py-2 w-[130px]">Tạo bởi - lúc</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
@@ -1405,7 +1575,7 @@ export default function OrderList() {
                 return (
                   <tr key={order.id} className={`${idx % 2 === 0 ? 'bg-white' : 'bg-[#fafafa]'} hover:bg-blue-50/50 transition-colors`}>
                     {/* 1. Mã đơn */}
-                    <td className="px-4 py-3 font-medium align-top">
+                    <td className="px-4 py-2 font-medium align-top">
                       <div>#{order.pancakeOrderId}</div>
                       {order.orderSource && /shopee|lazada|tiktok|tiki/i.test(order.orderSource) && (
                         <div className="text-[10px] font-bold text-blue-600 bg-blue-50 border border-blue-100 rounded px-1.5 py-0.5 mt-0.5 inline-block cursor-help" title={`Nguồn: ${order.orderSource}`}>
@@ -1415,80 +1585,75 @@ export default function OrderList() {
                     </td>
 
                     {/* 2. Khách hàng */}
-                    <td className="px-4 py-3 whitespace-normal align-top">
-                      <div className="font-bold text-gray-900 text-[14px]">{customerName}</div>
-                      <div className="text-gray-700 font-semibold text-[13px] my-0.5">{phone}</div>
-                      <div className="text-gray-500 text-[12px] leading-tight">{order.shippingAddress?.full_address || order.customer?.fullAddress || 'Không có địa chỉ'}</div>
+                    <td className="px-4 py-2 whitespace-normal align-top">
+                      <div className="font-bold text-gray-900 text-[13px]">{customerName}</div>
+                      <div className="text-gray-700 font-semibold text-[12px] my-0.5">{phone}</div>
+                      <div className="text-gray-500 text-[11px] leading-tight line-clamp-2" title={order.shippingAddress?.full_address || order.customer?.fullAddress || ''}>
+                        {order.shippingAddress?.full_address || order.customer?.fullAddress || 'Không có địa chỉ'}
+                      </div>
                     </td>
 
                     {/* 3. Công việc */}
-                    <td className="px-4 py-3 whitespace-normal align-top">
-                      {/* Trạng thái */}
-                      <div className="mb-1.5">
-                        <span className={`inline-block text-[11px] font-bold px-2 py-0.5 rounded text-white capitalize ${getStatusStyle(order.adminStatus || 'chờ xử lý')}`}>
+                    <td className="px-4 py-2 whitespace-normal align-top">
+                      {/* Trạng thái & Hẹn khách inline */}
+                      <div className="flex items-center flex-wrap gap-1.5 mb-1">
+                        <span className={`inline-block text-[10px] font-bold px-1.5 py-0.5 rounded text-white capitalize ${getStatusStyle(order.adminStatus || 'chờ xử lý')}`}>
                           {order.adminStatus === 'đang thực hiện' ? 'đã phân công' : (order.adminStatus || 'chờ xử lý')}
                         </span>
-                      </div>
-
-                      {/* Ngày hẹn */}
-                      {order.appointmentTime ? (() => {
-                        const isOverdue = new Date(order.appointmentTime) < new Date() && order.adminStatus !== 'hoàn thành' && order.adminStatus !== 'hủy đơn';
-                        return (
-                          <div className="text-[12px] mb-1">
-                            <span className="text-gray-400">Hẹn: </span>
-                            <span className={`font-semibold ${isOverdue ? 'text-red-600' : 'text-blue-700'}`}>
-                              {new Date(order.appointmentTime).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })} - {new Date(order.appointmentTime).toLocaleDateString('vi-VN')}
+                        {order.appointmentTime ? (() => {
+                          const isOverdue = new Date(order.appointmentTime) < new Date() && order.adminStatus !== 'hoàn thành' && order.adminStatus !== 'hủy đơn';
+                          return (
+                            <span className={`text-[11px] font-bold ${isOverdue ? 'text-red-600' : 'text-blue-700'}`} title={order.rescheduleReason ? `Lý do hẹn lại: ${order.rescheduleReason}` : ''}>
+                              📅 {new Date(order.appointmentTime).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })} {new Date(order.appointmentTime).toLocaleDateString('vi-VN')}
+                              {order.rescheduleReason && <span className="text-red-500 font-normal"> (Hẹn lại)</span>}
                             </span>
-                            {order.rescheduleReason && (
-                              <div className="text-[11px] text-red-500 italic mt-0.5 leading-tight">
-                                Lý do hẹn lại: {order.rescheduleReason}
-                              </div>
-                            )}
-                          </div>
-                        );
-                      })() : (
-                        <div className="text-[12px] text-gray-400 italic mb-1">Chưa hẹn lịch</div>
-                      )}
-
-                      {/* Loại công việc & dịch vụ */}
-                      <div className="text-[12px] my-1 font-medium text-gray-800">
-                        <div>Loại CV: <span className="font-semibold text-blue-800">{order.workType || 'Chưa xác định'}</span></div>
-                        {order.serviceType && order.serviceType !== 'Công việc đã bao gồm dịch vụ' && (
-                          <div className="text-[11px] text-gray-500">Dịch vụ: {order.serviceType}</div>
+                          );
+                        })() : (
+                          <span className="text-[11px] text-gray-400 italic">Chưa hẹn lịch</span>
                         )}
                       </div>
 
-                      {/* Sản phẩm */}
-                      <div className="text-gray-700 text-[12px] my-1 leading-tight">
+                      {/* Loại công việc & dịch vụ */}
+                      <div className="text-[11px] font-medium text-gray-800 leading-tight">
+                        <span>CV: </span>
+                        <span className="font-semibold text-blue-800">{order.workType || 'Chưa xác định'}</span>
+                        {order.serviceType && order.serviceType !== 'Công việc đã bao gồm dịch vụ' && (
+                          <span className="text-gray-500 font-normal"> ({order.serviceType})</span>
+                        )}
+                      </div>
+
+                      {/* Sản phẩm inline */}
+                      <div className="text-gray-600 text-[11px] my-1 leading-normal">
                         {order.items && order.items.length > 0 ? (
-                          <ul className="list-disc pl-4 text-gray-600 space-y-0.5">
-                            {order.items.map((item: any, i: number) => {
+                          <span>
+                            <span className="text-gray-400">📦 </span>
+                            {order.items.map((item: any) => {
                               const pName = item.productName || item.rawData?.variation_info?.name || item.rawData?.name || 'Sản phẩm';
-                              return (
-                                <li key={i}>{pName} <span className="font-semibold">x{item.quantity}</span></li>
-                              )
-                            })}
-                          </ul>
+                              return `${pName} (x${item.quantity})`;
+                            }).join(', ')}
+                          </span>
                         ) : (
                           <span className="text-gray-400 italic">Chưa có sản phẩm</span>
                         )}
                       </div>
 
                       {/* Tiền thu */}
-                      <div className="text-blue-700 font-bold text-[12px] mt-1.5">
-                        Thu: {(order.moneyToCollect || 0).toLocaleString('vi-VN')} đ
-                      </div>
+                      {order.moneyToCollect > 0 && (
+                        <div className="text-emerald-700 font-bold text-[11px] mt-0.5">
+                          Thu: {(order.moneyToCollect).toLocaleString('vi-VN')} đ
+                        </div>
+                      )}
                     </td>
 
-                    {/* 4. Ghi chú (Hiển thị full) */}
-                    <td className="px-4 py-3 whitespace-normal align-top">
-                      <div className="text-gray-700 text-[13px] italic whitespace-pre-wrap leading-relaxed">
+                    {/* 4. Ghi chú (Hiển thị đầy đủ như yêu cầu) */}
+                    <td className="px-4 py-2 whitespace-normal align-top">
+                      <div className="text-gray-700 text-[12px] italic whitespace-pre-wrap leading-relaxed">
                         {order.note || '-'}
                       </div>
                     </td>
 
                     {/* 5. Thao tác */}
-                    <td className="px-4 py-3 align-top">
+                    <td className="px-4 py-2 align-top">
                       <div className="flex items-center justify-center flex-wrap gap-1.5">
                         {/* Phân công */}
                         <button
@@ -1564,20 +1729,20 @@ export default function OrderList() {
                     </td>
 
                     {/* 6. Trạm - KTV */}
-                    <td className="px-4 py-3 whitespace-normal align-top">
+                    <td className="px-4 py-2 whitespace-normal align-top">
                       <div className="font-bold text-gray-800 text-[12px]">{mainStationName || 'Chưa phân trạm chính'}</div>
                       {techStationName && <div className="text-[11px] text-gray-600 font-medium">{techStationName}</div>}
                       <div className="text-gray-500 text-[11px] mt-0.5">KTV: <span className="font-semibold text-gray-700">{ktvName}</span></div>
 
                       {order.ktvCalledAt && (
-                        <div className="text-[10px] text-emerald-600 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded mt-1.5 w-max font-medium">
+                        <div className="text-[10px] text-emerald-600 bg-emerald-50 border border-emerald-200 px-1 py-0.2 rounded mt-1 inline-block font-medium">
                           📞 Đã gọi khách lúc {new Date(order.ktvCalledAt).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })} - {new Date(order.ktvCalledAt).toLocaleDateString('vi-VN')}
                         </div>
                       )}
                     </td>
 
                     {/* 7. Tạo bởi - lúc */}
-                    <td className="px-4 py-3 whitespace-normal align-top text-[12px]">
+                    <td className="px-4 py-2 whitespace-normal align-top text-[11px]">
                       {order.pancakeCreatedAt ? (() => {
                         const date = new Date(order.pancakeCreatedAt);
                         return (
@@ -1587,7 +1752,7 @@ export default function OrderList() {
                         );
                       })() : <div className="text-gray-400">-</div>}
 
-                      <div className="text-[11px] text-gray-400 mt-0.5">
+                      <div className="text-[10px] text-gray-400 mt-0.5">
                         {(() => {
                           const creatorName = order.rawData?.creator?.name;
                           if (creatorName) {
@@ -1758,35 +1923,161 @@ export default function OrderList() {
                   <textarea rows={2} className="w-full border rounded p-2 text-sm outline-none focus:border-blue-500" value={rescheduleReason} onChange={e => setRescheduleReason(e.target.value)} placeholder="Khách bận, KTV kẹt lịch..."></textarea>
                 </div>
 
+                {/* Giao diện thêm/chọn lại sản phẩm */}
+                <div className="border-t pt-4 mt-4 space-y-2">
+                  <label className="block text-sm font-semibold text-gray-800">Sản phẩm yêu cầu dịch vụ</label>
+                  
+                  {/* List of tempItems */}
+                  {tempItems.length > 0 ? (
+                    <div className="border border-gray-200 rounded divide-y max-h-40 overflow-y-auto bg-gray-50">
+                      {tempItems.map((item, idx) => (
+                        <div key={idx} className="flex justify-between items-center p-2 text-xs">
+                          <div className="font-medium text-gray-800 truncate pr-2 animate-fade-in" title={item.productName}>
+                            {item.productName} {item.sku ? `(${item.sku})` : ''}
+                          </div>
+                          <div className="flex items-center space-x-2 shrink-0">
+                            <input
+                              type="number"
+                              min={1}
+                              className="w-12 border rounded text-center py-0.5 text-xs outline-none focus:border-blue-500 bg-white text-gray-800"
+                              value={item.quantity}
+                              onChange={(e) => {
+                                const val = parseInt(e.target.value, 10) || 1;
+                                const newItems = [...tempItems];
+                                newItems[idx].quantity = val;
+                                setTempItems(newItems);
+                              }}
+                            />
+                            <button
+                              type="button"
+                              className="text-red-500 hover:text-red-700 font-bold px-1"
+                              onClick={() => {
+                                setTempItems(tempItems.filter((_, i) => i !== idx));
+                              }}
+                            >
+                              Xóa
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="text-xs text-gray-400 italic bg-gray-50 border border-dashed rounded p-3 text-center">
+                      Đơn hàng chưa có sản phẩm. Chọn bên dưới để thêm.
+                    </div>
+                  )}
+
+                  {/* Search and add product dropdown */}
+                  <div className="flex space-x-2">
+                    <select
+                      className="w-full border rounded p-2 text-sm outline-none focus:border-blue-500 bg-white text-gray-800 font-medium"
+                      defaultValue=""
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        if (!val) return;
+                        const selectedProd = productsStock.find(p => p.id === val);
+                        if (selectedProd) {
+                          const exists = tempItems.some(item => 
+                            item.sku === selectedProd.sku || 
+                            item.productName.toLowerCase() === selectedProd.name.toLowerCase()
+                          );
+                          if (exists) {
+                            alert('Sản phẩm này đã được thêm.');
+                          } else {
+                            setTempItems([...tempItems, {
+                              productName: selectedProd.name,
+                              sku: selectedProd.sku || '',
+                              quantity: 1,
+                              price: selectedProd.sellingPrice || 0,
+                              discount: 0
+                            }]);
+                          }
+                        }
+                        e.target.value = '';
+                      }}
+                    >
+                      <option value="">-- Thêm sản phẩm vào đơn --</option>
+                      {productsStock.map(p => (
+                        <option key={p.id} value={p.id}>
+                          {p.name} {p.sku ? `(${p.sku})` : ''}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
                 {/* Phần 3: Kho xuất hàng & Đối chiếu tồn kho */}
                 <div className="border-t pt-4 mt-4 space-y-3">
                   <h4 className="font-semibold text-gray-800 flex items-center gap-1.5">
                     3. Kho hàng xuất vật tư
                   </h4>
                   
-                  <div>
+                  <div className="relative">
                     <label className="block text-xs text-gray-500 mb-1">Chọn kho xuất hàng</label>
-                    <select 
-                      className="w-full border rounded p-2 text-sm outline-none focus:border-blue-500 bg-white text-gray-800 font-medium" 
-                      value={selectedWarehouseId} 
-                      onChange={e => setSelectedWarehouseId(e.target.value)}
-                    >
-                      <option value="">-- Chọn Kho hàng --</option>
-                      {warehouses.map(w => (
-                        <option key={w.id} value={w.id}>{w.name}</option>
-                      ))}
-                    </select>
+                    <div className="relative">
+                      <input 
+                        type="text"
+                        placeholder="Gõ để tìm & chọn kho..."
+                        className="w-full border rounded p-2 pr-8 text-sm outline-none focus:border-blue-500 bg-white text-gray-800 font-medium"
+                        value={warehouseSearch}
+                        onChange={(e) => {
+                          setWarehouseSearch(e.target.value);
+                          setShowWarehouseDropdown(true);
+                          if (!e.target.value) {
+                            setSelectedWarehouseId('');
+                          }
+                        }}
+                        onFocus={() => setShowWarehouseDropdown(true)}
+                      />
+                      <button
+                        type="button"
+                        className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 text-xs focus:outline-none"
+                        onClick={() => setShowWarehouseDropdown(!showWarehouseDropdown)}
+                      >
+                        {showWarehouseDropdown ? '▲' : '▼'}
+                      </button>
+                    </div>
+
+                    {showWarehouseDropdown && (
+                      <>
+                        <div className="fixed inset-0 z-10" onClick={() => setShowWarehouseDropdown(false)} />
+                        
+                        <div className="absolute left-0 right-0 mt-1 max-h-48 overflow-y-auto bg-white border rounded shadow-lg z-20 divide-y divide-gray-100">
+                          {warehouses
+                            .filter(w => removeAccents(w.name).includes(removeAccents(warehouseSearch)))
+                            .map(w => (
+                              <button
+                                key={w.id}
+                                type="button"
+                                className={`w-full text-left px-3 py-2 text-xs hover:bg-blue-50 transition-colors ${
+                                  selectedWarehouseId === w.id ? 'bg-blue-50/70 font-semibold text-blue-700' : 'text-gray-700'
+                                }`}
+                                onClick={() => {
+                                  setSelectedWarehouseId(w.id);
+                                  setWarehouseSearch(w.name);
+                                  setShowWarehouseDropdown(false);
+                                }}
+                              >
+                                {w.name}
+                              </button>
+                            ))}
+                          {warehouses.filter(w => removeAccents(w.name).includes(removeAccents(warehouseSearch))).length === 0 && (
+                            <div className="p-3 text-xs text-gray-400 italic text-center">Không tìm thấy kho hàng nào</div>
+                          )}
+                        </div>
+                      </>
+                    )}
                   </div>
 
-                  {/* Danh sách đối chiếu tồn kho */}
-                  {selectedWarehouseId && (
-                    <div className="space-y-2">
-                      <label className="block text-xs font-semibold text-gray-600">Đối chiếu tồn kho tại trạm/kho:</label>
-                      {loadingInventory ? (
-                        <div className="text-xs text-gray-400 italic">Đang đối chiếu tồn kho...</div>
-                      ) : assignModal.order.items && assignModal.order.items.length > 0 ? (
-                        <div className="space-y-1.5 max-h-40 overflow-y-auto pr-1">
-                          {assignModal.order.items.map((item: any, i: number) => {
+                {/* Danh sách đối chiếu tồn kho */}
+                {selectedWarehouseId && (
+                  <div className="space-y-2">
+                    <label className="block text-xs font-semibold text-gray-600">Đối chiếu tồn kho tại trạm/kho:</label>
+                    {loadingInventory ? (
+                      <div className="text-xs text-gray-400 italic">Đang đối chiếu tồn kho...</div>
+                    ) : tempItems && tempItems.length > 0 ? (
+                      <div className="space-y-1.5 max-h-40 overflow-y-auto pr-1">
+                        {tempItems.map((item: any, i: number) => {
                             const pName = item.productName || item.rawData?.variation_info?.name || item.rawData?.name || 'Sản phẩm';
                             const itemSku = item.sku || item.rawData?.sku || '';
                             
@@ -1803,10 +2094,13 @@ export default function OrderList() {
 
                             const isOutOfStock = available === 0;
                             const isLowStock = available > 0 && available <= 2;
-
+                            const isInstallation = workType === 'Lắp đặt';
                             let bgClass = 'bg-green-50 border-green-100 text-green-800';
                             let statusText = 'Còn hàng';
-                            if (isOutOfStock) {
+                            if (isInstallation) {
+                              bgClass = 'bg-blue-50 border-blue-100 text-blue-800 font-medium';
+                              statusText = 'Không trừ kho';
+                            } else if (isOutOfStock) {
                               bgClass = 'bg-red-50 border-red-200 text-red-700 font-medium';
                               statusText = 'HẾT HÀNG';
                             } else if (isLowStock) {

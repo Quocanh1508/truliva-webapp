@@ -175,11 +175,11 @@ export default function MyOrders() {
           <table className="w-full text-left text-[13px] border-collapse">
             <thead className="sticky top-0 bg-[#f8f9fa] text-gray-600 font-semibold border-b border-gray-200 z-10 shadow-sm">
               <tr>
-                <th className="px-4 py-3 w-[100px]">Mã đơn</th>
-                <th className="px-4 py-3 w-[250px]">Khách hàng</th>
-                <th className="px-4 py-3 w-[350px]">Công việc</th>
-                <th className="px-4 py-3">Ghi chú</th>
-                <th className="px-4 py-3 text-center w-[150px]">Thao tác</th>
+                <th className="px-4 py-3 w-[100px] min-w-[100px]">Mã đơn</th>
+                <th className="px-4 py-3 w-[220px] min-w-[220px]">Khách hàng</th>
+                <th className="px-4 py-3 w-[350px] min-w-[350px]">Công việc</th>
+                <th className="px-4 py-3 min-w-[320px]">Ghi chú</th>
+                <th className="px-4 py-3 text-center w-[130px] min-w-[130px]">Thao tác</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
