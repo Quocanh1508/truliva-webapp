@@ -91,7 +91,13 @@ export async function processOrderEvent(rawEventId: string | null, payload: any)
     // ══════════════════════════════════════
     const existingOrder = await prisma.order.findUnique({
       where: { pancakeOrderId: systemId },
-      select: { adminStatus: true }
+      select: {
+        adminStatus: true,
+        warehouseId: true,
+        warehouseInfo: true,
+        workType: true,
+        rawData: true,
+      }
     });
 
     let newAdminStatus = existingOrder?.adminStatus || 'chờ xử lý';
@@ -155,6 +161,26 @@ export async function processOrderEvent(rawEventId: string | null, payload: any)
       adminStatus: newAdminStatus, // mapped status
       rawData: payload,
     };
+
+    // Bảo vệ warehouseId và warehouseInfo cục bộ cho các đơn thuộc diện không trừ kho
+    if (existingOrder && !payload.warehouse_id) {
+      const isInstallation = existingOrder.workType === 'Lắp đặt';
+      let originallyHasProducts = false;
+      if (existingOrder.rawData) {
+        try {
+          const raw = typeof existingOrder.rawData === 'string' ? JSON.parse(existingOrder.rawData as string) : existingOrder.rawData;
+          const itemsList = raw.items || raw.order_items || [];
+          originallyHasProducts = Array.isArray(itemsList) && itemsList.length > 0;
+        } catch (e) {
+          originallyHasProducts = false;
+        }
+      }
+
+      if (isInstallation || !originallyHasProducts) {
+        orderData.warehouseId = existingOrder.warehouseId;
+        orderData.warehouseInfo = existingOrder.warehouseInfo;
+      }
+    }
 
     const orderSource = (payload.order_sources_name || '').toLowerCase();
     const isEcom = orderSource.includes('shopee') || orderSource.includes('lazada') || orderSource.includes('tiktok') || orderSource.includes('tiki');

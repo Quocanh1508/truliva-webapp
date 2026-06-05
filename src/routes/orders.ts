@@ -1000,25 +1000,22 @@ router.patch('/:id', requireAuth, requireAdmin, async (req: Request, res: Respon
         return;
       }
 
-      try {
-        logger.info('Syncing warehouse change to Pancake POS', { pancakeOrderId: oldOrder.pancakeOrderId, warehouseId });
-        const updateResponse = await axios.patch(
-          `https://pos.pages.fm/api/v1/shops/${shopId}/orders/${oldOrder.pancakeOrderId}`,
-          {
-            warehouse_id: warehouseId
-          },
-          {
-            params: { api_key: apiKey },
-            headers: { 'Content-Type': 'application/json' },
-            timeout: 10000
-          }
-        );
-
-        if (!updateResponse.data || !updateResponse.data.success) {
-          throw new Error(updateResponse.data?.message || 'Yêu cầu đổi kho thất bại trên Pancake POS');
+      // Xác định xem đơn hàng thuộc diện không trừ kho hay không (Lắp đặt hoặc không có sản phẩm ban đầu)
+      const isInstallation = (workType || oldOrder.workType) === 'Lắp đặt';
+      let originallyHasProducts = false;
+      if (oldOrder.rawData) {
+        try {
+          const raw = typeof oldOrder.rawData === 'string' ? JSON.parse(oldOrder.rawData) : oldOrder.rawData;
+          const itemsList = raw.items || raw.order_items || [];
+          originallyHasProducts = Array.isArray(itemsList) && itemsList.length > 0;
+        } catch (e) {
+          originallyHasProducts = false;
         }
+      }
 
-        // Fetch warehouses to get the name of new warehouse
+      const shouldSyncWarehouseToPancake = !isInstallation && originallyHasProducts;
+
+      try {
         let warehouseName = 'Kho hàng';
         try {
           const whResponse = await axios.get(`https://pos.pages.fm/api/v1/shops/${shopId}/warehouses`, {
@@ -1032,6 +1029,31 @@ router.patch('/:id', requireAuth, requireAdmin, async (req: Request, res: Respon
           }
         } catch (whErr) {
           logger.warn('Failed to fetch warehouse name from Pancake POS API, using default name', whErr);
+        }
+
+        if (shouldSyncWarehouseToPancake && warehouseId) {
+          logger.info('Syncing warehouse change to Pancake POS', { pancakeOrderId: oldOrder.pancakeOrderId, warehouseId });
+          const updateResponse = await axios.patch(
+            `https://pos.pages.fm/api/v1/shops/${shopId}/orders/${oldOrder.pancakeOrderId}`,
+            {
+              warehouse_id: warehouseId
+            },
+            {
+              params: { api_key: apiKey },
+              headers: { 'Content-Type': 'application/json' },
+              timeout: 10000
+            }
+          );
+
+          if (!updateResponse.data || !updateResponse.data.success) {
+            throw new Error(updateResponse.data?.message || 'Yêu cầu đổi kho thất bại trên Pancake POS');
+          }
+        } else {
+          logger.info('Bypassed syncing warehouse change to Pancake POS (not deducting inventory)', {
+            pancakeOrderId: oldOrder.pancakeOrderId,
+            warehouseId,
+            reason: isInstallation ? 'Installation order' : 'No original products'
+          });
         }
 
         updateData.warehouseId = warehouseId;

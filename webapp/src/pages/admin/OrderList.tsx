@@ -2095,9 +2095,24 @@ export default function OrderList() {
                             const isOutOfStock = available === 0;
                             const isLowStock = available > 0 && available <= 2;
                             const isInstallation = workType === 'Lắp đặt';
+
+                            // Xác định xem đơn hàng gốc có chứa sản phẩm ban đầu hay không
+                            let originallyHasProducts = false;
+                            if (assignModal?.order?.rawData) {
+                              try {
+                                const raw = typeof assignModal.order.rawData === 'string'
+                                  ? JSON.parse(assignModal.order.rawData)
+                                  : assignModal.order.rawData;
+                                const itemsList = raw.items || raw.order_items || [];
+                                originallyHasProducts = Array.isArray(itemsList) && itemsList.length > 0;
+                              } catch (e) {
+                                originallyHasProducts = false;
+                              }
+                            }
+
                             let bgClass = 'bg-green-50 border-green-100 text-green-800';
                             let statusText = 'Còn hàng';
-                            if (isInstallation) {
+                            if (isInstallation || !originallyHasProducts) {
                               bgClass = 'bg-blue-50 border-blue-100 text-blue-800 font-medium';
                               statusText = 'Không trừ kho';
                             } else if (isOutOfStock) {
