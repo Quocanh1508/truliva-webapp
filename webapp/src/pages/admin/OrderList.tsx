@@ -4,6 +4,7 @@ import { getOrders, updateOrder, getKtvUsers, getStations, getOrderAuditLog, syn
 import { Search, ChevronLeft, ChevronRight, History, XCircle, Filter, RefreshCw, FileText, CheckCircle2, RotateCcw, Copy, UserPlus, Download } from 'lucide-react';
 import { WARRANTY_SERVICE_GROUPS, REPAIR_SERVICE_GROUPS, WORK_TYPE_SERVICES } from '../../utils/workTypes';
 import { useConfirm } from '../../context/ConfirmContext';
+import DateRangePicker from '../../components/DateRangePicker';
 
 const ALL_SERVICE_TYPES = Array.from(new Set(Object.values(WORK_TYPE_SERVICES).flat()));
 
@@ -39,7 +40,6 @@ export default function OrderList() {
   const [sortOrder, setSortOrder] = useState('desc');
 
   // Date Filters
-  const [datePreset, setDatePreset] = useState('');
   const [customStartDate, setCustomStartDate] = useState('');
   const [customEndDate, setCustomEndDate] = useState('');
 
@@ -144,44 +144,9 @@ export default function OrderList() {
   const [cancelReason, setCancelReason] = useState('');
 
   const getDateRange = () => {
-    if (!datePreset) return { startDate: '', endDate: '' };
-
-    const now = new Date();
-
-    if (datePreset === 'today') {
-      const start = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0);
-      const end = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
-      return { startDate: start.toISOString(), endDate: end.toISOString() };
-    }
-
-    if (datePreset === 'yesterday') {
-      const start = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1, 0, 0, 0, 0);
-      const end = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1, 23, 59, 59, 999);
-      return { startDate: start.toISOString(), endDate: end.toISOString() };
-    }
-
-    if (datePreset === 'week') {
-      const start = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-      return { startDate: start.toISOString(), endDate: now.toISOString() };
-    }
-
-    if (datePreset === 'month') {
-      const start = new Date(now.getFullYear(), now.getMonth() - 1, now.getDate(), 0, 0, 0, 0);
-      return { startDate: start.toISOString(), endDate: now.toISOString() };
-    }
-
-    if (datePreset === 'year') {
-      const start = new Date(now.getFullYear() - 1, now.getMonth(), now.getDate(), 0, 0, 0, 0);
-      return { startDate: start.toISOString(), endDate: now.toISOString() };
-    }
-
-    if (datePreset === 'custom') {
-      const start = customStartDate ? new Date(customStartDate + 'T00:00:00').toISOString() : '';
-      const end = customEndDate ? new Date(customEndDate + 'T23:59:59').toISOString() : '';
-      return { startDate: start, endDate: end };
-    }
-
-    return { startDate: '', endDate: '' };
+    const start = customStartDate ? new Date(customStartDate + 'T00:00:00').toISOString() : '';
+    const end = customEndDate ? new Date(customEndDate + 'T23:59:59').toISOString() : '';
+    return { startDate: start, endDate: end };
   };
 
   const fetchOrdersData = async () => {
@@ -229,7 +194,6 @@ export default function OrderList() {
     page,
     sortBy,
     sortOrder,
-    datePreset,
     customStartDate,
     customEndDate,
     filterPancakeOrderId,
@@ -634,7 +598,6 @@ export default function OrderList() {
     setFilterProductNames([]);
     setFilterTechStationIds([]);
     setFilterProvinces([]);
-    setDatePreset('');
     setCustomStartDate('');
     setCustomEndDate('');
   };
@@ -1167,24 +1130,16 @@ export default function OrderList() {
               )}
             </div>
 
-            {/* Existing Date Range Picker logic */}
-            {datePreset === 'custom' && (
-              <div className="flex items-center space-x-2">
-                <input
-                  type="date"
-                  className="px-3 py-1.5 text-[13px] border border-gray-300 rounded-md outline-none text-gray-700 bg-white"
-                  value={customStartDate}
-                  onChange={(e) => { setCustomStartDate(e.target.value); setPage(1); }}
-                />
-                <span className="text-gray-400">đến</span>
-                <input
-                  type="date"
-                  className="px-3 py-1.5 text-[13px] border border-gray-300 rounded-md outline-none text-gray-700 bg-white"
-                  value={customEndDate}
-                  onChange={(e) => { setCustomEndDate(e.target.value); setPage(1); }}
-                />
-              </div>
-            )}
+            <DateRangePicker
+              startDate={customStartDate}
+              endDate={customEndDate}
+              onChange={(start, end) => {
+                setCustomStartDate(start);
+                setCustomEndDate(end);
+                setPage(1);
+              }}
+            />
+
             <select
               className="px-3 py-2 text-[13px] border border-gray-300 rounded-md bg-white text-gray-700 outline-none font-medium"
               value={`${sortBy}-${sortOrder}`}
@@ -1201,20 +1156,6 @@ export default function OrderList() {
               <option value="updatedAt-asc">Ngày hoàn thành cũ nhất</option>
               <option value="appointmentTime-asc">Thời gian hẹn khách gần nhất</option>
               <option value="appointmentTime-desc">Thời gian hẹn khách xa nhất</option>
-            </select>
-
-            <select
-              className="px-3 py-2 text-[13px] border border-gray-300 rounded-md bg-white text-gray-700 outline-none"
-              value={datePreset}
-              onChange={(e) => { setDatePreset(e.target.value); setPage(1); }}
-            >
-              <option value="">Tất cả thời gian</option>
-              <option value="today">Hôm nay</option>
-              <option value="yesterday">Hôm qua</option>
-              <option value="week">1 tuần qua</option>
-              <option value="month">1 tháng qua</option>
-              <option value="year">1 năm qua</option>
-              <option value="custom">Tự chọn khoảng...</option>
             </select>
           </div>
         </div>
