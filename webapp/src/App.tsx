@@ -21,6 +21,7 @@ import ReportForm from './pages/ktv/ReportForm';
 import MyReports from './pages/ktv/MyReports';
 import MyOrders from './pages/ktv/MyOrders';
 import Notifications from './pages/ktv/Notifications';
+import KtvInventory from './pages/ktv/KtvInventory';
 
 // Admin Pages
 import Dashboard from './pages/admin/Dashboard';
@@ -305,6 +306,7 @@ export default function App() {
                 <Route path="/ktv/my-reports" element={<MyReports />} />
                 <Route path="/ktv/my-orders" element={<MyOrders />} />
                 <Route path="/ktv/notifications" element={<Notifications />} />
+                <Route path="/ktv/inventory" element={<KtvInventory />} />
               </Route>
 
               {/* Admin Routes */}

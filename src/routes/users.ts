@@ -237,6 +237,8 @@ router.get('/', async (_req: Request, res: Response): Promise<void> => {
         bankAccount: true,
         bankName: true,
         email: true,
+        warehouseId: true,
+        warehouseName: true,
         _count: { select: { serviceReports: true } },
       } as any,
       orderBy: { createdAt: 'desc' },
@@ -257,7 +259,8 @@ router.post('/', async (req: Request, res: Response): Promise<void> => {
   try {
     const { 
       username, password, fullName, role, phoneNumber, techStationId,
-      address, cccdNumber, cccdDate, cccdPlace, bankAccount, bankName, email 
+      address, cccdNumber, cccdDate, cccdPlace, bankAccount, bankName, email,
+      warehouseId, warehouseName
     } = req.body;
 
     if (!username || !password || !fullName) {
@@ -296,6 +299,8 @@ router.post('/', async (req: Request, res: Response): Promise<void> => {
         bankAccount: bankAccount || null,
         bankName: bankName || null,
         email: email || null,
+        warehouseId: warehouseId || null,
+        warehouseName: warehouseName || null,
       },
       select: {
         id: true,
@@ -313,6 +318,8 @@ router.post('/', async (req: Request, res: Response): Promise<void> => {
         bankAccount: true,
         bankName: true,
         email: true,
+        warehouseId: true,
+        warehouseName: true,
       } as any,
     });
 
@@ -333,7 +340,8 @@ router.put('/:id', async (req: Request, res: Response): Promise<void> => {
     const id = req.params.id as string;
     const { 
       fullName, phoneNumber, password, isActive, role, techStationId,
-      address, cccdNumber, cccdDate, cccdPlace, bankAccount, bankName, email 
+      address, cccdNumber, cccdDate, cccdPlace, bankAccount, bankName, email,
+      warehouseId, warehouseName
     } = req.body;
 
     const updateData: any = {};
@@ -350,6 +358,8 @@ router.put('/:id', async (req: Request, res: Response): Promise<void> => {
     if (bankAccount !== undefined) updateData.bankAccount = bankAccount || null;
     if (bankName !== undefined) updateData.bankName = bankName || null;
     if (email !== undefined) updateData.email = email || null;
+    if (warehouseId !== undefined) updateData.warehouseId = warehouseId || null;
+    if (warehouseName !== undefined) updateData.warehouseName = warehouseName || null;
 
     if (password) {
       if (password.length < 4) {
@@ -377,6 +387,8 @@ router.put('/:id', async (req: Request, res: Response): Promise<void> => {
         bankAccount: true,
         bankName: true,
         email: true,
+        warehouseId: true,
+        warehouseName: true,
       } as any,
     });
 

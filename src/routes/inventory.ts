@@ -9,9 +9,8 @@ import { syncProducts } from '../scripts/syncProducts';
 const router = Router();
 const SHOP_ID = '1635300067';
 
-// Tất cả các API quản lý kho chỉ dành cho Admin đã đăng nhập
+// Các API quản lý kho yêu cầu đăng nhập
 router.use(requireAuth);
-router.use(requireAdmin);
 
 /**
  * Helper để lấy danh sách kho hàng từ Pancake POS
@@ -53,9 +52,9 @@ router.get('/warehouses', async (req: Request, res: Response): Promise<void> => 
 
 /**
  * GET /api/inventory/stock
- * Lấy bảng tổng hợp tồn kho của tất cả sản phẩm tại từng kho
+ * Lấy bảng tổng hợp tồn kho của tất cả sản phẩm tại từng kho (Admin only)
  */
-router.get('/stock', async (req: Request, res: Response): Promise<void> => {
+router.get('/stock', requireAdmin, async (req: Request, res: Response): Promise<void> => {
   try {
     // 1. Lấy danh sách kho
     const warehouses = await fetchPancakeWarehouses();
@@ -116,9 +115,9 @@ router.get('/stock', async (req: Request, res: Response): Promise<void> => {
 
 /**
  * POST /api/inventory/sync
- * Kích hoạt đồng bộ sản phẩm từ Pancake POS trong nền
+ * Kích hoạt đồng bộ sản phẩm từ Pancake POS trong nền (Admin only)
  */
-router.post('/sync', async (req: Request, res: Response): Promise<void> => {
+router.post('/sync', requireAdmin, async (req: Request, res: Response): Promise<void> => {
   try {
     syncProducts().catch((err) => logger.error('Sync products in background failed', { error: err.message }));
     res.status(200).json({ message: 'Sync process started in the background.' });
@@ -132,7 +131,7 @@ router.post('/sync', async (req: Request, res: Response): Promise<void> => {
  * GET /api/inventory/export
  * Xuất Excel báo cáo tồn kho hàng có áp dụng bộ lọc (Admin only)
  */
-router.get('/export', async (req: Request, res: Response): Promise<void> => {
+router.get('/export', requireAdmin, async (req: Request, res: Response): Promise<void> => {
   try {
     const { 
       search, 
@@ -374,6 +373,86 @@ router.get('/export', async (req: Request, res: Response): Promise<void> => {
   } catch (error: any) {
     logger.error('Export inventory stock error', { error: error.message });
     res.status(500).json({ error: 'Lỗi xuất file Excel tồn kho' });
+  }
+});
+
+/**
+ * GET /api/inventory/my-stock
+ * Lấy bảng tồn kho của riêng KTV đang đăng nhập dựa trên warehouseId được gán
+ */
+router.get('/my-stock', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const userId = req.user?.id;
+    if (!userId) {
+      res.status(401).json({ error: 'Chưa đăng nhập' });
+      return;
+    }
+
+    // 1. Lấy thông tin User để xem warehouseId được gán
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { warehouseId: true, warehouseName: true }
+    });
+
+    if (!user || !user.warehouseId) {
+      res.status(400).json({ error: 'Tài khoản của bạn chưa được gán kho hàng trên hệ thống. Vui lòng liên hệ Admin.' });
+      return;
+    }
+
+    // 2. Lấy danh sách kho hoạt động từ Pancake POS để xác thực kho có hoạt động
+    const activeWarehouses = await fetchPancakeWarehouses();
+    const currentWarehouse = activeWarehouses.find(w => String(w.id) === String(user.warehouseId));
+    
+    if (!currentWarehouse) {
+      res.status(400).json({ error: `Kho hàng được gán (${user.warehouseName}) hiện đã bị khóa hoặc không tồn tại trên Pancake POS.` });
+      return;
+    }
+
+    // 3. Lấy các sản phẩm có liên kết Pancake từ DB
+    const dbProducts = await prisma.product.findMany({
+      where: { isActive: true },
+      orderBy: { name: 'asc' }
+    });
+
+    // 4. Lọc tồn kho của duy nhất kho này
+    const productsData = dbProducts.map((p) => {
+      const rawData = (p.rawData as any) || {};
+      const vwList = rawData.variations_warehouses || [];
+      
+      let availableStock = 0;
+      let actualStock = 0;
+      
+      const matchedWarehouse = vwList.find((vw: any) => String(vw.warehouse_id) === String(user.warehouseId));
+      if (matchedWarehouse) {
+        availableStock = Number(matchedWarehouse.remain_quantity) || 0;
+        actualStock = Number(matchedWarehouse.actual_remain_quantity) || Number(matchedWarehouse.remain_quantity) || 0;
+      }
+
+      return {
+        id: p.id,
+        sku: p.sku || '',
+        name: p.name,
+        category: p.category || '',
+        imageUrl: p.imageUrl || '',
+        sellingPrice: p.sellingPrice || 0,
+        availableStock, // Tồn có thể bán tại kho KTV
+        actualStock    // Tồn thực tế tại kho KTV
+      };
+    });
+
+    res.json({
+      warehouse: {
+        id: currentWarehouse.id,
+        name: currentWarehouse.name,
+        address: currentWarehouse.address,
+        fullAddress: currentWarehouse.full_address
+      },
+      products: productsData
+    });
+
+  } catch (error: any) {
+    logger.error('Get KTV inventory stock error', { error: error.message });
+    res.status(500).json({ error: 'Lỗi lấy thông tin tồn kho của KTV' });
   }
 });
 

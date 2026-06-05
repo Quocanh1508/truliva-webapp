@@ -31,6 +31,10 @@ export default function UserManage() {
   const [stations, setStations] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   
+  const [warehouses, setWarehouses] = useState<any[]>([]);
+  const [warehouseId, setWarehouseId] = useState('');
+  const [warehouseName, setWarehouseName] = useState('');
+  
   // Filter state
   const [searchText, setSearchText] = useState('');
   const [filterMainStation, setFilterMainStation] = useState('');
@@ -76,6 +80,8 @@ export default function UserManage() {
     setBankAccount('');
     setBankName('');
     setEmail('');
+    setWarehouseId('');
+    setWarehouseName('');
     setIsActive(true);
     setActiveTab('basic');
     setError('');
@@ -97,6 +103,8 @@ export default function UserManage() {
     setBankAccount(user.bankAccount || '');
     setBankName(user.bankName || '');
     setEmail(user.email || '');
+    setWarehouseId(user.warehouseId || '');
+    setWarehouseName(user.warehouseName || '');
     setIsActive(user.isActive !== false);
     setActiveTab('basic');
     setError('');
@@ -106,6 +114,9 @@ export default function UserManage() {
   useEffect(() => {
     loadUsers();
     getStations().then(setStations).catch(console.error);
+    fetchApi('/inventory/warehouses')
+      .then(setWarehouses)
+      .catch(err => console.error('Lỗi tải danh sách kho', err));
   }, []);
 
   const loadUsers = async () => {
@@ -191,7 +202,8 @@ export default function UserManage() {
           method: 'POST',
           body: JSON.stringify({
             username, password, fullName, phoneNumber: phone, role: 'KTV', techStationId,
-            address, cccdNumber, cccdDate, cccdPlace, bankAccount, bankName, email
+            address, cccdNumber, cccdDate, cccdPlace, bankAccount, bankName, email,
+            warehouseId, warehouseName
           })
         });
       } else {
@@ -200,7 +212,8 @@ export default function UserManage() {
           body: JSON.stringify({
             fullName, phoneNumber: phone, role: 'KTV', techStationId, isActive,
             password: password.trim() || undefined,
-            address, cccdNumber, cccdDate, cccdPlace, bankAccount, bankName, email
+            address, cccdNumber, cccdDate, cccdPlace, bankAccount, bankName, email,
+            warehouseId, warehouseName
           })
         });
       }
@@ -209,6 +222,13 @@ export default function UserManage() {
     } catch (err: any) {
       setError(err.message);
     }
+  };
+
+  const handleWarehouseChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const wId = e.target.value;
+    setWarehouseId(wId);
+    const w = warehouses.find(item => String(item.id) === String(wId));
+    setWarehouseName(w ? w.name : '');
   };
 
   const toggleActive = async (id: string, current: boolean) => {
@@ -453,6 +473,19 @@ export default function UserManage() {
                       required={modalMode === 'create'}
                     />
                   </div>
+                  <div className="form-group mb-0">
+                    <label className="form-label text-xs font-semibold text-gray-700">Kho hàng tương ứng (Pancake POS)</label>
+                    <select
+                      className="form-input bg-white"
+                      value={warehouseId}
+                      onChange={handleWarehouseChange}
+                    >
+                      <option value="">-- Không gán kho / Chưa gán --</option>
+                      {warehouses.map((w: any) => (
+                        <option key={w.id} value={w.id}>{w.name}</option>
+                      ))}
+                    </select>
+                  </div>
                   {modalMode === 'edit' && (
                     <div className="form-group mb-0">
                       <label className="form-label text-xs font-semibold text-gray-700">Trạng thái hoạt động</label>
@@ -583,6 +616,11 @@ export default function UserManage() {
                   <td style={{ padding: '12px 16px' }}>
                     <div className="font-bold">{u.fullName}</div>
                     <div className="text-xs text-gray-500">{u.phoneNumber || '---'}</div>
+                    {u.warehouseName && (
+                      <div className="text-[11px] text-blue-600 font-semibold mt-1 bg-blue-50 border border-blue-150 px-1.5 py-0.5 rounded w-max">
+                        📦 {u.warehouseName}
+                      </div>
+                    )}
                   </td>
                   <td style={{ padding: '12px 16px' }}>{u.username}</td>
                   <td style={{ padding: '12px 16px' }}>

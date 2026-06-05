@@ -56,6 +56,7 @@ export default function Layout() {
     { name: 'Đổi mật khẩu', path: '/change-password', icon: <Key size={20} /> },
   ] : [
     { name: 'Dịch vụ được giao', path: '/ktv/my-orders', icon: <Wrench size={20} /> },
+    { name: 'Tồn kho của tôi', path: '/ktv/inventory', icon: <Warehouse size={20} /> },
     { name: 'Thông báo', path: '/ktv/notifications', icon: <Bell size={20} /> },
     { name: 'Tạo báo cáo', path: '/ktv/report', icon: <FileText size={20} /> },
     { name: 'Báo cáo của tôi', path: '/ktv/my-reports', icon: <List size={20} /> },
