@@ -1139,8 +1139,8 @@ router.patch('/:id', requireAuth, requireAdmin, async (req: Request, res: Respon
     if (assignedKtvId && assignedKtvId !== oldOrder.assignedKtvId) {
       const customerName = order.billFullName || 'Khách hàng';
       const workTypeText = order.workType || 'công việc';
-      const title = 'Đơn hàng mới được phân công';
-      const body = `Bạn vừa được gán đơn hàng mới #${order.pancakeOrderId} (${workTypeText}) từ khách hàng ${customerName}.`;
+      const title = 'Dịch vụ mới được phân công từ Truliva';
+      const body = `Bạn vừa được phân công dịch vụ mới #${order.pancakeOrderId} (${workTypeText}) cho khách hàng ${customerName}`;
 
       // 1. Gửi qua FCM Native
       sendPushNotification(assignedKtvId, title, body, {
