@@ -87,6 +87,7 @@ export async function syncOrders() {
 export async function getFiltersData(): Promise<{
   categories: string[];
   productNames: string[];
+  products: any[];
   techStations: any[];
   provinces: string[];
 }> {

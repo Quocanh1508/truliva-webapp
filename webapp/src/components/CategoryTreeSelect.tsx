@@ -8,8 +8,14 @@ interface TreeNode {
   children: TreeNode[];
 }
 
+interface ProductItem {
+  name: string;
+  category: string | null;
+}
+
 interface CategoryTreeSelectProps {
   categories: string[];
+  products?: ProductItem[];
   selected: string[];
   onChange: (selected: string[]) => void;
   label?: string;
@@ -19,6 +25,7 @@ interface CategoryTreeSelectProps {
 
 export default function CategoryTreeSelect({
   categories,
+  products = [],
   selected,
   onChange,
   label,
@@ -54,7 +61,7 @@ export default function CategoryTreeSelect({
       }
     }
 
-    // 2. Map children
+    // 2. Map children (subcategories)
     const childrenMap = new Map<string, string[]>();
     const childSet = new Set<string>();
 
@@ -87,7 +94,7 @@ export default function CategoryTreeSelect({
           children: children.map(child => ({
             id: child,
             label: child,
-            isParent: false,
+            isParent: products && products.length > 0 ? true : false,
             children: []
           }))
         });
@@ -100,10 +107,43 @@ export default function CategoryTreeSelect({
         roots.push({
           id: cat,
           label: cat,
-          isParent: false,
+          isParent: products && products.length > 0 ? true : false,
           children: []
         });
       }
+    }
+
+    // Populate products as Level 3 nodes if provided
+    if (products && products.length > 0) {
+      const populateProducts = (nodes: TreeNode[]) => {
+        nodes.forEach(node => {
+          if (node.isParent) {
+            // Find products belonging to this category
+            const matchedProducts = products.filter(p => p.category === node.id);
+            node.children = [
+              ...node.children.map(c => {
+                // Recursively populate products for subcategories
+                populateProducts([c]);
+                return c;
+              }),
+              ...matchedProducts.map(p => ({
+                id: `PROD:${p.name}`,
+                label: p.name,
+                isParent: false,
+                children: []
+              }))
+            ];
+            
+            // If the node has children products or children subcategories, mark it as parent
+            if (node.children.length > 0) {
+              node.isParent = true;
+            } else {
+              node.isParent = false;
+            }
+          }
+        });
+      };
+      populateProducts(roots);
     }
 
     // Sắp xếp roots theo thứ tự abc
@@ -322,6 +362,10 @@ export default function CategoryTreeSelect({
 
   const selectedDisplay = () => {
     if (selected.length === 0) return placeholder;
+    if (products && products.length > 0) {
+      const productCount = selected.filter(id => id.startsWith('PROD:')).length;
+      return `${productCount} sản phẩm đã chọn`;
+    }
     return `${selected.length} đã chọn (${selected.slice(0, 2).join(', ')}${selected.length > 2 ? '...' : ''})`;
   };
 

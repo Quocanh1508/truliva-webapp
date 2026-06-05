@@ -627,7 +627,7 @@ router.get('/filter-options', requireAdmin, async (req: Request, res: Response):
     ] = await Promise.all([
       prisma.serviceReport.findMany({ select: { workType: true }, distinct: ['workType'] }),
       prisma.serviceReport.findMany({ select: { serviceType: true }, distinct: ['serviceType'] }),
-      prisma.product.findMany({ select: { name: true }, orderBy: { name: 'asc' } }),
+       prisma.product.findMany({ select: { name: true, category: true }, orderBy: { name: 'asc' } }),
       prisma.product.findMany({ select: { category: true }, distinct: ['category'] }),
       prisma.mainStation.findMany({ select: { id: true, name: true }, orderBy: { name: 'asc' } }),
       prisma.techStation.findMany({ select: { id: true, name: true, mainStationId: true }, orderBy: { name: 'asc' } }),
@@ -643,6 +643,7 @@ router.get('/filter-options', requireAdmin, async (req: Request, res: Response):
       workTypes: workTypes.map((w: any) => w.workType).filter(Boolean),
       serviceTypes: serviceTypes.map((s: any) => s.serviceType).filter(Boolean),
       products: products.map((p: any) => p.name).filter(Boolean),
+      productsDetailed: products.map((p: any) => ({ name: p.name, category: p.category })),
       categories: categories.map((c: any) => c.category).filter(Boolean),
       mainStations,
       techStations,

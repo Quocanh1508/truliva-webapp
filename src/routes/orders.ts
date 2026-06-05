@@ -831,6 +831,7 @@ router.get('/filters-data', requireAuth, async (req: Request, res: Response): Pr
     res.json({
       categories,
       productNames,
+      products: products.map(p => ({ name: p.name, category: p.category })),
       techStations: stations,
       provinces
     });

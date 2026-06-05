@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getOrders, updateOrder, getKtvUsers, getStations, getOrderAuditLog, syncOrders, getFiltersData, fetchApi } from '../../api/client';
-import { Search, ChevronLeft, ChevronRight, History, XCircle, Filter, RefreshCw, FileText, CheckCircle2, RotateCcw, Copy, UserPlus, Download, Wrench, Settings, FolderOpen, Package, Building2, MapPin, Users, Calendar } from 'lucide-react';
+import { Search, ChevronLeft, ChevronRight, History, XCircle, Filter, RefreshCw, FileText, CheckCircle2, RotateCcw, Copy, UserPlus, Download, Wrench, Settings, FolderOpen, Building2, MapPin, Users, Calendar } from 'lucide-react';
 import { WARRANTY_SERVICE_GROUPS, REPAIR_SERVICE_GROUPS, WORK_TYPE_SERVICES } from '../../utils/workTypes';
 import { useConfirm } from '../../context/ConfirmContext';
 import DateRangePicker from '../../components/DateRangePicker';
@@ -95,11 +95,13 @@ export default function OrderList() {
   const [dbFilterOptions, setDbFilterOptions] = useState<{
     categories: string[];
     productNames: string[];
+    products: any[];
     techStations: any[];
     provinces: string[];
   }>({
     categories: [],
     productNames: [],
+    products: [],
     techStations: [],
     provinces: []
   });
@@ -591,7 +593,13 @@ export default function OrderList() {
       if (type === 'customerName') setTempCustomerName(filterCustomerName);
       if (type === 'customerPhone') setTempCustomerPhone(filterCustomerPhone);
       if (type === 'serviceTypes') setTempServiceTypes(filterServiceTypes);
-      if (type === 'productCategories') setTempProductCategories(filterProductCategories);
+      if (type === 'productCategories') {
+        const merged = [
+          ...filterProductCategories,
+          ...filterProductNames.map(name => `PROD:${name}`)
+        ];
+        setTempProductCategories(merged);
+      }
       if (type === 'productNames') setTempProductNames(filterProductNames);
       if (type === 'techStationIds') setTempTechStationIds(filterTechStationIds);
       if (type === 'provinces') setTempProvinces(filterProvinces);
@@ -608,7 +616,12 @@ export default function OrderList() {
     if (type === 'customerName') setFilterCustomerName(tempCustomerName);
     if (type === 'customerPhone') setFilterCustomerPhone(tempCustomerPhone);
     if (type === 'serviceTypes') setFilterServiceTypes(tempServiceTypes);
-    if (type === 'productCategories') setFilterProductCategories(tempProductCategories);
+    if (type === 'productCategories') {
+      const selectedCategories = tempProductCategories.filter(id => !id.startsWith('PROD:'));
+      const selectedProductNames = tempProductCategories.filter(id => id.startsWith('PROD:')).map(id => id.substring(5));
+      setFilterProductCategories(selectedCategories);
+      setFilterProductNames(selectedProductNames);
+    }
     if (type === 'productNames') setFilterProductNames(tempProductNames);
     if (type === 'techStationIds') setFilterTechStationIds(tempTechStationIds);
     if (type === 'provinces') setFilterProvinces(tempProvinces);
@@ -800,11 +813,7 @@ export default function OrderList() {
                       </button>
                       <button className="w-full flex items-center space-x-2.5 px-4 py-2 hover:bg-gray-50 text-purple-700 font-medium transition-colors text-[13px]" onClick={() => toggleDropdown('productCategories')}>
                         <FolderOpen size={15} className="text-purple-500" />
-                        <span>Danh mục sản phẩm</span>
-                      </button>
-                      <button className="w-full flex items-center space-x-2.5 px-4 py-2 hover:bg-gray-50 text-pink-700 font-medium transition-colors text-[13px]" onClick={() => toggleDropdown('productNames')}>
-                        <Package size={15} className="text-pink-500" />
-                        <span>Sản phẩm</span>
+                        <span>Danh mục & Sản phẩm</span>
                       </button>
                       <button className="w-full flex items-center space-x-2.5 px-4 py-2 hover:bg-gray-50 text-sky-700 font-medium transition-colors text-[13px]" onClick={() => toggleDropdown('mainStationIds')}>
                         <Building2 size={15} className="text-sky-500" />
@@ -1253,9 +1262,10 @@ export default function OrderList() {
 
                   {activeDropdown === 'productCategories' && (
                     <div className="p-4 w-72 space-y-3">
-                      <h4 className="font-semibold text-[14px] text-gray-800">Lọc theo Danh mục sản phẩm</h4>
+                      <h4 className="font-semibold text-[14px] text-gray-800">Lọc theo Danh mục & Sản phẩm</h4>
                       <CategoryTreeSelect
                         categories={dbFilterOptions.categories}
+                        products={dbFilterOptions.products}
                         selected={tempProductCategories}
                         onChange={setTempProductCategories}
                         renderInline

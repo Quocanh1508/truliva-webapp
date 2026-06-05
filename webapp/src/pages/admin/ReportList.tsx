@@ -92,6 +92,7 @@ interface FilterOptionsState {
   workTypes: string[];
   serviceTypes: string[];
   products: string[];
+  productsDetailed?: { name: string; category: string | null }[];
   categories: string[];
   mainStations: { id: string; name: string }[];
   techStations: { id: string; name: string; mainStationId: string }[];
@@ -308,7 +309,6 @@ export default function ReportList() {
   const [tempWorkTypes, setTempWorkTypes] = useState<string[]>([]);
   const [tempServiceTypes, setTempServiceTypes] = useState<string[]>([]);
   const [tempCategories, setTempCategories] = useState<string[]>([]);
-  const [tempProducts, setTempProducts] = useState<string[]>([]);
   const [tempMainStationId, setTempMainStationId] = useState('');
   const [tempTechStations, setTempTechStations] = useState<string[]>([]);
   const [tempKtvs, setTempKtvs] = useState<string[]>([]);
@@ -489,11 +489,14 @@ export default function ReportList() {
   };
 
   const applyFilters = () => {
+    const selectedCategories = tempCategories.filter(id => !id.startsWith('PROD:'));
+    const selectedProducts = tempCategories.filter(id => id.startsWith('PROD:')).map(id => id.substring(5));
+
     setAppliedFilters({
       workTypes: tempWorkTypes,
       serviceTypes: tempServiceTypes,
-      categories: tempCategories,
-      products: tempProducts,
+      categories: selectedCategories,
+      products: selectedProducts,
       mainStationId: tempMainStationId,
       techStations: tempTechStations,
       ktvs: tempKtvs,
@@ -511,7 +514,6 @@ export default function ReportList() {
     setTempWorkTypes([]);
     setTempServiceTypes([]);
     setTempCategories([]);
-    setTempProducts([]);
     setTempMainStationId('');
     setTempTechStations([]);
     setTempKtvs([]);
@@ -831,16 +833,11 @@ export default function ReportList() {
               onChange={setTempServiceTypes}
             />
             <CategoryTreeSelect
-              label="Danh mục sản phẩm"
+              label="Danh mục & Sản phẩm"
               categories={filterOptions?.categories || []}
+              products={filterOptions?.productsDetailed || []}
               selected={tempCategories}
               onChange={setTempCategories}
-            />
-            <MultiSelectDropdown
-              label="Sản phẩm"
-              options={filterOptions?.products || []}
-              selected={tempProducts}
-              onChange={setTempProducts}
             />
           </div>
 
