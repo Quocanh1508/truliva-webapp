@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { fetchApi } from '../../api/client';
-import { Warehouse, RefreshCw, Search, AlertTriangle, CheckSquare, Square, Info, Download } from 'lucide-react';
+import { Warehouse, RefreshCw, Search, AlertTriangle, CheckSquare, Square, Info, Download, ChevronDown, X } from 'lucide-react';
 import CategoryTreeSelect from '../../components/CategoryTreeSelect';
 
 interface WarehouseData {
@@ -208,7 +208,7 @@ export default function InventoryManage() {
             </label>
             <input
               type="text"
-              className="form-input text-sm"
+              className="form-input text-sm h-[38px] py-1.5 px-3 border border-slate-200 rounded-lg outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 bg-white"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               placeholder="Nhập tên sản phẩm hoặc mã SKU..."
@@ -233,7 +233,7 @@ export default function InventoryManage() {
             </label>
             <button
               onClick={() => setShowWarehouseFilterDropdown(!showWarehouseFilterDropdown)}
-              className="w-full text-left form-input text-sm flex justify-between items-center bg-white border border-slate-200 rounded-lg p-2.5"
+              className="w-full text-left bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm flex justify-between items-center h-[38px] hover:border-blue-400 focus:border-blue-500 transition-colors shadow-sm text-slate-700 font-medium"
             >
               <span className="truncate">
                 {selectedWarehouses.length === warehouses.length 
@@ -242,7 +242,21 @@ export default function InventoryManage() {
                     ? 'Không chọn kho nào' 
                     : `${selectedWarehouses.length} kho được chọn`}
               </span>
-              <span className="text-slate-400">▼</span>
+              <div className="flex items-center gap-1.5 text-slate-400 shrink-0">
+                {selectedWarehouses.length > 0 && selectedWarehouses.length < warehouses.length && (
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      clearAllWarehouses();
+                    }}
+                    className="p-0.5 rounded-full hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-colors"
+                    title="Hủy chọn tất cả"
+                  >
+                    <X size={14} />
+                  </button>
+                )}
+                <ChevronDown size={14} className={`transition-transform duration-200 ${showWarehouseFilterDropdown ? 'rotate-180' : ''}`} />
+              </div>
             </button>
 
             {showWarehouseFilterDropdown && (

@@ -436,7 +436,7 @@ export default function CategoryTreeSelect({
       {/* Trigger Button */}
       <div 
         onClick={() => setIsOpen(!isOpen)}
-        className="w-full bg-white border border-gray-300 rounded-md px-3 py-2 text-[13px] text-gray-750 cursor-pointer flex justify-between items-center hover:border-blue-400 focus:border-blue-500 transition-colors shadow-sm"
+        className="w-full bg-white border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-700 cursor-pointer flex justify-between items-center hover:border-blue-400 focus:border-blue-500 transition-colors shadow-sm h-[38px]"
       >
         <span className="truncate font-medium">{selectedDisplay()}</span>
         <div className="flex items-center gap-1.5 text-slate-400 shrink-0">
