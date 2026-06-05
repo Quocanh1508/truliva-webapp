@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { fetchApi } from '../../api/client';
 import { Warehouse, RefreshCw, Search, AlertTriangle, CheckSquare, Square, Info, Download, ChevronDown, X } from 'lucide-react';
 import CategoryTreeSelect from '../../components/CategoryTreeSelect';
@@ -45,6 +45,27 @@ export default function InventoryManage() {
 
   // UI Dropdowns
   const [showWarehouseFilterDropdown, setShowWarehouseFilterDropdown] = useState(false);
+  const [warehouseSearchTerm, setWarehouseSearchTerm] = useState('');
+
+  const warehouseDropdownRef = useRef<HTMLDivElement>(null);
+
+  // Close warehouse dropdown on click outside
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (warehouseDropdownRef.current && !warehouseDropdownRef.current.contains(event.target as Node)) {
+        setShowWarehouseFilterDropdown(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  // Reset warehouse search term when dropdown closes
+  useEffect(() => {
+    if (!showWarehouseFilterDropdown) {
+      setWarehouseSearchTerm('');
+    }
+  }, [showWarehouseFilterDropdown]);
 
   const loadData = async () => {
     setLoading(true);
@@ -101,6 +122,10 @@ export default function InventoryManage() {
   // Lấy danh sách Categories duy nhất để lọc
   const rawCategories = Array.from(new Set(products.map(p => p.category).filter(Boolean))) as string[];
 
+  const filteredWarehouses = warehouses.filter(w => 
+    w.name.toLowerCase().includes(warehouseSearchTerm.toLowerCase().trim())
+  );
+
   // Toggle chọn/hủy chọn kho hàng trong bộ lọc
   const toggleWarehouseSelection = (id: string) => {
     if (selectedWarehouses.includes(id)) {
@@ -111,11 +136,27 @@ export default function InventoryManage() {
   };
 
   const selectAllWarehouses = () => {
-    setSelectedWarehouses(warehouses.map(w => w.id));
+    if (warehouseSearchTerm.trim()) {
+      const filteredIds = filteredWarehouses.map(w => w.id);
+      setSelectedWarehouses(prev => {
+        const next = [...prev];
+        filteredIds.forEach(id => {
+          if (!next.includes(id)) next.push(id);
+        });
+        return next;
+      });
+    } else {
+      setSelectedWarehouses(warehouses.map(w => w.id));
+    }
   };
 
   const clearAllWarehouses = () => {
-    setSelectedWarehouses([]);
+    if (warehouseSearchTerm.trim()) {
+      const filteredIds = filteredWarehouses.map(w => w.id);
+      setSelectedWarehouses(prev => prev.filter(id => !filteredIds.includes(id)));
+    } else {
+      setSelectedWarehouses([]);
+    }
   };
 
   // Filter Products
@@ -227,7 +268,7 @@ export default function InventoryManage() {
           </div>
 
           {/* Dropdown Bộ lọc Kho hàng */}
-          <div className="md:col-span-3 form-group mb-0 relative">
+          <div className="md:col-span-3 form-group mb-0 relative" ref={warehouseDropdownRef}>
             <label className="form-label text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1.5 flex items-center justify-between">
               <span>Hiển thị kho ({selectedWarehouses.length}/{warehouses.length})</span>
             </label>
@@ -261,11 +302,32 @@ export default function InventoryManage() {
 
             {showWarehouseFilterDropdown && (
               <div className="absolute left-0 right-0 mt-1 bg-white border border-slate-200 rounded-xl shadow-xl z-30 max-h-72 overflow-y-auto p-3 flex flex-col gap-2">
+                {/* Thanh tìm kiếm nhanh tên kho */}
+                <div className="relative mb-1">
+                  <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" size={14} />
+                  <input
+                    type="text"
+                    className="w-full pl-8 pr-7 py-1.5 text-xs border border-slate-250 rounded-lg outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 transition-shadow bg-white"
+                    placeholder="Tìm kiếm kho..."
+                    value={warehouseSearchTerm}
+                    onChange={(e) => setWarehouseSearchTerm(e.target.value)}
+                  />
+                  {warehouseSearchTerm && (
+                    <button 
+                      onClick={() => setWarehouseSearchTerm('')}
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                    >
+                      <X size={12} />
+                    </button>
+                  )}
+                </div>
+
                 <div className="flex justify-between border-b border-slate-100 pb-2 mb-1">
                   <button onClick={selectAllWarehouses} className="text-xs font-semibold text-[#1B3A6B] hover:underline">Chọn tất cả</button>
                   <button onClick={clearAllWarehouses} className="text-xs font-semibold text-slate-500 hover:underline">Hủy chọn</button>
                 </div>
-                {warehouses.map((w) => (
+                
+                {filteredWarehouses.map((w) => (
                   <label key={w.id} className="flex items-center gap-2 text-sm text-slate-700 hover:bg-slate-50 p-1.5 rounded cursor-pointer transition-colors">
                     <input
                       type="checkbox"
@@ -276,6 +338,11 @@ export default function InventoryManage() {
                     <span className="truncate" title={w.name}>{w.name}</span>
                   </label>
                 ))}
+                {filteredWarehouses.length === 0 && (
+                  <span className="text-xs text-slate-400 italic p-3 text-center">
+                    Không tìm thấy kho hàng
+                  </span>
+                )}
               </div>
             )}
           </div>
