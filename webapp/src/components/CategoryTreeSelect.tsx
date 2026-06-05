@@ -11,6 +11,7 @@ interface TreeNode {
 interface ProductItem {
   name: string;
   category: string | null;
+  sku?: string;
 }
 
 interface CategoryTreeSelectProps {
@@ -128,7 +129,7 @@ export default function CategoryTreeSelect({
               }),
               ...matchedProducts.map(p => ({
                 id: `PROD:${p.name}`,
-                label: p.name,
+                label: p.sku ? `${p.name} (${p.sku})` : p.name,
                 isParent: false,
                 children: []
               }))
@@ -195,7 +196,7 @@ export default function CategoryTreeSelect({
 
   const isChecked = (node: TreeNode): boolean => {
     if (node.isParent && node.children.length > 0) {
-      return selected.includes(node.id) && node.children.every(child => selected.includes(child.id));
+      return node.children.every(child => isChecked(child));
     }
     return selected.includes(node.id);
   };
@@ -203,13 +204,13 @@ export default function CategoryTreeSelect({
   const isIndeterminate = (node: TreeNode): boolean => {
     if (!node.isParent || node.children.length === 0) return false;
     
-    const childCheckedCount = node.children.filter(child => selected.includes(child.id)).length;
-    const parentChecked = selected.includes(node.id);
+    const childChecked = node.children.map(child => isChecked(child));
+    const childIndeterminate = node.children.map(child => isIndeterminate(child));
     
-    const allChildrenChecked = childCheckedCount === node.children.length;
-    const someChildrenChecked = childCheckedCount > 0;
+    const anyChecked = childChecked.some(c => c) || childIndeterminate.some(i => i);
+    const allChecked = childChecked.every(c => c);
     
-    return (parentChecked && !allChildrenChecked) || (!parentChecked && someChildrenChecked);
+    return anyChecked && !allChecked;
   };
 
   const toggleNode = (node: TreeNode, e: React.MouseEvent) => {

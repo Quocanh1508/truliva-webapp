@@ -1966,41 +1966,61 @@ export default function OrderList() {
                   )}
 
                   {/* Search and add product dropdown */}
-                  <div className="flex space-x-2">
-                    <select
-                      className="w-full border rounded p-2 text-sm outline-none focus:border-blue-500 bg-white text-gray-800 font-medium"
-                      defaultValue=""
-                      onChange={(e) => {
-                        const val = e.target.value;
-                        if (!val) return;
-                        const selectedProd = productsStock.find(p => p.id === val);
-                        if (selectedProd) {
-                          const exists = tempItems.some(item => 
-                            item.sku === selectedProd.sku || 
-                            item.productName.toLowerCase() === selectedProd.name.toLowerCase()
+                  <div className="w-full">
+                    <CategoryTreeSelect
+                      categories={Array.from(new Set(productsStock.map(p => p.category).filter(Boolean))) as string[]}
+                      products={productsStock.map(p => ({ name: p.name, category: p.category, sku: p.sku }))}
+                      selected={tempItems.map(item => {
+                        const matched = productsStock.find(p => 
+                          (item.sku && p.sku === item.sku) ||
+                          p.name.toLowerCase() === item.productName.toLowerCase()
+                        );
+                        return `PROD:${matched ? matched.name : item.productName}`;
+                      })}
+                      placeholder="-- Chọn/thêm sản phẩm vào đơn --"
+                      onChange={(nextSelected) => {
+                        const nextProductNames = nextSelected
+                          .filter(id => id.startsWith('PROD:'))
+                          .map(id => id.substring(5)); // Remove 'PROD:' prefix
+
+                        // Filter out items that are no longer in selected products
+                        let updatedItems = tempItems.filter(item => {
+                          const matched = productsStock.find(p => 
+                            (item.sku && p.sku === item.sku) ||
+                            p.name.toLowerCase() === item.productName.toLowerCase()
                           );
-                          if (exists) {
-                            alert('Sản phẩm này đã được thêm.');
-                          } else {
-                            setTempItems([...tempItems, {
-                              productName: selectedProd.name,
-                              sku: selectedProd.sku || '',
-                              quantity: 1,
-                              price: selectedProd.sellingPrice || 0,
-                              discount: 0
-                            }]);
+                          const finalName = matched ? matched.name : item.productName;
+                          return nextProductNames.includes(finalName);
+                        });
+
+                        // Add newly selected products
+                        nextProductNames.forEach(name => {
+                          const alreadyAdded = updatedItems.some(item => {
+                            const matched = productsStock.find(p => 
+                              (item.sku && p.sku === item.sku) ||
+                              p.name.toLowerCase() === item.productName.toLowerCase()
+                            );
+                            const finalName = matched ? matched.name : item.productName;
+                            return finalName === name;
+                          });
+
+                          if (!alreadyAdded) {
+                            const prodData = productsStock.find(p => p.name === name);
+                            if (prodData) {
+                              updatedItems.push({
+                                productName: prodData.name,
+                                sku: prodData.sku || '',
+                                quantity: 1,
+                                price: prodData.sellingPrice || 0,
+                                discount: 0
+                              });
+                            }
                           }
-                        }
-                        e.target.value = '';
+                        });
+
+                        setTempItems(updatedItems);
                       }}
-                    >
-                      <option value="">-- Thêm sản phẩm vào đơn --</option>
-                      {productsStock.map(p => (
-                        <option key={p.id} value={p.id}>
-                          {p.name} {p.sku ? `(${p.sku})` : ''}
-                        </option>
-                      ))}
-                    </select>
+                    />
                   </div>
                 </div>
 
