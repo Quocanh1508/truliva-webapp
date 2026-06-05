@@ -41,10 +41,11 @@ export default function CategoryTreeSelect({
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  // Parse tree from categories list
   const tree = (() => {
+    const KNOWN_PARENTS = ['Device', 'Filter', 'Spare part'];
+
     // 1. Identify parents
-    const parentCandidates = new Set<string>();
+    const parentCandidates = new Set<string>(KNOWN_PARENTS);
     for (const cat of categories) {
       for (const other of categories) {
         if (other !== cat && other.endsWith(' ' + cat)) {
@@ -58,8 +59,11 @@ export default function CategoryTreeSelect({
     const childSet = new Set<string>();
 
     for (const cat of categories) {
+      if (parentCandidates.has(cat)) {
+        continue;
+      }
       for (const parent of parentCandidates) {
-        if (cat !== parent && cat.endsWith(' ' + parent)) {
+        if (cat.endsWith(' ' + parent)) {
           if (!childrenMap.has(parent)) {
             childrenMap.set(parent, []);
           }
@@ -73,12 +77,12 @@ export default function CategoryTreeSelect({
     const roots: TreeNode[] = [];
 
     // Add parent roots
-    for (const cat of categories) {
-      if (parentCandidates.has(cat) && !childSet.has(cat)) {
-        const children = childrenMap.get(cat) || [];
+    for (const parent of parentCandidates) {
+      const children = childrenMap.get(parent) || [];
+      if (children.length > 0 || categories.includes(parent)) {
         roots.push({
-          id: cat,
-          label: cat,
+          id: parent,
+          label: parent,
           isParent: true,
           children: children.map(child => ({
             id: child,
