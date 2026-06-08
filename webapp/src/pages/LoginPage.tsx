@@ -42,6 +42,10 @@ export default function LoginPage() {
         body: JSON.stringify({ username, password }),
       });
       
+      if (data.token) {
+        localStorage.setItem('session_token', data.token);
+      }
+      
       login(data.user);
       
       if (data.user.role === 'ADMIN') {

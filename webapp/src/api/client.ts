@@ -1,12 +1,19 @@
 export const API_URL = '/api';
 
 export async function fetchApi(endpoint: string, options: RequestInit = {}) {
+  const token = localStorage.getItem('session_token');
+  const headers = {
+    'Content-Type': 'application/json',
+    ...options.headers,
+  } as Record<string, string>;
+
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+
   const response = await fetch(`${API_URL}${endpoint}`, {
     ...options,
-    headers: {
-      'Content-Type': 'application/json',
-      ...options.headers,
-    },
+    headers,
   });
 
   const data = await response.json();

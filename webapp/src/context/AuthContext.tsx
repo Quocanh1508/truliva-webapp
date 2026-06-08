@@ -47,6 +47,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     } catch (e) {
       console.error('Logout error', e);
     } finally {
+      localStorage.removeItem('session_token');
       setUser(null);
     }
   };

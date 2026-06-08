@@ -24,7 +24,12 @@ declare global {
  */
 export async function requireAuth(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
-    const sessionToken = req.cookies?.session_token;
+    let sessionToken = req.cookies?.session_token;
+
+    const authHeader = req.headers.authorization;
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      sessionToken = authHeader.substring(7);
+    }
 
     if (!sessionToken) {
       res.status(401).json({ error: 'Chưa đăng nhập' });

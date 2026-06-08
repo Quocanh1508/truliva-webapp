@@ -61,6 +61,7 @@ router.post('/login', async (req: Request, res: Response): Promise<void> => {
     logger.info('User logged in with JWT', { userId: user.id, username: user.username });
 
     res.json({
+      token,
       user: {
         id: user.id,
         username: user.username,
