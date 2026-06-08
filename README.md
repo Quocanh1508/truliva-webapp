@@ -80,3 +80,6 @@ Khi có sự thay đổi về tính năng hoặc giao diện mới, thực hiệ
   <p>Truliva - Nâng cao hiệu quả vận hành dịch vụ kỹ thuật</p>
   <p>© 2026 Truliva Corporation. All rights reserved.</p>
 </div>
+
+<!-- Deploy Trigger: KTV Mobile UI & Persistent Authentication updates -->
+
