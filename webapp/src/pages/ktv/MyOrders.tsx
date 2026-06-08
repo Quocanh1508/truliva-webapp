@@ -199,7 +199,7 @@ export default function MyOrders() {
                 </div>
               </div>
 
-              {orders.map((order, index) => {
+              {orders.map((order) => {
                 const customerName = order.billFullName || order.customer?.fullName || 'Khách lẻ';
                 const phone = order.billPhoneNumber || order.customer?.phoneNumber || '';
                 const address = order.shippingAddress?.full_address || order.customer?.fullAddress || 'Đang cập nhật';
@@ -230,13 +230,12 @@ export default function MyOrders() {
                   }
                 }
                 
-                const isEven = index % 2 === 0;
-                const cardBg = isEven ? 'bg-white' : 'bg-blue-50';
-                const cardBorder = isEven ? 'border-gray-100' : 'border-blue-200/60';
-                const itemBg = isEven ? 'bg-gray-50' : 'bg-white';
-                const itemBorder = isEven ? 'border-gray-100' : 'border-blue-200/40';
-                const noteBg = isEven ? 'bg-gray-50/50' : 'bg-white/80';
-                const noteBorder = isEven ? 'border-gray-200' : 'border-blue-200/40';
+                const cardBg = 'bg-blue-50';
+                const cardBorder = 'border-blue-200/60';
+                const itemBg = 'bg-white';
+                const itemBorder = 'border-blue-200/40';
+                const noteBg = 'bg-white/80';
+                const noteBorder = 'border-blue-200/40';
                 
                 return (
                   <div key={order.id} className={`border ${cardBorder} rounded-xl shadow-sm ${cardBg} p-4 flex flex-col space-y-3.5 hover:shadow transition-shadow`}>
