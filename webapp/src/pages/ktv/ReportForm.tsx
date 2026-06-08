@@ -6,6 +6,7 @@ import { CheckCircle, ChevronLeft, Send, AlertCircle, Camera, Loader2, ChevronDo
 import { Html5Qrcode } from 'html5-qrcode';
 
 import { getImageSlots, WARRANTY_SERVICE_GROUPS, REPAIR_SERVICE_GROUPS, WORK_TYPE_SERVICES } from '../../utils/workTypes';
+import { matchesSearchTerm } from '../../utils/text';
 
 // ── Cấu trúc linh kiện phân loại theo dòng máy ──
 const SPARE_PARTS_GROUPS = [
@@ -752,8 +753,8 @@ export default function ReportForm() {
                         </div>
 
                         {(() => {
-                          const suggestedProds = getSuggestedProducts().filter(p => !productSearch || p.toLowerCase().includes(productSearch.toLowerCase()));
-                          const catalogProdsOnly = getCatalogProductsOnly().filter(p => !productSearch || p.toLowerCase().includes(productSearch.toLowerCase()));
+                          const suggestedProds = getSuggestedProducts().filter(p => !productSearch || matchesSearchTerm(p, productSearch));
+                          const catalogProdsOnly = getCatalogProductsOnly().filter(p => !productSearch || matchesSearchTerm(p, productSearch));
                           
                           if (suggestedProds.length === 0 && catalogProdsOnly.length === 0) {
                             return (

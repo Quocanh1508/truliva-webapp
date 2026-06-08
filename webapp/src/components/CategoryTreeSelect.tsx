@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { ChevronRight, ChevronDown, Folder, FolderOpen, FileText, Search, X, Check, Minus } from 'lucide-react';
+import { matchesSearchTerm } from '../utils/text';
 
 interface TreeNode {
   id: string;
@@ -164,19 +165,18 @@ export default function CategoryTreeSelect({
     if (searchTerm.trim() === '') return;
     
     const nextExpanded: Record<string, boolean> = {};
-    const lowerSearch = searchTerm.toLowerCase();
 
     const checkNode = (node: TreeNode): boolean => {
       let childMatches = false;
       if (node.children) {
         node.children.forEach(c => {
-          if (c.label.toLowerCase().includes(lowerSearch)) {
+          if (matchesSearchTerm(c.label, searchTerm)) {
             childMatches = true;
           }
         });
       }
       
-      const selfMatches = node.label.toLowerCase().includes(lowerSearch);
+      const selfMatches = matchesSearchTerm(node.label, searchTerm);
       
       if (childMatches) {
         nextExpanded[node.id] = true;
@@ -276,12 +276,11 @@ export default function CategoryTreeSelect({
 
   // Filter tree nodes based on search term
   const filterTree = (nodes: TreeNode[]): TreeNode[] => {
-    const lowerSearch = searchTerm.toLowerCase().trim();
-    if (lowerSearch === '') return nodes;
+    if (searchTerm.trim() === '') return nodes;
 
     return nodes
       .map(node => {
-        const matchesSelf = node.label.toLowerCase().includes(lowerSearch);
+        const matchesSelf = matchesSearchTerm(node.label, searchTerm);
         const filteredChildren = filterTree(node.children);
         
         if (matchesSelf || filteredChildren.length > 0) {

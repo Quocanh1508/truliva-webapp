@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import { fetchApi, getStations } from '../../api/client';
 import { UserPlus, Lock, Unlock, Search, Filter, X, Pencil, Download } from 'lucide-react';
 import { useConfirm } from '../../context/ConfirmContext';
+import { matchesSearchTerm } from '../../utils/text';
 
 // Helper to sort tech stations: TP.Hồ Chí Minh, Hà Nội, Đà Nẵng first, then A-Z
 function getSortedTechStations(main: any) {
@@ -153,11 +154,10 @@ export default function UserManage() {
 
     // Text search (name, phone, username)
     if (searchText.trim()) {
-      const q = searchText.toLowerCase().trim();
       result = result.filter(u =>
-        u.fullName?.toLowerCase().includes(q) ||
-        u.phoneNumber?.toLowerCase().includes(q) ||
-        u.username?.toLowerCase().includes(q)
+        (u.fullName && matchesSearchTerm(u.fullName, searchText)) ||
+        (u.phoneNumber && matchesSearchTerm(u.phoneNumber, searchText)) ||
+        (u.username && matchesSearchTerm(u.username, searchText))
       );
     }
 

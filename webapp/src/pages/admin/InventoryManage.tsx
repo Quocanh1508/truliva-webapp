@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { fetchApi } from '../../api/client';
 import { Warehouse, RefreshCw, Search, AlertTriangle, CheckSquare, Square, Info, Download, ChevronDown, X } from 'lucide-react';
 import CategoryTreeSelect from '../../components/CategoryTreeSelect';
+import { matchesSearchTerm } from '../../utils/text';
 
 interface WarehouseData {
   id: string;
@@ -123,7 +124,7 @@ export default function InventoryManage() {
   const rawCategories = Array.from(new Set(products.map(p => p.category).filter(Boolean))) as string[];
 
   const filteredWarehouses = warehouses.filter(w => 
-    w.name.toLowerCase().includes(warehouseSearchTerm.toLowerCase().trim())
+    matchesSearchTerm(w.name, warehouseSearchTerm)
   );
 
   // Toggle chọn/hủy chọn kho hàng trong bộ lọc
@@ -163,8 +164,8 @@ export default function InventoryManage() {
   const filteredProducts = products.filter(p => {
     // 1. Lọc theo tìm kiếm Tên / SKU
     const matchSearch = searchTerm.trim() === '' || 
-      p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (p.sku && p.sku.toLowerCase().includes(searchTerm.toLowerCase()));
+      matchesSearchTerm(p.name, searchTerm) ||
+      (p.sku && matchesSearchTerm(p.sku, searchTerm));
 
     // 2. Lọc theo Danh mục
     const matchCategory = selectedCategories.length === 0 || (p.category && selectedCategories.includes(p.category));

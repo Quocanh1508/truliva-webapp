@@ -3,6 +3,7 @@ import { fetchApi } from '../../api/client';
 import { Warehouse, Search, AlertTriangle, CheckSquare, Square, Download } from 'lucide-react';
 import CategoryTreeSelect from '../../components/CategoryTreeSelect';
 import PullToRefresh from '../../components/PullToRefresh';
+import { matchesSearchTerm } from '../../utils/text';
 
 export default function KtvInventory() {
   const [warehouse, setWarehouse] = useState<any>(null);
@@ -63,8 +64,8 @@ export default function KtvInventory() {
     return products.filter(p => {
       // 1. Lọc theo tìm kiếm Tên / SKU
       const matchSearch = searchTerm.trim() === '' || 
-        p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        (p.sku && p.sku.toLowerCase().includes(searchTerm.toLowerCase()));
+        matchesSearchTerm(p.name, searchTerm) ||
+        (p.sku && matchesSearchTerm(p.sku, searchTerm));
 
       // 2. Lọc theo Danh mục
       const matchCategory = selectedCategories.length === 0 || (p.category && selectedCategories.includes(p.category));
