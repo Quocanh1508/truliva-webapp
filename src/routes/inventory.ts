@@ -202,7 +202,7 @@ router.get('/export', async (req: Request, res: Response): Promise<void> => {
     let selectedWarehouseIds: string[] = [];
     if (userDb.role === 'KTV') {
       if (!userDb.warehouseId) {
-        res.status(400).json({ error: 'Tài khoản của bạn chưa được gán kho hàng trên hệ thống.' });
+        res.status(400).json({ error: 'Bạn không trực thuộc quản lý kho nào, nếu có sai sót hãy liên hệ admin.' });
         return;
       }
       selectedWarehouseIds = [userDb.warehouseId];
@@ -419,7 +419,7 @@ router.get('/my-stock', async (req: Request, res: Response): Promise<void> => {
     });
 
     if (!user || !user.warehouseId) {
-      res.status(400).json({ error: 'Tài khoản của bạn chưa được gán kho hàng trên hệ thống. Vui lòng liên hệ Admin.' });
+      res.status(400).json({ error: 'Bạn không trực thuộc quản lý kho nào, nếu có sai sót hãy liên hệ admin.' });
       return;
     }
 
