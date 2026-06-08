@@ -192,9 +192,9 @@ export default function LoginPage() {
             style={{ height: '60px', margin: '0 auto 0.75rem', cursor: 'pointer', transition: 'transform 0.2s' }} 
             className="mx-auto hover:opacity-90 active:scale-95"
           />
-          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-yellow-500/20 text-yellow-300 text-xs font-semibold mb-3 border border-yellow-500/30 select-none">
+          <div className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-slate-50 text-slate-400 text-[11px] font-medium mb-3 border border-slate-100 select-none">
             <span>⚽</span>
-            <span>World Cup 2026 Mode</span>
+            <span>World Cup Mode</span>
             <span>🏆</span>
           </div>
           <h2 className="font-bold text-xl">Đăng nhập hệ thống KTV</h2>
