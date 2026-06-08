@@ -4,6 +4,7 @@ import { LogIn, Download, Smartphone, X, Share2, PlusSquare, Monitor } from 'luc
 import { useAuth } from '../context/AuthContext';
 import { fetchApi } from '../api/client';
 import { Capacitor } from '@capacitor/core';
+import confetti from 'canvas-confetti';
 
 export default function LoginPage() {
   const [username, setUsername] = useState('');
@@ -29,6 +30,46 @@ export default function LoginPage() {
     };
     window.addEventListener('beforeinstallprompt', handler);
     return () => window.removeEventListener('beforeinstallprompt', handler);
+  }, []);
+
+  // Trigger World Cup confetti effect
+  const triggerWorldCupConfetti = () => {
+    try {
+      const soccer = confetti.shapeFromText({ text: '⚽' });
+      const trophy = confetti.shapeFromText({ text: '🏆' });
+      const flag = confetti.shapeFromText({ text: '🇻🇳' });
+      const star = confetti.shapeFromText({ text: '⭐' });
+
+      // Shoot from left corner
+      confetti({
+        particleCount: 25,
+        angle: 60,
+        spread: 55,
+        origin: { x: 0, y: 0.85 },
+        shapes: [soccer, trophy, flag, star],
+        scalar: 2.2,
+        zIndex: 1100
+      });
+      // Shoot from right corner
+      confetti({
+        particleCount: 25,
+        angle: 120,
+        spread: 55,
+        origin: { x: 1, y: 0.85 },
+        shapes: [soccer, trophy, flag, star],
+        scalar: 2.2,
+        zIndex: 1100
+      });
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      triggerWorldCupConfetti();
+    }, 600);
+    return () => clearTimeout(timer);
   }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -92,10 +133,70 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="flex items-center justify-center h-screen" style={{ backgroundColor: '#1B3A6B' }}>
-      <div className="card w-full animate-fade-in" style={{ maxWidth: '400px', margin: '1rem' }}>
+    <div className="relative flex items-center justify-center h-screen overflow-hidden" style={{ backgroundColor: '#1B3A6B' }}>
+      {/* Floating soccer balls background */}
+      <div className="absolute inset-0 overflow-hidden pointer-events-none z-0">
+        <div className="soccer-ball sb-1">⚽</div>
+        <div className="soccer-ball sb-2">⚽</div>
+        <div className="soccer-ball sb-3">⚽</div>
+        <div className="soccer-ball sb-4">⚽</div>
+        <div className="soccer-ball sb-5">⚽</div>
+        <div className="soccer-ball sb-6">⚽</div>
+        <div className="soccer-ball sb-7">⚽</div>
+        <div className="soccer-ball sb-8">⚽</div>
+      </div>
+
+      <style>{`
+        @keyframes float-up {
+          0% {
+            transform: translateY(105vh) rotate(0deg) scale(0.6);
+            opacity: 0;
+          }
+          10% {
+            opacity: 0.3;
+          }
+          90% {
+            opacity: 0.3;
+          }
+          100% {
+            transform: translateY(-10vh) rotate(360deg) scale(1.2);
+            opacity: 0;
+          }
+        }
+        .soccer-ball {
+          position: absolute;
+          bottom: -50px;
+          font-size: 2rem;
+          user-select: none;
+          pointer-events: none;
+          animation: float-up 12s linear infinite;
+          z-index: 0;
+        }
+        .sb-1 { left: 8%; animation-delay: 0s; animation-duration: 14s; }
+        .sb-2 { left: 23%; animation-delay: 3s; animation-duration: 18s; font-size: 2.5rem; }
+        .sb-3 { left: 43%; animation-delay: 6s; animation-duration: 15s; }
+        .sb-4 { left: 58%; animation-delay: 1s; animation-duration: 20s; font-size: 3rem; }
+        .sb-5 { left: 73%; animation-delay: 8s; animation-duration: 16s; }
+        .sb-6 { left: 88%; animation-delay: 4s; animation-duration: 22s; font-size: 2.2rem; }
+        .sb-7 { left: 33%; animation-delay: 10s; animation-duration: 17s; font-size: 1.8rem; }
+        .sb-8 { left: 80%; animation-delay: 12s; animation-duration: 19s; font-size: 2.8rem; }
+      `}</style>
+
+      <div className="card w-full animate-fade-in relative z-10" style={{ maxWidth: '400px', margin: '1rem' }}>
         <div className="text-center mb-6">
-          <img src="/TRULIVA_WC.png" alt="Truliva Logo" style={{ height: '60px', margin: '0 auto 1rem' }} />
+          <img 
+            src="/TRULIVA_WC.png" 
+            alt="Truliva Logo" 
+            onClick={triggerWorldCupConfetti}
+            title="Bấm vào để bắn pháo hoa World Cup!"
+            style={{ height: '60px', margin: '0 auto 0.75rem', cursor: 'pointer', transition: 'transform 0.2s' }} 
+            className="mx-auto hover:opacity-90 active:scale-95"
+          />
+          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-yellow-500/20 text-yellow-300 text-xs font-semibold mb-3 border border-yellow-500/30 select-none">
+            <span>⚽</span>
+            <span>World Cup 2026 Mode</span>
+            <span>🏆</span>
+          </div>
           <h2 className="font-bold text-xl">Đăng nhập hệ thống KTV</h2>
         </div>
 
