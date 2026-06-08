@@ -231,12 +231,12 @@ export default function MyOrders() {
                 }
                 
                 const isEven = index % 2 === 0;
-                const cardBg = isEven ? 'bg-white' : 'bg-blue-50/25';
-                const cardBorder = isEven ? 'border-gray-100' : 'border-blue-100/50';
-                const itemBg = isEven ? 'bg-gray-50' : 'bg-white/80';
-                const itemBorder = isEven ? 'border-gray-100' : 'border-blue-100/40';
-                const noteBg = isEven ? 'bg-gray-50/50' : 'bg-white/60';
-                const noteBorder = isEven ? 'border-gray-200' : 'border-blue-200/30';
+                const cardBg = isEven ? 'bg-white' : 'bg-blue-50';
+                const cardBorder = isEven ? 'border-gray-100' : 'border-blue-200/60';
+                const itemBg = isEven ? 'bg-gray-50' : 'bg-white';
+                const itemBorder = isEven ? 'border-gray-100' : 'border-blue-200/40';
+                const noteBg = isEven ? 'bg-gray-50/50' : 'bg-white/80';
+                const noteBorder = isEven ? 'border-gray-200' : 'border-blue-200/40';
                 
                 return (
                   <div key={order.id} className={`border ${cardBorder} rounded-xl shadow-sm ${cardBg} p-4 flex flex-col space-y-3.5 hover:shadow transition-shadow`}>
