@@ -259,7 +259,7 @@ export default function MyOrders() {
                     {/* Dòng 4: Công việc / Sản phẩm */}
                     <div className="flex items-start space-x-3 text-[12.5px] text-gray-700">
                       <Wrench className="text-gray-400 mt-0.5 shrink-0" size={16} />
-                      <div className="flex-1 space-y-1">
+                      <div className="flex-1 space-y-1 min-w-0">
                         <div>
                           <span className="font-semibold text-gray-800">Loại: </span>
                           <span>{order.serviceType && order.serviceType !== 'Công việc đã bao gồm dịch vụ' ? `${order.workType} (${order.serviceType})` : order.workType}</span>
@@ -267,7 +267,7 @@ export default function MyOrders() {
                         {order.items && order.items.length > 0 && (
                           <div className="bg-gray-50 border border-gray-100 rounded-lg p-2 mt-1 space-y-1 text-xs text-gray-600">
                             {order.items.map((item: any, itemIdx: number) => (
-                              <div key={item.id || itemIdx} className="flex justify-between">
+                              <div key={item.id || itemIdx} className="flex justify-between min-w-0">
                                 <span className="font-medium truncate pr-2">• {item.productName}</span>
                                 <span className="text-gray-900 font-bold shrink-0">x{item.quantity || 1}</span>
                               </div>
