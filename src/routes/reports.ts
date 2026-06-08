@@ -409,8 +409,18 @@ router.get('/my-stats', requireAuth, async (req: Request, res: Response): Promis
           gte: new Date(Date.now() - 90 * 24 * 60 * 60 * 1000)
         }
       },
-      include: {
+      select: {
+        id: true,
+        workType: true,
+        adminStatus: true,
+        ktvCalledAt: true,
+        appointmentTime: true,
+        createdAt: true,
+        updatedAt: true,
         serviceReports: {
+          select: {
+            createdAt: true
+          },
           orderBy: { createdAt: 'asc' },
           take: 1
         }

@@ -268,8 +268,23 @@ router.get('/dispatch-analysis', async (req: Request, res: Response): Promise<vo
     // Lấy tất cả các đơn hàng thỏa mãn
     let orders = await prisma.order.findMany({
       where,
-      include: {
+      select: {
+        id: true,
+        pancakeOrderId: true,
+        billFullName: true,
+        billPhoneNumber: true,
+        workType: true,
+        adminStatus: true,
+        appointmentTime: true,
+        updatedAt: true,
+        createdAt: true,
+        shippingAddress: true,
+        mainStationId: true,
+        techStationId: true,
         serviceReports: {
+          select: {
+            createdAt: true
+          },
           orderBy: { createdAt: 'asc' },
           take: 1
         },

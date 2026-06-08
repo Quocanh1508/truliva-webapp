@@ -333,56 +333,166 @@ router.get('/', requireAuth, async (req: Request, res: Response): Promise<void> 
     const statsConditions = conditions.filter(cond => !('adminStatus' in cond));
     const statsWhere: Prisma.OrderWhereInput = statsConditions.length > 0 ? { AND: statsConditions } : {};
 
-    const [orders, total, statsResult] = await Promise.all([
-      prisma.order.findMany({
-        where,
-        orderBy,
-        skip,
-        take: limitNumber,
-        include: {
-          items: true,
-          customer: {
-            select: {
-              fullName: true,
-              phoneNumber: true,
-              fullAddress: true,
-              provinceName: true,
-              districtName: true,
-            }
-          },
-          mainStation: {
-            select: {
-              name: true,
-            }
-          },
-          techStation: {
-            select: {
-              name: true,
-            }
-          },
-          assignedKtv: {
-            select: {
-              id: true,
-              fullName: true,
-              techStation: {
-                select: {
-                  name: true,
-                  mainStation: {
-                    select: {
-                      name: true,
-                    }
+    const isKtv = req.user?.role === 'KTV';
+    const findManyOptions: any = {
+      where,
+      orderBy,
+      skip,
+      take: limitNumber,
+    };
+
+    if (isKtv) {
+      findManyOptions.select = {
+        id: true,
+        pancakeOrderId: true,
+        customerId: true,
+        statusCode: true,
+        statusName: true,
+        totalPrice: true,
+        shippingFee: true,
+        totalDiscount: true,
+        totalQuantity: true,
+        moneyToCollect: true,
+        orderSource: true,
+        orderSourceId: true,
+        orderLink: true,
+        shippingAddress: true,
+        warehouseInfo: true,
+        billFullName: true,
+        billPhoneNumber: true,
+        note: true,
+        partnerFee: true,
+        feeMarketplace: true,
+        pancakeCreatedAt: true,
+        pancakeUpdatedAt: true,
+        appointmentTime: true,
+        adminStatus: true,
+        assignedKtvId: true,
+        workType: true,
+        serviceType: true,
+        mainStationId: true,
+        techStationId: true,
+        rescheduleReason: true,
+        cancelReason: true,
+        ktvCalledAt: true,
+        warehouseId: true,
+        pancakeSyncStatus: true,
+        createdAt: true,
+        updatedAt: true,
+        items: {
+          select: {
+            id: true,
+            orderId: true,
+            productName: true,
+            sku: true,
+            quantity: true,
+            price: true,
+            discount: true,
+            variationInfo: true,
+            createdAt: true,
+          }
+        },
+        customer: {
+          select: {
+            fullName: true,
+            phoneNumber: true,
+            fullAddress: true,
+            provinceName: true,
+            districtName: true,
+          }
+        },
+        mainStation: {
+          select: {
+            name: true,
+          }
+        },
+        techStation: {
+          select: {
+            name: true,
+          }
+        },
+        assignedKtv: {
+          select: {
+            id: true,
+            fullName: true,
+            techStation: {
+              select: {
+                name: true,
+                mainStation: {
+                  select: {
+                    name: true,
                   }
                 }
               }
             }
-          },
-          serviceReports: {
-            select: {
-              id: true
-            }
+          }
+        },
+        serviceReports: {
+          select: {
+            id: true
           }
         }
-      }),
+      };
+    } else {
+      findManyOptions.include = {
+        items: {
+          select: {
+            id: true,
+            orderId: true,
+            productName: true,
+            sku: true,
+            quantity: true,
+            price: true,
+            discount: true,
+            variationInfo: true,
+            createdAt: true,
+          }
+        },
+        customer: {
+          select: {
+            fullName: true,
+            phoneNumber: true,
+            fullAddress: true,
+            provinceName: true,
+            districtName: true,
+          }
+        },
+        mainStation: {
+          select: {
+            name: true,
+          }
+        },
+        techStation: {
+          select: {
+            name: true,
+          }
+        },
+        assignedKtv: {
+          select: {
+            id: true,
+            fullName: true,
+            techStation: {
+              select: {
+                name: true,
+                mainStation: {
+                  select: {
+                    name: true,
+                  }
+                }
+              }
+            }
+          }
+        },
+        serviceReports: {
+          select: {
+            id: true
+          }
+        }
+      };
+    }
+
+    const [orders, total, statsResult] = await Promise.all([
+      prisma.order.findMany(findManyOptions),
       prisma.order.count({ where }),
       prisma.order.groupBy({
         by: ['adminStatus'],
@@ -863,8 +973,26 @@ router.get('/export', requireAuth, requireAdmin, async (req: Request, res: Respo
     const orders = await prisma.order.findMany({
       where,
       orderBy,
-      include: {
-        items: true,
+      select: {
+        pancakeOrderId: true,
+        billFullName: true,
+        billPhoneNumber: true,
+        adminStatus: true,
+        workType: true,
+        serviceType: true,
+        moneyToCollect: true,
+        appointmentTime: true,
+        createdAt: true,
+        updatedAt: true,
+        note: true,
+        rescheduleReason: true,
+        cancelReason: true,
+        shippingAddress: true,
+        items: {
+          select: {
+            productName: true
+          }
+        },
         customer: {
           select: {
             fullName: true,
