@@ -22,6 +22,7 @@ export default function MyOrders() {
   // Pagination
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
+  const [totalOrders, setTotalOrders] = useState(0);
   const [callingOrderId, setCallingOrderId] = useState<string | null>(null);
 
   // Reschedule Modal state
@@ -42,6 +43,7 @@ export default function MyOrders() {
       });
       setOrders(res.orders);
       setTotalPages(res.pagination.totalPages);
+      setTotalOrders(res.pagination.total || 0);
       setError('');
     } catch (err: any) {
       setError(err.message || 'Lỗi tải danh sách đơn hàng');
@@ -176,7 +178,28 @@ export default function MyOrders() {
             <div className="text-center py-12 text-gray-400">Bạn chưa được giao dịch vụ nào</div>
           ) : (
             <div className="flex flex-col p-4 space-y-4">
-              {orders.map((order) => {
+              {/* Banner thống kê đơn hàng */}
+              <div className="p-3 bg-blue-50/80 border border-blue-100 rounded-xl flex items-center justify-between shadow-xs">
+                <div className="flex items-center space-x-2.5">
+                  <div className="p-2 bg-blue-600 text-white rounded-lg">
+                    <Clock size={16} />
+                  </div>
+                  <div>
+                    <h3 className="text-[13px] font-bold text-blue-900">
+                      {search ? 'Kết quả tìm kiếm' : 'Dịch vụ cần thực hiện'}
+                    </h3>
+                    <p className="text-[11.5px] text-blue-700">
+                      {search ? `Tìm thấy ${totalOrders} đơn hàng phù hợp` : `Bạn còn ${totalOrders} đơn hàng chưa hoàn thành`}
+                    </p>
+                  </div>
+                </div>
+                <div className="bg-white/80 px-3 py-1.5 rounded-lg border border-blue-100 text-center shadow-xs">
+                  <span className="text-lg font-black text-blue-600 block leading-tight">{totalOrders}</span>
+                  <span className="text-[9px] font-bold text-blue-500 uppercase tracking-wider block">đơn</span>
+                </div>
+              </div>
+
+              {orders.map((order, index) => {
                 const customerName = order.billFullName || order.customer?.fullName || 'Khách lẻ';
                 const phone = order.billPhoneNumber || order.customer?.phoneNumber || '';
                 const address = order.shippingAddress?.full_address || order.customer?.fullAddress || 'Đang cập nhật';
@@ -207,8 +230,16 @@ export default function MyOrders() {
                   }
                 }
                 
+                const isEven = index % 2 === 0;
+                const cardBg = isEven ? 'bg-white' : 'bg-blue-50/25';
+                const cardBorder = isEven ? 'border-gray-100' : 'border-blue-100/50';
+                const itemBg = isEven ? 'bg-gray-50' : 'bg-white/80';
+                const itemBorder = isEven ? 'border-gray-100' : 'border-blue-100/40';
+                const noteBg = isEven ? 'bg-gray-50/50' : 'bg-white/60';
+                const noteBorder = isEven ? 'border-gray-200' : 'border-blue-200/30';
+                
                 return (
-                  <div key={order.id} className="border border-gray-100 rounded-xl shadow-sm bg-white p-4 flex flex-col space-y-3.5 hover:shadow transition-shadow">
+                  <div key={order.id} className={`border ${cardBorder} rounded-xl shadow-sm ${cardBg} p-4 flex flex-col space-y-3.5 hover:shadow transition-shadow`}>
                     {/* Header: Mã đơn + Trạng thái */}
                     <div className="flex justify-between items-center border-b border-gray-50 pb-2">
                       <div className="flex items-center space-x-2">
@@ -265,7 +296,7 @@ export default function MyOrders() {
                           <span>{order.serviceType && order.serviceType !== 'Công việc đã bao gồm dịch vụ' ? `${order.workType} (${order.serviceType})` : order.workType}</span>
                         </div>
                         {order.items && order.items.length > 0 && (
-                          <div className="bg-gray-50 border border-gray-100 rounded-lg p-2 mt-1 space-y-1 text-xs text-gray-600">
+                          <div className={`${itemBg} border ${itemBorder} rounded-lg p-2 mt-1 space-y-1 text-xs text-gray-600`}>
                             {order.items.map((item: any, itemIdx: number) => (
                               <div key={item.id || itemIdx} className="flex justify-between min-w-0">
                                 <span className="font-medium truncate pr-2">• {item.productName}</span>
@@ -283,7 +314,7 @@ export default function MyOrders() {
                     </div>
 
                     {/* Dòng 5: Ghi chú */}
-                    <div className="flex items-start space-x-3 text-[12.5px] text-gray-500 bg-gray-50/50 rounded-lg p-2 border border-dashed border-gray-200">
+                    <div className={`flex items-start space-x-3 text-[12.5px] text-gray-500 ${noteBg} rounded-lg p-2 border border-dashed ${noteBorder}`}>
                       <MessageSquare className="text-gray-400 mt-0.5 shrink-0" size={15} />
                       <span className="italic whitespace-pre-wrap leading-relaxed">{order.note || 'Không có ghi chú'}</span>
                     </div>
