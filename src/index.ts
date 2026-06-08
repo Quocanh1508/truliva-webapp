@@ -170,7 +170,7 @@ app.listen(PORT, () => {
   });
 
   // Khởi động lập lịch đồng bộ đơn hàng tự động từ Pancake POS
-  startOrderSyncScheduler(5); // Chạy định kỳ mỗi 5 phút
+  startOrderSyncScheduler(60); // Chạy định kỳ mỗi 60 phút (1 giờ)
 
   // Khởi động lập lịch dọn dẹp báo cáo KTV cũ hơn 60 ngày
   startReportCleanupScheduler();

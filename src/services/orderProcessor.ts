@@ -92,11 +92,16 @@ export async function processOrderEvent(rawEventId: string | null, payload: any)
     const existingOrder = await prisma.order.findUnique({
       where: { pancakeOrderId: systemId },
       select: {
+        id: true,
         adminStatus: true,
         warehouseId: true,
         warehouseInfo: true,
         workType: true,
-        rawData: true,
+        items: {
+          select: {
+            id: true
+          }
+        }
       }
     });
 
@@ -165,16 +170,7 @@ export async function processOrderEvent(rawEventId: string | null, payload: any)
     // Bảo vệ warehouseId và warehouseInfo cục bộ cho các đơn thuộc diện không trừ kho
     if (existingOrder && !payload.warehouse_id) {
       const isInstallation = existingOrder.workType === 'Lắp đặt';
-      let originallyHasProducts = false;
-      if (existingOrder.rawData) {
-        try {
-          const raw = typeof existingOrder.rawData === 'string' ? JSON.parse(existingOrder.rawData as string) : existingOrder.rawData;
-          const itemsList = raw.items || raw.order_items || [];
-          originallyHasProducts = Array.isArray(itemsList) && itemsList.length > 0;
-        } catch (e) {
-          originallyHasProducts = false;
-        }
-      }
+      const originallyHasProducts = existingOrder.items && existingOrder.items.length > 0;
 
       if (isInstallation || !originallyHasProducts) {
         orderData.warehouseId = existingOrder.warehouseId;
