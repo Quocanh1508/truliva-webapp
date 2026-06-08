@@ -298,7 +298,7 @@ export default function MyOrders() {
                           <div className={`${itemBg} border ${itemBorder} rounded-lg p-2 mt-1 space-y-1 text-xs text-gray-600`}>
                             {order.items.map((item: any, itemIdx: number) => (
                               <div key={item.id || itemIdx} className="flex justify-between min-w-0">
-                                <span className="font-medium truncate pr-2">• {item.productName}</span>
+                                <span className="font-medium pr-2 break-words leading-relaxed">• {item.productName}</span>
                                 <span className="text-gray-900 font-bold shrink-0">x{item.quantity || 1}</span>
                               </div>
                             ))}
