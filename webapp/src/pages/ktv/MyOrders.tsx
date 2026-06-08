@@ -1,8 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getOrders, callCustomer, rescheduleOrder } from '../../api/client';
-import { Search, ChevronLeft, ChevronRight, Phone, Calendar, FileText } from 'lucide-react';
+import { Search, ChevronLeft, ChevronRight, Phone, Calendar, FileText, User, MapPin, Clock, MessageSquare, Wrench } from 'lucide-react';
 import PullToRefresh from '../../components/PullToRefresh';
+import { formatOrderId } from '../../utils/text';
 
 export default function MyOrders() {
   const navigate = useNavigate();
@@ -174,142 +175,163 @@ export default function MyOrders() {
           ) : orders.length === 0 ? (
             <div className="text-center py-12 text-gray-400">Bạn chưa được giao dịch vụ nào</div>
           ) : (
-            <table className="w-full text-left text-[13px] border-collapse">
-              <thead className="sticky top-0 bg-[#f8f9fa] text-gray-600 font-semibold border-b border-gray-200 z-10 shadow-sm">
-                <tr>
-                  <th className="px-4 py-3 w-[100px] min-w-[100px]">Mã đơn</th>
-                  <th className="px-4 py-3 w-[220px] min-w-[220px]">Khách hàng</th>
-                  <th className="px-4 py-3 w-[350px] min-w-[350px]">Công việc</th>
-                  <th className="px-4 py-3 min-w-[320px]">Ghi chú</th>
-                  <th className="px-4 py-3 text-center w-[130px] min-w-[130px]">Thao tác</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-100">
-                {orders.map((order, idx) => {
-                   const customerName = order.billFullName || order.customer?.fullName || 'Khách lẻ';
-                   const phone = order.billPhoneNumber || order.customer?.phoneNumber || '';
-                   const address = order.shippingAddress?.full_address || order.customer?.fullAddress || 'Đang cập nhật';
-                   
-                   return (
-                    <tr key={order.id} className={`${idx % 2 === 0 ? 'bg-white' : 'bg-[#fafafa]'} hover:bg-blue-50/50 transition-colors`}>
-                      {/* Mã đơn */}
-                      <td className="px-4 py-3 align-top">
-                        <div className="flex flex-col">
-                          <span className="text-blue-600 font-semibold text-[14px]">#{order.pancakeOrderId}</span>
-                          {getWorkTypeBadge(order.workType)}
-                        </div>
-                      </td>
+            <div className="flex flex-col p-4 space-y-4">
+              {orders.map((order) => {
+                const customerName = order.billFullName || order.customer?.fullName || 'Khách lẻ';
+                const phone = order.billPhoneNumber || order.customer?.phoneNumber || '';
+                const address = order.shippingAddress?.full_address || order.customer?.fullAddress || 'Đang cập nhật';
+                
+                // Tính toán thời gian hẹn và trạng thái
+                let timeStatusText = '';
+                let timeStatusColor = 'text-gray-500';
+                let isOverdue = false;
+                
+                if (order.appointmentTime) {
+                  const apptDate = new Date(order.appointmentTime);
+                  const now = new Date();
+                  isOverdue = apptDate < now;
+                  
+                  const diffTime = Math.abs(apptDate.getTime() - now.getTime());
+                  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+                  
+                  if (isOverdue) {
+                    timeStatusText = `Đã trễ ${diffDays} ngày trước`;
+                    timeStatusColor = 'text-rose-600 font-bold';
+                  } else {
+                    if (diffDays === 1) {
+                      timeStatusText = 'Thời gian còn lại trong ngày';
+                    } else {
+                      timeStatusText = `Thời gian còn lại: ${diffDays} ngày tới`;
+                    }
+                    timeStatusColor = 'text-blue-600 font-medium';
+                  }
+                }
+                
+                return (
+                  <div key={order.id} className="border border-gray-100 rounded-xl shadow-sm bg-white p-4 flex flex-col space-y-3.5 hover:shadow transition-shadow">
+                    {/* Header: Mã đơn + Trạng thái */}
+                    <div className="flex justify-between items-center border-b border-gray-50 pb-2">
+                      <div className="flex items-center space-x-2">
+                        <span className="text-blue-800 font-extrabold text-[15px]">{formatOrderId(order.pancakeOrderId)}</span>
+                        {getWorkTypeBadge(order.workType)}
+                      </div>
+                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded capitalize ${
+                        order.adminStatus === 'đang thực hiện' ? 'bg-blue-50 text-blue-700 border border-blue-100' : 'bg-amber-50 text-amber-700 border border-amber-100'
+                      }`}>
+                        {order.adminStatus === 'đang thực hiện' ? 'đã phân công' : (order.adminStatus || 'chờ xử lý')}
+                      </span>
+                    </div>
 
-                      {/* Khách hàng */}
-                      <td className="px-4 py-3 align-top whitespace-normal break-words">
-                        <div className="flex flex-col gap-0.5">
-                          <span className="text-gray-900 font-bold text-[13px]">{customerName}</span>
-                          <span className="text-gray-700 font-semibold">{phone}</span>
-                          <span className="text-gray-500 text-[11px] leading-tight">{address}</span>
-                        </div>
-                      </td>
+                    {/* Dòng 1: Khách hàng */}
+                    <div className="flex items-start space-x-3 text-[13px]">
+                      <User className="text-gray-400 mt-0.5 shrink-0" size={16} />
+                      <div className="flex-1">
+                        <span className="font-bold text-gray-900">{customerName}</span>
+                        {phone && <span className="text-gray-600 font-semibold ml-2">({phone})</span>}
+                      </div>
+                    </div>
 
-                      {/* Công việc */}
-                      <td className="px-4 py-3 align-top whitespace-normal break-words">
-                        <div className="flex flex-col gap-1">
-                          {/* Hẹn khách */}
-                          {order.appointmentTime ? (
-                            (() => {
-                              const apptDate = new Date(order.appointmentTime);
-                              const isOverdue = apptDate < new Date();
-                              return (
-                                <div className={`font-semibold text-[12px] flex items-center gap-1.5 ${isOverdue ? 'text-rose-600' : 'text-emerald-600'}`}>
-                                  📅 {apptDate.toLocaleTimeString('vi-VN', {hour: '2-digit', minute:'2-digit'})} - {apptDate.toLocaleDateString('vi-VN')}
-                                  {isOverdue && (
-                                    <span className="text-[10px] text-red-700 bg-red-50 border border-red-200 px-1 py-0.5 rounded font-bold">
-                                      Trễ hẹn
-                                    </span>
-                                  )}
-                                </div>
-                              );
-                            })()
-                          ) : <span className="text-gray-400 italic">Chưa hẹn lịch</span>}
+                    {/* Dòng 2: Địa chỉ */}
+                    <div className="flex items-start space-x-3 text-[12.5px] text-gray-600">
+                      <MapPin className="text-gray-400 mt-0.5 shrink-0" size={16} />
+                      <span className="leading-relaxed">{address}</span>
+                    </div>
 
-                          {/* Loại công việc & dịch vụ */}
-                          <div className="text-[12px] text-gray-700 flex flex-wrap gap-x-1.5 gap-y-0.5 items-center mt-0.5">
-                            <span className="font-semibold text-gray-800">Công việc:</span>
-                            <span>{order.workType || 'Chưa cập nhật'}</span>
-                            {order.serviceType && (
-                              <>
-                                <span className="text-gray-300">|</span>
-                                <span className="font-semibold text-gray-800">Dịch vụ:</span>
-                                <span className="text-blue-600 font-medium">{order.serviceType}</span>
-                              </>
-                            )}
+                    {/* Dòng 3: Hẹn khách */}
+                    <div className="flex items-start space-x-3 text-[12.5px]">
+                      <Clock className="text-gray-400 mt-0.5 shrink-0" size={16} />
+                      <div className="flex-1">
+                        {order.appointmentTime ? (
+                          <div className="space-y-0.5">
+                            <div className="font-semibold text-gray-800">
+                              Hẹn khách lúc {new Date(order.appointmentTime).toLocaleTimeString('vi-VN', {hour: '2-digit', minute:'2-digit'})} {new Date(order.appointmentTime).toLocaleDateString('vi-VN')}
+                            </div>
+                            <div className={`text-xs ${timeStatusColor}`}>
+                              {timeStatusText}
+                            </div>
                           </div>
+                        ) : (
+                          <span className="text-gray-400 italic">Chưa hẹn lịch</span>
+                        )}
+                      </div>
+                    </div>
 
-                          {/* Sản phẩm */}
-                          <div className="flex flex-col gap-0.5 mt-1 border-t border-gray-100 pt-1">
-                            {order.items?.map((item: any, itemIdx: number) => (
-                              <div key={item.id || itemIdx} className="text-[12px] text-gray-600">
-                                • {item.productName} <span className="text-gray-900 font-bold">x{item.quantity || 1}</span>
+                    {/* Dòng 4: Công việc / Sản phẩm */}
+                    <div className="flex items-start space-x-3 text-[12.5px] text-gray-700">
+                      <Wrench className="text-gray-400 mt-0.5 shrink-0" size={16} />
+                      <div className="flex-1 space-y-1">
+                        <div>
+                          <span className="font-semibold text-gray-800">Loại: </span>
+                          <span>{order.serviceType && order.serviceType !== 'Công việc đã bao gồm dịch vụ' ? `${order.workType} (${order.serviceType})` : order.workType}</span>
+                        </div>
+                        {order.items && order.items.length > 0 && (
+                          <div className="bg-gray-50 border border-gray-100 rounded-lg p-2 mt-1 space-y-1 text-xs text-gray-600">
+                            {order.items.map((item: any, itemIdx: number) => (
+                              <div key={item.id || itemIdx} className="flex justify-between">
+                                <span className="font-medium truncate pr-2">• {item.productName}</span>
+                                <span className="text-gray-900 font-bold shrink-0">x{item.quantity || 1}</span>
                               </div>
                             ))}
-                            {(!order.items || order.items.length === 0) && (
-                              <span className="text-gray-400 italic">Không có sản phẩm</span>
-                            )}
                           </div>
-
-                          {/* Tiền cần thu */}
-                          <div className="text-[12px] font-bold text-gray-800 mt-1">
-                            Thu: <span className="text-amber-600">{order.moneyToCollect ? order.moneyToCollect.toLocaleString('vi-VN') + ' đ' : '0 đ'}</span>
+                        )}
+                        {order.moneyToCollect > 0 && (
+                          <div className="text-emerald-700 font-bold text-xs mt-1">
+                            Thu hộ: {order.moneyToCollect.toLocaleString('vi-VN')} đ
                           </div>
-                        </div>
-                      </td>
+                        )}
+                      </div>
+                    </div>
 
-                      {/* Ghi chú */}
-                      <td className="px-4 py-3 align-top whitespace-normal break-words text-gray-600 text-[12px]">
-                        {order.note || <span className="text-gray-400 italic">Không có ghi chú</span>}
-                      </td>
+                    {/* Dòng 5: Ghi chú */}
+                    <div className="flex items-start space-x-3 text-[12.5px] text-gray-500 bg-gray-50/50 rounded-lg p-2 border border-dashed border-gray-200">
+                      <MessageSquare className="text-gray-400 mt-0.5 shrink-0" size={15} />
+                      <span className="italic whitespace-pre-wrap leading-relaxed">{order.note || 'Không có ghi chú'}</span>
+                    </div>
 
-                      {/* Thao tác */}
-                      <td className="px-4 py-3 align-top text-center">
-                        <div className="flex items-center justify-center gap-2 mt-1">
-                          {/* Gọi khách */}
-                          {phone ? (
-                            <button
-                              onClick={(e) => { e.stopPropagation(); handleCallCustomer(order.id, phone); }}
-                              disabled={callingOrderId === order.id}
-                              className="p-2 bg-emerald-500 hover:bg-emerald-600 text-white rounded-full shadow-sm hover:shadow transition-all disabled:opacity-50 cursor-pointer flex items-center justify-center shrink-0"
-                              title="Gọi khách (Copy SĐT & quay số)"
-                            >
-                              <Phone size={14} />
-                            </button>
-                          ) : (
-                            <div className="p-2 bg-gray-100 text-gray-400 rounded-full cursor-not-allowed shrink-0" title="Không có SĐT">
-                              <Phone size={14} />
-                            </div>
-                          )}
+                    {/* Thanh thao tác nhanh ở dưới cùng Card */}
+                    <div className="grid grid-cols-3 gap-2 pt-2 border-t border-gray-100">
+                      {/* Gọi điện */}
+                      {phone ? (
+                        <button
+                          onClick={(e) => { e.stopPropagation(); handleCallCustomer(order.id, phone); }}
+                          disabled={callingOrderId === order.id}
+                          className="flex items-center justify-center space-x-1.5 py-2 px-1 bg-emerald-50 hover:bg-emerald-100 border border-emerald-100 text-emerald-700 rounded-lg font-semibold text-xs transition-colors disabled:opacity-50 cursor-pointer"
+                        >
+                          <Phone size={13} />
+                          <span>Gọi khách</span>
+                        </button>
+                      ) : (
+                        <button
+                          disabled
+                          className="flex items-center justify-center space-x-1.5 py-2 px-1 bg-gray-50 border border-gray-100 text-gray-400 rounded-lg font-semibold text-xs cursor-not-allowed"
+                        >
+                          <Phone size={13} />
+                          <span>Không SĐT</span>
+                        </button>
+                      )}
 
-                          {/* Khách hẹn lại */}
-                          <button
-                            onClick={(e) => { e.stopPropagation(); setRescheduleModalOrder(order); }}
-                            className="p-2 bg-amber-500 hover:bg-amber-600 text-white rounded-full shadow-sm hover:shadow transition-all cursor-pointer flex items-center justify-center shrink-0"
-                            title="Khách hẹn lại lịch"
-                          >
-                            <Calendar size={14} />
-                          </button>
+                      {/* Hẹn lại */}
+                      <button
+                        onClick={(e) => { e.stopPropagation(); setRescheduleModalOrder(order); }}
+                        className="flex items-center justify-center space-x-1.5 py-2 px-1 bg-amber-50 hover:bg-amber-100 border border-amber-100 text-amber-700 rounded-lg font-semibold text-xs transition-colors cursor-pointer"
+                      >
+                        <Calendar size={13} />
+                        <span>Hẹn lại</span>
+                      </button>
 
-                          {/* Tạo báo cáo */}
-                          <button
-                            onClick={(e) => { e.stopPropagation(); navigate('/ktv/report', { state: { order } }); }}
-                            className="p-2 bg-blue-600 hover:bg-blue-700 text-white rounded-full shadow-sm hover:shadow transition-all cursor-pointer flex items-center justify-center shrink-0"
-                            title="Tạo báo cáo"
-                          >
-                            <FileText size={14} />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                   );
-                })}
-              </tbody>
-            </table>
+                      {/* Tạo báo cáo */}
+                      <button
+                        onClick={(e) => { e.stopPropagation(); navigate('/ktv/report', { state: { order } }); }}
+                        className="flex items-center justify-center space-x-1.5 py-2 px-1 bg-blue-50 hover:bg-blue-100 border border-blue-100 text-blue-700 rounded-lg font-semibold text-xs transition-colors cursor-pointer"
+                      >
+                        <FileText size={13} />
+                        <span>Báo cáo</span>
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
           )}
         </PullToRefresh>
       </div>
