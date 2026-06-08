@@ -21,6 +21,18 @@ Repository này chứa toàn bộ mã nguồn hệ thống quản lý điều ph
 - [Khởi Chạy Nhanh (Quick Start)](#-khởi-chạy-nhanh-quick-start)
 - [Đóng Gói Ứng Dụng Di Động (Capacitor Android)](#-đóng-gói-ứng-dụng-di-động-capacitor-android)
 - [Quy Trình Triển Khai (Deployment)](#-quy-trình-triển-khai-deployment)
+- [📚 Tài Liệu Tham Khảo](#-tài-liệu-tham-khảo)
+
+---
+
+## 📚 Tài Liệu Tham Khảo
+
+Các tài liệu kỹ thuật quan trọng dành cho lập trình viên tiếp nhận và vận hành hệ thống:
+
+| Tài liệu | Mô tả |
+|---|---|
+| [API.md](API.md) | Tài liệu đầy đủ toàn bộ API endpoint: phân quyền, tham số, ví dụ request/response và ghi chú nghiệp vụ |
+| [.env.example](.env.example) | Template biến môi trường với giải thích chi tiết từng biến: dùng để làm gì, lấy ở đâu, lưu ý khi deploy |
 
 ---
 
