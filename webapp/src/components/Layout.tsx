@@ -65,6 +65,18 @@ export default function Layout() {
     { name: 'Đổi mật khẩu', path: '/change-password', icon: <Key size={20} /> },
   ]);
 
+  const getTodayString = () => {
+    const days = ['Chủ nhật', 'Thứ hai', 'Thứ ba', 'Thứ tư', 'Thứ năm', 'Thứ sáu', 'Thứ bảy'];
+    const now = new Date();
+    const dayName = days[now.getDay()];
+    const dateStr = now.toLocaleDateString('vi-VN', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric'
+    });
+    return `${dayName}, ngày ${dateStr}`;
+  };
+
   const closeMenu = () => setMobileMenuOpen(false);
 
   return (
@@ -152,14 +164,6 @@ export default function Layout() {
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <div style={{ textAlign: 'right', minWidth: 0 }}>
-              <div style={{ fontWeight: 'bold', fontSize: '13px', color: 'var(--primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '100px' }}>
-                {user?.fullName}
-              </div>
-              <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
-                {user?.role}
-              </div>
-            </div>
             <button 
               onClick={handleLogout}
               style={{ padding: '8px', color: 'var(--text-muted)', background: 'transparent' }}
@@ -186,6 +190,24 @@ export default function Layout() {
               <button onClick={closeMenu} style={{ background: 'transparent', color: 'var(--text-muted)', border: 'none' }}>
                 <X size={20} />
               </button>
+            </div>
+
+            {/* Welcome Info */}
+            <div style={{ 
+              padding: '12px 16px', 
+              backgroundColor: '#f8fafc', 
+              borderBottom: '1px solid var(--border-color)',
+              fontSize: '12.5px',
+              color: '#475569',
+              lineHeight: '1.5'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <span>📅</span> 
+                <span>{getTodayString()}</span>
+              </div>
+              <div style={{ marginTop: '4px', fontWeight: 600 }}>
+                Xin chào, <span style={{ color: '#1B3A6B', fontWeight: 700 }}>{user?.fullName}</span> 👋
+              </div>
             </div>
 
             {/* Nav items */}
