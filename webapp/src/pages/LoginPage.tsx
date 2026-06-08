@@ -95,7 +95,7 @@ export default function LoginPage() {
     <div className="flex items-center justify-center h-screen" style={{ backgroundColor: '#1B3A6B' }}>
       <div className="card w-full animate-fade-in" style={{ maxWidth: '400px', margin: '1rem' }}>
         <div className="text-center mb-6">
-          <img src="/logo.png" alt="Truliva Logo" style={{ height: '60px', margin: '0 auto 1rem' }} />
+          <img src="/TRULIVA_WC.png" alt="Truliva Logo" style={{ height: '60px', margin: '0 auto 1rem' }} />
           <h2 className="font-bold text-xl">Đăng nhập hệ thống KTV</h2>
         </div>
 
