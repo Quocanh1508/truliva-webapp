@@ -27,3 +27,16 @@ export function matchesSearchTerm(target: string, query: string): boolean {
   const normalizedQuery = normalizeSearchTerm(query);
   return normalizedTarget.includes(normalizedQuery);
 }
+
+/**
+ * Formats a Pancake Order ID. If it is negative, formats as M{value}.
+ * Otherwise, prepends a '#' prefix or returns it as a string.
+ */
+export function formatOrderId(pancakeOrderId: number | string | null | undefined): string {
+  if (pancakeOrderId === null || pancakeOrderId === undefined) return '';
+  const numericId = Number(pancakeOrderId);
+  if (!isNaN(numericId) && numericId < 0) {
+    return `M${Math.abs(numericId)}`;
+  }
+  return `#${pancakeOrderId}`;
+}

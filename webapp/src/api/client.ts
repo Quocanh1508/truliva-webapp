@@ -84,6 +84,14 @@ export async function syncOrders() {
   });
 }
 
+export async function createOrder(data: any) {
+  return fetchApi('/orders', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
+}
+
+
 export async function getFiltersData(): Promise<{
   categories: string[];
   productNames: string[];

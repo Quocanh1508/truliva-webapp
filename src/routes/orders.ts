@@ -49,11 +49,12 @@ router.get('/', requireAuth, async (req: Request, res: Response): Promise<void> 
     const where: Prisma.OrderWhereInput = {};
     const conditions: Prisma.OrderWhereInput[] = [];
 
-    // Chỉ hiển thị các đơn hàng đã được xác nhận bên POS (ẩn các đơn nháp status = 0)
+    // Chỉ hiển thị các đơn hàng đã được xác nhận bên POS (ẩn các đơn nháp status = 0, luôn hiện đơn thủ công)
     conditions.push({
       OR: [
         { statusCode: { not: 0 } },
-        { statusCode: null }
+        { statusCode: null },
+        { pancakeOrderId: { lt: 0 } }
       ]
     });
     
@@ -287,9 +288,11 @@ router.get('/', requireAuth, async (req: Request, res: Response): Promise<void> 
           }
         }
       ];
-      const pancakeId = parseInt(searchStr, 10);
-      if (!isNaN(pancakeId)) {
-        searchOR.push({ pancakeOrderId: pancakeId });
+      const pancakeId = parseInt(searchStr.replace(/^#/, ''), 10);
+      const manualMatch = searchStr.match(/^m(\d+)$/i);
+      const finalPancakeId = manualMatch ? -parseInt(manualMatch[1], 10) : pancakeId;
+      if (!isNaN(finalPancakeId)) {
+        searchOR.push({ pancakeOrderId: finalPancakeId });
       }
       conditions.push({ OR: searchOR });
     }
@@ -417,6 +420,140 @@ router.get('/', requireAuth, async (req: Request, res: Response): Promise<void> 
 });
 
 /**
+ * POST /api/orders
+ * Tạo đơn hàng/dịch vụ thủ công (Admin only)
+ */
+router.post('/', requireAuth, requireAdmin, async (req: Request, res: Response): Promise<void> => {
+  try {
+    const {
+      customerName,
+      customerPhone,
+      address,
+      province,
+      workType,
+      serviceType,
+      appointmentTime,
+      items,
+      moneyToCollect,
+      note
+    } = req.body;
+
+    if (!customerName || !customerPhone) {
+      res.status(400).json({ error: 'Tên khách hàng và số điện thoại là bắt buộc' });
+      return;
+    }
+
+    // 1. Tìm hoặc tạo Customer
+    let customerId: string;
+    const cleanPhone = customerPhone.trim();
+    const existingCustomer = await prisma.customer.findFirst({
+      where: { phoneNumber: cleanPhone }
+    });
+
+    if (existingCustomer) {
+      customerId = existingCustomer.id;
+      // Cập nhật thông tin địa chỉ, tỉnh thành nếu chưa có hoặc có thay đổi
+      const updateData: any = {};
+      if (address && !existingCustomer.address) {
+        updateData.address = address;
+        updateData.fullAddress = address;
+      }
+      if (province && !existingCustomer.provinceName) {
+        updateData.provinceName = province;
+      }
+      if (Object.keys(updateData).length > 0) {
+        await prisma.customer.update({
+          where: { id: customerId },
+          data: updateData
+        });
+      }
+    } else {
+      const newCustomer = await prisma.customer.create({
+        data: {
+          fullName: customerName.trim(),
+          phoneNumber: cleanPhone,
+          address: address || null,
+          fullAddress: address || null,
+          provinceName: province || null
+        }
+      });
+      customerId = newCustomer.id;
+    }
+
+    // 2. Tìm pancakeOrderId âm nhỏ nhất hiện tại
+    const minOrder = await prisma.order.findFirst({
+      where: { pancakeOrderId: { lt: 0 } },
+      orderBy: { pancakeOrderId: 'asc' },
+      select: { pancakeOrderId: true }
+    });
+
+    let nextManualId = -1;
+    if (minOrder && minOrder.pancakeOrderId < 0) {
+      nextManualId = minOrder.pancakeOrderId - 1;
+    }
+
+    // 3. Tạo Order
+    const apptDate = appointmentTime ? new Date(appointmentTime) : null;
+    const totalQty = Array.isArray(items) ? items.reduce((acc: number, curr: any) => acc + (Number(curr.quantity) || 1), 0) : 0;
+    const finalTotalPrice = Array.isArray(items) ? items.reduce((acc: number, curr: any) => acc + ((Number(curr.price) || 0) * (Number(curr.quantity) || 1)), 0) : 0;
+
+    const order = await prisma.order.create({
+      data: {
+        pancakeOrderId: nextManualId,
+        customerId,
+        statusCode: 0,
+        statusName: 'submitted',
+        adminStatus: 'chờ xử lý',
+        totalPrice: finalTotalPrice,
+        totalQuantity: totalQty,
+        moneyToCollect: moneyToCollect ? Number(moneyToCollect) : 0,
+        workType: workType || null,
+        serviceType: serviceType || null,
+        appointmentTime: apptDate,
+        note: note || null,
+        shippingAddress: address ? { full_address: address } : undefined,
+        billFullName: customerName,
+        billPhoneNumber: cleanPhone
+      }
+    });
+
+    // 4. Tạo OrderItem
+    if (Array.isArray(items) && items.length > 0) {
+      const itemsData = items.map((it: any) => ({
+        orderId: order.id,
+        productName: it.productName,
+        sku: it.sku || null,
+        quantity: it.quantity ? Number(it.quantity) : 1,
+        price: it.price ? Number(it.price) : 0
+      }));
+
+      await prisma.orderItem.createMany({
+        data: itemsData
+      });
+    }
+
+    // 5. Ghi Audit Log
+    await prisma.auditLog.create({
+      data: {
+        entityType: 'Order',
+        entityId: order.id,
+        action: 'created_manual',
+        changes: [{ field: 'pancakeOrderId', from: null, to: nextManualId }],
+        userId: req.user!.id,
+        userName: req.user!.fullName
+      }
+    });
+
+    logger.info('Manual order created by admin', { orderId: order.id, pancakeOrderId: nextManualId, creator: req.user?.fullName });
+    res.json({ success: true, orderId: order.id, pancakeOrderId: nextManualId });
+
+  } catch (error: any) {
+    logger.error('Create manual order error', { error: error.message });
+    res.status(500).json({ error: error.message || 'Lỗi tạo đơn hàng thủ công' });
+  }
+});
+
+/**
  * GET /api/orders/export
  * Xuất Excel danh sách đơn hàng theo bộ lọc (Admin only)
  */
@@ -446,11 +583,12 @@ router.get('/export', requireAuth, requireAdmin, async (req: Request, res: Respo
 
     const conditions: Prisma.OrderWhereInput[] = [];
 
-    // Chỉ hiển thị các đơn hàng đã được xác nhận bên POS (ẩn các đơn nháp status = 0)
+    // Chỉ hiển thị các đơn hàng đã được xác nhận bên POS (ẩn các đơn nháp status = 0, luôn hiện đơn thủ công)
     conditions.push({
       OR: [
         { statusCode: { not: 0 } },
-        { statusCode: null }
+        { statusCode: null },
+        { pancakeOrderId: { lt: 0 } }
       ]
     });
 
@@ -764,7 +902,7 @@ router.get('/export', requireAuth, requireAdmin, async (req: Request, res: Respo
       const productsList = o.items.map((i: any) => i.productName).join(', ');
 
       sheet.addRow({
-        pancakeOrderId: o.pancakeOrderId,
+        pancakeOrderId: o.pancakeOrderId < 0 ? `M${Math.abs(o.pancakeOrderId)}` : o.pancakeOrderId,
         customerName,
         customerPhone: phone,
         address,
@@ -1014,7 +1152,8 @@ router.patch('/:id', requireAuth, requireAdmin, async (req: Request, res: Respon
         }
       }
 
-      const shouldSyncWarehouseToPancake = !isInstallation && originallyHasProducts;
+      const isManualOrder = oldOrder.pancakeOrderId < 0;
+      const shouldSyncWarehouseToPancake = !isInstallation && originallyHasProducts && !isManualOrder;
 
       try {
         let warehouseName = 'Kho hàng';
@@ -1053,7 +1192,7 @@ router.patch('/:id', requireAuth, requireAdmin, async (req: Request, res: Respon
           logger.info('Bypassed syncing warehouse change to Pancake POS (not deducting inventory)', {
             pancakeOrderId: oldOrder.pancakeOrderId,
             warehouseId,
-            reason: isInstallation ? 'Installation order' : 'No original products'
+            reason: isInstallation ? 'Installation order' : (isManualOrder ? 'Manual order' : 'No original products')
           });
         }
 
@@ -1163,13 +1302,14 @@ router.patch('/:id', requireAuth, requireAdmin, async (req: Request, res: Respon
       const customerName = order.billFullName || 'Khách hàng';
       const workTypeText = order.workType || 'công việc';
       const title = 'Dịch vụ mới được phân công';
-      const body = `Bạn vừa được phân công dịch vụ mới #${order.pancakeOrderId} (${workTypeText}) cho khách hàng ${customerName}`;
+      const displayOrderId = order.pancakeOrderId < 0 ? `M${Math.abs(order.pancakeOrderId)}` : `#${order.pancakeOrderId}`;
+      const body = `Bạn vừa được phân công dịch vụ mới ${displayOrderId} (${workTypeText}) cho khách hàng ${customerName}`;
 
       // 1. Gửi qua FCM Native
       sendPushNotification(assignedKtvId, title, body, {
         type: 'ORDER_ASSIGNED',
         orderId: order.id,
-        pancakeOrderId: String(order.pancakeOrderId)
+        pancakeOrderId: order.pancakeOrderId < 0 ? `M${Math.abs(order.pancakeOrderId)}` : String(order.pancakeOrderId)
       }).catch(err => {
         logger.error('Failed to trigger push notification for KTV assignment', { error: err.message });
       });
@@ -1178,7 +1318,7 @@ router.patch('/:id', requireAuth, requireAdmin, async (req: Request, res: Respon
       sendWebPushNotification(assignedKtvId, title, body, {
         type: 'ORDER_ASSIGNED',
         orderId: order.id,
-        pancakeOrderId: String(order.pancakeOrderId)
+        pancakeOrderId: order.pancakeOrderId < 0 ? `M${Math.abs(order.pancakeOrderId)}` : String(order.pancakeOrderId)
       }).catch(err => {
         logger.error('Failed to trigger Web Push notification for KTV assignment', { error: err.message });
       });

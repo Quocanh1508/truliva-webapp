@@ -3,6 +3,7 @@ import { useSearchParams } from 'react-router-dom';
 import { fetchApi, deleteReportWithReason, updateReport, uploadImages } from '../../api/client';
 import { Download, X, ExternalLink, Image as ImageIcon, Loader, Search, Edit3, Save, Plus, Trash2, SlidersHorizontal, RotateCcw, Calendar } from 'lucide-react';
 import CategoryTreeSelect from '../../components/CategoryTreeSelect';
+import { formatOrderId } from '../../utils/text';
 
 // Check if a URL points to a directly viewable image
 function isDirectImage(url: string): boolean {
@@ -1022,7 +1023,7 @@ export default function ReportList() {
                     {/* Mã đơn */}
                     <td style={{ padding: '12px 16px' }}>
                       {r.order?.pancakeOrderId ? (
-                        <span className="font-bold text-blue-700">#{r.order.pancakeOrderId}</span>
+                        <span className="font-bold text-blue-700">{formatOrderId(r.order.pancakeOrderId)}</span>
                       ) : (
                         <span className="text-gray-400 font-semibold text-[10px] bg-gray-100 px-2 py-0.5 rounded">Đơn lẻ</span>
                       )}
@@ -1185,7 +1186,7 @@ export default function ReportList() {
             {/* Modal Header */}
             <div className="flex justify-between items-center p-5 border-b border-gray-200 sticky top-0 bg-white z-10">
               <h3 className="font-bold text-lg text-[#1B3A6B]">
-                {isEditing ? 'Sửa' : 'Chi tiết'} báo cáo {selectedDetailReport.order?.pancakeOrderId ? `#${selectedDetailReport.order.pancakeOrderId}` : ''}
+                {isEditing ? 'Sửa' : 'Chi tiết'} báo cáo {selectedDetailReport.order?.pancakeOrderId ? formatOrderId(selectedDetailReport.order.pancakeOrderId) : ''}
               </h3>
               <button 
                 onClick={() => { cancelEditing(); setSelectedDetailReport(null); }}

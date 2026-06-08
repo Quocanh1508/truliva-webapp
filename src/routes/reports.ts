@@ -126,18 +126,20 @@ async function buildReportFilter(query: any, user: any): Promise<any> {
   // Lọc tìm kiếm tổng hợp
   if (search) {
     const searchStr = search as string;
-    const parsedOrderId = parseInt(searchStr);
+    const parsedOrderId = parseInt(searchStr.replace(/^#/, ''), 10);
+    const manualMatch = searchStr.match(/^m(\d+)$/i);
+    const finalOrderId = manualMatch ? -parseInt(manualMatch[1], 10) : parsedOrderId;
     
     const searchConditions: any[] = [
       { customerName: { contains: searchStr, mode: 'insensitive' } },
       { customerPhone: { contains: searchStr } },
       { ktvUser: { fullName: { contains: searchStr, mode: 'insensitive' } } }
     ];
-    
-    if (!isNaN(parsedOrderId)) {
+
+    if (!isNaN(finalOrderId)) {
       searchConditions.push({
         order: {
-          pancakeOrderId: parsedOrderId
+          pancakeOrderId: finalOrderId
         }
       });
     }
@@ -764,7 +766,9 @@ router.get('/export', requireAdmin, async (req: Request, res: Response): Promise
         month: r.month,
         createdAt: r.createdAt.toLocaleString('vi-VN'),
         ktvName: r.ktvUser.fullName,
-        pancakeOrderId: r.order?.pancakeOrderId || '',
+        pancakeOrderId: r.order?.pancakeOrderId 
+          ? (r.order.pancakeOrderId < 0 ? `M${Math.abs(r.order.pancakeOrderId)}` : r.order.pancakeOrderId) 
+          : '',
         customerName: r.customerName,
         customerPhone: r.customerPhone,
         address: r.address || '',

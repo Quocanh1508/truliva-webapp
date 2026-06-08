@@ -1,11 +1,13 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { getOrders, updateOrder, getKtvUsers, getStations, getOrderAuditLog, syncOrders, getFiltersData, fetchApi } from '../../api/client';
-import { Search, ChevronLeft, ChevronRight, History, XCircle, Filter, RefreshCw, FileText, CheckCircle2, RotateCcw, Copy, UserPlus, Download, Wrench, Settings, FolderOpen, Building2, MapPin, Users, Calendar } from 'lucide-react';
+import { getOrders, updateOrder, getKtvUsers, getStations, getOrderAuditLog, syncOrders, getFiltersData, fetchApi, createOrder } from '../../api/client';
+import { Search, ChevronLeft, ChevronRight, History, XCircle, Filter, RefreshCw, FileText, CheckCircle2, RotateCcw, Copy, UserPlus, Download, Wrench, Settings, FolderOpen, Building2, MapPin, Users, Calendar, Plus } from 'lucide-react';
 import { WARRANTY_SERVICE_GROUPS, REPAIR_SERVICE_GROUPS, WORK_TYPE_SERVICES } from '../../utils/workTypes';
 import { useConfirm } from '../../context/ConfirmContext';
 import DateRangePicker from '../../components/DateRangePicker';
 import CategoryTreeSelect from '../../components/CategoryTreeSelect';
+import { formatOrderId } from '../../utils/text';
+
 
 const ALL_SERVICE_TYPES = Array.from(new Set(Object.values(WORK_TYPE_SERVICES).flat()));
 
@@ -162,6 +164,115 @@ export default function OrderList() {
   const [cancelModal, setCancelModal] = useState<{ isOpen: boolean; orderId: string } | null>(null);
   const [cancelReason, setCancelReason] = useState('');
 
+  // Create Manual Order Modal
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [showCreateServiceDropdown, setShowCreateServiceDropdown] = useState(false);
+  const [newOrderForm, setNewOrderForm] = useState({
+    customerName: '',
+    customerPhone: '',
+    address: '',
+    province: '',
+    workType: '',
+    serviceType: '',
+    appointmentDate: '',
+    appointmentTime: '08:30',
+    items: [] as any[],
+    moneyToCollect: 0,
+    note: ''
+  });
+
+  const openCreateModal = () => {
+    setNewOrderForm({
+      customerName: '',
+      customerPhone: '',
+      address: '',
+      province: '',
+      workType: '',
+      serviceType: '',
+      appointmentDate: '',
+      appointmentTime: '08:30',
+      items: [],
+      moneyToCollect: 0,
+      note: ''
+    });
+
+    if (productsStock.length === 0) {
+      fetchApi('/inventory/stock')
+        .then(invData => {
+          const whs = invData.warehouses || [];
+          const prods = invData.products || [];
+          setWarehouses(whs);
+          setProductsStock(prods);
+        })
+        .catch(console.error);
+    }
+
+    setShowCreateModal(true);
+  };
+
+  const submitCreateManualOrder = async () => {
+    if (!newOrderForm.customerName.trim()) {
+      alert('Vui lòng nhập tên khách hàng.');
+      return;
+    }
+    if (!newOrderForm.customerPhone.trim()) {
+      alert('Vui lòng nhập số điện thoại khách hàng.');
+      return;
+    }
+    if (!newOrderForm.workType) {
+      alert('Vui lòng chọn loại công việc.');
+      return;
+    }
+    if (!newOrderForm.serviceType || !newOrderForm.serviceType.trim()) {
+      alert('Vui lòng chọn hoặc nhập loại dịch vụ chi tiết.');
+      return;
+    }
+
+    if (newOrderForm.workType === 'Bảo hành') {
+      const validWarrantyServices = Object.values(WARRANTY_SERVICE_GROUPS).flat();
+      if (!validWarrantyServices.includes(newOrderForm.serviceType)) {
+        alert('Loại dịch vụ chi tiết không hợp lệ. Vui lòng chọn một gợi ý trong danh mục.');
+        return;
+      }
+    } else if (newOrderForm.workType === 'Sửa chữa') {
+      const validRepairServices = Object.values(REPAIR_SERVICE_GROUPS).flat();
+      if (!validRepairServices.includes(newOrderForm.serviceType)) {
+        alert('Loại dịch vụ chi tiết không hợp lệ. Vui lòng chọn một gợi ý trong danh mục.');
+        return;
+      }
+    }
+
+    let appointmentTimeStr = null;
+    if (newOrderForm.appointmentDate) {
+      appointmentTimeStr = `${newOrderForm.appointmentDate}T${newOrderForm.appointmentTime || '08:30'}:00`;
+    }
+
+    try {
+      setLoading(true);
+      await createOrder({
+        customerName: newOrderForm.customerName.trim(),
+        customerPhone: newOrderForm.customerPhone.trim(),
+        address: newOrderForm.address.trim(),
+        province: newOrderForm.province.trim(),
+        workType: newOrderForm.workType,
+        serviceType: newOrderForm.serviceType,
+        appointmentTime: appointmentTimeStr,
+        items: newOrderForm.items,
+        moneyToCollect: Number(newOrderForm.moneyToCollect) || 0,
+        note: newOrderForm.note.trim()
+      });
+      setShowCreateModal(false);
+      setPage(1);
+      fetchOrdersData();
+      alert('Tạo ca dịch vụ thành công!');
+    } catch (err: any) {
+      alert(err.message || 'Lỗi khi tạo ca dịch vụ');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+
   const getDateRange = () => {
     const start = customStartDate ? new Date(customStartDate + 'T00:00:00').toISOString() : '';
     const end = customEndDate ? new Date(customEndDate + 'T23:59:59').toISOString() : '';
@@ -287,7 +398,7 @@ export default function OrderList() {
   const handleReopenOrder = async (order: any) => {
     const isConfirmed = await confirm({
       title: 'Mở lại đơn hàng',
-      message: `Bạn có chắc chắn muốn mở lại đơn #${order.pancakeOrderId}? Hành động này sẽ chuyển trạng thái về "Chờ xử lý" và xóa thông tin phân bổ trạm/KTV hiện tại.`,
+      message: `Bạn có chắc chắn muốn mở lại đơn ${formatOrderId(order.pancakeOrderId)}? Hành động này sẽ chuyển trạng thái về "Chờ xử lý" và xóa thông tin phân bổ trạm/KTV hiện tại.`,
       confirmText: 'Mở lại',
       cancelText: 'Hủy bỏ',
       type: 'warning'
@@ -326,7 +437,7 @@ export default function OrderList() {
 
     navigator.clipboard.writeText(text)
       .then(() => {
-        alert(`Đã copy thông tin đơn #${order.pancakeOrderId} thành công!`);
+        alert(`Đã copy thông tin đơn ${formatOrderId(order.pancakeOrderId)} thành công!`);
       })
       .catch(err => {
         console.error('Không thể copy', err);
@@ -762,6 +873,16 @@ export default function OrderList() {
           </form>
 
           <div className="flex items-center space-x-3">
+            {/* Tạo mới ca dịch vụ */}
+            <button
+              onClick={openCreateModal}
+              className="flex items-center space-x-1.5 px-3 py-2 text-[13px] border border-transparent rounded-md bg-blue-600 text-white hover:bg-blue-700 focus:outline-none font-semibold shadow-sm transition-colors"
+              title="Tạo mới ca dịch vụ thủ công"
+            >
+              <Plus size={15} />
+              <span>Tạo ca dịch vụ</span>
+            </button>
+
             {/* Đồng bộ từ Pancake button */}
             <button
               onClick={handleSync}
@@ -1574,7 +1695,7 @@ export default function OrderList() {
                   <tr key={order.id} className={`${idx % 2 === 0 ? 'bg-white' : 'bg-[#fafafa]'} hover:bg-blue-50/50 transition-colors`}>
                     {/* 1. Mã đơn */}
                     <td className="px-4 py-2 font-medium align-top">
-                      <div>#{order.pancakeOrderId}</div>
+                      <div>{formatOrderId(order.pancakeOrderId)}</div>
                       {order.orderSource && /shopee|lazada|tiktok|tiki/i.test(order.orderSource) && (
                         <div className="text-[10px] font-bold text-blue-600 bg-blue-50 border border-blue-100 rounded px-1.5 py-0.5 mt-0.5 inline-block cursor-help" title={`Nguồn: ${order.orderSource}`}>
                           Đơn Ecom
@@ -1789,7 +1910,7 @@ export default function OrderList() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
           <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl overflow-hidden flex flex-col max-h-[90vh]">
             <div className="px-6 py-4 border-b border-gray-200 bg-gray-50 flex justify-between items-center">
-              <h3 className="text-lg font-bold text-gray-900">Chi tiết & Phân bổ Yêu cầu #{assignModal.order.pancakeOrderId}</h3>
+              <h3 className="text-lg font-bold text-gray-900">Chi tiết & Phân bổ Yêu cầu {formatOrderId(assignModal.order.pancakeOrderId)}</h3>
               <button onClick={() => setAssignModal(null)} className="text-gray-400 hover:text-gray-600"><XCircle size={24} /></button>
             </div>
 
@@ -2364,6 +2485,317 @@ export default function OrderList() {
                   ))}
                 </div>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* CREATE MANUAL ORDER MODAL */}
+      {showCreateModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl overflow-hidden flex flex-col max-h-[90vh]">
+            <div className="px-6 py-4 border-b border-gray-200 bg-gray-50 flex justify-between items-center">
+              <h3 className="text-lg font-bold text-gray-900">Tạo ca dịch vụ độc lập</h3>
+              <button onClick={() => setShowCreateModal(false)} className="text-gray-400 hover:text-gray-600"><XCircle size={24} /></button>
+            </div>
+
+            <div className="p-6 overflow-auto flex-1 grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/* Cột trái: Khách hàng */}
+              <div className="space-y-4">
+                <h4 className="font-semibold text-gray-800 border-b pb-2">1. Thông tin Khách hàng</h4>
+
+                <div>
+                  <label className="block text-sm text-gray-600 mb-1">Tên khách hàng *</label>
+                  <input
+                    type="text"
+                    required
+                    className="w-full border rounded p-2 text-sm outline-none focus:border-blue-500 text-gray-800 bg-white"
+                    placeholder="Nhập tên khách hàng..."
+                    value={newOrderForm.customerName}
+                    onChange={e => setNewOrderForm({ ...newOrderForm, customerName: e.target.value })}
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm text-gray-600 mb-1">Số điện thoại *</label>
+                  <input
+                    type="text"
+                    required
+                    className="w-full border rounded p-2 text-sm outline-none focus:border-blue-500 text-gray-800 bg-white"
+                    placeholder="Nhập số điện thoại..."
+                    value={newOrderForm.customerPhone}
+                    onChange={e => setNewOrderForm({ ...newOrderForm, customerPhone: e.target.value })}
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm text-gray-600 mb-1">Địa chỉ chi tiết</label>
+                  <input
+                    type="text"
+                    className="w-full border rounded p-2 text-sm outline-none focus:border-blue-500 text-gray-800 bg-white"
+                    placeholder="Số nhà, tên đường, phường/xã, quận/huyện..."
+                    value={newOrderForm.address}
+                    onChange={e => setNewOrderForm({ ...newOrderForm, address: e.target.value })}
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm text-gray-600 mb-1">Tỉnh / Thành phố</label>
+                  <input
+                    type="text"
+                    list="new-order-provinces-list"
+                    className="w-full border rounded p-2 text-sm outline-none focus:border-blue-500 text-gray-800 bg-white"
+                    placeholder="Chọn hoặc gõ tỉnh thành..."
+                    value={newOrderForm.province}
+                    onChange={e => setNewOrderForm({ ...newOrderForm, province: e.target.value })}
+                  />
+                  <datalist id="new-order-provinces-list">
+                    {dbFilterOptions.provinces.map(prov => (
+                      <option key={prov} value={prov} />
+                    ))}
+                  </datalist>
+                </div>
+
+                <div>
+                  <label className="block text-sm text-gray-600 mb-1">Ghi chú</label>
+                  <textarea
+                    rows={4}
+                    className="w-full border rounded p-2 text-sm outline-none focus:border-blue-500"
+                    placeholder="Ghi chú về ca dịch vụ..."
+                    value={newOrderForm.note}
+                    onChange={e => setNewOrderForm({ ...newOrderForm, note: e.target.value })}
+                  ></textarea>
+                </div>
+              </div>
+
+              {/* Cột phải: Công việc & Sản phẩm */}
+              <div className="space-y-4">
+                <h4 className="font-semibold text-gray-800 border-b pb-2">2. Chi tiết Công việc</h4>
+
+                <div>
+                  <label className="block text-sm text-gray-600 mb-1">Loại công việc *</label>
+                  <select
+                    className="w-full border rounded p-2 text-sm outline-none focus:border-blue-500 text-gray-800 bg-white"
+                    value={newOrderForm.workType}
+                    onChange={e => {
+                      const wt = e.target.value;
+                      setNewOrderForm(prev => ({
+                        ...prev,
+                        workType: wt,
+                        serviceType: ['Giao hàng và Lắp đặt', 'Lắp đặt', 'Giao hàng', 'Thay lọc'].includes(wt)
+                          ? 'Công việc đã bao gồm dịch vụ'
+                          : ''
+                      }));
+                    }}
+                  >
+                    <option value="">-- Chọn loại --</option>
+                    <option value="Giao hàng và Lắp đặt">Giao hàng và Lắp đặt</option>
+                    <option value="Lắp đặt">Lắp đặt</option>
+                    <option value="Giao hàng">Giao hàng</option>
+                    <option value="Thay lọc">Thay lọc</option>
+                    <option value="Bảo hành">Bảo hành</option>
+                    <option value="Sửa chữa">Sửa chữa</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm text-gray-600 mb-1">Loại dịch vụ chi tiết *</label>
+                  {['Giao hàng và Lắp đặt', 'Lắp đặt', 'Giao hàng', 'Thay lọc'].includes(newOrderForm.workType) ? (
+                    <input
+                      type="text"
+                      className="w-full border rounded p-2 text-sm outline-none bg-gray-50 text-gray-500"
+                      value="Công việc đã bao gồm dịch vụ"
+                      readOnly
+                    />
+                  ) : (newOrderForm.workType === 'Bảo hành' || newOrderForm.workType === 'Sửa chữa') ? (
+                    <div className="relative">
+                      <input
+                        type="text"
+                        className="w-full border rounded p-2 text-sm outline-none focus:border-blue-500 text-gray-800 bg-white"
+                        placeholder="Gõ để tìm kiếm & chọn dịch vụ..."
+                        value={newOrderForm.serviceType}
+                        onChange={e => setNewOrderForm({ ...newOrderForm, serviceType: e.target.value })}
+                        onFocus={() => setShowCreateServiceDropdown(true)}
+                        onBlur={() => setTimeout(() => setShowCreateServiceDropdown(false), 200)}
+                      />
+                      <div className="absolute right-2 top-2.5 text-gray-400 pointer-events-none">
+                        <Search size={16} />
+                      </div>
+                      {showCreateServiceDropdown && (
+                        <div className="absolute left-0 right-0 z-50 mt-1 bg-white border border-gray-200 rounded-md shadow-lg max-h-60 overflow-y-auto">
+                          {(() => {
+                            const options = newOrderForm.workType === 'Bảo hành'
+                              ? Object.values(WARRANTY_SERVICE_GROUPS).flat()
+                              : Object.values(REPAIR_SERVICE_GROUPS).flat();
+                            const query = removeAccents(newOrderForm.serviceType || '');
+                            const filteredOptions = options.filter(opt =>
+                              removeAccents(opt).includes(query)
+                            );
+
+                            if (filteredOptions.length === 0) {
+                              return <div className="px-3 py-2 text-sm text-gray-400 italic">Không tìm thấy dịch vụ nào</div>;
+                            }
+
+                            const groups = newOrderForm.workType === 'Bảo hành' ? WARRANTY_SERVICE_GROUPS : REPAIR_SERVICE_GROUPS;
+                            return Object.entries(groups).map(([groupName, services]) => {
+                              const matchingServices = services.filter(s => filteredOptions.includes(s));
+                              if (matchingServices.length === 0) return null;
+                              return (
+                                <div key={groupName} className="border-b border-gray-100 last:border-0">
+                                  <div className="px-3 py-1 text-xs font-semibold text-gray-500 bg-gray-50">
+                                    {groupName}
+                                  </div>
+                                  <div className="divide-y divide-gray-50">
+                                    {matchingServices.map(s => (
+                                      <button
+                                        key={s}
+                                        type="button"
+                                        className="w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-700 transition-colors"
+                                        onClick={() => {
+                                          setNewOrderForm(prev => ({ ...prev, serviceType: s }));
+                                          setShowCreateServiceDropdown(false);
+                                        }}
+                                      >
+                                        {s}
+                                      </button>
+                                    ))}
+                                  </div>
+                                </div>
+                              );
+                            });
+                          })()}
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <input
+                      type="text"
+                      className="w-full border rounded p-2 text-sm outline-none bg-gray-100 text-gray-400 cursor-not-allowed"
+                      value="Vui lòng chọn loại công việc trước"
+                      disabled
+                    />
+                  )}
+                </div>
+
+                <div>
+                  <label className="block text-sm text-gray-600 mb-1">Thời gian hẹn khách</label>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <input
+                        type="date"
+                        className="w-full border rounded p-2 text-sm outline-none focus:border-blue-500 text-gray-800 bg-white"
+                        value={newOrderForm.appointmentDate}
+                        onChange={e => setNewOrderForm({ ...newOrderForm, appointmentDate: e.target.value })}
+                      />
+                    </div>
+                    <div>
+                      <input
+                        type="time"
+                        className="w-full border rounded p-2 text-sm outline-none focus:border-blue-500 text-gray-800 bg-white"
+                        value={newOrderForm.appointmentTime}
+                        onChange={e => setNewOrderForm({ ...newOrderForm, appointmentTime: e.target.value })}
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm text-gray-600 mb-1">Số tiền cần thu (VNĐ)</label>
+                  <input
+                    type="number"
+                    className="w-full border rounded p-2 text-sm outline-none focus:border-blue-500 text-gray-800 bg-white font-medium"
+                    placeholder="Ví dụ: 50000"
+                    value={newOrderForm.moneyToCollect === 0 ? '' : newOrderForm.moneyToCollect}
+                    onChange={e => setNewOrderForm({ ...newOrderForm, moneyToCollect: parseInt(e.target.value, 10) || 0 })}
+                  />
+                </div>
+
+                {/* Chọn sản phẩm */}
+                <div className="border-t pt-4 space-y-2">
+                  <label className="block text-sm font-semibold text-gray-800">Sản phẩm đi kèm</label>
+
+                  {newOrderForm.items.length > 0 ? (
+                    <div className="border border-gray-200 rounded divide-y max-h-40 overflow-y-auto bg-gray-50">
+                      {newOrderForm.items.map((item, idx) => (
+                        <div key={idx} className="flex justify-between items-center p-2 text-xs">
+                          <div className="font-medium text-gray-800 truncate pr-2 font-mono" title={item.productName}>
+                            {item.productName} {item.sku ? `(${item.sku})` : ''}
+                          </div>
+                          <div className="flex items-center space-x-2 shrink-0">
+                            <input
+                              type="number"
+                              min={1}
+                              className="w-12 border rounded text-center py-0.5 text-xs outline-none focus:border-blue-500 bg-white text-gray-800 font-medium"
+                              value={item.quantity}
+                              onChange={(e) => {
+                                const val = parseInt(e.target.value, 10) || 1;
+                                const newItems = [...newOrderForm.items];
+                                newItems[idx].quantity = val;
+                                setNewOrderForm({ ...newOrderForm, items: newItems });
+                              }}
+                            />
+                            <button
+                              type="button"
+                              className="text-red-500 hover:text-red-700 font-bold px-1"
+                              onClick={() => {
+                                setNewOrderForm({
+                                  ...newOrderForm,
+                                  items: newOrderForm.items.filter((_, i) => i !== idx)
+                                });
+                              }}
+                            >
+                              Xóa
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="text-xs text-gray-400 italic bg-gray-50 border border-dashed rounded p-3 text-center">
+                      Chưa chọn sản phẩm nào. Chọn bên dưới để thêm.
+                    </div>
+                  )}
+
+                  <div className="w-full">
+                    <CategoryTreeSelect
+                      categories={Array.from(new Set(productsStock.map(p => p.category).filter(Boolean))) as string[]}
+                      products={productsStock.map(p => ({ name: p.name, category: p.category, sku: p.sku }))}
+                      selected={newOrderForm.items.map(item => `PROD:${item.productName}`)}
+                      placeholder="-- Chọn sản phẩm --"
+                      onChange={(nextSelected) => {
+                        const nextProductNames = nextSelected
+                          .filter(id => id.startsWith('PROD:'))
+                          .map(id => id.substring(5));
+
+                        let updatedItems = newOrderForm.items.filter(item =>
+                          nextProductNames.includes(item.productName)
+                        );
+
+                        nextProductNames.forEach(name => {
+                          const alreadyAdded = updatedItems.some(item => item.productName === name);
+                          if (!alreadyAdded) {
+                            const prodData = productsStock.find(p => p.name === name);
+                            updatedItems.push({
+                              productName: name,
+                              sku: prodData?.sku || '',
+                              quantity: 1,
+                              price: prodData?.sellingPrice || 0
+                            });
+                          }
+                        });
+
+                        setNewOrderForm({ ...newOrderForm, items: updatedItems });
+                      }}
+                    />
+                  </div>
+                </div>
+
+              </div>
+            </div>
+
+            <div className="px-6 py-4 border-t border-gray-200 bg-gray-50 flex justify-end gap-3">
+              <button onClick={() => setShowCreateModal(false)} className="px-4 py-2 bg-white border rounded text-gray-700 hover:bg-gray-100 text-sm font-semibold transition-colors">Hủy</button>
+              <button onClick={submitCreateManualOrder} className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm font-semibold shadow-sm transition-colors">Tạo ca dịch vụ</button>
             </div>
           </div>
         </div>
