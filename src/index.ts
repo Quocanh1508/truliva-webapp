@@ -7,6 +7,7 @@ import helmet from 'helmet';
 import cors from 'cors';
 import cookieParser from 'cookie-parser';
 import path from 'path';
+import compression from 'compression';
 import logger from './utils/logger';
 import webhookRoutes from './routes/webhooks';
 import authRoutes from './routes/auth';
@@ -28,6 +29,9 @@ const PORT = process.env.PORT || 3000;
 
 // Trust proxy (Render dùng reverse proxy HTTPS)
 app.set('trust proxy', 1);
+
+// Enable gzip/deflate compression
+app.use(compression());
 
 // ── Security middleware ──
 app.use(helmet({
@@ -111,11 +115,25 @@ app.use('/api/notifications', notificationRoutes);
 app.use('/api/inventory', inventoryRoutes);
 
 // ── Serve uploaded images ──
-app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')));
+app.use('/uploads', express.static(path.join(process.cwd(), 'uploads'), {
+  maxAge: '7d',
+  setHeaders: (res) => {
+    res.setHeader('Cache-Control', 'public, max-age=604800');
+  }
+}));
 
 // ── Serve webapp static files (production) ──
 const webappPath = path.join(__dirname, '..', 'webapp', 'dist');
-app.use(express.static(webappPath));
+app.use(express.static(webappPath, {
+  maxAge: '1y',
+  setHeaders: (res, filepath) => {
+    if (filepath.endsWith('.html')) {
+      res.setHeader('Cache-Control', 'no-cache');
+    } else {
+      res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+    }
+  }
+}));
 
 // ── SPA fallback: mọi route không match API/webhook → index.html ──
 app.use((req, res, next) => {
