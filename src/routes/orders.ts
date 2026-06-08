@@ -49,12 +49,19 @@ router.get('/', requireAuth, async (req: Request, res: Response): Promise<void> 
     const where: Prisma.OrderWhereInput = {};
     const conditions: Prisma.OrderWhereInput[] = [];
 
-    // Chỉ hiển thị các đơn hàng đã được xác nhận bên POS (ẩn các đơn nháp status = 0, luôn hiện đơn thủ công)
+    // ── NGHIỆP VỤ: Lọc đơn hàng hiển thị ──────────────────────────────────────
+    // Pancake POS gán statusCode = 0 cho các đơn hàng ở trạng thái NHÁP (chưa xác nhận).
+    // Các đơn nháp này không nên hiển thị trong hệ thống vì chưa được Admin duyệt.
+    //
+    // Đơn hàng thủ công (tạo từ trang Admin trong Truliva, không qua Pancake POS)
+    // được gán pancakeOrderId âm (< 0) để phân biệt. Các đơn này luôn được hiển thị
+    // dù statusCode = 0 vì chúng không phải đơn nháp của Pancake.
+    // ─────────────────────────────────────────────────────────────────────────────
     conditions.push({
       OR: [
-        { statusCode: { not: 0 } },
-        { statusCode: null },
-        { pancakeOrderId: { lt: 0 } }
+        { statusCode: { not: 0 } },  // Đơn đã xác nhận từ Pancake POS
+        { statusCode: null },          // Đơn không có statusCode (edge case cũ)
+        { pancakeOrderId: { lt: 0 } } // Đơn thủ công (luôn hiện, bất kể statusCode)
       ]
     });
     
@@ -87,6 +94,14 @@ router.get('/', requireAuth, async (req: Request, res: Response): Promise<void> 
     if (adminStatuses) {
       const statusesList = typeof adminStatuses === 'string' ? adminStatuses.split(',') : (Array.isArray(adminStatuses) ? adminStatuses as string[] : []);
       if (statusesList.length > 0) {
+        // ── NGHIỆP VỤ: Ánh xạ trạng thái "chờ xử lý" ───────────────────────────
+        // Khi một đơn hàng mới đồng bộ vào từ Pancake POS, cột adminStatus trong
+        // Database được để NULL (chưa Admin gán trạng thái gì).
+        // Về mặt UI và nghiệp vụ, NULL được hiểu là "chờ xử lý".
+        // Do đó, khi user lọc theo "chờ xử lý", phải truy vấn cả hai:
+        //   - adminStatus = 'chờ xử lý' (đơn thủ công đã set rõ)
+        //   - adminStatus = null         (đơn từ Pancake mới vào, chưa được xử lý)
+        // ─────────────────────────────────────────────────────────────────────────
         const hasPending = statusesList.includes('chờ xử lý');
         if (hasPending) {
           conditions.push({
@@ -101,6 +116,7 @@ router.get('/', requireAuth, async (req: Request, res: Response): Promise<void> 
       }
     } else if (status) {
       if (status === 'chờ xử lý') {
+        // Xem giải thích trên: null trong DB = "chờ xử lý" trong UI
         conditions.push({
           OR: [
             { adminStatus: 'chờ xử lý' },
@@ -480,16 +496,26 @@ router.post('/', requireAuth, requireAdmin, async (req: Request, res: Response):
       customerId = newCustomer.id;
     }
 
-    // 2. Tìm pancakeOrderId âm nhỏ nhất hiện tại
+    // ── NGHIỆP VỤ: Hệ thống ID cho đơn hàng thủ công ───────────────────────────
+    // Đơn hàng từ Pancake POS luôn có pancakeOrderId là số DƯƠNG (1, 2, 3, ...).
+    // Đơn hàng thủ công (tạo từ Admin trong Truliva) được gán ID ÂM (-1, -2, -3, ...
+    // để đảm bảo không bao giờ bị trùng với ID của Pancake POS.
+    //
+    // Quy tắc tự tăng: Tìm đơn thủ công có ID âm NHỎ NHẤT hiện tại (ví dụ: -5),
+    // rồi lấy giá trị = ID_nhỏ_nhất - 1 (tức là -6) cho đơn mới tiếp theo.
+    //
+    // Trên UI, các ID âm này được format hiển thị bằng helper formatOrderId():
+    //   -1 → "M1", -2 → "M2", ... (tiền tố "M" = Manual)
+    // ─────────────────────────────────────────────────────────────────────────────
     const minOrder = await prisma.order.findFirst({
       where: { pancakeOrderId: { lt: 0 } },
-      orderBy: { pancakeOrderId: 'asc' },
+      orderBy: { pancakeOrderId: 'asc' }, // 'asc' → số âm nhỏ nhất lên đầu
       select: { pancakeOrderId: true }
     });
 
-    let nextManualId = -1;
+    let nextManualId = -1; // ID mặc định cho đơn thủ công đầu tiên
     if (minOrder && minOrder.pancakeOrderId < 0) {
-      nextManualId = minOrder.pancakeOrderId - 1;
+      nextManualId = minOrder.pancakeOrderId - 1; // Tiếp tục giảm dần: -1, -2, -3...
     }
 
     // 3. Tạo Order
