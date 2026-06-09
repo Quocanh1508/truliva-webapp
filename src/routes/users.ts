@@ -239,6 +239,8 @@ router.get('/', async (_req: Request, res: Response): Promise<void> => {
         email: true,
         warehouseId: true,
         warehouseName: true,
+        group: true,
+        pancakeAccountName: true,
         _count: { select: { serviceReports: true } },
       } as any,
       orderBy: { createdAt: 'desc' },
@@ -260,7 +262,7 @@ router.post('/', async (req: Request, res: Response): Promise<void> => {
     const { 
       username, password, fullName, role, phoneNumber, techStationId,
       address, cccdNumber, cccdDate, cccdPlace, bankAccount, bankName, email,
-      warehouseId, warehouseName
+      warehouseId, warehouseName, group, pancakeAccountName
     } = req.body;
 
     if (!username || !password || !fullName) {
@@ -283,13 +285,15 @@ router.post('/', async (req: Request, res: Response): Promise<void> => {
     }
 
     const passwordHash = await bcrypt.hash(password, 10);
+    const validRoles = ['KTV', 'ADMIN', 'DEV', 'SALE_SUPERVISOR', 'SALER', 'HOTLINE', 'COORDINATOR', 'STAFF'];
+    const finalRole = validRoles.includes(role) ? role : 'KTV';
 
     const user = await prisma.user.create({
       data: {
         username: username.toLowerCase().trim(),
         passwordHash,
         fullName,
-        role: role === 'ADMIN' ? 'ADMIN' : (role === 'DEV' ? 'DEV' : 'KTV'),
+        role: finalRole,
         phoneNumber: phoneNumber || null,
         techStationId: techStationId || null,
         address: address || null,
@@ -301,6 +305,8 @@ router.post('/', async (req: Request, res: Response): Promise<void> => {
         email: email || null,
         warehouseId: warehouseId || null,
         warehouseName: warehouseName || null,
+        group: group || null,
+        pancakeAccountName: pancakeAccountName || null,
       },
       select: {
         id: true,
@@ -320,6 +326,8 @@ router.post('/', async (req: Request, res: Response): Promise<void> => {
         email: true,
         warehouseId: true,
         warehouseName: true,
+        group: true,
+        pancakeAccountName: true,
       } as any,
     });
 
@@ -341,14 +349,19 @@ router.put('/:id', async (req: Request, res: Response): Promise<void> => {
     const { 
       fullName, phoneNumber, password, isActive, role, techStationId,
       address, cccdNumber, cccdDate, cccdPlace, bankAccount, bankName, email,
-      warehouseId, warehouseName
+      warehouseId, warehouseName, group, pancakeAccountName
     } = req.body;
 
     const updateData: any = {};
     if (fullName !== undefined) updateData.fullName = fullName;
     if (phoneNumber !== undefined) updateData.phoneNumber = phoneNumber;
     if (isActive !== undefined) updateData.isActive = isActive;
-    if (role !== undefined) updateData.role = role;
+    
+    if (role !== undefined) {
+      const validRoles = ['KTV', 'ADMIN', 'DEV', 'SALE_SUPERVISOR', 'SALER', 'HOTLINE', 'COORDINATOR', 'STAFF'];
+      updateData.role = validRoles.includes(role) ? role : 'KTV';
+    }
+    
     if (techStationId !== undefined) updateData.techStationId = techStationId || null;
     
     if (address !== undefined) updateData.address = address || null;
@@ -360,6 +373,8 @@ router.put('/:id', async (req: Request, res: Response): Promise<void> => {
     if (email !== undefined) updateData.email = email || null;
     if (warehouseId !== undefined) updateData.warehouseId = warehouseId || null;
     if (warehouseName !== undefined) updateData.warehouseName = warehouseName || null;
+    if (group !== undefined) updateData.group = group || null;
+    if (pancakeAccountName !== undefined) updateData.pancakeAccountName = pancakeAccountName || null;
 
     if (password) {
       if (password.length < 4) {
@@ -389,6 +404,8 @@ router.put('/:id', async (req: Request, res: Response): Promise<void> => {
         email: true,
         warehouseId: true,
         warehouseName: true,
+        group: true,
+        pancakeAccountName: true,
       } as any,
     });
 

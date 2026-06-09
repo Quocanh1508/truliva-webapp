@@ -1,12 +1,12 @@
 import { Router, Request, Response } from 'express';
 import prisma from '../config/database';
 import logger from '../utils/logger';
-import { requireAuth, requireAdmin } from '../middleware/authSession';
+import { requireAuth, requireDashboardAccess } from '../middleware/authSession';
 
 const router = Router();
 
-// Tất cả dashboard routes yêu cầu quyền admin
-router.use(requireAuth, requireAdmin);
+// Tất cả dashboard routes yêu cầu quyền dashboard access
+router.use(requireAuth, requireDashboardAccess);
 
 /**
  * GET /api/dashboard/stats

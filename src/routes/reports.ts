@@ -1,7 +1,7 @@
 import { Router, Request, Response } from 'express';
 import prisma from '../config/database';
 import logger from '../utils/logger';
-import { requireAuth, requireAdmin } from '../middleware/authSession';
+import { requireAuth, requireAdmin, requireCoordinatorOrAdmin, requireDashboardAccess } from '../middleware/authSession';
 import { sendPushNotification } from '../services/notificationService';
 import { sendWebPushNotification } from '../services/webPushService';
 import ExcelJS from 'exceljs';
@@ -36,15 +36,94 @@ async function buildReportFilter(query: any, user: any): Promise<any> {
 
   const where: any = {};
 
-  // Phân quyền: KTV chỉ thấy của mình
-  if (user.role === 'KTV') {
+  // Phân quyền IAM cho ServiceReport
+  const { role, group, pancakeAccountName } = user;
+  
+  if (role === 'KTV') {
     where.ktvUserId = user.id;
-  } else if (ktvId) {
-    where.ktvUserId = ktvId;
-  } else if (ktvIds) {
-    const list = (ktvIds as string).split(',').map((s: string) => s.trim()).filter(Boolean);
-    if (list.length > 0) {
-      where.ktvUserId = { in: list };
+  } else {
+    // ADMIN, DEV, COORDINATOR, HOTLINE và STAFF (Service group) được xem toàn bộ báo cáo
+    if (
+      role === 'ADMIN' ||
+      role === 'DEV' ||
+      role === 'COORDINATOR' ||
+      role === 'HOTLINE' ||
+      (role === 'STAFF' && group === 'Service')
+    ) {
+      if (ktvId) {
+        where.ktvUserId = ktvId;
+      } else if (ktvIds) {
+        const list = (ktvIds as string).split(',').map((s: string) => s.trim()).filter(Boolean);
+        if (list.length > 0) {
+          where.ktvUserId = { in: list };
+        }
+      }
+    } else {
+      // SALE_SUPERVISOR, SALER hoặc STAFF (Marketing/other)
+      const orConditions: any[] = [];
+      
+      if (role === 'SALER' || role === 'STAFF') {
+        const creatorName = pancakeAccountName || '';
+        if (creatorName) {
+          orConditions.push(
+            { order: { rawData: { path: ['creator', 'name'], equals: creatorName } } },
+            { order: { rawData: { path: ['assigning_seller', 'name'], equals: creatorName } } },
+            { order: { rawData: { path: ['assigning_care', 'name'], equals: creatorName } } }
+          );
+        }
+        if (group && group.toLowerCase() === 'ecom') {
+          orConditions.push(
+            { order: { orderSource: { contains: 'shopee', mode: 'insensitive' } } },
+            { order: { orderSource: { contains: 'lazada', mode: 'insensitive' } } },
+            { order: { orderSource: { contains: 'tiktok', mode: 'insensitive' } } },
+            { order: { orderSource: { contains: 'tiki', mode: 'insensitive' } } }
+          );
+        }
+      } else if (role === 'SALE_SUPERVISOR') {
+        if (group) {
+          const groupUsers = await prisma.user.findMany({
+            where: { group: group, isActive: true },
+            select: { pancakeAccountName: true }
+          });
+          const pancakeNames = groupUsers
+            .map(u => u.pancakeAccountName?.trim())
+            .filter(Boolean) as string[];
+
+          if (pancakeNames.length > 0) {
+            pancakeNames.forEach(name => {
+              orConditions.push(
+                { order: { rawData: { path: ['creator', 'name'], equals: name } } },
+                { order: { rawData: { path: ['assigning_seller', 'name'], equals: name } } },
+                { order: { rawData: { path: ['assigning_care', 'name'], equals: name } } }
+              );
+            });
+          }
+          if (group.toLowerCase() === 'ecom') {
+            orConditions.push(
+              { order: { orderSource: { contains: 'shopee', mode: 'insensitive' } } },
+              { order: { orderSource: { contains: 'lazada', mode: 'insensitive' } } },
+              { order: { orderSource: { contains: 'tiktok', mode: 'insensitive' } } },
+              { order: { orderSource: { contains: 'tiki', mode: 'insensitive' } } }
+            );
+          }
+        }
+      }
+
+      if (orConditions.length === 0) {
+        where.id = 'none';
+      } else {
+        where.AND = where.AND || [];
+        where.AND.push({ OR: orConditions });
+      }
+
+      if (ktvId) {
+        where.ktvUserId = ktvId;
+      } else if (ktvIds) {
+        const list = (ktvIds as string).split(',').map((s: string) => s.trim()).filter(Boolean);
+        if (list.length > 0) {
+          where.ktvUserId = { in: list };
+        }
+      }
     }
   }
 
@@ -628,7 +707,7 @@ router.get('/my-stats', requireAuth, async (req: Request, res: Response): Promis
  * GET /api/reports/filter-options
  * Lấy các tùy chọn cho bộ lọc nâng cao (Admin only)
  */
-router.get('/filter-options', requireAdmin, async (req: Request, res: Response): Promise<void> => {
+router.get('/filter-options', async (req: Request, res: Response): Promise<void> => {
   try {
     const [
       workTypes,
@@ -675,7 +754,7 @@ router.get('/filter-options', requireAdmin, async (req: Request, res: Response):
  * GET /api/reports/stats
  * Thống kê tổng hợp (Admin only)
  */
-router.get('/stats', requireAdmin, async (req: Request, res: Response): Promise<void> => {
+router.get('/stats', requireDashboardAccess, async (req: Request, res: Response): Promise<void> => {
   try {
     const { month } = req.query;
     const where: any = {};
@@ -722,7 +801,7 @@ router.get('/stats', requireAdmin, async (req: Request, res: Response): Promise<
  * GET /api/reports/export
  * Export Excel (Admin only)
  */
-router.get('/export', requireAdmin, async (req: Request, res: Response): Promise<void> => {
+router.get('/export', requireDashboardAccess, async (req: Request, res: Response): Promise<void> => {
   try {
     const { month } = req.query;
     const where = await buildReportFilter(req.query, req.user);
@@ -899,19 +978,17 @@ router.get('/check-serial', async (req: Request, res: Response): Promise<void> =
  */
 router.get('/:id', async (req: Request, res: Response): Promise<void> => {
   try {
-    const report = await prisma.serviceReport.findUnique({
-      where: { id: req.params.id as string },
+    const reportFilter = await buildReportFilter({}, req.user);
+    const report = await prisma.serviceReport.findFirst({
+      where: {
+        id: req.params.id as string,
+        ...reportFilter
+      },
       include: { ktvUser: { select: { fullName: true, username: true } } },
     });
 
     if (!report) {
-      res.status(404).json({ error: 'Không tìm thấy báo cáo' });
-      return;
-    }
-
-    // KTV chỉ xem được báo cáo của mình
-    if (req.user!.role === 'KTV' && report.ktvUserId !== req.user!.id) {
-      res.status(403).json({ error: 'Không có quyền xem' });
+      res.status(404).json({ error: 'Không tìm thấy báo cáo hoặc bạn không có quyền xem' });
       return;
     }
 
@@ -927,7 +1004,7 @@ router.get('/:id', async (req: Request, res: Response): Promise<void> => {
  * Admin cập nhật báo cáo — hỗ trợ sửa toàn bộ trường.
  * Khi admin sửa, KTV sẽ nhận thông báo.
  */
-router.put('/:id', requireAdmin, async (req: Request, res: Response): Promise<void> => {
+router.put('/:id', requireCoordinatorOrAdmin, async (req: Request, res: Response): Promise<void> => {
   try {
     const {
       isPaid, serviceCost, additionalCost, notes,
@@ -1037,7 +1114,7 @@ router.put('/:id', requireAdmin, async (req: Request, res: Response): Promise<vo
  * DELETE /api/reports/:id
  * Admin xóa báo cáo
  */
-router.delete('/:id', requireAdmin, async (req: Request, res: Response): Promise<void> => {
+router.delete('/:id', requireCoordinatorOrAdmin, async (req: Request, res: Response): Promise<void> => {
   try {
     const reportId = req.params.id as string;
     const { deleteReason } = req.body;

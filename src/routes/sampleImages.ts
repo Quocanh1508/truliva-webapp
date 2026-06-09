@@ -1,7 +1,7 @@
 import { Router, Request, Response } from 'express';
 import prisma from '../config/database';
 import logger from '../utils/logger';
-import { requireAuth, requireAdmin } from '../middleware/authSession';
+import { requireAuth, requireCoordinatorOrAdmin } from '../middleware/authSession';
 
 const router = Router();
 
@@ -35,8 +35,8 @@ router.get('/', async (req: Request, res: Response): Promise<void> => {
   }
 });
 
-// Các routes bên dưới yêu cầu Admin
-router.use(requireAdmin);
+// Các routes bên dưới yêu cầu Coordinator hoặc Admin
+router.use(requireCoordinatorOrAdmin);
 
 /**
  * POST /api/sample-images

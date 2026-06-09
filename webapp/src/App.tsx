@@ -309,15 +309,23 @@ export default function App() {
                 <Route path="/ktv/inventory" element={<KtvInventory />} />
               </Route>
 
-              {/* Admin Routes */}
-              <Route element={<ProtectedRoute allowedRoles={['ADMIN']} />}>
+              {/* Dashboard Route */}
+              <Route element={<ProtectedRoute allowedRoles={['ADMIN', 'COORDINATOR', 'STAFF']} requireDashboard={true} />}>
                 <Route path="/admin" element={<Dashboard />} />
+              </Route>
+
+              {/* Admin & Coordinator Settings Routes */}
+              <Route element={<ProtectedRoute allowedRoles={['ADMIN', 'COORDINATOR']} />}>
                 <Route path="/admin/inventory" element={<InventoryManage />} />
-                <Route path="/admin/reports" element={<ReportList />} />
-                <Route path="/admin/users" element={<UserManage />} />
                 <Route path="/admin/stations" element={<StationManage />} />
-                <Route path="/admin/orders" element={<OrderList />} />
+                <Route path="/admin/users" element={<UserManage />} />
                 <Route path="/admin/sample-images" element={<SampleImageManage />} />
+              </Route>
+
+              {/* All Office/Administrative Routes */}
+              <Route element={<ProtectedRoute allowedRoles={['ADMIN', 'COORDINATOR', 'SALE_SUPERVISOR', 'SALER', 'HOTLINE', 'STAFF']} />}>
+                <Route path="/admin/orders" element={<OrderList />} />
+                <Route path="/admin/reports" element={<ReportList />} />
               </Route>
 
               {/* Dev Routes */}
@@ -326,12 +334,9 @@ export default function App() {
               </Route>
 
               {/* Shared Routes */}
-              <Route element={<ProtectedRoute allowedRoles={['KTV', 'ADMIN', 'DEV']} />}>
+              <Route element={<ProtectedRoute allowedRoles={['KTV', 'ADMIN', 'DEV', 'COORDINATOR', 'SALE_SUPERVISOR', 'SALER', 'HOTLINE', 'STAFF']} />}>
                 <Route path="/profile" element={<ProfilePage />} />
                 <Route path="/change-password" element={<ChangePasswordPage />} />
-              </Route>
-
-              <Route element={<ProtectedRoute allowedRoles={['KTV', 'ADMIN']} />}>
                 <Route path="/feedback" element={<FeedbackPage />} />
               </Route>
             </Route>

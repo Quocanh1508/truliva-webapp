@@ -67,6 +67,8 @@ router.post('/login', async (req: Request, res: Response): Promise<void> => {
         username: user.username,
         fullName: user.fullName,
         role: user.role,
+        group: user.group,
+        pancakeAccountName: user.pancakeAccountName,
       },
     });
   } catch (error: any) {
@@ -96,6 +98,8 @@ router.get('/me', requireAuth, async (req: Request, res: Response): Promise<void
         username: true,
         fullName: true,
         role: true,
+        group: true,
+        pancakeAccountName: true,
         email: true,
         phoneNumber: true,
         address: true,

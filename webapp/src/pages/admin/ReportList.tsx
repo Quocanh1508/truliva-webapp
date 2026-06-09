@@ -4,6 +4,7 @@ import { fetchApi, deleteReportWithReason, updateReport, uploadImages } from '..
 import { Download, X, ExternalLink, Image as ImageIcon, Loader, Search, Edit3, Save, Plus, Trash2, SlidersHorizontal, RotateCcw, Calendar } from 'lucide-react';
 import CategoryTreeSelect from '../../components/CategoryTreeSelect';
 import { formatOrderId } from '../../utils/text';
+import { useAuth } from '../../context/AuthContext';
 
 // Check if a URL points to a directly viewable image
 function isDirectImage(url: string): boolean {
@@ -256,6 +257,10 @@ function MultiSelectObjectDropdown({
 }
 
 export default function ReportList() {
+  const { user: currentUser } = useAuth();
+  const canExportExcel = currentUser?.role === 'ADMIN' || currentUser?.role === 'DEV' || currentUser?.role === 'COORDINATOR' || (currentUser?.role === 'STAFF' && currentUser?.group === 'Service');
+  const canEditOrDelete = currentUser?.role === 'ADMIN' || currentUser?.role === 'DEV' || currentUser?.role === 'COORDINATOR';
+
   const [searchParams, setSearchParams] = useSearchParams();
   const searchParam = searchParams.get('search') || '';
 
@@ -743,9 +748,11 @@ export default function ReportList() {
       <div className="animate-fade-in">
       <div className="flex justify-between items-center mb-6">
         <h2 className="font-bold text-2xl text-[#1B3A6B]">Danh sách báo cáo</h2>
-        <button className="btn btn-outline flex items-center gap-2" onClick={handleExport}>
-          <Download size={18} /> Xuất Excel
-        </button>
+        {canExportExcel && (
+          <button className="btn btn-outline flex items-center gap-2" onClick={handleExport}>
+            <Download size={18} /> Xuất Excel
+          </button>
+        )}
       </div>
 
       {/* Filter Toolbar */}
@@ -1073,13 +1080,15 @@ export default function ReportList() {
                           </button>
                         )}
                         
-                        <button
-                          onClick={() => setDeleteModal({ isOpen: true, reportId: r.id })}
-                          className="text-left text-red-655 hover:text-red-805 hover:underline"
-                          style={{ background: 'none', cursor: 'pointer' }}
-                        >
-                          • Xóa
-                        </button>
+                        {canEditOrDelete && (
+                          <button
+                            onClick={() => setDeleteModal({ isOpen: true, reportId: r.id })}
+                            className="text-left text-red-655 hover:text-red-805 hover:underline"
+                            style={{ background: 'none', cursor: 'pointer' }}
+                          >
+                            • Xóa
+                          </button>
+                        )}
                       </div>
                       
                       {isPopupOpen && urls.length > 0 && (
@@ -1569,12 +1578,14 @@ export default function ReportList() {
             <div className="p-4 border-t border-gray-200 bg-gray-50 flex justify-end gap-3">
               {!isEditing ? (
                 <>
-                  <button 
-                    onClick={startEditing}
-                    className="px-4 py-2 bg-amber-500 hover:bg-amber-600 text-white font-semibold rounded-lg text-sm transition-colors flex items-center gap-2"
-                  >
-                    <Edit3 size={15} /> Sửa báo cáo
-                  </button>
+                  {canEditOrDelete && (
+                    <button 
+                      onClick={startEditing}
+                      className="px-4 py-2 bg-amber-500 hover:bg-amber-600 text-white font-semibold rounded-lg text-sm transition-colors flex items-center gap-2"
+                    >
+                      <Edit3 size={15} /> Sửa báo cáo
+                    </button>
+                  )}
                   <button 
                     onClick={() => setSelectedDetailReport(null)}
                     className="px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-700 font-semibold rounded-lg text-sm transition-colors"

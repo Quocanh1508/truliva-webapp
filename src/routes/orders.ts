@@ -11,6 +11,105 @@ import axios from 'axios';
 
 const router = Router();
 
+// Helper to build IAM filter for orders
+async function buildOrderFilter(user: any): Promise<Prisma.OrderWhereInput | null> {
+  if (!user) return { id: 'none' };
+  const { role, group, pancakeAccountName } = user;
+
+  // ADMIN, DEV, COORDINATOR, HOTLINE, and STAFF in Service group see all orders
+  if (
+    role === 'ADMIN' ||
+    role === 'DEV' ||
+    role === 'COORDINATOR' ||
+    role === 'HOTLINE' ||
+    (role === 'STAFF' && group === 'Service')
+  ) {
+    return null;
+  }
+
+  // KTV: see only assigned and not completed/cancelled
+  if (role === 'KTV') {
+    return {
+      assignedKtvId: user.id,
+      OR: [
+        { adminStatus: { notIn: ['hoàn thành', 'hủy đơn'] } },
+        { adminStatus: null }
+      ]
+    };
+  }
+
+  // SALER or STAFF (e.g., Marketing group)
+  if (role === 'SALER' || role === 'STAFF') {
+    const creatorName = pancakeAccountName || '';
+    const orConditions: Prisma.OrderWhereInput[] = [];
+
+    if (creatorName) {
+      orConditions.push(
+        { rawData: { path: ['creator', 'name'], equals: creatorName } },
+        { rawData: { path: ['assigning_seller', 'name'], equals: creatorName } },
+        { rawData: { path: ['assigning_care', 'name'], equals: creatorName } }
+      );
+    }
+
+    // eCom group sees shopee/lazada orders
+    if (group && group.toLowerCase() === 'ecom') {
+      orConditions.push(
+        { orderSource: { contains: 'shopee', mode: 'insensitive' } },
+        { orderSource: { contains: 'lazada', mode: 'insensitive' } },
+        { orderSource: { contains: 'tiktok', mode: 'insensitive' } },
+        { orderSource: { contains: 'tiki', mode: 'insensitive' } }
+      );
+    }
+
+    if (orConditions.length === 0) {
+      return { id: 'none' };
+    }
+    return { OR: orConditions };
+  }
+
+  // SALE_SUPERVISOR
+  if (role === 'SALE_SUPERVISOR') {
+    if (!group) return { id: 'none' };
+
+    // Get all users in the same group
+    const groupUsers = await prisma.user.findMany({
+      where: { group: group, isActive: true },
+      select: { pancakeAccountName: true }
+    });
+    const pancakeNames = groupUsers
+      .map(u => u.pancakeAccountName?.trim())
+      .filter(Boolean) as string[];
+
+    const orConditions: Prisma.OrderWhereInput[] = [];
+    if (pancakeNames.length > 0) {
+      pancakeNames.forEach(name => {
+        orConditions.push(
+          { rawData: { path: ['creator', 'name'], equals: name } },
+          { rawData: { path: ['assigning_seller', 'name'], equals: name } },
+          { rawData: { path: ['assigning_care', 'name'], equals: name } }
+        );
+      });
+    }
+
+    // eCom group sees shopee/lazada orders
+    if (group.toLowerCase() === 'ecom') {
+      orConditions.push(
+        { orderSource: { contains: 'shopee', mode: 'insensitive' } },
+        { orderSource: { contains: 'lazada', mode: 'insensitive' } },
+        { orderSource: { contains: 'tiktok', mode: 'insensitive' } },
+        { orderSource: { contains: 'tiki', mode: 'insensitive' } }
+      );
+    }
+
+    if (orConditions.length === 0) {
+      return { id: 'none' };
+    }
+    return { OR: orConditions };
+  }
+
+  return { id: 'none' };
+}
+
 /**
  * GET /api/orders
  * Lấy danh sách đơn hàng với hỗ trợ phân trang và bộ lọc/sắp xếp
@@ -65,15 +164,9 @@ router.get('/', requireAuth, async (req: Request, res: Response): Promise<void> 
       ]
     });
     
-    // Nếu user là KTV, chỉ lấy các đơn hàng được giao cho KTV đó và chưa hoàn thành / chưa hủy
-    if (req.user?.role === 'KTV') {
-      conditions.push({ assignedKtvId: req.user.id });
-      conditions.push({
-        OR: [
-          { adminStatus: { notIn: ['hoàn thành', 'hủy đơn'] } },
-          { adminStatus: null }
-        ]
-      });
+    const iamFilter = await buildOrderFilter(req.user);
+    if (iamFilter) {
+      conditions.push(iamFilter);
     }
 
     if (pancakeOrderId) {
@@ -693,8 +786,20 @@ router.post('/', requireAuth, requireAdmin, async (req: Request, res: Response):
  * GET /api/orders/export
  * Xuất Excel danh sách đơn hàng theo bộ lọc (Admin only)
  */
-router.get('/export', requireAuth, requireAdmin, async (req: Request, res: Response): Promise<void> => {
+router.get('/export', requireAuth, async (req: Request, res: Response): Promise<void> => {
   try {
+    const role = req.user?.role;
+    const group = req.user?.group;
+    const isAllowed = 
+      role === 'ADMIN' ||
+      role === 'DEV' ||
+      role === 'COORDINATOR' ||
+      (role === 'STAFF' && group === 'Service');
+
+    if (!isAllowed) {
+      res.status(403).json({ error: 'Bạn không có quyền xuất file Excel' });
+      return;
+    }
     const { 
       sortBy = 'createdAt',
       sortOrder = 'desc',
@@ -1265,8 +1370,17 @@ router.post('/:id/reschedule', requireAuth, async (req: Request, res: Response):
  * PATCH /api/orders/:id
  * Cập nhật đơn hàng (trạng thái, phân công, loại CV, trạm, hủy/khôi phục...)
  */
-router.patch('/:id', requireAuth, requireAdmin, async (req: Request, res: Response): Promise<void> => {
+router.patch('/:id', requireAuth, async (req: Request, res: Response): Promise<void> => {
   try {
+    const role = req.user?.role;
+    const group = req.user?.group;
+
+    // Check permission to modify orders
+    if (role === 'KTV' || (role === 'STAFF' && group === 'Service')) {
+      res.status(403).json({ error: 'Bạn không có quyền chỉnh sửa đơn hàng' });
+      return;
+    }
+
     const id = req.params.id as string;
     const {
       adminStatus, appointmentTime, assignedKtvId,
@@ -1280,6 +1394,18 @@ router.patch('/:id', requireAuth, requireAdmin, async (req: Request, res: Respon
     if (!oldOrder) {
       res.status(404).json({ error: 'Không tìm thấy đơn hàng' });
       return;
+    }
+
+    // Check IAM permission: user can only modify orders they can see
+    const iamFilter = await buildOrderFilter(req.user);
+    if (iamFilter) {
+      const accessibleOrder = await prisma.order.findFirst({
+        where: { id, ...iamFilter }
+      });
+      if (!accessibleOrder) {
+        res.status(403).json({ error: 'Bạn không có quyền chỉnh sửa đơn hàng này' });
+        return;
+      }
     }
 
     const updateData: any = {};

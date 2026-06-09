@@ -4,6 +4,7 @@ import { fetchApi, getStations } from '../../api/client';
 import { UserPlus, Lock, Unlock, Search, Filter, X, Pencil, Download } from 'lucide-react';
 import { useConfirm } from '../../context/ConfirmContext';
 import { matchesSearchTerm } from '../../utils/text';
+import { useAuth, type UserRole } from '../../context/AuthContext';
 
 // Helper to sort tech stations: TP.Hồ Chí Minh, Hà Nội, Đà Nẵng first, then A-Z
 function getSortedTechStations(main: any) {
@@ -28,6 +29,7 @@ function getSortedTechStations(main: any) {
 
 export default function UserManage() {
   const { confirm } = useConfirm();
+  const { user: currentUser } = useAuth();
   const [users, setUsers] = useState<any[]>([]);
   const [stations, setStations] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -35,6 +37,11 @@ export default function UserManage() {
   const [warehouses, setWarehouses] = useState<any[]>([]);
   const [warehouseId, setWarehouseId] = useState('');
   const [warehouseName, setWarehouseName] = useState('');
+  
+  // New role, group and pancake account fields
+  const [role, setRole] = useState<UserRole>('KTV');
+  const [group, setGroup] = useState('');
+  const [pancakeAccountName, setPancakeAccountName] = useState('');
   
   // Filter state
   const [searchText, setSearchText] = useState('');
@@ -83,6 +90,9 @@ export default function UserManage() {
     setEmail('');
     setWarehouseId('');
     setWarehouseName('');
+    setRole('KTV');
+    setGroup('');
+    setPancakeAccountName('');
     setIsActive(true);
     setActiveTab('basic');
     setError('');
@@ -106,6 +116,9 @@ export default function UserManage() {
     setEmail(user.email || '');
     setWarehouseId(user.warehouseId || '');
     setWarehouseName(user.warehouseName || '');
+    setRole(user.role || 'KTV');
+    setGroup(user.group || '');
+    setPancakeAccountName(user.pancakeAccountName || '');
     setIsActive(user.isActive !== false);
     setActiveTab('basic');
     setError('');
@@ -201,19 +214,19 @@ export default function UserManage() {
         await fetchApi('/users', {
           method: 'POST',
           body: JSON.stringify({
-            username, password, fullName, phoneNumber: phone, role: 'KTV', techStationId,
+            username, password, fullName, phoneNumber: phone, role, techStationId,
             address, cccdNumber, cccdDate, cccdPlace, bankAccount, bankName, email,
-            warehouseId, warehouseName
+            warehouseId, warehouseName, group, pancakeAccountName
           })
         });
       } else {
         await fetchApi(`/users/${editingUserId}`, {
           method: 'PUT',
           body: JSON.stringify({
-            fullName, phoneNumber: phone, role: 'KTV', techStationId, isActive,
+            fullName, phoneNumber: phone, role, techStationId, isActive,
             password: password.trim() || undefined,
             address, cccdNumber, cccdDate, cccdPlace, bankAccount, bankName, email,
-            warehouseId, warehouseName
+            warehouseId, warehouseName, group, pancakeAccountName
           })
         });
       }
@@ -486,6 +499,45 @@ export default function UserManage() {
                       ))}
                     </select>
                   </div>
+                  <div className="form-group mb-0">
+                    <label className="form-label text-xs font-semibold text-gray-700">Vai trò *</label>
+                    <select
+                      className="form-input bg-white"
+                      value={role}
+                      onChange={e => setRole(e.target.value as any)}
+                      disabled={currentUser?.role !== 'ADMIN'}
+                      required
+                    >
+                      <option value="KTV">Kỹ thuật viên (KTV)</option>
+                      <option value="ADMIN">Quản trị viên (ADMIN)</option>
+                      <option value="DEV">Lập trình viên (DEV)</option>
+                      <option value="SALE_SUPERVISOR">Sale Supervisor</option>
+                      <option value="SALER">Saler</option>
+                      <option value="HOTLINE">Hotline</option>
+                      <option value="COORDINATOR">Điều phối viên (Coordinator)</option>
+                      <option value="STAFF">Nhân viên (Staff)</option>
+                    </select>
+                  </div>
+                  <div className="form-group mb-0">
+                    <label className="form-label text-xs font-semibold text-gray-700">Nhóm công việc (Group)</label>
+                    <input
+                      type="text"
+                      className="form-input"
+                      value={group}
+                      onChange={e => setGroup(e.target.value)}
+                      placeholder="Ví dụ: DTC, eCom, Service, Marketing"
+                    />
+                  </div>
+                  <div className="form-group mb-0">
+                    <label className="form-label text-xs font-semibold text-gray-700">Tên account Pancake</label>
+                    <input
+                      type="text"
+                      className="form-input"
+                      value={pancakeAccountName}
+                      onChange={e => setPancakeAccountName(e.target.value)}
+                      placeholder="Nhập tên tài khoản Pancake"
+                    />
+                  </div>
                   {modalMode === 'edit' && (
                     <div className="form-group mb-0">
                       <label className="form-label text-xs font-semibold text-gray-700">Trạng thái hoạt động</label>
@@ -597,6 +649,8 @@ export default function UserManage() {
                 <th style={{ padding: '12px 16px' }}>Họ tên / SĐT</th>
                 <th style={{ padding: '12px 16px' }}>Username</th>
                 <th style={{ padding: '12px 16px' }}>Vai trò</th>
+                <th style={{ padding: '12px 16px' }}>Nhóm</th>
+                <th style={{ padding: '12px 16px' }}>Tên Pancake</th>
                 <th style={{ padding: '12px 16px' }}>Trạm trực thuộc</th>
                 <th style={{ padding: '12px 16px' }}>Số báo cáo</th>
                 <th style={{ padding: '12px 16px' }}>Trạng thái</th>
@@ -606,7 +660,7 @@ export default function UserManage() {
             <tbody>
               {filteredUsers.length === 0 ? (
                 <tr>
-                  <td colSpan={7} style={{ padding: '32px 16px', textAlign: 'center', color: 'var(--text-muted)' }}>
+                  <td colSpan={9} style={{ padding: '32px 16px', textAlign: 'center', color: 'var(--text-muted)' }}>
                     {hasFilters ? 'Không tìm thấy kỹ thuật viên phù hợp với bộ lọc.' : 'Chưa có kỹ thuật viên nào.'}
                   </td>
                 </tr>
@@ -624,12 +678,22 @@ export default function UserManage() {
                   </td>
                   <td style={{ padding: '12px 16px' }}>{u.username}</td>
                   <td style={{ padding: '12px 16px' }}>
-                    <span className={`px-2 py-1 text-xs rounded font-bold ${u.role === 'ADMIN' ? 'bg-purple-100 text-purple-700' : 'bg-blue-100 text-blue-700'}`}>
+                    <span className={`px-2 py-1 text-xs rounded font-bold ${
+                      u.role === 'ADMIN' ? 'bg-red-100 text-red-700' :
+                      u.role === 'COORDINATOR' ? 'bg-purple-100 text-purple-700' :
+                      u.role === 'SALE_SUPERVISOR' ? 'bg-amber-100 text-amber-700' :
+                      u.role === 'SALER' ? 'bg-green-100 text-green-700' :
+                      u.role === 'HOTLINE' ? 'bg-pink-100 text-pink-700' :
+                      u.role === 'STAFF' ? 'bg-teal-100 text-teal-700' :
+                      'bg-blue-100 text-blue-700'
+                    }`}>
                       {u.role}
                     </span>
                   </td>
+                  <td style={{ padding: '12px 16px' }}>{u.group || '---'}</td>
+                  <td style={{ padding: '12px 16px' }}>{u.pancakeAccountName || '---'}</td>
                   <td style={{ padding: '12px 16px' }}>
-                    {u.role === 'ADMIN' ? (
+                    {u.role !== 'KTV' ? (
                       <span className="text-gray-400 italic text-sm">Không áp dụng</span>
                     ) : (
                       <select 

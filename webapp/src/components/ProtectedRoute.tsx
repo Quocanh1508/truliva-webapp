@@ -4,9 +4,10 @@ import type { UserRole } from '../context/AuthContext';
 
 interface ProtectedRouteProps {
   allowedRoles?: UserRole[];
+  requireDashboard?: boolean;
 }
 
-export default function ProtectedRoute({ allowedRoles }: ProtectedRouteProps) {
+export default function ProtectedRoute({ allowedRoles, requireDashboard }: ProtectedRouteProps) {
   const { user, loading } = useAuth();
 
   if (loading) {
@@ -22,9 +23,21 @@ export default function ProtectedRoute({ allowedRoles }: ProtectedRouteProps) {
   }
 
   if (allowedRoles && !allowedRoles.includes(user.role)) {
-    if (user.role === 'ADMIN') return <Navigate to="/admin/orders" replace />;
+    if (user.role === 'KTV') return <Navigate to="/ktv/my-orders" replace />;
     if (user.role === 'DEV') return <Navigate to="/dev/feedbacks" replace />;
-    return <Navigate to="/ktv/my-orders" replace />;
+    return <Navigate to="/admin/orders" replace />;
+  }
+
+  if (requireDashboard) {
+    const hasDashboardAccess = 
+      user.role === 'ADMIN' || 
+      user.role === 'DEV' || 
+      user.role === 'COORDINATOR' || 
+      (user.role === 'STAFF' && user.group === 'Service');
+    
+    if (!hasDashboardAccess) {
+      return <Navigate to="/admin/orders" replace />;
+    }
   }
 
   return <Outlet />;

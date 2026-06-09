@@ -1,13 +1,15 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { fetchApi } from '../api/client';
 
-export type UserRole = 'KTV' | 'ADMIN' | 'DEV';
+export type UserRole = 'KTV' | 'ADMIN' | 'DEV' | 'SALE_SUPERVISOR' | 'SALER' | 'HOTLINE' | 'COORDINATOR' | 'STAFF';
 
 export interface User {
   id: string;
   username: string;
   fullName: string;
   role: UserRole;
+  group?: string | null;
+  pancakeAccountName?: string | null;
 }
 
 interface AuthContextType {

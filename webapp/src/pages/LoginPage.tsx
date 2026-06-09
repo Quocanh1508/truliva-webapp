@@ -89,12 +89,12 @@ export default function LoginPage() {
       
       login(data.user);
       
-      if (data.user.role === 'ADMIN') {
-        navigate('/admin/orders');
-      } else if (data.user.role === 'DEV') {
+      if (data.user.role === 'DEV') {
         navigate('/dev/feedbacks');
-      } else {
+      } else if (data.user.role === 'KTV') {
         navigate('/ktv/my-orders');
+      } else {
+        navigate('/admin/orders');
       }
     } catch (err: any) {
       setError(err.message);

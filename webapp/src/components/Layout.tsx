@@ -10,7 +10,8 @@ export default function Layout() {
   const location = useLocation();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
-  const logoPath = user?.role === 'ADMIN' ? '/admin/orders' : (user?.role === 'DEV' ? '/dev/feedbacks' : '/ktv/my-orders');
+  const isOfficeRole = user && user.role !== 'KTV' && user.role !== 'DEV';
+  const logoPath = isOfficeRole ? '/admin/orders' : (user?.role === 'DEV' ? '/dev/feedbacks' : '/ktv/my-orders');
 
   useEffect(() => {
     if (user?.role !== 'KTV') return;
@@ -39,31 +40,75 @@ export default function Layout() {
     navigate('/login');
   };
 
-  const navItems = user?.role === 'ADMIN' ? [
-    { name: 'Dashboard', path: '/admin', icon: <BarChart size={20} /> },
-    { name: 'Quản lý kho', path: '/admin/inventory', icon: <Warehouse size={20} /> },
-    { name: 'Quản lý dịch vụ', path: '/admin/orders', icon: <Wrench size={20} /> },
-    { name: 'Danh sách báo cáo', path: '/admin/reports', icon: <List size={20} /> },
-    { name: 'Quản lý Trạm', path: '/admin/stations', icon: <Building size={20} /> },
-    { name: 'Kỹ thuật viên', path: '/admin/users', icon: <Users size={20} /> },
-    { name: 'Ảnh mẫu báo cáo', path: '/admin/sample-images', icon: <ImageIcon size={20} /> },
-    { name: 'Đóng góp ý kiến', path: '/feedback', icon: <MessageSquare size={20} /> },
-    { name: 'Thông tin cá nhân', path: '/profile', icon: <User size={20} /> },
-    { name: 'Đổi mật khẩu', path: '/change-password', icon: <Key size={20} /> },
-  ] : (user?.role === 'DEV' ? [
-    { name: 'Phản hồi người dùng', path: '/dev/feedbacks', icon: <MessageSquare size={20} /> },
-    { name: 'Thông tin cá nhân', path: '/profile', icon: <User size={20} /> },
-    { name: 'Đổi mật khẩu', path: '/change-password', icon: <Key size={20} /> },
-  ] : [
-    { name: 'Dịch vụ được giao', path: '/ktv/my-orders', icon: <Wrench size={20} /> },
-    { name: 'Tồn kho của tôi', path: '/ktv/inventory', icon: <Warehouse size={20} /> },
-    { name: 'Thông báo', path: '/ktv/notifications', icon: <Bell size={20} /> },
-    { name: 'Tạo báo cáo', path: '/ktv/report', icon: <FileText size={20} /> },
-    { name: 'Báo cáo của tôi', path: '/ktv/my-reports', icon: <List size={20} /> },
-    { name: 'Đóng góp ý kiến', path: '/feedback', icon: <MessageSquare size={20} /> },
-    { name: 'Thông tin cá nhân', path: '/profile', icon: <User size={20} /> },
-    { name: 'Đổi mật khẩu', path: '/change-password', icon: <Key size={20} /> },
-  ]);
+  const getNavItems = () => {
+    if (!user) return [];
+    
+    if (user.role === 'DEV') {
+      return [
+        { name: 'Phản hồi người dùng', path: '/dev/feedbacks', icon: <MessageSquare size={20} /> },
+        { name: 'Thông tin cá nhân', path: '/profile', icon: <User size={20} /> },
+        { name: 'Đổi mật khẩu', path: '/change-password', icon: <Key size={20} /> },
+      ];
+    }
+    
+    if (user.role === 'KTV') {
+      return [
+        { name: 'Dịch vụ được giao', path: '/ktv/my-orders', icon: <Wrench size={20} /> },
+        { name: 'Tồn kho của tôi', path: '/ktv/inventory', icon: <Warehouse size={20} /> },
+        { name: 'Thông báo', path: '/ktv/notifications', icon: <Bell size={20} /> },
+        { name: 'Tạo báo cáo', path: '/ktv/report', icon: <FileText size={20} /> },
+        { name: 'Báo cáo của tôi', path: '/ktv/my-reports', icon: <List size={20} /> },
+        { name: 'Đóng góp ý kiến', path: '/feedback', icon: <MessageSquare size={20} /> },
+        { name: 'Thông tin cá nhân', path: '/profile', icon: <User size={20} /> },
+        { name: 'Đổi mật khẩu', path: '/change-password', icon: <Key size={20} /> },
+      ];
+    }
+    
+    // Office / Administrative roles
+    const items: any[] = [];
+    
+    // 1. Dashboard: Admin, Coordinator, Staff (Service group)
+    const canSeeDashboard = 
+      user.role === 'ADMIN' || 
+      user.role === 'COORDINATOR' || 
+      (user.role === 'STAFF' && user.group === 'Service');
+    if (canSeeDashboard) {
+      items.push({ name: 'Dashboard', path: '/admin', icon: <BarChart size={20} /> });
+    }
+    
+    // 2. Quản lý kho: Admin, Coordinator
+    const canSeeInventory = user.role === 'ADMIN' || user.role === 'COORDINATOR';
+    if (canSeeInventory) {
+      items.push({ name: 'Quản lý kho', path: '/admin/inventory', icon: <Warehouse size={20} /> });
+    }
+    
+    // 3. Quản lý dịch vụ: All office roles
+    items.push({ name: 'Quản lý dịch vụ', path: '/admin/orders', icon: <Wrench size={20} /> });
+    
+    // 4. Danh sách báo cáo: All office roles
+    items.push({ name: 'Danh sách báo cáo', path: '/admin/reports', icon: <List size={20} /> });
+    
+    // 5. Quản lý Trạm, KTV, Ảnh mẫu: Admin, Coordinator
+    const canSeeSettings = user.role === 'ADMIN' || user.role === 'COORDINATOR';
+    if (canSeeSettings) {
+      items.push(
+        { name: 'Quản lý Trạm', path: '/admin/stations', icon: <Building size={20} /> },
+        { name: 'Kỹ thuật viên', path: '/admin/users', icon: <Users size={20} /> },
+        { name: 'Ảnh mẫu báo cáo', path: '/admin/sample-images', icon: <ImageIcon size={20} /> }
+      );
+    }
+    
+    // Shared elements
+    items.push(
+      { name: 'Đóng góp ý kiến', path: '/feedback', icon: <MessageSquare size={20} /> },
+      { name: 'Thông tin cá nhân', path: '/profile', icon: <User size={20} /> },
+      { name: 'Đổi mật khẩu', path: '/change-password', icon: <Key size={20} /> }
+    );
+    
+    return items;
+  };
+
+  const navItems = getNavItems();
 
   const getTodayString = () => {
     const days = ['Chủ nhật', 'Thứ hai', 'Thứ ba', 'Thứ tư', 'Thứ năm', 'Thứ sáu', 'Thứ bảy'];

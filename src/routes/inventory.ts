@@ -3,7 +3,7 @@ import axios from 'axios';
 import ExcelJS from 'exceljs';
 import prisma from '../config/database';
 import logger from '../utils/logger';
-import { requireAuth, requireAdmin } from '../middleware/authSession';
+import { requireAuth, requireAdmin, requireCoordinatorOrAdmin } from '../middleware/authSession';
 import { syncProducts } from '../scripts/syncProducts';
 
 const router = Router();
@@ -54,7 +54,7 @@ router.get('/warehouses', async (req: Request, res: Response): Promise<void> => 
  * GET /api/inventory/stock
  * Lấy bảng tổng hợp tồn kho của tất cả sản phẩm tại từng kho (Admin only)
  */
-router.get('/stock', requireAdmin, async (req: Request, res: Response): Promise<void> => {
+router.get('/stock', requireCoordinatorOrAdmin, async (req: Request, res: Response): Promise<void> => {
   try {
     // 1. Lấy danh sách kho
     const warehouses = await fetchPancakeWarehouses();
@@ -117,7 +117,7 @@ router.get('/stock', requireAdmin, async (req: Request, res: Response): Promise<
  * POST /api/inventory/sync
  * Kích hoạt đồng bộ sản phẩm từ Pancake POS trong nền (Admin only)
  */
-router.post('/sync', requireAdmin, async (req: Request, res: Response): Promise<void> => {
+router.post('/sync', requireCoordinatorOrAdmin, async (req: Request, res: Response): Promise<void> => {
   try {
     syncProducts().catch((err) => logger.error('Sync products in background failed', { error: err.message }));
     res.status(200).json({ message: 'Sync process started in the background.' });

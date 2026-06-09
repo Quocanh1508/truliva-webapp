@@ -190,6 +190,11 @@ enum UserRole {
   KTV
   ADMIN
   DEV
+  SALE_SUPERVISOR
+  SALER
+  HOTLINE
+  COORDINATOR
+  STAFF
 }
 
 // ── Tài khoản người dùng (KTV + Admin) ──
@@ -213,6 +218,8 @@ model User {
   webPushSubscription Json?   @map("web_push_subscription")
   warehouseId     String?      @map("warehouse_id")
   warehouseName   String?      @map("warehouse_name")
+  pancakeAccountName String?   @map("pancake_account_name")
+  group           String?
   createdAt       DateTime     @default(now()) @map("created_at")
   updatedAt       DateTime     @updatedAt @map("updated_at")
 

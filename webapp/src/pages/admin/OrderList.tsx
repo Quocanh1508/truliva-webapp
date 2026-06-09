@@ -7,6 +7,7 @@ import { useConfirm } from '../../context/ConfirmContext';
 import DateRangePicker from '../../components/DateRangePicker';
 import CategoryTreeSelect from '../../components/CategoryTreeSelect';
 import { formatOrderId } from '../../utils/text';
+import { useAuth } from '../../context/AuthContext';
 
 
 const ALL_SERVICE_TYPES = Array.from(new Set(Object.values(WORK_TYPE_SERVICES).flat()));
@@ -37,6 +38,9 @@ const ROW_STATUS_OPTIONS = [
 
 export default function OrderList() {
   const { confirm } = useConfirm();
+  const { user: currentUser } = useAuth();
+  const isViewOnlyStaff = currentUser?.role === 'STAFF' && currentUser?.group === 'Service';
+  const canExportExcel = currentUser?.role === 'ADMIN' || currentUser?.role === 'DEV' || currentUser?.role === 'COORDINATOR' || (currentUser?.role === 'STAFF' && currentUser?.group === 'Service');
   const navigate = useNavigate();
   const [orders, setOrders] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -874,35 +878,41 @@ export default function OrderList() {
 
           <div className="flex items-center space-x-3">
             {/* Tạo mới ca dịch vụ */}
-            <button
-              onClick={openCreateModal}
-              className="flex items-center space-x-1.5 px-3 py-2 text-[13px] border border-transparent rounded-md bg-blue-600 text-white hover:bg-blue-700 focus:outline-none font-semibold shadow-sm transition-colors"
-              title="Tạo mới ca dịch vụ thủ công"
-            >
-              <Plus size={15} />
-              <span>Tạo ca dịch vụ</span>
-            </button>
-
+            {!isViewOnlyStaff && (
+              <button
+                onClick={openCreateModal}
+                className="flex items-center space-x-1.5 px-3 py-2 text-[13px] border border-transparent rounded-md bg-blue-600 text-white hover:bg-blue-700 focus:outline-none font-semibold shadow-sm transition-colors"
+                title="Tạo mới ca dịch vụ thủ công"
+              >
+                <Plus size={15} />
+                <span>Tạo ca dịch vụ</span>
+              </button>
+            )}
+ 
             {/* Đồng bộ từ Pancake button */}
-            <button
-              onClick={handleSync}
-              disabled={syncing}
-              className={`flex items-center space-x-1.5 px-3 py-2 text-[13px] border border-gray-300 rounded-md bg-white text-gray-700 hover:bg-gray-50 focus:outline-none font-medium transition-colors ${syncing ? 'opacity-60 cursor-not-allowed' : ''}`}
-              title="Đồng bộ thủ công các đơn hàng mới nhất từ Pancake POS"
-            >
-              <RefreshCw size={15} className={syncing ? 'animate-spin text-blue-600' : 'text-gray-500'} />
-              <span>{syncing ? 'Đang đồng bộ...' : 'Đồng bộ Pancake'}</span>
-            </button>
-
+            {!isViewOnlyStaff && (
+              <button
+                onClick={handleSync}
+                disabled={syncing}
+                className={`flex items-center space-x-1.5 px-3 py-2 text-[13px] border border-gray-300 rounded-md bg-white text-gray-700 hover:bg-gray-50 focus:outline-none font-medium transition-colors ${syncing ? 'opacity-60 cursor-not-allowed' : ''}`}
+                title="Đồng bộ thủ công các đơn hàng mới nhất từ Pancake POS"
+              >
+                <RefreshCw size={15} className={syncing ? 'animate-spin text-blue-600' : 'text-gray-500'} />
+                <span>{syncing ? 'Đang đồng bộ...' : 'Đồng bộ Pancake'}</span>
+              </button>
+            )}
+ 
             {/* Xuất Excel button */}
-            <button
-              onClick={handleExportExcel}
-              className="flex items-center space-x-1.5 px-3 py-2 text-[13px] border border-gray-300 rounded-md bg-white text-gray-700 hover:bg-gray-50 focus:outline-none font-medium transition-colors"
-              title="Xuất file Excel danh sách đơn hàng theo bộ lọc đang chọn"
-            >
-              <Download size={15} className="text-gray-500" />
-              <span>Xuất Excel</span>
-            </button>
+            {canExportExcel && (
+              <button
+                onClick={handleExportExcel}
+                className="flex items-center space-x-1.5 px-3 py-2 text-[13px] border border-gray-300 rounded-md bg-white text-gray-700 hover:bg-gray-50 focus:outline-none font-medium transition-colors"
+                title="Xuất file Excel danh sách đơn hàng theo bộ lọc đang chọn"
+              >
+                <Download size={15} className="text-gray-500" />
+                <span>Xuất Excel</span>
+              </button>
+            )}
 
             {/* Bộ lọc button & popover container */}
             <div className="relative z-50">
@@ -1775,16 +1785,18 @@ export default function OrderList() {
                     <td className="px-4 py-2 align-top">
                       <div className="flex items-center justify-center flex-wrap gap-1.5">
                         {/* Phân công */}
-                        <button
-                          onClick={() => openAssignModal(order)}
-                          className="p-1.5 text-blue-600 hover:bg-blue-50 rounded border border-transparent hover:border-blue-100 transition-colors"
-                          title="Phân loại & Phân công"
-                        >
-                          <UserPlus size={15} />
-                        </button>
-
+                        {!isViewOnlyStaff && (
+                          <button
+                            onClick={() => openAssignModal(order)}
+                            className="p-1.5 text-blue-600 hover:bg-blue-50 rounded border border-transparent hover:border-blue-100 transition-colors"
+                            title="Phân loại & Phân công"
+                          >
+                            <UserPlus size={15} />
+                          </button>
+                        )}
+ 
                         {/* Hoàn thành (chỉ hiện khi chưa hoàn thành/hủy) */}
-                        {order.adminStatus !== 'hoàn thành' && order.adminStatus !== 'hủy đơn' && (
+                        {!isViewOnlyStaff && order.adminStatus !== 'hoàn thành' && order.adminStatus !== 'hủy đơn' && (
                           <button
                             onClick={() => handleStatusChange(order.id, 'hoàn thành')}
                             className="p-1.5 text-emerald-600 hover:bg-emerald-50 rounded border border-transparent hover:border-emerald-100 transition-colors"
@@ -1793,9 +1805,9 @@ export default function OrderList() {
                             <CheckCircle2 size={15} />
                           </button>
                         )}
-
+ 
                         {/* Hủy đơn (chỉ hiện khi chưa hoàn thành/hủy) */}
-                        {order.adminStatus !== 'hoàn thành' && order.adminStatus !== 'hủy đơn' && (
+                        {!isViewOnlyStaff && order.adminStatus !== 'hoàn thành' && order.adminStatus !== 'hủy đơn' && (
                           <button
                             onClick={() => handleStatusChange(order.id, 'hủy đơn')}
                             className="p-1.5 text-red-600 hover:bg-red-50 rounded border border-transparent hover:border-red-100 transition-colors"
@@ -1804,9 +1816,9 @@ export default function OrderList() {
                             <XCircle size={15} />
                           </button>
                         )}
-
+ 
                         {/* Mở lại đơn (chỉ hiện khi đơn đã hoàn thành/hủy) */}
-                        {(order.adminStatus === 'hoàn thành' || order.adminStatus === 'hủy đơn') && (
+                        {!isViewOnlyStaff && (order.adminStatus === 'hoàn thành' || order.adminStatus === 'hủy đơn') && (
                           <button
                             onClick={() => handleReopenOrder(order)}
                             className="p-1.5 text-amber-600 hover:bg-amber-50 rounded border border-transparent hover:border-amber-100 transition-colors"

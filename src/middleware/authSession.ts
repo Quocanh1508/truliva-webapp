@@ -4,6 +4,7 @@ import prisma from '../config/database';
 import logger from '../utils/logger';
 
 // Extend Express Request to include user info
+// Extend Express Request to include user info
 declare global {
   namespace Express {
     interface Request {
@@ -11,7 +12,9 @@ declare global {
         id: string;
         username: string;
         fullName: string;
-        role: 'KTV' | 'ADMIN' | 'DEV';
+        role: 'KTV' | 'ADMIN' | 'DEV' | 'SALE_SUPERVISOR' | 'SALER' | 'HOTLINE' | 'COORDINATOR' | 'STAFF';
+        group?: string | null;
+        pancakeAccountName?: string | null;
       };
     }
   }
@@ -59,7 +62,7 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
 
     const user = await prisma.user.findUnique({
       where: { id: decoded.id },
-      select: { id: true, username: true, fullName: true, role: true, isActive: true },
+      select: { id: true, username: true, fullName: true, role: true, isActive: true, group: true, pancakeAccountName: true },
     });
 
     if (!user || !user.isActive) {
@@ -72,6 +75,8 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
       username: user.username,
       fullName: user.fullName,
       role: user.role,
+      group: user.group,
+      pancakeAccountName: user.pancakeAccountName,
     };
 
     next();
@@ -91,4 +96,33 @@ export function requireAdmin(req: Request, res: Response, next: NextFunction): v
     return;
   }
   next();
+}
+
+/**
+ * Middleware kiểm tra quyền Coordinator (Điều phối viên) hoặc Admin.
+ */
+export function requireCoordinatorOrAdmin(req: Request, res: Response, next: NextFunction): void {
+  const role = req.user?.role;
+  if (role !== 'ADMIN' && role !== 'DEV' && role !== 'COORDINATOR') {
+    res.status(403).json({ error: 'Không có quyền truy cập' });
+    return;
+  }
+  next();
+}
+
+/**
+ * Middleware kiểm tra quyền xem Dashboard.
+ */
+export function requireDashboardAccess(req: Request, res: Response, next: NextFunction): void {
+  const role = req.user?.role;
+  if (
+    role === 'ADMIN' ||
+    role === 'DEV' ||
+    role === 'COORDINATOR' ||
+    (role === 'STAFF' && req.user?.group === 'Service')
+  ) {
+    next();
+  } else {
+    res.status(403).json({ error: 'Không có quyền truy cập' });
+  }
 }
