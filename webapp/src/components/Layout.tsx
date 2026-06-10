@@ -93,7 +93,7 @@ export default function Layout() {
     if (canSeeSettings) {
       items.push(
         { name: 'Quản lý Trạm', path: '/admin/stations', icon: <Building size={20} /> },
-        { name: 'Kỹ thuật viên', path: '/admin/users', icon: <Users size={20} /> },
+        { name: 'Quản lí nhân viên', path: '/admin/users', icon: <Users size={20} /> },
         { name: 'Ảnh mẫu báo cáo', path: '/admin/sample-images', icon: <ImageIcon size={20} /> }
       );
     }

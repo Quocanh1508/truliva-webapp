@@ -3,7 +3,7 @@ import bcrypt from 'bcryptjs';
 import ExcelJS from 'exceljs';
 import prisma from '../config/database';
 import logger from '../utils/logger';
-import { requireAuth, requireAdmin } from '../middleware/authSession';
+import { requireAuth, requireCoordinatorOrAdmin } from '../middleware/authSession';
 
 const router = Router();
 
@@ -70,7 +70,7 @@ router.get('/ktvs', requireAuth, async (req: Request, res: Response): Promise<vo
 // ==========================================
 // ADMIN ROUTES
 // ==========================================
-router.use(requireAuth, requireAdmin);
+router.use(requireAuth, requireCoordinatorOrAdmin);
 
 /**
  * GET /api/users/export

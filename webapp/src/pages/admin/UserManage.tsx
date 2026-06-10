@@ -293,7 +293,7 @@ export default function UserManage() {
   return (
     <div className="animate-fade-in">
       <div className="flex justify-between items-center mb-6">
-        <h2 className="font-bold text-2xl text-[#1B3A6B]">Quản lý Kỹ Thuật Viên</h2>
+        <h2 className="font-bold text-2xl text-[#1B3A6B]">Quản Lí Nhân Viên</h2>
         <div className="flex items-center gap-2">
           <button className="btn btn-outline flex items-center gap-2" onClick={handleExportExcel} title="Xuất file Excel theo bộ lọc">
             <Download size={18} /> Xuất Excel
