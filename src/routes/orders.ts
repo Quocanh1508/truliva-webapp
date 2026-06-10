@@ -599,6 +599,9 @@ router.get('/', requireAuth, async (req: Request, res: Response): Promise<void> 
     let assignedCount = 0;
     let completedCount = 0;
     let cancelledCount = 0;
+    let returnExchangeCount = 0;
+
+    const returnExchangeStatuses = ['đang hoàn', 'đã hoàn', 'đang đổi', 'đã đổi', 'hoàn một phần'];
 
     statsResult.forEach(item => {
       const count = item._count;
@@ -611,6 +614,8 @@ router.get('/', requireAuth, async (req: Request, res: Response): Promise<void> 
         completedCount += count;
       } else if (item.adminStatus === 'hủy đơn') {
         cancelledCount += count;
+      } else if (returnExchangeStatuses.includes(item.adminStatus || '')) {
+        returnExchangeCount += count;
       } else {
         pendingCount += count;
       }
@@ -629,7 +634,8 @@ router.get('/', requireAuth, async (req: Request, res: Response): Promise<void> 
         pending: pendingCount,
         assigned: assignedCount,
         completed: completedCount,
-        cancelled: cancelledCount
+        cancelled: cancelledCount,
+        returnExchange: returnExchangeCount
       }
     });
   } catch (error: any) {
@@ -1487,6 +1493,52 @@ router.patch('/:id', requireAuth, async (req: Request, res: Response): Promise<v
         const errorMsg = err.response?.data?.message || err.message || 'Lỗi không xác định từ Pancake POS';
         res.status(400).json({ error: `Không thể đồng bộ thay đổi kho xuất hàng sang Pancake: ${errorMsg}` });
         return;
+      }
+    }
+
+    if (adminStatus !== undefined && adminStatus !== oldOrder.adminStatus) {
+      const isManualOrder = oldOrder.pancakeOrderId < 0;
+      if (!isManualOrder) {
+        const apiKey = process.env.PANCAKE_API_KEY;
+        const shopId = '1635300067';
+        if (!apiKey) {
+          res.status(500).json({ error: 'Thiếu cấu hình PANCAKE_API_KEY trên máy chủ.' });
+          return;
+        }
+
+        let statusIdToSync: number | null = null;
+        if (adminStatus === 'hoàn thành') {
+          statusIdToSync = 3; // Đã nhận
+        } else if (adminStatus === 'hủy đơn') {
+          statusIdToSync = 6; // Đã hủy
+        }
+
+        if (statusIdToSync !== null) {
+          try {
+            logger.info('Syncing status change to Pancake POS', { pancakeOrderId: oldOrder.pancakeOrderId, adminStatus, statusIdToSync });
+            const updateResponse = await axios.patch(
+              `https://pos.pages.fm/api/v1/shops/${shopId}/orders/${oldOrder.pancakeOrderId}`,
+              {
+                status: statusIdToSync
+              },
+              {
+                params: { api_key: apiKey },
+                headers: { 'Content-Type': 'application/json' },
+                timeout: 10000
+              }
+            );
+
+            if (!updateResponse.data || !updateResponse.data.success) {
+              throw new Error(updateResponse.data?.message || 'Yêu cầu cập nhật trạng thái thất bại trên Pancake POS');
+            }
+            updateData.pancakeSyncStatus = 'SUCCESS';
+          } catch (err: any) {
+            logger.error('Failed to sync status update to Pancake POS API', { error: err.message });
+            const errorMsg = err.response?.data?.message || err.message || 'Lỗi không xác định từ Pancake POS';
+            res.status(400).json({ error: `Không thể đồng bộ thay đổi trạng thái đơn hàng sang Pancake: ${errorMsg}` });
+            return;
+          }
+        }
       }
     }
 

@@ -170,6 +170,9 @@ router.get('/stats', async (req: Request, res: Response): Promise<void> => {
     let assigned = 0;
     let completed = 0;
     let cancelled = 0;
+    let returnExchange = 0;
+
+    const returnExchangeStatuses = ['đang hoàn', 'đã hoàn', 'đang đổi', 'đã đổi', 'hoàn một phần'];
 
     filteredOrders.forEach(o => {
       const status = o.adminStatus;
@@ -179,6 +182,8 @@ router.get('/stats', async (req: Request, res: Response): Promise<void> => {
         completed++;
       } else if (status === 'hủy đơn') {
         cancelled++;
+      } else if (returnExchangeStatuses.includes(status || '')) {
+        returnExchange++;
       } else {
         pending++;
       }
@@ -189,11 +194,12 @@ router.get('/stats', async (req: Request, res: Response): Promise<void> => {
       mapDensity: density,
       statusCounts,
       orderStats: {
-        total: pending + assigned + completed + cancelled,
+        total: pending + assigned + completed + cancelled + returnExchange,
         pending,
         assigned,
         completed,
-        cancelled
+        cancelled,
+        returnExchange
       }
     });
   } catch (error: any) {

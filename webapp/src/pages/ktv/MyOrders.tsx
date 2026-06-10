@@ -246,7 +246,19 @@ export default function MyOrders() {
                         {getWorkTypeBadge(order.workType)}
                       </div>
                       <span className={`text-[10px] font-bold px-2 py-0.5 rounded capitalize ${
-                        order.adminStatus === 'đang thực hiện' ? 'bg-blue-50 text-blue-700 border border-blue-100' : 'bg-amber-50 text-amber-700 border border-amber-100'
+                        order.adminStatus === 'đang thực hiện' 
+                          ? 'bg-blue-50 text-blue-700 border border-blue-100' 
+                          : order.adminStatus === 'đang hoàn'
+                          ? 'bg-purple-50 text-purple-700 border border-purple-100'
+                          : order.adminStatus === 'đang đổi'
+                          ? 'bg-indigo-50 text-indigo-700 border border-indigo-100'
+                          : order.adminStatus === 'hoàn một phần'
+                          ? 'bg-fuchsia-50 text-fuchsia-700 border border-fuchsia-100'
+                          : order.adminStatus === 'đã hoàn'
+                          ? 'bg-purple-100 text-purple-800 border border-purple-200'
+                          : order.adminStatus === 'đã đổi'
+                          ? 'bg-indigo-100 text-indigo-800 border border-indigo-200'
+                          : 'bg-amber-50 text-amber-700 border border-amber-100'
                       }`}>
                         {order.adminStatus === 'đang thực hiện' ? 'đã phân công' : (order.adminStatus || 'chờ xử lý')}
                       </span>

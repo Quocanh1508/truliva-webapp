@@ -34,6 +34,11 @@ const ROW_STATUS_OPTIONS = [
   { value: 'đang thực hiện', label: 'Đã phân công' },
   { value: 'hoàn thành', label: 'Hoàn thành' },
   { value: 'hủy đơn', label: 'Hủy đơn' },
+  { value: 'đang hoàn', label: 'Đang hoàn' },
+  { value: 'đang đổi', label: 'Đang đổi' },
+  { value: 'hoàn một phần', label: 'Hoàn một phần' },
+  { value: 'đã hoàn', label: 'Đã hoàn' },
+  { value: 'đã đổi', label: 'Đã đổi' },
 ];
 
 export default function OrderList() {
@@ -118,12 +123,14 @@ export default function OrderList() {
     assigned: number;
     completed: number;
     cancelled: number;
+    returnExchange: number;
   }>({
     total: 0,
     pending: 0,
     assigned: 0,
     completed: 0,
-    cancelled: 0
+    cancelled: 0,
+    returnExchange: 0
   });
 
   // Assignment Modal
@@ -781,6 +788,11 @@ export default function OrderList() {
       case 'đang thực hiện': return 'bg-blue-500 hover:bg-blue-600 focus:ring-blue-500';
       case 'hoàn thành': return 'bg-emerald-500 hover:bg-emerald-600 focus:ring-emerald-500';
       case 'hủy đơn': return 'bg-red-500 hover:bg-red-600 focus:ring-red-500';
+      case 'đang hoàn': return 'bg-purple-400 hover:bg-purple-500 focus:ring-purple-400';
+      case 'đã hoàn': return 'bg-purple-700 hover:bg-purple-800 focus:ring-purple-700';
+      case 'đang đổi': return 'bg-indigo-400 hover:bg-indigo-500 focus:ring-indigo-400';
+      case 'đã đổi': return 'bg-indigo-700 hover:bg-indigo-800 focus:ring-indigo-700';
+      case 'hoàn một phần': return 'bg-fuchsia-600 hover:bg-fuchsia-700 focus:ring-fuchsia-600';
       default: return 'bg-gray-500 hover:bg-gray-600 focus:ring-gray-500';
     }
   };
@@ -1647,7 +1659,7 @@ export default function OrderList() {
       </div>
 
       {/* Quick Stats Summary */}
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-2.5 px-4 py-1.5 bg-gray-50 border-b border-gray-200">
+      <div className="grid grid-cols-2 md:grid-cols-6 gap-2.5 px-4 py-1.5 bg-gray-50 border-b border-gray-200">
         <div className="bg-white px-3 py-1.5 rounded-lg border border-gray-200 shadow-sm flex flex-row items-center justify-between">
           <span className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Tổng số đơn</span>
           <span className="text-[17px] font-bold text-gray-900">{stats.total}</span>
@@ -1663,6 +1675,10 @@ export default function OrderList() {
         <div className="bg-white px-3 py-1.5 rounded-lg border border-gray-200 shadow-sm flex flex-row items-center justify-between border-l-4 border-l-emerald-500">
           <span className="text-[11px] font-semibold text-emerald-600 uppercase tracking-wider">Hoàn thành</span>
           <span className="text-[17px] font-bold text-gray-900">{stats.completed}</span>
+        </div>
+        <div className="bg-white px-3 py-1.5 rounded-lg border border-gray-200 shadow-sm flex flex-row items-center justify-between border-l-4 border-l-purple-500">
+          <span className="text-[11px] font-semibold text-purple-600 uppercase tracking-wider">Hoàn/Đổi</span>
+          <span className="text-[17px] font-bold text-gray-900">{stats.returnExchange || 0}</span>
         </div>
         <div className="bg-white px-3 py-1.5 rounded-lg border border-gray-200 shadow-sm flex flex-row items-center justify-between border-l-4 border-l-red-500">
           <span className="text-[11px] font-semibold text-red-600 uppercase tracking-wider">Hủy đơn</span>

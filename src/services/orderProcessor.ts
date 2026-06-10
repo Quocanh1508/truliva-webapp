@@ -109,22 +109,52 @@ export async function processOrderEvent(rawEventId: string | null, payload: any)
     const pStatus = (payload.status_name || '').toLowerCase();
     const statusId = typeof payload.status === 'number' ? payload.status : statusCode;
 
-    // Lọc trạng thái Hủy / Trả hàng:
-    // - statusId: 4 (Đang hoàn), 5 (Đã hoàn), 6 (Đã hủy)
-    // - Tên chữ: cancelled, returned, cancel, hoặc chứa chữ 'hủy'
-    const isCancelledOrReturned = 
+    // ══════════════════════════════════════
+    // Mapping Pancake POS Status → adminStatus
+    // ══════════════════════════════════════
+    // Ref: "Mapping status - Truliva webapp.xlsx"
+    //
+    // Pancake statusId reference:
+    //   0 = Mới (Nháp)        → Không gửi ticket (lọc bởi statusCode=0)
+    //   1 = Đã xác nhận       → chờ xử lý
+    //   2 = Đã gửi hàng       → chờ xử lý (khi phân bổ KTV → đang thực hiện)
+    //   3 = Đã nhận            → hoàn thành
+    //   4 = Đang hoàn          → đang hoàn
+    //   5 = Đã hoàn            → đã hoàn
+    //   6 = Đã hủy             → hủy đơn
+    //  16 = Đã thu tiền        → hoàn thành
+    //
+    // Các trạng thái khác khớp bằng status_name:
+    //   Đang đổi, Đã đổi, Hoàn một phần, Xóa gần đây, Chờ hàng, Đang đóng hàng, Chờ chuyển hàng
+
+    // 1. Trạng thái Hoàn/Đổi hàng (tách riêng, KHÔNG gộp vào hủy đơn)
+    const isReturning =
       statusId === 4 ||
+      pStatus.includes('đang hoàn');
+
+    const isReturned =
       statusId === 5 ||
+      pStatus.includes('đã hoàn');
+
+    const isExchanging =
+      pStatus.includes('đang đổi');
+
+    const isExchanged =
+      pStatus.includes('đã đổi');
+
+    const isPartialReturn =
+      pStatus.includes('hoàn một phần');
+
+    // 2. Trạng thái Hủy đơn (chỉ Đã hủy + Xóa gần đây)
+    const isCancelled =
       statusId === 6 ||
       pStatus === 'cancelled' ||
-      pStatus === 'returned' ||
       pStatus === 'cancel' ||
-      pStatus.includes('hủy');
+      pStatus.includes('đã hủy') ||
+      pStatus.includes('xóa gần đây');
 
-    // Lọc trạng thái Hoàn thành:
-    // - statusId: 3 (Đã nhận / delivered), 16 (Đã thu tiền / received_money)
-    // - Tên chữ: delivered, done, received, received_money, hoặc chứa chữ 'hoàn thành', 'đã nhận', 'thu tiền'
-    const isCompleted = 
+    // 3. Trạng thái Hoàn thành (Đã nhận, Đã thu tiền)
+    const isCompleted =
       statusId === 3 ||
       statusId === 16 ||
       pStatus === 'delivered' ||
@@ -135,8 +165,19 @@ export async function processOrderEvent(rawEventId: string | null, payload: any)
       pStatus.includes('đã nhận') ||
       pStatus.includes('thu tiền');
 
-    if (isCancelledOrReturned) {
+    // Áp dụng mapping theo thứ tự ưu tiên
+    if (isCancelled) {
       newAdminStatus = 'hủy đơn';
+    } else if (isReturning) {
+      newAdminStatus = 'đang hoàn';
+    } else if (isReturned) {
+      newAdminStatus = 'đã hoàn';
+    } else if (isExchanging) {
+      newAdminStatus = 'đang đổi';
+    } else if (isExchanged) {
+      newAdminStatus = 'đã đổi';
+    } else if (isPartialReturn) {
+      newAdminStatus = 'hoàn một phần';
     } else if (isCompleted) {
       if (newAdminStatus !== 'hủy đơn') newAdminStatus = 'hoàn thành';
     }
