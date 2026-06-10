@@ -1511,6 +1511,8 @@ router.patch('/:id', requireAuth, async (req: Request, res: Response): Promise<v
           statusIdToSync = 3; // Đã nhận
         } else if (adminStatus === 'hủy đơn') {
           statusIdToSync = 6; // Đã hủy
+        } else if (adminStatus === 'chờ xử lý') {
+          statusIdToSync = 1; // Đã xác nhận
         }
 
         if (statusIdToSync !== null) {
