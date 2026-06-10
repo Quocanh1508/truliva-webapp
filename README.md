@@ -4,6 +4,7 @@
 [![Framework](https://img.shields.io/badge/Framework-Node.js%20%7C%20React%20%7C%20Capacitor-orange)](#)
 [![Database](https://img.shields.io/badge/Database-PostgreSQL%20%7C%20Prisma-green)](#)
 [![Status](https://img.shields.io/badge/Status-Active-brightgreen)](#)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 This repository contains the complete source code for **Truliva**, a production-grade Field Service Management (FSM) and Mini-ERP system. It automates technical service dispatching, smart inventory tracking, and real-time order synchronization with the **Pancake POS** platform.
 
