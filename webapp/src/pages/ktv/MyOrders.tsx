@@ -23,6 +23,11 @@ export default function MyOrders() {
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [totalOrders, setTotalOrders] = useState(0);
+  const [pageInput, setPageInput] = useState('1');
+
+  useEffect(() => {
+    setPageInput(String(page));
+  }, [page]);
   const [callingOrderId, setCallingOrderId] = useState<string | null>(null);
 
   // Reschedule Modal state
@@ -381,9 +386,41 @@ export default function MyOrders() {
       {/* Pagination */}
       {!loading && totalPages > 1 && (
         <div className="flex justify-between items-center px-4 py-3 border-t border-gray-200 bg-white text-[13px] text-gray-600 shadow-[0_-1px_2px_rgba(0,0,0,0.02)] z-10">
-          <span>
-            Trang <span className="font-medium text-gray-900">{page}</span> / <span className="font-medium text-gray-900">{totalPages}</span>
-          </span>
+          <div className="flex items-center gap-1.5">
+            <span>Trang</span>
+            <input
+              type="text"
+              inputMode="numeric"
+              pattern="[0-9]*"
+              value={pageInput}
+              onChange={(e) => {
+                const val = e.target.value;
+                if (val === '' || /^\d+$/.test(val)) {
+                  setPageInput(val);
+                }
+              }}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  const val = parseInt(pageInput, 10);
+                  if (!isNaN(val) && val >= 1 && val <= totalPages) {
+                    setPage(val);
+                  } else {
+                    setPageInput(String(page));
+                  }
+                }
+              }}
+              onBlur={() => {
+                const val = parseInt(pageInput, 10);
+                if (!isNaN(val) && val >= 1 && val <= totalPages) {
+                  setPage(val);
+                } else {
+                  setPageInput(String(page));
+                }
+              }}
+              className="w-12 text-center border border-gray-300 rounded px-1.5 py-0.5 text-gray-900 font-medium focus:ring-1 focus:ring-blue-500 focus:border-blue-500 outline-none bg-white"
+            />
+            <span>/ <span className="font-medium text-gray-900">{totalPages}</span></span>
+          </div>
           <div className="flex items-center gap-1.5">
             <button
               className="p-1.5 border border-gray-300 rounded hover:bg-gray-50 hover:text-gray-900 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
