@@ -24,6 +24,7 @@ import inventoryRoutes from './routes/inventory';
 import { startOrderSyncScheduler } from './services/orderSyncScheduler';
 import { startReportCleanupScheduler } from './services/reportCleanupScheduler';
 import { apiLimiter, loginLimiter } from './middleware/rateLimiter';
+import { securityMiddleware } from './middleware/security';
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -60,6 +61,27 @@ app.use(cookieParser());
 
 // ── Parse JSON body (giới hạn 1MB để tránh payload quá lớn) ──
 app.use(express.json({ limit: '1mb' }));
+
+// ── Anti-bot & Host verification middleware ──
+app.use(securityMiddleware);
+
+// ── Honeypot trap routes for scanner bots ──
+const honeypots = [
+  '/wp-login.php',
+  '/wp-admin',
+  '/.git/config',
+  '/api/admin/config',
+  '/api/v1/users',
+  '/phpmyadmin'
+];
+
+honeypots.forEach(path => {
+  app.all(path, (req, res) => {
+    const ip = req.ip || req.socket.remoteAddress || 'unknown';
+    logger.warn(`[SECURITY_BLOCKED] IP: ${ip} | Reason: Honeypot Trap Triggered (${path}) | URL: ${req.originalUrl}`);
+    res.status(403).json({ error: 'Access Denied.' });
+  });
+});
 
 // ── Request logging middleware (Step 6) ──
 app.use((req, res, next) => {
