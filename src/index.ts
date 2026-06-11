@@ -23,6 +23,7 @@ import notificationRoutes from './routes/notifications';
 import inventoryRoutes from './routes/inventory';
 import { startOrderSyncScheduler } from './services/orderSyncScheduler';
 import { startReportCleanupScheduler } from './services/reportCleanupScheduler';
+import { apiLimiter, loginLimiter } from './middleware/rateLimiter';
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -100,6 +101,10 @@ app.get('/health', (_req, res) => {
 
 // ── Webhook routes (Step 2) ──
 app.use('/webhooks', webhookRoutes);
+
+// Apply rate limiting to secure APIs and logins against scrapers/brute-force
+app.use('/api/auth/login', loginLimiter);
+app.use('/api', apiLimiter);
 
 // ── KTV Webapp API routes ──
 app.use('/api/auth', authRoutes);

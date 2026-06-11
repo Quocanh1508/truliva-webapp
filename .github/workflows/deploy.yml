@@ -27,10 +27,13 @@ jobs:
             echo "=== 1. Pulling latest code ==="
             git pull origin main
             
-            echo "=== 2. Building Frontend and Backend ==="
+            echo "=== 2. Installing Backend & Frontend Dependencies ==="
+            npm install
+            
+            echo "=== 3. Building Frontend and Backend ==="
             npm run build
             
-            echo "=== 3. Restarting Backend Server ==="
+            echo "=== 4. Restarting Backend Server ==="
             pm2 restart truliva-backend
             
             echo "=== CI/CD Deployment Successfully Completed! ==="

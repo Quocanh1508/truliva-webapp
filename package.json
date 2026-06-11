@@ -43,6 +43,7 @@
     "dotenv": "^17.4.2",
     "exceljs": "^4.4.0",
     "express": "^5.2.1",
+    "express-rate-limit": "^8.5.2",
     "firebase-admin": "^13.10.0",
     "helmet": "^8.1.0",
     "jsonwebtoken": "^9.0.3",
@@ -59,6 +60,7 @@
   "devDependencies": {
     "concurrently": "^9.2.1",
     "nodemon": "^3.1.14",
+    "ssh2": "^1.17.0",
     "ts-node": "^10.9.2"
   }
 }
