@@ -132,9 +132,50 @@ export default function LoginPage() {
     }
   };
 
+  const flags = [
+    { code: 'vn', name: 'Việt Nam' },
+    { code: 'br', name: 'Brazil' },
+    { code: 'ar', name: 'Argentina' },
+    { code: 'fr', name: 'Pháp' },
+    { code: 'de', name: 'Đức' },
+    { code: 'gb', name: 'Anh' },
+    { code: 'pt', name: 'Bồ Đào Nha' },
+    { code: 'es', name: 'Tây Ban Nha' },
+    { code: 'jp', name: 'Nhật Bản' },
+    { code: 'it', name: 'Ý' },
+    { code: 'hr', name: 'Croatia' },
+    { code: 'be', name: 'Bỉ' }
+  ];
+
   return (
-    <div className="relative flex items-center justify-center h-screen overflow-hidden" style={{ backgroundColor: '#1B3A6B' }}>
-      {/* Floating soccer balls background */}
+    <div className="relative flex items-center justify-center h-screen overflow-hidden" style={{ background: 'radial-gradient(circle at 50% 15%, #1F4068 0%, #162447 50%, #1A1A2E 100%)' }}>
+      
+      {/* Stadium Spotlight Beams */}
+      <div className="absolute top-0 left-0 right-0 bottom-0 pointer-events-none z-0">
+        <div className="stadium-light left-beam"></div>
+        <div className="stadium-light right-beam"></div>
+      </div>
+
+      {/* Hanging Bunting Flags (Cờ dây trang trí World Cup) */}
+      <div className="absolute top-0 left-0 right-0 z-20 pointer-events-none overflow-hidden h-[120px] flex justify-center">
+        <div className="absolute top-0 left-0 right-0 h-[1.5px] bg-white/10 shadow-md"></div>
+        <div className="flex gap-2.5 sm:gap-4 md:gap-6 lg:gap-8 px-4 justify-around w-full max-w-7xl">
+          {flags.map((flag, idx) => (
+            <div 
+              key={flag.code} 
+              className="bunting-flag" 
+              style={{ 
+                backgroundImage: `url(https://flagcdn.com/w80/${flag.code}.png)`,
+                animationDelay: `${idx * 0.12}s`,
+                animationDuration: `${2.2 + (idx % 3) * 0.3}s`
+              }}
+              title={flag.name}
+            />
+          ))}
+        </div>
+      </div>
+
+      {/* Floating soccer balls & flags background */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none z-0">
         <div className="soccer-ball sb-1">⚽</div>
         <div className="soccer-ball sb-2">⚽</div>
@@ -144,22 +185,112 @@ export default function LoginPage() {
         <div className="soccer-ball sb-6">⚽</div>
         <div className="soccer-ball sb-7">⚽</div>
         <div className="soccer-ball sb-8">⚽</div>
+
+        {/* Floating Waving Flags */}
+        <div className="floating-flag ff-1" style={{ backgroundImage: 'url(https://flagcdn.com/w80/vn.png)', animationDelay: '1s' }}></div>
+        <div className="floating-flag ff-2" style={{ backgroundImage: 'url(https://flagcdn.com/w80/br.png)', animationDelay: '3.5s' }}></div>
+        <div className="floating-flag ff-3" style={{ backgroundImage: 'url(https://flagcdn.com/w80/ar.png)', animationDelay: '6s' }}></div>
+        <div className="floating-flag ff-4" style={{ backgroundImage: 'url(https://flagcdn.com/w80/fr.png)', animationDelay: '2s' }}></div>
+        <div className="floating-flag ff-5" style={{ backgroundImage: 'url(https://flagcdn.com/w80/de.png)', animationDelay: '8s' }}></div>
+        <div className="floating-flag ff-6" style={{ backgroundImage: 'url(https://flagcdn.com/w80/pt.png)', animationDelay: '10.5s' }}></div>
+        <div className="floating-flag ff-7" style={{ backgroundImage: 'url(https://flagcdn.com/w80/jp.png)', animationDelay: '12s' }}></div>
+        <div className="floating-flag ff-8" style={{ backgroundImage: 'url(https://flagcdn.com/w80/es.png)', animationDelay: '5s' }}></div>
       </div>
 
       <style>{`
+        /* Spotlight Glow Effects */
+        .stadium-light {
+          position: absolute;
+          top: -20%;
+          width: 50%;
+          height: 100%;
+          background: radial-gradient(ellipse at top, rgba(0, 163, 255, 0.15) 0%, rgba(0, 163, 255, 0) 70%);
+          filter: blur(40px);
+          pointer-events: none;
+          transform-origin: top center;
+        }
+        .left-beam {
+          left: -10%;
+          transform: rotate(25deg);
+          animation: sweep-left 12s ease-in-out infinite alternate;
+        }
+        .right-beam {
+          right: -10%;
+          transform: rotate(-25deg);
+          animation: sweep-right 12s ease-in-out infinite alternate;
+        }
+
+        @keyframes sweep-left {
+          0% { transform: rotate(15deg) scaleX(0.9); }
+          100% { transform: rotate(35deg) scaleX(1.1); }
+        }
+        @keyframes sweep-right {
+          0% { transform: rotate(-15deg) scaleX(0.9); }
+          100% { transform: rotate(-35deg) scaleX(1.1); }
+        }
+
+        /* Bunting Flags Styling */
+        .bunting-flag {
+          width: 24px;
+          height: 38px;
+          background-size: cover;
+          background-position: center;
+          background-repeat: no-repeat;
+          border-bottom-left-radius: 4px;
+          border-bottom-right-radius: 4px;
+          box-shadow: 0 4px 10px rgba(0, 0, 0, 0.45);
+          transform-origin: top center;
+          animation: swing 4s ease-in-out infinite alternate, wave-flag 2.5s ease-in-out infinite;
+          position: relative;
+        }
+        @media (min-width: 640px) {
+          .bunting-flag {
+            width: 38px;
+            height: 58px;
+          }
+        }
+        .bunting-flag::after {
+          content: '';
+          position: absolute;
+          inset: 0;
+          background: linear-gradient(
+            90deg,
+            rgba(255,255,255,0) 0%,
+            rgba(255,255,255,0.18) 25%,
+            rgba(0,0,0,0.22) 50%,
+            rgba(255,255,255,0.15) 75%,
+            rgba(0,0,0,0) 100%
+          );
+          background-size: 200% 100%;
+          animation: wind-shadow 2.2s linear infinite;
+          border-bottom-left-radius: 4px;
+          border-bottom-right-radius: 4px;
+        }
+
+        @keyframes swing {
+          0% { transform: rotate(-7deg); }
+          100% { transform: rotate(7deg); }
+        }
+        @keyframes wave-flag {
+          0% { transform: rotate(-7deg) skewY(-2.5deg) scaleX(1); }
+          50% { transform: rotate(0deg) skewY(2.5deg) scaleX(0.96); }
+          100% { transform: rotate(7deg) skewY(-2.5deg) scaleX(1); }
+        }
+        @keyframes wind-shadow {
+          0% { background-position: 0% 0%; }
+          100% { background-position: 200% 0%; }
+        }
+
+        /* Floating Objects */
         @keyframes float-up {
           0% {
             transform: translateY(105vh) rotate(0deg) scale(0.6);
             opacity: 0;
           }
-          10% {
-            opacity: 0.3;
-          }
-          90% {
-            opacity: 0.3;
-          }
+          10% { opacity: 0.35; }
+          90% { opacity: 0.35; }
           100% {
-            transform: translateY(-10vh) rotate(360deg) scale(1.2);
+            transform: translateY(-15vh) rotate(360deg) scale(1.1);
             opacity: 0;
           }
         }
@@ -180,24 +311,101 @@ export default function LoginPage() {
         .sb-6 { left: 88%; animation-delay: 4s; animation-duration: 22s; font-size: 2.2rem; }
         .sb-7 { left: 33%; animation-delay: 10s; animation-duration: 17s; font-size: 1.8rem; }
         .sb-8 { left: 80%; animation-delay: 12s; animation-duration: 19s; font-size: 2.8rem; }
+
+        /* Floating Waving Flags */
+        .floating-flag {
+          position: absolute;
+          bottom: -60px;
+          width: 32px;
+          height: 22px;
+          background-size: cover;
+          background-position: center;
+          box-shadow: 0 3px 8px rgba(0, 0, 0, 0.35);
+          border-radius: 2px;
+          animation: float-up-flag 15s linear infinite;
+          opacity: 0;
+          z-index: 0;
+        }
+        .floating-flag::after {
+          content: '';
+          position: absolute;
+          inset: 0;
+          background: linear-gradient(
+            90deg,
+            rgba(255,255,255,0) 0%,
+            rgba(255,255,255,0.12) 25%,
+            rgba(0,0,0,0.18) 50%,
+            rgba(255,255,255,0.1) 75%,
+            rgba(0,0,0,0) 100%
+          );
+          background-size: 200% 100%;
+          animation: wind-shadow 2.5s linear infinite;
+        }
+        .ff-1 { left: 15%; animation-duration: 15s; }
+        .ff-2 { left: 35%; animation-duration: 19s; }
+        .ff-3 { left: 50%; animation-duration: 16s; }
+        .ff-4 { left: 65%; animation-duration: 21s; }
+        .ff-5 { left: 85%; animation-duration: 17s; }
+        .ff-6 { left: 5%; animation-duration: 23s; }
+        .ff-7 { left: 45%; animation-duration: 14s; }
+        .ff-8 { left: 75%; animation-duration: 18s; }
+
+        @keyframes float-up-flag {
+          0% {
+            transform: translateY(105vh) rotate(0deg) scale(0.7) skewY(0deg);
+            opacity: 0;
+          }
+          10% { opacity: 0.3; }
+          90% { opacity: 0.3; }
+          100% {
+            transform: translateY(-15vh) rotate(180deg) scale(1.15) skewY(4deg);
+            opacity: 0;
+          }
+        }
+
+        /* Pulsing World Cup Badge */
+        @keyframes pulse-gold {
+          0% { box-shadow: 0 0 0 0 rgba(255, 215, 0, 0.5); }
+          70% { box-shadow: 0 0 0 8px rgba(255, 215, 0, 0); }
+          100% { box-shadow: 0 0 0 0 rgba(255, 215, 0, 0); }
+        }
+        .badge-world-cup {
+          background: linear-gradient(135deg, #FFD700 0%, #FFA500 100%) !important;
+          color: #0d1e36 !important;
+          font-weight: 700 !important;
+          box-shadow: 0 2px 8px rgba(255, 215, 0, 0.3);
+          border: 1px solid rgba(255, 255, 255, 0.4) !important;
+          animation: pulse-gold 2s infinite;
+        }
       `}</style>
 
-      <div className="card w-full animate-fade-in relative z-10" style={{ maxWidth: '400px', margin: '1rem' }}>
+      {/* Gold card styling */}
+      <div 
+        className="card w-full animate-fade-in relative z-10" 
+        style={{ 
+          maxWidth: '400px', 
+          margin: '1rem',
+          border: '1.5px solid rgba(255, 215, 0, 0.35)', 
+          boxShadow: '0 10px 40px rgba(0, 0, 0, 0.55), 0 0 20px rgba(255, 215, 0, 0.12)',
+          backdropFilter: 'blur(8px)',
+          background: 'rgba(255, 255, 255, 0.95)'
+        }}
+      >
         <div className="text-center mb-6">
           <img 
             src="/TRULIVA_WC.png" 
             alt="Truliva Logo" 
             onClick={triggerWorldCupConfetti}
             title="Bấm vào để bắn pháo hoa World Cup!"
-            style={{ height: '60px', margin: '0 auto 0.75rem', cursor: 'pointer', transition: 'transform 0.2s' }} 
-            className="mx-auto hover:opacity-90 active:scale-95"
+            style={{ height: '65px', margin: '0 auto 0.75rem', cursor: 'pointer', transition: 'transform 0.2s' }} 
+            className="mx-auto hover:opacity-90 active:scale-95 hover:scale-105"
           />
-          <div className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-slate-50 text-slate-400 text-[11px] font-medium mb-3 border border-slate-100 select-none">
+          <div className="inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full text-[11px] select-none badge-world-cup">
             <span>⚽</span>
             <span>World Cup Mode</span>
             <span>🏆</span>
           </div>
-          <h2 className="font-bold text-xl">Đăng nhập hệ thống KTV</h2>
+          <h2 className="font-bold text-xl mt-3 text-slate-800">Đăng nhập hệ thống KTV</h2>
         </div>
 
         {error && <div className="alert alert-error">{error}</div>}
