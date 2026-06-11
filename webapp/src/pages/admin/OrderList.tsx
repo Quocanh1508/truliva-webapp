@@ -392,7 +392,10 @@ export default function OrderList() {
       return;
     }
     try {
-      await updateOrder(orderId, { adminStatus: newStatus });
+      const res = await updateOrder(orderId, { adminStatus: newStatus });
+      if (res && res.warning) {
+        alert(res.warning);
+      }
       fetchOrdersData();
     } catch (err: any) {
       alert(err.message);
@@ -402,7 +405,10 @@ export default function OrderList() {
   const submitCancel = async () => {
     if (!cancelModal) return;
     try {
-      await updateOrder(cancelModal.orderId, { adminStatus: 'hủy đơn', cancelReason });
+      const res = await updateOrder(cancelModal.orderId, { adminStatus: 'hủy đơn', cancelReason });
+      if (res && res.warning) {
+        alert(res.warning);
+      }
       setCancelModal(null);
       setCancelReason('');
       fetchOrdersData();
@@ -421,7 +427,7 @@ export default function OrderList() {
     });
     if (!isConfirmed) return;
     try {
-      await updateOrder(order.id, {
+      const res = await updateOrder(order.id, {
         adminStatus: 'chờ xử lý',
         mainStationId: null,
         techStationId: null,
@@ -429,6 +435,9 @@ export default function OrderList() {
         appointmentTime: null,
         rescheduleReason: null
       });
+      if (res && res.warning) {
+        alert(res.warning);
+      }
       fetchOrdersData();
     } catch (err: any) {
       alert(err.message || 'Lỗi khi mở lại đơn');

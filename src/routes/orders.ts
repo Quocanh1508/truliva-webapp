@@ -1535,10 +1535,22 @@ router.patch('/:id', requireAuth, async (req: Request, res: Response): Promise<v
             }
             updateData.pancakeSyncStatus = 'SUCCESS';
           } catch (err: any) {
-            logger.error('Failed to sync status update to Pancake POS API', { error: err.message });
-            const errorMsg = err.response?.data?.message || err.message || 'Lỗi không xác định từ Pancake POS';
-            res.status(400).json({ error: `Không thể đồng bộ thay đổi trạng thái đơn hàng sang Pancake: ${errorMsg}` });
-            return;
+            logger.warn('Failed to sync status update to Pancake POS API (non-blocking)', { 
+              pancakeOrderId: oldOrder.pancakeOrderId,
+              error: err.message,
+              response: err.response?.data
+            });
+            
+            updateData.pancakeSyncStatus = 'FAILED';
+            
+            const errorMsg = err.response?.data?.message || err.response?.data?.errors?.order || err.message || 'Lỗi không xác định từ Pancake POS';
+            const isTransitionError = err.response?.status === 422;
+            
+            if (isTransitionError) {
+              (req as any).pancakeSyncWarning = `Không thể đồng bộ trạng thái sang Pancake POS (Lỗi 422: ${errorMsg}). Trạng thái trên Truliva vẫn được cập nhật thành công.`;
+            } else {
+              (req as any).pancakeSyncWarning = `Đã cập nhật trạng thái trên Truliva, nhưng không thể đồng bộ sang Pancake POS: ${errorMsg}.`;
+            }
           }
         }
       }
@@ -1659,7 +1671,10 @@ router.patch('/:id', requireAuth, async (req: Request, res: Response): Promise<v
     }
 
     logger.info('Order updated by admin', { orderId: id, by: req.user?.id, changes });
-    res.json({ order });
+    res.json({ 
+      order, 
+      warning: (req as any).pancakeSyncWarning || null 
+    });
   } catch (error: any) {
     logger.error('Update order error', { error: error.message });
     res.status(500).json({ error: 'Lỗi cập nhật đơn hàng' });
