@@ -5,7 +5,7 @@ const config: CapacitorConfig = {
   appName: 'truliva',
   webDir: 'dist',
   server: {
-    url: 'https://truliva-weebhook.onrender.com',
+    url: 'https://trulivaofficial.com',
     cleartext: true
   }
 };
