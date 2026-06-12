@@ -50,8 +50,29 @@ export default function MyOrders() {
       setTotalPages(res.pagination.totalPages);
       setTotalOrders(res.pagination.total || 0);
       setError('');
+      
+      // Cache the default view (first page, empty search)
+      if (!search && page === 1) {
+        localStorage.setItem('cached_ktv_orders', JSON.stringify({
+          orders: res.orders,
+          pagination: res.pagination
+        }));
+      }
     } catch (err: any) {
-      setError(err.message || 'Lỗi tải danh sách đơn hàng');
+      const cached = localStorage.getItem('cached_ktv_orders');
+      if (cached) {
+        try {
+          const parsed = JSON.parse(cached);
+          setOrders(parsed.orders || []);
+          setTotalPages(parsed.pagination?.totalPages || 1);
+          setTotalOrders(parsed.pagination?.total || 0);
+          setError('Bạn đang xem danh sách đơn hàng ngoại tuyến (không có mạng)');
+        } catch (e) {
+          setError(err.message || 'Lỗi tải danh sách đơn hàng');
+        }
+      } else {
+        setError(err.message || 'Lỗi tải danh sách đơn hàng');
+      }
     } finally {
       if (!silent) setLoading(false);
     }
@@ -60,6 +81,16 @@ export default function MyOrders() {
   useEffect(() => {
     fetchOrdersData();
   }, [page, sortBy, sortOrder]);
+
+  useEffect(() => {
+    const handleOnline = () => {
+      fetchOrdersData(true);
+    };
+    window.addEventListener('online', handleOnline);
+    return () => {
+      window.removeEventListener('online', handleOnline);
+    };
+  }, [page, sortBy, sortOrder, search]);
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
@@ -177,12 +208,21 @@ export default function MyOrders() {
             <div className="flex justify-center py-12">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
             </div>
-          ) : error ? (
+          ) : error && orders.length === 0 ? (
             <div className="text-center py-12 text-red-500 font-medium">{error}</div>
           ) : orders.length === 0 ? (
             <div className="text-center py-12 text-gray-400">Bạn chưa được giao dịch vụ nào</div>
           ) : (
             <div className="flex flex-col p-4 space-y-4">
+              {/* Banner trạng thái offline */}
+              {error && (
+                <div className="p-3 bg-amber-500 text-white rounded-xl flex items-center justify-between shadow-xs mb-1">
+                  <div className="flex items-center space-x-2">
+                    <span className="text-base">⚠️</span>
+                    <span className="text-xs font-semibold">{error}</span>
+                  </div>
+                </div>
+              )}
               {/* Banner thống kê đơn hàng */}
               <div className="p-3 bg-blue-50/80 border border-blue-100 rounded-xl flex items-center justify-between shadow-xs">
                 <div className="flex items-center space-x-2.5">

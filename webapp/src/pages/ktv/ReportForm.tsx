@@ -4,6 +4,7 @@ import { fetchApi, getOrders, getFiltersData } from '../../api/client';
 import LabeledImageUploader from '../../components/LabeledImageUploader';
 import { CheckCircle, ChevronLeft, Send, AlertCircle, Camera, Loader2, ChevronDown, ChevronUp, Search, X } from 'lucide-react';
 import { Html5Qrcode } from 'html5-qrcode';
+import { enqueueReport } from '../../utils/offlineStorage';
 
 import { getImageSlots, WARRANTY_SERVICE_GROUPS, REPAIR_SERVICE_GROUPS, WORK_TYPE_SERVICES } from '../../utils/workTypes';
 import { matchesSearchTerm } from '../../utils/text';
@@ -166,6 +167,7 @@ export default function ReportForm() {
 
   // ── Step 3: Ảnh ──
   const [imageUrls, setImageUrls] = useState<string[]>([]);
+  const [reportFiles, setReportFiles] = useState<File[]>([]);
 
   // ── Step 4: Ghi chú & Submit ──
   const [notes, setNotes] = useState('');
@@ -375,7 +377,72 @@ export default function ReportForm() {
           setOrders(list);
         }
       })
-      .catch(err => console.error('Lỗi tải đơn hàng', err));
+      .catch(err => {
+        console.error('Lỗi tải đơn hàng', err);
+        const cached = localStorage.getItem('cached_ktv_orders');
+        if (cached) {
+          try {
+            const parsed = JSON.parse(cached);
+            let list = parsed.orders || [];
+            const stateOrder = location.state?.order;
+            if (stateOrder) {
+              if (!list.some((o: any) => o.id === stateOrder.id)) {
+                list = [stateOrder, ...list];
+              }
+              setOrders(list);
+              setSelectedOrderId(stateOrder.id);
+              
+              setCustomerName(stateOrder.billFullName || stateOrder.customer?.fullName || '');
+              setCustomerPhone(stateOrder.billPhoneNumber || stateOrder.customer?.phoneNumber || '');
+              setProvince(stateOrder.shippingAddress?.province_name || stateOrder.customer?.provinceName || '');
+              setAddress(stateOrder.shippingAddress?.full_address || stateOrder.customer?.fullAddress || '');
+              
+              if (stateOrder.workType) {
+                setWorkType(stateOrder.workType);
+                const noServiceTypes = ['Giao hàng và Lắp đặt', 'Lắp đặt', 'Giao hàng', 'Thay lọc'];
+                if (noServiceTypes.includes(stateOrder.workType) && !stateOrder.serviceType) {
+                  setSelectedServices(['Công việc đã bao gồm dịch vụ']);
+                } else {
+                  setSelectedServices(stateOrder.serviceType ? stateOrder.serviceType.split(',').map((s: string) => s.trim()).filter(Boolean) : []);
+                }
+              } else {
+                setSelectedServices(stateOrder.serviceType ? stateOrder.serviceType.split(',').map((s: string) => s.trim()).filter(Boolean) : []);
+              }
+
+              let orderProducts: string[] = [];
+              let prodStr = '';
+              if (stateOrder.items && stateOrder.items.length > 0) {
+                orderProducts = stateOrder.items.map((item: any) => {
+                  const name = item.productName
+                    || item.variationInfo?.name
+                    || (item.sku ? `Sản phẩm (${item.sku})` : 'Sản phẩm không tên');
+                  const qty = item.quantity || 1;
+                  return `${name} x${qty}`;
+                });
+                prodStr = orderProducts.join(', ');
+                setSelectedProducts(orderProducts);
+              }
+              
+              if (stateOrder.moneyToCollect !== undefined && stateOrder.moneyToCollect !== null) {
+                setActualAmount(String(stateOrder.moneyToCollect));
+              }
+
+              const matchingGroups: string[] = ['Linh kiện chung / Khác'];
+              const pStrLower = prodStr.toLowerCase();
+              if (pStrLower.includes('3626')) matchingGroups.push('Linh kiện UR3626');
+              if (pStrLower.includes('5676') || pStrLower.includes('5640') || pStrLower.includes('5440')) matchingGroups.push('Linh kiện UR5676');
+              if (pStrLower.includes('5840')) matchingGroups.push('Linh kiện UR5840');
+              if (pStrLower.includes('61096')) matchingGroups.push('Linh kiện UR61096H');
+              if (pStrLower.includes('6412') || pStrLower.includes('w6412')) matchingGroups.push('Linh kiện W6412');
+              setExpandedGroups(matchingGroups);
+            } else {
+              setOrders(list);
+            }
+          } catch (e) {
+            console.error('Lỗi khi phân tích danh sách đơn hàng đã lưu cache', e);
+          }
+        }
+      });
   }, [location.state]);
 
   const handleOrderSelect = (orderId: string) => {
@@ -444,8 +511,11 @@ export default function ReportForm() {
     }
   };
 
-  const handleUploadSuccess = (urls: string[]) => {
+  const handleUploadSuccess = (urls: string[], files?: File[]) => {
     setImageUrls(urls);
+    if (files) {
+      setReportFiles(files);
+    }
     setStep(3);
   };
 
@@ -480,31 +550,40 @@ export default function ReportForm() {
       ? (handlingMethod === 'Khác (Nhập chi tiết phía dưới)' ? customHandlingMethod : handlingMethod)
       : null;
 
+    const payload = {
+      customerName,
+      customerPhone,
+      province,
+      address,
+      products: selectedProducts,
+      serviceType: selectedServices.join(', '),
+      workType,
+      serialNumber,
+      distanceKm,
+      actualAmount,
+      waterSource: needsTechnicalFields(workType) ? waterSource : null,
+      tdsIn: needsTechnicalFields(workType) ? tdsIn : null,
+      tdsOut: needsTechnicalFields(workType) ? tdsOut : null,
+      waterPressure: needsTechnicalFields(workType) ? waterPressure : null,
+      spareParts: needsSpareParts(workType) ? spareParts : [],
+      issueType: finalIssueType,
+      handlingMethod: finalHandlingMethod,
+      notes,
+      imageUrls: navigator.onLine ? imageUrls : [], // Dùng url rỗng khi offline để SyncManager điền sau
+      orderId: selectedOrderId,
+    };
+
     try {
+      if (!navigator.onLine) {
+        await enqueueReport(selectedOrderId, payload, reportFiles);
+        alert('Báo cáo đã được lưu tạm ngoại tuyến và sẽ tự động đồng bộ khi thiết bị của bạn có kết nối mạng.');
+        navigate('/ktv/my-orders');
+        return;
+      }
+
       await fetchApi('/reports', {
         method: 'POST',
-        body: JSON.stringify({
-          customerName,
-          customerPhone,
-          province,
-          address,
-          products: selectedProducts,
-          serviceType: selectedServices.join(', '),
-          workType,
-          serialNumber,
-          distanceKm,
-          actualAmount,
-          waterSource: needsTechnicalFields(workType) ? waterSource : null,
-          tdsIn: needsTechnicalFields(workType) ? tdsIn : null,
-          tdsOut: needsTechnicalFields(workType) ? tdsOut : null,
-          waterPressure: needsTechnicalFields(workType) ? waterPressure : null,
-          spareParts: needsSpareParts(workType) ? spareParts : [],
-          issueType: finalIssueType,
-          handlingMethod: finalHandlingMethod,
-          notes,
-          imageUrls,
-          orderId: selectedOrderId,
-        })
+        body: JSON.stringify(payload)
       });
       navigate('/ktv/my-reports');
     } catch (err: any) {

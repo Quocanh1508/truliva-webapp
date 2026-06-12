@@ -1,3 +1,5 @@
+import { compressImage } from '../utils/compressor';
+
 export const API_URL = '/api';
 
 export async function fetchApi(endpoint: string, options: RequestInit = {}) {
@@ -26,8 +28,9 @@ export async function fetchApi(endpoint: string, options: RequestInit = {}) {
 }
 
 export async function uploadImage(file: File): Promise<{ url: string; publicId: string }> {
+  const compressedFile = await compressImage(file);
   const formData = new FormData();
-  formData.append('image', file);
+  formData.append('image', compressedFile);
 
   const response = await fetch(`${API_URL}/upload`, {
     method: 'POST',
@@ -43,8 +46,9 @@ export async function uploadImage(file: File): Promise<{ url: string; publicId: 
 }
 
 export async function uploadImages(files: File[]): Promise<string[]> {
+  const compressedFiles = await Promise.all(files.map((f) => compressImage(f)));
   const formData = new FormData();
-  files.forEach((f) => formData.append('images', f));
+  compressedFiles.forEach((f) => formData.append('images', f));
 
   const response = await fetch(`${API_URL}/upload/multiple`, {
     method: 'POST',

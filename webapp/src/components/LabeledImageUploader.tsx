@@ -12,7 +12,7 @@ interface ImageSlot {
 interface Props {
   imageSlots: ImageSlot[];
   workType: string;
-  onUploadSuccess: (urls: string[]) => void;
+  onUploadSuccess: (urls: string[], files?: File[]) => void;
 }
 
 export default function LabeledImageUploader({ imageSlots, workType, onUploadSuccess }: Props) {
@@ -134,12 +134,20 @@ export default function LabeledImageUploader({ imageSlots, workType, onUploadSuc
       setError('Vui lòng chọn ít nhất 1 ảnh');
       return;
     }
+
+    if (!navigator.onLine) {
+      // Offline mode: bypass actual API upload, send local previews as placeholders
+      const localUrls = slotPreviews.filter((p): p is string => p !== null);
+      onUploadSuccess(localUrls, files);
+      return;
+    }
+
     setIsUploading(true);
     setError('');
 
     try {
       const urls = await uploadImages(files);
-      onUploadSuccess(urls);
+      onUploadSuccess(urls, files);
     } catch (err: any) {
       setError(err.message || 'Lỗi upload ảnh');
     } finally {

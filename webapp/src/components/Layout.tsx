@@ -3,6 +3,7 @@ import { Outlet, useNavigate, useLocation, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { LogOut, Menu, X, FileText, List, Users, BarChart, Building, Key, Image as ImageIcon, MessageSquare, Bell, Wrench, User, Warehouse } from 'lucide-react';
 import { fetchApi } from '../api/client';
+import SyncManager from './SyncManager';
 
 export default function Layout() {
   const { user, logout } = useAuth();
@@ -311,6 +312,7 @@ export default function Layout() {
       <main className="app-main">
         <Outlet />
       </main>
+      <SyncManager />
     </div>
   );
 }
