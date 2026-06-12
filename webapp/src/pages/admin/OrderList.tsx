@@ -2534,31 +2534,98 @@ export default function OrderList() {
                 <div className="text-center py-8 text-gray-500">Chưa có thay đổi nào.</div>
               ) : (
                 <div className="space-y-4">
-                  {auditLogs.map(log => (
-                    <div key={log.id} className="bg-white p-3 rounded shadow-sm border text-sm">
-                      <div className="flex justify-between text-gray-500 mb-2">
-                        <span className="font-semibold text-gray-700">{log.userName}</span>
-                        <span>{new Date(log.createdAt).toLocaleString('vi-VN')}</span>
-                      </div>
-                      <div className="text-blue-600 font-medium mb-1">Hành động: {log.action}</div>
-                      {log.changes && (() => {
-                        let changesArr: any[] = [];
-                        if (Array.isArray(log.changes)) {
-                          changesArr = log.changes;
-                        } else if (typeof log.changes === 'string') {
-                          try { changesArr = JSON.parse(log.changes); } catch { changesArr = []; }
-                          if (!Array.isArray(changesArr)) changesArr = [changesArr];
-                        } else if (typeof log.changes === 'object' && log.changes !== null) {
-                          changesArr = [log.changes];
+                  {auditLogs.map(log => {
+                    const translateAction = (act: string) => {
+                      const map: Record<string, string> = {
+                        created_manual: 'Tạo ca thủ công',
+                        created: 'Tạo ca',
+                        updated: 'Cập nhật',
+                        assigned: 'Phân công',
+                        cancelled: 'Hủy đơn',
+                        restored: 'Khôi phục',
+                        rescheduled: 'Hẹn lại lịch',
+                      };
+                      return map[act] || act;
+                    };
+
+                    const translateField = (field: string) => {
+                      const map: Record<string, string> = {
+                        adminStatus: 'Trạng thái xử lý',
+                        workType: 'Loại công việc',
+                        serviceType: 'Dịch vụ chi tiết',
+                        mainStationId: 'Trạm chính',
+                        techStationId: 'Trạm kỹ thuật',
+                        rescheduleReason: 'Lý do hẹn lại',
+                        cancelReason: 'Lý do hủy',
+                        note: 'Ghi chú',
+                        assignedKtvId: 'Kỹ thuật viên',
+                        appointmentTime: 'Thời gian hẹn',
+                        items: 'Sản phẩm/Vật tư (Số lượng)',
+                        pancakeOrderId: 'Mã đơn Pancake',
+                      };
+                      return map[field] || field;
+                    };
+
+                    const getStationName = (id: string) => {
+                      const st = stations.find(s => s.id === id);
+                      return st ? st.name : id;
+                    };
+
+                    const getKtvName = (id: string) => {
+                      const k = allKtvs.find(x => x.id === id);
+                      return k ? k.fullName : id;
+                    };
+
+                    const formatValue = (field: string, val: any) => {
+                      if (val === null || val === undefined || val === '' || val === 'Trống' || val === 'null') {
+                        return 'Trống';
+                      }
+                      if (field === 'mainStationId' || field === 'techStationId') {
+                        return getStationName(String(val));
+                      }
+                      if (field === 'assignedKtvId') {
+                        return getKtvName(String(val));
+                      }
+                      if (field === 'appointmentTime' || field === 'createdAt' || field === 'updatedAt') {
+                        const date = new Date(val);
+                        if (!isNaN(date.getTime())) {
+                          return `${date.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })} ${date.toLocaleDateString('vi-VN')}`;
                         }
-                        return changesArr.map((c: any, i: number) => (
-                          <div key={i} className="text-gray-600">
-                            - <span className="font-medium text-gray-800">{c.field || Object.keys(c)[0] || 'N/A'}</span>: <span className="line-through text-red-400">{String(c.from ?? c[Object.keys(c)[0]] ?? 'Trống')}</span> &rarr; <span className="text-green-600 font-medium">{String(c.to ?? 'Trống')}</span>
-                          </div>
-                        ));
-                      })()}
-                    </div>
-                  ))}
+                      }
+                      return String(val);
+                    };
+
+                    return (
+                      <div key={log.id} className="bg-white p-3 rounded shadow-sm border text-sm">
+                        <div className="flex justify-between text-gray-500 mb-2">
+                          <span className="font-semibold text-gray-700">{log.userName}</span>
+                          <span>{new Date(log.createdAt).toLocaleString('vi-VN')}</span>
+                        </div>
+                        <div className="text-blue-600 font-medium mb-1">Hành động: {translateAction(log.action)}</div>
+                        {log.changes && (() => {
+                          let changesArr: any[] = [];
+                          if (Array.isArray(log.changes)) {
+                            changesArr = log.changes;
+                          } else if (typeof log.changes === 'string') {
+                            try { changesArr = JSON.parse(log.changes); } catch { changesArr = []; }
+                            if (!Array.isArray(changesArr)) changesArr = [changesArr];
+                          } else if (typeof log.changes === 'object' && log.changes !== null) {
+                            changesArr = [log.changes];
+                          }
+                          return changesArr.map((c: any, i: number) => {
+                            const fieldName = c.field || Object.keys(c)[0] || 'N/A';
+                            const fromVal = c.from ?? c[Object.keys(c)[0]] ?? 'Trống';
+                            const toVal = c.to ?? 'Trống';
+                            return (
+                              <div key={i} className="text-gray-600">
+                                - <span className="font-medium text-gray-800">{translateField(fieldName)}</span>: <span className="line-through text-red-400">{formatValue(fieldName, fromVal)}</span> &rarr; <span className="text-green-600 font-medium">{formatValue(fieldName, toVal)}</span>
+                              </div>
+                            );
+                          });
+                        })()}
+                      </div>
+                    );
+                  })}
                 </div>
               )}
             </div>
