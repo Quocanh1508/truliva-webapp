@@ -21,7 +21,9 @@ export async function fetchApi(endpoint: string, options: RequestInit = {}) {
   const data = await response.json();
 
   if (!response.ok) {
-    throw new Error(data.error || 'Có lỗi xảy ra');
+    const error = new Error(data.error || 'Có lỗi xảy ra') as any;
+    error.status = response.status;
+    throw error;
   }
 
   return data;

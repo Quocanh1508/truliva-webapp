@@ -22,17 +22,42 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [user, setUser] = useState<User | null>(null);
+  const [user, setUser] = useState<User | null>(() => {
+    const cached = localStorage.getItem('session_user');
+    if (cached) {
+      try {
+        return JSON.parse(cached);
+      } catch (e) {
+        console.error('Error parsing cached user', e);
+      }
+    }
+    return null;
+  });
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    const token = localStorage.getItem('session_token');
+    if (!token) {
+      setUser(null);
+      setLoading(false);
+      return;
+    }
+
     // Check session on mount
     fetchApi('/auth/me')
       .then((data) => {
         setUser(data.user);
+        localStorage.setItem('session_user', JSON.stringify(data.user));
       })
-      .catch(() => {
-        setUser(null);
+      .catch((err: any) => {
+        console.error('Check session error:', err);
+        // Only log out if the token is rejected with 401 or 403
+        if (err.status === 401 || err.status === 403) {
+          localStorage.removeItem('session_token');
+          localStorage.removeItem('session_user');
+          localStorage.removeItem('cached_ktv_orders');
+          setUser(null);
+        }
       })
       .finally(() => {
         setLoading(false);
@@ -41,6 +66,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const login = (userData: User) => {
     setUser(userData);
+    localStorage.setItem('session_user', JSON.stringify(userData));
   };
 
   const logout = async () => {
@@ -50,6 +76,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       console.error('Logout error', e);
     } finally {
       localStorage.removeItem('session_token');
+      localStorage.removeItem('session_user');
       localStorage.removeItem('cached_ktv_orders');
       setUser(null);
     }
