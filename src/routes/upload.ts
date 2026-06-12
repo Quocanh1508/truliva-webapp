@@ -20,7 +20,7 @@ const storage = new CloudinaryStorage({
   params: async (_req, file) => {
     return {
       folder: 'truliva_reports',
-      allowed_formats: ['jpg', 'png', 'jpeg', 'webp', 'heic'],
+      format: 'jpg', // Tự động convert tất cả định dạng (bao gồm cả HEIC của iPhone) sang JPG để mọi trình duyệt xem được
       public_id: `${Date.now()}-${Math.round(Math.random() * 1e9)}`,
     };
   },
@@ -46,6 +46,7 @@ router.post(
         }
         return res.status(400).json({ error: `Lỗi tải ảnh: ${err.message}` });
       } else if (err) {
+        logger.error('Multer single upload error', { error: err.message || err });
         return res.status(500).json({ error: 'Lỗi hệ thống khi tải ảnh' });
       }
       next();
@@ -84,6 +85,7 @@ router.post(
         }
         return res.status(400).json({ error: `Lỗi tải ảnh: ${err.message}` });
       } else if (err) {
+        logger.error('Multer multiple upload error', { error: err.message || err });
         return res.status(500).json({ error: 'Lỗi hệ thống khi tải ảnh' });
       }
       next();
