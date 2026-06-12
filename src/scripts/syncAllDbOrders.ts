@@ -1,12 +1,13 @@
-import prisma from '../config/database';
-import axios from 'axios';
-import { processOrderEvent } from '../services/orderProcessor';
-import logger from '../utils/logger';
 import * as dotenv from 'dotenv';
 import * as path from 'path';
 
-// Load .env explicitly
+// Load .env explicitly BEFORE requiring prisma
 dotenv.config({ path: path.join(__dirname, '../../.env') });
+
+const prisma = require('../config/database').default;
+const { processOrderEvent } = require('../services/orderProcessor');
+import axios from 'axios';
+import logger from '../utils/logger';
 
 const SHOP_ID = '1635300067';
 const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
