@@ -32,7 +32,6 @@ export default function ProtectedRoute({ allowedRoles, requireDashboard }: Prote
     const hasDashboardAccess = 
       user.role === 'ADMIN' || 
       user.role === 'DEV' || 
-      user.role === 'COORDINATOR' || 
       (user.role === 'STAFF' && user.group === 'Service');
     
     if (!hasDashboardAccess) {

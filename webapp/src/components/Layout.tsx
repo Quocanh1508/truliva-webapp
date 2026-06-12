@@ -68,10 +68,9 @@ export default function Layout() {
     // Office / Administrative roles
     const items: any[] = [];
     
-    // 1. Dashboard: Admin, Coordinator, Staff (Service group)
+    // 1. Dashboard: Admin, Staff (Service group)
     const canSeeDashboard = 
       user.role === 'ADMIN' || 
-      user.role === 'COORDINATOR' || 
       (user.role === 'STAFF' && user.group === 'Service');
     if (canSeeDashboard) {
       items.push({ name: 'Dashboard', path: '/admin', icon: <BarChart size={20} /> });

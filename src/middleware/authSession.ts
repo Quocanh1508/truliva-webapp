@@ -118,7 +118,6 @@ export function requireDashboardAccess(req: Request, res: Response, next: NextFu
   if (
     role === 'ADMIN' ||
     role === 'DEV' ||
-    role === 'COORDINATOR' ||
     (role === 'STAFF' && req.user?.group === 'Service')
   ) {
     next();
