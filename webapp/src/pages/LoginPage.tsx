@@ -111,7 +111,7 @@ export default function LoginPage() {
 
     if (isAndroid) {
       // Tải trực tiếp file APK được phục vụ từ thư mục public
-      window.location.href = '/app-debug.apk';
+      window.location.href = '/Truliva_technician.apk';
     } else if (isiOS) {
       // Hiển thị modal hướng dẫn cách "Thêm vào MH chính" trên iOS Safari
       setShowIosModal(true);
@@ -536,13 +536,13 @@ export default function LoginPage() {
             
             <div className="space-y-3 mb-6">
               <a 
-                href="/app-debug.apk"
+                href="/Truliva_technician.apk"
                 className="flex items-center gap-4 p-3.5 rounded-xl border border-slate-200 hover:bg-slate-50 transition-colors text-left"
               >
                 <div className="w-10 h-10 rounded-lg bg-emerald-100 text-emerald-600 flex items-center justify-center font-bold text-sm shrink-0">APK</div>
                 <div>
                   <div className="font-semibold text-sm text-slate-900">Tải file cài đặt Android (APK)</div>
-                  <div className="text-xs text-slate-500">Tải trực tiếp file app-debug.apk để cài đặt thủ công</div>
+                  <div className="text-xs text-slate-500">Tải trực tiếp file Truliva_technician.apk để cài đặt thủ công</div>
                 </div>
               </a>
               
