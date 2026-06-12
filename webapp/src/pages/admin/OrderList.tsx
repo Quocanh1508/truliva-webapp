@@ -1746,7 +1746,18 @@ export default function OrderList() {
                     {/* 2. Khách hàng */}
                     <td className="px-4 py-2 whitespace-normal align-top">
                       <div className="font-bold text-gray-900 text-[13px]">{customerName}</div>
-                      <div className="text-gray-700 font-semibold text-[12px] my-0.5">{phone}</div>
+                      <div 
+                        onClick={() => {
+                          if (phone) {
+                            navigator.clipboard.writeText(phone);
+                            alert(`Đã sao chép SĐT: ${phone}`);
+                          }
+                        }}
+                        className="text-gray-750 font-bold text-[12px] my-0.5 cursor-pointer hover:text-blue-600 hover:underline inline-block"
+                        title="Click để sao chép số điện thoại"
+                      >
+                        {phone}
+                      </div>
                       <div className="text-gray-500 text-[11px] leading-tight line-clamp-2" title={order.shippingAddress?.full_address || order.customer?.fullAddress || ''}>
                         {order.shippingAddress?.full_address || order.customer?.fullAddress || 'Không có địa chỉ'}
                       </div>

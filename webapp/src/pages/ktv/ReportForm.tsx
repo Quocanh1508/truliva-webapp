@@ -100,13 +100,6 @@ const ISSUE_TYPES = [
   'Khác (Nhập chi tiết phía dưới)',
 ];
 
-const HANDLING_METHODS = [
-  'Thay thế linh kiện phát sinh',
-  'Sửa chữa mạch / Đường nước',
-  'Căn chỉnh áp suất / Vệ sinh máy',
-  'Hướng dẫn khách hàng sử dụng',
-  'Khác (Nhập chi tiết phía dưới)',
-];
 
 // ── Kiểm tra workType có cần trường kỹ thuật không ──
 function needsTechnicalFields(workType: string): boolean {
@@ -157,7 +150,6 @@ export default function ReportForm() {
   const [issueType, setIssueType] = useState('');
   const [customIssueType, setCustomIssueType] = useState('');
   const [handlingMethod, setHandlingMethod] = useState('');
-  const [customHandlingMethod, setCustomHandlingMethod] = useState('');
 
   // ── Thống kê kiểm tra Serial ──
   const [serialChecking, setSerialChecking] = useState(false);
@@ -531,8 +523,7 @@ export default function ReportForm() {
     if (['Bảo hành', 'Sửa chữa'].includes(workType)) {
       if (!issueType) return false;
       if (issueType === 'Khác (Nhập chi tiết phía dưới)' && !customIssueType) return false;
-      if (!handlingMethod) return false;
-      if (handlingMethod === 'Khác (Nhập chi tiết phía dưới)' && !customHandlingMethod) return false;
+      if (!handlingMethod.trim()) return false;
     }
     return true;
   };
@@ -547,7 +538,7 @@ export default function ReportForm() {
       : null;
 
     const finalHandlingMethod = ['Bảo hành', 'Sửa chữa'].includes(workType)
-      ? (handlingMethod === 'Khác (Nhập chi tiết phía dưới)' ? customHandlingMethod : handlingMethod)
+      ? handlingMethod.trim()
       : null;
 
     const payload = {
@@ -1063,34 +1054,15 @@ export default function ReportForm() {
 
                     <div className="form-group">
                       <label className="form-label">Cách xử lý của KTV *</label>
-                      <select 
-                        className="form-select" 
+                      <input 
+                        type="text" 
+                        className="form-input" 
+                        placeholder="Mô tả cách xử lý của KTV..." 
                         value={handlingMethod} 
-                        onChange={e => {
-                          setHandlingMethod(e.target.value);
-                          if (e.target.value !== 'Khác (Nhập chi tiết phía dưới)') {
-                            setCustomHandlingMethod('');
-                          }
-                        }} 
-                        required
-                      >
-                        <option value="">-- Chọn Cách xử lý --</option>
-                        {HANDLING_METHODS.map(h => <option key={h} value={h}>{h}</option>)}
-                      </select>
+                        onChange={e => setHandlingMethod(e.target.value)} 
+                        required 
+                      />
                     </div>
-                    {handlingMethod === 'Khác (Nhập chi tiết phía dưới)' && (
-                      <div className="form-group">
-                        <label className="form-label">Chi tiết cách xử lý *</label>
-                        <input 
-                          type="text" 
-                          className="form-input" 
-                          placeholder="Mô tả cách xử lý lỗi..." 
-                          value={customHandlingMethod} 
-                          onChange={e => setCustomHandlingMethod(e.target.value)} 
-                          required 
-                        />
-                      </div>
-                    )}
                   </div>
                 )}
 
@@ -1250,7 +1222,7 @@ export default function ReportForm() {
                     </span>
                     <span className="text-gray-500">Cách xử lý:</span>
                     <span className="font-medium">
-                      {handlingMethod === 'Khác (Nhập chi tiết phía dưới)' ? customHandlingMethod : handlingMethod}
+                      {handlingMethod}
                     </span>
                   </>
                 )}

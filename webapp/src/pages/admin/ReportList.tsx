@@ -1039,7 +1039,18 @@ export default function ReportList() {
                     {/* Khách hàng */}
                     <td style={{ padding: '12px 16px' }}>
                       <div className="font-bold text-gray-800">{r.customerName}</div>
-                      <div className="text-xs text-blue-600 font-semibold mt-0.5">{r.customerPhone}</div>
+                      <div 
+                        onClick={() => {
+                          if (r.customerPhone) {
+                            navigator.clipboard.writeText(r.customerPhone);
+                            alert(`Đã sao chép SĐT: ${r.customerPhone}`);
+                          }
+                        }}
+                        className="text-xs text-blue-600 font-semibold mt-0.5 cursor-pointer hover:text-blue-850 hover:underline inline-block"
+                        title="Click để sao chép số điện thoại"
+                      >
+                        {r.customerPhone}
+                      </div>
                       <div className="text-xs text-gray-500 mt-1 max-w-[150px] leading-relaxed truncate" title={r.address}>{r.address || '---'}</div>
                     </td>
 
@@ -1223,7 +1234,18 @@ export default function ReportList() {
                       </div>
                       <div>
                         <span className="text-gray-500 block text-xs">Số điện thoại</span>
-                        <span className="font-semibold text-gray-800">{selectedDetailReport.customerPhone}</span>
+                        <span 
+                          onClick={() => {
+                            if (selectedDetailReport.customerPhone) {
+                              navigator.clipboard.writeText(selectedDetailReport.customerPhone);
+                              alert(`Đã sao chép SĐT: ${selectedDetailReport.customerPhone}`);
+                            }
+                          }}
+                          className="font-semibold text-gray-800 cursor-pointer hover:text-blue-600 hover:underline"
+                          title="Click để sao chép số điện thoại"
+                        >
+                          {selectedDetailReport.customerPhone}
+                        </span>
                       </div>
                       <div className="col-span-2">
                         <span className="text-gray-500 block text-xs">Địa chỉ chi tiết</span>
