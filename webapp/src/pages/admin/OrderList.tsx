@@ -2567,8 +2567,15 @@ export default function OrderList() {
                     };
 
                     const getStationName = (id: string) => {
-                      const st = stations.find(s => s.id === id);
-                      return st ? st.name : id;
+                      const mainSt = stations.find(s => s.id === id);
+                      if (mainSt) return mainSt.name;
+                      for (const main of stations) {
+                        if (main.techStations) {
+                          const techSt = main.techStations.find((t: any) => t.id === id);
+                          if (techSt) return techSt.name;
+                        }
+                      }
+                      return id;
                     };
 
                     const getKtvName = (id: string) => {
