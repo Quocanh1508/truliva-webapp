@@ -642,115 +642,134 @@ export default function UserManage() {
       {loading ? (
         <div className="text-center py-10"><span className="spinner border-t-[#1B3A6B]"></span></div>
       ) : (
-        <div className="card table-container" style={{ padding: 0 }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
-            <thead>
-              <tr style={{ borderBottom: '2px solid var(--border-color)' }}>
-                <th style={{ padding: '12px 16px' }}>Họ tên / SĐT</th>
-                <th style={{ padding: '12px 16px' }}>Username</th>
-                <th style={{ padding: '12px 16px' }}>Vai trò</th>
-                <th style={{ padding: '12px 16px' }}>Nhóm</th>
-                <th style={{ padding: '12px 16px' }}>Tên Pancake</th>
-                <th style={{ padding: '12px 16px' }}>Trạm trực thuộc</th>
-                <th style={{ padding: '12px 16px' }}>Số báo cáo</th>
-                <th style={{ padding: '12px 16px', textAlign: 'center' }}>Trạng thái</th>
-                <th style={{ padding: '12px 16px' }}>Hành động</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredUsers.length === 0 ? (
-                <tr>
-                  <td colSpan={9} style={{ padding: '32px 16px', textAlign: 'center', color: 'var(--text-muted)' }}>
-                    {hasFilters ? 'Không tìm thấy kỹ thuật viên phù hợp với bộ lọc.' : 'Chưa có kỹ thuật viên nào.'}
-                  </td>
-                </tr>
-              ) : (
-                filteredUsers.map(u => (
-                <tr key={u.id} style={{ borderBottom: '1px solid var(--border-color)' }} className="hover:bg-gray-50">
-                  <td style={{ padding: '12px 16px' }}>
-                    <div className="font-bold">{u.fullName}</div>
-                    <div className="text-xs text-gray-500">{u.phoneNumber || '---'}</div>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {filteredUsers.length === 0 ? (
+            <div className="col-span-full text-center py-12 text-gray-500 bg-white rounded-xl border border-gray-200">
+              {hasFilters ? 'Không tìm thấy kỹ thuật viên phù hợp với bộ lọc.' : 'Chưa có kỹ thuật viên nào.'}
+            </div>
+          ) : (
+            filteredUsers.map(u => (
+              <div 
+                key={u.id} 
+                className="bg-white rounded-xl border border-gray-200 shadow-xs p-5 hover:shadow-md hover:border-blue-200 transition-all duration-200 flex flex-col justify-between min-h-[250px] relative text-left"
+              >
+                <div>
+                  {/* Header: Name, Status & Role */}
+                  <div className="flex justify-between items-start mb-3 gap-2">
+                    <div>
+                      <h4 className="font-bold text-gray-900 text-[16px] leading-snug">{u.fullName}</h4>
+                      <p className="text-xs text-gray-500 mt-0.5">{u.phoneNumber || 'Không có SĐT'}</p>
+                    </div>
+                    
+                    <div className="flex items-center gap-2 shrink-0">
+                      <span className={`px-2 py-0.5 text-[10px] rounded-md font-bold uppercase ${
+                        u.role === 'ADMIN' ? 'bg-red-100 text-red-700' :
+                        u.role === 'COORDINATOR' ? 'bg-purple-100 text-purple-700' :
+                        u.role === 'SALE_SUPERVISOR' ? 'bg-amber-100 text-amber-700' :
+                        u.role === 'SALER' ? 'bg-green-100 text-green-700' :
+                        u.role === 'HOTLINE' ? 'bg-pink-100 text-pink-700' :
+                        u.role === 'STAFF' ? 'bg-teal-100 text-teal-700' :
+                        'bg-blue-100 text-blue-700'
+                      }`}>
+                        {u.role}
+                      </span>
+                      
+                      {/* Status dot */}
+                      <span className="relative flex h-2.5 w-2.5" title={u.isActive ? "Hoạt động" : "Đã khóa"}>
+                        {u.isActive ? (
+                          <>
+                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                            <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-green-500"></span>
+                          </>
+                        ) : (
+                          <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-red-500"></span>
+                        )}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Main content info */}
+                  <div className="grid grid-cols-2 gap-y-2 gap-x-4 text-xs text-gray-600 border-t border-gray-100 pt-3 mb-4">
+                    <div>
+                      <span className="text-gray-400 block text-[10px] uppercase font-semibold">Username</span>
+                      <span className="font-medium text-gray-800">{u.username}</span>
+                    </div>
+                    <div>
+                      <span className="text-gray-400 block text-[10px] uppercase font-semibold">Nhóm</span>
+                      <span className="font-medium text-gray-800">{u.group || '---'}</span>
+                    </div>
+                    <div>
+                      <span className="text-gray-400 block text-[10px] uppercase font-semibold">Account Pancake</span>
+                      <span className="font-medium text-gray-800">{u.pancakeAccountName || '---'}</span>
+                    </div>
+                    <div>
+                      <span className="text-gray-400 block text-[10px] uppercase font-semibold">Báo cáo gửi</span>
+                      <span className="font-bold text-gray-900">{u._count.serviceReports} báo cáo</span>
+                    </div>
                     {u.warehouseName && (
-                      <div className="text-[11px] text-blue-600 font-semibold mt-1 bg-blue-50 border border-blue-150 px-1.5 py-0.5 rounded w-max">
-                        📦 {u.warehouseName}
+                      <div className="col-span-2 mt-1">
+                        <span className="inline-flex items-center gap-1.5 text-[11px] text-blue-700 font-bold bg-blue-50/80 border border-blue-100 px-2 py-0.5 rounded-md">
+                          📦 Kho: {u.warehouseName}
+                        </span>
                       </div>
                     )}
-                  </td>
-                  <td style={{ padding: '12px 16px' }}>{u.username}</td>
-                  <td style={{ padding: '12px 16px' }}>
-                    <span className={`px-2 py-1 text-xs rounded font-bold ${
-                      u.role === 'ADMIN' ? 'bg-red-100 text-red-700' :
-                      u.role === 'COORDINATOR' ? 'bg-purple-100 text-purple-700' :
-                      u.role === 'SALE_SUPERVISOR' ? 'bg-amber-100 text-amber-700' :
-                      u.role === 'SALER' ? 'bg-green-100 text-green-700' :
-                      u.role === 'HOTLINE' ? 'bg-pink-100 text-pink-700' :
-                      u.role === 'STAFF' ? 'bg-teal-100 text-teal-700' :
-                      'bg-blue-100 text-blue-700'
-                    }`}>
-                      {u.role}
-                    </span>
-                  </td>
-                  <td style={{ padding: '12px 16px' }}>{u.group || '---'}</td>
-                  <td style={{ padding: '12px 16px' }}>{u.pancakeAccountName || '---'}</td>
-                  <td style={{ padding: '12px 16px' }}>
+                  </div>
+                </div>
+
+                {/* Footer: Station select & actions */}
+                <div className="border-t border-gray-100 pt-3 flex items-center justify-between gap-3 mt-auto">
+                  <div className="flex-1">
                     {u.role !== 'KTV' ? (
-                      <span className="text-gray-400 italic text-sm">Không áp dụng</span>
+                      <span className="text-gray-400 italic text-xs">Không áp dụng trạm</span>
                     ) : (
-                      <select 
-                        className="form-input bg-white text-sm py-1 px-2 h-auto"
-                        value={u.techStationId || ''}
-                        onChange={(e) => handleChangeStation(u.id, e.target.value)}
-                      >
-                        <option value="">-- Chưa gán trạm --</option>
-                        {stations.map(main => (
-                          <optgroup key={main.id} label={main.name}>
-                            {getSortedTechStations(main).map((tech: any) => (
-                              <option key={tech.id} value={tech.id}>{main.name} | {tech.name}</option>
-                            ))}
-                          </optgroup>
-                        ))}
-                      </select>
+                      <div className="w-full">
+                        <span className="text-gray-400 block text-[10px] uppercase font-semibold mb-0.5">Trạm trực thuộc</span>
+                        <select 
+                          className="form-input bg-white text-xs py-1.5 px-2.5 h-auto w-full border-gray-200 focus:border-blue-500 rounded-md"
+                          value={u.techStationId || ''}
+                          onChange={(e) => handleChangeStation(u.id, e.target.value)}
+                        >
+                          <option value="">-- Chưa gán trạm --</option>
+                          {stations.map(main => (
+                            <optgroup key={main.id} label={main.name}>
+                              {getSortedTechStations(main).map((tech: any) => (
+                                <option key={tech.id} value={tech.id}>{main.name} | {tech.name}</option>
+                              ))}
+                            </optgroup>
+                          ))}
+                        </select>
+                      </div>
                     )}
-                  </td>
-                  <td style={{ padding: '12px 16px' }}>{u._count.serviceReports}</td>
-                  <td style={{ padding: '12px 16px' }}>
-                    <div className="flex justify-center items-center">
-                      {u.isActive ? (
-                        <span className="relative flex h-2.5 w-2.5" title="Hoạt động">
-                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
-                          <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-green-500"></span>
-                        </span>
-                      ) : (
-                        <span className="relative flex h-2.5 w-2.5" title="Đã khóa">
-                          <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-red-500"></span>
-                        </span>
-                      )}
-                    </div>
-                  </td>
-                  <td style={{ padding: '12px 16px' }}>
+                  </div>
+
+                  <div className="flex items-center gap-1 mt-3 shrink-0">
                     {u.role !== 'ADMIN' && (
-                      <div style={{ display: 'flex', gap: '4px' }}>
+                      <>
                         <button 
                           onClick={() => openEditModal(u)}
-                          className="p-2 rounded text-sm text-blue-600 hover:bg-blue-50"
+                          className="p-1.5 rounded-md text-blue-600 hover:bg-blue-50 border border-transparent hover:border-blue-100 transition-colors"
                           title="Chỉnh sửa thông tin"
                         >
-                          <Pencil size={18} />
+                          <Pencil size={16} />
                         </button>
                         <button 
                           onClick={() => toggleActive(u.id, u.isActive)}
-                          className={`p-2 rounded text-sm ${u.isActive ? 'text-red-600 hover:bg-red-50' : 'text-green-600 hover:bg-green-50'}`}
+                          className={`p-1.5 rounded-md border border-transparent transition-colors ${
+                            u.isActive 
+                              ? 'text-red-600 hover:bg-red-50' 
+                              : 'text-green-600 hover:bg-green-50'
+                          }`}
                           title={u.isActive ? "Khóa tài khoản" : "Mở khóa tài khoản"}
                         >
-                          {u.isActive ? <Lock size={18} /> : <Unlock size={18} />}
+                          {u.isActive ? <Lock size={16} /> : <Unlock size={16} />}
                         </button>
-                      </div>
+                      </>
                     )}
-                  </td>
-                </tr>
-              )))}
-            </tbody>
-          </table>
+                  </div>
+                </div>
+              </div>
+            ))
+          )}
         </div>
       )}
     </div>
