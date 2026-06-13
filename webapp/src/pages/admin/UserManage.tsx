@@ -653,7 +653,7 @@ export default function UserManage() {
                 <th style={{ padding: '12px 16px' }}>Tên Pancake</th>
                 <th style={{ padding: '12px 16px' }}>Trạm trực thuộc</th>
                 <th style={{ padding: '12px 16px' }}>Số báo cáo</th>
-                <th style={{ padding: '12px 16px' }}>Trạng thái</th>
+                <th style={{ padding: '12px 16px', textAlign: 'center' }}>Trạng thái</th>
                 <th style={{ padding: '12px 16px' }}>Hành động</th>
               </tr>
             </thead>
@@ -714,7 +714,18 @@ export default function UserManage() {
                   </td>
                   <td style={{ padding: '12px 16px' }}>{u._count.serviceReports}</td>
                   <td style={{ padding: '12px 16px' }}>
-                    {u.isActive ? <span className="text-green-600 font-bold text-sm">Hoạt động</span> : <span className="text-red-600 font-bold text-sm">Đã khóa</span>}
+                    <div className="flex justify-center items-center">
+                      {u.isActive ? (
+                        <span className="relative flex h-2.5 w-2.5" title="Hoạt động">
+                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                          <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-green-500"></span>
+                        </span>
+                      ) : (
+                        <span className="relative flex h-2.5 w-2.5" title="Đã khóa">
+                          <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-red-500"></span>
+                        </span>
+                      )}
+                    </div>
                   </td>
                   <td style={{ padding: '12px 16px' }}>
                     {u.role !== 'ADMIN' && (
