@@ -690,26 +690,26 @@ export default function UserManage() {
 
                   {/* Main content info */}
                   <div className="grid grid-cols-2 gap-y-2 gap-x-4 text-xs text-gray-600 border-t border-gray-100 pt-3 mb-4">
-                    <div>
+                    <div className="col-span-2">
                       <span className="text-gray-400 block text-[10px] uppercase font-semibold">Username</span>
-                      <span className="font-medium text-gray-800">{u.username}</span>
+                      <span className="font-medium text-gray-800 break-all select-all block" title={u.username}>{u.username}</span>
                     </div>
                     <div>
                       <span className="text-gray-400 block text-[10px] uppercase font-semibold">Nhóm</span>
-                      <span className="font-medium text-gray-800">{u.group || '---'}</span>
-                    </div>
-                    <div>
-                      <span className="text-gray-400 block text-[10px] uppercase font-semibold">Account Pancake</span>
-                      <span className="font-medium text-gray-800">{u.pancakeAccountName || '---'}</span>
+                      <span className="font-medium text-gray-800 truncate block" title={u.group || '---'}>{u.group || '---'}</span>
                     </div>
                     <div>
                       <span className="text-gray-400 block text-[10px] uppercase font-semibold">Báo cáo gửi</span>
-                      <span className="font-bold text-gray-900">{u._count.serviceReports} báo cáo</span>
+                      <span className="font-bold text-gray-900 block truncate" title={`${u._count.serviceReports} báo cáo`}>{u._count.serviceReports} báo cáo</span>
+                    </div>
+                    <div className="col-span-2">
+                      <span className="text-gray-400 block text-[10px] uppercase font-semibold">Account Pancake</span>
+                      <span className="font-medium text-gray-800 break-words block" title={u.pancakeAccountName || '---'}>{u.pancakeAccountName || '---'}</span>
                     </div>
                     {u.warehouseName && (
                       <div className="col-span-2 mt-1">
-                        <span className="inline-flex items-center gap-1.5 text-[11px] text-blue-700 font-bold bg-blue-50/80 border border-blue-100 px-2 py-0.5 rounded-md">
-                          📦 Kho: {u.warehouseName}
+                        <span className="inline-flex items-center gap-1.5 text-[11px] text-blue-700 font-bold bg-blue-50/80 border border-blue-100 px-2 py-0.5 rounded-md w-full">
+                          <span className="truncate" title={`Kho: ${u.warehouseName}`}>📦 Kho: {u.warehouseName}</span>
                         </span>
                       </div>
                     )}
