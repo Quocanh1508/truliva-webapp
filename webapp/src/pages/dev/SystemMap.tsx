@@ -56,7 +56,7 @@ interface UserProfile {
 }
 
 export default function SystemMap() {
-  const [activeTab, setActiveTab] = useState<'org' | 'health' | 'sop'>('org');
+  const [activeTab, setActiveTab] = useState<'org' | 'health' | 'sop' | 'code'>('org');
 
   // Tab 1: Organization Map States
   const [stations, setStations] = useState<MainStation[]>([]);
@@ -78,9 +78,27 @@ export default function SystemMap() {
   // Tab 3: SOP & Onboarding States
   const [selectedSop, setSelectedSop] = useState<'leak' | 'install' | 'assign'>('leak');
 
+  // Tab 4: Codebase Visualizer States
+  const [codeTab, setCodeTab] = useState<'db' | 'files' | 'api'>('db');
+  const [expandedFolders, setExpandedFolders] = useState<Record<string, boolean>>({
+    'backend': true,
+    'backend_routes': true,
+    'backend_services': false,
+    'frontend': true,
+    'frontend_pages': true,
+    'github': false
+  });
+  const toggleFolder = (key: string) => {
+    setExpandedFolders(prev => ({
+      ...prev,
+      [key]: prev[key] === false ? true : false
+    }));
+  };
+  const [hoveredModel, setHoveredModel] = useState<string | null>(null);
+
   // Shared Detail Drawer state
   const [detailNode, setDetailNode] = useState<{
-    type: 'main' | 'tech' | 'user' | 'service' | 'sopStep';
+    type: 'main' | 'tech' | 'user' | 'service' | 'sopStep' | 'codeModel' | 'codeFile' | 'codeApi';
     data: any;
   } | null>(null);
 
@@ -405,6 +423,295 @@ export default function SystemMap() {
     return sopData[selectedSop];
   }, [selectedSop, sopData]);
 
+  // Codebase Visualizer database definitions
+  const erdModels = useMemo(() => {
+    return [
+      {
+        id: 'MainStation',
+        name: 'MainStation (Trạm chính)',
+        x: 50, y: 30,
+        desc: 'Lưu trữ thông tin các Trạm chính (như Truliva, Kitchen Store...) đóng vai trò quản lý cấp vùng địa lý.',
+        prismaCode: `model MainStation {\n  id        String        @id @default(uuid())\n  name      String        @unique\n  isActive  Boolean       @default(true) @map("is_active")\n  createdAt DateTime      @default(now()) @map("created_at")\n  techStations TechStation[]\n  orders    Order[]\n  @@map("main_stations")\n}`,
+        fields: [
+          { name: 'id', type: 'String (UUID)', key: true, desc: 'Khóa chính' },
+          { name: 'name', type: 'String', desc: 'Tên trạm chính (duy nhất)' },
+          { name: 'isActive', type: 'Boolean', desc: 'Trạng thái hoạt động' },
+          { name: 'createdAt', type: 'DateTime', desc: 'Thời gian tạo' }
+        ]
+      },
+      {
+        id: 'TechStation',
+        name: 'TechStation (Trạm kỹ thuật)',
+        x: 50, y: 280,
+        desc: 'Trạm kỹ thuật trực thuộc Trạm chính. Là nơi quy tụ KTV và vật tư kho bãi cho từng cụm khu vực nhỏ.',
+        prismaCode: `model TechStation {\n  id            String      @id @default(uuid())\n  name          String\n  mainStationId String      @map("main_station_id")\n  isActive      Boolean     @default(true) @map("is_active")\n  mainStation   MainStation @relation(fields: [mainStationId], references: [id])\n  users         User[]\n  orders        Order[]\n  @@map("tech_stations")\n}`,
+        fields: [
+          { name: 'id', type: 'String (UUID)', key: true, desc: 'Khóa chính' },
+          { name: 'name', type: 'String', desc: 'Tên trạm kỹ thuật' },
+          { name: 'mainStationId', type: 'String (FK)', desc: 'Khóa ngoại liên kết MainStation' },
+          { name: 'isActive', type: 'Boolean', desc: 'Trạng thái hoạt động' }
+        ]
+      },
+      {
+        id: 'User',
+        name: 'User (Tài khoản nhân sự)',
+        x: 285, y: 170,
+        desc: 'Bảng người dùng lưu trữ tất cả các tài khoản hệ thống với các vai trò khác nhau (ADMIN, COORDINATOR, KTV, STAFF...).',
+        prismaCode: `model User {\n  id                 String          @id @default(uuid())\n  username           String          @unique\n  password           String\n  fullName           String          @map("full_name")\n  phoneNumber        String?         @map("phone_number")\n  role               Role            @default(KTV)\n  group              String?         // Ví dụ: Service, eCom\n  techStationId      String?         @map("tech_station_id")\n  pushToken          String?         @map("push_token")\n  isActive           Boolean         @default(true) @map("is_active")\n  techStation        TechStation?    @relation(fields: [techStationId], references: [id])\n  assignedOrders     Order[]         @relation("assignedKtv")\n  serviceReports     ServiceReport[]\n  @@map("users")\n}`,
+        fields: [
+          { name: 'id', type: 'String (UUID)', key: true, desc: 'Khóa chính' },
+          { name: 'username', type: 'String', desc: 'Tên đăng nhập (duy nhất)' },
+          { name: 'fullName', type: 'String', desc: 'Họ và tên nhân sự' },
+          { name: 'role', type: 'Enum (KTV|ADMIN...)', desc: 'Vai trò phân quyền hệ thống' },
+          { name: 'group', type: 'String', desc: 'Nhóm nghiệp vụ (ví dụ: Service)' },
+          { name: 'techStationId', type: 'String (FK)', desc: 'Trạm kỹ thuật trực thuộc' },
+          { name: 'isActive', type: 'Boolean', desc: 'Tài khoản có hoạt động không' }
+        ]
+      },
+      {
+        id: 'Order',
+        name: 'Order (Đơn hàng/Dịch vụ)',
+        x: 520, y: 170,
+        desc: 'Trọng tâm nghiệp vụ của hệ thống. Lưu thông tin đơn hàng đồng bộ từ Pancake POS và trạng thái xử lý nội bộ Truliva.',
+        prismaCode: `model Order {\n  id              String         @id @default(uuid())\n  pancakeOrderId  String         @unique @map("pancake_order_id")\n  customerName    String         @map("customer_name")\n  customerPhone   String         @map("customer_phone")\n  address         String\n  adminStatus     String?        @map("admin_status") // chờ xử lý, đang thực hiện, hoàn thành, hủy đơn...\n  assignedKtvId   String?        @map("assigned_ktv_id")\n  mainStationId   String?        @map("main_station_id")\n  techStationId   String?        @map("tech_station_id")\n  assignedKtv     User?          @relation("assignedKtv", fields: [assignedKtvId], references: [id])\n  mainStation     MainStation?   @relation(fields: [mainStationId], references: [id])\n  techStation     TechStation?   @relation(fields: [techStationId], references: [id])\n  items           OrderItem[]\n  serviceReports  ServiceReport[]\n  @@map("orders")\n}`,
+        fields: [
+          { name: 'id', type: 'String (UUID)', key: true, desc: 'Khóa chính' },
+          { name: 'pancakeOrderId', type: 'String', desc: 'Mã đơn hàng đồng bộ từ Pancake POS' },
+          { name: 'customerName', type: 'String', desc: 'Họ và tên khách hàng' },
+          { name: 'customerPhone', type: 'String', desc: 'Số điện thoại khách hàng' },
+          { name: 'adminStatus', type: 'String', desc: 'Trạng thái xử lý nội bộ tại Truliva' },
+          { name: 'assignedKtvId', type: 'String (FK)', desc: 'Kỹ thuật viên được chỉ định nhận ca' },
+          { name: 'mainStationId', type: 'String (FK)', desc: 'Trạm chính chịu trách nhiệm' },
+          { name: 'techStationId', type: 'String (FK)', desc: 'Trạm kỹ thuật chịu trách nhiệm' }
+        ]
+      },
+      {
+        id: 'ServiceReport',
+        name: 'ServiceReport (Báo cáo KTV)',
+        x: 775, y: 30,
+        desc: 'Báo cáo do KTV nộp sau khi hoàn tất sửa chữa/lắp đặt tại nhà khách hàng, chứa hình ảnh kết quả và chữ ký khách hàng.',
+        prismaCode: `model ServiceReport {\n  id             String       @id @default(uuid())\n  orderId        String       @map("order_id")\n  ktvId          String       @map("ktv_id")\n  status         String       @default("pending") // pending, approved, rejected\n  imageUrls      String[]     @map("image_urls")\n  customerSignature String?   @map("customer_signature")\n  order          Order        @relation(fields: [orderId], references: [id])\n  ktv            User         @relation(fields: [ktvId], references: [id])\n  @@map("service_reports")\n}`,
+        fields: [
+          { name: 'id', type: 'String (UUID)', key: true, desc: 'Khóa chính' },
+          { name: 'orderId', type: 'String (FK)', desc: 'Đơn hàng/Ca dịch vụ tương ứng' },
+          { name: 'ktvId', type: 'String (FK)', desc: 'Kỹ thuật viên nộp báo cáo' },
+          { name: 'status', type: 'String', desc: 'Trạng thái kiểm duyệt (pending|approved|rejected)' },
+          { name: 'imageUrls', type: 'String[]', desc: 'Ảnh chụp hiện trạng lắp đặt/sửa chữa' }
+        ]
+      },
+      {
+        id: 'OrderItem',
+        name: 'OrderItem (Chi tiết thiết bị)',
+        x: 775, y: 250,
+        desc: 'Bảng liên kết trung gian biểu thị các máy lọc nước hoặc lõi lọc đi kèm trong một Đơn hàng.',
+        prismaCode: `model OrderItem {\n  id          String   @id @default(uuid())\n  orderId     String   @map("order_id")\n  productId   String   @map("product_id")\n  quantity    Int      @default(1)\n  order       Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)\n  product     Product  @relation(fields: [productId], references: [id])\n  @@map("order_items")\n}`,
+        fields: [
+          { name: 'id', type: 'String (UUID)', key: true, desc: 'Khóa chính' },
+          { name: 'orderId', type: 'String (FK)', desc: 'Mã đơn hàng liên kết' },
+          { name: 'productId', type: 'String (FK)', desc: 'Mã sản phẩm thiết bị liên kết' },
+          { name: 'quantity', type: 'Int', desc: 'Số lượng thiết bị' }
+        ]
+      },
+      {
+        id: 'Product',
+        name: 'Product (Sản phẩm hàng hóa)',
+        x: 775, y: 440,
+        desc: 'Danh mục thiết bị máy lọc nước, linh kiện thay thế, lõi lọc được định nghĩa sẵn trong hệ thống.',
+        prismaCode: `model Product {\n  id          String      @id @default(uuid())\n  name        String\n  code        String      @unique\n  price       Float\n  items       OrderItem[]\n  @@map("products")\n}`,
+        fields: [
+          { name: 'id', type: 'String (UUID)', key: true, desc: 'Khóa chính' },
+          { name: 'name', type: 'String', desc: 'Tên sản phẩm hàng hóa' },
+          { name: 'code', type: 'String', desc: 'Mã sản phẩm (duy nhất)' },
+          { name: 'price', type: 'Float', desc: 'Đơn giá niêm yết' }
+        ]
+      },
+      {
+        id: 'AuditLog',
+        name: 'AuditLog (Lịch sử thay đổi)',
+        x: 520, y: 450,
+        desc: 'Lưu vết lịch sử thao tác quan trọng trên đơn hàng (Ai đã tạo đơn, đã gán KTV nào, thay đổi trạng thái lúc nào) phục vụ đối soát.',
+        prismaCode: `model AuditLog {\n  id          String   @id @default(uuid())\n  entityType  String   @map("entity_type") // ví dụ: "Order"\n  entityId    String   @map("entity_id")\n  action      String   // created, updated, assigned, cancelled...\n  changes     Json?\n  userId      String   @map("user_id")\n  userName    String   @map("user_name")\n  createdAt   DateTime @default(now()) @map("created_at")\n  @@map("audit_logs")\n}`,
+        fields: [
+          { name: 'id', type: 'String (UUID)', key: true, desc: 'Khóa chính' },
+          { name: 'entityType', type: 'String', desc: 'Loại thực thể bị thay đổi (Order)' },
+          { name: 'entityId', type: 'String', desc: 'ID của thực thể tương ứng' },
+          { name: 'action', type: 'String', desc: 'Hành động thay đổi (updated, assigned...)' },
+          { name: 'userName', type: 'String', desc: 'Tên người dùng thực hiện thao tác' }
+        ]
+      },
+      {
+        id: 'Feedback',
+        name: 'Feedback (Góp ý kỹ thuật)',
+        x: 285, y: 450,
+        desc: 'Các phản hồi đóng góp ý kiến của KTV hoặc nhân sự về ứng dụng được lưu trực tiếp vào CSDL để DEV xử lý.',
+        prismaCode: `model Feedback {\n  id        String   @id @default(uuid())\n  userId    String   @map("user_id")\n  content   String\n  imageUrls String[] @map("image_urls")\n  createdAt DateTime @default(now()) @map("created_at")\n  user      User     @relation(fields: [userId], references: [id])\n  @@map("feedbacks")\n}`,
+        fields: [
+          { name: 'id', type: 'String (UUID)', key: true, desc: 'Khóa chính' },
+          { name: 'userId', type: 'String (FK)', desc: 'Người gửi phản hồi' },
+          { name: 'content', type: 'String', desc: 'Nội dung phản hồi' },
+          { name: 'createdAt', type: 'DateTime', desc: 'Ngày tạo phản hồi' }
+        ]
+      }
+    ];
+  }, []);
+
+  const filesTree = useMemo(() => {
+    return {
+      name: 'Truliva Root (Thư mục gốc)',
+      type: 'folder',
+      key: 'root',
+      children: [
+        {
+          name: '.github/workflows',
+          type: 'folder',
+          key: 'github',
+          children: [
+            { name: 'deploy.yml', type: 'file', key: 'deploy_yml', desc: 'Cấu hình quy trình CI/CD tự động deploy lên VPS. Đã được nâng cấp để chạy ép buộc trên môi trường Node.js 24 để tắt cảnh báo Node 20 hết hạn.' }
+          ]
+        },
+        {
+          name: 'src (Express Backend)',
+          type: 'folder',
+          key: 'backend',
+          children: [
+            {
+              name: 'config',
+              type: 'folder',
+              key: 'backend_config',
+              children: [
+                { name: 'database.ts', type: 'file', key: 'db_ts', desc: 'Thiết lập kết nối PostgreSQL và khởi tạo đối tượng prisma dùng chung toàn server.' }
+              ]
+            },
+            {
+              name: 'middleware',
+              type: 'folder',
+              key: 'backend_middleware',
+              children: [
+                { name: 'authSession.ts', type: 'file', key: 'auth_ts', desc: 'Bộ lọc xác thực phiên đăng nhập (JWT). Khai báo các middleware phân quyền requireAuth, requireAdmin, requireDev, requireCoordinatorOrAdmin.' }
+              ]
+            },
+            {
+              name: 'routes',
+              type: 'folder',
+              key: 'backend_routes',
+              children: [
+                { name: 'orders.ts', type: 'file', key: 'routes_orders', desc: 'Chứa các API nghiệp vụ đơn hàng. Xử lý logic gán KTV, cập nhật trạng thái đơn hàng, và đồng bộ thủ công từ Pancake POS.' },
+                { name: 'reports.ts', type: 'file', key: 'routes_reports', desc: 'Xử lý các API nộp báo cáo ca hoàn thành từ KTV, phê duyệt và hủy duyệt báo cáo.' },
+                { name: 'users.ts', type: 'file', key: 'routes_users', desc: 'Quản lý tài khoản nhân viên văn phòng, trạm và kỹ thuật viên.' },
+                { name: 'dev.ts', type: 'file', key: 'routes_dev', desc: 'API dành riêng cho DEV thực hiện ping live kiểm tra Database, Pancake POS, Firebase Admin.' }
+              ]
+            },
+            {
+              name: 'services',
+              type: 'folder',
+              key: 'backend_services',
+              children: [
+                { name: 'orderProcessor.ts', type: 'file', key: 'srv_processor', desc: 'Xử lý chuyển trạng thái đơn hàng và ghi chép nhật ký thay đổi (Audit Log).' },
+                { name: 'notificationService.ts', type: 'file', key: 'srv_notification', desc: 'Dịch vụ kết nối SDK Firebase Admin để gửi tin nhắn Push Notification đến điện thoại KTV.' },
+                { name: 'orderSyncScheduler.ts', type: 'file', key: 'srv_sync', desc: 'Chạy nền tự động hẹn giờ (cron job) để kéo đơn hàng mới từ Pancake POS API.' }
+              ]
+            },
+            { name: 'index.ts', type: 'file', key: 'index_ts', desc: 'Điểm khởi tạo (Entrypoint) của Express App. Đăng ký các router, cấu hình bảo mật helmet/cors, giới hạn rate limit và mở cổng lắng nghe 3000.' }
+          ]
+        },
+        {
+          name: 'webapp/src (Vite Frontend)',
+          type: 'folder',
+          key: 'frontend',
+          children: [
+            {
+              name: 'api',
+              type: 'folder',
+              key: 'frontend_api',
+              children: [
+                { name: 'client.ts', type: 'file', key: 'client_ts', desc: 'Cấu hình fetch client đính kèm Bearer token từ localStorage để gọi API lên server.' }
+              ]
+            },
+            {
+              name: 'pages',
+              type: 'folder',
+              key: 'frontend_pages',
+              children: [
+                {
+                  name: 'admin',
+                  type: 'folder',
+                  key: 'pages_admin',
+                  children: [
+                    { name: 'OrderList.tsx', type: 'file', key: 'pages_orders', desc: 'Quản lý danh sách ca dịch vụ dành cho Admin và Điều phối viên. Hỗ trợ lọc nâng cao, gán ca cho KTV, xuất Excel.' },
+                    { name: 'Dashboard.tsx', type: 'file', desc: 'Báo cáo thống kê hiệu suất, đơn hàng, lượng báo cáo, biểu đồ doanh thu.' }
+                  ]
+                },
+                {
+                  name: 'dev',
+                  type: 'folder',
+                  key: 'pages_dev',
+                  children: [
+                    { name: 'SystemMap.tsx', type: 'file', key: 'pages_systemmap', desc: 'Trang đồ thị mạng lưới điều hành trạm, giám sát sức khỏe live, quy trình SOP và cấu trúc mã nguồn dự án.' }
+                  ]
+                },
+                {
+                  name: 'ktv',
+                  type: 'folder',
+                  key: 'pages_ktv',
+                  children: [
+                    { name: 'MyOrders.tsx', type: 'file', key: 'pages_ktvorders', desc: 'Giao diện ứng dụng di động cho KTV nhận ca, xem bản đồ và nộp báo cáo kết quả.' }
+                  ]
+                }
+              ]
+            },
+            { name: 'App.tsx', type: 'file', key: 'app_tsx', desc: 'Router cấu hình các định tuyến cho webapp, bọc các route trong ProtectedRoute để kiểm tra vai trò (Role).' }
+          ]
+        },
+        { name: 'prisma/schema.prisma', type: 'file', key: 'schema_prisma', desc: 'Định nghĩa cơ sở dữ liệu quan hệ (ERD Schema), các bảng và mối liên kết.' }
+      ]
+    };
+  }, []);
+
+  const apiRouters = useMemo(() => {
+    return [
+      {
+        name: 'Auth Router (/api/auth)',
+        endpoints: [
+          { method: 'POST', path: '/login', desc: 'Đăng nhập người dùng bằng tài khoản/mật khẩu, trả về JWT Token và thông tin tài khoản.', roles: 'Bất kỳ ai (Chưa đăng nhập)' },
+          { method: 'POST', path: '/logout', desc: 'Đăng xuất tài khoản, xóa cookie session_token trên trình duyệt.', roles: 'Tài khoản đã đăng nhập' },
+          { method: 'GET', path: '/me', desc: 'Lấy thông tin chi tiết và quyền của tài khoản hiện tại dựa trên JWT Token.', roles: 'Tài khoản đã đăng nhập' }
+        ]
+      },
+      {
+        name: 'Orders Router (/api/orders)',
+        endpoints: [
+          { method: 'GET', path: '/', desc: 'Lấy danh sách đơn hàng/ca dịch vụ kèm theo bộ lọc (Trạm, KTV, Thời gian, Trạng thái). Tự động lọc IAM (KTV chỉ thấy đơn của mình, Saler chỉ thấy đơn tự tạo).', roles: 'ADMIN, COORDINATOR, SALE_SUPERVISOR, SALER, HOTLINE, STAFF, KTV' },
+          { method: 'POST', path: '/', desc: 'Tạo ca dịch vụ thủ công (Chỉ cho phép các vai trò văn phòng có quyền điều phối). Chặn vai trò KTV và STAFF nhóm Service.', roles: 'ADMIN, DEV, COORDINATOR, SALE_SUPERVISOR, SALER, HOTLINE, STAFF (khác Service)' },
+          { method: 'PATCH', path: '/:id', desc: 'Cập nhật thông tin đơn hàng, chỉ định KTV (Phân công ca) và thời gian hẹn khách.', roles: 'ADMIN, DEV, COORDINATOR, SALE_SUPERVISOR, SALER, HOTLINE, STAFF (khác Service)' },
+          { method: 'POST', path: '/sync', desc: 'Đồng bộ thủ công 50 đơn hàng mới nhất từ Pancake POS API về hệ thống.', roles: 'ADMIN, DEV, COORDINATOR, SALE_SUPERVISOR, SALER, HOTLINE, STAFF (khác Service)' },
+          { method: 'GET', path: '/export', desc: 'Kết xuất và tải xuống danh sách đơn hàng đã lọc ra file Excel.', roles: 'ADMIN, DEV, COORDINATOR, STAFF (Service)' }
+        ]
+      },
+      {
+        name: 'Reports Router (/api/reports)',
+        endpoints: [
+          { method: 'GET', path: '/', desc: 'Lấy danh sách các báo cáo hoàn thành ca của KTV để chờ phê duyệt.', roles: 'ADMIN, COORDINATOR, KTV (chỉ xem báo cáo của mình)' },
+          { method: 'POST', path: '/', desc: 'KTV nộp báo cáo hoàn thành ca lên hệ thống, kèm danh sách ảnh hiện trường và chữ ký KH.', roles: 'KTV' },
+          { method: 'PATCH', path: '/:id', desc: 'Admin/Điều phối duyệt hoặc từ chối báo cáo KTV. Nếu phê duyệt, hệ thống tự động đổi trạng thái đơn hàng tương ứng sang "Hoàn thành".', roles: 'ADMIN, COORDINATOR' }
+        ]
+      },
+      {
+        name: 'Dev Router (/api/dev)',
+        endpoints: [
+          { method: 'GET', path: '/system-health', desc: 'Thực hiện kiểm tra kết nối (Live ping) tới Database, API Pancake và Firebase, trả về log hệ thống mới nhất.', roles: 'DEV' }
+        ]
+      },
+      {
+        name: 'Users Router (/api/users)',
+        endpoints: [
+          { method: 'GET', path: '/', desc: 'Lấy danh sách người dùng trong hệ thống kèm số ca chưa hoàn thành của từng KTV.', roles: 'ADMIN, COORDINATOR' },
+          { method: 'POST', path: '/', desc: 'Tạo mới tài khoản nhân viên hoặc KTV.', roles: 'ADMIN, COORDINATOR' },
+          { method: 'PATCH', path: '/:id', desc: 'Cập nhật thông tin tài khoản, khóa hoặc mở khóa tài khoản nhân viên.', roles: 'ADMIN, COORDINATOR' }
+        ]
+      }
+    ];
+  }, []);
+
   return (
     <div className="flex flex-col h-full bg-slate-50 overflow-hidden relative" style={{ minHeight: 'calc(100vh - 120px)' }}>
       {/* Self-contained premium animations */}
@@ -456,6 +763,21 @@ export default function SystemMap() {
         .node-pulse-red {
           animation: pulse-red-ring 2s infinite;
         }
+        /* Custom scrollbar for dark ERD */
+        .erd-scrollbar::-webkit-scrollbar {
+          width: 8px;
+          height: 8px;
+        }
+        .erd-scrollbar::-webkit-scrollbar-track {
+          background: #0f172a;
+        }
+        .erd-scrollbar::-webkit-scrollbar-thumb {
+          background: #334155;
+          border-radius: 4px;
+        }
+        .erd-scrollbar::-webkit-scrollbar-thumb:hover {
+          background: #475569;
+        }
       `}</style>
 
       {/* Top Header */}
@@ -469,6 +791,7 @@ export default function SystemMap() {
             {activeTab === 'org' && 'Sơ đồ liên kết trực quan giữa Trạm chính ➔ Trạm kỹ thuật ➔ Lực lượng kỹ thuật viên & Nhân sự'}
             {activeTab === 'health' && 'Bảng điều khiển giám sát trực tiếp (Live check) kết nối Cơ sở dữ liệu và các API đối tác'}
             {activeTab === 'sop' && 'Sơ đồ luồng hướng dẫn vận hành chuẩn (SOP) và tài liệu đào tạo nhân sự mới'}
+            {activeTab === 'code' && 'Trực quan hóa cấu trúc dự án từ cấp phân tử: sơ đồ CSDL, cấu trúc file và bản đồ API Router'}
           </p>
         </div>
 
@@ -494,6 +817,13 @@ export default function SystemMap() {
           >
             <BookOpen size={14} />
             <span>Quy trình (SOP)</span>
+          </button>
+          <button
+            onClick={() => { setActiveTab('code'); setDetailNode(null); }}
+            className={`flex items-center gap-1.5 px-4 py-1.5 rounded-md text-xs font-semibold transition-all ${activeTab === 'code' ? 'bg-white text-blue-700 shadow-sm border border-slate-200/50' : 'text-slate-600 hover:text-slate-900'}`}
+          >
+            <Cpu size={14} />
+            <span>Mã nguồn (Code)</span>
           </button>
         </div>
 
@@ -783,7 +1113,7 @@ export default function SystemMap() {
                     <div 
                       onClick={() => setDetailNode({ type: 'service', data: { name: 'Prisma Database (PostgreSQL)', key: 'database', ...healthData.health.database } })}
                       className={`absolute left-[50px] top-[120px] w-[140px] h-[100px] rounded-2xl border-2 bg-white flex flex-col items-center justify-center cursor-pointer hover:scale-105 transition-all p-3 text-center ${
-                        healthData.health.database.status === 'healthy' ? 'border-green-500 shadow-emerald-50 bg-green-50/20' : healthData.health.database.status === 'warning' ? 'border-amber-500 bg-amber-50/10' : 'border-red-500 node-pulse-red'
+                        healthData.health.database.status === 'healthy' ? 'border-green-500 shadow-emerald-55 bg-green-50/20' : healthData.health.database.status === 'warning' ? 'border-amber-500 bg-amber-50/10' : 'border-red-500 node-pulse-red'
                       }`}
                     >
                       <Database className={healthData.health.database.status === 'healthy' ? 'text-green-600' : healthData.health.database.status === 'warning' ? 'text-amber-500' : 'text-red-600'} size={24} />
@@ -809,7 +1139,7 @@ export default function SystemMap() {
                     <div 
                       onClick={() => setDetailNode({ type: 'service', data: { name: 'Pancake POS API', key: 'pancake', ...healthData.health.pancake } })}
                       className={`absolute left-[600px] top-[30px] w-[150px] h-[100px] rounded-2xl border-2 bg-white flex flex-col items-center justify-center cursor-pointer hover:scale-105 transition-all p-3 text-center ${
-                        healthData.health.pancake.status === 'healthy' ? 'border-green-500 shadow-emerald-50 bg-green-50/20' : healthData.health.pancake.status === 'warning' ? 'border-amber-500 bg-amber-50/10' : 'border-red-500 node-pulse-red'
+                        healthData.health.pancake.status === 'healthy' ? 'border-green-500 shadow-emerald-55 bg-green-50/20' : healthData.health.pancake.status === 'warning' ? 'border-amber-500 bg-amber-50/10' : 'border-red-500 node-pulse-red'
                       }`}
                     >
                       <RefreshCw className={healthData.health.pancake.status === 'healthy' ? 'text-green-600' : healthData.health.pancake.status === 'warning' ? 'text-amber-500' : 'text-red-600'} size={24} />
@@ -823,7 +1153,7 @@ export default function SystemMap() {
                     <div 
                       onClick={() => setDetailNode({ type: 'service', data: { name: 'Firebase Cloud Messaging', key: 'firebase', ...healthData.health.firebase } })}
                       className={`absolute left-[600px] top-[210px] w-[150px] h-[100px] rounded-2xl border-2 bg-white flex flex-col items-center justify-center cursor-pointer hover:scale-105 transition-all p-3 text-center ${
-                        healthData.health.firebase.status === 'healthy' ? 'border-green-500 shadow-emerald-50 bg-green-50/20' : healthData.health.firebase.status === 'warning' ? 'border-amber-500 bg-amber-50/10' : 'border-red-500 node-pulse-red'
+                        healthData.health.firebase.status === 'healthy' ? 'border-green-500 shadow-emerald-55 bg-green-50/20' : healthData.health.firebase.status === 'warning' ? 'border-amber-500 bg-amber-50/10' : 'border-red-500 node-pulse-red'
                       }`}
                     >
                       <Activity className={healthData.health.firebase.status === 'healthy' ? 'text-green-600' : healthData.health.firebase.status === 'warning' ? 'text-amber-500' : 'text-red-600'} size={24} />
@@ -1035,7 +1365,297 @@ export default function SystemMap() {
             </div>
           )}
 
-          {/* TAB 4: Detail Slide-out Drawer Panel (Accessible to all tabs) */}
+          {/* TAB 4: Codebase Visualizer Viewport */}
+          {activeTab === 'code' && (
+            <div className="flex-1 flex flex-col p-6 gap-6" style={{ minWidth: '960px' }}>
+              
+              {/* Code Sub-tabs Header */}
+              <div className="bg-white rounded-3xl border border-gray-200 p-4 shadow-sm flex justify-between items-center z-10">
+                <div className="flex items-center gap-2 pl-2">
+                  <Cpu size={18} className="text-indigo-600 animate-pulse" />
+                  <span className="font-bold text-sm text-gray-800">Bản đồ cấu trúc mã nguồn dự án (Molecular View)</span>
+                </div>
+
+                {/* Sub-tabs switcher */}
+                <div className="flex bg-slate-100 p-1 rounded-lg border border-slate-200">
+                  <button
+                    onClick={() => { setCodeTab('db'); setDetailNode(null); }}
+                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[11px] font-bold transition-all ${
+                      codeTab === 'db' ? 'bg-white text-indigo-700 shadow-sm border border-slate-200/50' : 'text-gray-500 hover:text-gray-900'
+                    }`}
+                  >
+                    <Database size={13} />
+                    Sơ đồ CSDL (Prisma ERD)
+                  </button>
+                  <button
+                    onClick={() => { setCodeTab('files'); setDetailNode(null); }}
+                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[11px] font-bold transition-all ${
+                      codeTab === 'files' ? 'bg-white text-indigo-700 shadow-sm border border-slate-200/50' : 'text-gray-500 hover:text-gray-900'
+                    }`}
+                  >
+                    <FileSpreadsheet size={13} />
+                    Cây tệp tin (Folder Tree)
+                  </button>
+                  <button
+                    onClick={() => { setCodeTab('api'); setDetailNode(null); }}
+                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[11px] font-bold transition-all ${
+                      codeTab === 'api' ? 'bg-white text-indigo-700 shadow-sm border border-slate-200/50' : 'text-gray-500 hover:text-gray-900'
+                    }`}
+                  >
+                    <Terminal size={13} />
+                    Bản đồ API (Backend Routers)
+                  </button>
+                </div>
+              </div>
+
+              {/* Sub-tab 1: Database Prisma ERD */}
+              {codeTab === 'db' && (
+                <div className="bg-slate-950 rounded-3xl border border-slate-900 p-6 flex-1 relative min-h-[500px] overflow-auto erd-scrollbar select-none">
+                  
+                  {/* ERD SVG connections layer */}
+                  <svg className="absolute inset-0 pointer-events-none" style={{ width: '1000px', height: '580px', zIndex: 0 }}>
+                    {/* Connections */}
+                    {[
+                      { from: 'MainStation', to: 'TechStation', fromX: 140, fromY: 155, toX: 140, toY: 280, type: '1-N' },
+                      { from: 'MainStation', to: 'Order', fromX: 230, fromY: 90, toX: 520, toY: 200, type: '1-N' },
+                      { from: 'TechStation', to: 'User', fromX: 230, fromY: 330, toX: 285, toY: 250, type: '1-N' },
+                      { from: 'TechStation', to: 'Order', fromX: 230, fromY: 345, toX: 520, toY: 290, type: '1-N' },
+                      { from: 'User', to: 'Order', fromX: 465, fromY: 250, toX: 520, toY: 250, type: '1-N' },
+                      { from: 'User', to: 'ServiceReport', fromX: 465, fromY: 220, toX: 775, toY: 100, type: '1-N' },
+                      { from: 'User', to: 'Feedback', fromX: 375, fromY: 335, toX: 375, toY: 450, type: '1-N' },
+                      { from: 'Order', to: 'ServiceReport', fromX: 700, fromY: 200, toX: 775, toY: 80, type: '1-N' },
+                      { from: 'Order', to: 'OrderItem', fromX: 700, fromY: 230, toX: 775, toY: 280, type: '1-N' },
+                      { from: 'OrderItem', to: 'Product', fromX: 865, fromY: 350, toX: 865, toY: 440, type: 'N-1' }
+                    ].map((link, idx) => {
+                      const isHovered = hoveredModel === link.from || hoveredModel === link.to;
+                      const isActive = detailNode?.type === 'codeModel' && (detailNode.data.id === link.from || detailNode.data.id === link.to);
+                      
+                      return (
+                        <g key={`erd-link-${idx}`}>
+                          <path
+                            d={`M ${link.fromX} ${link.fromY} C ${(link.fromX + link.toX)/2} ${link.fromY}, ${(link.fromX + link.toX)/2} ${link.toY}, ${link.toX} ${link.toY}`}
+                            stroke={isActive ? '#38bdf8' : isHovered ? '#34d399' : '#334155'}
+                            strokeWidth={isActive ? '2.5' : isHovered ? '2' : '1.5'}
+                            fill="none"
+                            opacity={isActive ? 1 : isHovered ? 0.8 : 0.4}
+                            className={isActive ? 'flow-line' : undefined}
+                            strokeDasharray={isActive ? '5 3' : undefined}
+                            style={{ transition: 'stroke 0.3s, stroke-width 0.3s' }}
+                          />
+                        </g>
+                      );
+                    })}
+                  </svg>
+
+                  {/* Render Model Cards */}
+                  <div className="relative" style={{ width: '1000px', height: '580px' }}>
+                    {erdModels.map((model) => {
+                      const isSelected = detailNode?.type === 'codeModel' && detailNode.data.id === model.id;
+                      
+                      return (
+                        <div
+                          key={model.id}
+                          onClick={() => setDetailNode({ type: 'codeModel', data: model })}
+                          onMouseEnter={() => setHoveredModel(model.id)}
+                          onMouseLeave={() => setHoveredModel(null)}
+                          className={`absolute w-[180px] rounded-xl border flex flex-col overflow-hidden cursor-pointer hover:scale-[1.03] transition-all select-none ${
+                            isSelected 
+                              ? 'border-sky-500 shadow-[0_0_15px_rgba(56,189,248,0.25)] bg-slate-900' 
+                              : hoveredModel === model.id
+                                ? 'border-emerald-500 shadow-[0_0_15px_rgba(52,211,153,0.2)] bg-slate-900'
+                                : 'border-slate-800 bg-slate-950/80'
+                          }`}
+                          style={{ left: `${model.x}px`, top: `${model.y}px`, zIndex: isSelected ? 10 : 5 }}
+                        >
+                          {/* Card Header */}
+                          <div className={`px-3 py-2 border-b font-bold text-[10px] uppercase flex items-center justify-between ${
+                            isSelected ? 'bg-sky-500/10 border-sky-500/30 text-sky-400' : 'bg-slate-900 border-slate-800 text-slate-300'
+                          }`}>
+                            <span>{model.name.split(' ')[0]}</span>
+                            <Database size={11} className={isSelected ? 'text-sky-400' : 'text-slate-500'} />
+                          </div>
+
+                          {/* Card Body (Fields list) */}
+                          <div className="p-2 flex flex-col gap-1 text-[9px] font-mono text-left">
+                            {model.fields.map((f, fIdx) => (
+                              <div key={fIdx} className="flex justify-between items-center gap-1.5 py-0.5 border-b border-slate-900/30">
+                                <span className={f.key ? 'text-yellow-500 font-bold' : 'text-slate-300'}>
+                                  {f.name}{f.key && ' 🔑'}
+                                </span>
+                                <span className="text-slate-500 shrink-0">{f.type}</span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                </div>
+              )}
+
+              {/* Sub-tab 2: Project Files Tree */}
+              {codeTab === 'files' && (
+                <div className="bg-white rounded-3xl border border-gray-200 p-6 flex-1 overflow-auto min-h-[500px]">
+                  
+                  {/* Tree Renderer helper */}
+                  <div className="max-w-xl mx-auto border border-gray-100 rounded-2xl p-4 bg-slate-50/50">
+                    <h4 className="font-bold text-xs text-gray-500 uppercase tracking-wider mb-4 pl-1 flex items-center gap-1.5">
+                      <FileSpreadsheet size={15} />
+                      Sơ đồ thư mục dự án
+                    </h4>
+
+                    {/* Recursive tree implementation */}
+                    <div className="flex flex-col gap-1 font-mono text-xs text-left">
+                      {/* Root node */}
+                      <div>
+                        <div 
+                          onClick={() => toggleFolder('root')}
+                          className="flex items-center gap-2 py-1 px-2 rounded hover:bg-slate-100 cursor-pointer text-slate-800 font-bold"
+                        >
+                          <span>{expandedFolders['root'] !== false ? '📂' : '📁'}</span>
+                          <span>{filesTree.name}</span>
+                        </div>
+
+                        {/* Level 1 children */}
+                        {expandedFolders['root'] !== false && (
+                          <div className="pl-6 border-l border-gray-200 ml-3 flex flex-col gap-1 mt-1">
+                            {filesTree.children.map((child, idx) => {
+                              const isFolder = child.type === 'folder';
+                              const isExpanded = expandedFolders[child.key || ''] !== false;
+
+                              if (isFolder) {
+                                return (
+                                  <div key={idx}>
+                                    <div 
+                                      onClick={() => toggleFolder(child.key || '')}
+                                      className="flex items-center gap-2 py-1 px-2 rounded hover:bg-slate-100 cursor-pointer text-slate-700 font-bold"
+                                    >
+                                      <span>{isExpanded ? '📂' : '📁'}</span>
+                                      <span>{child.name}</span>
+                                    </div>
+
+                                    {/* Level 2 children */}
+                                    {isExpanded && child.children && (
+                                      <div className="pl-6 border-l border-gray-200 ml-3 flex flex-col gap-1 mt-1">
+                                        {child.children.map((subChild, sIdx) => {
+                                          const isSubFolder = subChild.type === 'folder';
+                                          const isSubExpanded = expandedFolders[subChild.key || ''] !== false;
+
+                                          if (isSubFolder) {
+                                            return (
+                                              <div key={sIdx}>
+                                                <div 
+                                                  onClick={() => toggleFolder(subChild.key || '')}
+                                                  className="flex items-center gap-2 py-1 px-2 rounded hover:bg-slate-100 cursor-pointer text-slate-600 font-semibold"
+                                                >
+                                                  <span>{isSubExpanded ? '📂' : '📁'}</span>
+                                                  <span>{subChild.name}</span>
+                                                </div>
+
+                                                {/* Level 3 children */}
+                                                {isSubExpanded && subChild.children && (
+                                                  <div className="pl-6 border-l border-gray-200 ml-3 flex flex-col gap-1 mt-1">
+                                                    {subChild.children.map((file, fIdx) => (
+                                                      <div 
+                                                        key={fIdx}
+                                                        onClick={() => setDetailNode({ type: 'codeFile', data: file })}
+                                                        className="flex items-center gap-2 py-1 px-2 rounded hover:bg-indigo-50 hover:text-indigo-700 cursor-pointer text-gray-500 font-medium"
+                                                      >
+                                                        <span>📄</span>
+                                                        <span>{file.name}</span>
+                                                      </div>
+                                                    ))}
+                                                  </div>
+                                                )}
+                                              </div>
+                                            );
+                                          } else {
+                                            return (
+                                              <div 
+                                                key={sIdx}
+                                                onClick={() => setDetailNode({ type: 'codeFile', data: subChild })}
+                                                className="flex items-center gap-2 py-1 px-2 rounded hover:bg-indigo-50 hover:text-indigo-700 cursor-pointer text-gray-500 font-medium"
+                                              >
+                                                <span>📄</span>
+                                                <span>{subChild.name}</span>
+                                              </div>
+                                            );
+                                          }
+                                        })}
+                                      </div>
+                                    )}
+                                  </div>
+                                );
+                              } else {
+                                return (
+                                  <div 
+                                    key={idx}
+                                    onClick={() => setDetailNode({ type: 'codeFile', data: child })}
+                                    className="flex items-center gap-2 py-1 px-2 rounded hover:bg-indigo-50 hover:text-indigo-700 cursor-pointer text-gray-500 font-medium"
+                                  >
+                                    <span>📄</span>
+                                    <span>{child.name}</span>
+                                  </div>
+                                );
+                              }
+                            })}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                </div>
+              )}
+
+              {/* Sub-tab 3: Backend API Routers Map */}
+              {codeTab === 'api' && (
+                <div className="bg-white rounded-3xl border border-gray-200 p-6 flex-1 overflow-auto min-h-[500px]">
+                  
+                  <div className="max-w-4xl mx-auto flex flex-col gap-6 text-left">
+                    {apiRouters.map((router, rIdx) => (
+                      <div key={rIdx} className="bg-slate-50 border border-gray-150 rounded-2xl p-5 shadow-sm">
+                        <h4 className="font-bold text-sm text-gray-800 border-b border-gray-200 pb-2 flex items-center gap-2">
+                          <Terminal size={15} className="text-indigo-600" />
+                          {router.name}
+                        </h4>
+                        
+                        {/* Endpoints List */}
+                        <div className="flex flex-col gap-2 mt-4">
+                          {router.endpoints.map((ep, eIdx) => (
+                            <div 
+                              key={eIdx}
+                              onClick={() => setDetailNode({ type: 'codeApi', data: ep })}
+                              className="p-3 bg-white border border-gray-100 hover:border-indigo-300 rounded-xl cursor-pointer transition-all flex justify-between items-center text-xs group"
+                            >
+                              <div className="flex items-center gap-3">
+                                {/* Badge Method */}
+                                <span className={`px-2 py-0.5 rounded text-[9px] font-black uppercase text-center w-14 shrink-0 ${
+                                  ep.method === 'GET' ? 'bg-green-50 text-green-700 border border-green-200' :
+                                  ep.method === 'POST' ? 'bg-blue-50 text-blue-700 border border-blue-200' :
+                                  ep.method === 'PATCH' ? 'bg-amber-50 text-amber-700 border border-amber-200' :
+                                  'bg-red-50 text-red-700 border border-red-200'
+                                }`}>
+                                  {ep.method}
+                                </span>
+                                <span className="font-bold font-mono text-gray-800 group-hover:text-indigo-600">{ep.path}</span>
+                              </div>
+                              <span className="text-gray-400 max-w-[350px] truncate text-[11px] font-medium">{ep.desc}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                </div>
+              )}
+
+            </div>
+          )}
+
+          {/* TAB 5: Detail Slide-out Drawer Panel (Accessible to all tabs) */}
           {detailNode && (
             <div className="w-96 border-l border-gray-200 bg-white shadow-2xl flex flex-col z-20 animate-fade-in relative">
               {/* Drawer Header */}
@@ -1046,12 +1666,18 @@ export default function SystemMap() {
                   {detailNode.type === 'user' && <User className="text-emerald-600" size={20} />}
                   {detailNode.type === 'service' && <Activity className="text-blue-600" size={20} />}
                   {detailNode.type === 'sopStep' && <BookOpen className="text-emerald-600" size={20} />}
+                  {detailNode.type === 'codeModel' && <Database className="text-indigo-600" size={20} />}
+                  {detailNode.type === 'codeFile' && <FileSpreadsheet className="text-slate-600" size={20} />}
+                  {detailNode.type === 'codeApi' && <Terminal className="text-blue-600" size={20} />}
                   <h3 className="font-bold text-gray-800 text-sm">
                     {detailNode.type === 'main' && 'Thông tin Trạm chính'}
                     {detailNode.type === 'tech' && 'Thông tin Trạm kỹ thuật'}
                     {detailNode.type === 'user' && 'Chi tiết nhân sự'}
                     {detailNode.type === 'service' && 'Thông số sức khỏe kết nối'}
                     {detailNode.type === 'sopStep' && 'Chi tiết bước nghiệp vụ'}
+                    {detailNode.type === 'codeModel' && 'Chi tiết cấu trúc Model'}
+                    {detailNode.type === 'codeFile' && 'Thông tin Tệp tin'}
+                    {detailNode.type === 'codeApi' && 'Định nghĩa API Endpoint'}
                   </h3>
                 </div>
                 
@@ -1409,12 +2035,10 @@ export default function SystemMap() {
                       <p className="text-xs text-gray-500 mt-2 leading-relaxed">{detailNode.data.desc}</p>
                     </div>
 
-                    {/* Step Checklists */}
                     <div className="flex flex-col gap-3 border-t border-gray-100 pt-4">
                       <h5 className="font-bold text-xs text-gray-400 uppercase tracking-wider">Danh mục đầu việc (Checklist):</h5>
                       
                       <div className="flex flex-col gap-2 bg-slate-50 p-4 rounded-2xl border border-gray-150">
-                        {/* SOP Leak checklist */}
                         {detailNode.data.sopKey === 'leak' && (
                           <>
                             {detailNode.data.id === 1 && (
@@ -1426,107 +2050,89 @@ export default function SystemMap() {
                             )}
                             {detailNode.data.id === 2 && (
                               <>
-                                <div className="flex items-start gap-2 text-xs text-gray-700"><input type="checkbox" defaultChecked className="mt-0.5 cursor-not-allowed" disabled /> <span>Hướng dẫn tìm van khóa nước đầu vào máy (thường là van chữ T màu xanh/đỏ)</span></div>
-                                <div className="flex items-start gap-2 text-xs text-gray-700"><input type="checkbox" defaultChecked className="mt-0.5 cursor-not-allowed" disabled /> <span>Hướng dẫn rút phích cắm điện (nếu ổ cắm an toàn không bị ướt)</span></div>
-                                <div className="flex items-start gap-2 text-xs text-gray-700"><input type="checkbox" defaultChecked className="mt-0.5 cursor-not-allowed" disabled /> <span>Trường hợp ngập sâu, hướng dẫn ngắt cầu dao tổng khu vực bếp</span></div>
+                                <div className="flex items-start gap-2 text-xs text-gray-700"><input type="checkbox" defaultChecked className="mt-0.5 cursor-not-allowed" disabled /> <span> van khóa nước cấp đầu vào và ngắt nguồn điện máy lọc</span></div>
+                                <div className="flex items-start gap-2 text-xs text-gray-700"><input type="checkbox" defaultChecked className="mt-0.5 cursor-not-allowed" disabled /> <span>Hướng dẫn KH ngắt phích điện an toàn</span></div>
+                                <div className="flex items-start gap-2 text-xs text-gray-700"><input type="checkbox" defaultChecked className="mt-0.5 cursor-not-allowed" disabled /> <span>Hướng dẫn khóa nước đầu nguồn vào cấp cho máy lọc</span></div>
                               </>
                             )}
                             {detailNode.data.id === 3 && (
                               <>
-                                <div className="flex items-start gap-2 text-xs text-gray-700"><input type="checkbox" defaultChecked className="mt-0.5 cursor-not-allowed" disabled /> <span>Tìm KTV trống việc gần khu vực khách hàng nhất</span></div>
-                                <div className="flex items-start gap-2 text-xs text-gray-700"><input type="checkbox" defaultChecked className="mt-0.5 cursor-not-allowed" disabled /> <span>Tạo ca sự cố khẩn cấp trên phần mềm Truliva</span></div>
-                                <div className="flex items-start gap-2 text-xs text-gray-700"><input type="checkbox" defaultChecked className="mt-0.5 cursor-not-allowed" disabled /> <span>Gọi điện trực tiếp cho KTV để báo ca gấp</span></div>
+                                <div className="flex items-start gap-2 text-xs text-gray-700"><input type="checkbox" defaultChecked className="mt-0.5 cursor-not-allowed" disabled /> <span>Tìm kiếm KTV đang rảnh ở gần khách hàng nhất</span></div>
+                                <div className="flex items-start gap-2 text-xs text-gray-700"><input type="checkbox" defaultChecked className="mt-0.5 cursor-not-allowed" disabled /> <span>Bấm chỉ định KTV xử lý ca khẩn cấp trên hệ thống</span></div>
+                                <div className="flex items-start gap-2 text-xs text-gray-700"><input type="checkbox" defaultChecked className="mt-0.5 cursor-not-allowed" disabled /> <span>Gọi điện đôn đốc KTV di chuyển gấp đến điểm hẹn</span></div>
                               </>
                             )}
                             {detailNode.data.id === 4 && (
                               <>
-                                <div className="flex items-start gap-2 text-xs text-gray-700"><input type="checkbox" defaultChecked className="mt-0.5 cursor-not-allowed" disabled /> <span>Có mặt đúng thời gian cam kết (trong 30 phút)</span></div>
-                                <div className="flex items-start gap-2 text-xs text-gray-700"><input type="checkbox" defaultChecked className="mt-0.5 cursor-not-allowed" disabled /> <span>Kiểm tra các khớp nối (co cút), cốc lọc, bình áp</span></div>
-                                <div className="flex items-start gap-2 text-xs text-gray-700"><input type="checkbox" defaultChecked className="mt-0.5 cursor-not-allowed" disabled /> <span>Thay thế dây dẫn hoặc linh kiện bị nứt vỡ</span></div>
-                                <div className="flex items-start gap-2 text-xs text-gray-700"><input type="checkbox" defaultChecked className="mt-0.5 cursor-not-allowed" disabled /> <span>Lau sạch nước rò rỉ trên sàn nhà và xung quanh máy</span></div>
+                                <div className="flex items-start gap-2 text-xs text-gray-700"><input type="checkbox" defaultChecked className="mt-0.5 cursor-not-allowed" disabled /> <span>KTV có mặt kiểm tra vị trí rò rỉ nước (tại co cút, cốc lọc, bình áp...)</span></div>
+                                <div className="flex items-start gap-2 text-xs text-gray-700"><input type="checkbox" defaultChecked className="mt-0.5 cursor-not-allowed" disabled /> <span>Tháo rời và thay mới các linh kiện co cút bị hỏng</span></div>
+                                <div className="flex items-start gap-2 text-xs text-gray-700"><input type="checkbox" defaultChecked className="mt-0.5 cursor-not-allowed" disabled /> <span>Lau dọn vệ sinh sạch nước ngập trên sàn và tủ máy</span></div>
                               </>
                             )}
                             {detailNode.data.id === 5 && (
                               <>
-                                <div className="flex items-start gap-2 text-xs text-gray-700"><input type="checkbox" defaultChecked className="mt-0.5 cursor-not-allowed" disabled /> <span>Chụp ảnh vị trí rò rỉ ban đầu và sau khi sửa xong</span></div>
-                                <div className="flex items-start gap-2 text-xs text-gray-700"><input type="checkbox" defaultChecked className="mt-0.5 cursor-not-allowed" disabled /> <span>Nhập thông tin linh kiện thay thế vào báo cáo dịch vụ</span></div>
-                                <div className="flex items-start gap-2 text-xs text-gray-700"><input type="checkbox" defaultChecked className="mt-0.5 cursor-not-allowed" disabled /> <span>Khách hàng ký tên nghiệm thu máy hoạt động bình thường</span></div>
+                                <div className="flex items-start gap-2 text-xs text-gray-700"><input type="checkbox" defaultChecked className="mt-0.5 cursor-not-allowed" disabled /> <span>KTV chụp ảnh trước/sau sửa chữa nộp báo cáo ca hoàn thành</span></div>
+                                <div className="flex items-start gap-2 text-xs text-gray-700"><input type="checkbox" defaultChecked className="mt-0.5 cursor-not-allowed" disabled /> <span>Lấy chữ ký xác nhận của khách hàng trực tiếp trên App</span></div>
                               </>
                             )}
                           </>
                         )}
-
-                        {/* SOP Install checklist */}
+                        
                         {detailNode.data.sopKey === 'install' && (
                           <>
                             {detailNode.data.id === 1 && (
                               <>
-                                <div className="flex items-start gap-2 text-xs text-gray-700"><input type="checkbox" defaultChecked className="mt-0.5 cursor-not-allowed" disabled /> <span>Kiểm tra trạng thái đơn hàng trên Pancake POS</span></div>
-                                <div className="flex items-start gap-2 text-xs text-gray-700"><input type="checkbox" defaultChecked className="mt-0.5 cursor-not-allowed" disabled /> <span>Xác định mẫu máy lọc nước yêu cầu (RO, CTO...)</span></div>
-                                <div className="flex items-start gap-2 text-xs text-gray-700"><input type="checkbox" defaultChecked className="mt-0.5 cursor-not-allowed" disabled /> <span>Liên hệ khách hàng chốt giờ lắp đặt</span></div>
+                                <div className="flex items-start gap-2 text-xs text-gray-700"><input type="checkbox" defaultChecked className="mt-0.5 cursor-not-allowed" disabled /> <span>Xác nhận thông tin đơn lắp đặt từ Pancake</span></div>
+                                <div className="flex items-start gap-2 text-xs text-gray-700"><input type="checkbox" defaultChecked className="mt-0.5 cursor-not-allowed" disabled /> <span>Liên hệ khách hàng hẹn khung giờ kỹ thuật viên qua nhà</span></div>
                               </>
                             )}
                             {detailNode.data.id === 2 && (
                               <>
-                                <div className="flex items-start gap-2 text-xs text-gray-700"><input type="checkbox" defaultChecked className="mt-0.5 cursor-not-allowed" disabled /> <span>Kiểm tra máy mới còn nguyên đai nguyên kiện</span></div>
-                                <div className="flex items-start gap-2 text-xs text-gray-700"><input type="checkbox" defaultChecked className="mt-0.5 cursor-not-allowed" disabled /> <span>Nhận đủ co cút, dây dẫn, van khóa nước cấp, vòi inox</span></div>
-                                <div className="flex items-start gap-2 text-xs text-gray-700"><input type="checkbox" defaultChecked className="mt-0.5 cursor-not-allowed" disabled /> <span>Xác nhận phiếu xuất kho trên hệ thống Truliva</span></div>
+                                <div className="flex items-start gap-2 text-xs text-gray-700"><input type="checkbox" defaultChecked className="mt-0.5 cursor-not-allowed" disabled /> <span>Nhận thiết bị máy lọc mới nguyên kiện và vật tư phụ kiện</span></div>
+                                <div className="flex items-start gap-2 text-xs text-gray-700"><input type="checkbox" defaultChecked className="mt-0.5 cursor-not-allowed" disabled /> <span>Khai báo xác nhận xuất kho linh kiện trên app di động</span></div>
                               </>
                             )}
                             {detailNode.data.id === 3 && (
                               <>
-                                <div className="flex items-start gap-2 text-xs text-gray-700"><input type="checkbox" defaultChecked className="mt-0.5 cursor-not-allowed" disabled /> <span>Chọn vị trí đặt máy bằng phẳng, gần nguồn cấp nước và ổ cắm điện</span></div>
-                                <div className="flex items-start gap-2 text-xs text-gray-700"><input type="checkbox" defaultChecked className="mt-0.5 cursor-not-allowed" disabled /> <span>Khoan lắp vòi nước trên chậu rửa (nếu cần)</span></div>
-                                <div className="flex items-start gap-2 text-xs text-gray-700"><input type="checkbox" defaultChecked className="mt-0.5 cursor-not-allowed" disabled /> <span>Đấu nối van cấp nước đầu vào và đường nước thải ra</span></div>
+                                <div className="flex items-start gap-2 text-xs text-gray-700"><input type="checkbox" defaultChecked className="mt-0.5 cursor-not-allowed" disabled /> <span>Định vị vị trí đặt máy, khoan lắp vòi nước trên chậu rửa</span></div>
+                                <div className="flex items-start gap-2 text-xs text-gray-700"><input type="checkbox" defaultChecked className="mt-0.5 cursor-not-allowed" disabled /> <span>Đấu nối chia nước đầu nguồn cấp cho máy, đường nước thải</span></div>
                               </>
                             )}
                             {detailNode.data.id === 4 && (
                               <>
-                                <div className="flex items-start gap-2 text-xs text-gray-700"><input type="checkbox" defaultChecked className="mt-0.5 cursor-not-allowed" disabled /> <span>Mở nước sục rửa lõi lọc thô 1, 2, 3 cho đến khi nước trong</span></div>
-                                <div className="flex items-start gap-2 text-xs text-gray-700"><input type="checkbox" defaultChecked className="mt-0.5 cursor-not-allowed" disabled /> <span>Sục rửa màng RO và lõi chức năng</span></div>
-                                <div className="flex items-start gap-2 text-xs text-gray-700"><input type="checkbox" defaultChecked className="mt-0.5 cursor-not-allowed" disabled /> <span>Sử dụng bút thử TDS đo độ tinh khiết (TDS đầu ra &lt; 50)</span></div>
+                                <div className="flex items-start gap-2 text-xs text-gray-700"><input type="checkbox" defaultChecked className="mt-0.5 cursor-not-allowed" disabled /> <span>Thực hiện sục rửa lõi lọc thô 1, 2, 3 và màng lọc RO 15 phút</span></div>
+                                <div className="flex items-start gap-2 text-xs text-gray-700"><input type="checkbox" defaultChecked className="mt-0.5 cursor-not-allowed" disabled /> <span>Đo độ sạch tinh khiết của nước đầu ra (đảm bảo TDS dưới 50)</span></div>
                               </>
                             )}
                             {detailNode.data.id === 5 && (
                               <>
-                                <div className="flex items-start gap-2 text-xs text-gray-700"><input type="checkbox" defaultChecked className="mt-0.5 cursor-not-allowed" disabled /> <span>Hướng dẫn KH cách sử dụng vòi, xả bỏ bình nước đầu tiên</span></div>
-                                <div className="flex items-start gap-2 text-xs text-gray-700"><input type="checkbox" defaultChecked className="mt-0.5 cursor-not-allowed" disabled /> <span>Giải thích thời gian thay thế định kỳ của các lõi lọc</span></div>
-                                <div className="flex items-start gap-2 text-xs text-gray-700"><input type="checkbox" defaultChecked className="mt-0.5 cursor-not-allowed" disabled /> <span>Dán tem thông tin kỹ thuật &amp; Tem bảo hành lên máy</span></div>
-                                <div className="flex items-start gap-2 text-xs text-gray-700"><input type="checkbox" defaultChecked className="mt-0.5 cursor-not-allowed" disabled /> <span>Khách hàng ký nghiệm thu bàn giao lắp đặt thành công</span></div>
+                                <div className="flex items-start gap-2 text-xs text-gray-700"><input type="checkbox" defaultChecked className="mt-0.5 cursor-not-allowed" disabled /> <span>Dán tem bảo hành, hướng dẫn khách thay thế lõi lọc định kỳ</span></div>
+                                <div className="flex items-start gap-2 text-xs text-gray-700"><input type="checkbox" defaultChecked className="mt-0.5 cursor-not-allowed" disabled /> <span>Khách ký biên bản nghiệm thu thiết bị hoạt động tốt</span></div>
                               </>
                             )}
                           </>
                         )}
 
-                        {/* SOP Assign checklist */}
                         {detailNode.data.sopKey === 'assign' && (
                           <>
                             {detailNode.data.id === 1 && (
                               <>
-                                <div className="flex items-start gap-2 text-xs text-gray-700"><input type="checkbox" defaultChecked className="mt-0.5 cursor-not-allowed" disabled /> <span>Nhận payload order từ webhook Pancake</span></div>
-                                <div className="flex items-start gap-2 text-xs text-gray-700"><input type="checkbox" defaultChecked className="mt-0.5 cursor-not-allowed" disabled /> <span>Tạo bản ghi Order trong DB Truliva với trạng thái "Chờ xử lý"</span></div>
-                                <div className="flex items-start gap-2 text-xs text-gray-700"><input type="checkbox" defaultChecked className="mt-0.5 cursor-not-allowed" disabled /> <span>Phân loại tự động loại dịch vụ dựa trên note đơn hàng</span></div>
+                                <div className="flex items-start gap-2 text-xs text-gray-700"><input type="checkbox" defaultChecked className="mt-0.5 cursor-not-allowed" disabled /> <span>Đơn hàng đổ về lưu CSDL dưới dạng Chờ xử lý</span></div>
                               </>
                             )}
                             {detailNode.data.id === 2 && (
                               <>
-                                <div className="flex items-start gap-2 text-xs text-gray-700"><input type="checkbox" defaultChecked className="mt-0.5 cursor-not-allowed" disabled /> <span>Kiểm tra tính chính xác của địa chỉ khách hàng</span></div>
-                                <div className="flex items-start gap-2 text-xs text-gray-700"><input type="checkbox" defaultChecked className="mt-0.5 cursor-not-allowed" disabled /> <span>Chỉ định Trạm chính (Main Station) quản lý khu vực</span></div>
-                                <div className="flex items-start gap-2 text-xs text-gray-700"><input type="checkbox" defaultChecked className="mt-0.5 cursor-not-allowed" disabled /> <span>Chỉ định Trạm kỹ thuật (Tech Station) phụ trách thi công</span></div>
+                                <div className="flex items-start gap-2 text-xs text-gray-700"><input type="checkbox" defaultChecked className="mt-0.5 cursor-not-allowed" disabled /> <span>Điều phối viên xác minh khu vực và phân bổ về Trạm phù hợp</span></div>
                               </>
                             )}
                             {detailNode.data.id === 3 && (
                               <>
-                                <div className="flex items-start gap-2 text-xs text-gray-700"><input type="checkbox" defaultChecked className="mt-0.5 cursor-not-allowed" disabled /> <span>Liên hệ khách hàng thỏa thuận thời gian kỹ thuật qua</span></div>
-                                <div className="flex items-start gap-2 text-xs text-gray-700"><input type="checkbox" defaultChecked className="mt-0.5 cursor-not-allowed" disabled /> <span>Kiểm tra sĩ số ca đang xử lý của các KTV (chọn KTV ít ca nhất)</span></div>
-                                <div className="flex items-start gap-2 text-xs text-gray-700"><input type="checkbox" defaultChecked className="mt-0.5 cursor-not-allowed" disabled /> <span>Gán KTV và lưu thời gian hẹn khách trên hệ thống</span></div>
+                                <div className="flex items-start gap-2 text-xs text-gray-700"><input type="checkbox" defaultChecked className="mt-0.5 cursor-not-allowed" disabled /> <span>Gọi điện hẹn khách hàng và gán ca cho KTV trạm đó xử lý</span></div>
                               </>
                             )}
                             {detailNode.data.id === 4 && (
                               <>
-                                <div className="flex items-start gap-2 text-xs text-gray-700"><input type="checkbox" defaultChecked className="mt-0.5 cursor-not-allowed" disabled /> <span>Đảm bảo KTV bấm "Nhận ca" trên App KTV sau khi phân công</span></div>
-                                <div className="flex items-start gap-2 text-xs text-gray-700"><input type="checkbox" defaultChecked className="mt-0.5 cursor-not-allowed" disabled /> <span>Theo dõi nếu quá thời gian hẹn mà KTV chưa đến hoặc chưa báo cáo</span></div>
-                                <div className="flex items-start gap-2 text-xs text-gray-700"><input type="checkbox" defaultChecked className="mt-0.5 cursor-not-allowed" disabled /> <span>Liên hệ hỗ trợ KTV nếu gặp khó khăn kỹ thuật</span></div>
+                                <div className="flex items-start gap-2 text-xs text-gray-700"><input type="checkbox" defaultChecked className="mt-0.5 cursor-not-allowed" disabled /> <span>Đôn đốc KTV hoàn thành ca và giám sát kết quả báo cáo nộp lên</span></div>
                               </>
                             )}
                           </>
@@ -1546,11 +2152,118 @@ export default function SystemMap() {
                           💡 Chỉ số TDS đo được đại diện cho tổng lượng chất rắn hòa tan trong nước. Tiêu chuẩn nước tinh khiết uống trực tiếp yêu cầu chỉ số TDS luôn **dưới 50 ppm**.
                         </div>
                       )}
-                      {(!((detailNode.data.sopKey === 'leak' && detailNode.data.id === 2) || (detailNode.data.sopKey === 'install' && detailNode.data.id === 4))) && (
-                        <div className="text-gray-400 italic text-[11px]">
-                          Tuân thủ nghiêm ngặt thời gian và quy trình nghiệp vụ đã được chuẩn hóa để nâng cao chất lượng dịch vụ khách hàng.
+                    </div>
+                  </>
+                )}
+
+                {/* 6. Database Model Details */}
+                {detailNode.type === 'codeModel' && (
+                  <>
+                    <div>
+                      <h4 className="font-black text-lg text-gray-900 leading-tight flex items-center gap-2">
+                        <Database size={18} className="text-indigo-600" />
+                        {detailNode.data.name.split(' ')[0]}
+                      </h4>
+                      <p className="text-xs text-gray-500 mt-2 leading-relaxed">{detailNode.data.desc}</p>
+                    </div>
+
+                    {/* Attribute list */}
+                    <div className="flex flex-col gap-2.5 border-t border-gray-100 pt-4 text-xs">
+                      <h5 className="font-bold text-xs text-gray-400 uppercase tracking-wider">Chi tiết các Trường (Schema Fields):</h5>
+                      
+                      <div className="flex flex-col gap-2 bg-slate-50 p-3.5 rounded-2xl border border-gray-150 font-mono text-[9px] max-h-56 overflow-y-auto erd-scrollbar">
+                        {detailNode.data.fields.map((f: any, idx: number) => (
+                          <div key={idx} className="flex flex-col border-b border-gray-200/40 pb-1.5 last:border-0">
+                            <div className="flex justify-between items-center font-bold">
+                              <span className={f.key ? 'text-yellow-600' : 'text-slate-800'}>{f.name}</span>
+                              <span className="text-indigo-600">{f.type}</span>
+                            </div>
+                            <span className="text-gray-400 font-sans mt-0.5">{f.desc}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Prisma Code snippet */}
+                    <div className="flex flex-col gap-2 border-t border-gray-100 pt-4">
+                      <h5 className="font-bold text-xs text-gray-400 uppercase tracking-wider">Mã Prisma Schema:</h5>
+                      <pre className="bg-slate-900 text-slate-300 font-mono text-[9px] p-3 rounded-2xl border border-slate-800 overflow-x-auto text-left leading-relaxed">
+                        <code>{detailNode.data.prismaCode}</code>
+                      </pre>
+                    </div>
+                  </>
+                )}
+
+                {/* 7. Code File Details */}
+                {detailNode.type === 'codeFile' && (
+                  <>
+                    <div>
+                      <h4 className="font-black text-lg text-gray-900 leading-tight flex items-center gap-2 truncate">
+                        <span>📄</span>
+                        <span className="truncate">{detailNode.data.name}</span>
+                      </h4>
+                      <p className="text-xs text-gray-500 mt-2 leading-relaxed">{detailNode.data.desc}</p>
+                    </div>
+
+                    <div className="flex flex-col gap-3 border-t border-gray-100 pt-4 text-xs bg-slate-50 p-4 rounded-2xl border border-gray-150">
+                      <div>
+                        <span className="text-gray-400 block text-[9px] uppercase font-semibold">Đường dẫn đầy đủ:</span>
+                        <span className="font-mono font-bold text-slate-700 break-all">{detailNode.data.key ? `truliva/${detailNode.data.key.replace(/_/g, '/')}` : detailNode.data.name}</span>
+                      </div>
+                      <div className="mt-2">
+                        <span className="text-gray-400 block text-[9px] uppercase font-semibold">Kiến trúc:</span>
+                        <span className="font-semibold text-indigo-700">
+                          {detailNode.data.name.endsWith('.yml') ? 'GitHub Actions CI/CD Pipeline' :
+                           detailNode.data.name.endsWith('.prisma') ? 'Database Layer (Prisma ORM)' :
+                           detailNode.data.name.endsWith('.tsx') ? 'React View Component (Vite)' : 'Express API Logic (Node.js)'}
+                        </span>
+                      </div>
+                    </div>
+                  </>
+                )}
+
+                {/* 8. Code API Details */}
+                {detailNode.type === 'codeApi' && (
+                  <>
+                    <div>
+                      <span className={`inline-block px-2.5 py-0.5 rounded text-[10px] font-black uppercase tracking-wider mb-2 border ${
+                        detailNode.data.method === 'GET' ? 'bg-green-50 text-green-700 border-green-200' :
+                        detailNode.data.method === 'POST' ? 'bg-blue-50 text-blue-700 border-blue-200' :
+                        detailNode.data.method === 'PATCH' ? 'bg-amber-50 text-amber-700 border-amber-200' :
+                        'bg-red-50 text-red-700 border-red-200'
+                      }`}>
+                        {detailNode.data.method}
+                      </span>
+                      <h4 className="font-black text-lg text-gray-900 leading-tight font-mono break-all">{detailNode.data.path}</h4>
+                      <p className="text-xs text-gray-500 mt-2 leading-relaxed">{detailNode.data.desc}</p>
+                    </div>
+
+                    <div className="flex flex-col gap-3 border-t border-gray-100 pt-4 text-xs">
+                      <div className="bg-slate-50 p-4 rounded-2xl border border-gray-150 flex flex-col gap-2.5">
+                        <div>
+                          <span className="text-gray-400 block text-[9px] uppercase font-semibold">Quyền truy cập (Allowed Roles):</span>
+                          <span className="font-semibold text-indigo-700">{detailNode.data.roles}</span>
                         </div>
-                      )}
+                        <div className="mt-1">
+                          <span className="text-gray-400 block text-[9px] uppercase font-semibold">Yêu cầu xác thực:</span>
+                          <span className="font-bold text-green-600">Có (Require JWT in Headers/Cookies)</span>
+                        </div>
+                      </div>
+
+                      {detailNode.data.method === 'POST' || detailNode.data.method === 'PATCH' ? (
+                        <div className="mt-2 flex flex-col gap-2">
+                          <span className="text-gray-400 block text-[9px] uppercase font-bold">Tham số đầu vào (Request Body JSON):</span>
+                          <pre className="bg-slate-900 text-slate-300 font-mono text-[9px] p-3.5 rounded-2xl border border-slate-800 overflow-x-auto text-left leading-relaxed">
+                            {detailNode.data.path === '/login' ? (
+                              `{\n  "username": "ktv01",\n  "password": "password123"\n}`
+                            ) : detailNode.data.path === '/' && detailNode.data.roles.includes('COORDINATOR') ? (
+                              `{\n  "customerName": "Lê Văn A",\n  "customerPhone": "0987654321",\n  "address": "123 Đường B",\n  "workType": "Lắp đặt",\n  "serviceType": "RO"\n}`
+                            ) : (
+                              `{\n  "adminStatus": "hoàn thành",\n  "assignedKtvId": "user-uuid-1234"\n}`
+                            )}
+                          </pre>
+                        </div>
+                      ) : null}
                     </div>
                   </>
                 )}
