@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getOrders, updateOrder, getKtvUsers, getStations, getOrderAuditLog, syncOrders, getFiltersData, fetchApi, createOrder } from '../../api/client';
-import { Search, ChevronLeft, ChevronRight, History, XCircle, Filter, RefreshCw, FileText, CheckCircle2, RotateCcw, Copy, UserPlus, Download, Wrench, Settings, FolderOpen, Building2, MapPin, Users, Calendar, Plus } from 'lucide-react';
+import { Search, ChevronLeft, ChevronRight, History, XCircle, Filter, RefreshCw, FileText, CheckCircle2, RotateCcw, Copy, UserPlus, Download, Wrench, Settings, FolderOpen, Building2, MapPin, Users, Calendar, Plus, AlertTriangle, ExternalLink } from 'lucide-react';
 import { WARRANTY_SERVICE_GROUPS, REPAIR_SERVICE_GROUPS, WORK_TYPE_SERVICES } from '../../utils/workTypes';
 import { useConfirm } from '../../context/ConfirmContext';
 import DateRangePicker from '../../components/DateRangePicker';
@@ -179,6 +179,14 @@ export default function OrderList() {
   // Cancel Modal
   const [cancelModal, setCancelModal] = useState<{ isOpen: boolean; orderId: string } | null>(null);
   const [cancelReason, setCancelReason] = useState('');
+
+  // Pancake Sync Warning Modal
+  const [syncWarningModal, setSyncWarningModal] = useState<{
+    isOpen: boolean;
+    message: string;
+    orderLink?: string;
+    pancakeOrderId?: number;
+  } | null>(null);
 
   // Create Manual Order Modal
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -394,7 +402,13 @@ export default function OrderList() {
     try {
       const res = await updateOrder(orderId, { adminStatus: newStatus });
       if (res && res.warning) {
-        alert(res.warning);
+        const matchingOrder = orders.find(o => o.id === orderId);
+        setSyncWarningModal({
+          isOpen: true,
+          message: res.warning,
+          orderLink: res.order?.orderLink || matchingOrder?.orderLink,
+          pancakeOrderId: res.order?.pancakeOrderId || matchingOrder?.pancakeOrderId
+        });
       }
       fetchOrdersData();
     } catch (err: any) {
@@ -407,7 +421,13 @@ export default function OrderList() {
     try {
       const res = await updateOrder(cancelModal.orderId, { adminStatus: 'hủy đơn', cancelReason });
       if (res && res.warning) {
-        alert(res.warning);
+        const matchingOrder = orders.find(o => o.id === cancelModal.orderId);
+        setSyncWarningModal({
+          isOpen: true,
+          message: res.warning,
+          orderLink: res.order?.orderLink || matchingOrder?.orderLink,
+          pancakeOrderId: res.order?.pancakeOrderId || matchingOrder?.pancakeOrderId
+        });
       }
       setCancelModal(null);
       setCancelReason('');
@@ -436,7 +456,12 @@ export default function OrderList() {
         rescheduleReason: null
       });
       if (res && res.warning) {
-        alert(res.warning);
+        setSyncWarningModal({
+          isOpen: true,
+          message: res.warning,
+          orderLink: res.order?.orderLink || order.orderLink,
+          pancakeOrderId: res.order?.pancakeOrderId || order.pancakeOrderId
+        });
       }
       fetchOrdersData();
     } catch (err: any) {
@@ -2524,6 +2549,48 @@ export default function OrderList() {
             <div className="flex justify-end gap-2">
               <button onClick={() => setCancelModal(null)} className="px-4 py-2 border rounded">Đóng</button>
               <button onClick={submitCancel} disabled={!cancelReason.trim()} className="px-4 py-2 bg-red-600 text-white rounded disabled:opacity-50">Xác nhận hủy</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* PANCAKE SYNC WARNING MODAL */}
+      {syncWarningModal?.isOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs">
+          <div className="bg-white rounded-2xl p-6 w-[450px] shadow-2xl border border-amber-100 animate-scale-up">
+            <div className="flex items-center gap-3 text-amber-600 mb-4">
+              <div className="p-2 bg-amber-50 rounded-full">
+                <AlertTriangle size={24} />
+              </div>
+              <h3 className="text-lg font-bold text-gray-900">Không thể đồng bộ trạng thái</h3>
+            </div>
+            
+            <p className="text-sm text-gray-600 mb-6 leading-relaxed">
+              {syncWarningModal.message}
+            </p>
+            
+            <div className="flex flex-col gap-2">
+              {syncWarningModal.orderLink ? (
+                <a
+                  href={syncWarningModal.orderLink}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center justify-center gap-2 px-4 py-2.5 bg-amber-600 hover:bg-amber-700 text-white rounded-xl font-semibold text-sm transition-colors shadow-sm"
+                >
+                  <ExternalLink size={16} />
+                  <span>Mở đơn trên Pancake POS để khôi phục</span>
+                </a>
+              ) : (
+                <div className="text-xs text-gray-500 text-center py-2 bg-gray-50 rounded-lg border border-dashed">
+                  Không có link trực tiếp. Vui lòng khôi phục đơn hàng {syncWarningModal.pancakeOrderId ? `#${syncWarningModal.pancakeOrderId}` : ''} thủ công trên Pancake POS.
+                </div>
+              )}
+              <button
+                onClick={() => setSyncWarningModal(null)}
+                className="px-4 py-2.5 border border-gray-200 text-gray-700 hover:bg-gray-50 rounded-xl font-semibold text-sm transition-colors mt-1"
+              >
+                Đóng thông báo
+              </button>
             </div>
           </div>
         </div>

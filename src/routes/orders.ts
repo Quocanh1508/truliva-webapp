@@ -1547,7 +1547,7 @@ router.patch('/:id', requireAuth, async (req: Request, res: Response): Promise<v
             const isTransitionError = err.response?.status === 422;
             
             if (isTransitionError) {
-              (req as any).pancakeSyncWarning = `Không thể đồng bộ trạng thái sang Pancake POS (Lỗi 422: ${errorMsg}). Trạng thái trên Truliva vẫn được cập nhật thành công.`;
+              (req as any).pancakeSyncWarning = `Đơn hàng trên Pancake POS đang ở trạng thái đã Hủy hoặc đã Hoàn thành, do đó API Pancake không cho phép tự động khôi phục ngược về 'Đã xác nhận'. Trạng thái trên Truliva vẫn được cập nhật thành công.`;
             } else {
               (req as any).pancakeSyncWarning = `Đã cập nhật trạng thái trên Truliva, nhưng không thể đồng bộ sang Pancake POS: ${errorMsg}.`;
             }
