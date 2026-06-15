@@ -55,6 +55,74 @@ interface UserProfile {
   };
 }
 
+// --- DATA FOR UNDERSTAND ANYTHING ANALYTICS ---
+const UA_NODES = [
+  { id: 'index.ts', label: 'src/index.ts', x: 260, y: 120, category: 'entry', size: 28, desc: 'Entry point của Express Server, khởi chạy máy chủ, các cron job và đăng ký các routes.' },
+  { id: 'schema.prisma', label: 'prisma/schema.prisma', x: 120, y: 280, category: 'db', size: 26, desc: 'Định nghĩa 13 Models dữ liệu PostgreSQL kết nối qua Prisma ORM.' },
+  { id: 'webhooks.ts', label: 'src/routes/webhooks.ts', x: 440, y: 80, category: 'route', size: 24, desc: 'Tiếp nhận các sự kiện Pancake Webhooks, thực hiện kiểm tra trùng lặp và chuyển dữ liệu.' },
+  { id: 'orders.ts', label: 'src/routes/orders.ts', x: 440, y: 220, category: 'route', size: 24, desc: 'Cung cấp các API quản lý đơn hàng, phân công KTV, đồng bộ trạng thái ngược lên Pancake POS.' },
+  { id: 'users.ts', label: 'src/routes/users.ts', x: 440, y: 340, category: 'route', size: 20, desc: 'API quản lý danh sách kỹ thuật viên, cấu hình trạm kỹ thuật, thông tin cá nhân và xuất Excel.' },
+  { id: 'eventRouter.ts', label: 'src/services/eventRouter.ts', x: 620, y: 100, category: 'service', size: 22, desc: 'Điều phối sự kiện webhook, tự động phân loại đơn hàng (Order) hay khách hàng (Customer).' },
+  { id: 'orderProcessor.ts', label: 'src/services/orderProcessor.ts', x: 800, y: 140, category: 'service', size: 24, desc: 'Xử lý logic nghiệp vụ đơn hàng, tạo/cập nhật thông tin khách và sản phẩm vào CSDL.' },
+  { id: 'customerProcessor.ts', label: 'src/services/customerProcessor.ts', x: 800, y: 260, category: 'service', size: 20, desc: 'Xử lý đồng bộ thông tin khách hàng từ Pancake POS về hệ thống nội bộ.' },
+  { id: 'notificationService.ts', label: 'src/services/notificationService.ts', x: 620, y: 400, category: 'service', size: 22, desc: 'Tự động gửi push notification qua Firebase FCM và Web Push khi KTV được phân công đơn mới.' },
+  { id: 'logger.ts', label: 'src/utils/logger.ts', x: 120, y: 100, category: 'util', size: 18, desc: 'Hỗ trợ ghi nhận log của ứng dụng qua Winston logger.' },
+  { id: 'emailService.ts', label: 'src/utils/emailService.ts', x: 260, y: 440, category: 'util', size: 18, desc: 'Gửi email khôi phục mật khẩu cho nhân sự.' }
+];
+
+const UA_EDGES = [
+  { from: 'index.ts', to: 'webhooks.ts', desc: 'Đăng ký webhook routes' },
+  { from: 'index.ts', to: 'orders.ts', desc: 'Đăng ký order routes' },
+  { from: 'index.ts', to: 'users.ts', desc: 'Đăng ký user routes' },
+  { from: 'webhooks.ts', to: 'eventRouter.ts', desc: 'Chuyển tiếp sự kiện webhook' },
+  { from: 'orders.ts', to: 'orderProcessor.ts', desc: 'Xử lý logic đơn hàng' },
+  { from: 'eventRouter.ts', to: 'orderProcessor.ts', desc: 'Gọi bộ xử lý đơn hàng' },
+  { from: 'eventRouter.ts', to: 'customerProcessor.ts', desc: 'Gọi bộ xử lý khách hàng' },
+  { from: 'orderProcessor.ts', to: 'schema.prisma', desc: 'Đọc/ghi Database qua Prisma' },
+  { from: 'customerProcessor.ts', to: 'schema.prisma', desc: 'Đọc/ghi Database qua Prisma' },
+  { from: 'orders.ts', to: 'notificationService.ts', desc: 'Kích hoạt gửi thông báo phân công' },
+  { from: 'index.ts', to: 'logger.ts', desc: 'Sử dụng ghi log khởi động' },
+  { from: 'users.ts', to: 'emailService.ts', desc: 'Sử dụng gửi mail mật khẩu' }
+];
+
+const UA_TOUR_STEPS = [
+  {
+    nodeId: 'index.ts',
+    title: 'Bước 1: Khởi nguồn (Entry Point)',
+    desc: 'Tất cả các kết nối, cron job và routes đều khởi nguồn tại src/index.ts. Đây là cổng đón đầu tiếp nhận mọi dữ liệu và webhook từ Pancake POS.'
+  },
+  {
+    nodeId: 'schema.prisma',
+    title: 'Bước 2: Cấu trúc CSDL (Database Schema)',
+    desc: 'Toàn bộ mô hình dữ liệu (Order, Customer, User, ServiceReport, v.v.) được định hình trong prisma/schema.prisma, đảm bảo tính toàn vẹn và nhất quán của CSDL.'
+  },
+  {
+    nodeId: 'webhooks.ts',
+    title: 'Bước 3: Nhận tin (Webhook Router)',
+    desc: 'API src/routes/webhooks.ts nhận các sự kiện Pancake Webhooks và thực hiện ghi raw event bất đồng bộ để tránh bị mất đơn hàng hoặc timeout.'
+  },
+  {
+    nodeId: 'eventRouter.ts',
+    title: 'Bước 4: Định tuyến Sự kiện (Event Router)',
+    desc: 'src/services/eventRouter.ts sẽ phân loại các Webhooks để biết đây là sự kiện liên quan tới Khách hàng (Customer) hay Đơn hàng (Order) trước khi đưa vào xử lý sâu.'
+  },
+  {
+    nodeId: 'orderProcessor.ts',
+    title: 'Bước 5: Xử lý Đơn hàng (Order Processor)',
+    desc: 'Trọng tâm nghiệp vụ nằm tại src/services/orderProcessor.ts. File này xử lý các quy tắc kinh doanh, đồng bộ trạng thái, khấu trừ tồn kho và cập nhật dữ liệu CSDL.'
+  }
+];
+
+const UA_FILES_LIST = [
+  { name: 'src/index.ts', lines: 209, complexity: 'Simple', color: 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20', connections: 4, desc: 'Điểm khởi đầu của ứng dụng Express Server.' },
+  { name: 'src/routes/orders.ts', lines: 1718, complexity: 'Complex', color: 'text-rose-400 bg-rose-500/10 border-rose-500/20', connections: 28, desc: 'API nghiệp vụ quản lý và đồng bộ trạng thái đơn hàng.' },
+  { name: 'src/routes/users.ts', lines: 442, complexity: 'Moderate', color: 'text-amber-400 bg-amber-500/10 border-amber-500/20', connections: 8, desc: 'Quản lý tài khoản, trạm kỹ thuật và nhân sự.' },
+  { name: 'src/routes/webhooks.ts', lines: 183, complexity: 'Simple', color: 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20', connections: 5, desc: 'Endpoint tiếp nhận webhook Pancake POS.' },
+  { name: 'src/services/orderProcessor.ts', lines: 307, complexity: 'Complex', color: 'text-rose-400 bg-rose-500/10 border-rose-500/20', connections: 16, desc: 'Core xử lý đồng bộ, khấu trừ kho và cập nhật DB.' },
+  { name: 'src/services/eventRouter.ts', lines: 215, complexity: 'Moderate', color: 'text-amber-400 bg-amber-500/10 border-amber-500/20', connections: 11, desc: 'Bộ định tuyến phân loại sự kiện Pancake POS.' },
+  { name: 'prisma/schema.prisma', lines: 330, complexity: 'Moderate', color: 'text-amber-400 bg-amber-500/10 border-amber-500/20', connections: 13, desc: 'Cơ sở dữ liệu Schema Prisma (13 models PostgreSQL).' }
+];
+
 export default function SystemMap() {
   const [activeTab, setActiveTab] = useState<'org' | 'health' | 'sop' | 'code'>('org');
 
@@ -79,7 +147,11 @@ export default function SystemMap() {
   const [selectedSop, setSelectedSop] = useState<'leak' | 'install' | 'assign'>('leak');
 
   // Tab 4: Codebase Visualizer States
-  const [codeTab, setCodeTab] = useState<'db' | 'files' | 'api'>('db');
+  const [codeTab, setCodeTab] = useState<'db' | 'files' | 'api' | 'ua'>('db');
+  const [uaTab, setUaTab] = useState<'info' | 'files'>('info');
+  const [hoveredUaNode, setHoveredUaNode] = useState<string | null>(null);
+  const [uaSearchQuery, setUaSearchQuery] = useState<string>('');
+  const [tourStep, setTourStep] = useState<number>(-1);
   const [expandedFolders, setExpandedFolders] = useState<Record<string, boolean>>({
     'backend': true,
     'backend_routes': true,
@@ -1405,6 +1477,15 @@ export default function SystemMap() {
                     <Terminal size={13} />
                     Bản đồ API (Backend Routers)
                   </button>
+                  <button
+                    onClick={() => { setCodeTab('ua'); setDetailNode(null); }}
+                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[11px] font-bold transition-all ${
+                      codeTab === 'ua' ? 'bg-white text-indigo-700 shadow-sm border border-slate-200/50' : 'text-gray-500 hover:text-gray-900'
+                    }`}
+                  >
+                    <BookOpen size={13} />
+                    Understand Anything
+                  </button>
                 </div>
               </div>
 
@@ -1649,6 +1730,415 @@ export default function SystemMap() {
                     ))}
                   </div>
 
+                </div>
+              )}
+
+              {/* Sub-tab 4: Understand Anything Repo Analysis */}
+              {codeTab === 'ua' && (
+                <div className="flex flex-1 gap-6 min-h-[600px] text-left">
+                  {/* Left Column: Interactive Network Graph */}
+                  <div className="flex-1 bg-[#0c0a09] rounded-3xl border border-stone-850 p-6 relative flex flex-col justify-between select-none overflow-hidden" style={{ minHeight: '680px' }}>
+                    
+                    {/* Floating Info */}
+                    <div className="absolute top-4 left-4 z-10 flex flex-col gap-1.5">
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-amber-500 bg-amber-500/10 border border-amber-500/20 px-2.5 py-1 rounded w-fit">
+                        Understand Anything Graph
+                      </span>
+                      <span className="text-[11px] text-zinc-400">
+                        Di chuột vào các node để xem liên kết dependencies. Nhấn "Start Guided Tour" để chạy hướng dẫn từng bước.
+                      </span>
+                    </div>
+
+                    {/* SVG Canvas */}
+                    <svg className="w-full h-full min-h-[500px] z-0">
+                      {/* Definitions for arrow markers */}
+                      <defs>
+                        <marker id="arrow" viewBox="0 0 10 10" refX="20" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+                          <path d="M 0 0 L 10 5 L 0 10 z" fill="#3f3f46" />
+                        </marker>
+                      </defs>
+
+                      {/* Connections */}
+                      {UA_EDGES.map((edge, idx) => {
+                        const fromNode = UA_NODES.find(n => n.id === edge.from);
+                        const toNode = UA_NODES.find(n => n.id === edge.to);
+                        if (!fromNode || !toNode) return null;
+
+                        const isHighlighted = hoveredUaNode === edge.from || hoveredUaNode === edge.to;
+                        const isTourActive = tourStep >= 0;
+                        const isTourEdge = isTourActive && 
+                          UA_TOUR_STEPS[tourStep]?.nodeId === edge.to && 
+                          (tourStep > 0 ? UA_TOUR_STEPS[tourStep - 1]?.nodeId === edge.from : false);
+
+                        return (
+                          <g key={`ua-edge-${idx}`}>
+                            <path
+                              d={`M ${fromNode.x} ${fromNode.y} C ${(fromNode.x + toNode.x)/2} ${fromNode.y}, ${(fromNode.x + toNode.x)/2} ${toNode.y}, ${toNode.x} ${toNode.y}`}
+                              stroke={isTourEdge ? '#f59e0b' : isHighlighted ? '#38bdf8' : '#27272a'}
+                              strokeWidth={isTourEdge ? 3 : isHighlighted ? 2.5 : 1.5}
+                              fill="none"
+                              opacity={isTourActive ? (isTourEdge ? 1 : 0.1) : (isHighlighted ? 0.9 : 0.3)}
+                              strokeDasharray={isTourEdge || isHighlighted ? '5 3' : undefined}
+                              className={(isTourEdge || isHighlighted) ? 'flow-line' : undefined}
+                              style={{ transition: 'stroke 0.3s, stroke-width 0.3s, opacity 0.3s' }}
+                            />
+                          </g>
+                        );
+                      })}
+
+                      {/* Nodes */}
+                      {UA_NODES.map((node) => {
+                        const isHovered = hoveredUaNode === node.id;
+                        const isTourActive = tourStep >= 0;
+                        const isTourNode = isTourActive && UA_TOUR_STEPS[tourStep]?.nodeId === node.id;
+                        const tourIndex = UA_TOUR_STEPS.findIndex(s => s.nodeId === node.id);
+
+                        return (
+                          <g
+                            key={node.id}
+                            transform={`translate(${node.x}, ${node.y})`}
+                            onMouseEnter={() => !isTourActive && setHoveredUaNode(node.id)}
+                            onMouseLeave={() => !isTourActive && setHoveredUaNode(null)}
+                            className="cursor-pointer"
+                            onClick={() => {
+                              if (isTourActive && tourIndex !== -1) {
+                                setTourStep(tourIndex);
+                              } else {
+                                setDetailNode({ type: 'codeFile', data: { name: node.label, desc: node.desc, connections: 6 } });
+                              }
+                            }}
+                          >
+                            {/* Pulsing Outer Ring */}
+                            {(isHovered || isTourNode) && (
+                              <circle
+                                r={node.size + 8}
+                                fill="none"
+                                stroke={isTourNode ? '#f59e0b' : '#38bdf8'}
+                                strokeWidth="2"
+                                opacity="0.6"
+                                className="animate-ping"
+                              />
+                            )}
+
+                            {/* Main Node Circle */}
+                            <circle
+                              r={node.size}
+                              fill={isTourNode ? '#f59e0b' : node.category === 'entry' ? '#4f46e5' : node.category === 'db' ? '#0891b2' : node.category === 'route' ? '#0284c7' : node.category === 'service' ? '#059669' : '#52525b'}
+                              stroke={(isHovered || isTourNode) ? '#ffffff' : '#27272a'}
+                              strokeWidth="2"
+                              opacity={isTourActive ? (isTourNode ? 1 : 0.4) : 1}
+                              style={{ transition: 'fill 0.3s, stroke 0.3s, opacity 0.3s' }}
+                            />
+
+                            {/* Node Emoji */}
+                            <text
+                              textAnchor="middle"
+                              dy=".3em"
+                              fontSize="11px"
+                              opacity={isTourActive ? (isTourNode ? 1 : 0.4) : 1}
+                            >
+                              {node.category === 'entry' ? '🚀' : node.category === 'db' ? '💾' : node.category === 'route' ? '📡' : node.category === 'service' ? '⚙️' : '📄'}
+                            </text>
+
+                            {/* Text Label */}
+                            <text
+                              y={node.size + 14}
+                              textAnchor="middle"
+                              fill={isTourNode ? '#f59e0b' : (isHovered ? '#ffffff' : '#a1a1aa')}
+                              fontSize="9px"
+                              fontWeight={isTourNode ? 'bold' : 'normal'}
+                              opacity={isTourActive ? (isTourNode ? 1 : 0.3) : 1}
+                              style={{ transition: 'fill 0.3s, opacity 0.3s' }}
+                            >
+                              {node.id}
+                            </text>
+                          </g>
+                        );
+                      })}
+                    </svg>
+
+                    {/* Floating Tour Popover */}
+                    {tourStep >= 0 && (
+                      <div className="absolute bottom-6 left-6 right-6 bg-stone-900 border border-stone-850 rounded-2xl p-5 shadow-2xl flex flex-col gap-3 text-left animate-slide-up z-10">
+                        <div className="flex justify-between items-center border-b border-stone-800 pb-2">
+                          <span className="text-[10px] font-bold text-amber-500 uppercase tracking-widest flex items-center gap-1.5">
+                            ✨ HƯỚNG DẪN ĐỌC CODE — {tourStep + 1}/{UA_TOUR_STEPS.length}
+                          </span>
+                          <button 
+                            type="button"
+                            onClick={() => setTourStep(-1)}
+                            className="text-zinc-500 hover:text-white text-xs"
+                          >
+                            Đóng Tour
+                          </button>
+                        </div>
+                        <h4 className="font-bold text-white text-xs">
+                          {UA_TOUR_STEPS[tourStep].title}
+                        </h4>
+                        <p className="text-[11px] text-zinc-400 leading-relaxed">
+                          {UA_TOUR_STEPS[tourStep].desc}
+                        </p>
+                        <div className="flex justify-between items-center mt-2">
+                          <button
+                            type="button"
+                            onClick={() => setTourStep(prev => Math.max(0, prev - 1))}
+                            disabled={tourStep === 0}
+                            className="px-3 py-1 bg-stone-800 border border-stone-750 rounded text-xs text-zinc-400 hover:text-white disabled:opacity-30 disabled:pointer-events-none"
+                          >
+                            Quay lại
+                          </button>
+                          <div className="flex gap-2">
+                            {tourStep < UA_TOUR_STEPS.length - 1 ? (
+                              <button
+                                type="button"
+                                onClick={() => setTourStep(prev => prev + 1)}
+                                className="px-4 py-1 bg-amber-500 text-stone-950 font-bold rounded text-xs hover:bg-amber-400 transition-colors"
+                              >
+                                Tiếp theo
+                              </button>
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={() => setTourStep(-1)}
+                                className="px-4 py-1 bg-emerald-500 text-white font-bold rounded text-xs hover:bg-emerald-400 transition-colors"
+                              >
+                                Hoàn thành 🎉
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Right Column: Information Panel */}
+                  <div className="w-80 shrink-0 bg-[#161615] rounded-3xl border border-stone-850 flex flex-col overflow-hidden text-zinc-300 font-sans shadow-xl">
+                    
+                    {/* Tab Selection */}
+                    <div className="flex bg-stone-900/50 p-1 border-b border-stone-850">
+                      <button 
+                        type="button"
+                        onClick={() => setUaTab('info')}
+                        className={`flex-1 text-center py-2 text-[10px] font-black uppercase tracking-wider transition-all ${
+                          uaTab === 'info' 
+                            ? 'bg-stone-850 text-white rounded-lg shadow-sm border border-stone-750/50' 
+                            : 'text-zinc-500 hover:text-zinc-300'
+                        }`}
+                      >
+                        INFO
+                      </button>
+                      <button 
+                        type="button"
+                        onClick={() => setUaTab('files')}
+                        className={`flex-1 text-center py-2 text-[10px] font-black uppercase tracking-wider transition-all ${
+                          uaTab === 'files' 
+                            ? 'bg-stone-850 text-white rounded-lg shadow-sm border border-stone-750/50' 
+                            : 'text-zinc-500 hover:text-zinc-300'
+                        }`}
+                      >
+                        FILES
+                      </button>
+                    </div>
+
+                    {/* Tab Body */}
+                    <div className="flex-1 overflow-y-auto p-4 flex flex-col gap-5 text-left custom-dark-scrollbar">
+                      {uaTab === 'info' && (
+                        <>
+                          {/* Summary Stats Grid */}
+                          <div className="grid grid-cols-2 gap-2.5">
+                            {[
+                              { val: 750, label: 'NODES' },
+                              { val: 725, label: 'EDGES' },
+                              { val: 10, label: 'LAYERS' },
+                              { val: 8, label: 'TYPES' }
+                            ].map((stat, sIdx) => (
+                              <div key={sIdx} className="bg-stone-900/40 border border-stone-850 p-3 rounded-xl flex flex-col gap-0.5">
+                                <span className="text-xl font-black text-amber-500 font-mono leading-none">{stat.val}</span>
+                                <span className="text-[9px] font-bold tracking-wider text-zinc-500 uppercase">{stat.label}</span>
+                              </div>
+                            ))}
+                          </div>
+
+                          {/* File Types Section */}
+                          <div className="flex flex-col gap-2">
+                            <h5 className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">FILE TYPES</h5>
+                            <div className="flex flex-col gap-1 text-xs">
+                              {[
+                                { name: 'Code', count: 634, dotColor: 'bg-blue-500' },
+                                { name: 'Config', count: 27, dotColor: 'bg-cyan-400' },
+                                { name: 'Docs', count: 58, dotColor: 'bg-sky-400' },
+                                { name: 'Infra', count: 13, dotColor: 'bg-purple-500' },
+                                { name: 'Data', count: 18, dotColor: 'bg-emerald-400' }
+                              ].map((ft, ftIdx) => (
+                                <div key={ftIdx} className="flex justify-between items-center py-0.5">
+                                  <div className="flex items-center gap-2">
+                                    <span className={`w-2 h-2 rounded-full ${ft.dotColor}`} />
+                                    <span className="text-zinc-300">{ft.name}</span>
+                                  </div>
+                                  <span className="font-mono text-zinc-400 font-bold">{ft.count}</span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+
+                          {/* Languages Section */}
+                          <div className="flex flex-col gap-2">
+                            <h5 className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">LANGUAGES</h5>
+                            <div className="flex flex-wrap gap-1.5">
+                              {['config', 'css', 'dockerfile', 'javascript', 'json', 'markdown', 'python', 'shell', 'sql', 'toml', 'typescript', 'yaml'].map(lang => (
+                                <span key={lang} className="bg-stone-900 border border-stone-850 text-[10px] px-2 py-0.5 rounded text-zinc-300 font-mono">
+                                  {lang}
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+
+                          {/* Frameworks Section */}
+                          <div className="flex flex-col gap-2">
+                            <h5 className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">FRAMEWORKS</h5>
+                            <div className="flex flex-wrap gap-1.5">
+                              {['Caddy', 'Docker', 'Docker Compose', 'Drizzle', 'GitHub Actions', 'MCP', 'Next.js', 'React', 'Tailwind', 'Turborepo', 'Vitest'].map(fw => (
+                                <span key={fw} className="bg-stone-900/60 border border-stone-800 text-[10px] px-2 py-0.5 rounded text-zinc-400 font-mono font-semibold">
+                                  {fw}
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+
+                          {/* Node Type Distribution Section */}
+                          <div className="flex flex-col gap-2">
+                            <h5 className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">NODE TYPE DISTRIBUTION</h5>
+                            <div className="flex flex-col gap-2 text-[11px]">
+                              {[
+                                { name: 'File', count: 397, pct: 53 },
+                                { name: 'Function', count: 226, pct: 30 },
+                                { name: 'Document', count: 58, pct: 8 },
+                                { name: 'Config', count: 27, pct: 4 },
+                                { name: 'Table', count: 18, pct: 2 },
+                                { name: 'Class', count: 11, pct: 1 },
+                                { name: 'Pipeline', count: 7, pct: 1 },
+                                { name: 'Service', count: 6, pct: 1 }
+                              ].map((dist, dIdx) => (
+                                <div key={dIdx} className="flex flex-col gap-1">
+                                  <div className="flex justify-between text-zinc-400 text-[10px]">
+                                    <span className="font-semibold">{dist.name}</span>
+                                    <span className="font-mono text-zinc-500">{dist.count} ({dist.pct}%)</span>
+                                  </div>
+                                  <div className="w-full h-1.5 bg-stone-900 rounded overflow-hidden">
+                                    <div 
+                                      className="h-full bg-amber-500/80 rounded" 
+                                      style={{ width: `${dist.pct}%` }}
+                                    />
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+
+                          {/* Complexity Distribution Section */}
+                          <div className="flex flex-col gap-2">
+                            <h5 className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">COMPLEXITY DISTRIBUTION</h5>
+                            <div className="grid grid-cols-3 gap-2 text-center">
+                              <div className="bg-stone-900/50 border border-stone-850 p-2 rounded-xl flex flex-col gap-0.5">
+                                <span className="text-sm font-black text-emerald-400 font-mono">280</span>
+                                <span className="text-[8px] font-bold text-zinc-500 uppercase">SIMPLE</span>
+                              </div>
+                              <div className="bg-stone-900/50 border border-stone-850 p-2 rounded-xl flex flex-col gap-0.5">
+                                <span className="text-sm font-black text-amber-400 font-mono">254</span>
+                                <span className="text-[8px] font-bold text-zinc-500 uppercase">MODERATE</span>
+                              </div>
+                              <div className="bg-stone-900/50 border border-stone-850 p-2 rounded-xl flex flex-col gap-0.5">
+                                <span className="text-sm font-black text-rose-400 font-mono">216</span>
+                                <span className="text-[8px] font-bold text-zinc-500 uppercase">COMPLEX</span>
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Most Connected Nodes Section */}
+                          <div className="flex flex-col gap-2">
+                            <h5 className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">MOST CONNECTED NODES</h5>
+                            <div className="flex flex-col gap-1.5">
+                              {[
+                                { name: 'src/routes/orders.ts', count: 28 },
+                                { name: 'src/index.ts', count: 19 },
+                                { name: 'src/services/orderProcessor.ts', count: 16 },
+                                { name: 'prisma/schema.prisma', count: 13 },
+                                { name: 'src/services/eventRouter.ts', count: 11 }
+                              ].map((node, nIdx) => (
+                                <div key={nIdx} className="flex justify-between items-center text-xs bg-stone-900/30 p-2 rounded-lg border border-stone-850/50">
+                                  <div className="flex items-center gap-2 min-w-0">
+                                    <span className="w-5 h-5 rounded-full bg-stone-800 flex items-center justify-center text-[10px] font-bold text-zinc-400 shrink-0">
+                                      {nIdx + 1}
+                                    </span>
+                                    <span className="text-zinc-300 font-mono truncate text-[11px]">{node.name}</span>
+                                  </div>
+                                  <span className="font-mono text-amber-500 font-bold pl-2 shrink-0">{node.count}</span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+
+                          {/* Footer Stats */}
+                          <div className="border-t border-stone-800 pt-3 mt-1 flex justify-between items-center text-[10px] text-zinc-500 font-mono">
+                            <span>Avg Connections per Node</span>
+                            <span className="font-bold text-zinc-300 text-xs">1.9</span>
+                          </div>
+                          <div className="text-[9px] text-zinc-600 font-mono leading-none -mt-2">
+                            Analyzed: {new Date().toLocaleDateString('vi-VN')}
+                          </div>
+
+                          {/* Guided Tour trigger */}
+                          <button
+                            type="button"
+                            onClick={() => setTourStep(0)}
+                            className="w-full mt-2 py-2.5 bg-stone-800 hover:bg-stone-700 text-amber-500 hover:text-amber-400 font-bold border border-stone-750 hover:border-stone-700 rounded-xl text-xs transition-colors flex items-center justify-center gap-2 shadow-inner"
+                          >
+                            ✨ Start Guided Tour
+                          </button>
+                        </>
+                      )}
+
+                      {uaTab === 'files' && (
+                        <div className="flex flex-col gap-4">
+                          {/* File Search */}
+                          <div className="relative">
+                            <span className="absolute inset-y-0 left-0 flex items-center pl-2.5 pointer-events-none text-zinc-500">
+                              <Search size={13} />
+                            </span>
+                            <input
+                              type="text"
+                              className="w-full pl-8 pr-3 py-1.5 bg-stone-900 border border-stone-800 rounded-lg text-xs text-white focus:outline-none focus:ring-1 focus:ring-amber-500 focus:border-amber-500"
+                              placeholder="Search files..."
+                              value={uaSearchQuery}
+                              onChange={e => setUaSearchQuery(e.target.value)}
+                            />
+                          </div>
+
+                          {/* Files List */}
+                          <div className="flex flex-col gap-2">
+                            {UA_FILES_LIST.filter(f => f.name.toLowerCase().includes(uaSearchQuery.toLowerCase())).map((file, fIdx) => (
+                              <div 
+                                key={fIdx} 
+                                onClick={() => setDetailNode({ type: 'codeFile', data: { name: file.name, desc: file.desc, connections: file.connections } })}
+                                className="p-3 bg-stone-900/40 border border-stone-850 hover:border-amber-500/30 rounded-xl cursor-pointer transition-all flex flex-col gap-1.5 text-left"
+                              >
+                                <div className="flex justify-between items-center gap-2">
+                                  <span className="font-mono text-zinc-200 text-xs truncate">{file.name}</span>
+                                  <span className={`text-[8px] font-extrabold uppercase px-1.5 py-0.5 rounded border shrink-0 ${file.color}`}>
+                                    {file.complexity}
+                                  </span>
+                                </div>
+                                <div className="flex justify-between text-[10px] text-zinc-500 font-mono">
+                                  <span>Lines: {file.lines}</span>
+                                  <span>Connections: {file.connections}</span>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
                 </div>
               )}
 

@@ -67,7 +67,7 @@ export default function LabeledImageUploader({ imageSlots, workType, onUploadSuc
         const photo = await CapCamera.getPhoto({
           quality: 90,
           allowEditing: false,
-          resultType: CameraResultType.Uri,
+          resultType: CameraResultType.Base64,
           source: CameraSource.Prompt,
           saveToGallery: true,
           promptLabelHeader: 'Tải ảnh báo cáo',
@@ -75,17 +75,23 @@ export default function LabeledImageUploader({ imageSlots, workType, onUploadSuc
           promptLabelPicture: 'Chụp ảnh mới'
         });
 
-        if (photo.webPath) {
-          const response = await fetch(photo.webPath);
-          const blob = await response.blob();
-          const file = new File([blob], `photo_${index}.${photo.format || 'jpeg'}`, { type: blob.type || `image/${photo.format || 'jpeg'}` });
+        if (photo.base64String) {
+          const mimeType = `image/${photo.format || 'jpeg'}`;
+          const byteCharacters = atob(photo.base64String);
+          const byteNumbers = new Array(byteCharacters.length);
+          for (let i = 0; i < byteCharacters.length; i++) {
+            byteNumbers[i] = byteCharacters.charCodeAt(i);
+          }
+          const byteArray = new Uint8Array(byteNumbers);
+          const blob = new Blob([byteArray], { type: mimeType });
+          const file = new File([blob], `photo_${index}.${photo.format || 'jpeg'}`, { type: mimeType });
 
           const newFiles = [...slotFiles];
           newFiles[index] = file;
           setSlotFiles(newFiles);
 
           const newPreviews = [...slotPreviews];
-          newPreviews[index] = photo.webPath;
+          newPreviews[index] = `data:${mimeType};base64,${photo.base64String}`;
           setSlotPreviews(newPreviews);
           setError('');
         }
