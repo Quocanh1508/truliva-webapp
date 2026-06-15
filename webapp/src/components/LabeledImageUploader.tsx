@@ -130,12 +130,22 @@ export default function LabeledImageUploader({ imageSlots, workType, onUploadSuc
     setSlotPreviews(newPreviews);
   };
 
-  const handleDownloadPhoto = (index: number) => {
+  const handleDownloadPhoto = async (index: number) => {
     const file = slotFiles[index];
     const preview = slotPreviews[index];
     if (!preview) return;
 
     try {
+      // If the platform supports Web Share API for sharing files (perfect for iOS Safari/WebViews)
+      if (file && navigator.canShare && navigator.canShare({ files: [file] })) {
+        await navigator.share({
+          files: [file],
+          title: `Ảnh báo cáo ${index + 1}`,
+        });
+        return;
+      }
+
+      // Fallback: standard anchor download for desktop/unsupported browsers
       const a = document.createElement('a');
       a.href = preview;
       a.download = file ? file.name : `report_photo_${index + 1}.jpg`;
@@ -143,7 +153,18 @@ export default function LabeledImageUploader({ imageSlots, workType, onUploadSuc
       a.click();
       document.body.removeChild(a);
     } catch (err) {
-      console.error('Lỗi khi tải ảnh về máy:', err);
+      console.error('Lỗi khi tải/chia sẻ ảnh:', err);
+      // Secondary fallback in case share fails or throws an exception
+      try {
+        const a = document.createElement('a');
+        a.href = preview;
+        a.download = file ? file.name : `report_photo_${index + 1}.jpg`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+      } catch (innerErr) {
+        console.error('Lỗi fallback tải ảnh:', innerErr);
+      }
     }
   };
 
