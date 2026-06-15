@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Camera, X, UploadCloud } from 'lucide-react';
+import { Camera, X, UploadCloud, Download } from 'lucide-react';
 import { uploadImages, fetchApi } from '../api/client';
 import { Capacitor } from '@capacitor/core';
 import { Camera as CapCamera, CameraResultType, CameraSource } from '@capacitor/camera';
@@ -64,6 +64,12 @@ export default function LabeledImageUploader({ imageSlots, workType, onUploadSuc
 
     if (Capacitor.isNativePlatform()) {
       try {
+        // Request permissions beforehand to ensure photo gallery saving permission is granted
+        const currentPerms = await CapCamera.checkPermissions();
+        if (currentPerms.camera !== 'granted' || currentPerms.photos !== 'granted') {
+          await CapCamera.requestPermissions({ permissions: ['camera', 'photos'] });
+        }
+
         const photo = await CapCamera.getPhoto({
           quality: 90,
           allowEditing: false,
@@ -122,6 +128,23 @@ export default function LabeledImageUploader({ imageSlots, workType, onUploadSuc
     const newPreviews = [...slotPreviews];
     newPreviews[index] = null;
     setSlotPreviews(newPreviews);
+  };
+
+  const handleDownloadPhoto = (index: number) => {
+    const file = slotFiles[index];
+    const preview = slotPreviews[index];
+    if (!preview) return;
+
+    try {
+      const a = document.createElement('a');
+      a.href = preview;
+      a.download = file ? file.name : `report_photo_${index + 1}.jpg`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+    } catch (err) {
+      console.error('Lỗi khi tải ảnh về máy:', err);
+    }
   };
 
   const filledCount = slotFiles.filter(f => f !== null).length;
@@ -214,9 +237,25 @@ export default function LabeledImageUploader({ imageSlots, workType, onUploadSuc
                       background: 'rgba(220,38,38,0.85)', color: '#fff',
                       borderRadius: '50%', padding: '4px', border: 'none', cursor: 'pointer',
                       display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      zIndex: 2,
                     }}
                   >
                     <X size={14} />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleDownloadPhoto(index)}
+                    style={{
+                      position: 'absolute', bottom: '6px', right: '6px',
+                      background: 'rgba(27,58,107,0.85)', color: '#fff',
+                      borderRadius: '50%', padding: '6px', border: 'none', cursor: 'pointer',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      boxShadow: '0 2px 4px rgba(0,0,0,0.2)',
+                      zIndex: 2,
+                    }}
+                    title="Tải ảnh về máy"
+                  >
+                    <Download size={14} />
                   </button>
                 </div>
               ) : (
