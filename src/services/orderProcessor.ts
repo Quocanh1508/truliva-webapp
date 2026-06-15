@@ -1,5 +1,6 @@
 import prisma from '../config/database';
 import logger from '../utils/logger';
+import axios from 'axios';
 
 /**
  * Xử lý event "orders" từ Pancake webhook.
@@ -304,3 +305,54 @@ async function markFailed(rawEventId: string, errorLog: string) {
     data: { status: 'FAILED', errorLog: errorLog.substring(0, 1000) },
   });
 }
+
+/**
+ * Đồng bộ trạng thái đơn hàng sang Pancake POS API.
+ * Trả về chuỗi trạng thái đồng bộ: 'SUCCESS' hoặc ném ra lỗi nếu thất bại.
+ */
+export async function syncOrderStatusToPancake(pancakeOrderId: number, adminStatus: string): Promise<string> {
+  if (pancakeOrderId < 0) {
+    logger.info('Bypassed syncing status change to Pancake POS: manual order', { pancakeOrderId });
+    return 'SUCCESS';
+  }
+
+  const apiKey = process.env.PANCAKE_API_KEY;
+  const shopId = '1635300067';
+  if (!apiKey) {
+    throw new Error('Thiếu cấu hình PANCAKE_API_KEY trên máy chủ.');
+  }
+
+  let statusIdToSync: number | null = null;
+  if (adminStatus === 'hoàn thành') {
+    statusIdToSync = 3; // Đã nhận
+  } else if (adminStatus === 'hủy đơn') {
+    statusIdToSync = 6; // Đã hủy
+  } else if (adminStatus === 'chờ xử lý') {
+    statusIdToSync = 1; // Đã xác nhận
+  }
+
+  if (statusIdToSync === null) {
+    logger.info('Bypassed syncing status change to Pancake POS: status does not map', { pancakeOrderId, adminStatus });
+    return 'SUCCESS';
+  }
+
+  logger.info('Syncing status change to Pancake POS API', { pancakeOrderId, adminStatus, statusIdToSync });
+  const updateResponse = await axios.patch(
+    `https://pos.pages.fm/api/v1/shops/${shopId}/orders/${pancakeOrderId}`,
+    {
+      status: statusIdToSync
+    },
+    {
+      params: { api_key: apiKey },
+      headers: { 'Content-Type': 'application/json' },
+      timeout: 10000
+    }
+  );
+
+  if (!updateResponse.data || !updateResponse.data.success) {
+    throw new Error(updateResponse.data?.message || 'Yêu cầu cập nhật trạng thái thất bại trên Pancake POS');
+  }
+
+  return 'SUCCESS';
+}
+

@@ -3,6 +3,7 @@ import prisma from '../config/database';
 import logger from '../utils/logger';
 import { requireAuth, requireAdmin } from '../middleware/authSession';
 import { Prisma } from '@prisma/client';
+import { syncOrderStatusToPancake } from '../services/orderProcessor';
 import { syncRecentOrders } from '../services/orderSyncScheduler';
 import { sendPushNotification } from '../services/notificationService';
 import { sendWebPushNotification } from '../services/webPushService';
@@ -1550,61 +1551,25 @@ router.patch('/:id', requireAuth, async (req: Request, res: Response): Promise<v
     }
 
     if (adminStatus !== undefined && adminStatus !== oldOrder.adminStatus) {
-      const isManualOrder = oldOrder.pancakeOrderId < 0;
-      if (!isManualOrder) {
-        const apiKey = process.env.PANCAKE_API_KEY;
-        const shopId = '1635300067';
-        if (!apiKey) {
-          res.status(500).json({ error: 'Thiếu cấu hình PANCAKE_API_KEY trên máy chủ.' });
-          return;
-        }
-
-        let statusIdToSync: number | null = null;
-        if (adminStatus === 'hoàn thành') {
-          statusIdToSync = 3; // Đã nhận
-        } else if (adminStatus === 'hủy đơn') {
-          statusIdToSync = 6; // Đã hủy
-        } else if (adminStatus === 'chờ xử lý') {
-          statusIdToSync = 1; // Đã xác nhận
-        }
-
-        if (statusIdToSync !== null) {
-          try {
-            logger.info('Syncing status change to Pancake POS', { pancakeOrderId: oldOrder.pancakeOrderId, adminStatus, statusIdToSync });
-            const updateResponse = await axios.patch(
-              `https://pos.pages.fm/api/v1/shops/${shopId}/orders/${oldOrder.pancakeOrderId}`,
-              {
-                status: statusIdToSync
-              },
-              {
-                params: { api_key: apiKey },
-                headers: { 'Content-Type': 'application/json' },
-                timeout: 10000
-              }
-            );
-
-            if (!updateResponse.data || !updateResponse.data.success) {
-              throw new Error(updateResponse.data?.message || 'Yêu cầu cập nhật trạng thái thất bại trên Pancake POS');
-            }
-            updateData.pancakeSyncStatus = 'SUCCESS';
-          } catch (err: any) {
-            logger.warn('Failed to sync status update to Pancake POS API (non-blocking)', { 
-              pancakeOrderId: oldOrder.pancakeOrderId,
-              error: err.message,
-              response: err.response?.data
-            });
-            
-            updateData.pancakeSyncStatus = 'FAILED';
-            
-            const errorMsg = err.response?.data?.message || err.response?.data?.errors?.order || err.message || 'Lỗi không xác định từ Pancake POS';
-            const isTransitionError = err.response?.status === 422;
-            
-            if (isTransitionError) {
-              (req as any).pancakeSyncWarning = `Đơn hàng trên Pancake POS đang ở trạng thái đã Hủy hoặc đã Hoàn thành, do đó API Pancake không cho phép tự động khôi phục ngược về 'Đã xác nhận'. Trạng thái trên Truliva vẫn được cập nhật thành công.`;
-            } else {
-              (req as any).pancakeSyncWarning = `Đã cập nhật trạng thái trên Truliva, nhưng không thể đồng bộ sang Pancake POS: ${errorMsg}.`;
-            }
-          }
+      try {
+        await syncOrderStatusToPancake(oldOrder.pancakeOrderId, adminStatus);
+        updateData.pancakeSyncStatus = 'SUCCESS';
+      } catch (err: any) {
+        logger.warn('Failed to sync status update to Pancake POS API (non-blocking)', { 
+          pancakeOrderId: oldOrder.pancakeOrderId,
+          error: err.message,
+          response: err.response?.data
+        });
+        
+        updateData.pancakeSyncStatus = 'FAILED';
+        
+        const errorMsg = err.response?.data?.message || err.response?.data?.errors?.order || err.message || 'Lỗi không xác định từ Pancake POS';
+        const isTransitionError = err.response?.status === 422;
+        
+        if (isTransitionError) {
+          (req as any).pancakeSyncWarning = `Đơn hàng trên Pancake POS đang ở trạng thái đã Hủy hoặc đã Hoàn thành, do đó API Pancake không cho phép tự động khôi phục ngược về 'Đã xác nhận'. Trạng thái trên Truliva vẫn được cập nhật thành công.`;
+        } else {
+          (req as any).pancakeSyncWarning = `Đã cập nhật trạng thái trên Truliva, nhưng không thể đồng bộ sang Pancake POS: ${errorMsg}.`;
         }
       }
     }

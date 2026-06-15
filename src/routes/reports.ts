@@ -1,6 +1,7 @@
 import { Router, Request, Response } from 'express';
 import prisma from '../config/database';
 import logger from '../utils/logger';
+import { syncOrderStatusToPancake } from '../services/orderProcessor';
 import { requireAuth, requireAdmin, requireCoordinatorOrAdmin, requireDashboardAccess } from '../middleware/authSession';
 import { sendPushNotification } from '../services/notificationService';
 import { sendWebPushNotification } from '../services/webPushService';
@@ -362,6 +363,19 @@ router.post('/', async (req: Request, res: Response): Promise<void> => {
             province_name: province || currentShippingAddress.province_name,
             full_address: address || currentShippingAddress.full_address,
           };
+
+          let syncStatus = 'SUCCESS';
+          try {
+            await syncOrderStatusToPancake(order.pancakeOrderId, 'hoàn thành');
+          } catch (syncErr: any) {
+            logger.warn('Non-blocking Pancake POS status sync failed on report submission', {
+              orderId,
+              pancakeOrderId: order.pancakeOrderId,
+              error: syncErr.message
+            });
+            syncStatus = 'FAILED';
+          }
+
           await prisma.order.update({
             where: { id: orderId },
             data: { 
@@ -370,6 +384,7 @@ router.post('/', async (req: Request, res: Response): Promise<void> => {
               billFullName: customerName || undefined,
               billPhoneNumber: customerPhone || undefined,
               shippingAddress: updatedShippingAddress,
+              pancakeSyncStatus: syncStatus,
             },
           });
         }
