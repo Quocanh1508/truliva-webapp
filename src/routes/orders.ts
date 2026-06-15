@@ -1685,9 +1685,18 @@ router.patch('/:id', requireAuth, async (req: Request, res: Response): Promise<v
  * POST /api/orders/sync
  * Đồng bộ thủ công 50 đơn hàng gần nhất từ Pancake POS
  */
-router.post('/sync', requireAuth, requireAdmin, async (req: Request, res: Response): Promise<void> => {
+router.post('/sync', requireAuth, async (req: Request, res: Response): Promise<void> => {
   try {
-    logger.info('Manual orders sync initiated by admin', { userId: req.user?.id });
+    const role = req.user?.role;
+    const group = req.user?.group;
+
+    // Chỉ cho phép các vai trò có quyền phân công (ngoại trừ KTV và STAFF thuộc nhóm Service)
+    if (role === 'KTV' || (role === 'STAFF' && group === 'Service')) {
+      res.status(403).json({ error: 'Bạn không có quyền đồng bộ đơn hàng từ Pancake.' });
+      return;
+    }
+
+    logger.info('Manual orders sync initiated by user', { userId: req.user?.id, role });
     const count = await syncRecentOrders(50);
     res.json({ success: true, message: `Đồng bộ thành công ${count} đơn hàng gần đây từ Pancake.` });
   } catch (error: any) {
