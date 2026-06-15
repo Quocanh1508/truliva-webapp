@@ -170,31 +170,36 @@ export default function LabeledImageUploader({ imageSlots, workType, onUploadSuc
     <div>
       {error && <div className="alert alert-error mb-4">{error}</div>}
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: '12px', marginBottom: '16px' }}>
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 mb-6">
         {imageSlots.map((slot, index) => {
           const sample = samples.find(s => s.slotLabel === slot.label);
+          const hasImage = !!slotFiles[index];
 
           return (
-            <div key={index} style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+            <div 
+              key={index} 
+              className={`flex flex-col gap-2.5 p-3.5 rounded-xl border transition-all duration-200 ${
+                hasImage 
+                  ? 'bg-emerald-50/30 border-emerald-300 shadow-sm' 
+                  : 'bg-slate-50/50 border-slate-200 hover:border-slate-300 hover:bg-slate-50'
+              }`}
+            >
               {/* Label */}
-              <div style={{ display: 'flex', flexDirection: 'column', minHeight: '48px', justifyContent: 'flex-start' }}>
-                <span style={{
-                  fontSize: '11px',
-                  fontWeight: 600,
-                  color: slotFiles[index] ? '#059669' : '#6b7280',
-                  lineHeight: '1.3',
-                  display: 'flex',
-                  alignItems: 'center',
+              <div className="flex flex-col sm:min-h-[42px] justify-start">
+                <span className="text-[12px] font-semibold leading-normal flex items-start gap-1" style={{
+                  color: hasImage ? '#059669' : '#475569',
                 }}>
-                  {slotFiles[index] ? '✅ ' : `${index + 1}. `}
-                  {slot.label}
-                  {slot.isRequired && <span style={{ color: '#ef4444', marginLeft: '2px' }}>*</span>}
+                  <span className="shrink-0">{hasImage ? '✅ ' : `${index + 1}. `}</span>
+                  <span>
+                    {slot.label}
+                    {slot.isRequired && <span className="text-red-500 ml-1">*</span>}
+                  </span>
                 </span>
               </div>
 
               {/* Upload area / Preview */}
               {slotPreviews[index] ? (
-                <div style={{ position: 'relative', width: '100%', paddingBottom: '100%', borderRadius: '10px', overflow: 'hidden', border: '2px solid #059669' }}>
+                <div style={{ position: 'relative', width: '100%', paddingBottom: '100%', borderRadius: '10px', overflow: 'hidden', border: '2px solid #10b981' }}>
                   <img
                     src={slotPreviews[index]!}
                     alt={slot.label}
@@ -205,9 +210,10 @@ export default function LabeledImageUploader({ imageSlots, workType, onUploadSuc
                     onClick={() => removeFile(index)}
                     disabled={isUploading}
                     style={{
-                      position: 'absolute', top: '4px', right: '4px',
+                      position: 'absolute', top: '6px', right: '6px',
                       background: 'rgba(220,38,38,0.85)', color: '#fff',
                       borderRadius: '50%', padding: '4px', border: 'none', cursor: 'pointer',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
                     }}
                   >
                     <X size={14} />
@@ -220,7 +226,7 @@ export default function LabeledImageUploader({ imageSlots, workType, onUploadSuc
                     width: '100%', paddingBottom: '100%', position: 'relative',
                     borderRadius: '10px', border: '2px dashed #cbd5e1',
                     cursor: isUploading ? 'not-allowed' : 'pointer',
-                    background: '#f8fafc',
+                    background: '#ffffff',
                     transition: 'border-color 0.2s, background 0.2s',
                     overflow: 'hidden',
                   }}
@@ -228,7 +234,6 @@ export default function LabeledImageUploader({ imageSlots, workType, onUploadSuc
                     if (!isUploading) {
                       const div = e.currentTarget as HTMLDivElement;
                       div.style.borderColor = '#1B3A6B';
-                      div.style.background = '#eff6ff';
                       const overlay = div.querySelector('.upload-overlay') as HTMLDivElement;
                       if (overlay && sample?.imageUrl) {
                         overlay.style.backgroundColor = 'rgba(239, 246, 255, 0.5)';
@@ -236,12 +241,13 @@ export default function LabeledImageUploader({ imageSlots, workType, onUploadSuc
                     }
                   }}
                   onMouseLeave={(e) => {
-                    const div = e.currentTarget as HTMLDivElement;
-                    div.style.borderColor = '#cbd5e1';
-                    div.style.background = '#f8fafc';
-                    const overlay = div.querySelector('.upload-overlay') as HTMLDivElement;
-                    if (overlay && sample?.imageUrl) {
-                      overlay.style.backgroundColor = 'rgba(255, 255, 255, 0.65)';
+                    if (!isUploading) {
+                      const div = e.currentTarget as HTMLDivElement;
+                      div.style.borderColor = '#cbd5e1';
+                      const overlay = div.querySelector('.upload-overlay') as HTMLDivElement;
+                      if (overlay && sample?.imageUrl) {
+                        overlay.style.backgroundColor = 'rgba(255, 255, 255, 0.65)';
+                      }
                     }
                   }}
                 >
@@ -272,11 +278,13 @@ export default function LabeledImageUploader({ imageSlots, workType, onUploadSuc
                       zIndex: 1,
                     }}
                   >
-                    <Camera size={24} style={{ color: sample?.imageUrl ? '#1e293b' : '#94a3b8' }} />
+                    <div style={{ padding: '6px', borderRadius: '50%', background: 'rgba(255,255,255,0.85)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
+                      <Camera size={20} style={{ color: sample?.imageUrl ? '#1e293b' : '#94a3b8' }} />
+                    </div>
                     <span style={{ 
                       fontSize: '10px', 
-                      color: sample?.imageUrl ? '#1e293b' : '#94a3b8', 
-                      fontWeight: sample?.imageUrl ? 700 : 500 
+                      color: '#1e293b', 
+                      fontWeight: 700 
                     }}>
                       Chọn ảnh
                     </span>
