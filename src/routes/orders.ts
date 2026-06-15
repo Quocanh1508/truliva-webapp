@@ -646,10 +646,19 @@ router.get('/', requireAuth, async (req: Request, res: Response): Promise<void> 
 
 /**
  * POST /api/orders
- * Tạo đơn hàng/dịch vụ thủ công (Admin only)
+ * Tạo đơn hàng/dịch vụ thủ công (Cho phép các vai trò văn phòng có quyền điều chỉnh)
  */
-router.post('/', requireAuth, requireAdmin, async (req: Request, res: Response): Promise<void> => {
+router.post('/', requireAuth, async (req: Request, res: Response): Promise<void> => {
   try {
+    const role = req.user?.role;
+    const group = req.user?.group;
+
+    // Chặn các vai trò không có quyền điều chỉnh (KTV và STAFF Service)
+    if (role === 'KTV' || (role === 'STAFF' && group === 'Service')) {
+      res.status(403).json({ error: 'Bạn không có quyền tạo đơn hàng/ca dịch vụ.' });
+      return;
+    }
+
     const {
       customerName,
       customerPhone,
