@@ -1,9 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getOrders, updateOrder, getKtvUsers, getStations, getOrderAuditLog, syncOrders, getFiltersData, fetchApi, createOrder } from '../../api/client';
-import { Search, ChevronLeft, ChevronRight, History, XCircle, Filter, RefreshCw, FileText, CheckCircle2, RotateCcw, Copy, UserPlus, Download, Wrench, Settings, FolderOpen, Building2, MapPin, Users, Calendar, Plus, AlertTriangle, ExternalLink } from 'lucide-react';
+import { Search, ChevronLeft, ChevronRight, History, XCircle, Filter, RefreshCw, FileText, CheckCircle2, Copy, UserPlus, Download, Wrench, Settings, FolderOpen, Building2, MapPin, Users, Calendar, Plus, AlertTriangle, ExternalLink } from 'lucide-react';
 import { WARRANTY_SERVICE_GROUPS, REPAIR_SERVICE_GROUPS, WORK_TYPE_SERVICES } from '../../utils/workTypes';
-import { useConfirm } from '../../context/ConfirmContext';
+// import { useConfirm } from '../../context/ConfirmContext';
 import DateRangePicker from '../../components/DateRangePicker';
 import CategoryTreeSelect from '../../components/CategoryTreeSelect';
 import { formatOrderId } from '../../utils/text';
@@ -42,7 +42,7 @@ const ROW_STATUS_OPTIONS = [
 ];
 
 export default function OrderList() {
-  const { confirm } = useConfirm();
+  // const { confirm } = useConfirm();
   const { user: currentUser } = useAuth();
   const isViewOnlyStaff = currentUser?.role === 'STAFF' && currentUser?.group === 'Service';
   const canExportExcel = currentUser?.role === 'ADMIN' || currentUser?.role === 'DEV' || currentUser?.role === 'COORDINATOR' || (currentUser?.role === 'STAFF' && currentUser?.group === 'Service');
@@ -437,37 +437,37 @@ export default function OrderList() {
     }
   };
 
-  const handleReopenOrder = async (order: any) => {
-    const isConfirmed = await confirm({
-      title: 'Mở lại đơn hàng',
-      message: `Bạn có chắc chắn muốn mở lại đơn ${formatOrderId(order.pancakeOrderId)}? Hành động này sẽ chuyển trạng thái về "Chờ xử lý" và xóa thông tin phân bổ trạm/KTV hiện tại.`,
-      confirmText: 'Mở lại',
-      cancelText: 'Hủy bỏ',
-      type: 'warning'
-    });
-    if (!isConfirmed) return;
-    try {
-      const res = await updateOrder(order.id, {
-        adminStatus: 'chờ xử lý',
-        mainStationId: null,
-        techStationId: null,
-        assignedKtvId: null,
-        appointmentTime: null,
-        rescheduleReason: null
-      });
-      if (res && res.warning) {
-        setSyncWarningModal({
-          isOpen: true,
-          message: res.warning,
-          orderLink: res.order?.orderLink || order.orderLink,
-          pancakeOrderId: res.order?.pancakeOrderId || order.pancakeOrderId
-        });
-      }
-      fetchOrdersData();
-    } catch (err: any) {
-      alert(err.message || 'Lỗi khi mở lại đơn');
-    }
-  };
+  // const handleReopenOrder = async (order: any) => {
+  //   const isConfirmed = await confirm({
+  //     title: 'Mở lại đơn hàng',
+  //     message: `Bạn có chắc chắn muốn mở lại đơn ${formatOrderId(order.pancakeOrderId)}? Hành động này sẽ chuyển trạng thái về "Chờ xử lý" và xóa thông tin phân bổ trạm/KTV hiện tại.`,
+  //     confirmText: 'Mở lại',
+  //     cancelText: 'Hủy bỏ',
+  //     type: 'warning'
+  //   });
+  //   if (!isConfirmed) return;
+  //   try {
+  //     const res = await updateOrder(order.id, {
+  //       adminStatus: 'chờ xử lý',
+  //       mainStationId: null,
+  //       techStationId: null,
+  //       assignedKtvId: null,
+  //       appointmentTime: null,
+  //       rescheduleReason: null
+  //     });
+  //     if (res && res.warning) {
+  //       setSyncWarningModal({
+  //         isOpen: true,
+  //         message: res.warning,
+  //         orderLink: res.order?.orderLink || order.orderLink,
+  //         pancakeOrderId: res.order?.pancakeOrderId || order.pancakeOrderId
+  //       });
+  //     }
+  //     fetchOrdersData();
+  //   } catch (err: any) {
+  //     alert(err.message || 'Lỗi khi mở lại đơn');
+  //   }
+  // };
 
   const handleCopyOrderInfo = (order: any) => {
     const customerName = order.billFullName || order.customer?.fullName || 'Khách lẻ';
@@ -1861,8 +1861,8 @@ export default function OrderList() {
                           </button>
                         )}
  
-                        {/* Hoàn thành (chỉ hiện khi chưa hoàn thành/hủy) */}
-                        {!isViewOnlyStaff && order.adminStatus !== 'hoàn thành' && order.adminStatus !== 'hủy đơn' && (
+                        {/* Hoàn thành (Tạm thời disable theo yêu cầu của user) */}
+                        {/* {!isViewOnlyStaff && order.adminStatus !== 'hoàn thành' && order.adminStatus !== 'hủy đơn' && (
                           <button
                             onClick={() => handleStatusChange(order.id, 'hoàn thành')}
                             className="p-1.5 text-emerald-600 hover:bg-emerald-50 rounded border border-transparent hover:border-emerald-100 transition-colors"
@@ -1870,7 +1870,7 @@ export default function OrderList() {
                           >
                             <CheckCircle2 size={15} />
                           </button>
-                        )}
+                        )} */}
  
                         {/* Hủy đơn (chỉ hiện khi chưa hoàn thành/hủy) */}
                         {!isViewOnlyStaff && order.adminStatus !== 'hoàn thành' && order.adminStatus !== 'hủy đơn' && (
@@ -1883,8 +1883,8 @@ export default function OrderList() {
                           </button>
                         )}
  
-                        {/* Mở lại đơn (chỉ hiện khi đơn đã hoàn thành/hủy) */}
-                        {!isViewOnlyStaff && (order.adminStatus === 'hoàn thành' || order.adminStatus === 'hủy đơn') && (
+                        {/* Mở lại đơn (Tạm thời disable theo yêu cầu của user) */}
+                        {/* {!isViewOnlyStaff && (order.adminStatus === 'hoàn thành' || order.adminStatus === 'hủy đơn') && (
                           <button
                             onClick={() => handleReopenOrder(order)}
                             className="p-1.5 text-amber-600 hover:bg-amber-50 rounded border border-transparent hover:border-amber-100 transition-colors"
@@ -1892,7 +1892,7 @@ export default function OrderList() {
                           >
                             <RotateCcw size={15} />
                           </button>
-                        )}
+                        )} */}
 
                         {/* Copy nhanh thông tin đi Zalo */}
                         <button
