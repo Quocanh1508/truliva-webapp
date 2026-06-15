@@ -77,7 +77,12 @@ export default function LabeledImageUploader({ imageSlots, workType, onUploadSuc
 
         if (photo.base64String) {
           const mimeType = `image/${photo.format || 'jpeg'}`;
-          const byteCharacters = atob(photo.base64String);
+          // Clean up whitespaces/newlines (Safari/iOS strictness) and ensure correct base64 padding
+          let base64Clean = photo.base64String.replace(/\s/g, '');
+          const padding = '='.repeat((4 - base64Clean.length % 4) % 4);
+          base64Clean += padding;
+
+          const byteCharacters = atob(base64Clean);
           const byteNumbers = new Array(byteCharacters.length);
           for (let i = 0; i < byteCharacters.length; i++) {
             byteNumbers[i] = byteCharacters.charCodeAt(i);
