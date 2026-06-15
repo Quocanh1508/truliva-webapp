@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getOrders, updateOrder, getKtvUsers, getStations, getOrderAuditLog, syncOrders, getFiltersData, fetchApi, createOrder, searchCustomers } from '../../api/client';
 import { Search, ChevronLeft, ChevronRight, History, XCircle, Filter, RefreshCw, FileText, CheckCircle2, Copy, UserPlus, Download, Wrench, Settings, FolderOpen, Building2, MapPin, Users, Calendar, Plus, AlertTriangle, ExternalLink } from 'lucide-react';
@@ -206,7 +206,7 @@ export default function OrderList() {
   });
 
   const [customerSuggestions, setCustomerSuggestions] = useState<any[]>([]);
-  const [skipFetch, setSkipFetch] = useState(false);
+  const skipFetchRef = useRef(false);
 
   useEffect(() => {
     const phone = newOrderForm.customerPhone.trim();
@@ -214,8 +214,8 @@ export default function OrderList() {
       setCustomerSuggestions([]);
       return;
     }
-    if (skipFetch) {
-      setSkipFetch(false);
+    if (skipFetchRef.current) {
+      skipFetchRef.current = false;
       return;
     }
 
@@ -229,10 +229,10 @@ export default function OrderList() {
     }, 300);
 
     return () => clearTimeout(delayDebounceFn);
-  }, [newOrderForm.customerPhone, skipFetch]);
+  }, [newOrderForm.customerPhone]);
 
   const handleSelectCustomer = (cust: any) => {
-    setSkipFetch(true);
+    skipFetchRef.current = true;
     setNewOrderForm(prev => ({
       ...prev,
       customerName: cust.fullName || prev.customerName,
@@ -245,7 +245,7 @@ export default function OrderList() {
 
   const openCreateModal = () => {
     setCustomerSuggestions([]);
-    setSkipFetch(false);
+    skipFetchRef.current = false;
     setNewOrderForm({
       customerName: '',
       customerPhone: '',
