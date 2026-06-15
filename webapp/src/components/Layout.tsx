@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Outlet, useNavigate, useLocation, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { LogOut, Menu, X, FileText, List, Users, BarChart, Building, Key, Image as ImageIcon, MessageSquare, Bell, Wrench, User, Warehouse } from 'lucide-react';
+import { LogOut, Menu, X, FileText, List, Users, BarChart, Building, Key, Image as ImageIcon, MessageSquare, Bell, Wrench, User, Warehouse, Network } from 'lucide-react';
 import { fetchApi } from '../api/client';
 import SyncManager from './SyncManager';
 
@@ -46,6 +46,7 @@ export default function Layout() {
     
     if (user.role === 'DEV') {
       return [
+        { name: 'Sơ đồ hệ thống', path: '/dev/system-map', icon: <Network size={20} /> },
         { name: 'Phản hồi người dùng', path: '/dev/feedbacks', icon: <MessageSquare size={20} /> },
         { name: 'Thông tin cá nhân', path: '/profile', icon: <User size={20} /> },
         { name: 'Đổi mật khẩu', path: '/change-password', icon: <Key size={20} /> },

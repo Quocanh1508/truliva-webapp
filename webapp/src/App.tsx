@@ -35,6 +35,7 @@ import InventoryManage from './pages/admin/InventoryManage';
 // Feedback / DEV Pages
 import FeedbackPage from './pages/FeedbackPage';
 import FeedbackList from './pages/dev/FeedbackList';
+import SystemMap from './pages/dev/SystemMap';
 
 function PushNotificationManager({ children }: { children: React.ReactNode }) {
   const { user } = useAuth();
@@ -331,6 +332,7 @@ export default function App() {
               {/* Dev Routes */}
               <Route element={<ProtectedRoute allowedRoles={['DEV']} />}>
                 <Route path="/dev/feedbacks" element={<FeedbackList />} />
+                <Route path="/dev/system-map" element={<SystemMap />} />
               </Route>
 
               {/* Shared Routes */}
