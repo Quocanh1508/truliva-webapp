@@ -1,9 +1,9 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getOrders, updateOrder, getKtvUsers, getStations, getOrderAuditLog, syncOrders, getFiltersData, fetchApi, createOrder, searchCustomers } from '../../api/client';
-import { Search, ChevronLeft, ChevronRight, History, XCircle, Filter, RefreshCw, FileText, CheckCircle2, Copy, UserPlus, Download, Wrench, Settings, FolderOpen, Building2, MapPin, Users, Calendar, Plus, AlertTriangle, ExternalLink } from 'lucide-react';
+import { Search, ChevronLeft, ChevronRight, History, XCircle, Filter, RefreshCw, FileText, CheckCircle2, Copy, UserPlus, Download, Wrench, Settings, FolderOpen, Building2, MapPin, Users, Calendar, Plus, AlertTriangle, ExternalLink, RotateCcw } from 'lucide-react';
 import { WARRANTY_SERVICE_GROUPS, REPAIR_SERVICE_GROUPS, WORK_TYPE_SERVICES } from '../../utils/workTypes';
-// import { useConfirm } from '../../context/ConfirmContext';
+import { useConfirm } from '../../context/ConfirmContext';
 import DateRangePicker from '../../components/DateRangePicker';
 import CategoryTreeSelect from '../../components/CategoryTreeSelect';
 import { formatOrderId } from '../../utils/text';
@@ -42,7 +42,21 @@ const ROW_STATUS_OPTIONS = [
 ];
 
 export default function OrderList() {
-  // const { confirm } = useConfirm();
+  const { confirm } = useConfirm();
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'warning' } | null>(null);
+
+  const showToast = (message: string, type: 'success' | 'error' | 'warning' = 'success') => {
+    setToast({ message, type });
+    const timer = setTimeout(() => setToast(null), 4000);
+    return () => clearTimeout(timer);
+  };
+
+  const alert = (message: string) => {
+    const msgLower = message.toLowerCase();
+    const isSuccess = msgLower.includes('thành công') || msgLower.includes('copy') || msgLower.includes('sao chép');
+    showToast(message, isSuccess ? 'success' : 'error');
+  };
+
   const { user: currentUser } = useAuth();
   const isViewOnlyStaff = currentUser?.role === 'STAFF' && currentUser?.group === 'Service';
   const canExportExcel = currentUser?.role === 'ADMIN' || currentUser?.role === 'DEV' || currentUser?.role === 'COORDINATOR' || (currentUser?.role === 'STAFF' && currentUser?.group === 'Service');
@@ -477,37 +491,39 @@ export default function OrderList() {
     }
   };
 
-  // const handleReopenOrder = async (order: any) => {
-  //   const isConfirmed = await confirm({
-  //     title: 'Mở lại đơn hàng',
-  //     message: `Bạn có chắc chắn muốn mở lại đơn ${formatOrderId(order.pancakeOrderId)}? Hành động này sẽ chuyển trạng thái về "Chờ xử lý" và xóa thông tin phân bổ trạm/KTV hiện tại.`,
-  //     confirmText: 'Mở lại',
-  //     cancelText: 'Hủy bỏ',
-  //     type: 'warning'
-  //   });
-  //   if (!isConfirmed) return;
-  //   try {
-  //     const res = await updateOrder(order.id, {
-  //       adminStatus: 'chờ xử lý',
-  //       mainStationId: null,
-  //       techStationId: null,
-  //       assignedKtvId: null,
-  //       appointmentTime: null,
-  //       rescheduleReason: null
-  //     });
-  //     if (res && res.warning) {
-  //       setSyncWarningModal({
-  //         isOpen: true,
-  //         message: res.warning,
-  //         orderLink: res.order?.orderLink || order.orderLink,
-  //         pancakeOrderId: res.order?.pancakeOrderId || order.pancakeOrderId
-  //       });
-  //     }
-  //     fetchOrdersData();
-  //   } catch (err: any) {
-  //     alert(err.message || 'Lỗi khi mở lại đơn');
-  //   }
-  // };
+  const handleReopenOrder = async (order: any) => {
+    const isConfirmed = await confirm({
+      title: 'Mở lại đơn hàng',
+      message: `Bạn có chắc chắn muốn mở lại đơn ${formatOrderId(order.pancakeOrderId)}? Hành động này sẽ chuyển trạng thái về "Chờ xử lý" và xóa thông tin phân bổ trạm/KTV hiện tại.`,
+      confirmText: 'Mở lại',
+      cancelText: 'Hủy bỏ',
+      type: 'warning'
+    });
+    if (!isConfirmed) return;
+    try {
+      const res = await updateOrder(order.id, {
+        adminStatus: 'chờ xử lý',
+        mainStationId: null,
+        techStationId: null,
+        assignedKtvId: null,
+        appointmentTime: null,
+        rescheduleReason: null
+      });
+      if (res && res.warning) {
+        setSyncWarningModal({
+          isOpen: true,
+          message: res.warning,
+          orderLink: res.order?.orderLink || order.orderLink,
+          pancakeOrderId: res.order?.pancakeOrderId || order.pancakeOrderId
+        });
+      } else {
+        alert('Mở lại đơn hàng thành công!');
+      }
+      fetchOrdersData();
+    } catch (err: any) {
+      alert(err.message || 'Lỗi khi mở lại đơn');
+    }
+  };
 
   const handleCopyOrderInfo = (order: any) => {
     const customerName = order.billFullName || order.customer?.fullName || 'Khách lẻ';
@@ -1923,8 +1939,8 @@ export default function OrderList() {
                           </button>
                         )}
  
-                        {/* Mở lại đơn (Tạm thời disable theo yêu cầu của user) */}
-                        {/* {!isViewOnlyStaff && (order.adminStatus === 'hoàn thành' || order.adminStatus === 'hủy đơn') && (
+                        {/* Mở lại đơn (Khôi phục lại tính năng mở lại đơn hàng) */}
+                        {!isViewOnlyStaff && (order.adminStatus === 'hoàn thành' || order.adminStatus === 'hủy đơn') && (
                           <button
                             onClick={() => handleReopenOrder(order)}
                             className="p-1.5 text-amber-600 hover:bg-amber-50 rounded border border-transparent hover:border-amber-100 transition-colors"
@@ -1932,7 +1948,7 @@ export default function OrderList() {
                           >
                             <RotateCcw size={15} />
                           </button>
-                        )} */}
+                        )}
 
                         {/* Copy nhanh thông tin đi Zalo */}
                         <button
@@ -3089,6 +3105,27 @@ export default function OrderList() {
               <button onClick={() => setShowCreateModal(false)} className="px-4 py-2 bg-white border rounded text-gray-700 hover:bg-gray-100 text-sm font-semibold transition-colors">Hủy</button>
               <button onClick={submitCreateManualOrder} className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm font-semibold shadow-sm transition-colors">Tạo ca dịch vụ</button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Toast Notification overlay */}
+      {toast && (
+        <div className="fixed top-5 left-1/2 -translate-x-1/2 z-[9999] animate-fade-in">
+          <div className={`px-4 py-3 rounded-xl shadow-xl flex items-center gap-2.5 border font-semibold text-sm min-w-[300px] justify-between ${
+            toast.type === 'success' 
+              ? 'bg-emerald-50 border-emerald-200 text-emerald-800' 
+              : toast.type === 'error'
+              ? 'bg-rose-50 border-rose-200 text-rose-800'
+              : 'bg-amber-50 border-amber-200 text-amber-800'
+          }`}>
+            <div className="flex items-center gap-2">
+              {toast.type === 'success' && <CheckCircle2 size={18} className="text-emerald-600 shrink-0" />}
+              {toast.type === 'error' && <XCircle size={18} className="text-rose-600 shrink-0" />}
+              {toast.type === 'warning' && <AlertTriangle size={18} className="text-amber-600 shrink-0" />}
+              <span>{toast.message}</span>
+            </div>
+            <button onClick={() => setToast(null)} className="text-gray-400 hover:text-gray-600 ml-4 font-bold text-base">&times;</button>
           </div>
         </div>
       )}
