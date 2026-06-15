@@ -114,6 +114,7 @@ function needsSpareParts(workType: string): boolean {
 export default function ReportForm() {
   const navigate = useNavigate();
   const location = useLocation();
+  const editReportId = location.state?.editReportId;
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -160,6 +161,7 @@ export default function ReportForm() {
   // ── Step 3: Ảnh ──
   const [imageUrls, setImageUrls] = useState<string[]>([]);
   const [reportFiles, setReportFiles] = useState<File[]>([]);
+  const [isImageConfirmed, setIsImageConfirmed] = useState(false);
 
   // ── Step 4: Ghi chú & Submit ──
   const [notes, setNotes] = useState('');
@@ -174,6 +176,88 @@ export default function ReportForm() {
       })
       .catch(err => console.error('Lỗi tải danh mục sản phẩm', err));
   }, []);
+
+  // Tải báo cáo cũ nếu đang ở chế độ chỉnh sửa (Edit Mode)
+  useEffect(() => {
+    if (!editReportId) return;
+
+    setLoading(true);
+    fetchApi(`/reports/${editReportId}`)
+      .then((res: any) => {
+        const report = res?.report;
+        if (!report) {
+          setError('Không tìm thấy báo cáo');
+          return;
+        }
+
+        // Prefill states
+        setCustomerName(report.customerName || '');
+        setCustomerPhone(report.customerPhone || '');
+        setAddress(report.address || '');
+        setProvince(report.province || '');
+        setWorkType(report.workType || '');
+        
+        // Handle products
+        if (report.products) {
+          setSelectedProducts(report.products);
+        }
+        
+        // Handle services
+        if (report.serviceType) {
+          setSelectedServices(report.serviceType.split(',').map((s: string) => s.trim()).filter(Boolean));
+        }
+
+        setSerialNumber(report.serialNumber || '');
+        setDistanceKm(report.distanceKm ? String(report.distanceKm) : '');
+        setActualAmount(report.actualAmount ? String(report.actualAmount) : '');
+        setWaterSource(report.waterSource || '');
+        setTdsIn(report.tdsIn ? String(report.tdsIn) : '');
+        setTdsOut(report.tdsOut ? String(report.tdsOut) : '');
+        setWaterPressure(report.waterPressure ? String(report.waterPressure) : '');
+        setSpareParts(report.spareParts || []);
+        
+        // Handling method and issue type
+        if (['Bảo hành', 'Sửa chữa'].includes(report.workType)) {
+          if (report.issueType) {
+            if (ISSUE_TYPES.includes(report.issueType)) {
+              setIssueType(report.issueType);
+              setCustomIssueType('');
+            } else {
+              setIssueType('Khác (Nhập chi tiết phía dưới)');
+              setCustomIssueType(report.issueType);
+            }
+          }
+          setHandlingMethod(report.handlingMethod || '');
+        }
+
+        // Notes and ImageUrls
+        setNotes(report.notes || '');
+        if (report.imageUrls) {
+          setImageUrls(report.imageUrls);
+          setIsImageConfirmed(true);
+        }
+
+        // Selected Order Id
+        if (report.orderId) {
+          setSelectedOrderId(report.orderId);
+          if (report.order) {
+            setOrders(prevOrders => {
+              if (prevOrders.some(o => o.id === report.orderId)) {
+                return prevOrders;
+              }
+              return [report.order, ...prevOrders];
+            });
+          }
+        }
+      })
+      .catch((err: any) => {
+        console.error('Lỗi tải báo cáo để chỉnh sửa', err);
+        setError('Không thể tải thông tin báo cáo: ' + (err.message || err));
+      })
+      .finally(() => {
+        setLoading(false);
+      });
+  }, [editReportId]);
 
   const getServiceOptions = (): string[] => {
     let options: string[] = [];
@@ -312,6 +396,20 @@ export default function ReportForm() {
     getOrders({ limit: 50, sortBy: 'createdAt', sortOrder: 'desc' })
       .then(res => {
         let list = res.orders;
+
+        if (editReportId) {
+          setOrders(prevOrders => {
+            const merged = [...prevOrders];
+            list.forEach((o: any) => {
+              if (!merged.some(existing => existing.id === o.id)) {
+                merged.push(o);
+              }
+            });
+            return merged;
+          });
+          return;
+        }
+
         const stateOrder = location.state?.order;
         if (stateOrder) {
           if (!list.some((o: any) => o.id === stateOrder.id)) {
@@ -376,6 +474,20 @@ export default function ReportForm() {
           try {
             const parsed = JSON.parse(cached);
             let list = parsed.orders || [];
+
+            if (editReportId) {
+              setOrders(prevOrders => {
+                const merged = [...prevOrders];
+                list.forEach((o: any) => {
+                  if (!merged.some(existing => existing.id === o.id)) {
+                    merged.push(o);
+                  }
+                });
+                return merged;
+              });
+              return;
+            }
+
             const stateOrder = location.state?.order;
             if (stateOrder) {
               if (!list.some((o: any) => o.id === stateOrder.id)) {
@@ -435,7 +547,7 @@ export default function ReportForm() {
           }
         }
       });
-  }, [location.state]);
+  }, [location.state, editReportId]);
 
   const handleOrderSelect = (orderId: string) => {
     setSelectedOrderId(orderId);
@@ -508,6 +620,7 @@ export default function ReportForm() {
     if (files) {
       setReportFiles(files);
     }
+    setIsImageConfirmed(true);
     setStep(3);
   };
 
@@ -565,6 +678,21 @@ export default function ReportForm() {
     };
 
     try {
+      if (editReportId) {
+        if (!navigator.onLine) {
+          setError('Không thể chỉnh sửa báo cáo khi ngoại tuyến. Vui lòng kết nối mạng và thử lại.');
+          setLoading(false);
+          return;
+        }
+
+        await fetchApi(`/reports/${editReportId}`, {
+          method: 'PUT',
+          body: JSON.stringify(payload)
+        });
+        navigate('/ktv/my-reports');
+        return;
+      }
+
       if (!navigator.onLine) {
         await enqueueReport(selectedOrderId, payload, reportFiles);
         alert('Báo cáo đã được lưu tạm ngoại tuyến và sẽ tự động đồng bộ khi thiết bị của bạn có kết nối mạng.');
@@ -587,7 +715,9 @@ export default function ReportForm() {
 
   return (
     <div className="card max-w-2xl mx-auto animate-fade-in">
-      <h2 className="font-bold text-2xl mb-6 text-center text-[#1B3A6B]">Báo Cáo Hoàn Thành Công Việc</h2>
+      <h2 className="font-bold text-2xl mb-6 text-center text-[#1B3A6B]">
+        {editReportId ? 'Chỉnh Sửa Báo Cáo Công Việc' : 'Báo Cáo Hoàn Thành Công Việc'}
+      </h2>
 
       {/* Steps indicator */}
       <div className="flex justify-between mb-8 relative">
@@ -643,6 +773,7 @@ export default function ReportForm() {
                 value={selectedOrderId}
                 onChange={(e) => handleOrderSelect(e.target.value)}
                 required
+                disabled={!!editReportId}
               >
                 <option value="">-- Vui lòng chọn đơn hàng --</option>
                 {orders.map(o => {
@@ -1154,14 +1285,20 @@ export default function ReportForm() {
               Loại: <span className="font-semibold text-[#1B3A6B]">{workType}</span> — Cần {getImageSlots(workType).length} ảnh
             </p>
 
-            {imageUrls.length > 0 ? (
+            {isImageConfirmed ? (
               <div className="mb-4">
                 <div className="alert alert-success flex items-center gap-2">
-                  <CheckCircle size={20} /> Đã upload {imageUrls.length} ảnh thành công!
+                  <CheckCircle size={20} /> Đã xác nhận {imageUrls.length} ảnh!
                 </div>
                 <div className="flex gap-4 mt-4">
-                  <button type="button" className="btn btn-outline flex-1 flex items-center justify-center gap-2" onClick={() => { setImageUrls([]); }}>
-                    Upload lại
+                  <button
+                    type="button"
+                    className="btn btn-outline flex-1 flex items-center justify-center gap-2"
+                    onClick={() => {
+                      setIsImageConfirmed(false);
+                    }}
+                  >
+                    Chỉnh sửa ảnh
                   </button>
                   <button type="button" className="btn btn-primary flex-1" onClick={() => setStep(3)}>
                     Tiếp tục
@@ -1174,6 +1311,7 @@ export default function ReportForm() {
                   imageSlots={getImageSlots(workType)}
                   workType={workType}
                   onUploadSuccess={handleUploadSuccess}
+                  initialImageUrls={imageUrls}
                 />
                 <div className="mt-6 flex gap-4">
                   <button type="button" className="btn btn-outline w-full flex items-center justify-center gap-2" onClick={() => setStep(1)}>

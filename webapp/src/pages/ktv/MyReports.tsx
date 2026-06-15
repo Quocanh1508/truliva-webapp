@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { fetchApi } from '../../api/client';
 import { 
   Calendar, 
@@ -12,7 +13,8 @@ import {
   ExternalLink, 
   Tag, 
   FileText,
-  BarChart3
+  BarChart3,
+  Edit
 } from 'lucide-react';
 import PullToRefresh from '../../components/PullToRefresh';
 
@@ -26,6 +28,7 @@ const getTodayStr = () => {
 };
 
 export default function MyReports() {
+  const navigate = useNavigate();
   const [reports, setReports] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [expandedReports, setExpandedReports] = useState<Record<string, boolean>>({});
@@ -448,22 +451,31 @@ export default function MyReports() {
                     </div>
                   )}
 
-                  {/* Expand / Collapse Button */}
-                  <button 
-                    type="button"
-                    onClick={() => toggleExpand(r.id)}
-                    className="w-full mt-3 pt-2.5 border-t border-gray-55 flex items-center justify-center gap-1 text-xs text-gray-450 hover:text-blue-600 transition-colors font-semibold"
-                  >
-                    {isExpanded ? (
-                      <>
-                        Thu gọn chi tiết <ChevronUp className="w-4 h-4" />
-                      </>
-                    ) : (
-                      <>
-                        Xem chi tiết báo cáo <ChevronDown className="w-4 h-4" />
-                      </>
-                    )}
-                  </button>
+                  {/* Action Buttons */}
+                  <div className="flex items-center gap-3 mt-3 pt-2.5 border-t border-gray-100">
+                    <button 
+                      type="button"
+                      onClick={() => navigate('/ktv/report', { state: { editReportId: r.id } })}
+                      className="flex-1 flex items-center justify-center gap-1.5 text-xs text-blue-600 hover:text-blue-700 font-bold py-2 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors border border-blue-100"
+                    >
+                      <Edit className="w-3.5 h-3.5" /> Sửa báo cáo
+                    </button>
+                    <button 
+                      type="button"
+                      onClick={() => toggleExpand(r.id)}
+                      className="flex-1 flex items-center justify-center gap-1.5 text-xs text-gray-500 hover:text-gray-700 font-bold py-2 bg-gray-50 hover:bg-gray-100 rounded-lg transition-colors border border-gray-200"
+                    >
+                      {isExpanded ? (
+                        <>
+                          Thu gọn <ChevronUp className="w-3.5 h-3.5" />
+                        </>
+                      ) : (
+                        <>
+                          Chi tiết <ChevronDown className="w-3.5 h-3.5" />
+                        </>
+                      )}
+                    </button>
+                  </div>
                 </div>
               );
             })}

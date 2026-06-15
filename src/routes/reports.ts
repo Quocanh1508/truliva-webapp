@@ -999,7 +999,24 @@ router.get('/:id', async (req: Request, res: Response): Promise<void> => {
         id: req.params.id as string,
         ...reportFilter
       },
-      include: { ktvUser: { select: { fullName: true, username: true } } },
+      include: {
+        ktvUser: { select: { fullName: true, username: true } },
+        order: {
+          select: {
+            id: true,
+            pancakeOrderId: true,
+            billFullName: true,
+            billPhoneNumber: true,
+            shippingAddress: true,
+            customer: true,
+            workType: true,
+            serviceType: true,
+            items: true,
+            moneyToCollect: true,
+            totalPrice: true
+          }
+        }
+      },
     });
 
     if (!report) {
@@ -1019,8 +1036,27 @@ router.get('/:id', async (req: Request, res: Response): Promise<void> => {
  * Admin cập nhật báo cáo — hỗ trợ sửa toàn bộ trường.
  * Khi admin sửa, KTV sẽ nhận thông báo.
  */
-router.put('/:id', requireCoordinatorOrAdmin, async (req: Request, res: Response): Promise<void> => {
+router.put('/:id', requireAuth, async (req: Request, res: Response): Promise<void> => {
   try {
+    // Lấy báo cáo hiện tại để kiểm tra quyền sở hữu và thông tin đơn hàng
+    const existingReport = await prisma.serviceReport.findUnique({
+      where: { id: req.params.id as string },
+      include: { order: { select: { pancakeOrderId: true } } },
+    });
+
+    if (!existingReport) {
+      res.status(404).json({ error: 'Không tìm thấy báo cáo' });
+      return;
+    }
+
+    const isAdminOrCoordinator = req.user!.role === 'ADMIN' || req.user!.role === 'COORDINATOR' || req.user!.role === 'DEV';
+    const isOwner = existingReport.ktvUserId === req.user!.id;
+
+    if (!isAdminOrCoordinator && !isOwner) {
+      res.status(403).json({ error: 'Bạn không có quyền chỉnh sửa báo cáo này' });
+      return;
+    }
+
     const {
       isPaid, serviceCost, additionalCost, notes,
       customerName, customerPhone, province, address,
@@ -1061,26 +1097,15 @@ router.put('/:id', requireCoordinatorOrAdmin, async (req: Request, res: Response
     // ── Hình ảnh ──
     if (imageUrls !== undefined) updateData.imageUrls = imageUrls || [];
 
-    // Lấy báo cáo hiện tại để biết ktvUserId và thông tin đơn hàng
-    const existingReport = await prisma.serviceReport.findUnique({
-      where: { id: req.params.id as string },
-      include: { order: { select: { pancakeOrderId: true } } },
-    });
-
-    if (!existingReport) {
-      res.status(404).json({ error: 'Không tìm thấy báo cáo' });
-      return;
-    }
-
     const report = await prisma.serviceReport.update({
       where: { id: req.params.id as string },
       data: updateData,
       include: { ktvUser: { select: { fullName: true } } },
     });
 
-    // ── Gửi thông báo cho KTV nếu admin sửa nội dung (không chỉ isPaid) ──
+    // ── Gửi thông báo cho KTV nếu admin sửa nội dung (không chỉ isPaid) và người sửa không phải là chính KTV ──
     const hasContentEdit = Object.keys(updateData).some(k => k !== 'isPaid');
-    if (hasContentEdit) {
+    if (hasContentEdit && !isOwner) {
       try {
         const orderNum = existingReport.order?.pancakeOrderId;
         const orderText = orderNum ? `#${orderNum}` : '(không rõ mã đơn)';

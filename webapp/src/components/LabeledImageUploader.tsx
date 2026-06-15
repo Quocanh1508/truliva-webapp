@@ -13,9 +13,10 @@ interface Props {
   imageSlots: ImageSlot[];
   workType: string;
   onUploadSuccess: (urls: string[], files?: File[]) => void;
+  initialImageUrls?: string[];
 }
 
-export default function LabeledImageUploader({ imageSlots, workType, onUploadSuccess }: Props) {
+export default function LabeledImageUploader({ imageSlots, workType, onUploadSuccess, initialImageUrls }: Props) {
   // Mỗi slot có 1 file + 1 preview
   const [slotFiles, setSlotFiles] = useState<(File | null)[]>(imageSlots.map(() => null));
   const [slotPreviews, setSlotPreviews] = useState<(string | null)[]>(imageSlots.map(() => null));
@@ -30,8 +31,13 @@ export default function LabeledImageUploader({ imageSlots, workType, onUploadSuc
   useEffect(() => {
     // Reset file/previews khi số lượng slots thay đổi
     setSlotFiles(imageSlots.map(() => null));
-    setSlotPreviews(imageSlots.map(() => null));
-  }, [imageSlots]);
+    if (initialImageUrls && initialImageUrls.length > 0) {
+      const prefilled = imageSlots.map((_, i) => initialImageUrls[i] || null);
+      setSlotPreviews(prefilled);
+    } else {
+      setSlotPreviews(imageSlots.map(() => null));
+    }
+  }, [imageSlots, initialImageUrls]);
 
   useEffect(() => {
     if (!workType) return;
@@ -179,13 +185,13 @@ export default function LabeledImageUploader({ imageSlots, workType, onUploadSuc
     }
   };
 
-  const filledCount = slotFiles.filter(f => f !== null).length;
+  const filledCount = slotPreviews.filter(p => p !== null).length;
 
   const handleUpload = async () => {
     // Check if all required slots are filled
     const missingRequiredLabels: string[] = [];
     imageSlots.forEach((slot, index) => {
-      if (slot.isRequired && !slotFiles[index]) {
+      if (slot.isRequired && !slotFiles[index] && !slotPreviews[index]) {
         missingRequiredLabels.push(slot.label);
       }
     });
@@ -196,7 +202,8 @@ export default function LabeledImageUploader({ imageSlots, workType, onUploadSuc
     }
 
     const files = slotFiles.filter((f): f is File => f !== null);
-    if (files.length === 0) {
+    const hasAnyImage = slotPreviews.some(p => p !== null);
+    if (!hasAnyImage && files.length === 0) {
       setError('Vui lòng chọn ít nhất 1 ảnh');
       return;
     }
@@ -212,7 +219,20 @@ export default function LabeledImageUploader({ imageSlots, workType, onUploadSuc
     setError('');
 
     try {
-      const urls = await uploadImages(files);
+      // Upload only newly selected files and merge with existing URLs
+      const finalUrls: (string | null)[] = await Promise.all(
+        imageSlots.map(async (_, index) => {
+          const file = slotFiles[index];
+          const preview = slotPreviews[index];
+          if (file) {
+            const uploaded = await uploadImages([file]);
+            return uploaded[0];
+          }
+          return preview; // Keeps the existing server URL or null
+        })
+      );
+
+      const urls = finalUrls.filter((u): u is string => u !== null);
       onUploadSuccess(urls, files);
     } catch (err: any) {
       setError(err.message || 'Lỗi upload ảnh');
