@@ -25,6 +25,7 @@ export default function LabeledImageUploader({ imageSlots, workType, onUploadSuc
 
   // Ảnh mẫu tải từ server
   const [samples, setSamples] = useState<any[]>([]);
+  const [saveModalUrl, setSaveModalUrl] = useState<string | null>(null);
 
   useEffect(() => {
     // Reset file/previews khi số lượng slots thay đổi
@@ -136,16 +137,26 @@ export default function LabeledImageUploader({ imageSlots, workType, onUploadSuc
     if (!preview) return;
 
     try {
-      // If the platform supports Web Share API for sharing files (perfect for iOS Safari/WebViews)
-      if (file && navigator.canShare && navigator.canShare({ files: [file] })) {
-        await navigator.share({
-          files: [file],
-          title: `Ảnh báo cáo ${index + 1}`,
-        });
+      // If running inside native app, use the native saveToGallery or share sheet
+      if (Capacitor.isNativePlatform()) {
+        if (file && navigator.canShare && navigator.canShare({ files: [file] })) {
+          await navigator.share({
+            files: [file],
+            title: `Ảnh báo cáo ${index + 1}`,
+          });
+          return;
+        }
+      }
+
+      // Check if user is on mobile browser (iOS Safari, Zalo/FB WebView, Android Chrome, etc.)
+      const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+      if (isMobile) {
+        // Show the beautiful long-press save modal to avoid browser redirection / file previews
+        setSaveModalUrl(preview);
         return;
       }
 
-      // Fallback: standard anchor download for desktop/unsupported browsers
+      // Fallback: standard anchor download for desktop browsers
       const a = document.createElement('a');
       a.href = preview;
       a.download = file ? file.name : `report_photo_${index + 1}.jpg`;
@@ -378,6 +389,42 @@ export default function LabeledImageUploader({ imageSlots, workType, onUploadSuc
           {isUploading ? <span className="spinner"></span> : <><UploadCloud size={18} /> Xác nhận Upload Ảnh</>}
         </button>
       </div>
+
+      {/* Modal hướng dẫn chạm giữ để lưu ảnh trên Mobile Web */}
+      {saveModalUrl && (
+        <div 
+          className="fixed inset-0 bg-black/90 z-50 flex flex-col items-center justify-center p-4 animate-fade-in"
+          onClick={() => setSaveModalUrl(null)}
+        >
+          <div 
+            className="w-full max-w-sm bg-slate-900 border border-slate-800 rounded-2xl p-5 text-center flex flex-col items-center gap-4 shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h4 className="font-bold text-white text-base">Lưu ảnh vào điện thoại</h4>
+            
+            <p className="text-xs text-slate-300 leading-relaxed">
+              Chạm và giữ (nhấn giữ) vào bức ảnh dưới đây khoảng 2 giây, sau đó chọn <strong>"Lưu hình ảnh"</strong> hoặc <strong>"Thêm vào Ảnh"</strong>.
+            </p>
+
+            <div className="w-full aspect-square relative rounded-lg overflow-hidden border border-slate-800 bg-slate-950">
+              <img 
+                src={saveModalUrl} 
+                alt="Lưu ảnh" 
+                className="w-full h-full object-contain"
+                style={{ WebkitTouchCallout: 'default' }}
+              />
+            </div>
+
+            <button 
+              type="button" 
+              className="w-full py-2.5 px-4 bg-slate-800 hover:bg-slate-700 text-white font-semibold rounded-lg text-sm border-none cursor-pointer transition-colors"
+              onClick={() => setSaveModalUrl(null)}
+            >
+              Đóng
+            </button>
+          </div>
+        </div>
+      )}
 
     </div>
   );
