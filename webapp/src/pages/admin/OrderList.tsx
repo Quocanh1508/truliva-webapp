@@ -890,8 +890,8 @@ export default function OrderList() {
 
       {/* Toolbar */}
       <div className="flex flex-col bg-white border-b border-gray-200">
-        <div className="flex justify-between items-center px-4 py-3">
-          <form onSubmit={handleSearch} className="relative w-full max-w-sm">
+        <div className="flex flex-col md:flex-row justify-between items-stretch md:items-center px-4 py-3 gap-3">
+          <form onSubmit={handleSearch} className="relative w-full md:max-w-sm">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
             <input
               type="text"
@@ -902,7 +902,7 @@ export default function OrderList() {
             />
           </form>
 
-          <div className="flex items-center space-x-3">
+          <div className="flex flex-wrap items-center gap-2 md:gap-3">
             {/* Tạo mới ca dịch vụ */}
             {!isViewOnlyStaff && (
               <button
@@ -1758,7 +1758,7 @@ export default function OrderList() {
                       >
                         {phone}
                       </div>
-                      <div className="text-gray-500 text-[11px] leading-tight line-clamp-2" title={order.shippingAddress?.full_address || order.customer?.fullAddress || ''}>
+                      <div className="text-gray-500 text-[11px] leading-tight mt-0.5 break-words" title={order.shippingAddress?.full_address || order.customer?.fullAddress || ''}>
                         {order.shippingAddress?.full_address || order.customer?.fullAddress || 'Không có địa chỉ'}
                       </div>
                     </td>
