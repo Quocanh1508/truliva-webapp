@@ -1,18 +1,9 @@
 import { Router, Request, Response } from 'express';
 import prisma from '../config/database';
 import logger from '../utils/logger';
-import { requireAuth } from '../middleware/authSession';
+import { requireAuth, requireDev } from '../middleware/authSession';
 
 const router = Router();
-
-// Middleware kiểm tra quyền DEV
-function requireDev(req: Request, res: Response, next: any): void {
-  if (req.user?.role !== 'DEV') {
-    res.status(403).json({ error: 'Không có quyền truy cập. Chỉ dành cho DEV.' });
-    return;
-  }
-  next();
-}
 
 /**
  * POST /api/feedbacks

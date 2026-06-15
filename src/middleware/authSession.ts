@@ -125,3 +125,15 @@ export function requireDashboardAccess(req: Request, res: Response, next: NextFu
     res.status(403).json({ error: 'Không có quyền truy cập' });
   }
 }
+
+/**
+ * Middleware kiểm tra quyền DEV.
+ */
+export function requireDev(req: Request, res: Response, next: NextFunction): void {
+  if (req.user?.role !== 'DEV') {
+    res.status(403).json({ error: 'Không có quyền truy cập. Chỉ dành cho DEV.' });
+    return;
+  }
+  next();
+}
+

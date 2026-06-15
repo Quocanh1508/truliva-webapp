@@ -19,6 +19,7 @@ import stationRoutes from './routes/stations';
 import dashboardRoutes from './routes/dashboard';
 import sampleImageRoutes from './routes/sampleImages';
 import feedbackRoutes from './routes/feedbacks';
+import devRoutes from './routes/dev';
 import notificationRoutes from './routes/notifications';
 import inventoryRoutes from './routes/inventory';
 import { startOrderSyncScheduler } from './services/orderSyncScheduler';
@@ -138,6 +139,7 @@ app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/upload', uploadRoutes);
 app.use('/api/sample-images', sampleImageRoutes);
 app.use('/api/feedbacks', feedbackRoutes);
+app.use('/api/dev', devRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/inventory', inventoryRoutes);
 
