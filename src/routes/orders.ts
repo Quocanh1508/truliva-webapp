@@ -1254,6 +1254,50 @@ router.get('/filters-data', requireAuth, async (req: Request, res: Response): Pr
 });
 
 /**
+ * GET /api/orders/customers/search
+ * Tìm kiếm khách hàng theo số điện thoại để gợi ý auto-fill
+ */
+router.get('/customers/search', requireAuth, async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { phone } = req.query;
+    if (!phone || typeof phone !== 'string') {
+      res.json([]);
+      return;
+    }
+    const cleanPhone = phone.trim();
+    if (cleanPhone.length < 3) {
+      res.json([]);
+      return;
+    }
+    const customers = await prisma.customer.findMany({
+      where: {
+        phoneNumber: {
+          contains: cleanPhone,
+        }
+      },
+      take: 10,
+      select: {
+        id: true,
+        fullName: true,
+        phoneNumber: true,
+        address: true,
+        fullAddress: true,
+        provinceName: true,
+        districtName: true,
+        communeName: true,
+        provinceId: true,
+        districtId: true,
+        communeId: true,
+      }
+    });
+    res.json(customers);
+  } catch (error: any) {
+    logger.error('Search customers error', { error: error.message });
+    res.status(500).json({ error: 'Lỗi tìm kiếm thông tin khách hàng' });
+  }
+});
+
+/**
  * GET /api/orders/:id/audit
  * Lấy lịch sử thay đổi của 1 đơn hàng
  */

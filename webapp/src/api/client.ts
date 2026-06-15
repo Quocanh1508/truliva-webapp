@@ -104,6 +104,10 @@ export async function createOrder(data: any) {
   });
 }
 
+export async function searchCustomers(phone: string) {
+  return fetchApi(`/orders/customers/search?phone=${encodeURIComponent(phone)}`);
+}
+
 
 export async function getFiltersData(): Promise<{
   categories: string[];

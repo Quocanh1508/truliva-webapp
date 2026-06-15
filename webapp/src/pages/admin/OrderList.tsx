@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { getOrders, updateOrder, getKtvUsers, getStations, getOrderAuditLog, syncOrders, getFiltersData, fetchApi, createOrder } from '../../api/client';
+import { getOrders, updateOrder, getKtvUsers, getStations, getOrderAuditLog, syncOrders, getFiltersData, fetchApi, createOrder, searchCustomers } from '../../api/client';
 import { Search, ChevronLeft, ChevronRight, History, XCircle, Filter, RefreshCw, FileText, CheckCircle2, Copy, UserPlus, Download, Wrench, Settings, FolderOpen, Building2, MapPin, Users, Calendar, Plus, AlertTriangle, ExternalLink } from 'lucide-react';
 import { WARRANTY_SERVICE_GROUPS, REPAIR_SERVICE_GROUPS, WORK_TYPE_SERVICES } from '../../utils/workTypes';
 // import { useConfirm } from '../../context/ConfirmContext';
@@ -205,7 +205,47 @@ export default function OrderList() {
     note: ''
   });
 
+  const [customerSuggestions, setCustomerSuggestions] = useState<any[]>([]);
+  const [skipFetch, setSkipFetch] = useState(false);
+
+  useEffect(() => {
+    const phone = newOrderForm.customerPhone.trim();
+    if (phone.length < 3) {
+      setCustomerSuggestions([]);
+      return;
+    }
+    if (skipFetch) {
+      setSkipFetch(false);
+      return;
+    }
+
+    const delayDebounceFn = setTimeout(async () => {
+      try {
+        const results = await searchCustomers(phone);
+        setCustomerSuggestions(results);
+      } catch (err) {
+        console.error('Lỗi tìm kiếm khách hàng:', err);
+      }
+    }, 300);
+
+    return () => clearTimeout(delayDebounceFn);
+  }, [newOrderForm.customerPhone, skipFetch]);
+
+  const handleSelectCustomer = (cust: any) => {
+    setSkipFetch(true);
+    setNewOrderForm(prev => ({
+      ...prev,
+      customerName: cust.fullName || prev.customerName,
+      customerPhone: cust.phoneNumber || prev.customerPhone,
+      address: cust.fullAddress || cust.address || prev.address,
+      province: cust.provinceName || prev.province,
+    }));
+    setCustomerSuggestions([]);
+  };
+
   const openCreateModal = () => {
+    setCustomerSuggestions([]);
+    setSkipFetch(false);
     setNewOrderForm({
       customerName: '',
       customerPhone: '',
@@ -2744,7 +2784,7 @@ export default function OrderList() {
                   />
                 </div>
 
-                <div>
+                <div className="relative">
                   <label className="block text-sm text-gray-600 mb-1">Số điện thoại *</label>
                   <input
                     type="text"
@@ -2753,7 +2793,31 @@ export default function OrderList() {
                     placeholder="Nhập số điện thoại..."
                     value={newOrderForm.customerPhone}
                     onChange={e => setNewOrderForm({ ...newOrderForm, customerPhone: e.target.value })}
+                    onBlur={() => setTimeout(() => setCustomerSuggestions([]), 200)}
                   />
+                  {customerSuggestions.length > 0 && (
+                    <div className="absolute left-0 right-0 z-50 mt-1 bg-white border border-gray-200 rounded-md shadow-lg max-h-60 overflow-y-auto">
+                      {customerSuggestions.map(cust => (
+                        <button
+                          key={cust.id}
+                          type="button"
+                          className="w-full text-left px-3 py-2 text-sm hover:bg-blue-50 hover:text-blue-700 transition-colors border-b border-gray-100 last:border-0"
+                          onClick={() => handleSelectCustomer(cust)}
+                        >
+                          <div className="font-semibold text-gray-800">{cust.fullName}</div>
+                          <div className="text-xs text-gray-500 flex justify-between">
+                            <span>SĐT: {cust.phoneNumber}</span>
+                            {cust.provinceName && <span>Tỉnh: {cust.provinceName}</span>}
+                          </div>
+                          {cust.fullAddress && (
+                            <div className="text-[11px] text-gray-400 truncate mt-0.5">
+                              ĐC: {cust.fullAddress}
+                            </div>
+                          )}
+                        </button>
+                      ))}
+                    </div>
+                  )}
                 </div>
 
                 <div>
