@@ -37,17 +37,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   useEffect(() => {
     const token = localStorage.getItem('session_token');
-    if (!token) {
-      setUser(null);
-      setLoading(false);
-      return;
-    }
 
-    // Check session on mount
+    // Check session on mount (always call /auth/me to fallback to HttpOnly cookie if localStorage is cleared on iOS/in-app browsers)
     fetchApi('/auth/me')
       .then((data) => {
         setUser(data.user);
         localStorage.setItem('session_user', JSON.stringify(data.user));
+        if (data.token) {
+          localStorage.setItem('session_token', data.token);
+        }
       })
       .catch((err: any) => {
         console.error('Check session error:', err);
@@ -56,6 +54,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           localStorage.removeItem('session_token');
           localStorage.removeItem('session_user');
           localStorage.removeItem('cached_ktv_orders');
+          setUser(null);
+        } else if (!token) {
+          // If no token originally and check failed, ensure user state is null
           setUser(null);
         }
       })

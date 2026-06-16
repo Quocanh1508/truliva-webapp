@@ -127,7 +127,17 @@ router.get('/me', requireAuth, async (req: Request, res: Response): Promise<void
       return;
     }
 
-    res.json({ user });
+    const jwtSecret = process.env.JWT_SECRET;
+    let token: string | undefined;
+    if (jwtSecret) {
+      token = jwt.sign(
+        { id: user.id, role: user.role },
+        jwtSecret,
+        { expiresIn: '7d' }
+      );
+    }
+
+    res.json({ user, token });
   } catch (error: any) {
     logger.error('Get profile me error', { error: error.message });
     res.status(500).json({ error: 'Lỗi hệ thống' });
