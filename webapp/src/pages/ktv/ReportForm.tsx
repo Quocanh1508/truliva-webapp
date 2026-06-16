@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { fetchApi, getOrders, getFiltersData } from '../../api/client';
 import LabeledImageUploader from '../../components/LabeledImageUploader';
@@ -138,6 +138,23 @@ export default function ReportForm() {
   const [showServiceDropdown, setShowServiceDropdown] = useState(false);
   const [showProductDropdown, setShowProductDropdown] = useState(false);
   const [productSearch, setProductSearch] = useState('');
+
+  const serviceDropdownRef = useRef<HTMLDivElement>(null);
+  const productDropdownRef = useRef<HTMLDivElement>(null);
+
+  // Click outside handlers to close dropdowns
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (serviceDropdownRef.current && !serviceDropdownRef.current.contains(event.target as Node)) {
+        setShowServiceDropdown(false);
+      }
+      if (productDropdownRef.current && !productDropdownRef.current.contains(event.target as Node)) {
+        setShowProductDropdown(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   // ── Step 2: Trường kỹ thuật (dynamic) ──
   const [serialNumber, setSerialNumber] = useState('');
@@ -828,7 +845,7 @@ export default function ReportForm() {
                 <h3 className="font-bold mb-4 text-md text-[#1B3A6B]">🛠️ Nhập thông tin kỹ thuật</h3>
 
                 {/* Dịch vụ thực tế - Multi-select (Tag-based) */}
-                <div className="form-group relative">
+                <div className="form-group relative z-30" ref={serviceDropdownRef}>
                   <label className="form-label font-semibold text-gray-700">Dịch vụ thực tế *</label>
                   <div
                     onClick={() => setShowServiceDropdown(!showServiceDropdown)}
@@ -860,41 +877,41 @@ export default function ReportForm() {
                   </div>
                   
                   {showServiceDropdown && (
-                    <>
-                      <div className="fixed inset-0 z-20" onClick={() => setShowServiceDropdown(false)} />
-                      <div className="absolute z-35 mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg max-h-60 overflow-y-auto p-2 flex flex-col gap-1">
-                        {getServiceOptions().map((service) => {
-                          const isChecked = selectedServices.includes(service);
-                          return (
-                            <label
-                              key={service}
-                              className={`flex items-center gap-2.5 px-3 py-2 rounded-md cursor-pointer select-none text-[13px] transition-colors ${
-                                isChecked ? 'bg-blue-50/70 text-blue-900 font-medium' : 'text-gray-700 hover:bg-gray-50'
-                              }`}
-                            >
-                              <input
-                                type="checkbox"
-                                className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 w-4 h-4"
-                                checked={isChecked}
-                                onChange={() => {
-                                  if (isChecked) {
-                                    setSelectedServices(selectedServices.filter(s => s !== service));
-                                  } else {
-                                    setSelectedServices([...selectedServices, service]);
-                                  }
-                                }}
-                              />
-                              <span>{service}</span>
-                            </label>
-                          );
-                        })}
-                      </div>
-                    </>
+                    <div 
+                      className="absolute z-35 mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg max-h-60 overflow-y-auto p-2 flex flex-col gap-1"
+                    >
+                      {getServiceOptions().map((service) => {
+                        const isChecked = selectedServices.includes(service);
+                        return (
+                          <div
+                            key={service}
+                            onClick={() => {
+                              if (isChecked) {
+                                setSelectedServices(selectedServices.filter(s => s !== service));
+                              } else {
+                                setSelectedServices([...selectedServices, service]);
+                              }
+                            }}
+                            className={`flex items-center gap-2.5 px-3 py-2 rounded-md cursor-pointer select-none text-[13px] transition-colors ${
+                              isChecked ? 'bg-blue-50/70 text-blue-900 font-medium' : 'text-gray-700 hover:bg-gray-50'
+                            }`}
+                          >
+                            <input
+                              type="checkbox"
+                              className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 w-4 h-4 pointer-events-none"
+                              checked={isChecked}
+                              readOnly
+                            />
+                            <span>{service}</span>
+                          </div>
+                        );
+                      })}
+                    </div>
                   )}
                 </div>
 
                 {/* Danh sách sản phẩm thực tế - Multi-select (Tag-based) */}
-                <div className="form-group relative">
+                <div className="form-group relative z-30" ref={productDropdownRef}>
                   <label className="form-label font-semibold text-gray-700">Sản phẩm thực tế *</label>
                   <div
                     onClick={() => setShowProductDropdown(!showProductDropdown)}
@@ -926,117 +943,118 @@ export default function ReportForm() {
                   </div>
                   
                   {showProductDropdown && (
-                    <>
-                      <div className="fixed inset-0 z-20" onClick={() => setShowProductDropdown(false)} />
-                      <div className="absolute z-35 mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg max-h-72 overflow-y-auto p-2 flex flex-col gap-1.5">
-                        <div className="sticky top-0 bg-white pb-2 mb-1 border-b border-gray-100 flex items-center gap-2 px-1">
-                          <div className="relative w-full">
-                            <span className="absolute inset-y-0 left-0 flex items-center pl-2.5 pointer-events-none text-gray-400">
-                              <Search size={14} />
-                            </span>
-                            <input
-                              type="text"
-                              className="w-full pl-8 pr-7 py-1.5 text-xs border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
-                              placeholder="Tìm sản phẩm..."
-                              value={productSearch}
-                              onChange={e => setProductSearch(e.target.value)}
-                            />
-                            {productSearch && (
-                              <button
-                                type="button"
-                                className="absolute inset-y-0 right-0 flex items-center pr-2 text-gray-400 hover:text-gray-600"
-                                onClick={() => setProductSearch('')}
-                              >
-                                <X size={14} />
-                              </button>
-                            )}
-                          </div>
+                    <div 
+                      className="absolute z-35 mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg max-h-72 overflow-y-auto p-2 flex flex-col gap-1.5"
+                    >
+                      <div className="sticky top-0 bg-white pb-2 mb-1 border-b border-gray-100 flex items-center gap-2 px-1">
+                        <div className="relative w-full">
+                          <span className="absolute inset-y-0 left-0 flex items-center pl-2.5 pointer-events-none text-gray-400">
+                            <Search size={14} />
+                          </span>
+                          <input
+                            type="text"
+                            className="w-full pl-8 pr-7 py-1.5 text-xs border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+                            placeholder="Tìm sản phẩm..."
+                            value={productSearch}
+                            onChange={e => setProductSearch(e.target.value)}
+                          />
+                          {productSearch && (
+                            <button
+                              type="button"
+                              className="absolute inset-y-0 right-0 flex items-center pr-2 text-gray-400 hover:text-gray-600"
+                              onClick={() => setProductSearch('')}
+                            >
+                              <X size={14} />
+                            </button>
+                          )}
                         </div>
+                      </div>
 
-                        {(() => {
-                          const suggestedProds = getSuggestedProducts().filter(p => !productSearch || matchesSearchTerm(p, productSearch));
-                          const catalogProdsOnly = getCatalogProductsOnly().filter(p => !productSearch || matchesSearchTerm(p, productSearch));
-                          
-                          if (suggestedProds.length === 0 && catalogProdsOnly.length === 0) {
-                            return (
-                              <div className="text-center py-4 text-xs text-gray-400">
-                                Không tìm thấy sản phẩm phù hợp
-                              </div>
-                            );
-                          }
-
+                      {(() => {
+                        const suggestedProds = getSuggestedProducts().filter(p => !productSearch || matchesSearchTerm(p, productSearch));
+                        const catalogProdsOnly = getCatalogProductsOnly().filter(p => !productSearch || matchesSearchTerm(p, productSearch));
+                        
+                        if (suggestedProds.length === 0 && catalogProdsOnly.length === 0) {
                           return (
-                            <div className="flex flex-col gap-2.5">
-                              {suggestedProds.length > 0 && (
-                                <div className="flex flex-col gap-1">
-                                  <div className="px-2.5 py-1 text-[11px] font-bold text-blue-600 bg-blue-50/50 rounded-md">
-                                    💡 Sản phẩm từ đơn hàng (Gợi ý)
-                                  </div>
-                                  {suggestedProds.map((prod) => {
-                                    const isChecked = selectedProducts.includes(prod);
-                                    return (
-                                      <label
-                                        key={`suggest-${prod}`}
-                                        className={`flex items-center gap-2.5 px-3 py-2 rounded-md cursor-pointer select-none text-[13px] transition-colors ${
-                                          isChecked ? 'bg-blue-50/70 text-blue-900 font-medium' : 'text-gray-700 hover:bg-gray-50'
-                                        }`}
-                                      >
-                                        <input
-                                          type="checkbox"
-                                          className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 w-4 h-4"
-                                          checked={isChecked}
-                                          onChange={() => {
-                                            if (isChecked) {
-                                              setSelectedProducts(selectedProducts.filter(p => p !== prod));
-                                            } else {
-                                              setSelectedProducts([...selectedProducts, prod]);
-                                            }
-                                          }}
-                                        />
-                                        <span>{prod}</span>
-                                      </label>
-                                    );
-                                  })}
-                                </div>
-                              )}
-
-                              {catalogProdsOnly.length > 0 && (
-                                <div className="flex flex-col gap-1">
-                                  <div className="px-2.5 py-1 text-[11px] font-bold text-gray-500 bg-gray-50 rounded-md">
-                                    📦 Tất cả sản phẩm
-                                  </div>
-                                  {catalogProdsOnly.map((prod) => {
-                                    const isChecked = selectedProducts.includes(prod);
-                                    return (
-                                      <label
-                                        key={`catalog-${prod}`}
-                                        className={`flex items-center gap-2.5 px-3 py-2 rounded-md cursor-pointer select-none text-[13px] transition-colors ${
-                                          isChecked ? 'bg-blue-50/70 text-blue-900 font-medium' : 'text-gray-700 hover:bg-gray-50'
-                                        }`}
-                                      >
-                                        <input
-                                          type="checkbox"
-                                          className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 w-4 h-4"
-                                          checked={isChecked}
-                                          onChange={() => {
-                                            if (isChecked) {
-                                              setSelectedProducts(selectedProducts.filter(p => p !== prod));
-                                            } else {
-                                              setSelectedProducts([...selectedProducts, prod]);
-                                            }
-                                          }}
-                                        />
-                                        <span>{prod}</span>
-                                      </label>
-                                    );
-                                  })}
-                                </div>
-                              )}
+                            <div className="text-center py-4 text-xs text-gray-400">
+                              Không tìm thấy sản phẩm phù hợp
                             </div>
                           );
-                        })()}
-                      </div>
-                    </>
+                        }
+
+                        return (
+                          <div className="flex flex-col gap-2.5">
+                            {suggestedProds.length > 0 && (
+                              <div className="flex flex-col gap-1">
+                                <div className="px-2.5 py-1 text-[11px] font-bold text-blue-600 bg-blue-50/50 rounded-md">
+                                  💡 Sản phẩm từ đơn hàng (Gợi ý)
+                                </div>
+                                {suggestedProds.map((prod) => {
+                                  const isChecked = selectedProducts.includes(prod);
+                                  return (
+                                    <div
+                                      key={`suggest-${prod}`}
+                                      onClick={() => {
+                                        if (isChecked) {
+                                          setSelectedProducts(selectedProducts.filter(p => p !== prod));
+                                        } else {
+                                          setSelectedProducts([...selectedProducts, prod]);
+                                        }
+                                      }}
+                                      className={`flex items-center gap-2.5 px-3 py-2 rounded-md cursor-pointer select-none text-[13px] transition-colors ${
+                                        isChecked ? 'bg-blue-50/70 text-blue-900 font-medium' : 'text-gray-700 hover:bg-gray-50'
+                                      }`}
+                                    >
+                                      <input
+                                        type="checkbox"
+                                        className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 w-4 h-4 pointer-events-none"
+                                        checked={isChecked}
+                                        readOnly
+                                      />
+                                      <span>{prod}</span>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            )}
+
+                            {catalogProdsOnly.length > 0 && (
+                              <div className="flex flex-col gap-1">
+                                <div className="px-2.5 py-1 text-[11px] font-bold text-gray-500 bg-gray-50 rounded-md">
+                                  📦 Tất cả sản phẩm
+                                </div>
+                                {catalogProdsOnly.map((prod) => {
+                                  const isChecked = selectedProducts.includes(prod);
+                                  return (
+                                    <div
+                                      key={`catalog-${prod}`}
+                                      onClick={() => {
+                                        if (isChecked) {
+                                          setSelectedProducts(selectedProducts.filter(p => p !== prod));
+                                        } else {
+                                          setSelectedProducts([...selectedProducts, prod]);
+                                        }
+                                      }}
+                                      className={`flex items-center gap-2.5 px-3 py-2 rounded-md cursor-pointer select-none text-[13px] transition-colors ${
+                                        isChecked ? 'bg-blue-50/70 text-blue-900 font-medium' : 'text-gray-700 hover:bg-gray-50'
+                                      }`}
+                                    >
+                                      <input
+                                        type="checkbox"
+                                        className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 w-4 h-4 pointer-events-none"
+                                        checked={isChecked}
+                                        readOnly
+                                      />
+                                      <span>{prod}</span>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })()}
+                    </div>
                   )}
                 </div>
 
@@ -1116,23 +1134,30 @@ export default function ReportForm() {
                                 {/* Group Body (Parts Checklist) */}
                                 {isExpanded && (
                                   <div className="p-3 bg-white flex flex-col gap-2 max-h-[180px] overflow-y-auto animate-fade-in">
-                                    {group.parts.map((part) => (
-                                      <label key={part} className="flex items-center gap-2.5 py-1 text-[13px] text-gray-700 cursor-pointer hover:text-gray-900 select-none">
-                                        <input
-                                          type="checkbox"
-                                          className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 w-4 h-4"
-                                          checked={spareParts.includes(part)}
-                                          onChange={e => {
-                                            if (e.target.checked) {
-                                              setSpareParts([...spareParts, part]);
-                                            } else {
+                                    {group.parts.map((part) => {
+                                      const isChecked = spareParts.includes(part);
+                                      return (
+                                        <div
+                                          key={part}
+                                          onClick={() => {
+                                            if (isChecked) {
                                               setSpareParts(spareParts.filter(p => p !== part));
+                                            } else {
+                                              setSpareParts([...spareParts, part]);
                                             }
                                           }}
-                                        />
-                                        <span>{part}</span>
-                                      </label>
-                                    ))}
+                                          className="flex items-center gap-2.5 py-1 text-[13px] text-gray-700 cursor-pointer hover:text-gray-900 select-none"
+                                        >
+                                          <input
+                                            type="checkbox"
+                                            className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 w-4 h-4 pointer-events-none"
+                                            checked={isChecked}
+                                            readOnly
+                                          />
+                                          <span>{part}</span>
+                                        </div>
+                                      );
+                                    })}
                                   </div>
                                 )}
                               </div>
