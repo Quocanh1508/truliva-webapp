@@ -31,6 +31,7 @@ import OrderList from './pages/admin/OrderList';
 import StationManage from './pages/admin/StationManage';
 import SampleImageManage from './pages/admin/SampleImageManage';
 import InventoryManage from './pages/admin/InventoryManage';
+import BroadcastNotification from './pages/admin/BroadcastNotification';
 
 // Feedback / DEV Pages
 import FeedbackPage from './pages/FeedbackPage';
@@ -306,7 +307,6 @@ export default function App() {
                 <Route path="/ktv/report" element={<ReportForm />} />
                 <Route path="/ktv/my-reports" element={<MyReports />} />
                 <Route path="/ktv/my-orders" element={<MyOrders />} />
-                <Route path="/ktv/notifications" element={<Notifications />} />
                 <Route path="/ktv/inventory" element={<KtvInventory />} />
               </Route>
 
@@ -321,6 +321,11 @@ export default function App() {
                 <Route path="/admin/stations" element={<StationManage />} />
                 <Route path="/admin/users" element={<UserManage />} />
                 <Route path="/admin/sample-images" element={<SampleImageManage />} />
+              </Route>
+
+              {/* Admin & Dev Broadcast Routes */}
+              <Route element={<ProtectedRoute allowedRoles={['ADMIN', 'DEV']} />}>
+                <Route path="/admin/broadcast" element={<BroadcastNotification />} />
               </Route>
 
               {/* All Office/Administrative Routes */}
@@ -340,6 +345,7 @@ export default function App() {
                 <Route path="/profile" element={<ProfilePage />} />
                 <Route path="/change-password" element={<ChangePasswordPage />} />
                 <Route path="/feedback" element={<FeedbackPage />} />
+                <Route path="/notifications" element={<Notifications />} />
               </Route>
             </Route>
 

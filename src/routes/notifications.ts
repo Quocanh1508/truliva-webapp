@@ -2,6 +2,8 @@ import { Router, Request, Response } from 'express';
 import prisma from '../config/database';
 import logger from '../utils/logger';
 import { requireAuth } from '../middleware/authSession';
+import { sendPushNotification } from '../services/notificationService';
+import { sendWebPushNotification } from '../services/webPushService';
 
 const router = Router();
 
@@ -177,6 +179,89 @@ router.post('/subscribe', async (req: Request, res: Response): Promise<void> => 
   } catch (error: any) {
     logger.error('Register web push subscription error', { error: error.message });
     res.status(500).json({ error: 'Lỗi đăng ký nhận thông báo đẩy Web' });
+  }
+});
+
+/**
+ * POST /api/notifications/broadcast
+ * Gửi thông báo hệ thống đến các vai trò (roles) được chọn
+ * Chỉ dành cho Admin hoặc Dev
+ */
+router.post('/broadcast', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const userRole = req.user!.role;
+    if (userRole !== 'DEV' && userRole !== 'ADMIN') {
+      res.status(403).json({ error: 'Không có quyền thực hiện chức năng này' });
+      return;
+    }
+
+    const { title, content, targetRoles } = req.body;
+
+    if (!title || !content || !targetRoles || !Array.isArray(targetRoles) || targetRoles.length === 0) {
+      res.status(400).json({ error: 'Thiếu thông tin tiêu đề, nội dung hoặc vai trò nhận thông báo' });
+      return;
+    }
+
+    // Lấy danh sách người dùng thuộc các vai trò được chọn
+    const users = await prisma.user.findMany({
+      where: {
+        role: { in: targetRoles as any },
+        isActive: true,
+      },
+      select: {
+        id: true,
+        fullName: true,
+        pushToken: true,
+        webPushSubscription: true,
+      },
+    });
+
+    if (users.length === 0) {
+      res.json({ success: true, message: 'Không tìm thấy người dùng nào phù hợp', count: 0 });
+      return;
+    }
+
+    // Tạo thông báo trong Database cho tất cả người dùng được chọn
+    await prisma.notification.createMany({
+      data: users.map((u) => ({
+        userId: u.id,
+        title,
+        content,
+      })),
+    });
+
+    // Gửi thông báo đẩy ngầm (FCM & Web Push)
+    let pushCount = 0;
+    let webPushCount = 0;
+
+    // Để không làm nghẽn request, ta gửi bất đồng bộ trong background
+    users.forEach((u) => {
+      if (u.pushToken) {
+        sendPushNotification(u.id, title, content, { type: 'SYSTEM_ANNOUNCEMENT' })
+          .then((sent) => { if (sent) pushCount++; })
+          .catch((err) => logger.error(`Error sending push to ${u.id}`, { error: err.message }));
+      }
+      if (u.webPushSubscription) {
+        sendWebPushNotification(u.id, title, content, { type: 'SYSTEM_ANNOUNCEMENT' })
+          .then((sent) => { if (sent) webPushCount++; })
+          .catch((err) => logger.error(`Error sending web push to ${u.id}`, { error: err.message }));
+      }
+    });
+
+    logger.info('System notification broadcast successfully', {
+      by: req.user!.id,
+      targetRoles,
+      userCount: users.length,
+    });
+
+    res.json({
+      success: true,
+      message: `Đã gửi thông báo đến ${users.length} tài khoản thành công.`,
+      count: users.length,
+    });
+  } catch (error: any) {
+    logger.error('Broadcast notification error', { error: error.message });
+    res.status(500).json({ error: 'Lỗi khi gửi thông báo hệ thống' });
   }
 });
 

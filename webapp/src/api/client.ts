@@ -272,3 +272,10 @@ export const rescheduleOrder = async (orderId: string, appointmentTime: string, 
   });
 };
 
+export const broadcastNotification = async (data: { title: string; content: string; targetRoles: string[] }) => {
+  return fetchApi('/notifications/broadcast', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
+};
+
