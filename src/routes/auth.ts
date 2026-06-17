@@ -135,6 +135,14 @@ router.get('/me', requireAuth, async (req: Request, res: Response): Promise<void
         jwtSecret,
         { expiresIn: '7d' }
       );
+
+      // Thiết lập lại (làm mới) cookie để tự động gia hạn phiên đăng nhập (sliding expiration)
+      res.cookie('session_token', token, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'lax',
+        maxAge: 7 * 24 * 60 * 60 * 1000, // 7 ngày
+      });
     }
 
     res.json({ user, token });
