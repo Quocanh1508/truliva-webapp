@@ -2712,6 +2712,7 @@ export default function OrderList() {
                         appointmentTime: 'Thời gian hẹn',
                         items: 'Sản phẩm/Vật tư (Số lượng)',
                         pancakeOrderId: 'Mã đơn Pancake',
+                        warehouseInfo: 'Kho xuất hàng',
                       };
                       return map[field] || field;
                     };
@@ -2743,6 +2744,18 @@ export default function OrderList() {
                       if (field === 'assignedKtvId') {
                         return getKtvName(String(val));
                       }
+                      if (field === 'warehouseInfo') {
+                        if (val && typeof val === 'object') {
+                          return val.name || val.id || 'Kho hàng';
+                        }
+                        if (typeof val === 'string' && val.startsWith('{')) {
+                          try {
+                            const parsed = JSON.parse(val);
+                            return parsed.name || parsed.id || 'Kho hàng';
+                          } catch (e) {}
+                        }
+                        return String(val);
+                      }
                       if (field === 'appointmentTime' || field === 'createdAt' || field === 'updatedAt') {
                         const date = new Date(val);
                         if (!isNaN(date.getTime())) {
@@ -2769,16 +2782,21 @@ export default function OrderList() {
                           } else if (typeof log.changes === 'object' && log.changes !== null) {
                             changesArr = [log.changes];
                           }
-                          return changesArr.map((c: any, i: number) => {
-                            const fieldName = c.field || Object.keys(c)[0] || 'N/A';
-                            const fromVal = c.from ?? c[Object.keys(c)[0]] ?? 'Trống';
-                            const toVal = c.to ?? 'Trống';
-                            return (
-                              <div key={i} className="text-gray-600">
-                                - <span className="font-medium text-gray-800">{translateField(fieldName)}</span>: <span className="line-through text-red-400">{formatValue(fieldName, fromVal)}</span> &rarr; <span className="text-green-600 font-medium">{formatValue(fieldName, toVal)}</span>
-                              </div>
-                            );
-                          });
+                          return changesArr
+                            .filter((c: any) => {
+                              const fieldName = c.field || Object.keys(c)[0] || 'N/A';
+                              return fieldName !== 'warehouseId';
+                            })
+                            .map((c: any, i: number) => {
+                              const fieldName = c.field || Object.keys(c)[0] || 'N/A';
+                              const fromVal = c.from ?? c[Object.keys(c)[0]] ?? 'Trống';
+                              const toVal = c.to ?? 'Trống';
+                              return (
+                                <div key={i} className="text-gray-600">
+                                  - <span className="font-medium text-gray-800">{translateField(fieldName)}</span>: <span className="line-through text-red-400">{formatValue(fieldName, fromVal)}</span> &rarr; <span className="text-green-600 font-medium">{formatValue(fieldName, toVal)}</span>
+                                </div>
+                              );
+                            });
                         })()}
                       </div>
                     );
