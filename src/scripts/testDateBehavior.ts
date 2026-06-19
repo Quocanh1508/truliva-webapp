@@ -11,11 +11,32 @@ async function run() {
   const parsePancakeDate = (dateStr: string | null | undefined): Date | null => {
     if (!dateStr) return null;
     let normalized = String(dateStr).trim();
-    if (!normalized.includes('Z') && !normalized.includes('+') && !normalized.includes('-')) {
-      if (!normalized.includes('T')) {
-        normalized = normalized.replace(' ', 'T');
+    
+    // 1. Replace space with 'T' if present
+    if (!normalized.includes('T')) {
+      normalized = normalized.replace(' ', 'T');
+    }
+    
+    // 2. If it contains a dot (milliseconds), let's normalize the milliseconds to exactly 3 digits
+    const dotIndex = normalized.indexOf('.');
+    if (dotIndex !== -1) {
+      // Find where timezone starts
+      let tzStart = normalized.length;
+      for (let i = dotIndex + 1; i < normalized.length; i++) {
+        const char = normalized[i];
+        if (char === 'Z' || char === '+' || char === '-') {
+          tzStart = i;
+          break;
+        }
       }
-      normalized = normalized + 'Z';
+      const msPart = normalized.substring(dotIndex + 1, tzStart);
+      const msNormalized = msPart.substring(0, 3).padEnd(3, '0');
+      const tzPart = tzStart < normalized.length ? normalized.substring(tzStart) : 'Z';
+      normalized = normalized.substring(0, dotIndex + 1) + msNormalized + tzPart;
+    } else {
+      if (!normalized.includes('Z') && !normalized.includes('+') && !normalized.includes('-')) {
+        normalized = normalized + 'Z';
+      }
     }
     const d = new Date(normalized);
     return isNaN(d.getTime()) ? new Date(dateStr) : d;
