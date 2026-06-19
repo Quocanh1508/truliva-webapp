@@ -7,6 +7,17 @@ import { requireAuth, requireCoordinatorOrAdmin } from '../middleware/authSessio
 
 const router = Router();
 
+const ROLE_RANKS: Record<string, number> = {
+  DEV: 100,
+  ADMIN: 80,
+  COORDINATOR: 60,
+  HOTLINE: 50,
+  SALE_SUPERVISOR: 40,
+  SALER: 30,
+  STAFF: 20,
+  KTV: 10
+};
+
 // ==========================================
 // PUBLIC ROUTES (Dành cho mọi role đã login)
 // ==========================================
@@ -288,6 +299,16 @@ router.post('/', async (req: Request, res: Response): Promise<void> => {
     const validRoles = ['KTV', 'ADMIN', 'DEV', 'SALE_SUPERVISOR', 'SALER', 'HOTLINE', 'COORDINATOR', 'STAFF'];
     const finalRole = validRoles.includes(role) ? role : 'KTV';
 
+    // Ngăn chặn leo thang đặc quyền (Privilege Escalation Prevention)
+    const creatorRole = req.user!.role;
+    const creatorRank = ROLE_RANKS[creatorRole] || 0;
+    const targetRank = ROLE_RANKS[finalRole] || 0;
+
+    if (targetRank > creatorRank) {
+      res.status(403).json({ error: `Bạn không có quyền tạo tài khoản với vai trò ${finalRole}` });
+      return;
+    }
+
     const user = await prisma.user.create({
       data: {
         username: username.toLowerCase().trim(),
@@ -352,6 +373,31 @@ router.put('/:id', async (req: Request, res: Response): Promise<void> => {
       warehouseId, warehouseName, group, pancakeAccountName
     } = req.body;
 
+    const targetUser = await prisma.user.findUnique({
+      where: { id },
+      select: { id: true, role: true }
+    });
+
+    if (!targetUser) {
+      res.status(404).json({ error: 'Không tìm thấy người dùng' });
+      return;
+    }
+
+    const creatorRole = req.user!.role;
+    const creatorRank = ROLE_RANKS[creatorRole] || 0;
+    const currentTargetRank = ROLE_RANKS[targetUser.role] || 0;
+
+    // Ngăn chặn leo thang đặc quyền (Privilege Escalation Prevention)
+    if (currentTargetRank > creatorRank) {
+      res.status(403).json({ error: 'Bạn không có quyền chỉnh sửa tài khoản có vai trò cao hơn' });
+      return;
+    }
+
+    if (id === req.user!.id && role !== undefined && role !== creatorRole) {
+      res.status(400).json({ error: 'Bạn không thể tự thay đổi vai trò của chính mình' });
+      return;
+    }
+
     const updateData: any = {};
     if (fullName !== undefined) updateData.fullName = fullName;
     if (phoneNumber !== undefined) updateData.phoneNumber = phoneNumber;
@@ -359,7 +405,14 @@ router.put('/:id', async (req: Request, res: Response): Promise<void> => {
     
     if (role !== undefined) {
       const validRoles = ['KTV', 'ADMIN', 'DEV', 'SALE_SUPERVISOR', 'SALER', 'HOTLINE', 'COORDINATOR', 'STAFF'];
-      updateData.role = validRoles.includes(role) ? role : 'KTV';
+      const finalRole = validRoles.includes(role) ? role : 'KTV';
+      const targetNewRank = ROLE_RANKS[finalRole] || 0;
+
+      if (targetNewRank > creatorRank) {
+        res.status(403).json({ error: `Bạn không có quyền chuyển đổi vai trò sang ${finalRole}` });
+        return;
+      }
+      updateData.role = finalRole;
     }
     
     if (techStationId !== undefined) updateData.techStationId = techStationId || null;
@@ -424,6 +477,30 @@ router.put('/:id', async (req: Request, res: Response): Promise<void> => {
 router.delete('/:id', async (req: Request, res: Response): Promise<void> => {
   try {
     const id = req.params.id as string;
+
+    if (id === req.user!.id) {
+      res.status(400).json({ error: 'Bạn không thể tự vô hiệu hóa tài khoản của chính mình' });
+      return;
+    }
+
+    const targetUser = await prisma.user.findUnique({
+      where: { id },
+      select: { role: true }
+    });
+
+    if (!targetUser) {
+      res.status(404).json({ error: 'Không tìm thấy người dùng' });
+      return;
+    }
+
+    const creatorRole = req.user!.role;
+    const creatorRank = ROLE_RANKS[creatorRole] || 0;
+    const currentTargetRank = ROLE_RANKS[targetUser.role] || 0;
+
+    if (currentTargetRank > creatorRank) {
+      res.status(403).json({ error: 'Bạn không có quyền vô hiệu hóa tài khoản có vai trò cao hơn' });
+      return;
+    }
 
     await prisma.user.update({
       where: { id },
