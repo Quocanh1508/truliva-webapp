@@ -297,12 +297,28 @@ export default function OrderList() {
       alert('Vui lòng nhập số điện thoại khách hàng.');
       return;
     }
+    if (!newOrderForm.address.trim()) {
+      alert('Vui lòng nhập địa chỉ chi tiết.');
+      return;
+    }
+    if (!newOrderForm.province.trim()) {
+      alert('Vui lòng chọn hoặc nhập tỉnh / thành phố.');
+      return;
+    }
+    if (!newOrderForm.note.trim()) {
+      alert('Vui lòng nhập ghi chú.');
+      return;
+    }
     if (!newOrderForm.workType) {
       alert('Vui lòng chọn loại công việc.');
       return;
     }
     if (!newOrderForm.serviceType || !newOrderForm.serviceType.trim()) {
       alert('Vui lòng chọn hoặc nhập loại dịch vụ chi tiết.');
+      return;
+    }
+    if (newOrderForm.items.length === 0) {
+      alert('Vui lòng chọn ít nhất một sản phẩm đi kèm.');
       return;
     }
 
@@ -2837,7 +2853,7 @@ export default function OrderList() {
                 </div>
 
                 <div>
-                  <label className="block text-sm text-gray-600 mb-1">Địa chỉ chi tiết</label>
+                  <label className="block text-sm text-gray-600 mb-1">Địa chỉ chi tiết *</label>
                   <input
                     type="text"
                     className="w-full border rounded p-2 text-sm outline-none focus:border-blue-500 text-gray-800 bg-white"
@@ -2848,7 +2864,7 @@ export default function OrderList() {
                 </div>
 
                 <div>
-                  <label className="block text-sm text-gray-600 mb-1">Tỉnh / Thành phố</label>
+                  <label className="block text-sm text-gray-600 mb-1">Tỉnh / Thành phố *</label>
                   <input
                     type="text"
                     list="new-order-provinces-list"
@@ -2865,7 +2881,7 @@ export default function OrderList() {
                 </div>
 
                 <div>
-                  <label className="block text-sm text-gray-600 mb-1">Ghi chú</label>
+                  <label className="block text-sm text-gray-600 mb-1">Ghi chú *</label>
                   <textarea
                     rows={4}
                     className="w-full border rounded p-2 text-sm outline-none focus:border-blue-500"
@@ -3020,7 +3036,7 @@ export default function OrderList() {
 
                 {/* Chọn sản phẩm */}
                 <div className="border-t pt-4 space-y-2">
-                  <label className="block text-sm font-semibold text-gray-800">Sản phẩm đi kèm</label>
+                  <label className="block text-sm font-semibold text-gray-800">Sản phẩm đi kèm *</label>
 
                   {newOrderForm.items.length > 0 ? (
                     <div className="border border-gray-200 rounded divide-y max-h-40 overflow-y-auto bg-gray-50">
