@@ -6,6 +6,7 @@ import { requireAuth, requireAdmin, requireCoordinatorOrAdmin, requireDashboardA
 import { sendPushNotification } from '../services/notificationService';
 import { sendWebPushNotification } from '../services/webPushService';
 import ExcelJS from 'exceljs';
+import axios from 'axios';
 
 const router = Router();
 
@@ -364,6 +365,103 @@ router.post('/', async (req: Request, res: Response): Promise<void> => {
             full_address: address || currentShippingAddress.full_address,
           };
 
+          // ── Xử lý linh kiện phát sinh (spare parts) ──
+          let newTotalPrice = order.totalPrice || 0;
+          let newTotalQuantity = order.totalQuantity || 0;
+          let targetWarehouseId = order.warehouseId || null;
+          let targetWarehouseName = (order.warehouseInfo as any)?.name || 'Kho hàng';
+
+          const sparePartsList = Array.isArray(spareParts) ? spareParts.filter(Boolean) : [];
+          
+          if (sparePartsList.length > 0) {
+            // 1. Tìm các sản phẩm tương ứng trong danh mục
+            const matchedProducts = await prisma.product.findMany({
+              where: {
+                name: { in: sparePartsList },
+                isActive: true
+              }
+            });
+
+            if (matchedProducts.length > 0) {
+              // Lấy kho hàng của KTV để làm fallback
+              const ktvUser = await prisma.user.findUnique({
+                where: { id: req.user!.id },
+                select: { warehouseId: true, warehouseName: true }
+              });
+              
+              if (!targetWarehouseId && ktvUser?.warehouseId) {
+                targetWarehouseId = ktvUser.warehouseId;
+                targetWarehouseName = ktvUser.warehouseName || 'Kho hàng';
+              }
+
+              // 2. Nếu là đơn từ Pancake POS (pancakeOrderId > 0), thực hiện đồng bộ sản phẩm sang Pancake POS
+              if (order.pancakeOrderId > 0) {
+                const apiKey = process.env.PANCAKE_API_KEY;
+                const shopId = '1635300067'; // Default Shop ID từ dự án
+                if (apiKey) {
+                  const pancakeProducts = matchedProducts.map(p => ({
+                    variation_id: p.pancakeProductId,
+                    quantity: 1,
+                    price: p.sellingPrice || 0
+                  }));
+
+                  try {
+                    logger.info('Syncing spare parts and warehouse to Pancake POS', {
+                      pancakeOrderId: order.pancakeOrderId,
+                      productsCount: pancakeProducts.length,
+                      warehouseId: targetWarehouseId
+                    });
+
+                    const updateResponse = await axios.patch(
+                      `https://pos.pages.fm/api/v1/shops/${shopId}/orders/${order.pancakeOrderId}`,
+                      {
+                        products: pancakeProducts,
+                        warehouse_id: targetWarehouseId || undefined
+                      },
+                      {
+                        params: { api_key: apiKey },
+                        headers: { 'Content-Type': 'application/json' },
+                        timeout: 10000
+                      }
+                    );
+
+                    if (!updateResponse.data || !updateResponse.data.success) {
+                      logger.error('Failed to patch spare parts on Pancake POS', {
+                        pancakeOrderId: order.pancakeOrderId,
+                        response: updateResponse.data
+                      });
+                    }
+                  } catch (syncErr: any) {
+                    logger.error('Error patching spare parts on Pancake POS API', {
+                      pancakeOrderId: order.pancakeOrderId,
+                      error: syncErr.message,
+                      response: syncErr.response?.data
+                    });
+                  }
+                }
+              }
+
+              // 3. Cập nhật các OrderItem cục bộ
+              await prisma.orderItem.deleteMany({
+                where: { orderId: order.id }
+              });
+
+              await prisma.orderItem.createMany({
+                data: matchedProducts.map(p => ({
+                  orderId: order.id,
+                  productName: p.name,
+                  sku: p.sku || null,
+                  quantity: 1,
+                  price: p.sellingPrice || 0,
+                  rawData: p.rawData || undefined
+                }))
+              });
+
+              newTotalPrice = matchedProducts.reduce((sum, p) => sum + (p.sellingPrice || 0), 0);
+              newTotalQuantity = matchedProducts.length;
+            }
+          }
+
           let syncStatus = 'SUCCESS';
           try {
             await syncOrderStatusToPancake(order.pancakeOrderId, 'hoàn thành');
@@ -376,16 +474,27 @@ router.post('/', async (req: Request, res: Response): Promise<void> => {
             syncStatus = 'FAILED';
           }
 
+          const orderUpdateData: any = {
+            adminStatus: 'hoàn thành',
+            serviceType: serviceType || undefined,
+            billFullName: customerName || undefined,
+            billPhoneNumber: customerPhone || undefined,
+            shippingAddress: updatedShippingAddress,
+            pancakeSyncStatus: syncStatus,
+          };
+
+          if (sparePartsList.length > 0) {
+            orderUpdateData.totalPrice = newTotalPrice;
+            orderUpdateData.totalQuantity = newTotalQuantity;
+            if (targetWarehouseId) {
+              orderUpdateData.warehouseId = targetWarehouseId;
+              orderUpdateData.warehouseInfo = { id: targetWarehouseId, name: targetWarehouseName };
+            }
+          }
+
           await prisma.order.update({
             where: { id: orderId },
-            data: { 
-              adminStatus: 'hoàn thành',
-              serviceType: serviceType || undefined,
-              billFullName: customerName || undefined,
-              billPhoneNumber: customerPhone || undefined,
-              shippingAddress: updatedShippingAddress,
-              pancakeSyncStatus: syncStatus,
-            },
+            data: orderUpdateData,
           });
         }
         await prisma.auditLog.create({
