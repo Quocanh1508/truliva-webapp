@@ -214,7 +214,8 @@ async function buildReportFilter(query: any, user: any): Promise<any> {
     const searchConditions: any[] = [
       { customerName: { contains: searchStr, mode: 'insensitive' } },
       { customerPhone: { contains: searchStr } },
-      { ktvUser: { fullName: { contains: searchStr, mode: 'insensitive' } } }
+      { ktvUser: { fullName: { contains: searchStr, mode: 'insensitive' } } },
+      { serialNumber: { contains: searchStr, mode: 'insensitive' } }
     ];
 
     if (!isNaN(finalOrderId)) {

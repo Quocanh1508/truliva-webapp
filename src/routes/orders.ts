@@ -396,6 +396,13 @@ router.get('/', requireAuth, async (req: Request, res: Response): Promise<void> 
             path: ['id'],
             equals: searchStr
           }
+        },
+        {
+          serviceReports: {
+            some: {
+              serialNumber: { contains: searchStr, mode: 'insensitive' }
+            }
+          }
         }
       ];
       const pancakeId = parseInt(searchStr.replace(/^#/, ''), 10);
