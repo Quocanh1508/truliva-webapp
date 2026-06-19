@@ -22,7 +22,10 @@ async function test() {
   const response = await axios.get(url, {
     headers: {
       Authorization: `Bearer ${token}`,
-      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+      'sec-fetch-mode': 'cors',
+      'sec-fetch-site': 'same-origin',
+      'accept-language': 'en-US,en;q=0.9'
     }
   });
 
