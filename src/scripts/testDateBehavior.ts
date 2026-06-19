@@ -37,7 +37,7 @@ async function run() {
       pancakeOrderId: testOrderId,
       pancakeCreatedAt: parsedDate,
       workType: 'Test',
-      adminStatus: 0,
+      adminStatus: '0',
       rawData: {}
     },
     update: {
