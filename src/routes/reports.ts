@@ -218,7 +218,9 @@ async function buildReportFilter(query: any, user: any): Promise<any> {
       { serialNumber: { contains: searchStr, mode: 'insensitive' } }
     ];
 
-    if (!isNaN(finalOrderId)) {
+    const MAX_INT32 = 2147483647;
+    const MIN_INT32 = -2147483648;
+    if (!isNaN(finalOrderId) && finalOrderId <= MAX_INT32 && finalOrderId >= MIN_INT32) {
       searchConditions.push({
         order: {
           pancakeOrderId: finalOrderId

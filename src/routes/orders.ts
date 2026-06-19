@@ -408,7 +408,10 @@ router.get('/', requireAuth, async (req: Request, res: Response): Promise<void> 
       const pancakeId = parseInt(searchStr.replace(/^#/, ''), 10);
       const manualMatch = searchStr.match(/^m(\d+)$/i);
       const finalPancakeId = manualMatch ? -parseInt(manualMatch[1], 10) : pancakeId;
-      if (!isNaN(finalPancakeId)) {
+      
+      const MAX_INT32 = 2147483647;
+      const MIN_INT32 = -2147483648;
+      if (!isNaN(finalPancakeId) && finalPancakeId <= MAX_INT32 && finalPancakeId >= MIN_INT32) {
         searchOR.push({ pancakeOrderId: finalPancakeId });
       }
       conditions.push({ OR: searchOR });
