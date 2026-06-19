@@ -83,9 +83,22 @@ export async function processOrderEvent(rawEventId: string | null, payload: any)
       statusCode = lastStatus.status ?? null;
     }
 
-    // Parse dates
-    const pancakeCreatedAt = payload.inserted_at ? new Date(payload.inserted_at) : null;
-    const pancakeUpdatedAt = payload.updated_at ? new Date(payload.updated_at) : null;
+    // Parse dates (Pancake POS returns UTC times without timezone designation, causing them to be parsed as local time)
+    const parsePancakeDate = (dateStr: string | null | undefined): Date | null => {
+      if (!dateStr) return null;
+      let normalized = String(dateStr).trim();
+      if (!normalized.includes('Z') && !normalized.includes('+') && !normalized.includes('-')) {
+        if (!normalized.includes('T')) {
+          normalized = normalized.replace(' ', 'T');
+        }
+        normalized = normalized + 'Z';
+      }
+      const d = new Date(normalized);
+      return isNaN(d.getTime()) ? new Date(dateStr) : d;
+    };
+
+    const pancakeCreatedAt = parsePancakeDate(payload.inserted_at);
+    const pancakeUpdatedAt = parsePancakeDate(payload.updated_at);
 
     // ══════════════════════════════════════
     // Auto map adminStatus
