@@ -20,12 +20,14 @@ export function normalizeSearchTerm(str: string): string {
 }
 
 /**
- * Checks if a target string contains the query string, case and diacritics insensitive.
+ * Checks if a target string contains all the words from the query string (in any order), case and diacritics insensitive.
  */
 export function matchesSearchTerm(target: string, query: string): boolean {
   const normalizedTarget = normalizeSearchTerm(target);
   const normalizedQuery = normalizeSearchTerm(query);
-  return normalizedTarget.includes(normalizedQuery);
+  if (!normalizedQuery) return true;
+  const queryWords = normalizedQuery.split(/\s+/);
+  return queryWords.every(word => normalizedTarget.includes(word));
 }
 
 /**
