@@ -430,7 +430,7 @@ router.get('/', requireAuth, async (req: Request, res: Response): Promise<void> 
     } else if (sortBy === 'updatedAt') {
       orderBy.updatedAt = orderDirection;
     } else {
-      orderBy.createdAt = orderDirection;
+      orderBy.pancakeCreatedAt = orderDirection;
     }
 
     // Build statsWhere ignoring adminStatus filter to show counts of all statuses matching other active filters
@@ -768,7 +768,8 @@ router.post('/', requireAuth, async (req: Request, res: Response): Promise<void>
         note: note || null,
         shippingAddress: address ? { full_address: address } : undefined,
         billFullName: customerName,
-        billPhoneNumber: cleanPhone
+        billPhoneNumber: cleanPhone,
+        pancakeCreatedAt: new Date()
       }
     });
 
@@ -1098,7 +1099,7 @@ router.get('/export', requireAuth, async (req: Request, res: Response): Promise<
     } else if (sortBy === 'updatedAt') {
       orderBy.updatedAt = orderDirection;
     } else {
-      orderBy.createdAt = orderDirection;
+      orderBy.pancakeCreatedAt = orderDirection;
     }
 
     const orders = await prisma.order.findMany({
