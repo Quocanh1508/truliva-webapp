@@ -41,7 +41,7 @@ async function run() {
   const orders = await prisma.order.findMany({
     where: {
       pancakeOrderId: {
-        not: null
+        gt: 0
       }
     },
     select: {
