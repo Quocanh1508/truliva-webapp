@@ -379,7 +379,7 @@ export default function OrderList() {
       const { startDate, endDate } = getDateRange();
       const res = await getOrders({
         page,
-        limit: 20,
+        limit: 100,
         search,
         sortBy,
         sortOrder,
