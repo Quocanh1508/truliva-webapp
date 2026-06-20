@@ -5,6 +5,7 @@ import { syncOrderStatusToPancake } from '../services/orderProcessor';
 import { requireAuth, requireAdmin, requireCoordinatorOrAdmin, requireDashboardAccess } from '../middleware/authSession';
 import { sendPushNotification } from '../services/notificationService';
 import { sendWebPushNotification } from '../services/webPushService';
+import { syncOrderInventoryState } from '../services/inventoryService';
 import ExcelJS from 'exceljs';
 import axios from 'axios';
 
@@ -307,6 +308,7 @@ router.post('/', async (req: Request, res: Response): Promise<void> => {
       spareParts,
       issueType,
       handlingMethod,
+      items, // unified items
     } = req.body;
 
     // Validation
@@ -323,6 +325,53 @@ router.post('/', async (req: Request, res: Response): Promise<void> => {
     // Tự động lấy tháng hiện tại nếu không truyền
     const reportMonth = month || `${new Date().getMonth() + 1}/${new Date().getFullYear()}`;
 
+    let reportItems = items || [];
+
+    // Fallback nếu frontend gửi products/spareParts legacy nhưng không có items
+    if (reportItems.length === 0 && ((products && products.length > 0) || (spareParts && spareParts.length > 0))) {
+      const allStrings = [...(products || []), ...(spareParts || [])];
+      for (const str of allStrings) {
+        const match = str.match(/^(.+?)\s*x\s*(\d+)$/);
+        let name = str.trim();
+        let qty = 1;
+        if (match) {
+          name = match[1].trim();
+          qty = parseInt(match[2], 10) || 1;
+        }
+        if (name) {
+          reportItems.push({ productName: name, quantity: qty });
+        }
+      }
+    }
+
+    let finalProducts = products || [];
+    let finalSpareParts = spareParts || [];
+
+    const itemNames = reportItems.map((i: any) => i.productName);
+    const matchedProducts = await prisma.product.findMany({
+      where: {
+        name: { in: itemNames },
+        isActive: true
+      }
+    });
+
+    if (reportItems.length > 0) {
+      const parsedProducts: string[] = [];
+      const parsedSpareParts: string[] = [];
+      for (const item of reportItems) {
+        const prod = matchedProducts.find(p => p.name === item.productName);
+        const cat = prod?.category || '';
+        const formatted = item.quantity > 1 ? `${item.productName} x${item.quantity}` : item.productName;
+        if (cat.toLowerCase() === 'spare part') {
+          parsedSpareParts.push(formatted);
+        } else {
+          parsedProducts.push(formatted);
+        }
+      }
+      finalProducts = parsedProducts;
+      finalSpareParts = parsedSpareParts;
+    }
+
     const report = await prisma.serviceReport.create({
       data: {
         month: reportMonth,
@@ -330,7 +379,7 @@ router.post('/', async (req: Request, res: Response): Promise<void> => {
         customerName,
         customerPhone,
         province: province || 'N/A',
-        products: products || [],
+        products: finalProducts,
         serviceType: serviceType || 'N/A',
         imageUrls: imageUrls || [],
         notes: notes || null,
@@ -347,7 +396,7 @@ router.post('/', async (req: Request, res: Response): Promise<void> => {
         tdsIn: tdsIn ? parseFloat(tdsIn) : null,
         tdsOut: tdsOut ? parseFloat(tdsOut) : null,
         waterPressure: waterPressure ? parseFloat(waterPressure) : null,
-        spareParts: spareParts || [],
+        spareParts: finalSpareParts,
         issueType: issueType || null,
         handlingMethod: handlingMethod || null,
       } as any,
@@ -359,119 +408,118 @@ router.post('/', async (req: Request, res: Response): Promise<void> => {
     // Tự động chuyển trạng thái đơn hàng sang "hoàn thành" khi KTV nộp báo cáo
     if (orderId) {
       try {
-        const order = await prisma.order.findUnique({ where: { id: orderId } });
-        if (order) {
-          const currentShippingAddress = (order.shippingAddress as any) || {};
+        const oldOrder = await prisma.order.findUnique({
+          where: { id: orderId },
+          include: { items: true }
+        });
+
+        if (oldOrder) {
+          const currentShippingAddress = (oldOrder.shippingAddress as any) || {};
           const updatedShippingAddress = {
             ...currentShippingAddress,
             province_name: province || currentShippingAddress.province_name,
             full_address: address || currentShippingAddress.full_address,
           };
 
-          // ── Xử lý linh kiện phát sinh (spare parts) ──
-          let newTotalPrice = order.totalPrice || 0;
-          let newTotalQuantity = order.totalQuantity || 0;
-          let targetWarehouseId = order.warehouseId || null;
-          let targetWarehouseName = (order.warehouseInfo as any)?.name || 'Kho hàng';
+          // ── Xử lý linh kiện phát sinh (spare parts) & sản phẩm ──
+          let targetWarehouseId = oldOrder.warehouseId || null;
+          let targetWarehouseName = (oldOrder.warehouseInfo as any)?.name || 'Kho hàng';
 
-          const sparePartsList = Array.isArray(spareParts) ? spareParts.filter(Boolean) : [];
+          // Lấy kho hàng của KTV để làm fallback
+          const ktvUser = await prisma.user.findUnique({
+            where: { id: req.user!.id },
+            select: { warehouseId: true, warehouseName: true }
+          });
           
-          if (sparePartsList.length > 0) {
-            // 1. Tìm các sản phẩm tương ứng trong danh mục
-            const matchedProducts = await prisma.product.findMany({
-              where: {
-                name: { in: sparePartsList },
-                isActive: true
-              }
+          if (!targetWarehouseId && ktvUser?.warehouseId) {
+            targetWarehouseId = ktvUser.warehouseId;
+            targetWarehouseName = ktvUser.warehouseName || 'Kho hàng';
+          }
+
+          // 1. Cập nhật các OrderItem cục bộ
+          await prisma.orderItem.deleteMany({
+            where: { orderId: oldOrder.id }
+          });
+
+          if (reportItems.length > 0) {
+            await prisma.orderItem.createMany({
+              data: reportItems.map((item: any) => {
+                const prod = matchedProducts.find(p => p.name === item.productName);
+                return {
+                  orderId: oldOrder.id,
+                  productName: item.productName,
+                  sku: prod?.sku || null,
+                  quantity: item.quantity,
+                  price: prod?.sellingPrice || 0,
+                  rawData: prod?.rawData || undefined
+                };
+              })
             });
+          }
 
-            if (matchedProducts.length > 0) {
-              // Lấy kho hàng của KTV để làm fallback
-              const ktvUser = await prisma.user.findUnique({
-                where: { id: req.user!.id },
-                select: { warehouseId: true, warehouseName: true }
-              });
-              
-              if (!targetWarehouseId && ktvUser?.warehouseId) {
-                targetWarehouseId = ktvUser.warehouseId;
-                targetWarehouseName = ktvUser.warehouseName || 'Kho hàng';
-              }
+          const newTotalPrice = reportItems.reduce((sum: number, item: any) => {
+            const prod = matchedProducts.find(p => p.name === item.productName);
+            return sum + ((prod?.sellingPrice || 0) * item.quantity);
+          }, 0);
+          const newTotalQuantity = reportItems.reduce((sum: number, item: any) => sum + item.quantity, 0);
 
-              // 2. Nếu là đơn từ Pancake POS (pancakeOrderId > 0), thực hiện đồng bộ sản phẩm sang Pancake POS
-              if (order.pancakeOrderId > 0) {
-                const apiKey = process.env.PANCAKE_API_KEY;
-                const shopId = '1635300067'; // Default Shop ID từ dự án
-                if (apiKey) {
-                  const pancakeProducts = matchedProducts.map(p => ({
-                    variation_id: p.pancakeProductId,
-                    quantity: 1,
-                    price: p.sellingPrice || 0
-                  }));
+          // 2. Nếu là đơn từ Pancake POS (pancakeOrderId > 0), thực hiện đồng bộ sản phẩm sang Pancake POS
+          if (oldOrder.pancakeOrderId > 0 && reportItems.length > 0) {
+            const apiKey = process.env.PANCAKE_API_KEY;
+            const shopId = '1635300067'; // Default Shop ID từ dự án
+            if (apiKey) {
+              const pancakeProducts = reportItems.map((item: any) => {
+                const prod = matchedProducts.find(p => p.name === item.productName);
+                return {
+                  variation_id: prod?.pancakeProductId || null,
+                  quantity: item.quantity,
+                  price: prod?.sellingPrice || 0
+                };
+              }).filter((p: any) => p.variation_id);
 
-                  try {
-                    logger.info('Syncing spare parts and warehouse to Pancake POS', {
-                      pancakeOrderId: order.pancakeOrderId,
-                      productsCount: pancakeProducts.length,
-                      warehouseId: targetWarehouseId
-                    });
+              try {
+                logger.info('Syncing products and warehouse to Pancake POS', {
+                  pancakeOrderId: oldOrder.pancakeOrderId,
+                  productsCount: pancakeProducts.length,
+                  warehouseId: targetWarehouseId
+                });
 
-                    const updateResponse = await axios.patch(
-                      `https://pos.pages.fm/api/v1/shops/${shopId}/orders/${order.pancakeOrderId}`,
-                      {
-                        products: pancakeProducts,
-                        warehouse_id: targetWarehouseId || undefined
-                      },
-                      {
-                        params: { api_key: apiKey },
-                        headers: { 'Content-Type': 'application/json' },
-                        timeout: 10000
-                      }
-                    );
-
-                    if (!updateResponse.data || !updateResponse.data.success) {
-                      logger.error('Failed to patch spare parts on Pancake POS', {
-                        pancakeOrderId: order.pancakeOrderId,
-                        response: updateResponse.data
-                      });
-                    }
-                  } catch (syncErr: any) {
-                    logger.error('Error patching spare parts on Pancake POS API', {
-                      pancakeOrderId: order.pancakeOrderId,
-                      error: syncErr.message,
-                      response: syncErr.response?.data
-                    });
+                const updateResponse = await axios.patch(
+                  `https://pos.pages.fm/api/v1/shops/${shopId}/orders/${oldOrder.pancakeOrderId}`,
+                  {
+                    products: pancakeProducts,
+                    warehouse_id: targetWarehouseId || undefined
+                  },
+                  {
+                    params: { api_key: apiKey },
+                    headers: { 'Content-Type': 'application/json' },
+                    timeout: 10000
                   }
+                );
+
+                if (!updateResponse.data || !updateResponse.data.success) {
+                  logger.error('Failed to patch products on Pancake POS', {
+                    pancakeOrderId: oldOrder.pancakeOrderId,
+                    response: updateResponse.data
+                  });
                 }
+              } catch (syncErr: any) {
+                logger.error('Error patching products on Pancake POS API', {
+                  pancakeOrderId: oldOrder.pancakeOrderId,
+                  error: syncErr.message,
+                  response: syncErr.response?.data
+                });
               }
-
-              // 3. Cập nhật các OrderItem cục bộ
-              await prisma.orderItem.deleteMany({
-                where: { orderId: order.id }
-              });
-
-              await prisma.orderItem.createMany({
-                data: matchedProducts.map(p => ({
-                  orderId: order.id,
-                  productName: p.name,
-                  sku: p.sku || null,
-                  quantity: 1,
-                  price: p.sellingPrice || 0,
-                  rawData: p.rawData || undefined
-                }))
-              });
-
-              newTotalPrice = matchedProducts.reduce((sum, p) => sum + (p.sellingPrice || 0), 0);
-              newTotalQuantity = matchedProducts.length;
             }
           }
 
           let syncStatus = 'SUCCESS';
           try {
-            await syncOrderStatusToPancake(order.pancakeOrderId, 'hoàn thành');
+            await syncOrderStatusToPancake(oldOrder.pancakeOrderId, 'hoàn thành');
           } catch (syncErr: any) {
             logger.warn('Non-blocking Pancake POS status sync failed on report submission', {
               orderId,
-              pancakeOrderId: order.pancakeOrderId,
+              pancakeOrderId: oldOrder.pancakeOrderId,
               error: syncErr.message
             });
             syncStatus = 'FAILED';
@@ -484,28 +532,48 @@ router.post('/', async (req: Request, res: Response): Promise<void> => {
             billPhoneNumber: customerPhone || undefined,
             shippingAddress: updatedShippingAddress,
             pancakeSyncStatus: syncStatus,
+            totalPrice: newTotalPrice,
+            totalQuantity: newTotalQuantity,
+            warehouseId: targetWarehouseId,
+            warehouseInfo: targetWarehouseId ? { id: targetWarehouseId, name: targetWarehouseName } : undefined
           };
 
-          if (sparePartsList.length > 0) {
-            orderUpdateData.totalPrice = newTotalPrice;
-            orderUpdateData.totalQuantity = newTotalQuantity;
-            if (targetWarehouseId) {
-              orderUpdateData.warehouseId = targetWarehouseId;
-              orderUpdateData.warehouseInfo = { id: targetWarehouseId, name: targetWarehouseName };
-            }
-          }
-
-          await prisma.order.update({
+          const updatedOrder = await prisma.order.update({
             where: { id: orderId },
             data: orderUpdateData,
           });
+
+          // Tích hợp đồng bộ tồn kho cục bộ
+          try {
+            const newOrderItems = await prisma.orderItem.findMany({
+              where: { orderId }
+            });
+            await syncOrderInventoryState(orderId, {
+              adminStatus: oldOrder.adminStatus,
+              warehouseId: oldOrder.warehouseId,
+              items: oldOrder.items.map(item => ({
+                productName: item.productName || '',
+                quantity: item.quantity || 1
+              }))
+            }, {
+              adminStatus: updatedOrder.adminStatus,
+              warehouseId: updatedOrder.warehouseId,
+              items: newOrderItems.map(item => ({
+                productName: item.productName || '',
+                quantity: item.quantity || 1
+              }))
+            });
+          } catch (invErr: any) {
+            logger.error('Lỗi khấu trừ kho khi hoàn thành đơn qua báo cáo', { orderId, error: invErr.message });
+          }
         }
+
         await prisma.auditLog.create({
           data: {
             entityType: 'Order',
             entityId: orderId,
             action: 'updated',
-            changes: { adminStatus: { from: 'đang thực hiện', to: 'hoàn thành' } },
+            changes: { adminStatus: { from: oldOrder?.adminStatus || 'đang thực hiện', to: 'hoàn thành' } },
             userId: req.user!.id,
             userName: req.user!.fullName,
           },
@@ -1177,7 +1245,56 @@ router.put('/:id', requireAuth, async (req: Request, res: Response): Promise<voi
       waterSource, tdsIn, tdsOut, waterPressure,
       spareParts, issueType, handlingMethod,
       imageUrls,
+      items, // unified items
     } = req.body;
+
+    let finalProducts = products;
+    let finalSpareParts = spareParts;
+
+    let reportItems = items;
+    // Fallback nếu không truyền items nhưng có products/spareParts
+    if (reportItems === undefined && (products !== undefined || spareParts !== undefined)) {
+      reportItems = [];
+      const allStrings = [...(products || []), ...(spareParts || [])];
+      for (const str of allStrings) {
+        const match = str.match(/^(.+?)\s*x\s*(\d+)$/);
+        let name = str.trim();
+        let qty = 1;
+        if (match) {
+          name = match[1].trim();
+          qty = parseInt(match[2], 10) || 1;
+        }
+        if (name) {
+          reportItems.push({ productName: name, quantity: qty });
+        }
+      }
+    }
+
+    let matchedProducts: any[] = [];
+    if (reportItems !== undefined) {
+      const itemNames = reportItems.map((i: any) => i.productName);
+      matchedProducts = await prisma.product.findMany({
+        where: {
+          name: { in: itemNames },
+          isActive: true
+        }
+      });
+
+      const parsedProducts: string[] = [];
+      const parsedSpareParts: string[] = [];
+      for (const item of reportItems) {
+        const prod = matchedProducts.find(p => p.name === item.productName);
+        const cat = prod?.category || '';
+        const formatted = item.quantity > 1 ? `${item.productName} x${item.quantity}` : item.productName;
+        if (cat.toLowerCase() === 'spare part') {
+          parsedSpareParts.push(formatted);
+        } else {
+          parsedProducts.push(formatted);
+        }
+      }
+      finalProducts = parsedProducts;
+      finalSpareParts = parsedSpareParts;
+    }
 
     const updateData: any = {};
     if (isPaid !== undefined) updateData.isPaid = isPaid;
@@ -1190,7 +1307,7 @@ router.put('/:id', requireAuth, async (req: Request, res: Response): Promise<voi
     if (customerPhone !== undefined) updateData.customerPhone = customerPhone;
     if (province !== undefined) updateData.province = province;
     if (address !== undefined) updateData.address = address;
-    if (products !== undefined) updateData.products = products;
+    if (finalProducts !== undefined) updateData.products = finalProducts;
     if (serviceType !== undefined) updateData.serviceType = serviceType;
     if (workType !== undefined) updateData.workType = workType;
     if (actualAmount !== undefined) updateData.actualAmount = actualAmount !== null && actualAmount !== '' ? parseFloat(actualAmount) : null;
@@ -1202,7 +1319,7 @@ router.put('/:id', requireAuth, async (req: Request, res: Response): Promise<voi
     if (tdsIn !== undefined) updateData.tdsIn = tdsIn !== null && tdsIn !== '' ? parseFloat(tdsIn) : null;
     if (tdsOut !== undefined) updateData.tdsOut = tdsOut !== null && tdsOut !== '' ? parseFloat(tdsOut) : null;
     if (waterPressure !== undefined) updateData.waterPressure = waterPressure !== null && waterPressure !== '' ? parseFloat(waterPressure) : null;
-    if (spareParts !== undefined) updateData.spareParts = spareParts || [];
+    if (finalSpareParts !== undefined) updateData.spareParts = finalSpareParts;
     if (issueType !== undefined) updateData.issueType = issueType || null;
     if (handlingMethod !== undefined) updateData.handlingMethod = handlingMethod || null;
 
@@ -1214,6 +1331,134 @@ router.put('/:id', requireAuth, async (req: Request, res: Response): Promise<voi
       data: updateData,
       include: { ktvUser: { select: { fullName: true } } },
     });
+
+    // Nếu có orderId và reportItems được cập nhật, ta cập nhật cả Order và đồng bộ tồn kho
+    if (existingReport.orderId && reportItems !== undefined) {
+      try {
+        const orderId = existingReport.orderId;
+        const oldOrder = await prisma.order.findUnique({
+          where: { id: orderId },
+          include: { items: true }
+        });
+
+        if (oldOrder) {
+          let targetWarehouseId = oldOrder.warehouseId || null;
+          let targetWarehouseName = (oldOrder.warehouseInfo as any)?.name || 'Kho hàng';
+
+          // Cập nhật OrderItems
+          await prisma.orderItem.deleteMany({
+            where: { orderId }
+          });
+
+          if (reportItems.length > 0) {
+            await prisma.orderItem.createMany({
+              data: reportItems.map((item: any) => {
+                const prod = matchedProducts.find(p => p.name === item.productName);
+                return {
+                  orderId,
+                  productName: item.productName,
+                  sku: prod?.sku || null,
+                  quantity: item.quantity,
+                  price: prod?.sellingPrice || 0,
+                  rawData: prod?.rawData || undefined
+                };
+              })
+            });
+          }
+
+          const newTotalPrice = reportItems.reduce((sum: number, item: any) => {
+            const prod = matchedProducts.find(p => p.name === item.productName);
+            return sum + ((prod?.sellingPrice || 0) * item.quantity);
+          }, 0);
+          const newTotalQuantity = reportItems.reduce((sum: number, item: any) => sum + item.quantity, 0);
+
+          // Sync sang Pancake POS
+          if (oldOrder.pancakeOrderId > 0 && reportItems.length > 0) {
+            const apiKey = process.env.PANCAKE_API_KEY;
+            const shopId = '1635300067';
+            if (apiKey) {
+              const pancakeProducts = reportItems.map((item: any) => {
+                const prod = matchedProducts.find(p => p.name === item.productName);
+                return {
+                  variation_id: prod?.pancakeProductId || null,
+                  quantity: item.quantity,
+                  price: prod?.sellingPrice || 0
+                };
+              }).filter((p: any) => p.variation_id);
+
+              try {
+                logger.info('Syncing edited products and warehouse to Pancake POS', {
+                  pancakeOrderId: oldOrder.pancakeOrderId,
+                  productsCount: pancakeProducts.length,
+                  warehouseId: targetWarehouseId
+                });
+
+                const updateResponse = await axios.patch(
+                  `https://pos.pages.fm/api/v1/shops/${shopId}/orders/${oldOrder.pancakeOrderId}`,
+                  {
+                    products: pancakeProducts,
+                    warehouse_id: targetWarehouseId || undefined
+                  },
+                  {
+                    params: { api_key: apiKey },
+                    headers: { 'Content-Type': 'application/json' },
+                    timeout: 10000
+                  }
+                );
+
+                if (!updateResponse.data || !updateResponse.data.success) {
+                  logger.error('Failed to patch edited products on Pancake POS', {
+                    pancakeOrderId: oldOrder.pancakeOrderId,
+                    response: updateResponse.data
+                  });
+                }
+              } catch (syncErr: any) {
+                logger.error('Error patching edited products on Pancake POS API', {
+                  pancakeOrderId: oldOrder.pancakeOrderId,
+                  error: syncErr.message,
+                  response: syncErr.response?.data
+                });
+              }
+            }
+          }
+
+          // Cập nhật Order trong DB
+          const updatedOrder = await prisma.order.update({
+            where: { id: orderId },
+            data: {
+              totalPrice: newTotalPrice,
+              totalQuantity: newTotalQuantity,
+            }
+          });
+
+          // Sync Tồn kho cục bộ
+          try {
+            const newOrderItems = await prisma.orderItem.findMany({
+              where: { orderId }
+            });
+            await syncOrderInventoryState(orderId, {
+              adminStatus: oldOrder.adminStatus,
+              warehouseId: oldOrder.warehouseId,
+              items: oldOrder.items.map(item => ({
+                productName: item.productName || '',
+                quantity: item.quantity || 1
+              }))
+            }, {
+              adminStatus: updatedOrder.adminStatus,
+              warehouseId: updatedOrder.warehouseId,
+              items: newOrderItems.map(item => ({
+                productName: item.productName || '',
+                quantity: item.quantity || 1
+              }))
+            });
+          } catch (invErr: any) {
+            logger.error('Lỗi khấu trừ kho khi cập nhật báo cáo', { orderId, error: invErr.message });
+          }
+        }
+      } catch (err: any) {
+        logger.error('Failed to update order details on report edit', { error: err.message });
+      }
+    }
 
     // ── Gửi thông báo cho KTV nếu admin sửa nội dung (không chỉ isPaid) và người sửa không phải là chính KTV ──
     const hasContentEdit = Object.keys(updateData).some(k => k !== 'isPaid');

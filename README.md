@@ -94,7 +94,7 @@ graph TD
 
 ### Tech Stack
 *   **Backend Engine**: Node.js (Express), TypeScript
-*   **Database & ORM**: PostgreSQL (Neon Cloud), Prisma ORM
+*   **Database & ORM**: PostgreSQL, Prisma ORM
 *   **Push Notifications**: Firebase Admin SDK (for native app), Web-Push (for PWA web clients)
 *   **Frontend Webapp**: React, Vite, TypeScript, Tailwind CSS, Lucide Icons, Recharts
 *   **Mobile Wrapper**: Capacitor CLI (packaging web app source into native Android APK)
@@ -138,7 +138,7 @@ graph TD
 
 ### 1. System Requirements
 *   **Node.js**: Version 18.x or higher
-*   **PostgreSQL**: Active PostgreSQL instance (or Neon Cloud account)
+*   **PostgreSQL**: Active PostgreSQL instance
 *   **Package Manager**: npm (bundled with Node.js)
 
 ### 2. Dependency Installation

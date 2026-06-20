@@ -1,6 +1,7 @@
 import prisma from '../config/database';
 import logger from '../utils/logger';
 import axios from 'axios';
+import { syncOrderInventoryState } from './inventoryService';
 
 /**
  * Xử lý event "orders" từ Pancake webhook.
@@ -134,7 +135,8 @@ export async function processOrderEvent(rawEventId: string | null, payload: any)
         workType: true,
         items: {
           select: {
-            id: true
+            productName: true,
+            quantity: true
           }
         }
       }
@@ -295,6 +297,30 @@ export async function processOrderEvent(rawEventId: string | null, payload: any)
           rawData: item,
         })),
       });
+    }
+
+    // Tích hợp đồng bộ tồn kho cục bộ
+    try {
+      const newOrderItems = await prisma.orderItem.findMany({
+        where: { orderId: order.id }
+      });
+      await syncOrderInventoryState(order.id, existingOrder ? {
+        adminStatus: existingOrder.adminStatus,
+        warehouseId: existingOrder.warehouseId,
+        items: existingOrder.items.map(item => ({
+          productName: item.productName || '',
+          quantity: item.quantity || 1
+        }))
+      } : null, {
+        adminStatus: order.adminStatus,
+        warehouseId: order.warehouseId,
+        items: newOrderItems.map(item => ({
+          productName: item.productName || '',
+          quantity: item.quantity || 1
+        }))
+      });
+    } catch (invErr: any) {
+      logger.error('Lỗi khấu trừ kho khi đồng bộ webhook Pancake', { orderId: order.id, error: invErr.message });
     }
 
     // ══════════════════════════════════════

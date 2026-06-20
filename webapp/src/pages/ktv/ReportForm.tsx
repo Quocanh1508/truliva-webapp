@@ -2,84 +2,12 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { fetchApi, getOrders, getFiltersData } from '../../api/client';
 import LabeledImageUploader from '../../components/LabeledImageUploader';
-import { CheckCircle, ChevronLeft, Send, AlertCircle, Camera, Loader2, ChevronDown, ChevronUp, Search, X } from 'lucide-react';
+import { CheckCircle, ChevronLeft, Send, AlertCircle, Camera, Loader2, ChevronDown, X } from 'lucide-react';
 import { Html5Qrcode } from 'html5-qrcode';
 import { enqueueReport } from '../../utils/offlineStorage';
+import CategoryTreeSelect from '../../components/CategoryTreeSelect';
 
 import { getImageSlots, WARRANTY_SERVICE_GROUPS, REPAIR_SERVICE_GROUPS, WORK_TYPE_SERVICES } from '../../utils/workTypes';
-import { matchesSearchTerm } from '../../utils/text';
-
-// ── Cấu trúc linh kiện phân loại theo dòng máy ──
-const SPARE_PARTS_GROUPS = [
-  {
-    name: 'Linh kiện chung / Khác',
-    parts: ['Bơm tăng áp', 'Van giảm áp', 'Van chia']
-  },
-  {
-    name: 'Linh kiện UR3626',
-    parts: [
-      'Cụm van (2) Truliva UR3626',
-      'Bơm RO Truliva UR3626',
-      'Mạch điều khiển Truliva UR3626',
-      'Mạch đèn Truliva UR3626',
-      'Biến áp Truliva UR3626',
-      'Bộ vòi Truliva UR3626/UR5640/UR5440'
-    ]
-  },
-  {
-    name: 'Linh kiện UR5676',
-    parts: [
-      'Cụm van Truliva UR5676/UR5640/UR5440',
-      'Bơm RO Truliva UR5676/UR5640',
-      'Mạch điều khiển Truliva UR5676/UR5640/UR5440',
-      'Mạch đèn Truliva UR5676',
-      'Biến áp Truliva UR5676/UR5640/UR5440',
-      'Cảm biến TDS Truliva UR5676/UR61096H',
-      'Bộ vòi điện tử Truliva UR5676/UR5840'
-    ]
-  },
-  {
-    name: 'Linh kiện UR5840',
-    parts: [
-      'Cụm van Truliva UR5840',
-      'Bơm RO Truliva UR5840',
-      'Mạch điều khiển Truliva UR5840',
-      'Mạch đèn Truliva UR5840',
-      'Biến áp Truliva UR5840',
-      'Cảm biến TDS Truliva UR5840',
-      'Bộ vòi điện tử Truliva UR5676/UR5840'
-    ]
-  },
-  {
-    name: 'Linh kiện UR61096H',
-    parts: [
-      'Cụm van Truliva UR61096H',
-      'Bơm RO Truliva UR61096H',
-      'Mạch điều khiển Truliva UR61096H',
-      'Mạch đèn Truliva UR61096H',
-      'Biến áp Truliva UR61096H',
-      'Bộ vòi điện tử Truliva UR61096H',
-      'Cảm biến TDS Truliva UR5676/UR61096H'
-    ]
-  },
-  {
-    name: 'Linh kiện W6412',
-    parts: [
-      'Khay hứng nước Truliva W6412',
-      'Nắp khay hứng nước Truliva W6412',
-      'Ống silicon Truliva W6412',
-      'Vỏ trước Truliva W6412',
-      'Bộ gia nhiệt Truliva W6412',
-      'Mạch điều khiển Truliva W6412',
-      'Van điện từ nước vào Truliva W6412',
-      'Mạch màn hình Truliva W6412',
-      'Túi đá điện tử Truliva W6412',
-      'Bơm đường nước lạnh Truliva W6412',
-      'Bơm đường nước nóng Truliva W6412',
-      'Bình chứa Truliva W6412'
-    ]
-  }
-];
 
 // ── Nguồn nước options ──
 const WATER_SOURCES = [
@@ -106,11 +34,6 @@ function needsTechnicalFields(workType: string): boolean {
   return ['Thay lọc', 'Lắp đặt', 'Giao hàng và Lắp đặt', 'Bảo hành', 'Sửa chữa'].includes(workType);
 }
 
-// ── Kiểm tra workType có cần linh kiện phát sinh không ──
-function needsSpareParts(workType: string): boolean {
-  return ['Thay lọc', 'Bảo hành', 'Sửa chữa', 'Lắp đặt', 'Giao hàng và Lắp đặt'].includes(workType);
-}
-
 export default function ReportForm() {
   const navigate = useNavigate();
   const location = useLocation();
@@ -132,24 +55,19 @@ export default function ReportForm() {
   const [actualAmount, setActualAmount] = useState('');
 
   // ── Multi-select custom dropdown states ──
-  const [catalogProducts, setCatalogProducts] = useState<string[]>([]);
+  const [stockProducts, setStockProducts] = useState<any[]>([]);
+  const [categories, setCategories] = useState<string[]>([]);
+  const [selectedItems, setSelectedItems] = useState<any[]>([]);
   const [selectedServices, setSelectedServices] = useState<string[]>([]);
-  const [selectedProducts, setSelectedProducts] = useState<string[]>([]);
   const [showServiceDropdown, setShowServiceDropdown] = useState(false);
-  const [showProductDropdown, setShowProductDropdown] = useState(false);
-  const [productSearch, setProductSearch] = useState('');
 
   const serviceDropdownRef = useRef<HTMLDivElement>(null);
-  const productDropdownRef = useRef<HTMLDivElement>(null);
 
   // Click outside handlers to close dropdowns
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
       if (serviceDropdownRef.current && !serviceDropdownRef.current.contains(event.target as Node)) {
         setShowServiceDropdown(false);
-      }
-      if (productDropdownRef.current && !productDropdownRef.current.contains(event.target as Node)) {
-        setShowProductDropdown(false);
       }
     }
     document.addEventListener('mousedown', handleClickOutside);
@@ -163,8 +81,6 @@ export default function ReportForm() {
   const [tdsIn, setTdsIn] = useState('');
   const [tdsOut, setTdsOut] = useState('');
   const [waterPressure, setWaterPressure] = useState('');
-  const [spareParts, setSpareParts] = useState<string[]>([]);
-  const [expandedGroups, setExpandedGroups] = useState<string[]>(['Linh kiện chung / Khác']);
   const [issueType, setIssueType] = useState('');
   const [customIssueType, setCustomIssueType] = useState('');
   const [handlingMethod, setHandlingMethod] = useState('');
@@ -183,15 +99,27 @@ export default function ReportForm() {
   // ── Step 4: Ghi chú & Submit ──
   const [notes, setNotes] = useState('');
 
-  // Tải danh mục sản phẩm từ Database
+  // Tải danh mục sản phẩm & tồn kho của KTV từ Database
   useEffect(() => {
-    getFiltersData()
+    fetchApi('/inventory/my-stock')
       .then(res => {
-        if (res && res.productNames) {
-          setCatalogProducts(res.productNames);
+        if (res && res.products) {
+          setStockProducts(res.products);
+          const cats = Array.from(new Set(res.products.map((p: any) => p.category).filter(Boolean))) as string[];
+          setCategories(cats);
         }
       })
-      .catch(err => console.error('Lỗi tải danh mục sản phẩm', err));
+      .catch(err => {
+        console.error('Lỗi tải thông tin tồn kho KTV, thử tải từ bộ lọc', err);
+        getFiltersData()
+          .then(res => {
+            if (res && res.products) {
+              setStockProducts(res.products.map((p: any) => ({ name: p.name, category: p.category })));
+              setCategories(res.categories || []);
+            }
+          })
+          .catch(filterErr => console.error('Lỗi tải danh mục sản phẩm', filterErr));
+      });
   }, []);
 
   // Tải báo cáo cũ nếu đang ở chế độ chỉnh sửa (Edit Mode)
@@ -214,10 +142,27 @@ export default function ReportForm() {
         setProvince(report.province || '');
         setWorkType(report.workType || '');
         
-        // Handle products
-        if (report.products) {
-          setSelectedProducts(report.products);
-        }
+        // Khôi phục selectedItems từ products và spareParts của báo cáo cũ
+        const loadedItems: any[] = [];
+        const allStrings = [...(report.products || []), ...(report.spareParts || [])];
+        allStrings.forEach((str: string) => {
+          const match = str.match(/^(.+?)\s*x\s*(\d+)$/);
+          let name = str.trim();
+          let qty = 1;
+          if (match) {
+            name = match[1].trim();
+            qty = parseInt(match[2], 10) || 1;
+          }
+          if (name) {
+            loadedItems.push({
+              productName: name,
+              sku: '',
+              quantity: qty,
+              price: 0
+            });
+          }
+        });
+        setSelectedItems(loadedItems);
         
         // Handle services
         if (report.serviceType) {
@@ -231,7 +176,6 @@ export default function ReportForm() {
         setTdsIn(report.tdsIn ? String(report.tdsIn) : '');
         setTdsOut(report.tdsOut ? String(report.tdsOut) : '');
         setWaterPressure(report.waterPressure ? String(report.waterPressure) : '');
-        setSpareParts(report.spareParts || []);
         
         // Handling method and issue type
         if (['Bảo hành', 'Sửa chữa'].includes(report.workType)) {
@@ -276,6 +220,30 @@ export default function ReportForm() {
       });
   }, [editReportId]);
 
+  // Đồng bộ thông tin SKU/Price cho selectedItems khi danh mục sản phẩm được tải
+  useEffect(() => {
+    if (stockProducts.length > 0 && selectedItems.length > 0) {
+      const updated = selectedItems.map(item => {
+        if (!item.sku || !item.price) {
+          const matched = stockProducts.find(p => p.name.toLowerCase() === item.productName.toLowerCase());
+          if (matched) {
+            return {
+              ...item,
+              productName: matched.name,
+              sku: matched.sku || '',
+              price: matched.sellingPrice || 0
+            };
+          }
+        }
+        return item;
+      });
+      const changed = JSON.stringify(updated) !== JSON.stringify(selectedItems);
+      if (changed) {
+        setSelectedItems(updated);
+      }
+    }
+  }, [stockProducts, selectedItems]);
+
   const getServiceOptions = (): string[] => {
     let options: string[] = [];
     if (workType === 'Bảo hành') {
@@ -302,27 +270,41 @@ export default function ReportForm() {
     return Array.from(new Set(options));
   };
 
-  const getSuggestedProducts = (): string[] => {
-    const suggestions = new Set<string>();
-    if (selectedOrderId) {
-      const order = orders.find(o => o.id === selectedOrderId);
-      if (order?.items) {
-        order.items.forEach((item: any) => {
-          const name = item.productName
-            || item.variationInfo?.name
-            || (item.sku ? `Sản phẩm (${item.sku})` : 'Sản phẩm không tên');
-          const qty = item.quantity || 1;
-          suggestions.add(`${name} x${qty}`);
-          suggestions.add(name);
-        });
+  const handleTreeSelectChange = (selectedNodeIds: string[]) => {
+    const selectedProductNames = selectedNodeIds
+      .filter(id => id.startsWith('PROD:'))
+      .map(id => id.substring(5));
+
+    const nextItems = selectedProductNames.map(name => {
+      const existing = selectedItems.find(item => item.productName === name);
+      if (existing) {
+        return existing;
       }
-    }
-    return Array.from(suggestions);
+      
+      const pData = stockProducts.find(p => p.name === name);
+      return {
+        productName: name,
+        sku: pData?.sku || '',
+        quantity: 1,
+        price: pData?.sellingPrice || 0
+      };
+    });
+    
+    setSelectedItems(nextItems);
   };
 
-  const getCatalogProductsOnly = (): string[] => {
-    const suggestions = new Set(getSuggestedProducts());
-    return catalogProducts.filter(p => !suggestions.has(p));
+  const handleUpdateQuantity = (productName: string, delta: number) => {
+    setSelectedItems(prev => prev.map(item => {
+      if (item.productName === productName) {
+        const nextQty = Math.max(1, item.quantity + delta);
+        return { ...item, quantity: nextQty };
+      }
+      return item;
+    }));
+  };
+
+  const handleRemoveItem = (productName: string) => {
+    setSelectedItems(prev => prev.filter(item => item.productName !== productName));
   };
 
   // Định dạng hiển thị Số Serial dạng: XXXX XXX XXX XXXXX
@@ -359,9 +341,15 @@ export default function ReportForm() {
       if (res && res.exists) {
         setSerialInfo(res);
         setSerialWarning('');
-        if (res.products && res.products.length > 0 && selectedProducts.length === 0) {
+        if (res.products && res.products.length > 0 && selectedItems.length === 0) {
           const matchedProd = res.products[0].split('x')[0].trim();
-          setSelectedProducts([matchedProd]);
+          const prodData = stockProducts.find(p => p.name.toLowerCase() === matchedProd.toLowerCase());
+          setSelectedItems([{
+            productName: prodData?.name || matchedProd,
+            sku: prodData?.sku || '',
+            quantity: 1,
+            price: prodData?.sellingPrice || 0
+          }]);
         }
       } else {
         setSerialInfo(null);
@@ -452,33 +440,27 @@ export default function ReportForm() {
             setSelectedServices(stateOrder.serviceType ? stateOrder.serviceType.split(',').map((s: string) => s.trim()).filter(Boolean) : []);
           }
 
-          let orderProducts: string[] = [];
-          let prodStr = '';
           if (stateOrder.items && stateOrder.items.length > 0) {
-            orderProducts = stateOrder.items.map((item: any) => {
+            const initialItems = stateOrder.items.map((item: any) => {
               const name = item.productName
                 || item.variationInfo?.name
                 || (item.sku ? `Sản phẩm (${item.sku})` : 'Sản phẩm không tên');
               const qty = item.quantity || 1;
-              return `${name} x${qty}`;
+              return {
+                productName: name,
+                sku: item.sku || '',
+                quantity: qty,
+                price: item.price || 0
+              };
             });
-            prodStr = orderProducts.join(', ');
-            setSelectedProducts(orderProducts);
+            setSelectedItems(initialItems);
+          } else {
+            setSelectedItems([]);
           }
           
           if (stateOrder.moneyToCollect !== undefined && stateOrder.moneyToCollect !== null) {
             setActualAmount(String(stateOrder.moneyToCollect));
           }
-
-          // Tự động mở rộng nhóm linh kiện tương ứng dựa trên tên dòng máy
-          const matchingGroups: string[] = ['Linh kiện chung / Khác'];
-          const pStrLower = prodStr.toLowerCase();
-          if (pStrLower.includes('3626')) matchingGroups.push('Linh kiện UR3626');
-          if (pStrLower.includes('5676') || pStrLower.includes('5640') || pStrLower.includes('5440')) matchingGroups.push('Linh kiện UR5676');
-          if (pStrLower.includes('5840')) matchingGroups.push('Linh kiện UR5840');
-          if (pStrLower.includes('61096')) matchingGroups.push('Linh kiện UR61096H');
-          if (pStrLower.includes('6412') || pStrLower.includes('w6412')) matchingGroups.push('Linh kiện W6412');
-          setExpandedGroups(matchingGroups);
 
         } else {
           setOrders(list);
@@ -530,32 +512,27 @@ export default function ReportForm() {
                 setSelectedServices(stateOrder.serviceType ? stateOrder.serviceType.split(',').map((s: string) => s.trim()).filter(Boolean) : []);
               }
 
-              let orderProducts: string[] = [];
-              let prodStr = '';
               if (stateOrder.items && stateOrder.items.length > 0) {
-                orderProducts = stateOrder.items.map((item: any) => {
+                const initialItems = stateOrder.items.map((item: any) => {
                   const name = item.productName
                     || item.variationInfo?.name
                     || (item.sku ? `Sản phẩm (${item.sku})` : 'Sản phẩm không tên');
                   const qty = item.quantity || 1;
-                  return `${name} x${qty}`;
+                  return {
+                    productName: name,
+                    sku: item.sku || '',
+                    quantity: qty,
+                    price: item.price || 0
+                  };
                 });
-                prodStr = orderProducts.join(', ');
-                setSelectedProducts(orderProducts);
+                setSelectedItems(initialItems);
+              } else {
+                setSelectedItems([]);
               }
               
               if (stateOrder.moneyToCollect !== undefined && stateOrder.moneyToCollect !== null) {
                 setActualAmount(String(stateOrder.moneyToCollect));
               }
-
-              const matchingGroups: string[] = ['Linh kiện chung / Khác'];
-              const pStrLower = prodStr.toLowerCase();
-              if (pStrLower.includes('3626')) matchingGroups.push('Linh kiện UR3626');
-              if (pStrLower.includes('5676') || pStrLower.includes('5640') || pStrLower.includes('5440')) matchingGroups.push('Linh kiện UR5676');
-              if (pStrLower.includes('5840')) matchingGroups.push('Linh kiện UR5840');
-              if (pStrLower.includes('61096')) matchingGroups.push('Linh kiện UR61096H');
-              if (pStrLower.includes('6412') || pStrLower.includes('w6412')) matchingGroups.push('Linh kiện W6412');
-              setExpandedGroups(matchingGroups);
             } else {
               setOrders(list);
             }
@@ -575,7 +552,7 @@ export default function ReportForm() {
       setProvince('');
       setWorkType('');
       setSelectedServices([]);
-      setSelectedProducts([]);
+      setSelectedItems([]);
       setActualAmount('');
       return;
     }
@@ -599,30 +576,23 @@ export default function ReportForm() {
       }
 
       // ── Mapping sản phẩm x số lượng từ items ──
-      let prodStr = '';
       if (order.items && order.items.length > 0) {
-        const itemNames = order.items.map((item: any) => {
+        const initialItems = order.items.map((item: any) => {
           const name = item.productName
             || item.variationInfo?.name
             || (item.sku ? `Sản phẩm (${item.sku})` : 'Sản phẩm không tên');
           const qty = item.quantity || 1;
-          return `${name} x${qty}`;
+          return {
+            productName: name,
+            sku: item.sku || '',
+            quantity: qty,
+            price: item.price || 0
+          };
         });
-        prodStr = itemNames.join(', ');
-        setSelectedProducts(itemNames);
+        setSelectedItems(initialItems);
       } else {
-        setSelectedProducts([]);
+        setSelectedItems([]);
       }
-
-      // Tự động mở rộng nhóm linh kiện tương ứng dựa trên tên dòng máy
-      const matchingGroups: string[] = ['Linh kiện chung / Khác'];
-      const pStrLower = prodStr.toLowerCase();
-      if (pStrLower.includes('3626')) matchingGroups.push('Linh kiện UR3626');
-      if (pStrLower.includes('5676') || pStrLower.includes('5640') || pStrLower.includes('5440')) matchingGroups.push('Linh kiện UR5676');
-      if (pStrLower.includes('5840')) matchingGroups.push('Linh kiện UR5840');
-      if (pStrLower.includes('61096')) matchingGroups.push('Linh kiện UR61096H');
-      if (pStrLower.includes('6412') || pStrLower.includes('w6412')) matchingGroups.push('Linh kiện W6412');
-      setExpandedGroups(matchingGroups);
 
       // ── Mapping tiền thu thực tế (moneyToCollect hoặc totalPrice) ──
       const amount = order.moneyToCollect || order.totalPrice || 0;
@@ -645,7 +615,7 @@ export default function ReportForm() {
   const canProceedStep1 = (): boolean => {
     if (!serialNumber) return false;
     if (selectedServices.length === 0) return false;
-    if (selectedProducts.length === 0) return false;
+    if (selectedItems.length === 0) return false;
     if (actualAmount === '') return false;
     if (needsTechnicalFields(workType)) {
       if (!waterSource || !tdsIn || !tdsOut || !waterPressure) return false;
@@ -671,12 +641,25 @@ export default function ReportForm() {
       ? handlingMethod.trim()
       : null;
 
+    const legacyProducts: string[] = [];
+    const legacySpareParts: string[] = [];
+    selectedItems.forEach(item => {
+      const prodInfo = stockProducts.find(p => p.name.toLowerCase() === item.productName.toLowerCase());
+      const isSparePart = prodInfo?.category?.toLowerCase() === 'spare part';
+      const formatted = item.quantity > 1 ? `${item.productName} x${item.quantity}` : item.productName;
+      if (isSparePart) {
+        legacySpareParts.push(formatted);
+      } else {
+        legacyProducts.push(formatted);
+      }
+    });
+
     const payload = {
       customerName,
       customerPhone,
       province,
       address,
-      products: selectedProducts,
+      products: legacyProducts,
       serviceType: selectedServices.join(', '),
       workType,
       serialNumber,
@@ -686,12 +669,13 @@ export default function ReportForm() {
       tdsIn: needsTechnicalFields(workType) ? tdsIn : null,
       tdsOut: needsTechnicalFields(workType) ? tdsOut : null,
       waterPressure: needsTechnicalFields(workType) ? waterPressure : null,
-      spareParts: needsSpareParts(workType) ? spareParts : [],
+      spareParts: legacySpareParts,
       issueType: finalIssueType,
       handlingMethod: finalHandlingMethod,
       notes,
       imageUrls: navigator.onLine ? imageUrls : [], // Dùng url rỗng khi offline để SyncManager điền sau
       orderId: selectedOrderId,
+      items: selectedItems.map(item => ({ productName: item.productName, quantity: item.quantity }))
     };
 
     try {
@@ -910,153 +894,88 @@ export default function ReportForm() {
                   )}
                 </div>
 
-                {/* Danh sách sản phẩm thực tế - Multi-select (Tag-based) */}
-                <div className="form-group relative z-30" ref={productDropdownRef}>
-                  <label className="form-label font-semibold text-gray-700">Sản phẩm thực tế *</label>
-                  <div
-                    onClick={() => setShowProductDropdown(!showProductDropdown)}
-                    className="w-full min-h-[42px] px-3 py-2 bg-white border border-gray-300 rounded-lg text-left text-sm flex flex-wrap gap-1.5 items-center cursor-pointer focus-within:ring-2 focus-within:ring-blue-500 focus-within:border-blue-500 transition-all"
-                  >
-                    {selectedProducts.length > 0 ? (
-                      selectedProducts.map(prod => (
-                        <span
-                          key={prod}
-                          className="inline-flex items-center gap-1 bg-blue-50 text-blue-700 border border-blue-200 px-2 py-0.5 rounded-md text-xs font-semibold"
-                        >
-                          {prod}
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setSelectedProducts(selectedProducts.filter(p => p !== prod));
-                            }}
-                            className="text-blue-500 hover:text-blue-800 font-bold ml-0.5 text-sm"
-                          >
-                            &times;
-                          </button>
-                        </span>
-                      ))
-                    ) : (
-                      <span className="text-gray-400 text-sm">-- Chọn danh sách sản phẩm --</span>
-                    )}
-                    <ChevronDown size={18} className="text-gray-400 shrink-0 ml-auto" />
-                  </div>
-                  
-                  {showProductDropdown && (
-                    <div 
-                      className="absolute z-35 mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg max-h-72 overflow-y-auto p-2 flex flex-col gap-1.5"
-                    >
-                      <div className="sticky top-0 bg-white pb-2 mb-1 border-b border-gray-100 flex items-center gap-2 px-1">
-                        <div className="relative w-full">
-                          <span className="absolute inset-y-0 left-0 flex items-center pl-2.5 pointer-events-none text-gray-400">
-                            <Search size={14} />
-                          </span>
-                          <input
-                            type="text"
-                            className="w-full pl-8 pr-7 py-1.5 text-xs border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
-                            placeholder="Tìm sản phẩm..."
-                            value={productSearch}
-                            onChange={e => setProductSearch(e.target.value)}
-                          />
-                          {productSearch && (
-                            <button
-                              type="button"
-                              className="absolute inset-y-0 right-0 flex items-center pr-2 text-gray-400 hover:text-gray-600"
-                              onClick={() => setProductSearch('')}
-                            >
-                              <X size={14} />
-                            </button>
-                          )}
-                        </div>
-                      </div>
+                {/* Hợp nhất chọn sản phẩm & linh kiện bằng CategoryTreeSelect */}
+                <div className="form-group relative z-30">
+                  <CategoryTreeSelect
+                    categories={categories}
+                    products={stockProducts}
+                    selected={selectedItems.map(item => `PROD:${item.productName}`)}
+                    onChange={handleTreeSelectChange}
+                    label="Sản phẩm & linh kiện thực tế *"
+                    placeholder="Chọn sản phẩm hoặc linh kiện phát sinh..."
+                  />
+                </div>
 
-                      {(() => {
-                        const suggestedProds = getSuggestedProducts().filter(p => !productSearch || matchesSearchTerm(p, productSearch));
-                        const catalogProdsOnly = getCatalogProductsOnly().filter(p => !productSearch || matchesSearchTerm(p, productSearch));
+                {/* Danh sách sản phẩm & linh kiện đã chọn kèm tăng giảm số lượng */}
+                {selectedItems.length > 0 && (
+                  <div className="form-group bg-slate-50 border border-slate-200 rounded-xl p-4 mb-4">
+                    <label className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-3 block">
+                      Danh sách sản phẩm & linh kiện sử dụng ({selectedItems.length})
+                    </label>
+                    <div className="flex flex-col gap-2.5">
+                      {selectedItems.map(item => {
+                        const prodInfo = stockProducts.find(p => p.name.toLowerCase() === item.productName.toLowerCase());
+                        const isSpare = prodInfo?.category?.toLowerCase() === 'spare part';
                         
-                        if (suggestedProds.length === 0 && catalogProdsOnly.length === 0) {
-                          return (
-                            <div className="text-center py-4 text-xs text-gray-400">
-                              Không tìm thấy sản phẩm phù hợp
-                            </div>
-                          );
-                        }
-
                         return (
-                          <div className="flex flex-col gap-2.5">
-                            {suggestedProds.length > 0 && (
-                              <div className="flex flex-col gap-1">
-                                <div className="px-2.5 py-1 text-[11px] font-bold text-blue-600 bg-blue-50/50 rounded-md">
-                                  💡 Sản phẩm từ đơn hàng (Gợi ý)
-                                </div>
-                                {suggestedProds.map((prod) => {
-                                  const isChecked = selectedProducts.includes(prod);
-                                  return (
-                                    <div
-                                      key={`suggest-${prod}`}
-                                      onClick={() => {
-                                        if (isChecked) {
-                                          setSelectedProducts(selectedProducts.filter(p => p !== prod));
-                                        } else {
-                                          setSelectedProducts([...selectedProducts, prod]);
-                                        }
-                                      }}
-                                      className={`flex items-center gap-2.5 px-3 py-2 rounded-md cursor-pointer select-none text-[13px] transition-colors ${
-                                        isChecked ? 'bg-blue-50/70 text-blue-900 font-medium' : 'text-gray-700 hover:bg-gray-50'
-                                      }`}
-                                    >
-                                      <input
-                                        type="checkbox"
-                                        className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 w-4 h-4 pointer-events-none"
-                                        checked={isChecked}
-                                        readOnly
-                                      />
-                                      <span>{prod}</span>
-                                    </div>
-                                  );
-                                })}
-                              </div>
-                            )}
-
-                            {catalogProdsOnly.length > 0 && (
-                              <div className="flex flex-col gap-1">
-                                <div className="px-2.5 py-1 text-[11px] font-bold text-gray-500 bg-gray-50 rounded-md">
-                                  📦 Tất cả sản phẩm
-                                </div>
-                                {catalogProdsOnly.map((prod) => {
-                                  const isChecked = selectedProducts.includes(prod);
-                                  return (
-                                    <div
-                                      key={`catalog-${prod}`}
-                                      onClick={() => {
-                                        if (isChecked) {
-                                          setSelectedProducts(selectedProducts.filter(p => p !== prod));
-                                        } else {
-                                          setSelectedProducts([...selectedProducts, prod]);
-                                        }
-                                      }}
-                                      className={`flex items-center gap-2.5 px-3 py-2 rounded-md cursor-pointer select-none text-[13px] transition-colors ${
-                                        isChecked ? 'bg-blue-50/70 text-blue-900 font-medium' : 'text-gray-700 hover:bg-gray-50'
-                                      }`}
-                                    >
-                                      <input
-                                        type="checkbox"
-                                        className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 w-4 h-4 pointer-events-none"
-                                        checked={isChecked}
-                                        readOnly
-                                      />
-                                      <span>{prod}</span>
-                                    </div>
-                                  );
-                                })}
-                              </div>
-                            )}
+                          <div 
+                            key={item.productName} 
+                            className="flex items-center justify-between bg-white border border-slate-150 p-3 rounded-lg shadow-xs gap-3"
+                          >
+                            <div className="flex flex-col min-w-0 flex-1">
+                              <span className="font-semibold text-sm text-slate-800 truncate leading-snug">
+                                {item.productName}
+                              </span>
+                              <span className="text-[11px] text-slate-400 font-mono mt-0.5">
+                                {item.sku ? `SKU: ${item.sku}` : 'Chưa có SKU'} 
+                                <span className="mx-1.5">•</span> 
+                                <span className={`px-1.5 py-0.5 rounded-sm font-semibold ${isSpare ? 'bg-amber-50 text-amber-700' : 'bg-blue-50 text-blue-700'}`}>
+                                  {isSpare ? 'Linh kiện' : 'Thiết bị/Lọc'}
+                                </span>
+                              </span>
+                            </div>
+                            
+                            {/* Bộ tăng giảm số lượng */}
+                            <div className="flex items-center gap-2 shrink-0">
+                              <button
+                                type="button"
+                                className="w-7 h-7 rounded-lg border border-slate-200 flex items-center justify-center hover:bg-slate-50 active:bg-slate-100 text-slate-600 transition-colors"
+                                onClick={() => handleUpdateQuantity(item.productName, -1)}
+                              >
+                                -
+                              </button>
+                              <input
+                                type="number"
+                                min="1"
+                                className="w-10 text-center font-bold text-sm bg-transparent border-0 focus:outline-none focus:ring-0 p-0 text-slate-800"
+                                value={item.quantity}
+                                onChange={(e) => {
+                                  const val = parseInt(e.target.value, 10) || 1;
+                                  setSelectedItems(prev => prev.map(si => si.productName === item.productName ? { ...si, quantity: Math.max(1, val) } : si));
+                                }}
+                              />
+                              <button
+                                type="button"
+                                className="w-7 h-7 rounded-lg border border-slate-200 flex items-center justify-center hover:bg-slate-50 active:bg-slate-100 text-slate-600 transition-colors"
+                                onClick={() => handleUpdateQuantity(item.productName, 1)}
+                              >
+                                +
+                              </button>
+                              <button
+                                type="button"
+                                className="w-7 h-7 rounded-lg text-red-500 hover:bg-red-50 active:bg-red-100 flex items-center justify-center transition-colors ml-1.5"
+                                onClick={() => handleRemoveItem(item.productName)}
+                                title="Xóa"
+                              >
+                                <X size={15} />
+                              </button>
+                            </div>
                           </div>
                         );
-                      })()}
+                      })}
                     </div>
-                  )}
-                </div>
+                  </div>
+                )}
 
                 {/* Tiền thu thực tế */}
                 <div className="form-group">
@@ -1095,82 +1014,7 @@ export default function ReportForm() {
                       <label className="form-label">Áp suất nước đầu vào (psi) *</label>
                       <input type="number" className="form-input" placeholder="Nhập số psi thực tế" value={waterPressure} onChange={e => setWaterPressure(e.target.value)} required />
                     </div>
-                    {/* Linh kiện phát sinh */}
-                    {needsSpareParts(workType) && (
-                      <div className="form-group">
-                        <label className="form-label">Linh kiện phát sinh (nếu có)</label>
-                        <div className="flex flex-col gap-2">
-                          {SPARE_PARTS_GROUPS.map((group) => {
-                            const isExpanded = expandedGroups.includes(group.name);
-                            const selectedCount = spareParts.filter(p => group.parts.includes(p)).length;
-                            
-                            return (
-                              <div key={group.name} className="border border-gray-200 rounded-lg overflow-hidden bg-white shadow-xs">
-                                {/* Group Header */}
-                                <button
-                                  type="button"
-                                  className="w-full px-4 py-2.5 bg-slate-50 hover:bg-slate-100 flex items-center justify-between transition-colors border-b border-gray-150"
-                                  onClick={() => {
-                                    if (isExpanded) {
-                                      setExpandedGroups(expandedGroups.filter(g => g !== group.name));
-                                    } else {
-                                      setExpandedGroups([...expandedGroups, group.name]);
-                                    }
-                                  }}
-                                >
-                                  <div className="flex items-center gap-2">
-                                    <span className="font-semibold text-[13px] text-gray-800">{group.name}</span>
-                                    {selectedCount > 0 && (
-                                      <span className="px-2 py-0.5 text-[10px] font-bold bg-green-100 text-green-700 rounded-full">
-                                        Đã chọn {selectedCount}
-                                      </span>
-                                    )}
-                                  </div>
-                                  <div className="text-gray-400">
-                                    {isExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
-                                  </div>
-                                </button>
-
-                                {/* Group Body (Parts Checklist) */}
-                                {isExpanded && (
-                                  <div className="p-3 bg-white flex flex-col gap-2 max-h-[180px] overflow-y-auto animate-fade-in">
-                                    {group.parts.map((part) => {
-                                      const isChecked = spareParts.includes(part);
-                                      return (
-                                        <div
-                                          key={part}
-                                          onClick={() => {
-                                            if (isChecked) {
-                                              setSpareParts(spareParts.filter(p => p !== part));
-                                            } else {
-                                              setSpareParts([...spareParts, part]);
-                                            }
-                                          }}
-                                          className="flex items-center gap-2.5 py-1 text-[13px] text-gray-700 cursor-pointer hover:text-gray-900 select-none"
-                                        >
-                                          <input
-                                            type="checkbox"
-                                            className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 w-4 h-4 pointer-events-none"
-                                            checked={isChecked}
-                                            readOnly
-                                          />
-                                          <span>{part}</span>
-                                        </div>
-                                      );
-                                    })}
-                                  </div>
-                                )}
-                              </div>
-                            );
-                          })}
-                        </div>
-                        {spareParts.length > 0 && (
-                          <p className="text-xs text-blue-600 mt-2.5 font-semibold flex items-center gap-1">
-                            <CheckCircle size={14} className="text-emerald-500" /> Tổng cộng đã chọn {spareParts.length} linh kiện
-                          </p>
-                        )}
-                      </div>
-                    )}
+                    {/* Linh kiện phát sinh đã được gộp chung vào CategoryTreeSelect phía trên */}
                   </>
                 )}
 
@@ -1369,10 +1213,12 @@ export default function ReportForm() {
                 <span className="font-medium">{workType}</span>
                 <span className="text-gray-500">Loại dịch vụ:</span>
                 <span className="font-medium">{selectedServices.join(', ')}</span>
-                {selectedProducts.length > 0 && (
+                {selectedItems.length > 0 && (
                   <>
-                    <span className="text-gray-500">Sản phẩm:</span>
-                    <span className="font-medium">{selectedProducts.join(', ')}</span>
+                    <span className="text-gray-500">Sản phẩm & Linh kiện:</span>
+                    <span className="font-medium">
+                      {selectedItems.map(item => `${item.productName} (x${item.quantity})`).join(', ')}
+                    </span>
                   </>
                 )}
                 <span className="text-gray-500">Seri SP:</span>

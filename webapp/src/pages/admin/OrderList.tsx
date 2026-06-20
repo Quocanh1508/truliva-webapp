@@ -65,6 +65,7 @@ export default function OrderList() {
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
   const [_error, setError] = useState('');
+  const [autoRefresh, setAutoRefresh] = useState(true);
 
   // Filters
   const [search, setSearch] = useState('');
@@ -373,9 +374,10 @@ export default function OrderList() {
     return { startDate: start, endDate: end };
   };
 
-  const fetchOrdersData = async () => {
+  const fetchOrdersData = async (options?: { silent?: boolean }) => {
+    const isSilent = options?.silent ?? false;
     try {
-      setLoading(true);
+      if (!isSilent) setLoading(true);
       const { startDate, endDate } = getDateRange();
       const res = await getOrders({
         page,
@@ -408,13 +410,43 @@ export default function OrderList() {
     } catch (err: any) {
       setError(err.message || 'Lỗi tải danh sách');
     } finally {
-      setLoading(false);
+      if (!isSilent) setLoading(false);
     }
   };
 
   useEffect(() => {
     fetchOrdersData();
   }, [
+    page,
+    sortBy,
+    sortOrder,
+    customStartDate,
+    customEndDate,
+    filterPancakeOrderId,
+    filterAdminStatuses,
+    filterKtvIds,
+    filterWorkTypes,
+    filterMainStationIds,
+    filterCustomerName,
+    filterCustomerPhone,
+    filterServiceTypes,
+    filterProductCategories,
+    filterProductNames,
+    filterTechStationIds,
+    filterProvinces,
+    dateType
+  ]);
+
+  useEffect(() => {
+    if (!autoRefresh) return;
+
+    const interval = setInterval(() => {
+      fetchOrdersData({ silent: true });
+    }, 5000);
+
+    return () => clearInterval(interval);
+  }, [
+    autoRefresh,
     page,
     sortBy,
     sortOrder,
@@ -1012,12 +1044,26 @@ export default function OrderList() {
               </button>
             )}
  
+            {/* Tự động làm mới Toggle */}
+            <div className="flex items-center space-x-2 px-3 py-2 text-[13px] border border-gray-300 rounded-md bg-white text-gray-700 shadow-sm h-[38px]">
+              <label className="relative inline-flex items-center cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  className="sr-only peer"
+                  checked={autoRefresh}
+                  onChange={(e) => setAutoRefresh(e.target.checked)}
+                />
+                <div className="w-8 h-4.5 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[3px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-3.5 after:w-3.5 after:transition-all peer-checked:bg-blue-600"></div>
+                <span className="ml-2 font-medium text-gray-700">Tự động làm mới (5s)</span>
+              </label>
+            </div>
+
             {/* Đồng bộ từ Pancake button */}
             {!isViewOnlyStaff && (
               <button
                 onClick={handleSync}
                 disabled={syncing}
-                className={`flex items-center space-x-1.5 px-3 py-2 text-[13px] border border-gray-300 rounded-md bg-white text-gray-700 hover:bg-gray-50 focus:outline-none font-medium transition-colors ${syncing ? 'opacity-60 cursor-not-allowed' : ''}`}
+                className={`flex items-center space-x-1.5 px-3 py-2 text-[13px] border border-gray-300 rounded-md bg-white text-gray-700 hover:bg-gray-50 focus:outline-none font-medium transition-colors h-[38px] ${syncing ? 'opacity-60 cursor-not-allowed' : ''}`}
                 title="Đồng bộ thủ công các đơn hàng mới nhất từ Pancake POS"
               >
                 <RefreshCw size={15} className={syncing ? 'animate-spin text-blue-600' : 'text-gray-500'} />

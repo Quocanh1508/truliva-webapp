@@ -92,6 +92,14 @@ export default function MyOrders() {
     };
   }, [page, sortBy, sortOrder, search]);
 
+  useEffect(() => {
+    const interval = setInterval(() => {
+      fetchOrdersData(true);
+    }, 5000);
+
+    return () => clearInterval(interval);
+  }, [page, sortBy, sortOrder, search]);
+
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
     setPage(1);

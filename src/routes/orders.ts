@@ -7,6 +7,7 @@ import { syncOrderStatusToPancake } from '../services/orderProcessor';
 import { syncRecentOrders } from '../services/orderSyncScheduler';
 import { sendPushNotification } from '../services/notificationService';
 import { sendWebPushNotification } from '../services/webPushService';
+import { syncOrderInventoryState } from '../services/inventoryService';
 import ExcelJS from 'exceljs';
 import axios from 'axios';
 
@@ -800,6 +801,23 @@ router.post('/', requireAuth, async (req: Request, res: Response): Promise<void>
       }
     });
 
+    // Tích hợp đồng bộ tồn kho cục bộ
+    try {
+      const createdOrderItems = await prisma.orderItem.findMany({
+        where: { orderId: order.id }
+      });
+      await syncOrderInventoryState(order.id, null, {
+        adminStatus: order.adminStatus,
+        warehouseId: order.warehouseId,
+        items: createdOrderItems.map(item => ({
+          productName: item.productName || '',
+          quantity: item.quantity || 1
+        }))
+      });
+    } catch (invErr: any) {
+      logger.error('Lỗi khấu trừ kho khi tạo đơn thủ công', { orderId: order.id, error: invErr.message });
+    }
+
     logger.info('Manual order created by admin', { orderId: order.id, pancakeOrderId: nextManualId, creator: req.user?.fullName });
     res.json({ success: true, orderId: order.id, pancakeOrderId: nextManualId });
 
@@ -1460,8 +1478,11 @@ router.patch('/:id', requireAuth, async (req: Request, res: Response): Promise<v
       items
     } = req.body;
 
-    // Lấy order hiện tại để so sánh cho audit
-    const oldOrder = await prisma.order.findUnique({ where: { id } });
+    // Lấy order hiện tại để so sánh cho audit và đồng bộ kho
+    const oldOrder = await prisma.order.findUnique({
+      where: { id },
+      include: { items: true }
+    });
     if (!oldOrder) {
       res.status(404).json({ error: 'Không tìm thấy đơn hàng' });
       return;
@@ -1651,6 +1672,30 @@ router.patch('/:id', requireAuth, async (req: Request, res: Response): Promise<v
       where: { id },
       data: updateData,
     });
+
+    // Tích hợp đồng bộ tồn kho cục bộ
+    try {
+      const newOrderItems = await prisma.orderItem.findMany({
+        where: { orderId: id }
+      });
+      await syncOrderInventoryState(id, {
+        adminStatus: oldOrder.adminStatus,
+        warehouseId: oldOrder.warehouseId,
+        items: oldOrder.items.map(item => ({
+          productName: item.productName || '',
+          quantity: item.quantity || 1
+        }))
+      }, {
+        adminStatus: order.adminStatus,
+        warehouseId: order.warehouseId,
+        items: newOrderItems.map(item => ({
+          productName: item.productName || '',
+          quantity: item.quantity || 1
+        }))
+      });
+    } catch (invErr: any) {
+      logger.error('Lỗi khấu trừ kho khi cập nhật đơn hàng', { orderId: id, error: invErr.message });
+    }
 
     // Ghi audit log
     if (changes.length > 0) {
