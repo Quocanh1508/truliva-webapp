@@ -428,12 +428,13 @@ export default function LoginPage() {
             {/* Ambient logo glow */}
             <div className="absolute inset-0 bg-blue-500/10 blur-3xl rounded-full pointer-events-none z-[-1]" />
           </div>
-          
-          <div className="inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full text-[10px] font-semibold tracking-wider uppercase bg-blue-500/10 text-blue-400 border border-blue-500/20 select-none">
-            <ShieldCheck size={11} className="text-blue-400 animate-pulse" />
-            <span>Kỹ thuật viên</span>
+          <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full text-[13px] font-bold tracking-wide uppercase bg-blue-500/10 text-blue-400 border border-blue-500/20 select-none">
+            <ShieldCheck size={14} className="text-blue-400 animate-pulse" />
+            <span>Truliva App</span>
           </div>
-          <h2 className="font-bold text-[18px] mt-3 text-white tracking-wide leading-snug">Hệ thống quản lí dịch vụ và kĩ thuật viên</h2>
+          <h2 className="font-bold text-[18px] mt-3.5 text-white tracking-wide leading-snug">
+            Hệ thống quản lí dịch vụ<br />và kĩ thuật viên
+          </h2>
         </div>
 
         {error && <div className="cyber-alert">{error}</div>}
