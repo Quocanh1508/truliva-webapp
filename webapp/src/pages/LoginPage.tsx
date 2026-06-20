@@ -1,10 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { LogIn, Download, Smartphone, X, Share2, PlusSquare, Monitor } from 'lucide-react';
+import { LogIn, Download, Smartphone, X, Share2, PlusSquare, Monitor, ShieldCheck } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { fetchApi } from '../api/client';
 import { Capacitor } from '@capacitor/core';
-import confetti from 'canvas-confetti';
 
 export default function LoginPage() {
   const [username, setUsername] = useState('');
@@ -23,6 +22,35 @@ export default function LoginPage() {
   // Detect if running inside the Capacitor mobile app shell
   const isApp = Capacitor.isNativePlatform();
 
+  // 3D Tilt and Glare Effect
+  const [tilt, setTilt] = useState({ x: 0, y: 0 });
+  const [glare, setGlare] = useState({ x: 50, y: 50, opacity: 0 });
+  const cardRef = useRef<HTMLDivElement>(null);
+
+  const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (!cardRef.current) return;
+    const card = cardRef.current;
+    const rect = card.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    const xc = rect.width / 2;
+    const yc = rect.height / 2;
+    // Max tilt angle is 8 degrees
+    const rotateX = -(y - yc) / 25;
+    const rotateY = (x - xc) / 25;
+    setTilt({ x: rotateY, y: rotateX });
+    setGlare({
+      x: (x / rect.width) * 100,
+      y: (y / rect.height) * 100,
+      opacity: 0.15,
+    });
+  };
+
+  const handleMouseLeave = () => {
+    setTilt({ x: 0, y: 0 });
+    setGlare(prev => ({ ...prev, opacity: 0 }));
+  };
+
   useEffect(() => {
     const handler = (e: Event) => {
       e.preventDefault();
@@ -30,46 +58,6 @@ export default function LoginPage() {
     };
     window.addEventListener('beforeinstallprompt', handler);
     return () => window.removeEventListener('beforeinstallprompt', handler);
-  }, []);
-
-  // Trigger World Cup confetti effect
-  const triggerWorldCupConfetti = () => {
-    try {
-      const soccer = confetti.shapeFromText({ text: '⚽' });
-      const trophy = confetti.shapeFromText({ text: '🏆' });
-      const flag = confetti.shapeFromText({ text: '🇻🇳' });
-      const star = confetti.shapeFromText({ text: '⭐' });
-
-      // Shoot from left corner
-      confetti({
-        particleCount: 25,
-        angle: 60,
-        spread: 55,
-        origin: { x: 0, y: 0.85 },
-        shapes: [soccer, trophy, flag, star],
-        scalar: 2.2,
-        zIndex: 1100
-      });
-      // Shoot from right corner
-      confetti({
-        particleCount: 25,
-        angle: 120,
-        spread: 55,
-        origin: { x: 1, y: 0.85 },
-        shapes: [soccer, trophy, flag, star],
-        scalar: 2.2,
-        zIndex: 1100
-      });
-    } catch (e) {
-      console.error(e);
-    }
-  };
-
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      triggerWorldCupConfetti();
-    }, 600);
-    return () => clearTimeout(timer);
   }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -110,13 +98,10 @@ export default function LoginPage() {
     const isiOS = /ipad|iphone|ipod/i.test(userAgent) && !(window as any).MSStream;
 
     if (isAndroid) {
-      // Tải trực tiếp file APK được phục vụ từ thư mục public
       window.location.href = '/Truliva_technician.apk';
     } else if (isiOS) {
-      // Hiển thị modal hướng dẫn cách "Thêm vào MH chính" trên iOS Safari
       setShowIosModal(true);
     } else {
-      // Thiết bị Desktop/Khác
       if (deferredPrompt) {
         deferredPrompt.prompt();
         deferredPrompt.userChoice.then((choiceResult: any) => {
@@ -126,313 +111,238 @@ export default function LoginPage() {
           setDeferredPrompt(null);
         });
       } else {
-        // Hiện hộp thoại chung cung cấp cả link tải APK và hướng dẫn iOS
         setShowGeneralModal(true);
       }
     }
   };
 
-  const flags = [
-    { code: 'vn', name: 'Việt Nam' },
-    { code: 'br', name: 'Brazil' },
-    { code: 'ar', name: 'Argentina' },
-    { code: 'fr', name: 'Pháp' },
-    { code: 'de', name: 'Đức' },
-    { code: 'gb', name: 'Anh' },
-    { code: 'pt', name: 'Bồ Đào Nha' },
-    { code: 'es', name: 'Tây Ban Nha' },
-    { code: 'jp', name: 'Nhật Bản' },
-    { code: 'it', name: 'Ý' },
-    { code: 'hr', name: 'Croatia' },
-    { code: 'be', name: 'Bỉ' }
-  ];
-
   return (
-    <div className="relative flex items-center justify-center h-screen overflow-hidden" style={{ background: 'radial-gradient(circle at 50% 15%, #1F4068 0%, #162447 50%, #1A1A2E 100%)' }}>
+    <div className="relative flex items-center justify-center h-screen overflow-hidden cyber-bg">
       
-      {/* Stadium Spotlight Beams */}
-      <div className="absolute top-0 left-0 right-0 bottom-0 pointer-events-none z-0">
-        <div className="stadium-light left-beam"></div>
-        <div className="stadium-light right-beam"></div>
-      </div>
+      {/* Subtle grid pattern overlay */}
+      <div className="absolute inset-0 pointer-events-none z-0 cyber-grid" />
 
-      {/* Hanging Bunting Flags (Cờ dây trang trí World Cup) */}
-      <div className="absolute top-0 left-0 right-0 z-20 pointer-events-none overflow-hidden h-[120px] flex justify-center">
-        <div className="absolute top-0 left-0 right-0 h-[1.5px] bg-white/10 shadow-md"></div>
-        <div className="flex gap-2.5 sm:gap-4 md:gap-6 lg:gap-8 px-4 justify-around w-full max-w-7xl">
-          {flags.map((flag, idx) => (
-            <div 
-              key={flag.code} 
-              className="bunting-flag" 
-              style={{ 
-                backgroundImage: `url(https://flagcdn.com/w80/${flag.code}.png)`,
-                animationDelay: `${idx * 0.12}s`,
-                animationDuration: `${2.2 + (idx % 3) * 0.3}s`
-              }}
-              title={flag.name}
-            />
-          ))}
-        </div>
-      </div>
-
-      {/* Floating soccer balls & flags background */}
-      <div className="absolute inset-0 overflow-hidden pointer-events-none z-0">
-        <div className="soccer-ball sb-1">⚽</div>
-        <div className="soccer-ball sb-2">⚽</div>
-        <div className="soccer-ball sb-3">⚽</div>
-        <div className="soccer-ball sb-4">⚽</div>
-        <div className="soccer-ball sb-5">⚽</div>
-        <div className="soccer-ball sb-6">⚽</div>
-        <div className="soccer-ball sb-7">⚽</div>
-        <div className="soccer-ball sb-8">⚽</div>
-
-        {/* Floating Waving Flags */}
-        <div className="floating-flag ff-1" style={{ backgroundImage: 'url(https://flagcdn.com/w80/vn.png)', animationDelay: '1s' }}></div>
-        <div className="floating-flag ff-2" style={{ backgroundImage: 'url(https://flagcdn.com/w80/br.png)', animationDelay: '3.5s' }}></div>
-        <div className="floating-flag ff-3" style={{ backgroundImage: 'url(https://flagcdn.com/w80/ar.png)', animationDelay: '6s' }}></div>
-        <div className="floating-flag ff-4" style={{ backgroundImage: 'url(https://flagcdn.com/w80/fr.png)', animationDelay: '2s' }}></div>
-        <div className="floating-flag ff-5" style={{ backgroundImage: 'url(https://flagcdn.com/w80/de.png)', animationDelay: '8s' }}></div>
-        <div className="floating-flag ff-6" style={{ backgroundImage: 'url(https://flagcdn.com/w80/pt.png)', animationDelay: '10.5s' }}></div>
-        <div className="floating-flag ff-7" style={{ backgroundImage: 'url(https://flagcdn.com/w80/jp.png)', animationDelay: '12s' }}></div>
-        <div className="floating-flag ff-8" style={{ backgroundImage: 'url(https://flagcdn.com/w80/es.png)', animationDelay: '5s' }}></div>
-      </div>
+      {/* Ambient Glowing Orbs */}
+      <div className="cyber-orb orb-blue z-0" />
+      <div className="cyber-orb orb-cyan z-0" />
 
       <style>{`
-        /* Spotlight Glow Effects */
-        .stadium-light {
-          position: absolute;
-          top: -20%;
-          width: 50%;
-          height: 100%;
-          background: radial-gradient(ellipse at top, rgba(0, 163, 255, 0.15) 0%, rgba(0, 163, 255, 0) 70%);
-          filter: blur(40px);
-          pointer-events: none;
-          transform-origin: top center;
-        }
-        .left-beam {
-          left: -10%;
-          transform: rotate(25deg);
-          animation: sweep-left 12s ease-in-out infinite alternate;
-        }
-        .right-beam {
-          right: -10%;
-          transform: rotate(-25deg);
-          animation: sweep-right 12s ease-in-out infinite alternate;
+        .cyber-bg {
+          background: radial-gradient(circle at 50% 30%, #0B132B 0%, #050A16 70%, #010204 100%);
         }
 
-        @keyframes sweep-left {
-          0% { transform: rotate(15deg) scaleX(0.9); }
-          100% { transform: rotate(35deg) scaleX(1.1); }
-        }
-        @keyframes sweep-right {
-          0% { transform: rotate(-15deg) scaleX(0.9); }
-          100% { transform: rotate(-35deg) scaleX(1.1); }
-        }
-
-        /* Bunting Flags Styling */
-        .bunting-flag {
-          width: 24px;
-          height: 38px;
-          background-size: cover;
+        .cyber-grid {
+          background-image: 
+            linear-gradient(rgba(59, 130, 246, 0.04) 1px, transparent 1px),
+            linear-gradient(90deg, rgba(59, 130, 246, 0.04) 1px, transparent 1px);
+          background-size: 32px 32px;
           background-position: center;
-          background-repeat: no-repeat;
-          border-bottom-left-radius: 4px;
-          border-bottom-right-radius: 4px;
-          box-shadow: 0 4px 10px rgba(0, 0, 0, 0.45);
-          transform-origin: top center;
-          animation: swing 4s ease-in-out infinite alternate, wave-flag 2.5s ease-in-out infinite;
+        }
+
+        .cyber-orb {
+          position: absolute;
+          border-radius: 50%;
+          filter: blur(100px);
+          pointer-events: none;
+          opacity: 0.35;
+          mix-blend-mode: screen;
+        }
+
+        .orb-blue {
+          width: 500px;
+          height: 500px;
+          background: radial-gradient(circle, rgba(37, 99, 235, 0.25) 0%, rgba(37, 99, 235, 0) 70%);
+          top: -10%;
+          left: 15%;
+          animation: float-slow 15s infinite alternate;
+        }
+
+        .orb-cyan {
+          width: 550px;
+          height: 550px;
+          background: radial-gradient(circle, rgba(6, 182, 212, 0.2) 0%, rgba(6, 182, 212, 0) 70%);
+          bottom: -10%;
+          right: 15%;
+          animation: float-slow 20s infinite alternate-reverse;
+        }
+
+        @keyframes float-slow {
+          0% { transform: translate(0, 0) scale(1); }
+          100% { transform: translate(30px, 20px) scale(1.05); }
+        }
+
+        /* 3D Glassmorphism Card Style */
+        .glow-card {
           position: relative;
+          background: rgba(10, 18, 36, 0.75);
+          backdrop-filter: blur(16px);
+          border-radius: 1.25rem;
+          padding: 2.25rem 2rem;
+          width: 100%;
+          max-width: 400px;
+          margin: 1.5rem;
+          box-shadow: 
+            0 15px 35px -5px rgba(0, 0, 0, 0.5), 
+            0 5px 15px -5px rgba(0, 0, 0, 0.3),
+            0 0 30px rgba(59, 130, 246, 0.05);
+          transform-style: preserve-3d;
         }
-        @media (min-width: 640px) {
-          .bunting-flag {
-            width: 38px;
-            height: 58px;
-          }
-        }
-        .bunting-flag::after {
+
+        .glow-card::before {
           content: '';
           position: absolute;
           inset: 0;
-          background: linear-gradient(
-            90deg,
-            rgba(255,255,255,0) 0%,
-            rgba(255,255,255,0.18) 25%,
-            rgba(0,0,0,0.22) 50%,
-            rgba(255,255,255,0.15) 75%,
-            rgba(0,0,0,0) 100%
-          );
-          background-size: 200% 100%;
-          animation: wind-shadow 2.2s linear infinite;
-          border-bottom-left-radius: 4px;
-          border-bottom-right-radius: 4px;
-        }
-
-        @keyframes swing {
-          0% { transform: rotate(-7deg); }
-          100% { transform: rotate(7deg); }
-        }
-        @keyframes wave-flag {
-          0% { transform: rotate(-7deg) skewY(-2.5deg) scaleX(1); }
-          50% { transform: rotate(0deg) skewY(2.5deg) scaleX(0.96); }
-          100% { transform: rotate(7deg) skewY(-2.5deg) scaleX(1); }
-        }
-        @keyframes wind-shadow {
-          0% { background-position: 0% 0%; }
-          100% { background-position: 200% 0%; }
-        }
-
-        /* Floating Objects */
-        @keyframes float-up {
-          0% {
-            transform: translateY(105vh) rotate(0deg) scale(0.6);
-            opacity: 0;
-          }
-          10% { opacity: 0.35; }
-          90% { opacity: 0.35; }
-          100% {
-            transform: translateY(-15vh) rotate(360deg) scale(1.1);
-            opacity: 0;
-          }
-        }
-        .soccer-ball {
-          position: absolute;
-          bottom: -50px;
-          font-size: 2rem;
-          user-select: none;
+          border-radius: 1.25rem;
+          padding: 1.5px;
+          background: linear-gradient(135deg, rgba(59, 130, 246, 0.4), rgba(6, 182, 212, 0.08), rgba(59, 130, 246, 0.08), rgba(6, 182, 212, 0.3));
+          -webkit-mask: 
+             linear-gradient(#fff 0 0) content-box, 
+             linear-gradient(#fff 0 0);
+          -webkit-mask-composite: xor;
+                  mask-composite: exclude;
           pointer-events: none;
-          animation: float-up 12s linear infinite;
-          z-index: 0;
-        }
-        .sb-1 { left: 8%; animation-delay: 0s; animation-duration: 14s; }
-        .sb-2 { left: 23%; animation-delay: 3s; animation-duration: 18s; font-size: 2.5rem; }
-        .sb-3 { left: 43%; animation-delay: 6s; animation-duration: 15s; }
-        .sb-4 { left: 58%; animation-delay: 1s; animation-duration: 20s; font-size: 3rem; }
-        .sb-5 { left: 73%; animation-delay: 8s; animation-duration: 16s; }
-        .sb-6 { left: 88%; animation-delay: 4s; animation-duration: 22s; font-size: 2.2rem; }
-        .sb-7 { left: 33%; animation-delay: 10s; animation-duration: 17s; font-size: 1.8rem; }
-        .sb-8 { left: 80%; animation-delay: 12s; animation-duration: 19s; font-size: 2.8rem; }
-
-        /* Floating Waving Flags */
-        .floating-flag {
-          position: absolute;
-          bottom: -60px;
-          width: 32px;
-          height: 22px;
-          background-size: cover;
-          background-position: center;
-          box-shadow: 0 3px 8px rgba(0, 0, 0, 0.35);
-          border-radius: 2px;
-          animation: float-up-flag 15s linear infinite;
-          opacity: 0;
-          z-index: 0;
-        }
-        .floating-flag::after {
-          content: '';
-          position: absolute;
-          inset: 0;
-          background: linear-gradient(
-            90deg,
-            rgba(255,255,255,0) 0%,
-            rgba(255,255,255,0.12) 25%,
-            rgba(0,0,0,0.18) 50%,
-            rgba(255,255,255,0.1) 75%,
-            rgba(0,0,0,0) 100%
-          );
-          background-size: 200% 100%;
-          animation: wind-shadow 2.5s linear infinite;
-        }
-        .ff-1 { left: 15%; animation-duration: 15s; }
-        .ff-2 { left: 35%; animation-duration: 19s; }
-        .ff-3 { left: 50%; animation-duration: 16s; }
-        .ff-4 { left: 65%; animation-duration: 21s; }
-        .ff-5 { left: 85%; animation-duration: 17s; }
-        .ff-6 { left: 5%; animation-duration: 23s; }
-        .ff-7 { left: 45%; animation-duration: 14s; }
-        .ff-8 { left: 75%; animation-duration: 18s; }
-
-        @keyframes float-up-flag {
-          0% {
-            transform: translateY(105vh) rotate(0deg) scale(0.7) skewY(0deg);
-            opacity: 0;
-          }
-          10% { opacity: 0.3; }
-          90% { opacity: 0.3; }
-          100% {
-            transform: translateY(-15vh) rotate(180deg) scale(1.15) skewY(4deg);
-            opacity: 0;
-          }
         }
 
-        /* Pulsing World Cup Badge */
-        @keyframes pulse-gold {
-          0% { box-shadow: 0 0 0 0 rgba(255, 215, 0, 0.5); }
-          70% { box-shadow: 0 0 0 8px rgba(255, 215, 0, 0); }
-          100% { box-shadow: 0 0 0 0 rgba(255, 215, 0, 0); }
+        .cyber-label {
+          color: #94a3b8;
+          font-size: 13px;
+          font-weight: 500;
+          margin-bottom: 6px;
+          display: block;
         }
-        .badge-world-cup {
-          background: linear-gradient(135deg, #FFD700 0%, #FFA500 100%) !important;
-          color: #0d1e36 !important;
-          font-weight: 700 !important;
-          box-shadow: 0 2px 8px rgba(255, 215, 0, 0.3);
-          border: 1px solid rgba(255, 255, 255, 0.4) !important;
-          animation: pulse-gold 2s infinite;
+
+        .cyber-input {
+          background: rgba(5, 10, 20, 0.5);
+          border: 1px solid rgba(255, 255, 255, 0.08);
+          color: white;
+          width: 100%;
+          padding: 0.75rem 1rem;
+          border-radius: 0.75rem;
+          font-size: 14px;
+          transition: all 0.25s ease;
+        }
+
+        .cyber-input:focus {
+          border-color: rgba(59, 130, 246, 0.7);
+          box-shadow: 0 0 12px rgba(59, 130, 246, 0.25);
+          background: rgba(5, 10, 20, 0.7);
+          outline: none;
+        }
+
+        .cyber-input::placeholder {
+          color: #475569;
+        }
+
+        .cyber-btn {
+          background: linear-gradient(135deg, #2563EB 0%, #1D4ED8 100%);
+          border: none;
+          color: white;
+          font-weight: 600;
+          font-size: 14px;
+          padding: 0.85rem;
+          border-radius: 0.75rem;
+          box-shadow: 0 4px 12px rgba(37, 99, 235, 0.25);
+          transition: all 0.25s ease;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          gap: 0.5rem;
+          cursor: pointer;
+        }
+
+        .cyber-btn:hover:not(:disabled) {
+          background: linear-gradient(135deg, #3B82F6 0%, #2563EB 100%);
+          box-shadow: 0 6px 16px rgba(59, 130, 246, 0.4);
+          transform: translateY(-1px);
+        }
+
+        .cyber-btn:active:not(:disabled) {
+          transform: translateY(1px);
+          box-shadow: 0 2px 6px rgba(37, 99, 235, 0.2);
+        }
+
+        .cyber-btn:disabled {
+          opacity: 0.5;
+          cursor: not-allowed;
+          box-shadow: none;
+        }
+
+        .cyber-alert {
+          background: rgba(239, 68, 68, 0.1);
+          border: 1px solid rgba(239, 68, 68, 0.2);
+          color: #F87171;
+          padding: 0.75rem;
+          border-radius: 0.75rem;
+          font-size: 13px;
+          margin-bottom: 1.25rem;
+          text-align: center;
         }
       `}</style>
 
-      {/* Gold card styling */}
+      {/* Login Card */}
       <div 
-        className="card w-full animate-fade-in relative z-10" 
-        style={{ 
-          maxWidth: '400px', 
-          margin: '1rem',
-          border: '1.5px solid rgba(255, 215, 0, 0.35)', 
-          boxShadow: '0 10px 40px rgba(0, 0, 0, 0.55), 0 0 20px rgba(255, 215, 0, 0.12)',
-          backdropFilter: 'blur(8px)',
-          background: 'rgba(255, 255, 255, 0.95)'
+        ref={cardRef}
+        onMouseMove={handleMouseMove}
+        onMouseLeave={handleMouseLeave}
+        className="glow-card relative z-10 transition-all duration-300 group"
+        style={{
+          transform: `perspective(1000px) rotateY(${tilt.x}deg) rotateX(${tilt.y}deg)`,
+          transition: 'transform 0.1s ease, box-shadow 0.3s ease',
         }}
       >
+        {/* Dynamic glare shine effect overlay */}
+        <div
+          className="absolute inset-0 pointer-events-none rounded-2xl transition-opacity duration-300"
+          style={{
+            background: `radial-gradient(circle 180px at ${glare.x}% ${glare.y}%, rgba(255,255,255,0.08), transparent 100%)`,
+            opacity: glare.opacity,
+            mixBlendMode: 'overlay',
+          }}
+        />
+
         <div className="text-center mb-6">
-          <img 
-            src="/TRULIVA_WC.png" 
-            alt="Truliva Logo" 
-            onClick={triggerWorldCupConfetti}
-            title="Bấm vào để bắn pháo hoa World Cup!"
-            style={{ height: '65px', margin: '0 auto 0.75rem', cursor: 'pointer', transition: 'transform 0.2s' }} 
-            className="mx-auto hover:opacity-90 active:scale-95 hover:scale-105"
-          />
-          <div className="inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full text-[11px] select-none badge-world-cup">
-            <span>⚽</span>
-            <span>World Cup Mode</span>
-            <span>🏆</span>
+          <div className="flex justify-center mb-4 relative">
+            <img 
+              src="/logo.jpg" 
+              alt="Truliva Logo" 
+              className="h-16 rounded-xl bg-white p-1 shadow-md border border-white/10 object-contain transition-transform duration-300 group-hover:scale-105"
+            />
+            {/* Ambient logo glow */}
+            <div className="absolute inset-0 bg-blue-500/10 blur-xl rounded-full pointer-events-none z-[-1]" />
           </div>
-          <h2 className="font-bold text-xl mt-3 text-slate-800">Đăng nhập hệ thống KTV</h2>
+          
+          <div className="inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full text-[10px] font-semibold tracking-wider uppercase bg-blue-500/10 text-blue-400 border border-blue-500/20 select-none">
+            <ShieldCheck size={11} className="text-blue-400 animate-pulse" />
+            <span>Kỹ thuật viên</span>
+          </div>
+          <h2 className="font-bold text-xl mt-3 text-white tracking-wide">Đăng nhập hệ thống</h2>
         </div>
 
-        {error && <div className="alert alert-error">{error}</div>}
+        {error && <div className="cyber-alert">{error}</div>}
 
-        <form onSubmit={handleSubmit}>
+        <form onSubmit={handleSubmit} className="space-y-4">
           <div className="form-group">
-            <label className="form-label">Tài khoản</label>
+            <label className="cyber-label">Tài khoản</label>
             <input
               type="text"
-              className="form-input"
+              className="cyber-input"
               value={username}
               onChange={(e) => setUsername(e.target.value)}
-              placeholder="Nhập username"
+              placeholder="Nhập tên đăng nhập"
               required
             />
           </div>
 
-          <div className="form-group mb-6">
-            <div className="flex justify-between items-center mb-2">
-              <label className="form-label mb-0">Mật khẩu</label>
-              <Link to="/forgot-password" style={{ color: '#00A3FF' }} className="text-sm font-semibold hover:underline">
+          <div className="form-group">
+            <div className="flex justify-between items-center mb-1">
+              <label className="cyber-label mb-0">Mật khẩu</label>
+              <Link to="/forgot-password" style={{ color: '#60A5FA' }} className="text-xs font-semibold hover:underline transition-colors">
                 Quên mật khẩu?
               </Link>
             </div>
             <input
               type="password"
-              className="form-input"
+              className="cyber-input"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               placeholder="Nhập mật khẩu"
@@ -442,22 +352,21 @@ export default function LoginPage() {
 
           <button
             type="submit"
-            className="btn btn-primary w-full flex justify-center"
+            className="cyber-btn w-full mt-2"
             disabled={loading || !username || !password}
           >
-            {loading ? <span className="spinner"></span> : <><LogIn size={20} /> Đăng nhập</>}
+            {loading ? <span className="spinner border-2 border-white/30 border-t-white rounded-full w-5 h-5 animate-spin"></span> : <><LogIn size={18} /> Đăng nhập</>}
           </button>
         </form>
 
-        {/* Nút tải ứng dụng hiển thị ở cuối thẻ đăng nhập (chỉ hiện trên web browser, ẩn khi đã chạy trong native app shell) */}
+        {/* Nút tải ứng dụng hiển thị ở cuối thẻ đăng nhập */}
         {!isApp && (
-          <div className="text-center mt-6 pt-4 border-t border-slate-200">
+          <div className="text-center mt-6 pt-4 border-t border-white/5">
             <button
               onClick={handleDownloadAppClick}
-              className="inline-flex items-center gap-2 text-sm font-semibold hover:underline transition-all"
-              style={{ color: '#00A3FF' }}
+              className="inline-flex items-center gap-2 text-xs font-semibold hover:underline transition-all text-blue-400 hover:text-blue-300"
             >
-              <Download size={16} /> Tải ứng dụng Truliva Mobile
+              <Download size={14} /> Tải ứng dụng Truliva Mobile
             </button>
           </div>
         )}
@@ -465,41 +374,41 @@ export default function LoginPage() {
 
       {/* Modal hướng dẫn cho iOS (iPhone/iPad) */}
       {showIosModal && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-end justify-center sm:items-center p-4">
-          <div className="bg-white rounded-t-2xl sm:rounded-2xl w-full max-w-md p-6 animate-slide-up shadow-2xl relative text-slate-800">
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-end justify-center sm:items-center p-4">
+          <div className="bg-slate-900 border border-white/10 rounded-t-2xl sm:rounded-2xl w-full max-w-md p-6 animate-slide-up shadow-2xl relative text-white">
             <button 
               onClick={() => setShowIosModal(false)}
-              className="absolute top-4 right-4 text-slate-400 hover:text-slate-600"
+              className="absolute top-4 right-4 text-slate-400 hover:text-slate-200 transition-colors"
             >
               <X size={20} />
             </button>
             
             <div className="text-center mb-6">
-              <div className="w-12 h-12 bg-sky-100 rounded-full flex items-center justify-center mx-auto mb-3 text-sky-600">
+              <div className="w-12 h-12 bg-blue-500/10 border border-blue-500/20 rounded-full flex items-center justify-center mx-auto mb-3 text-blue-400">
                 <Smartphone size={24} />
               </div>
-              <h3 className="font-bold text-lg text-slate-900">Cài đặt Truliva trên iPhone</h3>
-              <p className="text-slate-500 text-sm mt-1">Vui lòng làm theo hướng dẫn dưới đây sử dụng trình duyệt Safari</p>
+              <h3 className="font-bold text-lg text-white">Cài đặt Truliva trên iPhone</h3>
+              <p className="text-slate-400 text-sm mt-1">Vui lòng làm theo hướng dẫn dưới đây sử dụng trình duyệt Safari</p>
             </div>
             
             <div className="space-y-4 mb-6">
               <div className="flex gap-3 items-start">
-                <div className="w-6 h-6 rounded-full bg-slate-100 flex items-center justify-center text-xs font-bold text-slate-600 shrink-0">1</div>
-                <p className="text-sm text-slate-600">
-                  Bấm vào nút <strong>Chia sẻ (Share)</strong> <span className="inline-block p-1 bg-slate-100 rounded border border-slate-200 align-middle"><Share2 size={14} className="inline text-sky-600" /></span> trên thanh công cụ ở dưới cùng Safari.
+                <div className="w-6 h-6 rounded-full bg-slate-800 border border-white/5 flex items-center justify-center text-xs font-bold text-slate-400 shrink-0">1</div>
+                <p className="text-sm text-slate-300">
+                  Bấm vào nút <strong>Chia sẻ (Share)</strong> <span className="inline-block p-1 bg-slate-800 rounded border border-white/10 align-middle"><Share2 size={12} className="inline text-blue-400" /></span> trên thanh công cụ ở dưới cùng Safari.
                 </p>
               </div>
               
               <div className="flex gap-3 items-start">
-                <div className="w-6 h-6 rounded-full bg-slate-100 flex items-center justify-center text-xs font-bold text-slate-600 shrink-0">2</div>
-                <p className="text-sm text-slate-600">
-                  Kéo danh sách xuống dưới và chọn <strong>"Thêm vào MH chính" (Add to Home Screen)</strong> <span className="inline-block p-1 bg-slate-100 rounded border border-slate-200 align-middle"><PlusSquare size={14} className="inline text-slate-600" /></span>.
+                <div className="w-6 h-6 rounded-full bg-slate-800 border border-white/5 flex items-center justify-center text-xs font-bold text-slate-400 shrink-0">2</div>
+                <p className="text-sm text-slate-300">
+                  Kéo danh sách xuống dưới và chọn <strong>"Thêm vào MH chính" (Add to Home Screen)</strong> <span className="inline-block p-1 bg-slate-800 rounded border border-white/10 align-middle"><PlusSquare size={12} className="inline text-blue-400" /></span>.
                 </p>
               </div>
               
               <div className="flex gap-3 items-start">
-                <div className="w-6 h-6 rounded-full bg-slate-100 flex items-center justify-center text-xs font-bold text-slate-600 shrink-0">3</div>
-                <p className="text-sm text-slate-600">
+                <div className="w-6 h-6 rounded-full bg-slate-800 border border-white/5 flex items-center justify-center text-xs font-bold text-slate-400 shrink-0">3</div>
+                <p className="text-sm text-slate-300">
                   Bấm <strong>Thêm (Add)</strong> ở góc trên bên phải màn hình để hoàn tất cài đặt ứng dụng.
                 </p>
               </div>
@@ -507,7 +416,7 @@ export default function LoginPage() {
             
             <button 
               onClick={() => setShowIosModal(false)}
-              className="w-full btn btn-primary py-2.5 rounded-xl font-semibold flex justify-center"
+              className="w-full cyber-btn py-2.5 rounded-xl font-semibold flex justify-center"
             >
               Đã hiểu
             </button>
@@ -517,32 +426,32 @@ export default function LoginPage() {
 
       {/* Modal lựa chọn cho Desktop / Thiết bị khác */}
       {showGeneralModal && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl w-full max-w-md p-6 animate-fade-in shadow-2xl relative text-slate-800">
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-slate-900 border border-white/10 rounded-2xl w-full max-w-md p-6 animate-fade-in shadow-2xl relative text-white">
             <button 
               onClick={() => setShowGeneralModal(false)}
-              className="absolute top-4 right-4 text-slate-400 hover:text-slate-600"
+              className="absolute top-4 right-4 text-slate-400 hover:text-slate-200 transition-colors"
             >
               <X size={20} />
             </button>
             
             <div className="text-center mb-6">
-              <div className="w-12 h-12 bg-sky-100 rounded-full flex items-center justify-center mx-auto mb-3 text-sky-600">
+              <div className="w-12 h-12 bg-blue-500/10 border border-blue-500/20 rounded-full flex items-center justify-center mx-auto mb-3 text-blue-400">
                 <Monitor size={24} />
               </div>
-              <h3 className="font-bold text-lg text-slate-900">Cài đặt ứng dụng Truliva</h3>
-              <p className="text-slate-500 text-sm mt-1">Chọn phương thức cài đặt phù hợp với thiết bị của bạn</p>
+              <h3 className="font-bold text-lg text-white">Cài đặt ứng dụng Truliva</h3>
+              <p className="text-slate-400 text-sm mt-1">Chọn phương thức cài đặt phù hợp với thiết bị của bạn</p>
             </div>
             
             <div className="space-y-3 mb-6">
               <a 
                 href="/Truliva_technician.apk"
-                className="flex items-center gap-4 p-3.5 rounded-xl border border-slate-200 hover:bg-slate-50 transition-colors text-left"
+                className="flex items-center gap-4 p-3.5 rounded-xl border border-white/5 hover:border-white/10 bg-slate-950/40 hover:bg-slate-950/60 transition-all text-left group"
               >
-                <div className="w-10 h-10 rounded-lg bg-emerald-100 text-emerald-600 flex items-center justify-center font-bold text-sm shrink-0">APK</div>
+                <div className="w-10 h-10 rounded-lg bg-emerald-500/10 text-emerald-400 border border-emerald-500/25 flex items-center justify-center font-bold text-sm shrink-0">APK</div>
                 <div>
-                  <div className="font-semibold text-sm text-slate-900">Tải file cài đặt Android (APK)</div>
-                  <div className="text-xs text-slate-500">Tải trực tiếp file Truliva_technician.apk để cài đặt thủ công</div>
+                  <div className="font-semibold text-sm text-white group-hover:text-emerald-300 transition-colors">Tải file cài đặt Android (APK)</div>
+                  <div className="text-xs text-slate-400">Tải trực tiếp file Truliva_technician.apk để cài đặt thủ công</div>
                 </div>
               </a>
               
@@ -551,19 +460,19 @@ export default function LoginPage() {
                   setShowGeneralModal(false);
                   setShowIosModal(true);
                 }}
-                className="w-full flex items-center gap-4 p-3.5 rounded-xl border border-slate-200 hover:bg-slate-50 transition-colors text-left"
+                className="w-full flex items-center gap-4 p-3.5 rounded-xl border border-white/5 hover:border-white/10 bg-slate-950/40 hover:bg-slate-950/60 transition-all text-left group"
               >
-                <div className="w-10 h-10 rounded-lg bg-amber-100 text-amber-600 flex items-center justify-center shrink-0"><Smartphone size={20} /></div>
+                <div className="w-10 h-10 rounded-lg bg-blue-500/10 text-blue-400 border border-blue-500/25 flex items-center justify-center shrink-0"><Smartphone size={18} /></div>
                 <div>
-                  <div className="font-semibold text-sm text-slate-900">Hướng dẫn cài đặt trên iPhone (iOS)</div>
-                  <div className="text-xs text-slate-500">Thêm ứng dụng vào màn hình chính qua trình duyệt Safari</div>
+                  <div className="font-semibold text-sm text-white group-hover:text-blue-300 transition-colors">Hướng dẫn cài đặt trên iPhone (iOS)</div>
+                  <div className="text-xs text-slate-400">Thêm ứng dụng vào màn hình chính qua trình duyệt Safari</div>
                 </div>
               </button>
             </div>
             
             <button 
               onClick={() => setShowGeneralModal(false)}
-              className="w-full btn btn-primary py-2.5 rounded-xl font-semibold flex justify-center"
+              className="w-full cyber-btn py-2.5 rounded-xl font-semibold flex justify-center"
             >
               Đóng
             </button>
