@@ -1006,9 +1006,41 @@ export default function OrderList() {
     <div className="flex flex-col bg-white rounded-lg shadow-sm border border-gray-200 font-sans">
 
       {/* Top Tabs */}
-      <div className="flex justify-between border-b border-gray-200 bg-gray-50 px-4 pt-1">
+      <div className="flex justify-between items-end border-b border-gray-200 bg-gray-50 px-4 pt-1">
         <div className="flex space-x-1">
           <button className="px-5 py-2.5 text-[14px] font-medium text-blue-600 border-b-2 border-blue-600 bg-white -mb-[1px]">Yêu cầu dịch vụ</button>
+        </div>
+        
+        {/* Right side: Auto Refresh */}
+        <div className="pb-1.5 pr-2">
+          <div 
+            onClick={() => setAutoRefresh(!autoRefresh)}
+            className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-full border text-[12px] font-medium cursor-pointer select-none transition-all duration-300 ${
+              autoRefresh 
+                ? 'bg-emerald-50 text-emerald-700 border-emerald-200 shadow-sm shadow-emerald-100/50 hover:bg-emerald-100/50' 
+                : 'bg-white text-gray-500 border-gray-300 hover:bg-gray-50'
+            }`}
+            title="Bật/Tắt tự động làm mới danh sách đơn hàng mỗi 5 giây"
+          >
+            <div className="relative flex items-center justify-center w-4 h-4">
+              {autoRefresh ? (
+                <svg
+                  className="w-4 h-4 text-emerald-600 animate-spin"
+                  viewBox="0 0 24 24"
+                  fill="currentColor"
+                >
+                  <circle cx="12" cy="12" r="2.5" />
+                  <path d="M12 12c0-3.5 2.5-5 5-5c0 0-1.5 3-5 5z" />
+                  <path d="M12 12c3.5 0 5 2.5 5 5c0 0-3-1.5-5-5z" />
+                  <path d="M12 12c0 3.5-2.5 5-5 5c0 0 1.5-3 5-5z" />
+                  <path d="M12 12c-3.5 0-5-2.5-5-5c0 0 3 1.5 5 5z" />
+                </svg>
+              ) : (
+                <div className="w-3 h-3 rounded-full border-2 border-gray-300 bg-white" />
+              )}
+            </div>
+            <span>Tự động làm mới (5s)</span>
+          </div>
         </div>
       </div>
 
@@ -1044,19 +1076,7 @@ export default function OrderList() {
               </button>
             )}
  
-            {/* Tự động làm mới Toggle */}
-            <div className="flex items-center space-x-2 px-3 py-2 text-[13px] border border-gray-300 rounded-md bg-white text-gray-700 shadow-sm h-[38px]">
-              <label className="relative inline-flex items-center cursor-pointer select-none">
-                <input
-                  type="checkbox"
-                  className="sr-only peer"
-                  checked={autoRefresh}
-                  onChange={(e) => setAutoRefresh(e.target.checked)}
-                />
-                <div className="w-8 h-4.5 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[3px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-3.5 after:w-3.5 after:transition-all peer-checked:bg-blue-600"></div>
-                <span className="ml-2 font-medium text-gray-700">Tự động làm mới (5s)</span>
-              </label>
-            </div>
+
 
             {/* Đồng bộ từ Pancake button */}
             {!isViewOnlyStaff && (
