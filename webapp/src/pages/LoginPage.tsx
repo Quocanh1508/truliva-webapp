@@ -5,6 +5,16 @@ import { useAuth } from '../context/AuthContext';
 import { fetchApi } from '../api/client';
 import { Capacitor } from '@capacitor/core';
 
+interface Particle {
+  x: number;
+  y: number;
+  vx: number;
+  vy: number;
+  radius: number;
+  alpha: number;
+  baseAlpha: number;
+}
+
 export default function LoginPage() {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
@@ -22,33 +32,148 @@ export default function LoginPage() {
   // Detect if running inside the Capacitor mobile app shell
   const isApp = Capacitor.isNativePlatform();
 
-  // 3D Tilt and Glare Effect
-  const [tilt, setTilt] = useState({ x: 0, y: 0 });
-  const [glare, setGlare] = useState({ x: 50, y: 50, opacity: 0 });
-  const cardRef = useRef<HTMLDivElement>(null);
+  // Canvas Constellation Reference
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const mouseRef = useRef<{ x: number | null; y: number | null }>({ x: null, y: null });
 
-  const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (!cardRef.current) return;
-    const card = cardRef.current;
-    const rect = card.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
-    const xc = rect.width / 2;
-    const yc = rect.height / 2;
-    // Max tilt angle is 8 degrees
-    const rotateX = -(y - yc) / 25;
-    const rotateY = (x - xc) / 25;
-    setTilt({ x: rotateY, y: rotateX });
-    setGlare({
-      x: (x / rect.width) * 100,
-      y: (y / rect.height) * 100,
-      opacity: 0.15,
-    });
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    let animationFrameId: number;
+    let particles: Particle[] = [];
+    const maxParticles = window.innerWidth < 768 ? 30 : 65; // Density optimized for performance
+    const connectionDist = 110;
+    const mouseConnectionDist = 150;
+
+    const resizeCanvas = () => {
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+    };
+    resizeCanvas();
+    window.addEventListener('resize', resizeCanvas);
+
+    // Initialize particles
+    particles = [];
+    for (let i = 0; i < maxParticles; i++) {
+      particles.push({
+        x: Math.random() * canvas.width,
+        y: Math.random() * canvas.height,
+        vx: (Math.random() - 0.5) * 0.35, // Slow elegant movement
+        vy: (Math.random() - 0.5) * 0.35,
+        radius: Math.random() * 2 + 1.2,
+        alpha: Math.random() * 0.35 + 0.15,
+        baseAlpha: Math.random() * 0.25 + 0.1,
+      });
+    }
+
+    const draw = () => {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      const mouse = mouseRef.current;
+
+      // Draw connections
+      for (let i = 0; i < particles.length; i++) {
+        const p1 = particles[i];
+        
+        // Connect to other particles
+        for (let j = i + 1; j < particles.length; j++) {
+          const p2 = particles[j];
+          const dist = Math.hypot(p1.x - p2.x, p1.y - p2.y);
+          if (dist < connectionDist) {
+            const alpha = (1 - dist / connectionDist) * 0.12;
+            ctx.beginPath();
+            ctx.strokeStyle = `rgba(59, 130, 246, ${alpha})`;
+            ctx.lineWidth = 0.7;
+            ctx.moveTo(p1.x, p1.y);
+            ctx.lineTo(p2.x, p2.y);
+            ctx.stroke();
+          }
+        }
+
+        // Connect to mouse or touch point
+        if (mouse.x !== null && mouse.y !== null) {
+          const distToMouse = Math.hypot(p1.x - mouse.x, p1.y - mouse.y);
+          if (distToMouse < mouseConnectionDist) {
+            const alpha = (1 - distToMouse / mouseConnectionDist) * 0.45;
+            
+            // Draw connector line with cyan/emerald glow
+            ctx.beginPath();
+            ctx.strokeStyle = `rgba(6, 182, 212, ${alpha})`;
+            ctx.lineWidth = 1.1;
+            ctx.moveTo(p1.x, p1.y);
+            ctx.lineTo(mouse.x, mouse.y);
+            ctx.stroke();
+
+            // Glow effect on particles near mouse
+            p1.alpha = p1.baseAlpha + (1 - distToMouse / mouseConnectionDist) * 0.65;
+          } else {
+            p1.alpha = p1.baseAlpha;
+          }
+        } else {
+          p1.alpha = p1.baseAlpha;
+        }
+
+        // Update particle position
+        p1.x += p1.vx;
+        p1.y += p1.vy;
+
+        // Wrap boundaries
+        if (p1.x < 0) p1.x = canvas.width;
+        if (p1.x > canvas.width) p1.x = 0;
+        if (p1.y < 0) p1.y = canvas.height;
+        if (p1.y > canvas.height) p1.y = 0;
+
+        // Draw particle
+        ctx.beginPath();
+        ctx.arc(p1.x, p1.y, p1.radius, 0, Math.PI * 2);
+        ctx.fillStyle = `rgba(14, 165, 233, ${p1.alpha})`;
+        ctx.fill();
+        
+        // Small radial glow around particle if near cursor
+        if (p1.alpha > 0.35) {
+          ctx.beginPath();
+          ctx.arc(p1.x, p1.y, p1.radius * 3.5, 0, Math.PI * 2);
+          ctx.fillStyle = `rgba(6, 182, 212, ${(p1.alpha - 0.35) * 0.25})`;
+          ctx.fill();
+        }
+      }
+
+      animationFrameId = requestAnimationFrame(draw);
+    };
+
+    draw();
+
+    return () => {
+      window.removeEventListener('resize', resizeCanvas);
+      cancelAnimationFrame(animationFrameId);
+    };
+  }, []);
+
+  const handleMouseMove = (e: React.MouseEvent) => {
+    mouseRef.current = { x: e.clientX, y: e.clientY };
   };
 
   const handleMouseLeave = () => {
-    setTilt({ x: 0, y: 0 });
-    setGlare(prev => ({ ...prev, opacity: 0 }));
+    mouseRef.current = { x: null, y: null };
+  };
+
+  const handleTouchStart = (e: React.TouchEvent) => {
+    if (e.touches.length > 0) {
+      mouseRef.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+    }
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    if (e.touches.length > 0) {
+      mouseRef.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+    }
+  };
+
+  const handleTouchEnd = () => {
+    mouseRef.current = { x: null, y: null };
   };
 
   useEffect(() => {
@@ -117,10 +242,22 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="relative flex items-center justify-center h-screen overflow-hidden cyber-bg">
-      
+    <div 
+      onMouseMove={handleMouseMove}
+      onMouseLeave={handleMouseLeave}
+      onTouchStart={handleTouchStart}
+      onTouchMove={handleTouchMove}
+      onTouchEnd={handleTouchEnd}
+      className="relative flex items-center justify-center h-screen overflow-hidden cyber-bg"
+    >
       {/* Subtle grid pattern overlay */}
       <div className="absolute inset-0 pointer-events-none z-0 cyber-grid" />
+
+      {/* Interactive Canvas Particle Network */}
+      <canvas 
+        ref={canvasRef} 
+        className="absolute inset-0 pointer-events-none z-10" 
+      />
 
       {/* Ambient Glowing Orbs */}
       <div className="cyber-orb orb-blue z-0" />
@@ -133,8 +270,8 @@ export default function LoginPage() {
 
         .cyber-grid {
           background-image: 
-            linear-gradient(rgba(59, 130, 246, 0.04) 1px, transparent 1px),
-            linear-gradient(90deg, rgba(59, 130, 246, 0.04) 1px, transparent 1px);
+            linear-gradient(rgba(59, 130, 246, 0.03) 1px, transparent 1px),
+            linear-gradient(90deg, rgba(59, 130, 246, 0.03) 1px, transparent 1px);
           background-size: 32px 32px;
           background-position: center;
         }
@@ -142,16 +279,16 @@ export default function LoginPage() {
         .cyber-orb {
           position: absolute;
           border-radius: 50%;
-          filter: blur(100px);
+          filter: blur(120px);
           pointer-events: none;
-          opacity: 0.35;
+          opacity: 0.3;
           mix-blend-mode: screen;
         }
 
         .orb-blue {
           width: 500px;
           height: 500px;
-          background: radial-gradient(circle, rgba(37, 99, 235, 0.25) 0%, rgba(37, 99, 235, 0) 70%);
+          background: radial-gradient(circle, rgba(37, 99, 235, 0.22) 0%, rgba(37, 99, 235, 0) 70%);
           top: -10%;
           left: 15%;
           animation: float-slow 15s infinite alternate;
@@ -160,7 +297,7 @@ export default function LoginPage() {
         .orb-cyan {
           width: 550px;
           height: 550px;
-          background: radial-gradient(circle, rgba(6, 182, 212, 0.2) 0%, rgba(6, 182, 212, 0) 70%);
+          background: radial-gradient(circle, rgba(6, 182, 212, 0.18) 0%, rgba(6, 182, 212, 0) 70%);
           bottom: -10%;
           right: 15%;
           animation: float-slow 20s infinite alternate-reverse;
@@ -171,21 +308,20 @@ export default function LoginPage() {
           100% { transform: translate(30px, 20px) scale(1.05); }
         }
 
-        /* 3D Glassmorphism Card Style */
+        /* 3D Glassmorphism Card Style (Stationary layout as requested) */
         .glow-card {
           position: relative;
-          background: rgba(10, 18, 36, 0.75);
-          backdrop-filter: blur(16px);
+          background: rgba(10, 18, 36, 0.85);
+          backdrop-filter: blur(20px);
           border-radius: 1.25rem;
-          padding: 2.25rem 2rem;
+          padding: 2.5rem 2.25rem;
           width: 100%;
-          max-width: 400px;
+          max-width: 410px;
           margin: 1.5rem;
           box-shadow: 
-            0 15px 35px -5px rgba(0, 0, 0, 0.5), 
-            0 5px 15px -5px rgba(0, 0, 0, 0.3),
-            0 0 30px rgba(59, 130, 246, 0.05);
-          transform-style: preserve-3d;
+            0 20px 45px -10px rgba(0, 0, 0, 0.6), 
+            0 10px 20px -10px rgba(0, 0, 0, 0.4),
+            0 0 35px rgba(59, 130, 246, 0.04);
         }
 
         .glow-card::before {
@@ -194,7 +330,7 @@ export default function LoginPage() {
           inset: 0;
           border-radius: 1.25rem;
           padding: 1.5px;
-          background: linear-gradient(135deg, rgba(59, 130, 246, 0.4), rgba(6, 182, 212, 0.08), rgba(59, 130, 246, 0.08), rgba(6, 182, 212, 0.3));
+          background: linear-gradient(135deg, rgba(59, 130, 246, 0.45), rgba(6, 182, 212, 0.1), rgba(59, 130, 246, 0.1), rgba(6, 182, 212, 0.35));
           -webkit-mask: 
              linear-gradient(#fff 0 0) content-box, 
              linear-gradient(#fff 0 0);
@@ -279,36 +415,18 @@ export default function LoginPage() {
         }
       `}</style>
 
-      {/* Login Card */}
-      <div 
-        ref={cardRef}
-        onMouseMove={handleMouseMove}
-        onMouseLeave={handleMouseLeave}
-        className="glow-card relative z-10 transition-all duration-300 group"
-        style={{
-          transform: `perspective(1000px) rotateY(${tilt.x}deg) rotateX(${tilt.y}deg)`,
-          transition: 'transform 0.1s ease, box-shadow 0.3s ease',
-        }}
-      >
-        {/* Dynamic glare shine effect overlay */}
-        <div
-          className="absolute inset-0 pointer-events-none rounded-2xl transition-opacity duration-300"
-          style={{
-            background: `radial-gradient(circle 180px at ${glare.x}% ${glare.y}%, rgba(255,255,255,0.08), transparent 100%)`,
-            opacity: glare.opacity,
-            mixBlendMode: 'overlay',
-          }}
-        />
-
+      {/* Login Card (Stationary) */}
+      <div className="glow-card relative z-20 transition-all duration-300 group">
         <div className="text-center mb-6">
-          <div className="flex justify-center mb-4 relative">
+          {/* Logo - Enlarged Container */}
+          <div className="flex justify-center mb-5 relative">
             <img 
               src="/logo.jpg" 
               alt="Truliva Logo" 
-              className="h-16 rounded-xl bg-white p-1 shadow-md border border-white/10 object-contain transition-transform duration-300 group-hover:scale-105"
+              className="h-24 rounded-2xl bg-white p-2 shadow-lg border border-white/10 object-contain transition-all duration-300 group-hover:scale-[1.03]"
             />
             {/* Ambient logo glow */}
-            <div className="absolute inset-0 bg-blue-500/10 blur-xl rounded-full pointer-events-none z-[-1]" />
+            <div className="absolute inset-0 bg-blue-500/10 blur-2xl rounded-full pointer-events-none z-[-1]" />
           </div>
           
           <div className="inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full text-[10px] font-semibold tracking-wider uppercase bg-blue-500/10 text-blue-400 border border-blue-500/20 select-none">
