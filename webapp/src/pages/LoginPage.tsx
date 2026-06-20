@@ -423,17 +423,17 @@ export default function LoginPage() {
             <img 
               src="/logo.jpg" 
               alt="Truliva Logo" 
-              className="h-24 rounded-2xl bg-white p-2 shadow-lg border border-white/10 object-contain transition-all duration-300 group-hover:scale-[1.03]"
+              className="h-32 rounded-3xl bg-white p-2.5 shadow-xl border border-white/10 object-contain transition-all duration-300 group-hover:scale-[1.03]"
             />
             {/* Ambient logo glow */}
-            <div className="absolute inset-0 bg-blue-500/10 blur-2xl rounded-full pointer-events-none z-[-1]" />
+            <div className="absolute inset-0 bg-blue-500/10 blur-3xl rounded-full pointer-events-none z-[-1]" />
           </div>
           
           <div className="inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full text-[10px] font-semibold tracking-wider uppercase bg-blue-500/10 text-blue-400 border border-blue-500/20 select-none">
             <ShieldCheck size={11} className="text-blue-400 animate-pulse" />
             <span>Kỹ thuật viên</span>
           </div>
-          <h2 className="font-bold text-xl mt-3 text-white tracking-wide">Đăng nhập hệ thống</h2>
+          <h2 className="font-bold text-[18px] mt-3 text-white tracking-wide leading-snug">Hệ thống quản lí dịch vụ và kĩ thuật viên</h2>
         </div>
 
         {error && <div className="cyber-alert">{error}</div>}
