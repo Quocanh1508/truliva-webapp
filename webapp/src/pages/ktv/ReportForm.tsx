@@ -829,7 +829,7 @@ export default function ReportForm() {
                 <h3 className="font-bold mb-4 text-md text-[#1B3A6B]">🛠️ Nhập thông tin kỹ thuật</h3>
 
                 {/* Dịch vụ thực tế - Multi-select (Tag-based) */}
-                <div className="form-group relative z-30" ref={serviceDropdownRef}>
+                <div className={`form-group relative ${showServiceDropdown ? 'z-40' : 'z-20'}`} ref={serviceDropdownRef}>
                   <label className="form-label font-semibold text-gray-700">Dịch vụ thực tế *</label>
                   <div
                     onClick={() => setShowServiceDropdown(!showServiceDropdown)}
