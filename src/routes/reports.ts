@@ -377,13 +377,40 @@ router.post('/', async (req: Request, res: Response): Promise<void> => {
       finalSpareParts = parsedSpareParts;
     }
 
+    let isApprovalRequired = false;
+    let oldOrder = null;
+
     if (orderId) {
+      oldOrder = await prisma.order.findUnique({
+        where: { id: orderId },
+        include: { items: true }
+      });
+
+      if (oldOrder) {
+        // Compare reportItems with oldOrder.items
+        for (const reportItem of reportItems) {
+          const matchingOriginalItem = oldOrder.items.find(
+            (oi: any) => oi.productName?.trim().toLowerCase() === reportItem.productName?.trim().toLowerCase()
+          );
+
+          if (!matchingOriginalItem) {
+            isApprovalRequired = true;
+          } else if (reportItem.quantity > (matchingOriginalItem.quantity || 0)) {
+            isApprovalRequired = true;
+          }
+        }
+      }
+
       await prisma.serviceReport.deleteMany({
         where: {
           orderId,
           approvalStatus: { in: ['PENDING', 'REJECTED'] }
         }
       });
+    }
+
+    if (finalSpareParts.length > 0) {
+      isApprovalRequired = true;
     }
 
     const report = await prisma.serviceReport.create({
@@ -413,7 +440,7 @@ router.post('/', async (req: Request, res: Response): Promise<void> => {
         spareParts: finalSpareParts,
         issueType: issueType || null,
         handlingMethod: handlingMethod || null,
-        approvalStatus: finalSpareParts.length > 0 ? 'PENDING' : 'APPROVED',
+        approvalStatus: isApprovalRequired ? 'PENDING' : 'APPROVED',
       } as any,
       include: {
         ktvUser: { select: { fullName: true } },
@@ -423,62 +450,57 @@ router.post('/', async (req: Request, res: Response): Promise<void> => {
     // Tự động chuyển trạng thái đơn hàng khi KTV nộp báo cáo
     if (orderId) {
       try {
-        const oldOrder = await prisma.order.findUnique({
-          where: { id: orderId },
-          include: { items: true }
-        });
-
         if (oldOrder) {
           const currentShippingAddress = (oldOrder.shippingAddress as any) || {};
-          const updatedShippingAddress = {
-            ...currentShippingAddress,
-            province_name: province || currentShippingAddress.province_name,
-            full_address: address || currentShippingAddress.full_address,
-          };
+        const updatedShippingAddress = {
+          ...currentShippingAddress,
+          province_name: province || currentShippingAddress.province_name,
+          full_address: address || currentShippingAddress.full_address,
+        };
 
-          // ── Xử lý linh kiện phát sinh (spare parts) & sản phẩm ──
-          let targetWarehouseId = oldOrder.warehouseId || null;
-          let targetWarehouseName = (oldOrder.warehouseInfo as any)?.name || 'Kho hàng';
+        // ── Xử lý linh kiện phát sinh (spare parts) & sản phẩm ──
+        let targetWarehouseId = oldOrder.warehouseId || null;
+        let targetWarehouseName = (oldOrder.warehouseInfo as any)?.name || 'Kho hàng';
 
-          // Lấy kho hàng của KTV để làm fallback
-          const ktvUser = await prisma.user.findUnique({
-            where: { id: req.user!.id },
-            select: { warehouseId: true, warehouseName: true }
+        // Lấy kho hàng của KTV để làm fallback
+        const ktvUser = await prisma.user.findUnique({
+          where: { id: req.user!.id },
+          select: { warehouseId: true, warehouseName: true }
+        });
+        
+        if (!targetWarehouseId && ktvUser?.warehouseId) {
+          targetWarehouseId = ktvUser.warehouseId;
+          targetWarehouseName = ktvUser.warehouseName || 'Kho hàng';
+        }
+
+        // 1. Cập nhật các OrderItem cục bộ
+        await prisma.orderItem.deleteMany({
+          where: { orderId: oldOrder.id }
+        });
+
+        if (reportItems.length > 0) {
+          await prisma.orderItem.createMany({
+            data: reportItems.map((item: any) => {
+              const prod = matchedProducts.find(p => p.name === item.productName);
+              return {
+                orderId: oldOrder.id,
+                productName: item.productName,
+                sku: prod?.sku || null,
+                quantity: item.quantity,
+                price: prod?.sellingPrice || 0,
+                rawData: prod?.rawData || undefined
+              };
+            })
           });
-          
-          if (!targetWarehouseId && ktvUser?.warehouseId) {
-            targetWarehouseId = ktvUser.warehouseId;
-            targetWarehouseName = ktvUser.warehouseName || 'Kho hàng';
-          }
+        }
 
-          // 1. Cập nhật các OrderItem cục bộ
-          await prisma.orderItem.deleteMany({
-            where: { orderId: oldOrder.id }
-          });
+        const newTotalPrice = reportItems.reduce((sum: number, item: any) => {
+          const prod = matchedProducts.find(p => p.name === item.productName);
+          return sum + ((prod?.sellingPrice || 0) * item.quantity);
+        }, 0);
+        const newTotalQuantity = reportItems.reduce((sum: number, item: any) => sum + item.quantity, 0);
 
-          if (reportItems.length > 0) {
-            await prisma.orderItem.createMany({
-              data: reportItems.map((item: any) => {
-                const prod = matchedProducts.find(p => p.name === item.productName);
-                return {
-                  orderId: oldOrder.id,
-                  productName: item.productName,
-                  sku: prod?.sku || null,
-                  quantity: item.quantity,
-                  price: prod?.sellingPrice || 0,
-                  rawData: prod?.rawData || undefined
-                };
-              })
-            });
-          }
-
-          const newTotalPrice = reportItems.reduce((sum: number, item: any) => {
-            const prod = matchedProducts.find(p => p.name === item.productName);
-            return sum + ((prod?.sellingPrice || 0) * item.quantity);
-          }, 0);
-          const newTotalQuantity = reportItems.reduce((sum: number, item: any) => sum + item.quantity, 0);
-
-          if (finalSpareParts.length > 0) {
+        if (isApprovalRequired) {
             // LUỒNG CHỜ DUYỆT (Có linh kiện phát sinh)
             const orderUpdateData: any = {
               adminStatus: 'chờ duyệt',
