@@ -379,6 +379,7 @@ router.post('/', async (req: Request, res: Response): Promise<void> => {
 
     let isApprovalRequired = false;
     let oldOrder = null;
+    const arisingItemsList: string[] = [];
 
     if (orderId) {
       oldOrder = await prisma.order.findUnique({
@@ -395,8 +396,11 @@ router.post('/', async (req: Request, res: Response): Promise<void> => {
 
           if (!matchingOriginalItem) {
             isApprovalRequired = true;
+            arisingItemsList.push(`${reportItem.productName} (x${reportItem.quantity})`);
           } else if (reportItem.quantity > (matchingOriginalItem.quantity || 0)) {
             isApprovalRequired = true;
+            const extraQty = reportItem.quantity - (matchingOriginalItem.quantity || 0);
+            arisingItemsList.push(`${reportItem.productName} (thêm x${extraQty})`);
           }
         }
       }
@@ -411,6 +415,9 @@ router.post('/', async (req: Request, res: Response): Promise<void> => {
 
     if (finalSpareParts.length > 0) {
       isApprovalRequired = true;
+      if (arisingItemsList.length === 0) {
+        arisingItemsList.push(...finalSpareParts);
+      }
     }
 
     const report = await prisma.serviceReport.create({
@@ -578,7 +585,10 @@ router.post('/', async (req: Request, res: Response): Promise<void> => {
             });
 
             const staffTitle = 'Yêu cầu duyệt báo cáo';
-            const staffContent = `KTV ${req.user!.fullName} đã gửi báo cáo có linh kiện phát sinh cho đơn hàng ${orderCode}. Vui lòng phê duyệt.`;
+            let staffContent = `KTV ${req.user!.fullName} đã gửi báo cáo có linh kiện phát sinh cho đơn hàng ${orderCode}. Vui lòng phê duyệt.`;
+            if (arisingItemsList.length > 0) {
+              staffContent += `\nLinh kiện phát sinh: ${arisingItemsList.join(', ')}`;
+            }
 
             await prisma.notification.createMany({
               data: staffUsers.map(u => ({
