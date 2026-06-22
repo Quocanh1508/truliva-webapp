@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { broadcastNotification } from '../../api/client';
-import { Send, Bell, CheckSquare, Square, AlertCircle, CheckCircle } from 'lucide-react';
+import { Send, Bell, CheckSquare, Square, AlertCircle, CheckCircle, Bold, Italic, List } from 'lucide-react';
 
 const rolesList = [
   { key: 'KTV', label: 'Kỹ thuật viên (KTV)', group: 'tech' },
@@ -20,6 +20,40 @@ export default function BroadcastNotification() {
   const [loading, setLoading] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
   const [errorMessage, setErrorMessage] = useState('');
+
+  const insertFormatting = (prefix: string, suffix: string = '') => {
+    const textarea = document.getElementById('notification-content-textarea') as HTMLTextAreaElement;
+    if (!textarea) return;
+
+    const start = textarea.selectionStart;
+    const end = textarea.selectionEnd;
+    const text = textarea.value;
+    const selected = text.substring(start, end);
+    
+    let replacement = '';
+    if (prefix === '- ' && suffix === '') {
+      replacement = selected
+        .split('\n')
+        .map(line => line.startsWith('- ') ? line : `- ${line}`)
+        .join('\n');
+      if (replacement === '') {
+        replacement = '- ';
+      }
+    } else {
+      replacement = prefix + selected + suffix;
+    }
+
+    const before = text.substring(0, start);
+    const after = text.substring(end);
+
+    setContent(before + replacement + after);
+    
+    setTimeout(() => {
+      textarea.focus();
+      const newCursorPos = start + prefix.length + selected.length + suffix.length;
+      textarea.setSelectionRange(newCursorPos, newCursorPos);
+    }, 0);
+  };
 
   const handleCheckboxChange = (roleKey: string) => {
     setSelectedRoles(prev =>
@@ -132,13 +166,47 @@ export default function BroadcastNotification() {
 
           {/* Nội dung */}
           <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-1.5">
-              Nội dung thông báo <span className="text-red-500">*</span>
-            </label>
+            <div className="flex justify-between items-center mb-1.5">
+              <label className="block text-sm font-semibold text-gray-700">
+                Nội dung thông báo <span className="text-red-500">*</span>
+              </label>
+              
+              {/* Toolbar định dạng */}
+              <div className="flex items-center gap-1 bg-gray-50 p-1 rounded-lg border border-gray-200">
+                <button
+                  type="button"
+                  onClick={() => insertFormatting('**', '**')}
+                  className="p-1 rounded hover:bg-gray-200 transition-colors text-gray-600 hover:text-gray-900"
+                  title="Chữ đậm (**in đậm**)"
+                  disabled={loading}
+                >
+                  <Bold size={14} />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => insertFormatting('*', '*')}
+                  className="p-1 rounded hover:bg-gray-200 transition-colors text-gray-600 hover:text-gray-900"
+                  title="Chữ nghiêng (*in nghiêng*)"
+                  disabled={loading}
+                >
+                  <Italic size={14} />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => insertFormatting('- ')}
+                  className="p-1 rounded hover:bg-gray-200 transition-colors text-gray-600 hover:text-gray-900"
+                  title="Danh sách gạch đầu dòng (- dòng)"
+                  disabled={loading}
+                >
+                  <List size={14} />
+                </button>
+              </div>
+            </div>
             <textarea
+              id="notification-content-textarea"
               value={content}
               onChange={e => setContent(e.target.value)}
-              placeholder="Nhập nội dung thông báo..."
+              placeholder="Nhập nội dung thông báo... (Hỗ trợ định dạng: **chữ đậm**, *chữ nghiêng*, - danh sách)"
               rows={6}
               className="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#1B3A6B]/20 focus:border-[#1B3A6B] transition-all text-sm leading-relaxed"
               disabled={loading}

@@ -76,6 +76,62 @@ export default function Notifications() {
     }
   };
 
+  const renderFormattedContent = (text: string) => {
+    if (!text) return '';
+    const lines = text.split('\n');
+    return lines.map((line, idx) => {
+      let isBullet = false;
+      let cleanLine = line;
+
+      if (cleanLine.trim().startsWith('- ')) {
+        isBullet = true;
+        cleanLine = cleanLine.trim().substring(2);
+      } else if (cleanLine.trim().startsWith('* ')) {
+        isBullet = true;
+        cleanLine = cleanLine.trim().substring(2);
+      }
+
+      const parts = [];
+      const regex = /\*\*(.*?)\*\*|\*(.*?)\*/g;
+      let match;
+      let lastIndex = 0;
+
+      while ((match = regex.exec(cleanLine)) !== null) {
+        const matchIndex = match.index;
+        if (matchIndex > lastIndex) {
+          parts.push(cleanLine.substring(lastIndex, matchIndex));
+        }
+        if (match[1] !== undefined) {
+          parts.push(<strong key={matchIndex} className="font-bold text-gray-900">{match[1]}</strong>);
+        } else if (match[2] !== undefined) {
+          parts.push(<em key={matchIndex} className="italic text-gray-800">{match[2]}</em>);
+        }
+        lastIndex = regex.lastIndex;
+      }
+
+      if (lastIndex < cleanLine.length) {
+        parts.push(cleanLine.substring(lastIndex));
+      }
+
+      const contentNode = parts.length > 0 ? parts : cleanLine;
+
+      if (isBullet) {
+        return (
+          <div key={idx} className="flex items-start gap-1.5 pl-3 my-0.5">
+            <span className="text-blue-500 shrink-0 select-none">•</span>
+            <span className="flex-1 text-gray-700">{contentNode}</span>
+          </div>
+        );
+      }
+
+      return (
+        <div key={idx} className="min-h-[1.25rem]">
+          {contentNode}
+        </div>
+      );
+    });
+  };
+
   const loadNotifications = async (silent = false) => {
     try {
       if (!silent) setLoading(true);
@@ -182,9 +238,9 @@ export default function Notifications() {
                     )}
                   </div>
                   
-                  <p className="text-[13px] text-gray-600 whitespace-pre-wrap leading-relaxed">
-                    {n.content}
-                  </p>
+                  <div className="text-[13px] text-gray-600 leading-relaxed space-y-1.5">
+                    {renderFormattedContent(n.content)}
+                  </div>
                   
                   {n.rawData?.type === 'REPORT_APPROVAL_REQUEST' && (
                     <div className="mt-3 p-3 bg-gray-50 border border-gray-150 rounded-lg flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 text-left">
