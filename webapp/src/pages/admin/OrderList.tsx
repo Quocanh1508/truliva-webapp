@@ -66,7 +66,7 @@ export default function OrderList() {
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
   const [_error, setError] = useState('');
-  const [autoRefresh, setAutoRefresh] = useState(true);
+  const [autoRefresh, setAutoRefresh] = useState(false);
 
   // Filters
   const [search, setSearch] = useState('');
