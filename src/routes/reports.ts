@@ -388,19 +388,23 @@ router.post('/', async (req: Request, res: Response): Promise<void> => {
       });
 
       if (oldOrder) {
-        // Compare reportItems with oldOrder.items
-        for (const reportItem of reportItems) {
-          const matchingOriginalItem = oldOrder.items.find(
-            (oi: any) => oi.productName?.trim().toLowerCase() === reportItem.productName?.trim().toLowerCase()
-          );
+        const isApprovalWorkType = ['Bảo hành', 'Sửa chữa', 'Thay lọc'].includes(oldOrder.workType || '');
 
-          if (!matchingOriginalItem) {
-            isApprovalRequired = true;
-            arisingItemsList.push(`${reportItem.productName} (x${reportItem.quantity})`);
-          } else if (reportItem.quantity > (matchingOriginalItem.quantity || 0)) {
-            isApprovalRequired = true;
-            const extraQty = reportItem.quantity - (matchingOriginalItem.quantity || 0);
-            arisingItemsList.push(`${reportItem.productName} (thêm x${extraQty})`);
+        if (isApprovalWorkType) {
+          // Compare reportItems with oldOrder.items
+          for (const reportItem of reportItems) {
+            const matchingOriginalItem = oldOrder.items.find(
+              (oi: any) => oi.productName?.trim().toLowerCase() === reportItem.productName?.trim().toLowerCase()
+            );
+
+            if (!matchingOriginalItem) {
+              isApprovalRequired = true;
+              arisingItemsList.push(`${reportItem.productName} (x${reportItem.quantity})`);
+            } else if (reportItem.quantity > (matchingOriginalItem.quantity || 0)) {
+              isApprovalRequired = true;
+              const extraQty = reportItem.quantity - (matchingOriginalItem.quantity || 0);
+              arisingItemsList.push(`${reportItem.productName} (thêm x${extraQty})`);
+            }
           }
         }
       }
@@ -413,11 +417,15 @@ router.post('/', async (req: Request, res: Response): Promise<void> => {
       });
     }
 
-    if (finalSpareParts.length > 0) {
-      isApprovalRequired = true;
-      if (arisingItemsList.length === 0) {
-        arisingItemsList.push(...finalSpareParts);
+    if (oldOrder && ['Bảo hành', 'Sửa chữa', 'Thay lọc'].includes(oldOrder.workType || '')) {
+      if (finalSpareParts.length > 0) {
+        isApprovalRequired = true;
+        if (arisingItemsList.length === 0) {
+          arisingItemsList.push(...finalSpareParts);
+        }
       }
+    } else {
+      isApprovalRequired = false;
     }
 
     const report = await prisma.serviceReport.create({
