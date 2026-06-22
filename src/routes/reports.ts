@@ -11,6 +11,11 @@ import axios from 'axios';
 
 const router = Router();
 
+function formatOrderCode(pancakeOrderId: number | null | undefined): string {
+  if (pancakeOrderId === undefined || pancakeOrderId === null) return '';
+  return pancakeOrderId < 0 ? `M${Math.abs(pancakeOrderId)}` : `#${pancakeOrderId}`;
+}
+
 // Reusable function to build standard & advanced report filter queries
 async function buildReportFilter(query: any, user: any): Promise<any> {
   const {
@@ -372,6 +377,15 @@ router.post('/', async (req: Request, res: Response): Promise<void> => {
       finalSpareParts = parsedSpareParts;
     }
 
+    if (orderId) {
+      await prisma.serviceReport.deleteMany({
+        where: {
+          orderId,
+          approvalStatus: { in: ['PENDING', 'REJECTED'] }
+        }
+      });
+    }
+
     const report = await prisma.serviceReport.create({
       data: {
         month: reportMonth,
@@ -399,13 +413,14 @@ router.post('/', async (req: Request, res: Response): Promise<void> => {
         spareParts: finalSpareParts,
         issueType: issueType || null,
         handlingMethod: handlingMethod || null,
+        approvalStatus: finalSpareParts.length > 0 ? 'PENDING' : 'APPROVED',
       } as any,
       include: {
         ktvUser: { select: { fullName: true } },
       },
     });
 
-    // Tự động chuyển trạng thái đơn hàng sang "hoàn thành" khi KTV nộp báo cáo
+    // Tự động chuyển trạng thái đơn hàng khi KTV nộp báo cáo
     if (orderId) {
       try {
         const oldOrder = await prisma.order.findUnique({
@@ -463,122 +478,248 @@ router.post('/', async (req: Request, res: Response): Promise<void> => {
           }, 0);
           const newTotalQuantity = reportItems.reduce((sum: number, item: any) => sum + item.quantity, 0);
 
-          // 2. Nếu là đơn từ Pancake POS (pancakeOrderId > 0), thực hiện đồng bộ sản phẩm sang Pancake POS
-          if (oldOrder.pancakeOrderId > 0 && reportItems.length > 0) {
-            const apiKey = process.env.PANCAKE_API_KEY;
-            const shopId = '1635300067'; // Default Shop ID từ dự án
-            if (apiKey) {
-              const pancakeProducts = reportItems.map((item: any) => {
-                const prod = matchedProducts.find(p => p.name === item.productName);
-                return {
-                  variation_id: prod?.pancakeProductId || null,
-                  quantity: item.quantity,
-                  price: prod?.sellingPrice || 0
-                };
-              }).filter((p: any) => p.variation_id);
+          if (finalSpareParts.length > 0) {
+            // LUỒNG CHỜ DUYỆT (Có linh kiện phát sinh)
+            const orderUpdateData: any = {
+              adminStatus: 'chờ duyệt',
+              serviceType: serviceType || undefined,
+              billFullName: customerName || undefined,
+              billPhoneNumber: customerPhone || undefined,
+              shippingAddress: updatedShippingAddress,
+              totalPrice: newTotalPrice,
+              totalQuantity: newTotalQuantity,
+              warehouseId: targetWarehouseId,
+              warehouseInfo: targetWarehouseId ? { id: targetWarehouseId, name: targetWarehouseName } : undefined
+            };
 
-              try {
-                logger.info('Syncing products and warehouse to Pancake POS', {
-                  pancakeOrderId: oldOrder.pancakeOrderId,
-                  productsCount: pancakeProducts.length,
-                  warehouseId: targetWarehouseId
-                });
+            const updatedOrder = await prisma.order.update({
+              where: { id: orderId },
+              data: orderUpdateData,
+            });
 
-                const updateResponse = await axios.patch(
-                  `https://pos.pages.fm/api/v1/shops/${shopId}/orders/${oldOrder.pancakeOrderId}`,
-                  {
-                    products: pancakeProducts,
-                    warehouse_id: targetWarehouseId || undefined
-                  },
-                  {
-                    params: { api_key: apiKey },
-                    headers: { 'Content-Type': 'application/json' },
-                    timeout: 10000
-                  }
-                );
+            // Tích hợp đồng bộ tồn kho cục bộ (ở trạng thái giữ hàng - available)
+            try {
+              const newOrderItems = await prisma.orderItem.findMany({
+                where: { orderId }
+              });
+              await syncOrderInventoryState(orderId, {
+                adminStatus: oldOrder.adminStatus,
+                warehouseId: oldOrder.warehouseId,
+                items: oldOrder.items.map(item => ({
+                  productName: item.productName || '',
+                  quantity: item.quantity || 1
+                }))
+              }, {
+                adminStatus: updatedOrder.adminStatus,
+                warehouseId: updatedOrder.warehouseId,
+                items: newOrderItems.map(item => ({
+                  productName: item.productName || '',
+                  quantity: item.quantity || 1
+                }))
+              });
+            } catch (invErr: any) {
+              logger.error('Lỗi giữ kho khi chuyển đơn qua chờ duyệt', { orderId, error: invErr.message });
+            }
 
-                if (!updateResponse.data || !updateResponse.data.success) {
-                  logger.error('Failed to patch products on Pancake POS', {
-                    pancakeOrderId: oldOrder.pancakeOrderId,
-                    response: updateResponse.data
-                  });
-                }
-              } catch (syncErr: any) {
-                logger.error('Error patching products on Pancake POS API', {
-                  pancakeOrderId: oldOrder.pancakeOrderId,
-                  error: syncErr.message,
-                  response: syncErr.response?.data
-                });
+            // Gửi thông báo cho KTV
+            const orderCode = formatOrderCode(oldOrder.pancakeOrderId);
+            const ktvTitle = 'Báo cáo đang chờ duyệt';
+            const ktvContent = `Báo cáo với mã đơn ${orderCode} đang chờ được duyệt.`;
+            
+            await prisma.notification.create({
+              data: {
+                userId: req.user!.id,
+                title: ktvTitle,
+                content: ktvContent
+              }
+            });
+
+            sendPushNotification(req.user!.id, ktvTitle, ktvContent, {
+              type: 'REPORT_PENDING',
+              reportId: report.id,
+              orderId
+            }).catch(err => logger.error('KTV push notification failed', { error: err.message }));
+
+            sendWebPushNotification(req.user!.id, ktvTitle, ktvContent, {
+              type: 'REPORT_PENDING',
+              reportId: report.id,
+              orderId
+            }).catch(err => logger.error('KTV web push notification failed', { error: err.message }));
+
+            // Gửi thông báo cho Staff/Coordinator/Admin
+            const staffUsers = await prisma.user.findMany({
+              where: {
+                role: { in: ['ADMIN', 'COORDINATOR', 'STAFF'] },
+                isActive: true
+              },
+              select: { id: true, pushToken: true, webPushSubscription: true }
+            });
+
+            const staffTitle = 'Yêu cầu duyệt báo cáo';
+            const staffContent = `KTV ${req.user!.fullName} đã gửi báo cáo có linh kiện phát sinh cho đơn hàng ${orderCode}. Vui lòng phê duyệt.`;
+
+            await prisma.notification.createMany({
+              data: staffUsers.map(u => ({
+                userId: u.id,
+                title: staffTitle,
+                content: staffContent,
+                rawData: {
+                  type: 'REPORT_APPROVAL_REQUEST',
+                  reportId: report.id,
+                  orderId
+                } as any
+              }))
+            });
+
+            for (const u of staffUsers) {
+              if (u.pushToken) {
+                sendPushNotification(u.id, staffTitle, staffContent, {
+                  type: 'REPORT_APPROVAL_REQUEST',
+                  reportId: report.id,
+                  orderId
+                }).catch(err => logger.error(`Staff push failed for user ${u.id}`, { error: err.message }));
+              }
+              if (u.webPushSubscription) {
+                sendWebPushNotification(u.id, staffTitle, staffContent, {
+                  type: 'REPORT_APPROVAL_REQUEST',
+                  reportId: report.id,
+                  orderId
+                }).catch(err => logger.error(`Staff web push failed for user ${u.id}`, { error: err.message }));
               }
             }
-          }
 
-          let syncStatus = 'SUCCESS';
-          try {
-            await syncOrderStatusToPancake(oldOrder.pancakeOrderId, 'hoàn thành');
-          } catch (syncErr: any) {
-            logger.warn('Non-blocking Pancake POS status sync failed on report submission', {
-              orderId,
-              pancakeOrderId: oldOrder.pancakeOrderId,
-              error: syncErr.message
+            await prisma.auditLog.create({
+              data: {
+                entityType: 'Order',
+                entityId: orderId,
+                action: 'updated',
+                changes: { adminStatus: { from: oldOrder.adminStatus || 'đang thực hiện', to: 'chờ duyệt' } },
+                userId: req.user!.id,
+                userName: req.user!.fullName,
+              },
             });
-            syncStatus = 'FAILED';
-          }
 
-          const orderUpdateData: any = {
-            adminStatus: 'hoàn thành',
-            serviceType: serviceType || undefined,
-            billFullName: customerName || undefined,
-            billPhoneNumber: customerPhone || undefined,
-            shippingAddress: updatedShippingAddress,
-            pancakeSyncStatus: syncStatus,
-            totalPrice: newTotalPrice,
-            totalQuantity: newTotalQuantity,
-            warehouseId: targetWarehouseId,
-            warehouseInfo: targetWarehouseId ? { id: targetWarehouseId, name: targetWarehouseName } : undefined
-          };
+            logger.info('Order status auto-updated to chờ duyệt due to KTV report submission with spare parts', { orderId });
 
-          const updatedOrder = await prisma.order.update({
-            where: { id: orderId },
-            data: orderUpdateData,
-          });
+          } else {
+            // LUỒNG HOÀN THÀNH NGAY (Không có linh kiện phát sinh) - giữ nguyên logic cũ
+            // 2. Nếu là đơn từ Pancake POS (pancakeOrderId > 0), thực hiện đồng bộ sản phẩm sang Pancake POS
+            if (oldOrder.pancakeOrderId > 0 && reportItems.length > 0) {
+              const apiKey = process.env.PANCAKE_API_KEY;
+              const shopId = '1635300067'; // Default Shop ID từ dự án
+              if (apiKey) {
+                const pancakeProducts = reportItems.map((item: any) => {
+                  const prod = matchedProducts.find(p => p.name === item.productName);
+                  return {
+                    variation_id: prod?.pancakeProductId || null,
+                    quantity: item.quantity,
+                    price: prod?.sellingPrice || 0
+                  };
+                }).filter((p: any) => p.variation_id);
 
-          // Tích hợp đồng bộ tồn kho cục bộ
-          try {
-            const newOrderItems = await prisma.orderItem.findMany({
-              where: { orderId }
+                try {
+                  logger.info('Syncing products and warehouse to Pancake POS', {
+                    pancakeOrderId: oldOrder.pancakeOrderId,
+                    productsCount: pancakeProducts.length,
+                    warehouseId: targetWarehouseId
+                  });
+
+                  const updateResponse = await axios.patch(
+                    `https://pos.pages.fm/api/v1/shops/${shopId}/orders/${oldOrder.pancakeOrderId}`,
+                    {
+                      products: pancakeProducts,
+                      warehouse_id: targetWarehouseId || undefined
+                    },
+                    {
+                      params: { api_key: apiKey },
+                      headers: { 'Content-Type': 'application/json' },
+                      timeout: 10000
+                    }
+                  );
+
+                  if (!updateResponse.data || !updateResponse.data.success) {
+                    logger.error('Failed to patch products on Pancake POS', {
+                      pancakeOrderId: oldOrder.pancakeOrderId,
+                      response: updateResponse.data
+                    });
+                  }
+                } catch (syncErr: any) {
+                  logger.error('Error patching products on Pancake POS API', {
+                    pancakeOrderId: oldOrder.pancakeOrderId,
+                    error: syncErr.message,
+                    response: syncErr.response?.data
+                  });
+                }
+              }
+            }
+
+            let syncStatus = 'SUCCESS';
+            try {
+              await syncOrderStatusToPancake(oldOrder.pancakeOrderId, 'hoàn thành');
+            } catch (syncErr: any) {
+              logger.warn('Non-blocking Pancake POS status sync failed on report submission', {
+                orderId,
+                pancakeOrderId: oldOrder.pancakeOrderId,
+                error: syncErr.message
+              });
+              syncStatus = 'FAILED';
+            }
+
+            const orderUpdateData: any = {
+              adminStatus: 'hoàn thành',
+              serviceType: serviceType || undefined,
+              billFullName: customerName || undefined,
+              billPhoneNumber: customerPhone || undefined,
+              shippingAddress: updatedShippingAddress,
+              pancakeSyncStatus: syncStatus,
+              totalPrice: newTotalPrice,
+              totalQuantity: newTotalQuantity,
+              warehouseId: targetWarehouseId,
+              warehouseInfo: targetWarehouseId ? { id: targetWarehouseId, name: targetWarehouseName } : undefined
+            };
+
+            const updatedOrder = await prisma.order.update({
+              where: { id: orderId },
+              data: orderUpdateData,
             });
-            await syncOrderInventoryState(orderId, {
-              adminStatus: oldOrder.adminStatus,
-              warehouseId: oldOrder.warehouseId,
-              items: oldOrder.items.map(item => ({
-                productName: item.productName || '',
-                quantity: item.quantity || 1
-              }))
-            }, {
-              adminStatus: updatedOrder.adminStatus,
-              warehouseId: updatedOrder.warehouseId,
-              items: newOrderItems.map(item => ({
-                productName: item.productName || '',
-                quantity: item.quantity || 1
-              }))
+
+            // Tích hợp đồng bộ tồn kho cục bộ
+            try {
+              const newOrderItems = await prisma.orderItem.findMany({
+                where: { orderId }
+              });
+              await syncOrderInventoryState(orderId, {
+                adminStatus: oldOrder.adminStatus,
+                warehouseId: oldOrder.warehouseId,
+                items: oldOrder.items.map(item => ({
+                  productName: item.productName || '',
+                  quantity: item.quantity || 1
+                }))
+              }, {
+                adminStatus: updatedOrder.adminStatus,
+                warehouseId: updatedOrder.warehouseId,
+                items: newOrderItems.map(item => ({
+                  productName: item.productName || '',
+                  quantity: item.quantity || 1
+                }))
+              });
+            } catch (invErr: any) {
+              logger.error('Lỗi khấu trừ kho khi hoàn thành đơn qua báo cáo', { orderId, error: invErr.message });
+            }
+
+            await prisma.auditLog.create({
+              data: {
+                entityType: 'Order',
+                entityId: orderId,
+                action: 'updated',
+                changes: { adminStatus: { from: oldOrder?.adminStatus || 'đang thực hiện', to: 'hoàn thành' } },
+                userId: req.user!.id,
+                userName: req.user!.fullName,
+              },
             });
-          } catch (invErr: any) {
-            logger.error('Lỗi khấu trừ kho khi hoàn thành đơn qua báo cáo', { orderId, error: invErr.message });
+            logger.info('Order status auto-updated to hoàn thành due to KTV report submission', { orderId });
           }
         }
-
-        await prisma.auditLog.create({
-          data: {
-            entityType: 'Order',
-            entityId: orderId,
-            action: 'updated',
-            changes: { adminStatus: { from: oldOrder?.adminStatus || 'đang thực hiện', to: 'hoàn thành' } },
-            userId: req.user!.id,
-            userName: req.user!.fullName,
-          },
-        });
-        logger.info('Order status auto-updated to hoàn thành due to KTV report submission', { orderId });
       } catch (err: any) {
         logger.error('Failed to auto-update order status on report creation', { orderId, error: err.message });
       }
@@ -1575,6 +1716,325 @@ router.delete('/:id', requireCoordinatorOrAdmin, async (req: Request, res: Respo
   } catch (error: any) {
     logger.error('Delete report error', { error: error.message });
     res.status(500).json({ error: 'Lỗi xóa báo cáo' });
+  }
+});
+
+/**
+ * POST /api/reports/:id/approve
+ * Phê duyệt báo cáo công việc (Admin / Coordinator / Staff)
+ */
+router.post('/:id/approve', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { role } = req.user!;
+    if (role !== 'ADMIN' && role !== 'DEV' && role !== 'COORDINATOR' && role !== 'STAFF') {
+      res.status(403).json({ error: 'Bạn không có quyền thực hiện hành động này' });
+      return;
+    }
+
+    const reportId = req.params.id as string;
+
+    const report = await prisma.serviceReport.findUnique({
+      where: { id: reportId },
+      include: { order: { include: { items: true } } }
+    });
+
+    if (!report) {
+      res.status(404).json({ error: 'Không tìm thấy báo cáo' });
+      return;
+    }
+
+    if (report.approvalStatus !== 'PENDING') {
+      res.status(400).json({ error: 'Báo cáo này đã được xử lý từ trước' });
+      return;
+    }
+
+    // 1. Cập nhật trạng thái duyệt của báo cáo
+    await prisma.serviceReport.update({
+      where: { id: reportId },
+      data: { approvalStatus: 'APPROVED' }
+    });
+
+    const order = report.order;
+    if (order) {
+      const orderId = order.id;
+
+      // Lấy danh sách sản phẩm trong báo cáo để đồng bộ
+      const reportProducts = report.products || [];
+      const reportSpareParts = report.spareParts || [];
+      const allStrings = [...reportProducts, ...reportSpareParts];
+
+      const reportItems: any[] = [];
+      for (const str of allStrings) {
+        const match = str.match(/^(.+?)\s*x\s*(\d+)$/);
+        let name = str.trim();
+        let qty = 1;
+        if (match) {
+          name = match[1].trim();
+          qty = parseInt(match[2], 10) || 1;
+        }
+        if (name) {
+          reportItems.push({ productName: name, quantity: qty });
+        }
+      }
+
+      const itemNames = reportItems.map(i => i.productName);
+      const matchedProducts = await prisma.product.findMany({
+        where: { name: { in: itemNames }, isActive: true }
+      });
+
+      // Đồng bộ Pancake POS
+      if (order.pancakeOrderId > 0 && reportItems.length > 0) {
+        const apiKey = process.env.PANCAKE_API_KEY;
+        const shopId = '1635300067';
+        if (apiKey) {
+          const pancakeProducts = reportItems.map((item: any) => {
+            const prod = matchedProducts.find(p => p.name === item.productName);
+            return {
+              variation_id: prod?.pancakeProductId || null,
+              quantity: item.quantity,
+              price: prod?.sellingPrice || 0
+            };
+          }).filter((p: any) => p.variation_id);
+
+          try {
+            logger.info('Approved order: Syncing products to Pancake POS', {
+              pancakeOrderId: order.pancakeOrderId,
+              productsCount: pancakeProducts.length,
+              warehouseId: order.warehouseId
+            });
+
+            await axios.patch(
+              `https://pos.pages.fm/api/v1/shops/${shopId}/orders/${order.pancakeOrderId}`,
+              {
+                products: pancakeProducts,
+                warehouse_id: order.warehouseId || undefined
+              },
+              {
+                params: { api_key: apiKey },
+                headers: { 'Content-Type': 'application/json' },
+                timeout: 10000
+              }
+            );
+          } catch (syncErr: any) {
+            logger.error('Error syncing products to Pancake POS on approval', {
+              pancakeOrderId: order.pancakeOrderId,
+              error: syncErr.message
+            });
+          }
+        }
+      }
+
+      let syncStatus = 'SUCCESS';
+      try {
+        await syncOrderStatusToPancake(order.pancakeOrderId, 'hoàn thành');
+      } catch (syncErr: any) {
+        logger.warn('Pancake POS status sync failed on approval', {
+          orderId,
+          pancakeOrderId: order.pancakeOrderId,
+          error: syncErr.message
+        });
+        syncStatus = 'FAILED';
+      }
+
+      // Cập nhật trạng thái đơn hàng
+      const updatedOrder = await prisma.order.update({
+        where: { id: orderId },
+        data: {
+          adminStatus: 'hoàn thành',
+          pancakeSyncStatus: syncStatus
+        }
+      });
+
+      // Tích hợp đồng bộ tồn kho cục bộ (chuyển từ 'chờ duyệt' sang 'hoàn thành' để trừ kho thực tế)
+      try {
+        const newOrderItems = await prisma.orderItem.findMany({
+          where: { orderId }
+        });
+        await syncOrderInventoryState(orderId, {
+          adminStatus: order.adminStatus, // 'chờ duyệt'
+          warehouseId: order.warehouseId,
+          items: order.items.map(item => ({
+            productName: item.productName || '',
+            quantity: item.quantity || 1
+          }))
+        }, {
+          adminStatus: updatedOrder.adminStatus, // 'hoàn thành'
+          warehouseId: updatedOrder.warehouseId,
+          items: newOrderItems.map(item => ({
+            productName: item.productName || '',
+            quantity: item.quantity || 1
+          }))
+        });
+      } catch (invErr: any) {
+        logger.error('Lỗi khấu trừ kho khi duyệt hoàn thành đơn', { orderId, error: invErr.message });
+      }
+
+      // Ghi audit log
+      await prisma.auditLog.create({
+        data: {
+          entityType: 'Order',
+          entityId: orderId,
+          action: 'updated',
+          changes: { adminStatus: { from: order.adminStatus || 'chờ duyệt', to: 'hoàn thành' } },
+          userId: req.user!.id,
+          userName: req.user!.fullName,
+        }
+      });
+    }
+
+    // 2. Gửi thông báo đến KTV báo cáo thành công
+    const orderCode = formatOrderCode(report.order?.pancakeOrderId);
+    const ktvTitle = 'Báo cáo đã được phê duyệt';
+    const ktvContent = `Báo cáo của đơn hàng ${orderCode} đã được phê duyệt.`;
+
+    await prisma.notification.create({
+      data: {
+        userId: report.ktvUserId,
+        title: ktvTitle,
+        content: ktvContent
+      }
+    });
+
+    sendPushNotification(report.ktvUserId, ktvTitle, ktvContent, {
+      type: 'REPORT_APPROVED',
+      reportId,
+      orderId: report.orderId || ''
+    }).catch(err => logger.error('Push notification failed on approval', { error: err.message }));
+
+    sendWebPushNotification(report.ktvUserId, ktvTitle, ktvContent, {
+      type: 'REPORT_APPROVED',
+      reportId,
+      orderId: report.orderId || ''
+    }).catch(err => logger.error('Web push notification failed on approval', { error: err.message }));
+
+    logger.info('Report approved successfully', { reportId, approvedBy: req.user!.id });
+    res.json({ success: true, message: 'Phê duyệt báo cáo thành công' });
+  } catch (error: any) {
+    logger.error('Approve report error', { error: error.message });
+    res.status(500).json({ error: 'Lỗi phê duyệt báo cáo' });
+  }
+});
+
+/**
+ * POST /api/reports/:id/reject
+ * Từ chối báo cáo công việc (Admin / Coordinator / Staff)
+ */
+router.post('/:id/reject', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { role } = req.user!;
+    if (role !== 'ADMIN' && role !== 'DEV' && role !== 'COORDINATOR' && role !== 'STAFF') {
+      res.status(403).json({ error: 'Bạn không có quyền thực hiện hành động này' });
+      return;
+    }
+
+    const { rejectReason } = req.body;
+    if (!rejectReason || !rejectReason.trim()) {
+      res.status(400).json({ error: 'Vui lòng cung cấp lý do từ chối' });
+      return;
+    }
+
+    const reportId = req.params.id as string;
+
+    const report = await prisma.serviceReport.findUnique({
+      where: { id: reportId },
+      include: { order: { include: { items: true } } }
+    });
+
+    if (!report) {
+      res.status(404).json({ error: 'Không tìm thấy báo cáo' });
+      return;
+    }
+
+    if (report.approvalStatus !== 'PENDING') {
+      res.status(400).json({ error: 'Báo cáo này đã được xử lý từ trước' });
+      return;
+    }
+
+    // 1. Cập nhật trạng thái báo cáo
+    await prisma.serviceReport.update({
+      where: { id: reportId },
+      data: {
+        approvalStatus: 'REJECTED',
+        rejectReason: rejectReason.trim()
+      }
+    });
+
+    const order = report.order;
+    if (order) {
+      const orderId = order.id;
+
+      // Cập nhật trạng thái đơn hàng quay về 'đang thực hiện'
+      const updatedOrder = await prisma.order.update({
+        where: { id: orderId },
+        data: { adminStatus: 'đang thực hiện' }
+      });
+
+      // Cập nhật tồn kho cục bộ (chuyển đổi từ 'chờ duyệt' sang 'đang thực hiện' - cả hai đều là active nên chỉ giữ kho)
+      try {
+        await syncOrderInventoryState(orderId, {
+          adminStatus: order.adminStatus, // 'chờ duyệt'
+          warehouseId: order.warehouseId,
+          items: order.items.map(item => ({
+            productName: item.productName || '',
+            quantity: item.quantity || 1
+          }))
+        }, {
+          adminStatus: updatedOrder.adminStatus, // 'đang thực hiện'
+          warehouseId: updatedOrder.warehouseId,
+          items: order.items.map(item => ({
+            productName: item.productName || '',
+            quantity: item.quantity || 1
+          }))
+        });
+      } catch (invErr: any) {
+        logger.error('Lỗi đồng bộ kho khi từ chối đơn', { orderId, error: invErr.message });
+      }
+
+      // Ghi audit log
+      await prisma.auditLog.create({
+        data: {
+          entityType: 'Order',
+          entityId: orderId,
+          action: 'updated',
+          changes: { adminStatus: { from: order.adminStatus || 'chờ duyệt', to: 'đang thực hiện' } },
+          userId: req.user!.id,
+          userName: req.user!.fullName,
+        }
+      });
+    }
+
+    // 2. Gửi thông báo từ chối cho KTV
+    const orderCode = formatOrderCode(report.order?.pancakeOrderId);
+    const ktvTitle = 'Báo cáo không được phê duyệt';
+    const ktvContent = `Báo cáo của bạn cho đơn hàng ${orderCode} không được duyệt vì lý do: ${rejectReason.trim()}`;
+
+    await prisma.notification.create({
+      data: {
+        userId: report.ktvUserId,
+        title: ktvTitle,
+        content: ktvContent
+      }
+    });
+
+    sendPushNotification(report.ktvUserId, ktvTitle, ktvContent, {
+      type: 'REPORT_REJECTED',
+      reportId,
+      orderId: report.orderId || '',
+      rejectReason: rejectReason.trim()
+    }).catch(err => logger.error('Push notification failed on reject', { error: err.message }));
+
+    sendWebPushNotification(report.ktvUserId, ktvTitle, ktvContent, {
+      type: 'REPORT_REJECTED',
+      reportId,
+      orderId: report.orderId || '',
+      rejectReason: rejectReason.trim()
+    }).catch(err => logger.error('Web push notification failed on reject', { error: err.message }));
+
+    logger.info('Report rejected successfully', { reportId, rejectedBy: req.user!.id, reason: rejectReason });
+    res.json({ success: true, message: 'Từ chối phê duyệt báo cáo thành công' });
+  } catch (error: any) {
+    logger.error('Reject report error', { error: error.message });
+    res.status(500).json({ error: 'Lỗi từ chối phê duyệt báo cáo' });
   }
 });
 

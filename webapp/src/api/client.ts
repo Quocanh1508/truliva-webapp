@@ -279,3 +279,16 @@ export const broadcastNotification = async (data: { title: string; content: stri
   });
 };
 
+export const approveReport = async (id: string) => {
+  return fetchApi(`/reports/${id}/approve`, {
+    method: 'POST',
+  });
+};
+
+export const rejectReport = async (id: string, rejectReason: string) => {
+  return fetchApi(`/reports/${id}/reject`, {
+    method: 'POST',
+    body: JSON.stringify({ rejectReason }),
+  });
+};
+

@@ -32,6 +32,7 @@ function formatDate(dateStr: string): string {
 const ROW_STATUS_OPTIONS = [
   { value: 'chờ xử lý', label: 'Chờ xử lý' },
   { value: 'đang thực hiện', label: 'Đã phân công' },
+  { value: 'chờ duyệt', label: 'Chờ duyệt' },
   { value: 'hoàn thành', label: 'Hoàn thành' },
   { value: 'hủy đơn', label: 'Hủy đơn' },
   { value: 'đang hoàn', label: 'Đang hoàn' },
@@ -929,6 +930,7 @@ export default function OrderList() {
     switch (status) {
       case 'chờ xử lý': return 'bg-amber-500 hover:bg-amber-600 focus:ring-amber-500';
       case 'đang thực hiện': return 'bg-blue-500 hover:bg-blue-600 focus:ring-blue-500';
+      case 'chờ duyệt': return 'bg-orange-500 hover:bg-orange-600 focus:ring-orange-500';
       case 'hoàn thành': return 'bg-emerald-500 hover:bg-emerald-600 focus:ring-emerald-500';
       case 'hủy đơn': return 'bg-red-500 hover:bg-red-600 focus:ring-red-500';
       case 'đang hoàn': return 'bg-purple-400 hover:bg-purple-500 focus:ring-purple-400';

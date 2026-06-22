@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { getNotifications, markNotificationRead, markAllNotificationsRead } from '../../api/client';
+import { getNotifications, markNotificationRead, markAllNotificationsRead, approveReport, rejectReport } from '../../api/client';
 import { Bell, Check, Clock, Eye } from 'lucide-react';
 import PullToRefresh from '../../components/PullToRefresh';
 
@@ -7,10 +7,54 @@ export default function Notifications() {
   const [notifications, setNotifications] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [unreadCount, setUnreadCount] = useState(0);
+  const [actionLoadingId, setActionLoadingId] = useState<string | null>(null);
 
   useEffect(() => {
     loadNotifications();
   }, []);
+
+  const handleApprove = async (e: React.MouseEvent, notificationId: string, reportId: string) => {
+    e.stopPropagation();
+    if (!reportId || actionLoadingId) return;
+    
+    if (!window.confirm('Bạn có chắc chắn muốn duyệt báo cáo này?')) return;
+
+    try {
+      setActionLoadingId(notificationId);
+      const res = await approveReport(reportId);
+      alert(res.message || 'Phê duyệt báo cáo thành công');
+      await handleMarkAsRead(notificationId);
+      await loadNotifications(true);
+    } catch (err: any) {
+      alert(err.message || 'Lỗi khi phê duyệt báo cáo');
+    } finally {
+      setActionLoadingId(null);
+    }
+  };
+
+  const handleReject = async (e: React.MouseEvent, notificationId: string, reportId: string) => {
+    e.stopPropagation();
+    if (!reportId || actionLoadingId) return;
+
+    const reason = window.prompt('Nhập lý do từ chối báo cáo (bắt buộc):');
+    if (reason === null) return;
+    if (!reason.trim()) {
+      alert('Vui lòng nhập lý do từ chối');
+      return;
+    }
+
+    try {
+      setActionLoadingId(notificationId);
+      const res = await rejectReport(reportId, reason.trim());
+      alert(res.message || 'Từ chối báo cáo thành công');
+      await handleMarkAsRead(notificationId);
+      await loadNotifications(true);
+    } catch (err: any) {
+      alert(err.message || 'Lỗi khi từ chối báo cáo');
+    } finally {
+      setActionLoadingId(null);
+    }
+  };
 
   const loadNotifications = async (silent = false) => {
     try {
@@ -122,6 +166,52 @@ export default function Notifications() {
                     {n.content}
                   </p>
                   
+                  {n.rawData?.type === 'REPORT_APPROVAL_REQUEST' && (
+                    <div className="mt-3 p-3 bg-gray-50 border border-gray-150 rounded-lg flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 text-left">
+                      <div className="text-xs font-semibold text-gray-650 flex flex-wrap items-center gap-1.5">
+                        Trạng thái duyệt:
+                        {n.reportStatus === 'PENDING' && (
+                          <span className="px-2 py-0.5 bg-orange-100 text-orange-850 rounded font-bold uppercase text-[10px]">
+                            Chờ duyệt
+                          </span>
+                        )}
+                        {n.reportStatus === 'APPROVED' && (
+                          <span className="px-2 py-0.5 bg-emerald-100 text-emerald-850 rounded font-bold uppercase text-[10px]">
+                            Đã duyệt
+                          </span>
+                        )}
+                        {n.reportStatus === 'REJECTED' && (
+                          <span className="px-2 py-0.5 bg-red-100 text-red-850 rounded font-bold uppercase text-[10px]">
+                            Đã từ chối
+                          </span>
+                        )}
+                      </div>
+
+                      {n.reportStatus === 'PENDING' ? (
+                        <div className="flex gap-2">
+                          <button
+                            onClick={(e) => handleApprove(e, n.id, n.rawData.reportId)}
+                            disabled={!!actionLoadingId}
+                            className="px-3 py-1 bg-emerald-600 hover:bg-emerald-700 disabled:bg-gray-400 text-white rounded text-xs font-bold transition-colors cursor-pointer flex items-center gap-1 shadow-sm"
+                          >
+                            {actionLoadingId === n.id ? 'Đang xử lý...' : 'Duyệt'}
+                          </button>
+                          <button
+                            onClick={(e) => handleReject(e, n.id, n.rawData.reportId)}
+                            disabled={!!actionLoadingId}
+                            className="px-3 py-1 bg-red-650 hover:bg-red-750 disabled:bg-gray-400 text-white rounded text-xs font-bold transition-colors cursor-pointer flex items-center gap-1 shadow-sm"
+                          >
+                            {actionLoadingId === n.id ? 'Đang xử lý...' : 'Từ chối'}
+                          </button>
+                        </div>
+                      ) : n.reportStatus === 'REJECTED' && n.rejectReason ? (
+                        <div className="text-xs text-red-650 italic font-semibold max-w-md break-words">
+                          Lý do: {n.rejectReason}
+                        </div>
+                      ) : null}
+                    </div>
+                  )}
+
                   <div className="flex items-center gap-3 mt-3 text-xs text-gray-400 font-medium">
                     <Clock size={12} />
                     <span>{new Date(n.createdAt).toLocaleString('vi-VN')}</span>

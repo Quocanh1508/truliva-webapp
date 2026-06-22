@@ -301,6 +301,8 @@ export default function MyOrders() {
                       <span className={`text-[10px] font-bold px-2 py-0.5 rounded capitalize ${
                         order.adminStatus === 'đang thực hiện' 
                           ? 'bg-blue-50 text-blue-700 border border-blue-100' 
+                          : order.adminStatus === 'chờ duyệt'
+                          ? 'bg-orange-50 text-orange-700 border border-orange-100'
                           : order.adminStatus === 'đang hoàn'
                           ? 'bg-purple-50 text-purple-700 border border-purple-100'
                           : order.adminStatus === 'đang đổi'
@@ -415,13 +417,23 @@ export default function MyOrders() {
                       </button>
 
                       {/* Tạo báo cáo */}
-                      <button
-                        onClick={(e) => { e.stopPropagation(); navigate('/ktv/report', { state: { order } }); }}
-                        className="flex items-center justify-center space-x-1.5 py-2 px-1 bg-blue-50 hover:bg-blue-100 border border-blue-100 text-blue-700 rounded-lg font-semibold text-xs transition-colors cursor-pointer"
-                      >
-                        <FileText size={13} />
-                        <span>Báo cáo</span>
-                      </button>
+                      {order.adminStatus === 'chờ duyệt' ? (
+                        <button
+                          disabled
+                          className="flex items-center justify-center space-x-1.5 py-2 px-1 bg-gray-100 border border-gray-200 text-gray-400 rounded-lg font-semibold text-xs cursor-not-allowed"
+                        >
+                          <FileText size={13} />
+                          <span>Đang chờ duyệt</span>
+                        </button>
+                      ) : (
+                        <button
+                          onClick={(e) => { e.stopPropagation(); navigate('/ktv/report', { state: { order } }); }}
+                          className="flex items-center justify-center space-x-1.5 py-2 px-1 bg-blue-50 hover:bg-blue-100 border border-blue-100 text-blue-700 rounded-lg font-semibold text-xs transition-colors cursor-pointer"
+                        >
+                          <FileText size={13} />
+                          <span>Báo cáo</span>
+                        </button>
+                      )}
                     </div>
                   </div>
                 );

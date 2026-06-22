@@ -277,6 +277,8 @@ model ServiceReport {
   spareParts        String[]  @map("spare_parts")          // Linh kiện phát sinh (multi-select)
   issueType         String?   @map("issue_type")           // Loại sự cố / Nguyên nhân
   handlingMethod    String?   @map("handling_method")      // Cách xử lý của KTV
+  approvalStatus    String    @default("APPROVED") @map("approval_status")
+  rejectReason      String?   @map("reject_reason")
   createdAt         DateTime  @default(now()) @map("created_at")
   updatedAt         DateTime  @updatedAt @map("updated_at")
 
@@ -320,6 +322,7 @@ model Notification {
   title       String
   content     String   @db.Text
   isRead      Boolean  @default(false) @map("is_read")
+  rawData     Json?    @map("raw_data")
   createdAt   DateTime @default(now()) @map("created_at")
 
   user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)

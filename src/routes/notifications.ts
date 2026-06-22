@@ -35,12 +35,35 @@ router.get('/', async (req: Request, res: Response): Promise<void> => {
       }),
     ]);
 
+    // Lấy thêm trạng thái duyệt của báo cáo nếu có liên kết
+    const reportIds = notifications
+      .map((n: any) => (n.rawData as any)?.reportId)
+      .filter(Boolean) as string[];
+
+    let reports: any[] = [];
+    if (reportIds.length > 0) {
+      reports = await prisma.serviceReport.findMany({
+        where: { id: { in: reportIds } },
+        select: { id: true, approvalStatus: true, rejectReason: true }
+      });
+    }
+
+    const enrichedNotifications = notifications.map((n: any) => {
+      const reportId = (n.rawData as any)?.reportId;
+      const report = reports.find(r => r.id === reportId);
+      return {
+        ...n,
+        reportStatus: report ? report.approvalStatus : undefined,
+        rejectReason: report ? report.rejectReason : undefined
+      };
+    });
+
     const unreadCount = await prisma.notification.count({
       where: { userId, isRead: false },
     });
 
     res.json({
-      notifications,
+      notifications: enrichedNotifications,
       unreadCount,
       pagination: {
         total,

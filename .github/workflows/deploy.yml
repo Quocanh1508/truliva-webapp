@@ -33,10 +33,13 @@ jobs:
             echo "=== 2. Installing Backend & Frontend Dependencies ==="
             npm install
             
-            echo "=== 3. Building Frontend and Backend ==="
+            echo "=== 3. Updating Database Schema ==="
+            npx prisma db push
+            
+            echo "=== 4. Building Frontend and Backend ==="
             npm run build
             
-            echo "=== 4. Restarting Backend Server ==="
+            echo "=== 5. Restarting Backend Server ==="
             pm2 restart truliva-backend
             
             echo "=== CI/CD Deployment Successfully Completed! ==="

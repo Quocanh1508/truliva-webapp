@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { fetchApi, deleteReportWithReason, updateReport, uploadImages } from '../../api/client';
+import { fetchApi, deleteReportWithReason, updateReport, uploadImages, approveReport, rejectReport } from '../../api/client';
 import { Download, X, ExternalLink, Image as ImageIcon, Loader, Search, Edit3, Save, Plus, Trash2, SlidersHorizontal, RotateCcw, Calendar } from 'lucide-react';
 import CategoryTreeSelect from '../../components/CategoryTreeSelect';
 import { formatOrderId } from '../../utils/text';
@@ -260,6 +260,7 @@ export default function ReportList() {
   const { user: currentUser } = useAuth();
   const canExportExcel = currentUser?.role === 'ADMIN' || currentUser?.role === 'DEV' || currentUser?.role === 'COORDINATOR' || (currentUser?.role === 'STAFF' && currentUser?.group === 'Service');
   const canEditOrDelete = currentUser?.role === 'ADMIN' || currentUser?.role === 'DEV' || currentUser?.role === 'COORDINATOR';
+  const canApproveOrReject = currentUser?.role === 'ADMIN' || currentUser?.role === 'DEV' || currentUser?.role === 'COORDINATOR' || currentUser?.role === 'STAFF';
 
   const [searchParams, setSearchParams] = useSearchParams();
   const searchParam = searchParams.get('search') || '';
@@ -294,9 +295,64 @@ export default function ReportList() {
     return <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-gray-50 text-gray-700 border border-gray-200 capitalize">{status}</span>;
   };
 
+  const getApprovalStatusBadge = (status: string) => {
+    const s = (status || 'APPROVED').toUpperCase();
+    if (s === 'PENDING') {
+      return <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-orange-50 text-orange-700 border border-orange-200">Chờ duyệt</span>;
+    }
+    if (s === 'APPROVED') {
+      return <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">Đã duyệt</span>;
+    }
+    if (s === 'REJECTED') {
+      return <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-red-50 text-red-700 border border-red-200">Đã từ chối</span>;
+    }
+    return <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-gray-50 text-gray-750 border border-gray-200 capitalize">{status}</span>;
+  };
+
   const [reports, setReports] = useState<any[]>([]);
   const [selectedDetailReport, setSelectedDetailReport] = useState<any | null>(null);
   const [loading, setLoading] = useState(true);
+  const [modalActionLoading, setModalActionLoading] = useState(false);
+
+  const handleModalApprove = async (reportId: string) => {
+    if (!reportId || modalActionLoading) return;
+    if (!window.confirm('Bạn có chắc chắn muốn duyệt báo cáo này?')) return;
+
+    try {
+      setModalActionLoading(true);
+      const res = await approveReport(reportId);
+      alert(res.message || 'Phê duyệt báo cáo thành công');
+      setSelectedDetailReport(null);
+      loadReports();
+    } catch (err: any) {
+      alert(err.message || 'Lỗi khi phê duyệt báo cáo');
+    } finally {
+      setModalActionLoading(false);
+    }
+  };
+
+  const handleModalReject = async (reportId: string) => {
+    if (!reportId || modalActionLoading) return;
+
+    const reason = window.prompt('Nhập lý do từ chối báo cáo (bắt buộc):');
+    if (reason === null) return;
+    if (!reason.trim()) {
+      alert('Vui lòng nhập lý do từ chối');
+      return;
+    }
+
+    try {
+      setModalActionLoading(true);
+      const res = await rejectReport(reportId, reason.trim());
+      alert(res.message || 'Từ chối báo cáo thành công');
+      setSelectedDetailReport(null);
+      loadReports();
+    } catch (err: any) {
+      alert(err.message || 'Lỗi khi từ chối báo cáo');
+    } finally {
+      setModalActionLoading(false);
+    }
+  };
   const [filterMonth, setFilterMonth] = useState('');
   const [openPopupId, setOpenPopupId] = useState<string | null>(null);
   const [search, setSearch] = useState(searchParam);
@@ -1056,7 +1112,10 @@ export default function ReportList() {
 
                     {/* Công việc */}
                     <td style={{ padding: '12px 16px' }} className="text-xs leading-relaxed text-gray-700">
-                      <div className="mb-1">{getStatusBadge(r.order?.adminStatus)}</div>
+                      <div className="flex flex-wrap gap-1 mb-1">
+                        {getStatusBadge(r.order?.adminStatus)}
+                        {getApprovalStatusBadge(r.approvalStatus)}
+                      </div>
                       <div><span className="text-gray-400">Hẹn khách:</span> <span className="font-medium">{formatDate(r.order?.appointmentTime)}</span></div>
                       <div><span className="text-gray-400">Hoàn thành:</span> <span className="font-semibold text-gray-800">{formatDateTime(r.createdAt)}</span></div>
                       {r.workType && <div><span className="text-gray-400">Công việc:</span> <span className="font-semibold text-purple-750 bg-purple-50 px-1.5 py-0.5 rounded border border-purple-100 inline-block mt-0.5">{r.workType}</span></div>}
@@ -1281,6 +1340,16 @@ export default function ReportList() {
                         <span className="text-gray-500 block text-xs">Tháng báo cáo</span>
                         <span className="font-medium text-gray-800">{selectedDetailReport.month}</span>
                       </div>
+                      <div>
+                        <span className="text-gray-500 block text-xs">Trạng thái phê duyệt</span>
+                        <span className="mt-0.5 inline-block">{getApprovalStatusBadge(selectedDetailReport.approvalStatus)}</span>
+                      </div>
+                      {selectedDetailReport.rejectReason && (
+                        <div className="col-span-2">
+                          <span className="text-gray-500 block text-xs font-semibold text-red-650">Lý do từ chối</span>
+                          <span className="font-medium text-red-750 bg-red-50 border border-red-100 px-2 py-1 rounded block mt-0.5">{selectedDetailReport.rejectReason}</span>
+                        </div>
+                      )}
                       {selectedDetailReport.order?.ktvCalledAt && (
                         <div className="col-span-2">
                           <span className="text-gray-500 block text-xs">Thời gian KTV gọi khách</span>
@@ -1600,17 +1669,37 @@ export default function ReportList() {
             <div className="p-4 border-t border-gray-200 bg-gray-50 flex justify-end gap-3">
               {!isEditing ? (
                 <>
+                  {canApproveOrReject && selectedDetailReport.approvalStatus === 'PENDING' && (
+                    <>
+                      <button 
+                        onClick={() => handleModalApprove(selectedDetailReport.id)}
+                        disabled={modalActionLoading}
+                        className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 disabled:bg-gray-400 text-white font-semibold rounded-lg text-sm transition-colors cursor-pointer flex items-center gap-1.5"
+                      >
+                        {modalActionLoading ? 'Đang duyệt...' : 'Duyệt báo cáo'}
+                      </button>
+                      <button 
+                        onClick={() => handleModalReject(selectedDetailReport.id)}
+                        disabled={modalActionLoading}
+                        className="px-4 py-2 bg-red-600 hover:bg-red-700 disabled:bg-gray-400 text-white font-semibold rounded-lg text-sm transition-colors cursor-pointer flex items-center gap-1.5"
+                      >
+                        {modalActionLoading ? 'Đang từ chối...' : 'Từ chối'}
+                      </button>
+                    </>
+                  )}
                   {canEditOrDelete && (
                     <button 
                       onClick={startEditing}
-                      className="px-4 py-2 bg-amber-500 hover:bg-amber-600 text-white font-semibold rounded-lg text-sm transition-colors flex items-center gap-2"
+                      disabled={modalActionLoading}
+                      className="px-4 py-2 bg-amber-500 hover:bg-amber-600 text-white font-semibold rounded-lg text-sm transition-colors flex items-center gap-2 disabled:opacity-50"
                     >
                       <Edit3 size={15} /> Sửa báo cáo
                     </button>
                   )}
                   <button 
                     onClick={() => setSelectedDetailReport(null)}
-                    className="px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-700 font-semibold rounded-lg text-sm transition-colors"
+                    disabled={modalActionLoading}
+                    className="px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-700 font-semibold rounded-lg text-sm transition-colors disabled:opacity-50"
                   >
                     Đóng
                   </button>
