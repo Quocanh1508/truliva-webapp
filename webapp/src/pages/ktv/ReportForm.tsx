@@ -170,12 +170,12 @@ export default function ReportForm() {
         }
 
         setSerialNumber(report.serialNumber || '');
-        setDistanceKm(report.distanceKm ? String(report.distanceKm) : '');
-        setActualAmount(report.actualAmount ? String(report.actualAmount) : '');
+        setDistanceKm(report.distanceKm !== undefined && report.distanceKm !== null ? String(report.distanceKm) : '');
+        setActualAmount(report.actualAmount !== undefined && report.actualAmount !== null ? String(report.actualAmount) : '');
         setWaterSource(report.waterSource || '');
-        setTdsIn(report.tdsIn ? String(report.tdsIn) : '');
-        setTdsOut(report.tdsOut ? String(report.tdsOut) : '');
-        setWaterPressure(report.waterPressure ? String(report.waterPressure) : '');
+        setTdsIn(report.tdsIn !== undefined && report.tdsIn !== null ? String(report.tdsIn) : '');
+        setTdsOut(report.tdsOut !== undefined && report.tdsOut !== null ? String(report.tdsOut) : '');
+        setWaterPressure(report.waterPressure !== undefined && report.waterPressure !== null ? String(report.waterPressure) : '');
         
         // Handling method and issue type
         if (['Bảo hành', 'Sửa chữa'].includes(report.workType)) {
@@ -458,9 +458,10 @@ export default function ReportForm() {
             setSelectedItems([]);
           }
           
-          if (stateOrder.moneyToCollect !== undefined && stateOrder.moneyToCollect !== null) {
-            setActualAmount(String(stateOrder.moneyToCollect));
-          }
+          const amount = stateOrder.moneyToCollect !== undefined && stateOrder.moneyToCollect !== null
+            ? stateOrder.moneyToCollect
+            : (stateOrder.totalPrice !== undefined && stateOrder.totalPrice !== null ? stateOrder.totalPrice : 0);
+          setActualAmount(String(amount));
 
         } else {
           setOrders(list);
@@ -530,9 +531,10 @@ export default function ReportForm() {
                 setSelectedItems([]);
               }
               
-              if (stateOrder.moneyToCollect !== undefined && stateOrder.moneyToCollect !== null) {
-                setActualAmount(String(stateOrder.moneyToCollect));
-              }
+              const amount = stateOrder.moneyToCollect !== undefined && stateOrder.moneyToCollect !== null
+                ? stateOrder.moneyToCollect
+                : (stateOrder.totalPrice !== undefined && stateOrder.totalPrice !== null ? stateOrder.totalPrice : 0);
+              setActualAmount(String(amount));
             } else {
               setOrders(list);
             }
@@ -595,10 +597,10 @@ export default function ReportForm() {
       }
 
       // ── Mapping tiền thu thực tế (moneyToCollect hoặc totalPrice) ──
-      const amount = order.moneyToCollect || order.totalPrice || 0;
-      if (amount > 0) {
-        setActualAmount(String(amount));
-      }
+      const amount = order.moneyToCollect !== undefined && order.moneyToCollect !== null
+        ? order.moneyToCollect
+        : (order.totalPrice !== undefined && order.totalPrice !== null ? order.totalPrice : 0);
+      setActualAmount(String(amount));
     }
   };
 
