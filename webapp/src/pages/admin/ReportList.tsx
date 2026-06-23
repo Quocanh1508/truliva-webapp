@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { fetchApi, deleteReportWithReason, updateReport, uploadImages, approveReport, rejectReport } from '../../api/client';
-import { Download, X, ExternalLink, Image as ImageIcon, Loader, Search, Edit3, Save, Plus, Trash2, SlidersHorizontal, RotateCcw, Calendar } from 'lucide-react';
+import { Download, X, ExternalLink, Image as ImageIcon, Loader, Search, Edit3, Save, Plus, Trash2, SlidersHorizontal, RotateCcw, Calendar, ChevronLeft, ChevronRight } from 'lucide-react';
 import CategoryTreeSelect from '../../components/CategoryTreeSelect';
 import { formatOrderId } from '../../utils/text';
 import { useAuth } from '../../context/AuthContext';
@@ -310,9 +310,16 @@ export default function ReportList() {
   };
 
   const [reports, setReports] = useState<any[]>([]);
+  const [page, setPage] = useState(1);
+  const [pageInput, setPageInput] = useState('1');
+  const [totalPages, setTotalPages] = useState(1);
   const [selectedDetailReport, setSelectedDetailReport] = useState<any | null>(null);
   const [loading, setLoading] = useState(true);
   const [modalActionLoading, setModalActionLoading] = useState(false);
+
+  useEffect(() => {
+    setPageInput(String(page));
+  }, [page]);
 
   const handleModalApprove = async (reportId: string) => {
     if (!reportId || modalActionLoading) return;
@@ -458,13 +465,14 @@ export default function ReportList() {
 
   useEffect(() => {
     loadReports(searchParam);
-  }, [filterMonth, datePreset, customStartDate, customEndDate, searchParam, appliedFilters]);
+  }, [filterMonth, datePreset, customStartDate, customEndDate, searchParam, appliedFilters, page]);
 
   const loadReports = async (overrideSearch?: string) => {
     setLoading(true);
     try {
       const params = new URLSearchParams();
       params.append('limit', '100');
+      params.append('page', String(page));
       if (filterMonth) params.append('month', filterMonth);
       
       const currentSearch = overrideSearch !== undefined ? overrideSearch : search;
@@ -520,6 +528,9 @@ export default function ReportList() {
 
       const data = await fetchApi(`/reports?${params.toString()}`);
       setReports(data.reports);
+      if (data.pagination) {
+        setTotalPages(data.pagination.totalPages || 1);
+      }
     } catch (e) {
       console.error(e);
     } finally {
@@ -530,6 +541,7 @@ export default function ReportList() {
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
     setSearchParams(search ? { search } : {});
+    setPage(1);
   };
 
   const handleMainStationChange = (id: string) => {
@@ -570,6 +582,7 @@ export default function ReportList() {
       updatedStart: tempUpdatedStart,
       updatedEnd: tempUpdatedEnd
     });
+    setPage(1);
   };
 
   const resetFilters = () => {
@@ -603,6 +616,7 @@ export default function ReportList() {
       updatedStart: '',
       updatedEnd: ''
     });
+    setPage(1);
   };
 
   const handleExport = () => {
@@ -831,21 +845,21 @@ export default function ReportList() {
                 type="date" 
                 className="px-3 py-1.5 text-[13px] border border-gray-300 rounded-md outline-none text-gray-700 bg-white"
                 value={customStartDate}
-                onChange={(e) => setCustomStartDate(e.target.value)}
+                onChange={(e) => { setCustomStartDate(e.target.value); setPage(1); }}
               />
               <span className="text-gray-400 text-sm">đến</span>
               <input 
                 type="date" 
                 className="px-3 py-1.5 text-[13px] border border-gray-300 rounded-md outline-none text-gray-700 bg-white"
                 value={customEndDate}
-                onChange={(e) => setCustomEndDate(e.target.value)}
+                onChange={(e) => { setCustomEndDate(e.target.value); setPage(1); }}
               />
             </div>
           )}
           <select 
             className="px-3 py-2 text-[13px] border border-gray-300 rounded-md bg-white text-gray-700 outline-none"
             value={datePreset}
-            onChange={(e) => setDatePreset(e.target.value)}
+            onChange={(e) => { setDatePreset(e.target.value); setPage(1); }}
           >
             <option value="">Tất cả thời gian</option>
             <option value="today">Hôm nay</option>
@@ -862,7 +876,7 @@ export default function ReportList() {
             style={{ width: '130px' }} 
             placeholder="Tháng (vd: 5/2026)" 
             value={filterMonth}
-            onChange={e => setFilterMonth(e.target.value)}
+            onChange={e => { setFilterMonth(e.target.value); setPage(1); }}
           />
 
           <button 
@@ -1064,7 +1078,8 @@ export default function ReportList() {
       {loading ? (
         <div className="text-center py-10"><span className="spinner border-t-[#1B3A6B]"></span></div>
       ) : (
-        <div className="card table-container" style={{ padding: 0, overflowX: 'auto' }}>
+        <>
+          <div className="card table-container" style={{ padding: 0, overflowX: 'auto' }}>
           <table style={{ width: '100%', minWidth: '1000px', borderCollapse: 'collapse', textAlign: 'left' }}>
             <thead>
               <tr style={{ borderBottom: '2px solid var(--border-color)' }}>
@@ -1256,6 +1271,52 @@ export default function ReportList() {
             </tbody>
           </table>
         </div>
+        
+        {/* Pagination */}
+        {!loading && totalPages > 1 && (
+          <div className="flex justify-between items-center px-4 py-3 border-t border-gray-200 text-[13px] text-gray-600 bg-white rounded-b-xl">
+            <div className="flex items-center gap-1.5">
+              <span>Trang</span>
+              <input
+                type="text"
+                inputMode="numeric"
+                pattern="[0-9]*"
+                value={pageInput}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  if (val === '' || /^\d+$/.test(val)) {
+                    setPageInput(val);
+                  }
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    const val = parseInt(pageInput, 10);
+                    if (!isNaN(val) && val >= 1 && val <= totalPages) {
+                      setPage(val);
+                    } else {
+                      setPageInput(String(page));
+                    }
+                  }
+                }}
+                onBlur={() => {
+                  const val = parseInt(pageInput, 10);
+                  if (!isNaN(val) && val >= 1 && val <= totalPages) {
+                    setPage(val);
+                  } else {
+                    setPageInput(String(page));
+                  }
+                }}
+                className="w-12 text-center border border-gray-300 rounded px-1.5 py-0.5 text-gray-900 font-medium focus:ring-1 focus:ring-blue-500 focus:border-blue-500 outline-none bg-white"
+              />
+              <span>/ <span className="font-medium text-gray-900">{totalPages}</span></span>
+            </div>
+            <div className="flex gap-2">
+              <button disabled={page === 1} onClick={() => setPage(p => p - 1)} className="p-1.5 border rounded cursor-pointer disabled:opacity-50"><ChevronLeft size={16} /></button>
+              <button disabled={page === totalPages} onClick={() => setPage(p => p + 1)} className="p-1.5 border rounded cursor-pointer disabled:opacity-50"><ChevronRight size={16} /></button>
+            </div>
+          </div>
+        )}
+      </>
       )}
       </div>
 
