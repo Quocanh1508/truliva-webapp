@@ -583,10 +583,10 @@ router.post('/', async (req: Request, res: Response): Promise<void> => {
               orderId
             }).catch(err => logger.error('KTV web push notification failed', { error: err.message }));
 
-            // Gửi thông báo cho Staff/Coordinator/Admin
+            // Gửi thông báo cho Coordinator/Admin
             const staffUsers = await prisma.user.findMany({
               where: {
-                role: { in: ['ADMIN', 'COORDINATOR', 'STAFF'] },
+                role: { in: ['ADMIN', 'COORDINATOR'] },
                 isActive: true
               },
               select: { id: true, pushToken: true, webPushSubscription: true }
@@ -1766,7 +1766,7 @@ router.delete('/:id', requireCoordinatorOrAdmin, async (req: Request, res: Respo
 router.post('/:id/approve', async (req: Request, res: Response): Promise<void> => {
   try {
     const { role } = req.user!;
-    if (role !== 'ADMIN' && role !== 'DEV' && role !== 'COORDINATOR' && role !== 'STAFF') {
+    if (role !== 'ADMIN' && role !== 'DEV' && role !== 'COORDINATOR') {
       res.status(403).json({ error: 'Bạn không có quyền thực hiện hành động này' });
       return;
     }
@@ -1962,7 +1962,7 @@ router.post('/:id/approve', async (req: Request, res: Response): Promise<void> =
 router.post('/:id/reject', async (req: Request, res: Response): Promise<void> => {
   try {
     const { role } = req.user!;
-    if (role !== 'ADMIN' && role !== 'DEV' && role !== 'COORDINATOR' && role !== 'STAFF') {
+    if (role !== 'ADMIN' && role !== 'DEV' && role !== 'COORDINATOR') {
       res.status(403).json({ error: 'Bạn không có quyền thực hiện hành động này' });
       return;
     }
