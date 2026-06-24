@@ -59,8 +59,9 @@ router.get('/stock', requireCoordinatorOrAdmin, async (req: Request, res: Respon
     // 1. Lấy danh sách kho
     const warehouses = await fetchPancakeWarehouses();
     
-    // 2. Lấy toàn bộ sản phẩm có liên kết Pancake trong database
+    // 2. Lấy toàn bộ sản phẩm ACTIVE có liên kết Pancake trong database
     const dbProducts = await prisma.product.findMany({
+      where: { isActive: true },
       orderBy: { name: 'asc' }
     });
 
