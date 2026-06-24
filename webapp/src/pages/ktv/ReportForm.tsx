@@ -681,6 +681,18 @@ export default function ReportForm() {
     };
 
     try {
+      if (navigator.onLine && imageUrls.length === 0) {
+        setError('Báo cáo bắt buộc phải có hình ảnh xác nhận. Vui lòng quay lại bước 2 để tải ảnh.');
+        setLoading(false);
+        return;
+      }
+
+      if (!navigator.onLine && reportFiles.length === 0) {
+        setError('Báo cáo bắt buộc phải có hình ảnh xác nhận. Vui lòng quay lại bước 2 để chọn ảnh.');
+        setLoading(false);
+        return;
+      }
+
       if (editReportId) {
         if (!navigator.onLine) {
           setError('Không thể chỉnh sửa báo cáo khi ngoại tuyến. Vui lòng kết nối mạng và thử lại.');

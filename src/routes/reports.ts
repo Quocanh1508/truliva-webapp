@@ -327,6 +327,11 @@ router.post('/', async (req: Request, res: Response): Promise<void> => {
       return;
     }
 
+    if (!imageUrls || !Array.isArray(imageUrls) || imageUrls.length === 0) {
+      res.status(400).json({ error: 'Báo cáo bắt buộc phải có hình ảnh xác nhận' });
+      return;
+    }
+
     // Tự động lấy tháng hiện tại nếu không truyền
     const reportMonth = month || `${new Date().getMonth() + 1}/${new Date().getFullYear()}`;
 
@@ -1428,6 +1433,11 @@ router.put('/:id', requireAuth, async (req: Request, res: Response): Promise<voi
       imageUrls,
       items, // unified items
     } = req.body;
+
+    if (imageUrls !== undefined && (!imageUrls || !Array.isArray(imageUrls) || imageUrls.length === 0)) {
+      res.status(400).json({ error: 'Báo cáo bắt buộc phải có hình ảnh xác nhận' });
+      return;
+    }
 
     let finalProducts = products;
     let finalSpareParts = spareParts;
