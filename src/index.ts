@@ -24,6 +24,7 @@ import notificationRoutes from './routes/notifications';
 import inventoryRoutes from './routes/inventory';
 import { startOrderSyncScheduler } from './services/orderSyncScheduler';
 import { startReportCleanupScheduler } from './services/reportCleanupScheduler';
+import { initWebSocketServer } from './services/websocketService';
 import { apiLimiter, loginLimiter } from './middleware/rateLimiter';
 import { securityMiddleware } from './middleware/security';
 
@@ -185,7 +186,7 @@ app.use((err: Error, _req: express.Request, res: express.Response, _next: expres
 // ══════════════════════════════════════
 //  START SERVER
 // ══════════════════════════════════════
-app.listen(PORT, () => {
+const server = app.listen(PORT, () => {
   logger.info(`🚀 Truliva Webhook Server started`, {
     port: PORT,
     environment: process.env.NODE_ENV || 'development',
@@ -204,5 +205,7 @@ app.listen(PORT, () => {
   // Khởi động lập lịch dọn dẹp báo cáo KTV cũ hơn 60 ngày
   startReportCleanupScheduler();
 });
+
+initWebSocketServer(server);
 
 export default app;

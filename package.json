@@ -55,9 +55,11 @@
     "typescript": "^6.0.3",
     "uuid": "^14.0.0",
     "web-push": "^3.6.7",
-    "winston": "^3.19.0"
+    "winston": "^3.19.0",
+    "ws": "^8.21.0"
   },
   "devDependencies": {
+    "@types/ws": "^8.18.1",
     "concurrently": "^9.2.1",
     "nodemon": "^3.1.14",
     "ssh2": "^1.17.0",

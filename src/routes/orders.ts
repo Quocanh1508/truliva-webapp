@@ -8,6 +8,7 @@ import { syncRecentOrders } from '../services/orderSyncScheduler';
 import { sendPushNotification } from '../services/notificationService';
 import { sendWebPushNotification } from '../services/webPushService';
 import { syncOrderInventoryState } from '../services/inventoryService';
+import { broadcastEvent } from '../services/websocketService';
 import ExcelJS from 'exceljs';
 import axios from 'axios';
 
@@ -819,6 +820,7 @@ router.post('/', requireAuth, async (req: Request, res: Response): Promise<void>
     }
 
     logger.info('Manual order created by admin', { orderId: order.id, pancakeOrderId: nextManualId, creator: req.user?.fullName });
+    broadcastEvent('ORDER_UPDATED', { orderId: order.id, pancakeOrderId: nextManualId });
     res.json({ success: true, orderId: order.id, pancakeOrderId: nextManualId });
 
   } catch (error: any) {
@@ -1827,6 +1829,7 @@ router.patch('/:id', requireAuth, async (req: Request, res: Response): Promise<v
     }
 
     logger.info('Order updated by admin', { orderId: id, by: req.user?.id, changes });
+    broadcastEvent('ORDER_UPDATED', { orderId: order.id, pancakeOrderId: order.pancakeOrderId });
     res.json({ 
       order, 
       warning: (req as any).pancakeSyncWarning || null 

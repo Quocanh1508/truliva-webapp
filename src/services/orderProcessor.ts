@@ -2,6 +2,7 @@ import prisma from '../config/database';
 import logger from '../utils/logger';
 import axios from 'axios';
 import { syncOrderInventoryState } from './inventoryService';
+import { broadcastEvent } from './websocketService';
 
 /**
  * Xử lý event "orders" từ Pancake webhook.
@@ -337,6 +338,8 @@ export async function processOrderEvent(rawEventId: string | null, payload: any)
       totalPrice: payload.total_price,
       itemCount: items.length,
     });
+
+    broadcastEvent('ORDER_UPDATED', { orderId: order.id, pancakeOrderId: order.pancakeOrderId });
 
   } catch (error: any) {
     logger.error('Failed to process order event', {

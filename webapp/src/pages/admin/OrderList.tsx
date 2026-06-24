@@ -67,6 +67,7 @@ export default function OrderList() {
   const [syncing, setSyncing] = useState(false);
   const [_error, setError] = useState('');
   const [autoRefresh, setAutoRefresh] = useState(false);
+  const [wsConnected, setWsConnected] = useState(false);
 
   // Filters
   const [search, setSearch] = useState('');
@@ -486,6 +487,83 @@ export default function OrderList() {
     }
   };
 
+  // Keep references updated to avoid closure stale state in WebSocket event listener
+  const fetchOrdersDataRef = useRef(fetchOrdersData);
+  const autoRefreshRef = useRef(autoRefresh);
+
+  useEffect(() => {
+    fetchOrdersDataRef.current = fetchOrdersData;
+  });
+
+  useEffect(() => {
+    autoRefreshRef.current = autoRefresh;
+  }, [autoRefresh]);
+
+  // WebSocket connection & real-time sync
+  useEffect(() => {
+    let socket: WebSocket | null = null;
+    let reconnectTimeout: any = null;
+    let isMounted = true;
+
+    function connect() {
+      if (!isMounted) return;
+      try {
+        const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        const host = window.location.host;
+        const wsUrl = `${protocol}//${host}/ws`;
+        
+        socket = new WebSocket(wsUrl);
+
+        socket.onopen = () => {
+          if (isMounted) {
+            setWsConnected(true);
+            console.log('WebSocket connected successfully');
+          }
+        };
+
+        socket.onmessage = (event) => {
+          if (!isMounted) return;
+          try {
+            const message = JSON.parse(event.data);
+            if (message.type === 'ORDER_UPDATED') {
+              if (autoRefreshRef.current) {
+                console.log('Real-time order update received, refreshing...', message.data);
+                fetchOrdersDataRef.current({ silent: true });
+              }
+            }
+          } catch (err) {
+            console.error('Error parsing WebSocket message:', err);
+          }
+        };
+
+        socket.onclose = () => {
+          if (isMounted) {
+            setWsConnected(false);
+            console.log('WebSocket disconnected, scheduling reconnect in 5s...');
+            reconnectTimeout = setTimeout(connect, 5000);
+          }
+        };
+
+        socket.onerror = (err) => {
+          console.error('WebSocket error:', err);
+        };
+      } catch (err) {
+        console.error('Failed to create WebSocket:', err);
+        if (isMounted) {
+          reconnectTimeout = setTimeout(connect, 5000);
+        }
+      }
+    }
+
+    connect();
+
+    return () => {
+      isMounted = false;
+      if (socket) socket.close();
+      if (reconnectTimeout) clearTimeout(reconnectTimeout);
+    };
+  }, []);
+
   useEffect(() => {
     fetchOrdersData();
   }, [
@@ -511,7 +589,19 @@ export default function OrderList() {
   ]);
 
   useEffect(() => {
-    if (!autoRefresh) return;
+    // Only poll if autoRefresh is enabled AND WebSocket is not connected
+    if (!autoRefresh || wsConnected) return;
+
+    // Smart Pause: Pause polling if user is actively interacting to avoid interrupts
+    if (
+      search !== debouncedSearch ||
+      showCreateModal ||
+      assignModal ||
+      cancelModal ||
+      activeDropdown !== null
+    ) {
+      return;
+    }
 
     const interval = setInterval(() => {
       fetchOrdersData({ silent: true });
@@ -520,6 +610,13 @@ export default function OrderList() {
     return () => clearInterval(interval);
   }, [
     autoRefresh,
+    wsConnected,
+    search,
+    debouncedSearch,
+    showCreateModal,
+    assignModal,
+    cancelModal,
+    activeDropdown,
     page,
     sortBy,
     sortOrder,
@@ -1091,29 +1188,50 @@ export default function OrderList() {
             onClick={() => setAutoRefresh(!autoRefresh)}
             className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-full border text-[12px] font-medium cursor-pointer select-none transition-all duration-300 ${
               autoRefresh 
-                ? 'bg-emerald-50 text-emerald-700 border-emerald-200 shadow-sm shadow-emerald-100/50 hover:bg-emerald-100/50' 
+                ? wsConnected
+                  ? 'bg-emerald-50 text-emerald-700 border-emerald-200 shadow-sm shadow-emerald-100/50 hover:bg-emerald-100/50'
+                  : 'bg-amber-50 text-amber-700 border-amber-200 shadow-sm shadow-amber-100/50 hover:bg-amber-100/50'
                 : 'bg-white text-gray-500 border-gray-300 hover:bg-gray-50'
             }`}
-            title="Bật/Tắt tự động làm mới danh sách đơn hàng mỗi 5 giây"
+            title={
+              autoRefresh
+                ? wsConnected
+                  ? "Đồng bộ thời gian thực qua WebSocket đang hoạt động"
+                  : "Mất kết nối WebSocket, đang tự động làm mới mỗi 5s"
+                : "Bật để tự động đồng bộ thời gian thực"
+            }
           >
             <div className="relative flex items-center justify-center w-4 h-4">
               {autoRefresh ? (
-                <svg
-                  className="w-4 h-4 text-emerald-600 animate-spin"
-                  viewBox="0 0 24 24"
-                  fill="currentColor"
-                >
-                  <circle cx="12" cy="12" r="2.5" />
-                  <path d="M12 12c0-3.5 2.5-5 5-5c0 0-1.5 3-5 5z" />
-                  <path d="M12 12c3.5 0 5 2.5 5 5c0 0-3-1.5-5-5z" />
-                  <path d="M12 12c0 3.5-2.5 5-5 5c0 0 1.5-3 5-5z" />
-                  <path d="M12 12c-3.5 0-5-2.5-5-5c0 0 3 1.5 5 5z" />
-                </svg>
+                wsConnected ? (
+                  <span className="relative flex h-2 w-2">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                    <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                  </span>
+                ) : (
+                  <svg
+                    className="w-4 h-4 text-amber-600 animate-spin"
+                    viewBox="0 0 24 24"
+                    fill="currentColor"
+                  >
+                    <circle cx="12" cy="12" r="2.5" />
+                    <path d="M12 12c0-3.5 2.5-5 5-5c0 0-1.5 3-5 5z" />
+                    <path d="M12 12c3.5 0 5 2.5 5 5c0 0-3-1.5-5-5z" />
+                    <path d="M12 12c0 3.5-2.5 5-5 5c0 0 1.5-3 5-5z" />
+                    <path d="M12 12c-3.5 0-5-2.5-5-5c0 0 3 1.5 5 5z" />
+                  </svg>
+                )
               ) : (
                 <div className="w-3 h-3 rounded-full border-2 border-gray-300 bg-white" />
               )}
             </div>
-            <span>Tự động làm mới (5s)</span>
+            <span>
+              {autoRefresh 
+                ? wsConnected 
+                  ? 'Đồng bộ Real-time' 
+                  : 'Tự động làm mới (5s)' 
+                : 'Tự động làm mới'}
+            </span>
           </div>
         </div>
       </div>
