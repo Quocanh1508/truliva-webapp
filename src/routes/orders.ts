@@ -1475,7 +1475,7 @@ router.patch('/:id', requireAuth, async (req: Request, res: Response): Promise<v
       adminStatus, appointmentTime, assignedKtvId,
       workType, serviceType, mainStationId, techStationId,
       rescheduleReason, cancelReason, note, warehouseId,
-      items
+      items, customerName, customerPhone, address, province, moneyToCollect
     } = req.body;
 
     // Lấy order hiện tại để so sánh cho audit và đồng bộ kho
@@ -1637,6 +1637,81 @@ router.patch('/:id', requireAuth, async (req: Request, res: Response): Promise<v
       }
     }
 
+    // Support modifying customer info for manual orders (pancakeOrderId < 0)
+    if (oldOrder.pancakeOrderId < 0) {
+      if (customerPhone !== undefined || customerName !== undefined) {
+        const phoneToUse = customerPhone !== undefined ? customerPhone.trim() : oldOrder.billPhoneNumber;
+        const nameToUse = customerName !== undefined ? customerName.trim() : oldOrder.billFullName;
+        
+        let customerId = oldOrder.customerId;
+        if (phoneToUse) {
+          const existingCustomer = await prisma.customer.findFirst({
+            where: { phoneNumber: phoneToUse }
+          });
+          if (existingCustomer) {
+            customerId = existingCustomer.id;
+            const customerUpdate: any = {};
+            if (address && !existingCustomer.address) {
+              customerUpdate.address = address;
+              customerUpdate.fullAddress = address;
+            }
+            if (province && !existingCustomer.provinceName) {
+              customerUpdate.provinceName = province;
+            }
+            if (Object.keys(customerUpdate).length > 0) {
+              await prisma.customer.update({
+                where: { id: customerId },
+                data: customerUpdate
+              });
+            }
+          } else {
+            const newCustomer = await prisma.customer.create({
+              data: {
+                fullName: nameToUse || 'Khách hàng',
+                phoneNumber: phoneToUse,
+                address: address || null,
+                fullAddress: address || null,
+                provinceName: province || null
+              }
+            });
+            customerId = newCustomer.id;
+          }
+        }
+        
+        if (customerId !== oldOrder.customerId) {
+          updateData.customerId = customerId;
+          changes.push({ field: 'customerId', from: oldOrder.customerId, to: customerId });
+        }
+        if (customerName !== undefined && customerName.trim() !== oldOrder.billFullName) {
+          updateData.billFullName = customerName.trim();
+          changes.push({ field: 'billFullName', from: oldOrder.billFullName, to: updateData.billFullName });
+        }
+        if (customerPhone !== undefined && phoneToUse !== oldOrder.billPhoneNumber) {
+          updateData.billPhoneNumber = phoneToUse;
+          changes.push({ field: 'billPhoneNumber', from: oldOrder.billPhoneNumber, to: updateData.billPhoneNumber });
+        }
+      }
+
+      if (address !== undefined || province !== undefined) {
+        const currentAddr = oldOrder.shippingAddress as any;
+        const newAddr = {
+          full_address: address !== undefined ? address : (currentAddr?.full_address || ''),
+          province_name: province !== undefined ? province : (currentAddr?.province_name || ''),
+          district_name: currentAddr?.district_name || ''
+        };
+        updateData.shippingAddress = newAddr;
+        changes.push({ field: 'shippingAddress', from: oldOrder.shippingAddress, to: newAddr });
+      }
+
+      if (moneyToCollect !== undefined) {
+        const val = Number(moneyToCollect) || 0;
+        if (val !== oldOrder.moneyToCollect) {
+          updateData.moneyToCollect = val;
+          changes.push({ field: 'moneyToCollect', from: oldOrder.moneyToCollect, to: val });
+        }
+      }
+    }
+
     if (items !== undefined && Array.isArray(items)) {
       // Xóa các items cũ
       await prisma.orderItem.deleteMany({
@@ -1665,6 +1740,13 @@ router.patch('/:id', requireAuth, async (req: Request, res: Response): Promise<v
       const totalQuantity = items.reduce((acc: number, curr: any) => acc + (Number(curr.quantity) || 1), 0);
       updateData.totalQuantity = totalQuantity;
       changes.push({ field: 'items', from: oldOrder.totalQuantity, to: totalQuantity });
+
+      // Cập nhật totalPrice cho đơn thủ công
+      if (oldOrder.pancakeOrderId < 0) {
+        const totalPrice = items.reduce((acc: number, curr: any) => acc + ((Number(curr.price) || 0) * (Number(curr.quantity) || 1)), 0);
+        updateData.totalPrice = totalPrice;
+        changes.push({ field: 'totalPrice', from: oldOrder.totalPrice, to: totalPrice });
+      }
     }
 
     // Thực hiện cập nhật

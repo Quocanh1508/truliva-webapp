@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getOrders, updateOrder, getKtvUsers, getStations, getOrderAuditLog, syncOrders, getFiltersData, fetchApi, createOrder, searchCustomers } from '../../api/client';
-import { Search, ChevronLeft, ChevronRight, History, XCircle, Filter, RefreshCw, FileText, CheckCircle2, Copy, UserPlus, Download, Wrench, Settings, FolderOpen, Building2, MapPin, Users, Calendar, Plus, AlertTriangle, ExternalLink, RotateCcw } from 'lucide-react';
+import { Search, ChevronLeft, ChevronRight, History, XCircle, Filter, RefreshCw, FileText, CheckCircle2, Copy, UserPlus, Download, Wrench, Settings, FolderOpen, Building2, MapPin, Users, Calendar, Plus, AlertTriangle, ExternalLink, RotateCcw, Edit3 } from 'lucide-react';
 import { WARRANTY_SERVICE_GROUPS, REPAIR_SERVICE_GROUPS, WORK_TYPE_SERVICES } from '../../utils/workTypes';
 import { useConfirm } from '../../context/ConfirmContext';
 import DateRangePicker from '../../components/DateRangePicker';
@@ -70,6 +70,18 @@ export default function OrderList() {
 
   // Filters
   const [search, setSearch] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
+
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      setDebouncedSearch(search);
+    }, 500);
+    return () => clearTimeout(handler);
+  }, [search]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [debouncedSearch]);
   const [sortBy, setSortBy] = useState('createdAt');
   const [sortOrder, setSortOrder] = useState('desc');
 
@@ -206,6 +218,7 @@ export default function OrderList() {
 
   // Create Manual Order Modal
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [editingOrderId, setEditingOrderId] = useState<string | null>(null);
   const [showCreateServiceDropdown, setShowCreateServiceDropdown] = useState(false);
   const [newOrderForm, setNewOrderForm] = useState({
     customerName: '',
@@ -260,6 +273,7 @@ export default function OrderList() {
   };
 
   const openCreateModal = () => {
+    setEditingOrderId(null);
     setCustomerSuggestions([]);
     skipFetchRef.current = false;
     setNewOrderForm({
@@ -287,6 +301,55 @@ export default function OrderList() {
         .catch(console.error);
     }
 
+    setShowCreateModal(true);
+  };
+
+  const openEditManualOrderModal = (order: any) => {
+    setCustomerSuggestions([]);
+    skipFetchRef.current = true;
+
+    // Parse appointmentDate and appointmentTime from order.appointmentTime
+    let appDateStr = '';
+    let appTimeStr = '08:30';
+    if (order.appointmentTime) {
+      const d = new Date(order.appointmentTime);
+      const localDate = new Date(d.getTime() - d.getTimezoneOffset() * 60000);
+      const iso = localDate.toISOString();
+      appDateStr = iso.slice(0, 10);
+      appTimeStr = iso.slice(11, 16);
+    }
+
+    setNewOrderForm({
+      customerName: order.billFullName || '',
+      customerPhone: order.billPhoneNumber || '',
+      address: order.shippingAddress?.full_address || order.customer?.fullAddress || '',
+      province: order.shippingAddress?.province_name || order.customer?.provinceName || '',
+      workType: order.workType || '',
+      serviceType: order.serviceType || '',
+      appointmentDate: appDateStr,
+      appointmentTime: appTimeStr,
+      items: order.items ? order.items.map((it: any) => ({
+        productName: it.productName || '',
+        sku: it.sku || '',
+        quantity: it.quantity || 1,
+        price: it.price || 0
+      })) : [],
+      moneyToCollect: order.moneyToCollect || 0,
+      note: order.note || ''
+    });
+
+    if (productsStock.length === 0) {
+      fetchApi('/inventory/stock')
+        .then(invData => {
+          const whs = invData.warehouses || [];
+          const prods = invData.products || [];
+          setWarehouses(whs);
+          setProductsStock(prods);
+        })
+        .catch(console.error);
+    }
+
+    setEditingOrderId(order.id);
     setShowCreateModal(true);
   };
 
@@ -345,7 +408,7 @@ export default function OrderList() {
 
     try {
       setLoading(true);
-      await createOrder({
+      const payload = {
         customerName: newOrderForm.customerName.trim(),
         customerPhone: newOrderForm.customerPhone.trim(),
         address: newOrderForm.address.trim(),
@@ -356,13 +419,21 @@ export default function OrderList() {
         items: newOrderForm.items,
         moneyToCollect: Number(newOrderForm.moneyToCollect) || 0,
         note: newOrderForm.note.trim()
-      });
+      };
+
+      if (editingOrderId) {
+        await updateOrder(editingOrderId, payload);
+        alert('Cập nhật ca dịch vụ thành công!');
+      } else {
+        await createOrder(payload);
+        alert('Tạo ca dịch vụ thành công!');
+      }
       setShowCreateModal(false);
+      setEditingOrderId(null);
       setPage(1);
       fetchOrdersData();
-      alert('Tạo ca dịch vụ thành công!');
     } catch (err: any) {
-      alert(err.message || 'Lỗi khi tạo ca dịch vụ');
+      alert(err.message || (editingOrderId ? 'Lỗi khi cập nhật ca dịch vụ' : 'Lỗi khi tạo ca dịch vụ'));
     } finally {
       setLoading(false);
     }
@@ -383,7 +454,7 @@ export default function OrderList() {
       const res = await getOrders({
         page,
         limit: 100,
-        search,
+        search: debouncedSearch,
         sortBy,
         sortOrder,
         startDate,
@@ -435,7 +506,8 @@ export default function OrderList() {
     filterProductNames,
     filterTechStationIds,
     filterProvinces,
-    dateType
+    dateType,
+    debouncedSearch
   ]);
 
   useEffect(() => {
@@ -2000,6 +2072,17 @@ export default function OrderList() {
                             <UserPlus size={15} />
                           </button>
                         )}
+
+                        {/* Sửa đơn tự tạo */}
+                        {!isViewOnlyStaff && order.pancakeOrderId < 0 && (
+                          <button
+                            onClick={() => openEditManualOrderModal(order)}
+                            className="p-1.5 text-amber-600 hover:bg-amber-50 rounded border border-transparent hover:border-amber-100 transition-colors"
+                            title="Chỉnh sửa ca tự tạo"
+                          >
+                            <Edit3 size={15} />
+                          </button>
+                        )}
  
                         {/* Hoàn thành (Tạm thời disable theo yêu cầu của user) */}
                         {/* {!isViewOnlyStaff && order.adminStatus !== 'hoàn thành' && order.adminStatus !== 'hủy đơn' && (
@@ -2881,8 +2964,8 @@ export default function OrderList() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
           <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl overflow-hidden flex flex-col max-h-[90vh]">
             <div className="px-6 py-4 border-b border-gray-200 bg-gray-50 flex justify-between items-center">
-              <h3 className="text-lg font-bold text-gray-900">Tạo ca dịch vụ độc lập</h3>
-              <button onClick={() => setShowCreateModal(false)} className="text-gray-400 hover:text-gray-600"><XCircle size={24} /></button>
+              <h3 className="text-lg font-bold text-gray-900">{editingOrderId ? 'Cập nhật ca dịch vụ độc lập' : 'Tạo ca dịch vụ độc lập'}</h3>
+              <button onClick={() => { setShowCreateModal(false); setEditingOrderId(null); }} className="text-gray-400 hover:text-gray-600"><XCircle size={24} /></button>
             </div>
 
             <div className="p-6 overflow-auto flex-1 grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -3204,8 +3287,8 @@ export default function OrderList() {
             </div>
 
             <div className="px-6 py-4 border-t border-gray-200 bg-gray-50 flex justify-end gap-3">
-              <button onClick={() => setShowCreateModal(false)} className="px-4 py-2 bg-white border rounded text-gray-700 hover:bg-gray-100 text-sm font-semibold transition-colors">Hủy</button>
-              <button onClick={submitCreateManualOrder} className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm font-semibold shadow-sm transition-colors">Tạo ca dịch vụ</button>
+              <button onClick={() => { setShowCreateModal(false); setEditingOrderId(null); }} className="px-4 py-2 bg-white border rounded text-gray-700 hover:bg-gray-100 text-sm font-semibold transition-colors">Hủy</button>
+              <button onClick={submitCreateManualOrder} className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm font-semibold shadow-sm transition-colors">{editingOrderId ? 'Cập nhật' : 'Tạo ca dịch vụ'}</button>
             </div>
           </div>
         </div>
