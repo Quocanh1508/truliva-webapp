@@ -1501,6 +1501,29 @@ router.patch('/:id', requireAuth, async (req: Request, res: Response): Promise<v
       return;
     }
 
+    // Kiểm tra phân quyền chỉnh sửa cho đơn hàng tự tạo (manual order)
+    const isManualOrder = oldOrder.pancakeOrderId < 0;
+    if (isManualOrder) {
+      const hasPrivilegedRole = role === 'ADMIN' || role === 'DEV' || role === 'COORDINATOR';
+      if (!hasPrivilegedRole) {
+        const creationLog = await prisma.auditLog.findFirst({
+          where: {
+            entityType: 'Order',
+            entityId: id,
+            action: 'created_manual'
+          },
+          select: {
+            userId: true
+          }
+        });
+        const isCreator = creationLog && creationLog.userId === req.user?.id;
+        if (!isCreator) {
+          res.status(403).json({ error: 'Bạn không có quyền chỉnh sửa đơn hàng tự tạo này' });
+          return;
+        }
+      }
+    }
+
     // Check IAM permission: user can only modify orders they can see
     const iamFilter = await buildOrderFilter(req.user);
     if (iamFilter) {
