@@ -54,6 +54,24 @@ async function buildOrderFilter(user: any): Promise<Prisma.OrderWhereInput | nul
       );
     }
 
+    // Lấy danh sách các đơn hàng thủ công do chính người dùng này tạo ra
+    const createdManualLogs = await prisma.auditLog.findMany({
+      where: {
+        entityType: 'Order',
+        action: 'created_manual',
+        userId: user.id
+      },
+      select: {
+        entityId: true
+      }
+    });
+    const createdManualOrderIds = createdManualLogs.map(log => log.entityId);
+    if (createdManualOrderIds.length > 0) {
+      orConditions.push({
+        id: { in: createdManualOrderIds }
+      });
+    }
+
     // eCom group sees shopee/lazada orders
     if (group && group.toLowerCase() === 'ecom') {
       orConditions.push(
@@ -77,7 +95,7 @@ async function buildOrderFilter(user: any): Promise<Prisma.OrderWhereInput | nul
     // Get all users in the same group
     const groupUsers = await prisma.user.findMany({
       where: { group: group, isActive: true },
-      select: { pancakeAccountName: true }
+      select: { id: true, pancakeAccountName: true }
     });
     const pancakeNames = groupUsers
       .map(u => u.pancakeAccountName?.trim())
@@ -91,6 +109,25 @@ async function buildOrderFilter(user: any): Promise<Prisma.OrderWhereInput | nul
           { rawData: { path: ['assigning_seller', 'name'], equals: name } },
           { rawData: { path: ['assigning_care', 'name'], equals: name } }
         );
+      });
+    }
+
+    // Lấy các đơn hàng thủ công do bất kỳ ai trong nhóm/group tạo
+    const groupUserIds = groupUsers.map(u => u.id);
+    const createdManualLogs = await prisma.auditLog.findMany({
+      where: {
+        entityType: 'Order',
+        action: 'created_manual',
+        userId: { in: groupUserIds }
+      },
+      select: {
+        entityId: true
+      }
+    });
+    const createdManualOrderIds = createdManualLogs.map(log => log.entityId);
+    if (createdManualOrderIds.length > 0) {
+      orConditions.push({
+        id: { in: createdManualOrderIds }
       });
     }
 
