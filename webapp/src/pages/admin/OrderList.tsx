@@ -61,6 +61,7 @@ export default function OrderList() {
   const { user: currentUser } = useAuth();
   const isViewOnlyStaff = currentUser?.role === 'STAFF' && currentUser?.group === 'Service';
   const canExportExcel = currentUser?.role === 'ADMIN' || currentUser?.role === 'DEV' || currentUser?.role === 'COORDINATOR' || (currentUser?.role === 'STAFF' && currentUser?.group === 'Service');
+  const canUseAutoRefresh = currentUser?.role === 'ADMIN' || currentUser?.role === 'DEV' || currentUser?.role === 'COORDINATOR';
   const navigate = useNavigate();
   const [orders, setOrders] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -501,6 +502,8 @@ export default function OrderList() {
 
   // WebSocket connection & real-time sync
   useEffect(() => {
+    if (!canUseAutoRefresh) return;
+
     let socket: WebSocket | null = null;
     let reconnectTimeout: any = null;
     let isMounted = true;
@@ -562,7 +565,7 @@ export default function OrderList() {
       if (socket) socket.close();
       if (reconnectTimeout) clearTimeout(reconnectTimeout);
     };
-  }, []);
+  }, [currentUser, canUseAutoRefresh]);
 
   useEffect(() => {
     fetchOrdersData();
@@ -590,7 +593,7 @@ export default function OrderList() {
 
   useEffect(() => {
     // Only poll if autoRefresh is enabled AND WebSocket is not connected
-    if (!autoRefresh || wsConnected) return;
+    if (!canUseAutoRefresh || !autoRefresh || wsConnected) return;
 
     // Smart Pause: Pause polling if user is actively interacting to avoid interrupts
     if (
@@ -1185,24 +1188,34 @@ export default function OrderList() {
         {/* Right side: Auto Refresh */}
         <div className="pb-1.5 pr-2">
           <div 
-            onClick={() => setAutoRefresh(!autoRefresh)}
-            className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-full border text-[12px] font-medium cursor-pointer select-none transition-all duration-300 ${
-              autoRefresh 
-                ? wsConnected
-                  ? 'bg-emerald-50 text-emerald-700 border-emerald-200 shadow-sm shadow-emerald-100/50 hover:bg-emerald-100/50'
-                  : 'bg-amber-50 text-amber-700 border-amber-200 shadow-sm shadow-amber-100/50 hover:bg-amber-100/50'
-                : 'bg-white text-gray-500 border-gray-300 hover:bg-gray-50'
+            onClick={() => {
+              if (canUseAutoRefresh) {
+                setAutoRefresh(!autoRefresh);
+              } else {
+                alert("Bạn không có quyền sử dụng tính năng này. Vui lòng liên hệ Admin/Coordinator.");
+              }
+            }}
+            className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-full border text-[12px] font-medium select-none transition-all duration-300 ${
+              !canUseAutoRefresh
+                ? 'bg-gray-50 text-gray-400 border-gray-200 cursor-not-allowed opacity-60'
+                : autoRefresh 
+                  ? wsConnected
+                    ? 'bg-emerald-50 text-emerald-700 border-emerald-200 shadow-sm shadow-emerald-100/50 hover:bg-emerald-100/50 cursor-pointer'
+                    : 'bg-amber-50 text-amber-700 border-amber-200 shadow-sm shadow-amber-100/50 hover:bg-amber-100/50 cursor-pointer'
+                  : 'bg-white text-gray-500 border-gray-300 hover:bg-gray-50 cursor-pointer'
             }`}
             title={
-              autoRefresh
-                ? wsConnected
-                  ? "Đồng bộ thời gian thực qua WebSocket đang hoạt động"
-                  : "Mất kết nối WebSocket, đang tự động làm mới mỗi 5s"
-                : "Bật để tự động đồng bộ thời gian thực"
+              !canUseAutoRefresh
+                ? "Tính năng đồng bộ thời gian thực chỉ dành cho Admin và Điều phối viên"
+                : autoRefresh
+                  ? wsConnected
+                    ? "Đồng bộ thời gian thực qua WebSocket đang hoạt động"
+                    : "Mất kết nối WebSocket, đang tự động làm mới mỗi 5s"
+                  : "Bật để tự động đồng bộ thời gian thực"
             }
           >
             <div className="relative flex items-center justify-center w-4 h-4">
-              {autoRefresh ? (
+              {autoRefresh && canUseAutoRefresh ? (
                 wsConnected ? (
                   <span className="relative flex h-2 w-2">
                     <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
@@ -1226,7 +1239,7 @@ export default function OrderList() {
               )}
             </div>
             <span>
-              {autoRefresh 
+              {autoRefresh && canUseAutoRefresh
                 ? wsConnected 
                   ? 'Đồng bộ Real-time' 
                   : 'Tự động làm mới (5s)' 
