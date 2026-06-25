@@ -266,6 +266,58 @@ export async function processOrderEvent(rawEventId: string | null, payload: any)
       }
     }
 
+    // ══════════════════════════════════════
+    // Kiểm tra và xử lý trùng lặp đơn Ecom cùng mã gốc
+    // ══════════════════════════════════════
+    const originalPosId = payload.id || (payload.rawData as any)?.id;
+    let duplicateOrder: any = null;
+    if (originalPosId) {
+      duplicateOrder = await prisma.order.findFirst({
+        where: {
+          rawData: {
+            path: ['id'],
+            equals: originalPosId
+          },
+          pancakeOrderId: {
+            not: systemId
+          }
+        }
+      });
+    }
+
+    if (duplicateOrder) {
+      if (systemId > duplicateOrder.pancakeOrderId) {
+        // Đơn mới hơn -> Thừa kế các thông tin nghiệp vụ đặc thù của Truliva từ đơn cũ sang đơn mới
+        orderData.assignedKtvId = orderData.assignedKtvId || duplicateOrder.assignedKtvId;
+        orderData.mainStationId = orderData.mainStationId || duplicateOrder.mainStationId;
+        orderData.techStationId = orderData.techStationId || duplicateOrder.techStationId;
+        orderData.workType = orderData.workType || duplicateOrder.workType;
+        orderData.serviceType = orderData.serviceType || duplicateOrder.serviceType;
+        orderData.appointmentTime = orderData.appointmentTime || duplicateOrder.appointmentTime;
+        orderData.rescheduleReason = orderData.rescheduleReason || duplicateOrder.rescheduleReason;
+        orderData.cancelReason = orderData.cancelReason || duplicateOrder.cancelReason;
+        orderData.ktvCalledAt = orderData.ktvCalledAt || duplicateOrder.ktvCalledAt;
+        orderData.warehouseId = orderData.warehouseId || duplicateOrder.warehouseId;
+        orderData.warehouseInfo = orderData.warehouseInfo || duplicateOrder.warehouseInfo;
+
+        const returnStatuses = ['đang hoàn', 'đã hoàn', 'hoàn một phần', 'đang đổi', 'đã đổi'];
+        if (!returnStatuses.includes(newAdminStatus)) {
+          orderData.adminStatus = duplicateOrder.adminStatus || newAdminStatus;
+        }
+      } else {
+        // Đơn mới cũ hơn đơn đang có trong DB -> Bỏ qua không xử lý đè lên bản ghi mới hơn
+        logger.info('Bypassed processing older duplicate Ecom webhook event', {
+          systemId,
+          existingNewerPancakeId: duplicateOrder.pancakeOrderId,
+          originalPosId
+        });
+        if (rawEventId) {
+          await markProcessed(rawEventId);
+        }
+        return;
+      }
+    }
+
     const orderSource = (payload.order_sources_name || '').toLowerCase();
     const isEcom = orderSource.includes('shopee') || orderSource.includes('lazada') || orderSource.includes('tiktok') || orderSource.includes('tiki');
     const defaultAppointmentTime = isEcom
@@ -284,24 +336,25 @@ export async function processOrderEvent(rawEventId: string | null, payload: any)
       update: orderData,
     });
 
-    // Đồng bộ trạng thái hoàn/đổi hàng cho các đơn cùng mã gốc (Ecom ID)
-    const originalPosId = payload.id || (payload.rawData as any)?.id;
-    if (originalPosId && ['đang hoàn', 'đã hoàn', 'hoàn một phần', 'đang đổi', 'đã đổi'].includes(newAdminStatus)) {
-      await prisma.order.updateMany({
-        where: {
-          rawData: {
-            path: ['id'],
-            equals: originalPosId
-          },
-          pancakeOrderId: {
-            not: systemId
-          }
-        },
-        data: {
-          adminStatus: newAdminStatus
-        }
+    // Nếu phát hiện trùng lặp và đơn mới hơn được lưu thành công, tiến hành dọn dẹp đơn cũ
+    if (duplicateOrder && systemId > duplicateOrder.pancakeOrderId) {
+      // 1. Chuyển toàn bộ ServiceReport từ đơn cũ sang đơn mới
+      await prisma.serviceReport.updateMany({
+        where: { orderId: duplicateOrder.id },
+        data: { orderId: order.id }
       });
-      logger.info('Synced status to other orders sharing original POS ID', { originalPosId, newAdminStatus });
+
+      // 2. Xóa đơn cũ (Cascade delete sẽ tự động xóa OrderItem của đơn cũ)
+      await prisma.order.delete({
+        where: { id: duplicateOrder.id }
+      });
+
+      logger.info('Merged duplicate Ecom order, transferred reports and deleted old order', {
+        oldPancakeId: duplicateOrder.pancakeOrderId,
+        newPancakeId: systemId,
+        oldUuid: duplicateOrder.id,
+        newUuid: order.id
+      });
     }
 
     // ══════════════════════════════════════
