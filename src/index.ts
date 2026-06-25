@@ -127,9 +127,8 @@ app.get('/health', (_req, res) => {
 // ── Webhook routes (Step 2) ──
 app.use('/webhooks', webhookRoutes);
 
-// Apply rate limiting to secure APIs and logins against scrapers/brute-force
+// Apply rate limiting to secure logins against brute-force
 app.use('/api/auth/login', loginLimiter);
-app.use('/api', apiLimiter);
 
 // ── KTV Webapp API routes ──
 app.use('/api/auth', authRoutes);
