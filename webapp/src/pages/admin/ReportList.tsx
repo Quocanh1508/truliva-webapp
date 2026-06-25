@@ -292,6 +292,21 @@ export default function ReportList() {
     if (s === 'hủy đơn' || s === 'hủy') {
       return <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-red-50 text-red-750 border border-red-200">Hủy đơn</span>;
     }
+    if (s === 'đang hoàn') {
+      return <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-purple-50 text-purple-700 border border-purple-200">Đang hoàn</span>;
+    }
+    if (s === 'đã hoàn') {
+      return <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-pink-50 text-pink-700 border border-pink-200">Đã hoàn</span>;
+    }
+    if (s === 'hoàn một phần') {
+      return <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-fuchsia-50 text-fuchsia-700 border border-fuchsia-200">Hoàn một phần</span>;
+    }
+    if (s === 'đang đổi') {
+      return <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-200">Đang đổi</span>;
+    }
+    if (s === 'đã đổi') {
+      return <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-teal-50 text-teal-700 border border-teal-200">Đã đổi</span>;
+    }
     return <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-gray-50 text-gray-700 border border-gray-200 capitalize">{status}</span>;
   };
 

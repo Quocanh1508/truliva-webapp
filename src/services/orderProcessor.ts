@@ -168,20 +168,27 @@ export async function processOrderEvent(rawEventId: string | null, payload: any)
     // 1. Trạng thái Hoàn/Đổi hàng (tách riêng, KHÔNG gộp vào hủy đơn)
     const isReturning =
       statusId === 4 ||
-      pStatus.includes('đang hoàn');
+      pStatus.includes('đang hoàn') ||
+      pStatus.includes('returning');
 
     const isReturned =
       statusId === 5 ||
-      pStatus.includes('đã hoàn');
+      pStatus.includes('đã hoàn') ||
+      pStatus.includes('returned');
 
     const isExchanging =
-      pStatus.includes('đang đổi');
+      pStatus.includes('đang đổi') ||
+      pStatus.includes('exchanging');
 
     const isExchanged =
-      pStatus.includes('đã đổi');
+      pStatus.includes('đã đổi') ||
+      pStatus.includes('exchanged');
 
     const isPartialReturn =
-      pStatus.includes('hoàn một phần');
+      statusId === 15 ||
+      pStatus.includes('hoàn một phần') ||
+      pStatus.includes('part_returned') ||
+      pStatus.includes('partially_returned');
 
     // 2. Trạng thái Hủy đơn (chỉ Đã hủy + Xóa gần đây)
     const isCancelled =
@@ -276,6 +283,26 @@ export async function processOrderEvent(rawEventId: string | null, payload: any)
       },
       update: orderData,
     });
+
+    // Đồng bộ trạng thái hoàn/đổi hàng cho các đơn cùng mã gốc (Ecom ID)
+    const originalPosId = payload.id || (payload.rawData as any)?.id;
+    if (originalPosId && ['đang hoàn', 'đã hoàn', 'hoàn một phần', 'đang đổi', 'đã đổi'].includes(newAdminStatus)) {
+      await prisma.order.updateMany({
+        where: {
+          rawData: {
+            path: ['id'],
+            equals: originalPosId
+          },
+          pancakeOrderId: {
+            not: systemId
+          }
+        },
+        data: {
+          adminStatus: newAdminStatus
+        }
+      });
+      logger.info('Synced status to other orders sharing original POS ID', { originalPosId, newAdminStatus });
+    }
 
     // ══════════════════════════════════════
     // 3. Xử lý Order Items
