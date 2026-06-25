@@ -1101,7 +1101,30 @@ export default function ReportList() {
                     {/* Mã đơn */}
                     <td style={{ padding: '12px 16px' }}>
                       {r.order?.pancakeOrderId ? (
-                        <span className="font-bold text-blue-700">{formatOrderId(r.order.pancakeOrderId)}</span>
+                        <div className="flex flex-col gap-0.5 items-start">
+                          <span className="font-bold text-blue-700">{formatOrderId(r.order.pancakeOrderId)}</span>
+                          {r.order.orderSource && /shopee|lazada|tiktok|tiki/i.test(r.order.orderSource) && (() => {
+                            try {
+                              const raw = typeof r.order.rawData === 'string' ? JSON.parse(r.order.rawData) : r.order.rawData;
+                              const originalId = raw?.id;
+                              if (originalId) {
+                                return (
+                                  <span
+                                    onClick={() => {
+                                      navigator.clipboard.writeText(String(originalId));
+                                      alert(`Đã sao chép mã đơn gốc: ${originalId}`);
+                                    }}
+                                    className="text-[9px] text-gray-500 font-mono bg-gray-50 border border-gray-200 rounded px-1.5 py-0.5 mt-0.5 cursor-pointer hover:text-blue-600 hover:bg-blue-50 hover:border-blue-200 transition-colors inline-block break-all max-w-[85px] leading-tight select-all"
+                                    title="Click để sao chép mã đơn gốc từ POS"
+                                  >
+                                    {originalId}
+                                  </span>
+                                );
+                              }
+                            } catch (e) {}
+                            return null;
+                          })()}
+                        </div>
                       ) : (
                         <span className="text-gray-400 font-semibold text-[10px] bg-gray-100 px-2 py-0.5 rounded">Đơn lẻ</span>
                       )}

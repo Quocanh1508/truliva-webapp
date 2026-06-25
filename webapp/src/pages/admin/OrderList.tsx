@@ -2092,8 +2092,32 @@ export default function OrderList() {
                     <td className="px-4 py-2 font-medium align-top">
                       <div>{formatOrderId(order.pancakeOrderId)}</div>
                       {order.orderSource && /shopee|lazada|tiktok|tiki/i.test(order.orderSource) && (
-                        <div className="text-[10px] font-bold text-blue-600 bg-blue-50 border border-blue-100 rounded px-1.5 py-0.5 mt-0.5 inline-block cursor-help" title={`Nguồn: ${order.orderSource}`}>
-                          Đơn Ecom
+                        <div className="flex flex-col gap-0.5 items-start">
+                          <div className="text-[10px] font-bold text-blue-600 bg-blue-50 border border-blue-100 rounded px-1.5 py-0.5 mt-0.5 inline-block cursor-help" title={`Nguồn: ${order.orderSource}`}>
+                            Đơn Ecom
+                          </div>
+                          {(() => {
+                            if (!order.rawData) return null;
+                            try {
+                              const raw = typeof order.rawData === 'string' ? JSON.parse(order.rawData) : order.rawData;
+                              const originalId = raw?.id;
+                              if (!originalId) return null;
+                              return (
+                                <span
+                                  onClick={() => {
+                                    navigator.clipboard.writeText(String(originalId));
+                                    alert(`Đã sao chép mã đơn gốc: ${originalId}`);
+                                  }}
+                                  className="text-[9px] text-gray-500 font-mono bg-gray-50 border border-gray-200 rounded px-1.5 py-0.5 mt-0.5 cursor-pointer hover:text-blue-600 hover:bg-blue-50 hover:border-blue-200 transition-colors inline-block break-all max-w-[85px] leading-tight select-all"
+                                  title="Click để sao chép mã đơn gốc từ POS"
+                                >
+                                  {originalId}
+                                </span>
+                              );
+                            } catch (e) {
+                              return null;
+                            }
+                          })()}
                         </div>
                       )}
                     </td>
@@ -2385,7 +2409,33 @@ export default function OrderList() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
           <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl overflow-hidden flex flex-col max-h-[90vh]">
             <div className="px-6 py-4 border-b border-gray-200 bg-gray-50 flex justify-between items-center">
-              <h3 className="text-lg font-bold text-gray-900">Chi tiết & Phân bổ Yêu cầu {formatOrderId(assignModal.order.pancakeOrderId)}</h3>
+              <h3 className="text-lg font-bold text-gray-900 flex items-center flex-wrap gap-2">
+                <span>Chi tiết & Phân bổ Yêu cầu {formatOrderId(assignModal.order.pancakeOrderId)}</span>
+                {(() => {
+                  const o = assignModal.order;
+                  if (o.orderSource && /shopee|lazada|tiktok|tiki/i.test(o.orderSource)) {
+                    try {
+                      const raw = typeof o.rawData === 'string' ? JSON.parse(o.rawData) : o.rawData;
+                      const originalId = raw?.id;
+                      if (originalId) {
+                        return (
+                          <span 
+                            onClick={() => {
+                              navigator.clipboard.writeText(String(originalId));
+                              alert(`Đã sao chép mã đơn gốc: ${originalId}`);
+                            }}
+                            className="text-xs font-normal text-gray-500 font-mono bg-gray-100 border border-gray-200 rounded px-2 py-0.5 cursor-pointer hover:text-blue-600 hover:bg-blue-50 transition-colors"
+                            title="Click để sao chép mã đơn gốc từ POS"
+                          >
+                            Mã gốc: {originalId}
+                          </span>
+                        );
+                      }
+                    } catch (e) {}
+                  }
+                  return null;
+                })()}
+              </h3>
               <button onClick={() => setAssignModal(null)} className="text-gray-400 hover:text-gray-600"><XCircle size={24} /></button>
             </div>
 
