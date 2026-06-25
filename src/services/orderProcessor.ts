@@ -206,6 +206,8 @@ export async function processOrderEvent(rawEventId: string | null, payload: any)
     // Áp dụng mapping theo thứ tự ưu tiên
     if (isCancelled) {
       newAdminStatus = 'hủy đơn';
+    } else if (isPartialReturn) {
+      newAdminStatus = 'hoàn một phần';
     } else if (isReturning) {
       newAdminStatus = 'đang hoàn';
     } else if (isReturned) {
@@ -214,8 +216,6 @@ export async function processOrderEvent(rawEventId: string | null, payload: any)
       newAdminStatus = 'đang đổi';
     } else if (isExchanged) {
       newAdminStatus = 'đã đổi';
-    } else if (isPartialReturn) {
-      newAdminStatus = 'hoàn một phần';
     } else if (isCompleted) {
       if (newAdminStatus !== 'hủy đơn') newAdminStatus = 'hoàn thành';
     }
