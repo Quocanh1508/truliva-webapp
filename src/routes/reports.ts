@@ -532,6 +532,8 @@ router.post('/', async (req: Request, res: Response): Promise<void> => {
           where: { orderId: oldOrder.id }
         });
 
+        const isWarranty = (oldOrder.workType || '').toLowerCase() === 'bảo hành';
+
         if (reportItems.length > 0) {
           await prisma.orderItem.createMany({
             data: reportItems.map((item: any) => {
@@ -541,14 +543,14 @@ router.post('/', async (req: Request, res: Response): Promise<void> => {
                 productName: item.productName,
                 sku: prod?.sku || null,
                 quantity: item.quantity,
-                price: prod?.sellingPrice || 0,
+                price: isWarranty ? 0 : (prod?.sellingPrice || 0),
                 rawData: prod?.rawData || undefined
               };
             })
           });
         }
 
-        const newTotalPrice = reportItems.reduce((sum: number, item: any) => {
+        const newTotalPrice = isWarranty ? 0 : reportItems.reduce((sum: number, item: any) => {
           const prod = matchedProducts.find(p => p.name === item.productName);
           return sum + ((prod?.sellingPrice || 0) * item.quantity);
         }, 0);
@@ -692,7 +694,7 @@ router.post('/', async (req: Request, res: Response): Promise<void> => {
                   return {
                     variation_id: prod?.pancakeProductId || null,
                     quantity: item.quantity,
-                    price: prod?.sellingPrice || 0
+                    price: isWarranty ? 0 : (prod?.sellingPrice || 0)
                   };
                 }).filter((p: any) => p.variation_id);
 
@@ -1633,6 +1635,8 @@ router.put('/:id', requireAuth, async (req: Request, res: Response): Promise<voi
           let targetWarehouseId = oldOrder.warehouseId || null;
           let targetWarehouseName = (oldOrder.warehouseInfo as any)?.name || 'Kho hàng';
 
+          const isWarranty = (oldOrder.workType || '').toLowerCase() === 'bảo hành';
+
           // Cập nhật OrderItems
           await prisma.orderItem.deleteMany({
             where: { orderId }
@@ -1647,14 +1651,14 @@ router.put('/:id', requireAuth, async (req: Request, res: Response): Promise<voi
                   productName: item.productName,
                   sku: prod?.sku || null,
                   quantity: item.quantity,
-                  price: prod?.sellingPrice || 0,
+                  price: isWarranty ? 0 : (prod?.sellingPrice || 0),
                   rawData: prod?.rawData || undefined
                 };
               })
             });
           }
 
-          const newTotalPrice = reportItems.reduce((sum: number, item: any) => {
+          const newTotalPrice = isWarranty ? 0 : reportItems.reduce((sum: number, item: any) => {
             const prod = matchedProducts.find(p => p.name === item.productName);
             return sum + ((prod?.sellingPrice || 0) * item.quantity);
           }, 0);
@@ -1670,7 +1674,7 @@ router.put('/:id', requireAuth, async (req: Request, res: Response): Promise<voi
                 return {
                   variation_id: prod?.pancakeProductId || null,
                   quantity: item.quantity,
-                  price: prod?.sellingPrice || 0
+                  price: isWarranty ? 0 : (prod?.sellingPrice || 0)
                 };
               }).filter((p: any) => p.variation_id);
 
@@ -1934,12 +1938,13 @@ router.post('/:id/approve', async (req: Request, res: Response): Promise<void> =
         const apiKey = process.env.PANCAKE_API_KEY;
         const shopId = '1635300067';
         if (apiKey) {
+          const isWarranty = (order.workType || '').toLowerCase() === 'bảo hành';
           const pancakeProducts = reportItems.map((item: any) => {
             const prod = matchedProducts.find(p => p.name === item.productName);
             return {
               variation_id: prod?.pancakeProductId || null,
               quantity: item.quantity,
-              price: prod?.sellingPrice || 0
+              price: isWarranty ? 0 : (prod?.sellingPrice || 0)
             };
           }).filter((p: any) => p.variation_id);
 

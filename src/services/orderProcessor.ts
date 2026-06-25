@@ -220,15 +220,17 @@ export async function processOrderEvent(rawEventId: string | null, payload: any)
       if (newAdminStatus !== 'hủy đơn') newAdminStatus = 'hoàn thành';
     }
 
+    const isWarrantyOrder = (existingOrder?.workType || '').toLowerCase() === 'bảo hành';
+
     const orderData: any = {
       customerId,
       statusCode,
       statusName: payload.status_name || null,
-      totalPrice: payload.total_price ?? null,
+      totalPrice: isWarrantyOrder ? 0 : (payload.total_price ?? null),
       shippingFee: payload.shipping_fee ?? null,
       totalDiscount: payload.total_discount ?? null,
       totalQuantity: payload.total_quantity ?? null,
-      moneyToCollect: payload.money_to_collect ?? null,
+      moneyToCollect: isWarrantyOrder ? 0 : (payload.money_to_collect ?? null),
       orderSource: payload.order_sources_name || null,
       orderSourceId: payload.marketplace_id ? String(payload.marketplace_id) : null,
       orderLink: payload.order_link || null,
@@ -292,7 +294,7 @@ export async function processOrderEvent(rawEventId: string | null, payload: any)
           productName: item.product_name || item.name || item.variation_info?.name || item.variations?.name || 'Sản phẩm không tên',
           sku: item.sku || item.product_sku || item.variation_info?.display_id || null,
           quantity: item.quantity ?? 1,
-          price: item.price ?? item.product_price ?? null,
+          price: isWarrantyOrder ? 0 : (item.price ?? item.product_price ?? null),
           discount: item.discount ?? 0,
           variationInfo: item.variation_info || item.variations || null,
           rawData: item,
