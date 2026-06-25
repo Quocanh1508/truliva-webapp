@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Outlet, useNavigate, useLocation, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { LogOut, Menu, X, FileText, List, Users, BarChart, Building, Key, Image as ImageIcon, MessageSquare, Bell, Wrench, User, Warehouse, Network, Send } from 'lucide-react';
+import { LogOut, Menu, X, FileText, List, Users, BarChart, Building, Key, Image as ImageIcon, MessageSquare, Bell, Wrench, User, Warehouse, Network, Send, Hash } from 'lucide-react';
 import { fetchApi } from '../api/client';
 import SyncManager from './SyncManager';
 
@@ -83,6 +83,7 @@ export default function Layout() {
     const canSeeInventory = user.role === 'ADMIN' || user.role === 'COORDINATOR';
     if (canSeeInventory) {
       items.push({ name: 'Quản lý kho', path: '/admin/inventory', icon: <Warehouse size={20} /> });
+      items.push({ name: 'Quản lý Serial', path: '/admin/serials', icon: <Hash size={20} /> });
     }
     
     // 3. Quản lý dịch vụ: All office roles

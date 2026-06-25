@@ -467,6 +467,40 @@ router.post('/', async (req: Request, res: Response): Promise<void> => {
       },
     });
 
+    // ── Đối chiếu ngược: Cập nhật bảng Serial khi báo cáo có serialNumber ──
+    if (report.serialNumber) {
+      try {
+        const existingSerial = await prisma.serial.findUnique({
+          where: { serialNumber: report.serialNumber },
+        });
+        if (existingSerial) {
+          const serialUpdate: any = {};
+          // Auto-fill thông tin KH nếu Serial chưa có
+          if (!existingSerial.customerName && customerName) serialUpdate.customerName = customerName;
+          if (!existingSerial.customerPhone && customerPhone) serialUpdate.customerPhone = customerPhone;
+          if (!existingSerial.address && address) serialUpdate.address = address;
+          if (!existingSerial.province && province) serialUpdate.province = province;
+          // Cập nhật trạng thái kích hoạt nếu là ca lắp đặt
+          const installWorkTypes = ['Lắp đặt', 'Giao hàng và Lắp đặt'];
+          if (existingSerial.status === 'Chưa kích hoạt' && installWorkTypes.includes(workType || '')) {
+            serialUpdate.status = 'Đã kích hoạt';
+            if (!existingSerial.activationDate) {
+              serialUpdate.activationDate = new Date();
+            }
+          }
+          if (Object.keys(serialUpdate).length > 0) {
+            await prisma.serial.update({
+              where: { serialNumber: report.serialNumber },
+              data: serialUpdate,
+            });
+            logger.info('Serial auto-updated from report', { serialNumber: report.serialNumber, updates: Object.keys(serialUpdate) });
+          }
+        }
+      } catch (serialErr: any) {
+        logger.error('Lỗi đối chiếu serial khi tạo báo cáo', { error: serialErr.message, serialNumber: report.serialNumber });
+      }
+    }
+
     // Tự động chuyển trạng thái đơn hàng khi KTV nộp báo cáo
     if (orderId) {
       try {
@@ -1286,13 +1320,42 @@ router.get('/check-serial', async (req: Request, res: Response): Promise<void> =
       return;
     }
 
-    const cleanInput = (serialNumber as string).replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
+    const cleanInput = (serialNumber as string).replace(/[^a-zA-Z0-9_]/g, '').toUpperCase();
     if (!cleanInput) {
       res.json({ exists: false });
       return;
     }
 
-    // 1. Tìm chính xác tuyệt đối
+    // 1. Ưu tiên kiểm tra bảng Serial (quản lý serial mới)
+    const serialRecord = await prisma.serial.findUnique({
+      where: { serialNumber: cleanInput },
+    });
+
+    if (serialRecord) {
+      // Tìm báo cáo lắp đặt liên quan để lấy thông tin sản phẩm
+      const installReport = await prisma.serviceReport.findFirst({
+        where: {
+          serialNumber: { mode: 'insensitive', equals: cleanInput },
+          workType: { in: ['Lắp đặt', 'Giao hàng và Lắp đặt'] },
+        },
+        orderBy: { createdAt: 'asc' },
+      });
+
+      res.json({
+        exists: true,
+        installDate: serialRecord.activationDate || installReport?.createdAt || null,
+        customerName: serialRecord.customerName || installReport?.customerName || null,
+        products: installReport?.products || [serialRecord.model],
+        serialNumber: serialRecord.serialNumber,
+        model: serialRecord.model,
+        warrantyExpiryDate: serialRecord.warrantyExpiryDate,
+        status: serialRecord.status,
+        source: 'serial_table',
+      });
+      return;
+    }
+
+    // 2. Fallback: Tìm trong bảng ServiceReport (tương thích ngược)
     const exactMatch = await prisma.serviceReport.findFirst({
       where: {
         serialNumber: {
@@ -1310,12 +1373,13 @@ router.get('/check-serial', async (req: Request, res: Response): Promise<void> =
         installDate: exactMatch.createdAt,
         customerName: exactMatch.customerName,
         products: exactMatch.products,
-        serialNumber: exactMatch.serialNumber
+        serialNumber: exactMatch.serialNumber,
+        source: 'service_report',
       });
       return;
     }
 
-    // 2. Tìm kiếm linh hoạt nếu KTV gõ có khoảng trắng/dấu gạch
+    // 3. Tìm kiếm linh hoạt nếu KTV gõ có khoảng trắng/dấu gạch
     const possibleReports = await prisma.serviceReport.findMany({
       where: {
         workType: { in: ['Lắp đặt', 'Giao hàng và Lắp đặt'] },
@@ -1331,7 +1395,7 @@ router.get('/check-serial', async (req: Request, res: Response): Promise<void> =
     });
 
     const fuzzyMatch = possibleReports.find((r: any) => {
-      const cleanDb = (r.serialNumber || '').replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
+      const cleanDb = (r.serialNumber || '').replace(/[^a-zA-Z0-9_]/g, '').toUpperCase();
       return cleanDb === cleanInput;
     });
 
@@ -1341,7 +1405,8 @@ router.get('/check-serial', async (req: Request, res: Response): Promise<void> =
         installDate: fuzzyMatch.createdAt,
         customerName: fuzzyMatch.customerName,
         products: fuzzyMatch.products,
-        serialNumber: fuzzyMatch.serialNumber
+        serialNumber: fuzzyMatch.serialNumber,
+        source: 'service_report',
       });
       return;
     }
@@ -1522,6 +1587,38 @@ router.put('/:id', requireAuth, async (req: Request, res: Response): Promise<voi
       data: updateData,
       include: { ktvUser: { select: { fullName: true } } },
     });
+
+    // ── Đối chiếu ngược: Cập nhật bảng Serial khi cập nhật báo cáo có serialNumber ──
+    if (report.serialNumber) {
+      try {
+        const existingSerial = await prisma.serial.findUnique({
+          where: { serialNumber: report.serialNumber },
+        });
+        if (existingSerial) {
+          const serialUpdate: any = {};
+          if (!existingSerial.customerName && report.customerName) serialUpdate.customerName = report.customerName;
+          if (!existingSerial.customerPhone && report.customerPhone) serialUpdate.customerPhone = report.customerPhone;
+          if (!existingSerial.address && report.address) serialUpdate.address = report.address;
+          if (!existingSerial.province && report.province) serialUpdate.province = report.province;
+          const installWorkTypes = ['Lắp đặt', 'Giao hàng và Lắp đặt'];
+          if (existingSerial.status === 'Chưa kích hoạt' && installWorkTypes.includes(report.workType || '')) {
+            serialUpdate.status = 'Đã kích hoạt';
+            if (!existingSerial.activationDate) {
+              serialUpdate.activationDate = new Date();
+            }
+          }
+          if (Object.keys(serialUpdate).length > 0) {
+            await prisma.serial.update({
+              where: { serialNumber: report.serialNumber },
+              data: serialUpdate,
+            });
+            logger.info('Serial auto-updated from report update', { serialNumber: report.serialNumber, updates: Object.keys(serialUpdate) });
+          }
+        }
+      } catch (serialErr: any) {
+        logger.error('Lỗi đối chiếu serial khi cập nhật báo cáo', { error: serialErr.message, serialNumber: report.serialNumber });
+      }
+    }
 
     // Nếu có orderId và reportItems được cập nhật, ta cập nhật cả Order và đồng bộ tồn kho
     if (existingReport.orderId && reportItems !== undefined) {

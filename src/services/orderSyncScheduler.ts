@@ -9,7 +9,7 @@ const SHOP_ID = '1635300067';
  * Đồng bộ các đơn hàng gần đây từ Pancake POS API về Database.
  * Trả về số lượng đơn hàng được xử lý.
  */
-export async function syncRecentOrders(pageSize: number = 50): Promise<number> {
+export async function syncRecentOrders(pageSize: number = 500): Promise<number> {
   const apiKey = process.env.PANCAKE_API_KEY;
   if (!apiKey) {
     logger.error('PANCAKE_API_KEY is not defined in env, order sync aborted');
@@ -68,7 +68,7 @@ export function startOrderSyncScheduler(intervalMinutes: number = 5): void {
   // Chạy ngay lập tức khi khởi động server
   setTimeout(() => {
     logger.info('Running initial startup orders sync...');
-    syncRecentOrders(50).catch(err => {
+    syncRecentOrders(500).catch(err => {
       logger.error('Initial auto orders sync failed', { error: err.message });
     });
   }, 5000); // Đợi 5 giây sau khi server start
@@ -76,7 +76,7 @@ export function startOrderSyncScheduler(intervalMinutes: number = 5): void {
   // Thiết lập interval
   setInterval(() => {
     logger.info('Running scheduled orders sync...');
-    syncRecentOrders(50).catch(err => {
+    syncRecentOrders(500).catch(err => {
       logger.error('Scheduled auto orders sync failed', { error: err.message });
     });
   }, intervalMinutes * 60 * 1000);

@@ -32,6 +32,7 @@ import StationManage from './pages/admin/StationManage';
 import SampleImageManage from './pages/admin/SampleImageManage';
 import InventoryManage from './pages/admin/InventoryManage';
 import BroadcastNotification from './pages/admin/BroadcastNotification';
+import SerialManage from './pages/admin/SerialManage';
 
 // Feedback / DEV Pages
 import FeedbackPage from './pages/FeedbackPage';
@@ -321,6 +322,7 @@ export default function App() {
                 <Route path="/admin/stations" element={<StationManage />} />
                 <Route path="/admin/users" element={<UserManage />} />
                 <Route path="/admin/sample-images" element={<SampleImageManage />} />
+                <Route path="/admin/serials" element={<SerialManage />} />
               </Route>
 
               {/* Admin & Dev Broadcast Routes */}

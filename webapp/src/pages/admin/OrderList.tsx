@@ -2150,13 +2150,35 @@ export default function OrderList() {
                       {/* Sản phẩm inline */}
                       <div className="text-gray-600 text-[11px] my-1 leading-normal">
                         {order.items && order.items.length > 0 ? (
-                          <span>
-                            <span className="text-gray-400">📦 </span>
-                            {order.items.map((item: any) => {
+                          <div className="flex flex-col gap-1 mt-0.5">
+                            {order.items.map((item: any, i: number) => {
                               const pName = item.productName || item.rawData?.variation_info?.name || item.rawData?.name || 'Sản phẩm';
-                              return `${pName} (x${item.quantity})`;
-                            }).join(', ')}
-                          </span>
+                              
+                              // Tìm các báo cáo của đơn hàng này có serialNumber và khớp với tên sản phẩm/linh kiện này
+                              const matchedReports = (order.serviceReports || []).filter((r: any) => {
+                                if (!r.serialNumber) return false;
+                                const itemClean = removeAccents(pName);
+                                const matchesProduct = (r.products || []).some((p: string) => removeAccents(p).includes(itemClean) || itemClean.includes(removeAccents(p)));
+                                const matchesSparePart = (r.spareParts || []).some((sp: string) => removeAccents(sp).includes(itemClean) || itemClean.includes(removeAccents(sp)));
+                                return matchesProduct || matchesSparePart;
+                              });
+
+                              return (
+                                <div key={item.id || i} className="flex items-center flex-wrap gap-1">
+                                  <span>📦 {pName} (x{item.quantity})</span>
+                                  {matchedReports.map((r: any) => (
+                                    <span 
+                                      key={r.id} 
+                                      className="inline-flex items-center gap-0.5 px-1.5 py-0.25 rounded text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-100 font-mono" 
+                                      title={`Serial từ báo cáo: ${r.workType || 'Báo cáo dịch vụ'}`}
+                                    >
+                                      #{r.serialNumber}
+                                    </span>
+                                  ))}
+                                </div>
+                              );
+                            })}
+                          </div>
                         ) : (
                           <span className="text-gray-400 italic">Chưa có sản phẩm</span>
                         )}

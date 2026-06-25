@@ -287,6 +287,7 @@ model ServiceReport {
   order             Order?    @relation(fields: [orderId], references: [id])
 
   @@map("service_reports")
+  @@index([serialNumber])
 }
 
 // ── Ảnh mẫu theo loại công việc và nhãn slot ──
@@ -328,5 +329,32 @@ model Notification {
   user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("notifications")
+}
+
+// ── Quản lý Serial sản phẩm ──
+model Serial {
+  id                       String    @id @default(uuid())
+  serialNumber             String    @unique @map("serial_number")          // Số Serial (Khóa duy nhất)
+  model                    String                                           // Tên Model máy (VD: "Ultima White")
+  status                   String    @default("Chưa kích hoạt")            // Trạng thái: "Chưa kích hoạt" | "Đã kích hoạt" | "KH xác nhận"
+  activationDate           DateTime? @map("activation_date")                // Ngày kích hoạt
+  warrantyExpiryDate       DateTime? @map("warranty_expiry_date")           // Ngày hết hạn bảo hành
+  customerConfirmationDate DateTime? @map("customer_confirmation_date")     // Ngày KH xác nhận
+
+  // Thông tin khách hàng (từ Excel hoặc auto-fill từ báo cáo)
+  customerName             String?   @map("customer_name")
+  customerPhone            String?   @map("customer_phone")
+  address                  String?
+  province                 String?                                          // Tỉnh/Thành phố
+
+  // Metadata
+  importBatchId            String?   @map("import_batch_id")                // Nhóm theo đợt import
+  importedById             String?   @map("imported_by_id")                 // ID người thực hiện import
+  rawData                  Json?     @map("raw_data")                       // JSON row gốc từ Excel
+
+  createdAt                DateTime  @default(now()) @map("created_at")
+  updatedAt                DateTime  @updatedAt @map("updated_at")
+
+  @@map("serials")
 }
 

@@ -22,6 +22,7 @@ import feedbackRoutes from './routes/feedbacks';
 import devRoutes from './routes/dev';
 import notificationRoutes from './routes/notifications';
 import inventoryRoutes from './routes/inventory';
+import serialRoutes from './routes/serials';
 import { startOrderSyncScheduler } from './services/orderSyncScheduler';
 import { startReportCleanupScheduler } from './services/reportCleanupScheduler';
 import { initWebSocketServer } from './services/websocketService';
@@ -143,6 +144,7 @@ app.use('/api/feedbacks', feedbackRoutes);
 app.use('/api/dev', devRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/inventory', inventoryRoutes);
+app.use('/api/serials', serialRoutes);
 
 // ── Serve uploaded images ──
 app.use('/uploads', express.static(path.join(process.cwd(), 'uploads'), {
