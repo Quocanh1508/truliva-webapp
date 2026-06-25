@@ -52,10 +52,13 @@ router.get('/warehouses', async (req: Request, res: Response): Promise<void> => 
 
 /**
  * GET /api/inventory/stock
- * Lấy bảng tổng hợp tồn kho của tất cả sản phẩm tại từng kho (Admin only)
+ * Lấy bảng tổng hợp tồn kho của tất cả sản phẩm tại từng kho (Có phân quyền lọc chi tiết)
  */
-router.get('/stock', requireCoordinatorOrAdmin, async (req: Request, res: Response): Promise<void> => {
+router.get('/stock', async (req: Request, res: Response): Promise<void> => {
   try {
+    const role = req.user?.role;
+    const isCoordinatorOrAdmin = role === 'ADMIN' || role === 'DEV' || role === 'COORDINATOR';
+
     // 1. Lấy danh sách kho
     const warehouses = await fetchPancakeWarehouses();
     
@@ -80,21 +83,27 @@ router.get('/stock', requireCoordinatorOrAdmin, async (req: Request, res: Respon
         }
       });
 
-      return {
+      const prod: any = {
         id: p.id,
         pancakeProductId: p.pancakeProductId,
         sku: p.sku,
         name: p.name,
         category: p.category,
         imageUrl: p.imageUrl,
-        costPrice: p.costPrice,
         sellingPrice: p.sellingPrice,
         availableStock: p.availableStock ?? 0,
         totalStock: p.totalStock ?? 0,
         isActive: p.isActive,
-        stocks, // { [warehouse_id]: remain_quantity }
-        actualStocks // { [warehouse_id]: actual_remain_quantity }
       };
+
+      // Chỉ trả về giá vốn và tồn kho chi tiết nếu là Admin/Coordinator
+      if (isCoordinatorOrAdmin) {
+        prod.costPrice = p.costPrice;
+        prod.stocks = stocks;
+        prod.actualStocks = actualStocks;
+      }
+
+      return prod;
     });
 
     res.json({
