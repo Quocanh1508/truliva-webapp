@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getOrders, callCustomer, rescheduleOrder } from '../../api/client';
-import { Search, ChevronLeft, ChevronRight, Phone, Calendar, FileText, User, MapPin, Clock, MessageSquare, Wrench } from 'lucide-react';
+import { Search, ChevronLeft, ChevronRight, Phone, Calendar, FileText, User, MapPin, Clock, MessageSquare, Wrench, CreditCard } from 'lucide-react';
 import PullToRefresh from '../../components/PullToRefresh';
 import { formatOrderId } from '../../utils/text';
 
@@ -380,7 +380,7 @@ export default function MyOrders() {
                     </div>
 
                     {/* Thanh thao tác nhanh ở dưới cùng Card */}
-                    <div className="grid grid-cols-3 gap-2 pt-2 border-t border-gray-100">
+                    <div className="grid grid-cols-4 gap-2 pt-2 border-t border-gray-100">
                       {/* Gọi điện */}
                       {phone ? (
                         <button
@@ -409,6 +409,25 @@ export default function MyOrders() {
                         <Calendar size={13} />
                         <span>Hẹn lại</span>
                       </button>
+
+                      {/* Thanh toán */}
+                      {order.checkoutLink ? (
+                        <button
+                          onClick={(e) => { e.stopPropagation(); window.open(order.checkoutLink, '_blank', 'noopener,noreferrer'); }}
+                          className="flex items-center justify-center space-x-1.5 py-2 px-1 bg-violet-50 hover:bg-violet-100 border border-violet-100 text-violet-700 rounded-lg font-semibold text-xs transition-colors cursor-pointer"
+                        >
+                          <CreditCard size={13} />
+                          <span>Thanh toán</span>
+                        </button>
+                      ) : (
+                        <button
+                          disabled
+                          className="flex items-center justify-center space-x-1.5 py-2 px-1 bg-gray-50 border border-gray-100 text-gray-400 rounded-lg font-semibold text-xs cursor-not-allowed"
+                        >
+                          <CreditCard size={13} />
+                          <span>Chưa có link</span>
+                        </button>
+                      )}
 
                       {/* Tạo báo cáo */}
                       {order.adminStatus === 'chờ duyệt' ? (

@@ -241,6 +241,9 @@ export async function processOrderEvent(rawEventId: string | null, payload: any)
       orderSource: payload.order_sources_name || null,
       orderSourceId: payload.marketplace_id ? String(payload.marketplace_id) : null,
       orderLink: payload.order_link || null,
+      checkoutLink: payload.tracking_link
+        ? payload.tracking_link.replace('/tracking?', '/payment?')
+        : null,
       shippingAddress: payload.shipping_address || null,
       warehouseInfo: payload.warehouse_info || null,
       warehouseId: payload.warehouse_id ? String(payload.warehouse_id) : null,

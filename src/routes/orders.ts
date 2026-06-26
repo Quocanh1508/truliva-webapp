@@ -499,6 +499,7 @@ router.get('/', requireAuth, async (req: Request, res: Response): Promise<void> 
         orderSource: true,
         orderSourceId: true,
         orderLink: true,
+        checkoutLink: true,
         shippingAddress: true,
         warehouseInfo: true,
         billFullName: true,

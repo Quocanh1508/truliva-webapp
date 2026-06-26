@@ -96,6 +96,7 @@ model Order {
   ktvCalledAt         DateTime? @map("ktv_called_at")             // Thời gian KTV nhấn nút gọi khách
   warehouseId         String?   @map("warehouse_id")              // ID kho hàng được phân bổ xuất hàng
   pancakeSyncStatus   String?   @map("pancake_sync_status")       // Trạng thái đồng bộ đơn sang Pancake: SUCCESS, FAILED
+  checkoutLink        String?   @map("checkout_link")             // Link thanh toán cho khách (derived from tracking_link)
   rawData             Json?     @map("raw_data")
   createdAt           DateTime  @default(now()) @map("created_at")
   updatedAt           DateTime  @updatedAt @map("updated_at")
