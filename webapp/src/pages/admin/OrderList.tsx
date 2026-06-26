@@ -70,6 +70,11 @@ export default function OrderList() {
   const [autoRefresh, setAutoRefresh] = useState(false);
   const [wsConnected, setWsConnected] = useState(false);
 
+  // Track whether user is actively interacting (filtering/searching) to pause real-time updates
+  const isUserInteractingRef = useRef(false);
+  const wsDebounceTimerRef = useRef<any>(null);
+  const ordersFingerprint = useRef<string>('');
+
   // Filters
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
@@ -475,6 +480,15 @@ export default function OrderList() {
         provinces: filterProvinces,
         dateType: dateType
       });
+
+      // Only update orders state if data actually changed (avoid unnecessary re-renders / glitch)
+      const newFingerprint = JSON.stringify(res.orders.map((o: any) => o.id + ':' + o.updatedAt));
+      if (isSilent && ordersFingerprint.current === newFingerprint) {
+        // Data hasn't changed, skip re-render
+        return;
+      }
+      ordersFingerprint.current = newFingerprint;
+
       setOrders(res.orders);
       setTotalPages(res.pagination.totalPages);
       setTotalItems(res.pagination.total);
@@ -499,6 +513,28 @@ export default function OrderList() {
   useEffect(() => {
     autoRefreshRef.current = autoRefresh;
   }, [autoRefresh]);
+
+  // Track user interaction state for WebSocket smart-pause
+  useEffect(() => {
+    const hasActiveFilters = !!debouncedSearch || !!filterPancakeOrderId || filterAdminStatuses.length > 0 ||
+      filterKtvIds.length > 0 || filterWorkTypes.length > 0 || filterMainStationIds.length > 0 ||
+      !!filterCustomerName || !!filterCustomerPhone || filterServiceTypes.length > 0 ||
+      filterProductCategories.length > 0 || filterProductNames.length > 0 ||
+      filterTechStationIds.length > 0 || filterProvinces.length > 0 ||
+      !!customStartDate || !!customEndDate;
+    const isTypingSearch = search !== debouncedSearch;
+    const hasModalOpen = !!showCreateModal || !!assignModal || !!cancelModal;
+    const hasDropdownOpen = activeDropdown !== null;
+
+    isUserInteractingRef.current = isTypingSearch || hasModalOpen || hasDropdownOpen;
+  }, [
+    search, debouncedSearch,
+    filterPancakeOrderId, filterAdminStatuses, filterKtvIds, filterWorkTypes,
+    filterMainStationIds, filterCustomerName, filterCustomerPhone,
+    filterServiceTypes, filterProductCategories, filterProductNames,
+    filterTechStationIds, filterProvinces, customStartDate, customEndDate,
+    showCreateModal, assignModal, cancelModal, activeDropdown
+  ]);
 
   // WebSocket connection & real-time sync
   useEffect(() => {
@@ -530,8 +566,20 @@ export default function OrderList() {
             const message = JSON.parse(event.data);
             if (message.type === 'ORDER_UPDATED') {
               if (autoRefreshRef.current) {
-                console.log('Real-time order update received, refreshing...', message.data);
-                fetchOrdersDataRef.current({ silent: true });
+                // Smart Pause: Skip fetch if user is actively interacting (typing search, modal open, dropdown open)
+                if (isUserInteractingRef.current) {
+                  console.log('Real-time update received but user is interacting, skipping refresh');
+                  return;
+                }
+                // Debounce: If multiple WS events arrive rapidly, only fetch once after 800ms of quiet
+                if (wsDebounceTimerRef.current) {
+                  clearTimeout(wsDebounceTimerRef.current);
+                }
+                wsDebounceTimerRef.current = setTimeout(() => {
+                  console.log('Real-time order update received, refreshing...', message.data);
+                  fetchOrdersDataRef.current({ silent: true });
+                  wsDebounceTimerRef.current = null;
+                }, 800);
               }
             }
           } catch (err) {
