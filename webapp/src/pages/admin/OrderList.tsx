@@ -516,12 +516,6 @@ export default function OrderList() {
 
   // Track user interaction state for WebSocket smart-pause
   useEffect(() => {
-    const hasActiveFilters = !!debouncedSearch || !!filterPancakeOrderId || filterAdminStatuses.length > 0 ||
-      filterKtvIds.length > 0 || filterWorkTypes.length > 0 || filterMainStationIds.length > 0 ||
-      !!filterCustomerName || !!filterCustomerPhone || filterServiceTypes.length > 0 ||
-      filterProductCategories.length > 0 || filterProductNames.length > 0 ||
-      filterTechStationIds.length > 0 || filterProvinces.length > 0 ||
-      !!customStartDate || !!customEndDate;
     const isTypingSearch = search !== debouncedSearch;
     const hasModalOpen = !!showCreateModal || !!assignModal || !!cancelModal;
     const hasDropdownOpen = activeDropdown !== null;
@@ -529,10 +523,6 @@ export default function OrderList() {
     isUserInteractingRef.current = isTypingSearch || hasModalOpen || hasDropdownOpen;
   }, [
     search, debouncedSearch,
-    filterPancakeOrderId, filterAdminStatuses, filterKtvIds, filterWorkTypes,
-    filterMainStationIds, filterCustomerName, filterCustomerPhone,
-    filterServiceTypes, filterProductCategories, filterProductNames,
-    filterTechStationIds, filterProvinces, customStartDate, customEndDate,
     showCreateModal, assignModal, cancelModal, activeDropdown
   ]);
 
