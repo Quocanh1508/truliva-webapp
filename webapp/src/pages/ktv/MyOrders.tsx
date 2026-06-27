@@ -4,10 +4,12 @@ import { getOrders, callCustomer, rescheduleOrder } from '../../api/client';
 import { Search, ChevronLeft, ChevronRight, Phone, Calendar, FileText, User, MapPin, Clock, MessageSquare, Wrench, CreditCard } from 'lucide-react';
 import PullToRefresh from '../../components/PullToRefresh';
 import { formatOrderId } from '../../utils/text';
+import { fetchCurrentWeather, type WeatherInfo } from '../../utils/weather';
 
 export default function MyOrders() {
   const navigate = useNavigate();
   const [orders, setOrders] = useState<any[]>([]);
+  const [weather, setWeather] = useState<WeatherInfo | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
@@ -50,6 +52,11 @@ export default function MyOrders() {
       setTotalPages(res.pagination.totalPages);
       setTotalOrders(res.pagination.total || 0);
       setError('');
+
+      if (silent) {
+        const wData = await fetchCurrentWeather(true);
+        if (wData) setWeather(wData);
+      }
       
       // Cache the default view (first page, empty search)
       if (!search && page === 1) {
@@ -81,6 +88,14 @@ export default function MyOrders() {
   useEffect(() => {
     fetchOrdersData();
   }, [page, sortBy, sortOrder]);
+
+  useEffect(() => {
+    const loadWeather = async () => {
+      const wData = await fetchCurrentWeather();
+      if (wData) setWeather(wData);
+    };
+    loadWeather();
+  }, []);
 
   useEffect(() => {
     const handleOnline = () => {
@@ -163,6 +178,39 @@ export default function MyOrders() {
     return <span className="inline-flex px-1.5 py-0.5 bg-gray-50 text-gray-700 border border-gray-200 rounded text-[10px] font-bold mt-1 w-max">{workType}</span>;
   };
 
+  const getWeatherAlert = () => {
+    if (!weather) return null;
+    const isRainy = [51, 53, 55, 56, 57, 61, 63, 65, 66, 67, 80, 81, 82].includes(weather.weatherCode);
+    const isThunderstorm = [95, 96, 99].includes(weather.weatherCode);
+    const isHot = weather.temperature >= 35;
+
+    if (isThunderstorm) {
+      return {
+        bg: 'bg-red-50 border-red-200',
+        text: 'text-red-800 border-red-200',
+        icon: '⛈️',
+        message: `Khu vực hiện tại có dông bão (${weather.temperature}°C). Anh/chị chú ý an toàn khi di chuyển và bảo quản kỹ thiết bị điện nhé!`
+      };
+    }
+    if (isRainy) {
+      return {
+        bg: 'bg-indigo-50 border-indigo-200',
+        text: 'text-indigo-800 border-indigo-200',
+        icon: '🌧️',
+        message: `Trời đang có mưa (${weather.temperature}°C). Anh/chị chú ý mang theo áo mưa và bảo quản cẩn thận hàng hóa khi đi giao nhé!`
+      };
+    }
+    if (isHot) {
+      return {
+        bg: 'bg-amber-50 border-amber-200',
+        text: 'text-amber-800 border-amber-200',
+        icon: '☀️',
+        message: `Thời tiết hôm nay nắng nóng gay gắt (${weather.temperature}°C). Anh/chị chú ý bổ sung nước đầy đủ và giữ gìn sức khỏe nhé!`
+      };
+    }
+    return null;
+  };
+
   return (
     <div className="flex flex-col bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden h-[calc(100vh-80px)] font-sans">
       
@@ -225,6 +273,21 @@ export default function MyOrders() {
                   </div>
                 </div>
               )}
+
+              {/* Banner thời tiết thông minh */}
+              {(() => {
+                const alert = getWeatherAlert();
+                if (!alert) return null;
+                return (
+                  <div className={`p-3 border rounded-xl flex items-start space-x-2.5 shadow-2xs ${alert.bg} ${alert.text}`}>
+                    <span className="text-xl shrink-0">{alert.icon}</span>
+                    <div className="flex-1 text-[12px] font-semibold leading-relaxed">
+                      {alert.message}
+                    </div>
+                  </div>
+                );
+              })()}
+
               {/* Banner thống kê đơn hàng */}
               <div className="p-3 bg-blue-50/80 border border-blue-100 rounded-xl flex items-center justify-between shadow-xs">
                 <div className="flex items-center space-x-2.5">

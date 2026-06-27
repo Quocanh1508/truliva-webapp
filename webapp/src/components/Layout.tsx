@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import { LogOut, Menu, X, FileText, List, Users, BarChart, Building, Key, Image as ImageIcon, MessageSquare, Bell, Wrench, User, Warehouse, Network, Send, Hash } from 'lucide-react';
 import { fetchApi } from '../api/client';
 import SyncManager from './SyncManager';
+import { fetchCurrentWeather, type WeatherInfo } from '../utils/weather';
 
 export default function Layout() {
   const { user, logout } = useAuth();
@@ -11,8 +12,18 @@ export default function Layout() {
   const location = useLocation();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
+  const [weather, setWeather] = useState<WeatherInfo | null>(null);
   const isOfficeRole = user && user.role !== 'KTV' && user.role !== 'DEV';
   const logoPath = isOfficeRole ? '/admin/orders' : (user?.role === 'DEV' ? '/dev/feedbacks' : '/ktv/my-orders');
+
+  useEffect(() => {
+    if (!user || user.role !== 'KTV') return;
+    const loadWeather = async () => {
+      const data = await fetchCurrentWeather();
+      if (data) setWeather(data);
+    };
+    loadWeather();
+  }, [user]);
 
   useEffect(() => {
     if (!user) return;
@@ -263,6 +274,28 @@ export default function Layout() {
               <div style={{ marginTop: '4px', fontWeight: 600 }}>
                 Xin chào, <span style={{ color: '#1B3A6B', fontWeight: 700 }}>{user?.fullName}</span> 👋
               </div>
+              {user?.role === 'KTV' && weather && (
+                <div style={{ 
+                  marginTop: '8px', 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  gap: '8px', 
+                  padding: '6px 10px', 
+                  backgroundColor: '#eff6ff', 
+                  borderRadius: '8px', 
+                  border: '1px solid #bfdbfe' 
+                }}>
+                  <span style={{ fontSize: '18px' }}>{weather.icon}</span>
+                  <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+                    <span style={{ fontWeight: 700, color: '#1B3A6B', fontSize: '12px' }}>
+                      {weather.temperature}°C - {weather.text}
+                    </span>
+                    <span style={{ fontSize: '10px', color: '#64748b', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={weather.locationName}>
+                      📍 {weather.locationName}
+                    </span>
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Nav items */}
