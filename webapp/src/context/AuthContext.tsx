@@ -10,6 +10,12 @@ export interface User {
   role: UserRole;
   group?: string | null;
   pancakeAccountName?: string | null;
+  techStation?: {
+    name: string;
+    mainStation?: {
+      name: string;
+    } | null;
+  } | null;
 }
 
 interface AuthContextType {

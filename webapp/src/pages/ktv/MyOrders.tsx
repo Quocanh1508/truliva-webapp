@@ -5,9 +5,11 @@ import { Search, ChevronLeft, ChevronRight, Phone, Calendar, FileText, User, Map
 import PullToRefresh from '../../components/PullToRefresh';
 import { formatOrderId } from '../../utils/text';
 import { fetchCurrentWeather, type WeatherInfo } from '../../utils/weather';
+import { useAuth } from '../../context/AuthContext';
 
 export default function MyOrders() {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [orders, setOrders] = useState<any[]>([]);
   const [weather, setWeather] = useState<WeatherInfo | null>(null);
   const [loading, setLoading] = useState(true);
@@ -54,7 +56,8 @@ export default function MyOrders() {
       setError('');
 
       if (silent) {
-        const wData = await fetchCurrentWeather(true);
+        const stationName = user?.techStation?.name || user?.techStation?.mainStation?.name || '';
+        const wData = await fetchCurrentWeather(true, stationName);
         if (wData) setWeather(wData);
       }
       
@@ -90,12 +93,14 @@ export default function MyOrders() {
   }, [page, sortBy, sortOrder]);
 
   useEffect(() => {
+    if (!user) return;
     const loadWeather = async () => {
-      const wData = await fetchCurrentWeather();
+      const stationName = user.techStation?.name || user.techStation?.mainStation?.name || '';
+      const wData = await fetchCurrentWeather(false, stationName);
       if (wData) setWeather(wData);
     };
     loadWeather();
-  }, []);
+  }, [user]);
 
   useEffect(() => {
     const handleOnline = () => {

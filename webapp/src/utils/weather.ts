@@ -71,8 +71,8 @@ interface Coordinates {
   city: string;
 }
 
-// Lấy vị trí của người dùng qua GPS hoặc IP Geolocation làm fallback
-async function getCoordinates(): Promise<Coordinates> {
+// Lấy vị trí của người dùng qua GPS hoặc trạm kỹ thuật/IP Geolocation làm fallback
+async function getCoordinates(stationName?: string): Promise<Coordinates> {
   // 1. Thử lấy qua GPS/Trình duyệt Geolocation
   if (navigator.geolocation) {
     try {
@@ -89,11 +89,31 @@ async function getCoordinates(): Promise<Coordinates> {
         city: 'Vị trí hiện tại'
       };
     } catch (gpsError) {
-      console.warn('GPS Geolocation failed or denied. Falling back to IP Geolocation...', gpsError);
+      console.warn('GPS Geolocation failed or denied. Falling back to Smart Station Mapping...', gpsError);
     }
   }
 
-  // 2. Fallback sang IP Geolocation (Sử dụng ipapi.co miễn phí hỗ trợ HTTPS)
+  // 2. Fallback sang Trạm kỹ thuật (Smart Station Mapping)
+  if (stationName) {
+    const sName = stationName.toLowerCase();
+    if (sName.includes('hồ chí minh') || sName.includes('tphcm') || sName.includes('hcm') || sName.includes('sài gòn')) {
+      return { latitude: 10.762622, longitude: 106.660172, city: 'TP. Hồ Chí Minh' };
+    }
+    if (sName.includes('vũng tàu')) {
+      return { latitude: 10.34599, longitude: 107.08426, city: 'Vũng Tàu' };
+    }
+    if (sName.includes('đồng nai') || sName.includes('biên hòa')) {
+      return { latitude: 10.95738, longitude: 106.84268, city: 'Đồng Nai' };
+    }
+    if (sName.includes('hà nội') || sName.includes('hn')) {
+      return { latitude: 21.028511, longitude: 105.804817, city: 'Hà Nội' };
+    }
+    if (sName.includes('đà nẵng') || sName.includes('dn')) {
+      return { latitude: 16.0544, longitude: 108.2022, city: 'Đà Nẵng' };
+    }
+  }
+
+  // 3. Fallback sang IP Geolocation (Sử dụng ipapi.co miễn phí hỗ trợ HTTPS)
   try {
     const response = await fetch('https://ipapi.co/json/');
     if (response.ok) {
@@ -110,7 +130,7 @@ async function getCoordinates(): Promise<Coordinates> {
     console.error('IP Geolocation failed. Using default coordinates (Hà Nội)...', ipError);
   }
 
-  // 3. Mặc định
+  // 4. Mặc định
   return {
     latitude: DEFAULT_LAT,
     longitude: DEFAULT_LON,
@@ -121,7 +141,7 @@ async function getCoordinates(): Promise<Coordinates> {
 const CACHE_KEY = 'truliva_weather_cache';
 const CACHE_DURATION_MS = 30 * 60 * 1000; // 30 phút
 
-export async function fetchCurrentWeather(forceRefresh = false): Promise<WeatherInfo | null> {
+export async function fetchCurrentWeather(forceRefresh = false, stationName?: string): Promise<WeatherInfo | null> {
   try {
     // 1. Kiểm tra cache
     if (!forceRefresh) {
@@ -136,7 +156,7 @@ export async function fetchCurrentWeather(forceRefresh = false): Promise<Weather
     }
 
     // 2. Lấy vị trí
-    const coords = await getCoordinates();
+    const coords = await getCoordinates(stationName);
 
     // 3. Gọi Open-Meteo API
     const weatherUrl = `https://api.open-meteo.com/v1/forecast?latitude=${coords.latitude}&longitude=${coords.longitude}&current=temperature_2m,weather_code&timezone=auto`;

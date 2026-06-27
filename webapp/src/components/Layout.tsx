@@ -19,7 +19,8 @@ export default function Layout() {
   useEffect(() => {
     if (!user || user.role !== 'KTV') return;
     const loadWeather = async () => {
-      const data = await fetchCurrentWeather();
+      const stationName = user.techStation?.name || user.techStation?.mainStation?.name || '';
+      const data = await fetchCurrentWeather(false, stationName);
       if (data) setWeather(data);
     };
     loadWeather();
