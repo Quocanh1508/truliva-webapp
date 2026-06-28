@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { User, Save, AlertCircle, CheckCircle, MapPin, FileText, CreditCard, Shield } from 'lucide-react';
+import { User, Save, AlertCircle, CheckCircle, MapPin, FileText, CreditCard, Shield, Key } from 'lucide-react';
 import { fetchApi } from '../api/client';
 import { useAuth } from '../context/AuthContext';
 
@@ -28,6 +28,48 @@ export default function ProfilePage() {
   const [loading, setLoading] = useState(false);
   const [fetching, setFetching] = useState(true);
   const navigate = useNavigate();
+
+  // Password change states
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [pwError, setPwError] = useState('');
+  const [pwSuccess, setPwSuccess] = useState('');
+  const [pwLoading, setPwLoading] = useState(false);
+
+  const handleChangePassword = async (e?: React.MouseEvent) => {
+    if (e) e.preventDefault();
+    setPwError('');
+    setPwSuccess('');
+
+    if (newPassword.length < 4) {
+      setPwError('Mật khẩu mới phải có ít nhất 4 ký tự.');
+      return;
+    }
+
+    if (newPassword !== confirmPassword) {
+      setPwError('Mật khẩu mới và xác nhận mật khẩu không khớp.');
+      return;
+    }
+
+    setPwLoading(true);
+
+    try {
+      await fetchApi('/auth/change-password', {
+        method: 'POST',
+        body: JSON.stringify({ currentPassword, newPassword }),
+      });
+
+      setPwSuccess('Thay đổi mật khẩu thành công!');
+      setCurrentPassword('');
+      setNewPassword('');
+      setConfirmPassword('');
+    } catch (err: any) {
+      setPwError(err.message || 'Lỗi khi đổi mật khẩu.');
+    } finally {
+      setPwLoading(false);
+    }
+  };
 
   useEffect(() => {
     const loadProfile = async () => {
@@ -314,6 +356,72 @@ export default function ProfilePage() {
                   onChange={(e) => setBankName(e.target.value)}
                   placeholder="Ví dụ: Vietcombank, Techcombank..."
                 />
+              </div>
+            </div>
+          </div>
+
+          {/* SECTION 5: CHANGE PASSWORD */}
+          <div style={{ borderTop: '1px dashed var(--border-color)', paddingTop: '20px', marginBottom: '1rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px', color: '#1B3A6B', fontWeight: 600, fontSize: '14px' }}>
+              <Key size={16} />
+              <span>Đổi mật khẩu tài khoản</span>
+            </div>
+
+            {pwError && (
+              <div className="alert alert-error mb-3" style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '12.5px' }}>
+                <AlertCircle size={16} />
+                <div>{pwError}</div>
+              </div>
+            )}
+
+            {pwSuccess && (
+              <div className="alert alert-success mb-3" style={{ display: 'flex', alignItems: 'center', gap: '8px', backgroundColor: '#ecfdf5', color: '#065f46', border: '1px solid #a7f3d0', padding: '8px 12px', borderRadius: '8px', fontSize: '12.5px' }}>
+                <CheckCircle size={16} />
+                <div>{pwSuccess}</div>
+              </div>
+            )}
+
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px', alignItems: 'end' }}>
+              <div className="form-group mb-0">
+                <label className="form-label text-xs">Mật khẩu hiện tại</label>
+                <input
+                  type="password"
+                  className="form-input"
+                  value={currentPassword}
+                  onChange={(e) => setCurrentPassword(e.target.value)}
+                  placeholder="Nhập mật khẩu hiện tại"
+                />
+              </div>
+              <div className="form-group mb-0">
+                <label className="form-label text-xs">Mật khẩu mới</label>
+                <input
+                  type="password"
+                  className="form-input"
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  placeholder="Mật khẩu mới (tối thiểu 4 ký tự)"
+                />
+              </div>
+              <div className="form-group mb-0">
+                <label className="form-label text-xs">Xác nhận mật khẩu mới</label>
+                <input
+                  type="password"
+                  className="form-input"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  placeholder="Nhập lại mật khẩu mới"
+                />
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+                <button
+                  type="button"
+                  className="btn btn-outline"
+                  style={{ borderColor: '#1B3A6B', color: '#1B3A6B', height: '38px', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', fontWeight: 600 }}
+                  onClick={() => handleChangePassword()}
+                  disabled={pwLoading || !currentPassword || !newPassword || !confirmPassword}
+                >
+                  {pwLoading ? <span className="spinner" style={{ width: '14px', height: '14px' }}></span> : <><Key size={14} /> Đổi mật khẩu</>}
+                </button>
               </div>
             </div>
           </div>

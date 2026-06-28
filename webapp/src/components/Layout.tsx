@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Outlet, useNavigate, useLocation, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { LogOut, Menu, X, FileText, List, Users, BarChart, Building, Key, Image as ImageIcon, MessageSquare, Bell, Wrench, User, Warehouse, Network, Send, Hash } from 'lucide-react';
+import { LogOut, Menu, X, FileText, List, Users, BarChart, Building, Image as ImageIcon, MessageSquare, Bell, Wrench, User, Warehouse, Network, Send, Hash } from 'lucide-react';
 import { fetchApi } from '../api/client';
 import SyncManager from './SyncManager';
 import { fetchCurrentWeather, type WeatherInfo } from '../utils/weather';
@@ -63,7 +63,6 @@ export default function Layout() {
         { name: 'Gửi thông báo', path: '/admin/broadcast', icon: <Send size={20} /> },
         { name: 'Thông báo', path: '/notifications', icon: <Bell size={20} /> },
         { name: 'Thông tin cá nhân', path: '/profile', icon: <User size={20} /> },
-        { name: 'Đổi mật khẩu', path: '/change-password', icon: <Key size={20} /> },
       ];
     }
     
@@ -76,7 +75,6 @@ export default function Layout() {
         { name: 'Báo cáo của tôi', path: '/ktv/my-reports', icon: <List size={20} /> },
         { name: 'Đóng góp ý kiến', path: '/feedback', icon: <MessageSquare size={20} /> },
         { name: 'Thông tin cá nhân', path: '/profile', icon: <User size={20} /> },
-        { name: 'Đổi mật khẩu', path: '/change-password', icon: <Key size={20} /> },
       ];
     }
     
@@ -123,8 +121,7 @@ export default function Layout() {
     items.push(
       { name: 'Thông báo', path: '/notifications', icon: <Bell size={20} /> },
       { name: 'Đóng góp ý kiến', path: '/feedback', icon: <MessageSquare size={20} /> },
-      { name: 'Thông tin cá nhân', path: '/profile', icon: <User size={20} /> },
-      { name: 'Đổi mật khẩu', path: '/change-password', icon: <Key size={20} /> }
+      { name: 'Thông tin cá nhân', path: '/profile', icon: <User size={20} /> }
     );
     
     return items;
