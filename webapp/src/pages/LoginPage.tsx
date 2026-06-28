@@ -420,11 +420,11 @@ export default function LoginPage() {
         <div className="text-center mb-6">
           {/* Logo - Enlarged Container */}
           <div className="flex justify-center mb-5 relative">
-            <div className="bg-white rounded-3xl p-3.5 shadow-[0_12px_40px_rgba(37,99,235,0.25)] border border-white/20 flex items-center justify-center h-28 w-28 transition-all duration-300 group-hover:scale-[1.05]">
+            <div className="bg-white rounded-3xl p-2.5 shadow-[0_12px_40px_rgba(37,99,235,0.25)] border border-white/20 flex items-center justify-center h-28 w-28 overflow-hidden transition-all duration-300 group-hover:scale-[1.05]">
               <img 
                 src="/logo.png?v=2" 
                 alt="Truliva Logo" 
-                className="h-full w-full object-contain"
+                className="h-[145%] w-[145%] object-contain"
               />
             </div>
             {/* Ambient logo glow */}
