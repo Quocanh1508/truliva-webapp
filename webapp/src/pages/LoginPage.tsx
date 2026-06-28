@@ -422,7 +422,7 @@ export default function LoginPage() {
           <div className="flex justify-center mb-5 relative">
             <div className="bg-white rounded-3xl p-3.5 shadow-[0_12px_40px_rgba(37,99,235,0.25)] border border-white/20 flex items-center justify-center h-28 w-28 transition-all duration-300 group-hover:scale-[1.05]">
               <img 
-                src="/logo.png" 
+                src="/logo.png?v=2" 
                 alt="Truliva Logo" 
                 className="h-full w-full object-contain"
               />

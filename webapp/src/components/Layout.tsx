@@ -152,7 +152,7 @@ export default function Layout() {
       <aside className="app-sidebar">
         {/* Brand Logo */}
         <Link to={logoPath} style={{ padding: '24px 16px', borderBottom: '1px solid var(--border-color)', display: 'flex', justifyContent: 'center', backgroundColor: '#fff' }}>
-          <img src="/logo.png" alt="Truliva" style={{ height: '36px' }} />
+          <img src="/logo.png?v=2" alt="Truliva" style={{ height: '36px' }} />
         </Link>
 
         {/* Links */}
@@ -226,7 +226,7 @@ export default function Layout() {
               <Menu size={24} />
             </button>
             <Link to={logoPath} style={{ display: 'flex', alignItems: 'center' }}>
-              <img src="/logo.png" alt="Truliva" style={{ height: '32px' }} />
+              <img src="/logo.png?v=2" alt="Truliva" style={{ height: '32px' }} />
             </Link>
           </div>
 
@@ -252,7 +252,7 @@ export default function Layout() {
             {/* Header of Drawer */}
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px', borderBottom: '1px solid var(--border-color)' }}>
               <Link to={logoPath} onClick={closeMenu} style={{ display: 'flex', alignItems: 'center' }}>
-                <img src="/logo.png" alt="Truliva" style={{ height: '28px' }} />
+                <img src="/logo.png?v=2" alt="Truliva" style={{ height: '28px' }} />
               </Link>
               <button onClick={closeMenu} style={{ background: 'transparent', color: 'var(--text-muted)', border: 'none' }}>
                 <X size={20} />

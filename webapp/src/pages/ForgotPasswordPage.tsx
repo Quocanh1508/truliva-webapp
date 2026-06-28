@@ -33,7 +33,7 @@ export default function ForgotPasswordPage() {
     <div className="flex items-center justify-center h-screen" style={{ backgroundColor: '#1B3A6B' }}>
       <div className="card w-full animate-fade-in" style={{ maxWidth: '400px', margin: '1rem' }}>
         <div className="text-center mb-6">
-          <img src="/logo.png" alt="Truliva Logo" style={{ height: '60px', margin: '0 auto 1rem' }} />
+          <img src="/logo.png?v=2" alt="Truliva Logo" style={{ height: '60px', margin: '0 auto 1rem' }} />
           <h2 className="font-bold text-xl">Quên mật khẩu</h2>
           <p className="text-muted text-sm mt-2">Nhập username hoặc email của bạn để nhận liên kết khôi phục mật khẩu</p>
         </div>
