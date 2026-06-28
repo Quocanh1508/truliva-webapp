@@ -420,13 +420,15 @@ export default function LoginPage() {
         <div className="text-center mb-6">
           {/* Logo - Enlarged Container */}
           <div className="flex justify-center mb-5 relative">
-            <img 
-              src="/logo.jpg" 
-              alt="Truliva Logo" 
-              className="h-32 rounded-3xl bg-white p-2.5 shadow-xl border border-white/10 object-contain transition-all duration-300 group-hover:scale-[1.03]"
-            />
+            <div className="bg-white rounded-3xl p-3.5 shadow-[0_12px_40px_rgba(37,99,235,0.25)] border border-white/20 flex items-center justify-center h-28 w-28 transition-all duration-300 group-hover:scale-[1.05]">
+              <img 
+                src="/logo.png" 
+                alt="Truliva Logo" 
+                className="h-full w-full object-contain"
+              />
+            </div>
             {/* Ambient logo glow */}
-            <div className="absolute inset-0 bg-blue-500/10 blur-3xl rounded-full pointer-events-none z-[-1]" />
+            <div className="absolute inset-0 bg-blue-500/15 blur-3xl rounded-full pointer-events-none z-[-1]" />
           </div>
           <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full text-[13px] font-bold tracking-wide uppercase bg-blue-500/10 text-blue-400 border border-blue-500/20 select-none">
             <ShieldCheck size={14} className="text-blue-400 animate-pulse" />
