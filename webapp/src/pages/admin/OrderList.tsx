@@ -993,6 +993,11 @@ export default function OrderList() {
   const submitAssign = async () => {
     if (!assignModal) return;
 
+    if (!tempItems || tempItems.length === 0) {
+      alert('Vui lòng chọn ít nhất một sản phẩm yêu cầu dịch vụ.');
+      return;
+    }
+
     if (!workType) {
       alert('Vui lòng chọn loại công việc.');
       return;
@@ -2620,7 +2625,7 @@ export default function OrderList() {
 
                 {/* Giao diện thêm/chọn lại sản phẩm */}
                 <div className="border-t pt-4 mt-4 space-y-2">
-                  <label className="block text-sm font-semibold text-gray-800">Sản phẩm yêu cầu dịch vụ</label>
+                  <label className="block text-sm font-semibold text-gray-800">Sản phẩm yêu cầu dịch vụ *</label>
                   
                   {/* List of tempItems */}
                   {tempItems.length > 0 ? (
