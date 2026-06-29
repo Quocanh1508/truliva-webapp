@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { fetchApi } from '../../api/client';
-import { Plus, Edit2, Trash2, Lock, Unlock, Search, Calendar, Tag, FileText, CheckCircle, AlertCircle, Loader2, X } from 'lucide-react';
+import { Plus, Edit2, Trash2, Lock, Unlock, Search, Calendar, Tag, CheckCircle, AlertCircle, Loader2, X } from 'lucide-react';
 import { useConfirm } from '../../context/ConfirmContext';
 import { useAuth } from '../../context/AuthContext';
 
@@ -128,7 +128,7 @@ export default function PromoManage() {
     }
   };
 
-  const handleToggleLock = async (id: string, codeStr: string, currentLock: boolean) => {
+  const handleToggleLock = async (id: string, codeStr: string) => {
     try {
       const updated = await fetchApi(`/promos/${id}/toggle-lock`, { method: 'PATCH' });
       setPromos(prev => prev.map(p => p.id === id ? updated : p));

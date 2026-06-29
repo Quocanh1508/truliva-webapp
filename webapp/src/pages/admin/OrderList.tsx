@@ -303,7 +303,8 @@ export default function OrderList() {
       appointmentTime: '08:30',
       items: [],
       moneyToCollect: 0,
-      note: ''
+      note: '',
+      promoCode: ''
     });
 
     if (productsStock.length === 0) {

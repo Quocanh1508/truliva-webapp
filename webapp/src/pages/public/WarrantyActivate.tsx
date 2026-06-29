@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { ShieldCheck, ArrowRight, UploadCloud, CheckCircle, AlertTriangle, FileText, Smartphone, User, MapPin, Loader2, Sparkles } from 'lucide-react';
+import { ShieldCheck, ArrowRight, UploadCloud, CheckCircle, AlertTriangle, Smartphone, User, MapPin, Loader2, Sparkles } from 'lucide-react';
 import { API_URL } from '../../api/client';
 
 export default function WarrantyActivate() {
@@ -25,7 +25,6 @@ export default function WarrantyActivate() {
   const [customerPhone, setCustomerPhone] = useState('');
   const [address, setAddress] = useState('');
   const [province, setProvince] = useState('');
-  const [invoiceImageFile, setInvoiceImageFile] = useState<File | null>(null);
   const [invoiceImageUrl, setInvoiceImageUrl] = useState('');
   const [uploadingImage, setUploadingImage] = useState(false);
   
@@ -92,7 +91,6 @@ export default function WarrantyActivate() {
       }
 
       setInvoiceImageUrl(data.url);
-      setInvoiceImageFile(file);
     } catch (err: any) {
       console.error(err);
       setSubmitError(err.message || 'Không thể tải ảnh lên. Vui lòng chọn ảnh khác.');
@@ -448,7 +446,6 @@ export default function WarrantyActivate() {
                 setCustomerPhone('');
                 setAddress('');
                 setProvince('');
-                setInvoiceImageFile(null);
                 setInvoiceImageUrl('');
               }}
               className="w-full bg-gray-800 hover:bg-gray-700 text-gray-200 font-bold py-3 px-4 rounded-xl text-sm transition-all"

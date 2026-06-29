@@ -16,6 +16,9 @@ interface Serial {
   province: string | null;
   importBatchId: string | null;
   createdAt: string;
+  invoiceImageUrl?: string | null;
+  activatedBy?: string | null;
+  promoCode?: string | null;
 }
 
 interface SerialStats {
