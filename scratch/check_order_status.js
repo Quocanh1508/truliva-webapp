@@ -11,10 +11,7 @@ async function main() {
   try {
     const order = await prisma.order.findFirst({
       where: {
-        OR: [
-          { id: 3269 },
-          { pancakeOrderId: 3269 }
-        ]
+        pancakeOrderId: 3269
       },
       include: {
         items: true,
@@ -32,7 +29,7 @@ async function main() {
 
     console.log('\n=== AUDIT LOGS ===');
     const logs = await prisma.auditLog.findMany({
-      where: { entityId: order.id.toString() },
+      where: { entityId: order.id },
       orderBy: { createdAt: 'desc' }
     });
     console.log(JSON.stringify(logs, null, 2));
