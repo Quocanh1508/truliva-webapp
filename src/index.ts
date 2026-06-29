@@ -25,6 +25,7 @@ import inventoryRoutes from './routes/inventory';
 import serialRoutes from './routes/serials';
 import { startOrderSyncScheduler } from './services/orderSyncScheduler';
 import { startReportCleanupScheduler } from './services/reportCleanupScheduler';
+import { startPancakeRetryScheduler } from './services/pancakeRetryScheduler';
 import { initWebSocketServer } from './services/websocketService';
 import { apiLimiter, loginLimiter } from './middleware/rateLimiter';
 import { securityMiddleware } from './middleware/security';
@@ -205,6 +206,9 @@ const server = app.listen(PORT, () => {
 
   // Khởi động lập lịch dọn dẹp báo cáo KTV cũ hơn 60 ngày
   startReportCleanupScheduler();
+
+  // Khởi động lập lịch tự động đồng bộ lại đơn lỗi sang Pancake POS
+  startPancakeRetryScheduler(10); // Chạy định kỳ mỗi 10 phút
 });
 
 initWebSocketServer(server);
