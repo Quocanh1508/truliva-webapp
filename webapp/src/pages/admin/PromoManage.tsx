@@ -297,7 +297,7 @@ export default function PromoManage() {
                           <div className="flex gap-2.5 justify-end">
                             <button
                               type="button"
-                              onClick={() => handleToggleLock(promo.id, promo.code, promo.isLocked)}
+                              onClick={() => handleToggleLock(promo.id, promo.code)}
                               title={promo.isLocked ? 'Mở khóa' : 'Khóa mã'}
                               className={`p-1.5 rounded transition ${
                                 promo.isLocked ? 'text-emerald-600 hover:bg-emerald-50' : 'text-amber-600 hover:bg-amber-50'
