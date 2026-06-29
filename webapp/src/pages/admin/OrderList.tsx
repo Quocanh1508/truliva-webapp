@@ -187,6 +187,7 @@ export default function OrderList() {
   const [rescheduleReason, setRescheduleReason] = useState('');
   const [workType, setWorkType] = useState('');
   const [serviceType, setServiceType] = useState('');
+  const [assignPromoCode, setAssignPromoCode] = useState('');
   const [showServiceDropdown, setShowServiceDropdown] = useState(false);
   const [warehouses, setWarehouses] = useState<any[]>([]);
   const [productsStock, setProductsStock] = useState<any[]>([]);
@@ -863,6 +864,7 @@ export default function OrderList() {
     setRescheduleReason(order.rescheduleReason || '');
     setWorkType(order.workType || '');
     setServiceType(order.serviceType || '');
+    setAssignPromoCode(order.promoCode || '');
 
     // --- Smart Dispatching Logic (Cải tiến) ---
     let matchedMain: any = null;
@@ -1064,7 +1066,8 @@ export default function OrderList() {
         serviceType: serviceType || null,
         adminStatus: selectedKtv ? 'đang thực hiện' : 'chờ xử lý', // auto update status
         warehouseId: selectedWarehouseId || null,
-        items: tempItems
+        items: tempItems,
+        promoCode: assignPromoCode || null
       });
       setAssignModal(null);
       fetchOrdersData();
@@ -2633,6 +2636,22 @@ export default function OrderList() {
                 <div>
                   <label className="block text-sm text-gray-600 mb-1">Lý do hẹn lại (nếu có)</label>
                   <textarea rows={2} className="w-full border rounded p-2 text-sm outline-none focus:border-blue-500" value={rescheduleReason} onChange={e => setRescheduleReason(e.target.value)} placeholder="Khách bận, KTV kẹt lịch..."></textarea>
+                </div>
+
+                <div>
+                  <label className="block text-sm text-gray-600 mb-1">Chương trình khuyến mãi bảo hành (Mã khuyến mãi)</label>
+                  <select
+                    className="w-full border rounded p-2 text-sm outline-none focus:border-blue-500 text-gray-800 bg-white font-medium cursor-pointer"
+                    value={assignPromoCode}
+                    onChange={e => setAssignPromoCode(e.target.value)}
+                  >
+                    <option value="">Không áp dụng</option>
+                    {promosList.filter(p => !p.isLocked || p.code === assignPromoCode).map(p => (
+                      <option key={p.id} value={p.code}>
+                        {p.code} (+{p.promoMonths} tháng bảo hành)
+                      </option>
+                    ))}
+                  </select>
                 </div>
 
                 {/* Giao diện thêm/chọn lại sản phẩm */}
