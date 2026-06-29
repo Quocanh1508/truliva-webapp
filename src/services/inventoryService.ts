@@ -107,6 +107,40 @@ export async function syncOrderInventoryState(
   newState: OrderState
 ): Promise<void> {
   try {
+    // Lấy thông tin đầy đủ của đơn hàng từ DB để kiểm tra điều kiện đồng bộ sang Pancake POS
+    const order = await prisma.order.findUnique({
+      where: { id: orderId },
+      select: {
+        workType: true,
+        pancakeOrderId: true,
+        rawData: true
+      }
+    });
+
+    if (order) {
+      const isInstallation = order.workType === 'Lắp đặt';
+      let originallyHasProducts = false;
+      if (order.rawData) {
+        try {
+          const raw = typeof order.rawData === 'string' ? JSON.parse(order.rawData) : order.rawData;
+          const itemsList = raw.items || raw.order_items || [];
+          originallyHasProducts = Array.isArray(itemsList) && itemsList.length > 0;
+        } catch (e) {
+          originallyHasProducts = false;
+        }
+      }
+      const isManualOrder = Number(order.pancakeOrderId) < 0;
+      
+      // Nếu thỏa mãn shouldSyncWarehouseToPancake (đơn hàng tự khấu trừ bên Pancake POS),
+      // thì bỏ qua việc khấu trừ kho cục bộ trên Truliva DB để tránh lỗi double-deduction.
+      const shouldSyncWarehouseToPancake = !isInstallation && originallyHasProducts && !isManualOrder;
+
+      if (shouldSyncWarehouseToPancake) {
+        logger.info(`syncOrderInventoryState: Đơn hàng "${order.pancakeOrderId || orderId}" tự động khấu trừ kho trên Pancake POS. Bỏ qua điều chỉnh kho cục bộ.`);
+        return;
+      }
+    }
+
     const isActiveStatus = (status: string | null) => {
       if (!status) return true; // Mặc định là chờ xử lý (Active)
       const s = status.toLowerCase();
