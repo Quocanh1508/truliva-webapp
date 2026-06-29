@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { fetchApi, deleteReportWithReason, updateReport, uploadImages, approveReport, rejectReport } from '../../api/client';
+import { fetchApi, deleteReportWithReason, updateReport, uploadImages, approveReport, rejectReport, getFiltersData } from '../../api/client';
 import { Download, X, ExternalLink, Image as ImageIcon, Loader, Search, Edit3, Save, Plus, Trash2, SlidersHorizontal, RotateCcw, Calendar, ChevronLeft, ChevronRight } from 'lucide-react';
 import CategoryTreeSelect from '../../components/CategoryTreeSelect';
 import { formatOrderId } from '../../utils/text';
@@ -332,6 +332,48 @@ export default function ReportList() {
   const [loading, setLoading] = useState(true);
   const [modalActionLoading, setModalActionLoading] = useState(false);
 
+  // States for Admin report approval adjustment
+  const [dbProducts, setDbProducts] = useState<any[]>([]);
+  const [adjustedItems, setAdjustedItems] = useState<{ productName: string; quantity: number; price?: number | null }[]>([]);
+  const [adjustedDiscount, setAdjustedDiscount] = useState<number>(0);
+  const [isAdjusting, setIsAdjusting] = useState<boolean>(false);
+
+  // Fetch products for adjustment dropdown on mount
+  useEffect(() => {
+    getFiltersData().then(data => {
+      if (data && data.products) {
+        setDbProducts(data.products);
+      }
+    }).catch(err => console.error('Error fetching products for report approval:', err));
+  }, []);
+
+  // Parse items when selectedDetailReport changes
+  useEffect(() => {
+    if (selectedDetailReport) {
+      const items: any[] = [];
+      const origProducts = selectedDetailReport.products || [];
+      const origSpareParts = selectedDetailReport.spareParts || [];
+      const allStrings = [...origProducts, ...origSpareParts];
+
+      for (const str of allStrings) {
+        const match = str.match(/^(.+?)\s*x\s*(\d+)$/);
+        let name = str.trim();
+        let qty = 1;
+        if (match) {
+          name = match[1].trim();
+          qty = parseInt(match[2], 10) || 1;
+        }
+        if (name) {
+          items.push({ productName: name, quantity: qty, price: null });
+        }
+      }
+      
+      setAdjustedItems(items);
+      setAdjustedDiscount(selectedDetailReport.order?.totalDiscount || 0);
+      setIsAdjusting(false);
+    }
+  }, [selectedDetailReport]);
+
   useEffect(() => {
     setPageInput(String(page));
   }, [page]);
@@ -342,7 +384,16 @@ export default function ReportList() {
 
     try {
       setModalActionLoading(true);
-      const res = await approveReport(reportId);
+      const payload = isAdjusting ? {
+        items: adjustedItems.map(item => ({
+          productName: item.productName,
+          quantity: item.quantity,
+          price: item.price
+        })),
+        discount: adjustedDiscount
+      } : undefined;
+
+      const res = await approveReport(reportId, payload);
       alert(res.message || 'Phê duyệt báo cáo thành công');
       setSelectedDetailReport(null);
       loadReports();
@@ -1567,6 +1618,122 @@ export default function ReportList() {
                       {selectedDetailReport.notes || 'Kỹ thuật viên không để lại ghi chú nào.'}
                     </div>
                   </div>
+
+                  {/* Step 5: Điều chỉnh của Admin (Chỉ hiện khi PENDING) */}
+                  {selectedDetailReport.approvalStatus === 'PENDING' && canApproveOrReject && (
+                    <div className="mt-6 border-t border-gray-200 pt-4">
+                      <div className="flex items-center justify-between mb-4">
+                        <h4 className="font-bold text-sm text-gray-800 border-l-4 border-emerald-600 pl-2 uppercase tracking-wider">
+                          Điều chỉnh linh kiện & Chiết khấu (Admin)
+                        </h4>
+                        <label className="flex items-center gap-2 text-sm font-semibold text-emerald-700 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            className="rounded border-gray-300 text-emerald-600 focus:ring-emerald-500 h-4 w-4"
+                            checked={isAdjusting}
+                            onChange={(e) => setIsAdjusting(e.target.checked)}
+                          />
+                          Kích hoạt điều chỉnh
+                        </label>
+                      </div>
+
+                      {isAdjusting && (
+                        <div className="bg-emerald-50/50 border border-emerald-100 rounded-lg p-4 text-sm">
+                          {/* List of items */}
+                          <div className="space-y-3 mb-4">
+                            {adjustedItems.map((item, idx) => (
+                              <div key={idx} className="flex flex-wrap items-center gap-3 bg-white p-3 rounded-lg shadow-sm border border-gray-155">
+                                <div className="flex-1 min-w-[200px]">
+                                  <span className="font-semibold text-gray-800">{item.productName}</span>
+                                </div>
+                                <div className="w-24">
+                                  <label className="block text-[10px] text-gray-500 font-bold uppercase mb-0.5">Số lượng</label>
+                                  <input
+                                    type="number"
+                                    min="1"
+                                    className="w-full border border-gray-300 rounded px-2 py-1 text-sm bg-white"
+                                    value={item.quantity}
+                                    onChange={(e) => {
+                                      const val = parseInt(e.target.value, 10) || 1;
+                                      const updated = [...adjustedItems];
+                                      updated[idx].quantity = val;
+                                      setAdjustedItems(updated);
+                                    }}
+                                  />
+                                </div>
+                                <div className="w-32">
+                                  <label className="block text-[10px] text-gray-500 font-bold uppercase mb-0.5">Đơn giá tùy chỉnh</label>
+                                  <input
+                                    type="number"
+                                    min="0"
+                                    placeholder="Giá niêm yết"
+                                    className="w-full border border-gray-300 rounded px-2 py-1 text-sm bg-white"
+                                    value={item.price !== null && item.price !== undefined ? item.price : ''}
+                                    onChange={(e) => {
+                                      const val = e.target.value === '' ? null : parseFloat(e.target.value);
+                                      const updated = [...adjustedItems];
+                                      updated[idx].price = val;
+                                      setAdjustedItems(updated);
+                                    }}
+                                  />
+                                </div>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setAdjustedItems(adjustedItems.filter((_, i) => i !== idx));
+                                  }}
+                                  className="mt-4 text-red-600 hover:text-red-800 font-semibold text-xs cursor-pointer"
+                                >
+                                  Xóa
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+
+                          {/* Add item dropdown */}
+                          <div className="flex gap-2 mb-4 max-w-md">
+                            <select
+                              id="add-item-select"
+                              className="flex-1 border border-gray-300 rounded px-2 py-1.5 text-sm bg-white"
+                              defaultValue=""
+                              onChange={(e) => {
+                                const selectedName = e.target.value;
+                                if (!selectedName) return;
+                                if (adjustedItems.some(i => i.productName === selectedName)) {
+                                  alert('Sản phẩm này đã có trong danh sách');
+                                  e.target.value = '';
+                                  return;
+                                }
+                                setAdjustedItems([...adjustedItems, { productName: selectedName, quantity: 1, price: null }]);
+                                e.target.value = '';
+                              }}
+                            >
+                              <option value="">-- Thêm linh kiện mới --</option>
+                              {dbProducts.map((p, pidx) => (
+                                <option key={pidx} value={p.name}>
+                                  {p.name} - {(p.sellingPrice || 0).toLocaleString('vi-VN')}đ
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+
+                          {/* General discount */}
+                          <div className="max-w-xs border-t border-emerald-100 pt-3">
+                            <label className="block text-xs font-semibold text-gray-700 mb-1">
+                              Số tiền chiết khấu / giảm giá (VNĐ):
+                            </label>
+                            <input
+                              type="number"
+                              min="0"
+                              className="w-full border border-gray-300 rounded px-3 py-1.5 text-sm bg-white"
+                              value={adjustedDiscount}
+                              onChange={(e) => setAdjustedDiscount(parseFloat(e.target.value) || 0)}
+                            />
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </>
               ) : (
                 /* ═══════════ EDIT MODE ═══════════ */

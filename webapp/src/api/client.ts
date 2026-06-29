@@ -279,9 +279,10 @@ export const broadcastNotification = async (data: { title: string; content: stri
   });
 };
 
-export const approveReport = async (id: string) => {
+export const approveReport = async (id: string, data?: { items: any[]; discount?: number }) => {
   return fetchApi(`/reports/${id}/approve`, {
     method: 'POST',
+    body: data ? JSON.stringify(data) : undefined,
   });
 };
 

@@ -1908,43 +1908,167 @@ router.post('/:id/approve', async (req: Request, res: Response): Promise<void> =
     const order = report.order;
     if (order) {
       const orderId = order.id;
+      const { items: adjustedItems, discount } = req.body;
 
-      // Lấy danh sách sản phẩm trong báo cáo để đồng bộ
-      const reportProducts = report.products || [];
-      const reportSpareParts = report.spareParts || [];
-      const allStrings = [...reportProducts, ...reportSpareParts];
+      let reportItems: any[] = [];
+      const changesList: string[] = [];
 
-      const reportItems: any[] = [];
-      for (const str of allStrings) {
-        const match = str.match(/^(.+?)\s*x\s*(\d+)$/);
-        let name = str.trim();
-        let qty = 1;
-        if (match) {
-          name = match[1].trim();
-          qty = parseInt(match[2], 10) || 1;
-        }
-        if (name) {
-          reportItems.push({ productName: name, quantity: qty });
+      if (adjustedItems && Array.isArray(adjustedItems)) {
+        reportItems = adjustedItems.map((item: any) => ({
+          productName: item.productName,
+          quantity: parseInt(item.quantity, 10) || 1,
+          price: item.price !== undefined && item.price !== null ? parseFloat(item.price) : null
+        }));
+      } else {
+        // Fallback to original parsing if not provided
+        const reportProducts = report.products || [];
+        const reportSpareParts = report.spareParts || [];
+        const allStrings = [...reportProducts, ...reportSpareParts];
+
+        for (const str of allStrings) {
+          const match = str.match(/^(.+?)\s*x\s*(\d+)$/);
+          let name = str.trim();
+          let qty = 1;
+          if (match) {
+            name = match[1].trim();
+            qty = parseInt(match[2], 10) || 1;
+          }
+          if (name) {
+            reportItems.push({ productName: name, quantity: qty, price: null });
+          }
         }
       }
 
+      // Fetch matched products to get categories and prices
       const itemNames = reportItems.map(i => i.productName);
       const matchedProducts = await prisma.product.findMany({
         where: { name: { in: itemNames }, isActive: true }
       });
+
+      // Update ServiceReport products and spareParts lists to reflect final approved items
+      const updatedProductsList: string[] = [];
+      const updatedSparePartsList: string[] = [];
+      for (const item of reportItems) {
+        const prod = matchedProducts.find(p => p.name === item.productName);
+        const cat = prod?.category || '';
+        const formatted = item.quantity > 1 ? `${item.productName} x${item.quantity}` : item.productName;
+        if (cat.toLowerCase() === 'spare part') {
+          updatedSparePartsList.push(formatted);
+        } else {
+          updatedProductsList.push(formatted);
+        }
+      }
+
+      await prisma.serviceReport.update({
+        where: { id: reportId },
+        data: {
+          products: updatedProductsList,
+          spareParts: updatedSparePartsList,
+          actualAmount: report.actualAmount
+        }
+      });
+
+      // Compile detailed Audit Logs for adjustments
+      if (adjustedItems && Array.isArray(adjustedItems)) {
+        changesList.push(`Admin ${req.user!.fullName} đã điều chỉnh chi tiết linh kiện/giá khi duyệt báo cáo:`);
+        
+        // Log general order level adjustments
+        const newDiscount = discount !== undefined ? parseFloat(discount) : (order.totalDiscount || 0);
+        if (newDiscount !== (order.totalDiscount || 0)) {
+          changesList.push(`- Chiết khấu đơn: từ ${order.totalDiscount || 0}đ thành ${newDiscount}đ`);
+        }
+
+        // Compare items
+        const parsedOriginal: any[] = [];
+        const origProducts = report.products || [];
+        const origSpareParts = report.spareParts || [];
+        const allOrigStrings = [...origProducts, ...origSpareParts];
+        for (const str of allOrigStrings) {
+          const match = str.match(/^(.+?)\s*x\s*(\d+)$/);
+          let name = str.trim();
+          let qty = 1;
+          if (match) {
+            name = match[1].trim();
+            qty = parseInt(match[2], 10) || 1;
+          }
+          if (name) {
+            parsedOriginal.push({ productName: name, quantity: qty });
+          }
+        }
+
+        for (const item of reportItems) {
+          const orig = parsedOriginal.find(o => o.productName === item.productName);
+          const prod = matchedProducts.find(p => p.name === item.productName);
+          const origPrice = prod?.sellingPrice || 0;
+          const newPrice = item.price !== undefined && item.price !== null ? item.price : origPrice;
+
+          if (!orig) {
+            changesList.push(`- Thêm mới linh kiện: ${item.productName} (x${item.quantity}) với giá ${newPrice}đ`);
+          } else {
+            if (orig.quantity !== item.quantity) {
+              changesList.push(`- Sửa số lượng [${item.productName}]: từ x${orig.quantity} thành x${item.quantity}`);
+            }
+            if (item.price !== undefined && item.price !== null && item.price !== origPrice) {
+              changesList.push(`- Sửa đơn giá [${item.productName}]: từ ${origPrice}đ thành ${newPrice}đ`);
+            }
+          }
+        }
+
+        for (const orig of parsedOriginal) {
+          const current = reportItems.find(c => c.productName === orig.productName);
+          if (!current) {
+            changesList.push(`- Xóa linh kiện: ${orig.productName}`);
+          }
+        }
+      }
+
+      // Sync local OrderItems
+      await prisma.orderItem.deleteMany({
+        where: { orderId }
+      });
+
+      const isWarranty = (order.workType || '').toLowerCase() === 'bảo hành';
+
+      if (reportItems.length > 0) {
+        await prisma.orderItem.createMany({
+          data: reportItems.map((item: any) => {
+            const prod = matchedProducts.find(p => p.name === item.productName);
+            const itemPrice = isWarranty ? 0 : (item.price !== undefined && item.price !== null ? item.price : (prod?.sellingPrice || 0));
+            return {
+              orderId,
+              productName: item.productName,
+              sku: prod?.sku || null,
+              quantity: item.quantity,
+              price: itemPrice,
+              rawData: prod?.rawData || undefined
+            };
+          })
+        });
+      }
+
+      const newTotalPrice = isWarranty ? 0 : reportItems.reduce((sum: number, item: any) => {
+        const prod = matchedProducts.find(p => p.name === item.productName);
+        const itemPrice = item.price !== undefined && item.price !== null ? item.price : (prod?.sellingPrice || 0);
+        return sum + (itemPrice * item.quantity);
+      }, 0);
+      const newTotalQuantity = reportItems.reduce((sum: number, item: any) => sum + item.quantity, 0);
+
+      const shippingFee = order.shippingFee || 0;
+      const totalDiscount = discount !== undefined ? parseFloat(discount) : (order.totalDiscount || 0);
+      const newMoneyToCollect = Math.max(0, newTotalPrice + shippingFee - totalDiscount);
 
       // Đồng bộ Pancake POS
       if (order.pancakeOrderId > 0 && reportItems.length > 0) {
         const apiKey = process.env.PANCAKE_API_KEY;
         const shopId = '1635300067';
         if (apiKey) {
-          const isWarranty = (order.workType || '').toLowerCase() === 'bảo hành';
           const pancakeProducts = reportItems.map((item: any) => {
             const prod = matchedProducts.find(p => p.name === item.productName);
+            const itemPrice = isWarranty ? 0 : (item.price !== undefined && item.price !== null ? item.price : (prod?.sellingPrice || 0));
             return {
               variation_id: prod?.pancakeProductId || null,
               quantity: item.quantity,
-              price: isWarranty ? 0 : (prod?.sellingPrice || 0)
+              price: itemPrice
             };
           }).filter((p: any) => p.variation_id);
 
@@ -1959,7 +2083,9 @@ router.post('/:id/approve', async (req: Request, res: Response): Promise<void> =
               `https://pos.pages.fm/api/v1/shops/${shopId}/orders/${order.pancakeOrderId}`,
               {
                 products: pancakeProducts,
-                warehouse_id: order.warehouseId || undefined
+                warehouse_id: order.warehouseId || undefined,
+                discount: totalDiscount,
+                cod: newMoneyToCollect
               },
               {
                 params: { api_key: apiKey },
@@ -1993,7 +2119,11 @@ router.post('/:id/approve', async (req: Request, res: Response): Promise<void> =
         where: { id: orderId },
         data: {
           adminStatus: 'hoàn thành',
-          pancakeSyncStatus: syncStatus
+          pancakeSyncStatus: syncStatus,
+          totalPrice: newTotalPrice,
+          totalQuantity: newTotalQuantity,
+          totalDiscount: totalDiscount,
+          moneyToCollect: newMoneyToCollect
         }
       });
 
@@ -2027,7 +2157,10 @@ router.post('/:id/approve', async (req: Request, res: Response): Promise<void> =
           entityType: 'Order',
           entityId: orderId,
           action: 'updated',
-          changes: { adminStatus: { from: order.adminStatus || 'chờ duyệt', to: 'hoàn thành' } },
+          changes: {
+            adminStatus: { from: order.adminStatus || 'chờ duyệt', to: 'hoàn thành' },
+            adjustments: changesList.length > 0 ? changesList : undefined
+          },
           userId: req.user!.id,
           userName: req.user!.fullName,
         }
