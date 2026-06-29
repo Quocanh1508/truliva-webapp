@@ -25,10 +25,7 @@ async function checkStock() {
     // 2. Tìm sản phẩm Máy lọc nước Truliva UR61096H
     const product = await prisma.product.findFirst({
       where: {
-        name: {
-          contains: 'UR61096H',
-          mode: 'insensitive'
-        }
+        sku: '104321-0002'
       }
     });
 
