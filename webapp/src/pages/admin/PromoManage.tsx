@@ -37,7 +37,6 @@ export default function PromoManage() {
   const [description, setDescription] = useState('');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
-  const [applicableModelsInput, setApplicableModelsInput] = useState('');
   const [isLocked, setIsLocked] = useState(false);
   const [productsStock, setProductsStock] = useState<any[]>([]);
   const [selectedModels, setSelectedModels] = useState<string[]>([]);
@@ -72,7 +71,6 @@ export default function PromoManage() {
     setDescription('');
     setStartDate('');
     setEndDate('');
-    setApplicableModelsInput('');
     setSelectedModels([]);
     setIsLocked(false);
     setShowModal(true);
@@ -87,7 +85,6 @@ export default function PromoManage() {
     setDescription(promo.description || '');
     setStartDate(promo.startDate ? promo.startDate.substring(0, 10) : '');
     setEndDate(promo.endDate ? promo.endDate.substring(0, 10) : '');
-    setApplicableModelsInput(promo.applicableModels.join(', '));
     setSelectedModels(promo.applicableModels.map(m => `PROD:${m}`));
     setIsLocked(promo.isLocked);
     setShowModal(true);
