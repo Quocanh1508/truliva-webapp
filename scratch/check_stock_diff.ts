@@ -22,24 +22,26 @@ async function checkStock() {
     console.log(`📌 Warehouse ID: ${ktv.warehouseId}`);
     console.log(`📌 Warehouse Name: ${ktv.warehouseName}\n`);
 
-    // 2. Tìm sản phẩm Máy lọc nước Truliva UR61096H
-    const product = await prisma.product.findFirst({
+    // 2. Tìm tất cả sản phẩm liên quan
+    const products = await prisma.product.findMany({
       where: {
-        sku: '104321-0002'
+        OR: [
+          { name: { contains: 'UR61096H', mode: 'insensitive' } },
+          { sku: { contains: '104321-0002', mode: 'insensitive' } }
+        ]
       }
     });
 
-    if (!product) {
-      console.log('❌ Không tìm thấy Máy lọc nước Truliva UR61096H');
-      return;
+    console.log(`🔍 Tìm thấy ${products.length} sản phẩm liên quan:`);
+    for (const p of products) {
+      console.log(`- ID: ${p.id} | Name: ${p.name} | SKU: ${p.sku} | Active: ${p.isActive}`);
+      const vw = (p.rawData as any)?.variations_warehouses || [];
+      const targetVw = vw.find((v: any) => v.warehouse_id === ktv.warehouseId);
+      console.log(`  -> Kho KTV Khánh Bắc Ninh:`, JSON.stringify(targetVw, null, 2));
     }
 
-    console.log(`📦 Sản phẩm: ${product.name}`);
-    console.log(`📦 SKU: ${product.sku}`);
-    console.log(`📦 Pancake Product ID: ${product.pancakeProductId}`);
-    
-    // In rawData tồn kho của sản phẩm
-    console.log('📦 Tồn kho rawData:', JSON.stringify(product.rawData, null, 2));
+    if (products.length === 0) return;
+    const product = products[0]; // Dùng sản phẩm đầu tiên cho các phần tiếp theo
 
     // 3. Tìm các đơn hàng chứa sản phẩm này và thuộc kho KTV này mà ở trạng thái ACTIVE (hold hàng)
     const activeOrders = await prisma.order.findMany({
