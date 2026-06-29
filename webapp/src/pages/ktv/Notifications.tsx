@@ -212,35 +212,50 @@ export default function Notifications() {
         </div>
       ) : (
         <div className="flex flex-col gap-3">
-          {notifications.map((n) => (
-            <div
-              key={n.id}
-              onClick={() => !n.isRead && handleMarkAsRead(n.id)}
-              className={`p-4 rounded-xl border transition-all duration-300 relative overflow-hidden ${
-                n.isRead
-                  ? 'bg-white border-gray-200 hover:shadow-sm'
-                  : 'bg-blue-50/40 border-blue-100 hover:bg-blue-50/70 shadow-sm cursor-pointer'
-              }`}
-            >
-              {/* Vạch chỉ thị chưa đọc */}
-              {!n.isRead && (
-                <div className="absolute top-0 left-0 bottom-0 w-1 bg-blue-600"></div>
-              )}
+          {notifications.map((n) => {
+            const isDevNotification = n.rawData?.senderRole === 'DEV';
+            return (
+              <div
+                key={n.id}
+                onClick={() => !n.isRead && handleMarkAsRead(n.id)}
+                className={`p-4 rounded-xl border transition-all duration-300 relative overflow-hidden ${
+                  isDevNotification
+                    ? n.isRead
+                      ? 'bg-indigo-50/20 border-indigo-150 hover:shadow-sm'
+                      : 'bg-indigo-50/50 border-indigo-250 hover:bg-indigo-50/80 shadow-md cursor-pointer'
+                    : n.isRead
+                      ? 'bg-white border-gray-200 hover:shadow-sm'
+                      : 'bg-blue-50/40 border-blue-100 hover:bg-blue-50/70 shadow-sm cursor-pointer'
+                }`}
+              >
+                {/* Vạch chỉ thị chưa đọc */}
+                {!n.isRead && (
+                  <div className={`absolute top-0 left-0 bottom-0 w-1 ${isDevNotification ? 'bg-indigo-600' : 'bg-blue-600'}`}></div>
+                )}
 
-              <div className="flex justify-between items-start gap-4">
-                <div className="flex-1 pl-2">
-                  <div className="flex items-center gap-2 mb-1.5">
-                    <span className={`font-bold text-sm ${n.isRead ? 'text-gray-800' : 'text-blue-900'}`}>
-                      {n.title}
-                    </span>
-                    {!n.isRead && (
-                      <span className="w-2 h-2 rounded-full bg-blue-600 inline-block animate-pulse"></span>
-                    )}
-                  </div>
-                  
-                  <div className="text-[13px] text-gray-600 leading-relaxed space-y-1.5">
-                    {renderFormattedContent(n.content)}
-                  </div>
+                <div className="flex justify-between items-start gap-4">
+                  <div className="flex-1 pl-2">
+                    <div className="flex items-center gap-2 mb-1.5 flex-wrap">
+                      {isDevNotification && (
+                        <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-indigo-600 text-white border border-indigo-650 tracking-wide uppercase">
+                          🔧 Hệ thống
+                        </span>
+                      )}
+                      <span className={`font-bold text-sm ${
+                        isDevNotification
+                          ? n.isRead ? 'text-indigo-950' : 'text-indigo-900'
+                          : n.isRead ? 'text-gray-800' : 'text-blue-900'
+                      }`}>
+                        {n.title}
+                      </span>
+                      {!n.isRead && (
+                        <span className={`w-2 h-2 rounded-full inline-block animate-pulse ${isDevNotification ? 'bg-indigo-600' : 'bg-blue-600'}`}></span>
+                      )}
+                    </div>
+                    
+                    <div className="text-[13px] text-gray-600 leading-relaxed space-y-1.5">
+                      {renderFormattedContent(n.content)}
+                    </div>
                   
                   {n.rawData?.type === 'REPORT_APPROVAL_REQUEST' && (
                     <div className="mt-3 p-3 bg-gray-50 border border-gray-150 rounded-lg flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 text-left">
@@ -321,8 +336,9 @@ export default function Notifications() {
                 )}
               </div>
             </div>
-          ))}
-        </div>
+          )
+        })}
+      </div>
       )}
 
       {selectedReport && (

@@ -250,6 +250,7 @@ router.post('/broadcast', async (req: Request, res: Response): Promise<void> => 
         userId: u.id,
         title,
         content,
+        rawData: { senderRole: req.user!.role, senderName: req.user!.fullName }
       })),
     });
 
