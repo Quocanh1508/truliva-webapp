@@ -2820,8 +2820,8 @@ export default function OrderList() {
                               (item.rawData?.variation_id && String(p.pancakeProductId) === String(item.rawData.variation_id))
                             );
 
-                            const available = stockProd ? (stockProd.stocks[selectedWarehouseId] ?? 0) : 0;
-                            const actual = stockProd ? (stockProd.actualStocks[selectedWarehouseId] ?? 0) : 0;
+                            const available = stockProd ? ((stockProd.stocks && stockProd.stocks[selectedWarehouseId]) ?? 0) : 0;
+                            const actual = stockProd ? ((stockProd.actualStocks && stockProd.actualStocks[selectedWarehouseId]) ?? 0) : 0;
                             const requiredQty = item.quantity || 1;
 
                             const isOutOfStock = available === 0;
