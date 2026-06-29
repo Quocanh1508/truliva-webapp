@@ -174,7 +174,7 @@ export default function InventoryManage() {
     let matchLowStock = true;
     if (showOnlyLowStock) {
       matchLowStock = selectedWarehouses.some(wId => {
-        const qty = p.stocks[wId] ?? 0;
+        const qty = p.stocks ? (p.stocks[wId] ?? 0) : 0;
         return qty <= lowStockThreshold;
       });
     }
@@ -183,7 +183,7 @@ export default function InventoryManage() {
     let matchInStock = true;
     if (showOnlyInStock) {
       matchInStock = selectedWarehouses.some(wId => {
-        const qty = p.stocks[wId] ?? 0;
+        const qty = p.stocks ? (p.stocks[wId] ?? 0) : 0;
         return qty > lowStockThreshold;
       });
     }
@@ -476,7 +476,7 @@ export default function InventoryManage() {
  
                       {/* Các cột kho hàng hiển thị tồn kho tương ứng */}
                       {warehouses.filter(w => selectedWarehouses.includes(w.id)).map((w) => {
-                        const stockQty = p.stocks[w.id] ?? 0;
+                        const stockQty = p.stocks ? (p.stocks[w.id] ?? 0) : 0;
                         const actualStockQty = p.actualStocks ? (p.actualStocks[w.id] ?? stockQty) : stockQty;
                         const isLowStock = stockQty <= lowStockThreshold;
                         return (

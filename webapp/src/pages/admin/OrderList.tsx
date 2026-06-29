@@ -238,8 +238,17 @@ export default function OrderList() {
     appointmentTime: '08:30',
     items: [] as any[],
     moneyToCollect: 0,
-    note: ''
+    note: '',
+    promoCode: ''
   });
+
+  const [promosList, setPromosList] = useState<any[]>([]);
+
+  useEffect(() => {
+    fetchApi('/promos')
+      .then(data => setPromosList(data || []))
+      .catch(console.error);
+  }, []);
 
   const [customerSuggestions, setCustomerSuggestions] = useState<any[]>([]);
   const skipFetchRef = useRef(false);
@@ -342,7 +351,8 @@ export default function OrderList() {
         price: it.price || 0
       })) : [],
       moneyToCollect: order.moneyToCollect || 0,
-      note: order.note || ''
+      note: order.note || '',
+      promoCode: order.promoCode || ''
     });
 
     if (productsStock.length === 0) {
@@ -425,7 +435,8 @@ export default function OrderList() {
         appointmentTime: appointmentTimeStr,
         items: newOrderForm.items,
         moneyToCollect: Number(newOrderForm.moneyToCollect) || 0,
-        note: newOrderForm.note.trim()
+        note: newOrderForm.note.trim(),
+        promoCode: newOrderForm.promoCode.trim().toUpperCase() || null
       };
 
       if (editingOrderId) {
@@ -3447,6 +3458,22 @@ export default function OrderList() {
                     value={newOrderForm.moneyToCollect === 0 ? '' : newOrderForm.moneyToCollect}
                     onChange={e => setNewOrderForm({ ...newOrderForm, moneyToCollect: parseInt(e.target.value, 10) || 0 })}
                   />
+                </div>
+
+                <div>
+                  <label className="block text-sm text-gray-600 mb-1">Chương trình khuyến mãi bảo hành (Mã khuyến mãi)</label>
+                  <select
+                    className="w-full border rounded p-2 text-sm outline-none focus:border-blue-500 text-gray-800 bg-white font-medium cursor-pointer"
+                    value={newOrderForm.promoCode}
+                    onChange={e => setNewOrderForm({ ...newOrderForm, promoCode: e.target.value })}
+                  >
+                    <option value="">Không áp dụng</option>
+                    {promosList.filter(p => !p.isLocked).map(p => (
+                      <option key={p.id} value={p.code}>
+                        {p.code} (+{p.promoMonths} tháng bảo hành)
+                      </option>
+                    ))}
+                  </select>
                 </div>
 
                 {/* Chọn sản phẩm */}

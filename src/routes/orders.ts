@@ -731,7 +731,8 @@ router.post('/', requireAuth, async (req: Request, res: Response): Promise<void>
       appointmentTime,
       items,
       moneyToCollect,
-      note
+      note,
+      promoCode
     } = req.body;
 
     if (!customerName || !customerPhone) {
@@ -820,7 +821,8 @@ router.post('/', requireAuth, async (req: Request, res: Response): Promise<void>
         shippingAddress: address ? { full_address: address } : undefined,
         billFullName: customerName,
         billPhoneNumber: cleanPhone,
-        pancakeCreatedAt: new Date()
+        pancakeCreatedAt: new Date(),
+        promoCode: promoCode || null
       }
     });
 
@@ -1526,7 +1528,8 @@ router.patch('/:id', requireAuth, async (req: Request, res: Response): Promise<v
       adminStatus, appointmentTime, assignedKtvId,
       workType, serviceType, mainStationId, techStationId,
       rescheduleReason, cancelReason, note, warehouseId,
-      items, customerName, customerPhone, address, province, moneyToCollect
+      items, customerName, customerPhone, address, province, moneyToCollect,
+      promoCode
     } = req.body;
 
     // Lấy order hiện tại để so sánh cho audit và đồng bộ kho
@@ -1697,6 +1700,7 @@ router.patch('/:id', requireAuth, async (req: Request, res: Response): Promise<v
     track('rescheduleReason', rescheduleReason);
     track('cancelReason', cancelReason);
     track('note', note);
+    track('promoCode', promoCode || null);
 
     if (assignedKtvId !== undefined) {
       const val = assignedKtvId || null;

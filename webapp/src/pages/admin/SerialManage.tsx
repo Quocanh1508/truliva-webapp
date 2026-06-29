@@ -79,6 +79,80 @@ export default function SerialManage() {
   const [history, setHistory] = useState<HistoryItem[]>([]);
   const [loadingDetail, setLoadingDetail] = useState(false);
 
+  // Form states for approval & manual activation
+  const [promosList, setPromosList] = useState<any[]>([]);
+  const [manualStartDate, setManualStartDate] = useState(new Date().toISOString().substring(0, 10));
+  const [selectedPromoCode, setSelectedPromoCode] = useState('');
+  const [submittingApprove, setSubmittingApprove] = useState(false);
+  const [showManualForm, setShowManualForm] = useState(false);
+  const [manualName, setManualName] = useState('');
+  const [manualPhone, setManualPhone] = useState('');
+  const [manualAddress, setManualAddress] = useState('');
+  const [manualProvince, setManualProvince] = useState('');
+
+  useEffect(() => {
+    const fetchPromos = async () => {
+      try {
+        const data = await fetchApi('/promos');
+        setPromosList(data || []);
+      } catch (err) {
+        console.error('Lỗi tải danh sách khuyến mãi', err);
+      }
+    };
+    fetchPromos();
+  }, []);
+
+  const handleApproveWarranty = async (serialId: string) => {
+    setSubmittingApprove(true);
+    try {
+      await fetchApi(`/serials/${serialId}/approve-warranty`, {
+        method: 'POST',
+        body: JSON.stringify({
+          manualStartDate: manualStartDate,
+          promoCode: selectedPromoCode || null
+        })
+      });
+      alert('Đã phê duyệt bảo hành thành công!');
+      setSelectedSerial(null);
+      loadSerials();
+    } catch (err: any) {
+      console.error(err);
+      alert(err.message || 'Lỗi khi phê duyệt bảo hành');
+    } finally {
+      setSubmittingApprove(false);
+    }
+  };
+
+  const handleManualActivate = async (serialId: string) => {
+    if (!manualName.trim() || !manualPhone.trim() || !manualAddress.trim() || !manualProvince.trim()) {
+      alert('Vui lòng điền đầy đủ thông tin bắt buộc');
+      return;
+    }
+    setSubmittingApprove(true);
+    try {
+      await fetchApi(`/serials/${serialId}/activate`, {
+        method: 'POST',
+        body: JSON.stringify({
+          customerName: manualName.trim(),
+          customerPhone: manualPhone.trim(),
+          address: manualAddress.trim(),
+          province: manualProvince.trim(),
+          manualStartDate: manualStartDate,
+          promoCode: selectedPromoCode || null
+        })
+      });
+      alert('Kích hoạt bảo hành thủ công thành công!');
+      setSelectedSerial(null);
+      setShowManualForm(false);
+      loadSerials();
+    } catch (err: any) {
+      console.error(err);
+      alert(err.message || 'Lỗi khi kích hoạt bảo hành');
+    } finally {
+      setSubmittingApprove(false);
+    }
+  };
+
   const loadSerials = async () => {
     setLoading(true);
     try {
@@ -160,10 +234,23 @@ export default function SerialManage() {
     setSelectedSerial(serial);
     setLoadingDetail(true);
     setHistory([]);
+    setManualStartDate(new Date().toISOString().substring(0, 10));
+    setSelectedPromoCode('');
+    setShowManualForm(false);
+    setManualName(serial.customerName || '');
+    setManualPhone(serial.customerPhone || '');
+    setManualAddress(serial.address || '');
+    setManualProvince(serial.province || '');
     try {
       const data = await fetchApi(`/serials/${serial.id}`);
       setSelectedSerial(data.serial);
       setHistory(data.history || []);
+      if (data.serial) {
+        setManualName(data.serial.customerName || '');
+        setManualPhone(data.serial.customerPhone || '');
+        setManualAddress(data.serial.address || '');
+        setManualProvince(data.serial.province || '');
+      }
     } catch (err: any) {
       console.error('Lỗi tải chi tiết serial:', err);
     } finally {
@@ -189,6 +276,7 @@ export default function SerialManage() {
       'Đã kích hoạt': { bg: '#dcfce7', color: '#166534', icon: <CheckCircle size={14} /> },
       'Chưa kích hoạt': { bg: '#fef3c7', color: '#92400e', icon: <AlertTriangle size={14} /> },
       'KH xác nhận': { bg: '#dbeafe', color: '#1e40af', icon: <User size={14} /> },
+      'Chờ duyệt': { bg: '#fee2e2', color: '#991b1b', icon: <Clock size={14} /> },
     };
     const s = styles[status] || { bg: '#f3f4f6', color: '#374151', icon: null };
     return (
@@ -284,6 +372,7 @@ export default function SerialManage() {
               <option value="Chưa kích hoạt">Chưa kích hoạt</option>
               <option value="Đã kích hoạt">Đã kích hoạt</option>
               <option value="KH xác nhận">KH xác nhận</option>
+              <option value="Chờ duyệt">Chờ duyệt</option>
             </select>
             <Filter size={14} style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none', color: '#9ca3af' }} />
           </div>
@@ -597,6 +686,172 @@ export default function SerialManage() {
                         <MapPin size={14} color="#64748b" /> {selectedSerial.province}
                       </div>
                     )}
+                  </div>
+                </div>
+              )}
+
+              {/* Invoice Image view if present */}
+              {selectedSerial.invoiceImageUrl && (
+                <div style={{ marginTop: 16, paddingTop: 16, borderTop: '1px solid #e2e8f0' }}>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: '#475569', marginBottom: 8 }}>Ảnh hóa đơn mua hàng</div>
+                  <a href={selectedSerial.invoiceImageUrl} target="_blank" rel="noreferrer">
+                    <img 
+                      src={selectedSerial.invoiceImageUrl} 
+                      alt="Hóa đơn" 
+                      style={{ maxWidth: '100%', maxHeight: 240, borderRadius: 8, objectFit: 'contain', border: '1px solid #cbd5e1' }} 
+                    />
+                  </a>
+                </div>
+              )}
+
+              {/* Approval Form for pending verification */}
+              {selectedSerial.status === 'Chờ duyệt' && (
+                <div style={{ marginTop: 16, paddingTop: 16, borderTop: '1px solid #e2e8f0' }}>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: '#475569', marginBottom: 8 }}>Phê duyệt bảo hành</div>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
+                     <div>
+                       <label style={{ fontSize: 12, fontWeight: 600, color: '#64748b' }}>Ngày bắt đầu bảo hành</label>
+                       <input 
+                         type="date" 
+                         value={manualStartDate}
+                         onChange={e => setManualStartDate(e.target.value)}
+                         style={{ width: '100%', padding: '6px 10px', borderRadius: 6, border: '1px solid #cbd5e1', fontSize: 13, marginTop: 4 }}
+                       />
+                     </div>
+                     <div>
+                       <label style={{ fontSize: 12, fontWeight: 600, color: '#64748b' }}>Mã khuyến mãi (nếu có)</label>
+                       <select
+                         value={selectedPromoCode}
+                         onChange={e => setSelectedPromoCode(e.target.value)}
+                         style={{ width: '100%', padding: '6px 10px', borderRadius: 6, border: '1px solid #cbd5e1', fontSize: 13, marginTop: 4, background: 'white' }}
+                       >
+                         <option value="">Không áp dụng</option>
+                         {promosList.filter(p => !p.isLocked).map(p => (
+                           <option key={p.id} value={p.code}>
+                             {p.code} (+{p.promoMonths} tháng)
+                           </option>
+                         ))}
+                       </select>
+                     </div>
+                  </div>
+                  <div style={{ display: 'flex', gap: 8, justifyContent: 'end' }}>
+                     <button
+                       onClick={() => handleApproveWarranty(selectedSerial.id)}
+                       disabled={submittingApprove}
+                       style={{
+                         padding: '8px 16px', background: '#16a34a', color: 'white', border: 'none',
+                         borderRadius: 6, fontSize: 13, fontWeight: 600, cursor: 'pointer',
+                         opacity: submittingApprove ? 0.6 : 1
+                       }}
+                     >
+                       {submittingApprove ? 'Đang duyệt...' : 'Phê duyệt bảo hành'}
+                     </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Manual Activation Form for unactivated serials */}
+              {selectedSerial.status === 'Chưa kích hoạt' && !showManualForm && (
+                <div style={{ display: 'flex', justifyContent: 'end', marginTop: 16 }}>
+                  <button
+                    onClick={() => setShowManualForm(true)}
+                    style={{
+                      padding: '8px 16px', background: '#4472C4', color: 'white', border: 'none',
+                      borderRadius: 6, fontSize: 13, fontWeight: 600, cursor: 'pointer'
+                    }}
+                  >
+                    Kích hoạt bảo hành thủ công
+                  </button>
+                </div>
+              )}
+
+              {showManualForm && (
+                <div style={{ marginTop: 16, paddingTop: 16, borderTop: '1px solid #e2e8f0' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                    <div style={{ fontSize: 13, fontWeight: 700, color: '#475569' }}>Thông tin kích hoạt thủ công</div>
+                    <button 
+                      onClick={() => setShowManualForm(false)} 
+                      style={{ background: 'none', border: 'none', color: '#64748b', cursor: 'pointer', fontSize: 12 }}
+                    >
+                      Hủy
+                    </button>
+                  </div>
+                  
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px 16px', marginBottom: 12 }}>
+                    <div>
+                      <label style={{ fontSize: 11, fontWeight: 600, color: '#64748b' }}>Họ và tên KH (*)</label>
+                      <input 
+                        type="text" 
+                        value={manualName}
+                        onChange={e => setManualName(e.target.value)}
+                        style={{ width: '100%', padding: '6px 10px', borderRadius: 6, border: '1px solid #cbd5e1', fontSize: 13, marginTop: 2 }}
+                      />
+                    </div>
+                    <div>
+                      <label style={{ fontSize: 11, fontWeight: 600, color: '#64748b' }}>Số điện thoại (*)</label>
+                      <input 
+                        type="text" 
+                        value={manualPhone}
+                        onChange={e => setManualPhone(e.target.value)}
+                        style={{ width: '100%', padding: '6px 10px', borderRadius: 6, border: '1px solid #cbd5e1', fontSize: 13, marginTop: 2 }}
+                      />
+                    </div>
+                    <div>
+                      <label style={{ fontSize: 11, fontWeight: 600, color: '#64748b' }}>Tỉnh/Thành phố (*)</label>
+                      <input 
+                        type="text" 
+                        value={manualProvince}
+                        onChange={e => setManualProvince(e.target.value)}
+                        style={{ width: '100%', padding: '6px 10px', borderRadius: 6, border: '1px solid #cbd5e1', fontSize: 13, marginTop: 2 }}
+                      />
+                    </div>
+                    <div>
+                      <label style={{ fontSize: 11, fontWeight: 600, color: '#64748b' }}>Địa chỉ cụ thể (*)</label>
+                      <input 
+                        type="text" 
+                        value={manualAddress}
+                        onChange={e => setManualAddress(e.target.value)}
+                        style={{ width: '100%', padding: '6px 10px', borderRadius: 6, border: '1px solid #cbd5e1', fontSize: 13, marginTop: 2 }}
+                      />
+                    </div>
+                    <div>
+                      <label style={{ fontSize: 11, fontWeight: 600, color: '#64748b' }}>Ngày bắt đầu bảo hành</label>
+                      <input 
+                        type="date" 
+                        value={manualStartDate}
+                        onChange={e => setManualStartDate(e.target.value)}
+                        style={{ width: '100%', padding: '6px 10px', borderRadius: 6, border: '1px solid #cbd5e1', fontSize: 13, marginTop: 2 }}
+                      />
+                    </div>
+                    <div>
+                      <label style={{ fontSize: 11, fontWeight: 600, color: '#64748b' }}>Mã khuyến mãi</label>
+                      <select
+                        value={selectedPromoCode}
+                        onChange={e => setSelectedPromoCode(e.target.value)}
+                        style={{ width: '100%', padding: '6px 10px', borderRadius: 6, border: '1px solid #cbd5e1', fontSize: 13, marginTop: 2, background: 'white' }}
+                      >
+                        <option value="">Không áp dụng</option>
+                        {promosList.filter(p => !p.isLocked).map(p => (
+                          <option key={p.id} value={p.code}>
+                            {p.code} (+{p.promoMonths} tháng)
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                  
+                  <div style={{ display: 'flex', gap: 8, justifySelf: 'end' }}>
+                    <button
+                      onClick={() => handleManualActivate(selectedSerial.id)}
+                      disabled={submittingApprove}
+                      style={{
+                        padding: '8px 16px', background: '#16a34a', color: 'white', border: 'none',
+                        borderRadius: 6, fontSize: 13, fontWeight: 600, cursor: 'pointer',
+                        opacity: submittingApprove ? 0.6 : 1
+                      }}
+                    >
+                      {submittingApprove ? 'Đang kích hoạt...' : 'Kích hoạt ngay'}
+                    </button>
                   </div>
                 </div>
               )}

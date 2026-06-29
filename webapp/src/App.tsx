@@ -33,6 +33,8 @@ import SampleImageManage from './pages/admin/SampleImageManage';
 import InventoryManage from './pages/admin/InventoryManage';
 import BroadcastNotification from './pages/admin/BroadcastNotification';
 import SerialManage from './pages/admin/SerialManage';
+import PromoManage from './pages/admin/PromoManage';
+import WarrantyActivate from './pages/public/WarrantyActivate';
 
 // Feedback / DEV Pages
 import FeedbackPage from './pages/FeedbackPage';
@@ -301,6 +303,7 @@ export default function App() {
               <Route path="/login" element={<LoginPage />} />
               <Route path="/forgot-password" element={<ForgotPasswordPage />} />
               <Route path="/reset-password" element={<ResetPasswordPage />} />
+              <Route path="/warranty-activate" element={<WarrantyActivate />} />
               
               <Route element={<Layout />}>
               {/* KTV Routes */}
@@ -334,6 +337,7 @@ export default function App() {
               <Route element={<ProtectedRoute allowedRoles={['ADMIN', 'COORDINATOR', 'SALE_SUPERVISOR', 'SALER', 'HOTLINE', 'STAFF']} />}>
                 <Route path="/admin/orders" element={<OrderList />} />
                 <Route path="/admin/reports" element={<ReportList />} />
+                <Route path="/admin/promos" element={<PromoManage />} />
               </Route>
 
               {/* Dev Routes */}

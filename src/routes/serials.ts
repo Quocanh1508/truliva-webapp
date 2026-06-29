@@ -2,13 +2,188 @@ import { Router, Request, Response } from 'express';
 import multer from 'multer';
 import ExcelJS from 'exceljs';
 import { v4 as uuidv4 } from 'uuid';
+import { v2 as cloudinary } from 'cloudinary';
+import { CloudinaryStorage } from 'multer-storage-cloudinary';
 import prisma from '../config/database';
 import logger from '../utils/logger';
 import { requireAuth, requireCoordinatorOrAdmin } from '../middleware/authSession';
+import { activateSerialWarranty } from '../services/warrantyService';
+
+// Cấu hình Cloudinary cho hóa đơn
+cloudinary.config({
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+  api_key: process.env.CLOUDINARY_API_KEY,
+  api_secret: process.env.CLOUDINARY_API_SECRET,
+});
+
+const invoiceStorage = new CloudinaryStorage({
+  cloudinary: cloudinary,
+  params: async (_req, file) => {
+    return {
+      folder: 'truliva_invoices',
+      format: 'jpg',
+      public_id: `${Date.now()}-${Math.round(Math.random() * 1e9)}`,
+    };
+  },
+});
+
+const invoiceUpload = multer({
+  storage: invoiceStorage,
+  limits: { fileSize: 20 * 1024 * 1024 }, // 20MB
+});
 
 const router = Router();
 
-// Tất cả route yêu cầu đăng nhập
+// ══════════════════════════════════════
+//  PUBLIC ROUTES (Không cần đăng nhập)
+// ══════════════════════════════════════
+
+/**
+ * POST /api/serials/public/upload-invoice
+ * Upload ảnh hóa đơn mua hàng (Public route không cần đăng nhập)
+ */
+router.post('/public/upload-invoice', (req, res, next) => {
+  invoiceUpload.single('image')(req, res, (err) => {
+    if (err instanceof multer.MulterError) {
+      if (err.code === 'LIMIT_FILE_SIZE') {
+        return res.status(400).json({ error: 'Ảnh quá lớn (tối đa 20MB)' });
+      }
+      return res.status(400).json({ error: `Lỗi tải ảnh: ${err.message}` });
+    } else if (err) {
+      logger.error('Multer upload invoice error', { error: err.message || err });
+      return res.status(500).json({ error: 'Lỗi hệ thống khi tải ảnh' });
+    }
+    next();
+  });
+}, async (req: Request, res: Response): Promise<void> => {
+  try {
+    if (!req.file) {
+      res.status(400).json({ error: 'Không tìm thấy file ảnh' });
+      return;
+    }
+    res.json({
+      url: req.file.path,
+      publicId: req.file.filename,
+    });
+  } catch (error: any) {
+    logger.error('Upload invoice error', { error: error.message });
+    res.status(500).json({ error: 'Lỗi upload ảnh hóa đơn' });
+  }
+});
+
+/**
+ * GET /api/serials/public/check/:serialNumber
+ * Kiểm tra số serial để kích hoạt bảo hành. Trả về model máy và thời gian bảo hành tiêu chuẩn.
+ */
+router.get('/public/check/:serialNumber', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const serialNumber = req.params.serialNumber as string;
+    if (!serialNumber) {
+      res.status(400).json({ error: 'Thiếu số Serial' });
+      return;
+    }
+
+    const cleaned = serialNumber.trim().replace(/[^a-zA-Z0-9_]/g, '').toUpperCase();
+    const serial = await prisma.serial.findUnique({
+      where: { serialNumber: cleaned }
+    });
+
+    if (!serial) {
+      res.status(404).json({ error: 'Không tìm thấy số Serial trong hệ thống. Vui lòng kiểm tra lại.' });
+      return;
+    }
+
+    if (serial.status === 'Đã kích hoạt' || serial.status === 'KH xác nhận') {
+      res.status(400).json({ error: 'Số Serial này đã được kích hoạt bảo hành trước đó.' });
+      return;
+    }
+
+    if (serial.status === 'Chờ duyệt') {
+      res.status(400).json({ error: 'Yêu cầu kích hoạt bảo hành cho số Serial này đang ở trạng thái chờ duyệt.' });
+      return;
+    }
+
+    // Tra cứu WarrantyPolicy để tìm thời gian bảo hành tiêu chuẩn
+    let standardMonths = 12; // Mặc định 12 tháng
+    const policies = await prisma.warrantyPolicy.findMany();
+    const matchedPolicy = policies.find((p: any) => 
+      serial.model.toLowerCase().includes(p.modelKeyword.toLowerCase())
+    );
+    if (matchedPolicy) {
+      standardMonths = matchedPolicy.warrantyMonths;
+    }
+
+    res.json({
+      serialNumber: serial.serialNumber,
+      model: serial.model,
+      status: serial.status,
+      standardMonths
+    });
+  } catch (error: any) {
+    logger.error('Lỗi kiểm tra serial public', { error: error.message });
+    res.status(500).json({ error: 'Lỗi hệ thống khi kiểm tra Serial' });
+  }
+});
+
+/**
+ * POST /api/serials/public/activate
+ * Khách hàng tự gửi yêu cầu kích hoạt bảo hành (kèm ảnh hóa đơn bắt buộc)
+ */
+router.post('/public/activate', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { serialNumber, customerName, customerPhone, address, province, invoiceImageUrl } = req.body;
+
+    if (!serialNumber || !customerName || !customerPhone || !address || !province || !invoiceImageUrl) {
+      res.status(400).json({ error: 'Vui lòng điền đầy đủ các thông tin bắt buộc và tải lên ảnh hóa đơn' });
+      return;
+    }
+
+    const cleaned = serialNumber.trim().replace(/[^a-zA-Z0-9_]/g, '').toUpperCase();
+    const serial = await prisma.serial.findUnique({
+      where: { serialNumber: cleaned }
+    });
+
+    if (!serial) {
+      res.status(404).json({ error: 'Không tìm thấy số Serial trong hệ thống. Vui lòng kiểm tra lại.' });
+      return;
+    }
+
+    if (serial.status === 'Đã kích hoạt' || serial.status === 'KH xác nhận') {
+      res.status(400).json({ error: 'Số Serial này đã được kích hoạt bảo hành.' });
+      return;
+    }
+
+    if (serial.status === 'Chờ duyệt') {
+      res.status(400).json({ error: 'Yêu cầu kích hoạt bảo hành cho số Serial này đã được gửi trước đó.' });
+      return;
+    }
+
+    // Tiến hành đăng ký kích hoạt (Chuyển trạng thái sang Chờ duyệt)
+    await activateSerialWarranty(
+      cleaned,
+      null,
+      {
+        customerName: customerName.trim(),
+        customerPhone: customerPhone.trim(),
+        address: address.trim(),
+        province: province.trim(),
+        invoiceImageUrl: invoiceImageUrl.trim()
+      },
+      'CUSTOMER',
+      'Chờ duyệt'
+    );
+
+    res.json({
+      success: true,
+      message: 'Gửi yêu cầu kích hoạt bảo hành thành công. Vui lòng chờ bộ phận CSKH phê duyệt.'
+    });
+  } catch (error: any) {
+    logger.error('Lỗi gửi yêu cầu kích hoạt bảo hành public', { error: error.message });
+    res.status(500).json({ error: 'Lỗi hệ thống khi gửi yêu cầu kích hoạt bảo hành' });
+  }
+});
+
+// Tất cả route phía dưới yêu cầu đăng nhập
 router.use(requireAuth);
 
 // Cấu hình multer để upload Excel file (lưu vào bộ nhớ tạm)
@@ -138,11 +313,12 @@ router.get('/', requireCoordinatorOrAdmin, async (req: Request, res: Response): 
     ]);
 
     // Thống kê nhanh
-    const [totalAll, activated, unactivated, confirmed] = await Promise.all([
+    const [totalAll, activated, unactivated, confirmed, pending] = await Promise.all([
       prisma.serial.count(),
       prisma.serial.count({ where: { status: 'Đã kích hoạt' } }),
       prisma.serial.count({ where: { status: 'Chưa kích hoạt' } }),
       prisma.serial.count({ where: { status: 'KH xác nhận' } }),
+      prisma.serial.count({ where: { status: 'Chờ duyệt' } }),
     ]);
 
     res.json({
@@ -158,6 +334,7 @@ router.get('/', requireCoordinatorOrAdmin, async (req: Request, res: Response): 
         activated,
         unactivated,
         confirmed,
+        pending,
       },
     });
   } catch (error: any) {
@@ -506,6 +683,134 @@ router.get('/:id', requireCoordinatorOrAdmin, async (req: Request, res: Response
   } catch (error: any) {
     logger.error('Lỗi lấy chi tiết serial', { error: error.message });
     res.status(500).json({ error: 'Lỗi lấy chi tiết serial' });
+  }
+});
+
+/**
+ * POST /api/serials/:id/activate
+ * Admin/Sales/Coordinator kích hoạt trực tiếp bảo hành cho Serial (không cần duyệt)
+ */
+router.post('/:id/activate', requireCoordinatorOrAdmin, async (req: Request, res: Response): Promise<void> => {
+  try {
+    const id = req.params.id as string;
+    const { customerName, customerPhone, address, province, promoCode, manualStartDate } = req.body;
+
+    if (!customerName || !customerPhone || !address || !province) {
+      res.status(400).json({ error: 'Vui lòng điền đầy đủ các thông tin bắt buộc' });
+      return;
+    }
+
+    const serial = await prisma.serial.findUnique({
+      where: { id }
+    });
+
+    if (!serial) {
+      res.status(404).json({ error: 'Không tìm thấy Serial' });
+      return;
+    }
+
+    const startDate = manualStartDate ? new Date(manualStartDate) : new Date();
+
+    const updated = await activateSerialWarranty(
+      serial.serialNumber,
+      null,
+      {
+        customerName: customerName.trim(),
+        customerPhone: customerPhone.trim(),
+        address: address.trim(),
+        province: province.trim()
+      },
+      'ADMIN',
+      'Đã kích hoạt',
+      startDate,
+      promoCode || null
+    );
+
+    // Ghi Audit Log
+    await prisma.auditLog.create({
+      data: {
+        entityType: 'Serial',
+        entityId: serial.id,
+        action: 'activated_manual',
+        changes: {
+          status: { from: serial.status, to: 'Đã kích hoạt' },
+          customerName,
+          customerPhone,
+          promoCode
+        },
+        userId: req.user!.id,
+        userName: req.user!.fullName
+      }
+    });
+
+    res.json({ success: true, serial: updated });
+  } catch (error: any) {
+    logger.error('Lỗi Admin kích hoạt bảo hành', { error: error.message });
+    res.status(500).json({ error: error.message || 'Lỗi hệ thống khi kích hoạt bảo hành' });
+  }
+});
+
+/**
+ * POST /api/serials/:id/approve-warranty
+ * Admin/Coordinator duyệt yêu cầu kích hoạt bảo hành từ Khách hàng
+ */
+router.post('/:id/approve-warranty', requireCoordinatorOrAdmin, async (req: Request, res: Response): Promise<void> => {
+  try {
+    const id = req.params.id as string;
+    const { manualStartDate, promoCode } = req.body;
+
+    const serial = await prisma.serial.findUnique({
+      where: { id }
+    });
+
+    if (!serial) {
+      res.status(404).json({ error: 'Không tìm thấy Serial' });
+      return;
+    }
+
+    if (serial.status !== 'Chờ duyệt') {
+      res.status(400).json({ error: 'Chỉ có thể phê duyệt các Serial có trạng thái "Chờ duyệt"' });
+      return;
+    }
+
+    const startDate = manualStartDate ? new Date(manualStartDate) : new Date();
+
+    const updated = await activateSerialWarranty(
+      serial.serialNumber,
+      serial.orderId,
+      {
+        customerName: serial.customerName,
+        customerPhone: serial.customerPhone,
+        address: serial.address,
+        province: serial.province,
+        invoiceImageUrl: serial.invoiceImageUrl
+      },
+      'ADMIN',
+      'Đã kích hoạt',
+      startDate,
+      promoCode || null
+    );
+
+    // Ghi Audit Log
+    await prisma.auditLog.create({
+      data: {
+        entityType: 'Serial',
+        entityId: serial.id,
+        action: 'approved_warranty',
+        changes: {
+          status: { from: serial.status, to: 'Đã kích hoạt' },
+          startDate,
+          promoCode
+        },
+        userId: req.user!.id,
+        userName: req.user!.fullName
+      }
+    });
+
+    res.json({ success: true, serial: updated });
+  } catch (error: any) {
+    logger.error('Lỗi phê duyệt bảo hành', { error: error.message });
+    res.status(500).json({ error: error.message || 'Lỗi hệ thống khi phê duyệt bảo hành' });
   }
 });
 

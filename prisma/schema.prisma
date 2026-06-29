@@ -97,6 +97,7 @@ model Order {
   warehouseId         String?   @map("warehouse_id")              // ID kho hàng được phân bổ xuất hàng
   pancakeSyncStatus   String?   @map("pancake_sync_status")       // Trạng thái đồng bộ đơn sang Pancake: SUCCESS, FAILED
   checkoutLink        String?   @map("checkout_link")             // Link thanh toán cho khách (derived from tracking_link)
+  promoCode           String?   @map("promo_code")                // Mã khuyến mãi bảo hành áp dụng cho đơn hàng
   rawData             Json?     @map("raw_data")
   createdAt           DateTime  @default(now()) @map("created_at")
   updatedAt           DateTime  @updatedAt @map("updated_at")
@@ -337,7 +338,7 @@ model Serial {
   id                       String    @id @default(uuid())
   serialNumber             String    @unique @map("serial_number")          // Số Serial (Khóa duy nhất)
   model                    String                                           // Tên Model máy (VD: "Ultima White")
-  status                   String    @default("Chưa kích hoạt")            // Trạng thái: "Chưa kích hoạt" | "Đã kích hoạt" | "KH xác nhận"
+  status                   String    @default("Chưa kích hoạt")            // Trạng thái: "Chưa kích hoạt" | "Chờ duyệt" | "Đã kích hoạt" | "KH xác nhận"
   activationDate           DateTime? @map("activation_date")                // Ngày kích hoạt
   warrantyExpiryDate       DateTime? @map("warranty_expiry_date")           // Ngày hết hạn bảo hành
   customerConfirmationDate DateTime? @map("customer_confirmation_date")     // Ngày KH xác nhận
@@ -348,6 +349,12 @@ model Serial {
   address                  String?
   province                 String?                                          // Tỉnh/Thành phố
 
+  // Trường mới phục vụ đối chiếu hóa đơn và luồng khuyến mãi
+  invoiceImageUrl          String?   @map("invoice_image_url")              // Đường dẫn ảnh hóa đơn mua hàng
+  activatedBy              String?   @map("activated_by")                   // Cách thức kích hoạt: "CUSTOMER" | "KTV" | "ADMIN"
+  orderId                  String?   @map("order_id")                       // Đơn hàng liên kết khi kích hoạt qua dịch vụ
+  promoCode                String?   @map("promo_code")                     // Mã khuyến mãi đã áp dụng (nếu có)
+
   // Metadata
   importBatchId            String?   @map("import_batch_id")                // Nhóm theo đợt import
   importedById             String?   @map("imported_by_id")                 // ID người thực hiện import
@@ -357,5 +364,32 @@ model Serial {
   updatedAt                DateTime  @updatedAt @map("updated_at")
 
   @@map("serials")
+}
+
+// ── Chương trình Khuyến mãi Bảo hành ──
+model WarrantyPromo {
+  id               String    @id @default(uuid())
+  code             String    @unique                                  // Mã khuyến mãi (VD: MUNGHE6T)
+  promoMonths      Int       @map("promo_months")                     // Số tháng bảo hành cộng thêm (VD: 6)
+  description      String?                                            // Mô tả chương trình
+  isLocked         Boolean   @default(false) @map("is_locked")         // Trạng thái khóa (true = không cho sử dụng)
+  startDate        DateTime? @map("start_date")                       // Ngày bắt đầu hiệu lực (optional)
+  endDate          DateTime? @map("end_date")                         // Ngày hết hạn hiệu lực (optional)
+  applicableModels String[]  @map("applicable_models")                // Các dòng máy được áp dụng (rỗng = tất cả)
+  createdAt        DateTime  @default(now()) @map("created_at")
+  updatedAt        DateTime  @updatedAt @map("updated_at")
+
+  @@map("warranty_promos")
+}
+
+// ── Chính sách Bảo hành tiêu chuẩn theo Model ──
+model WarrantyPolicy {
+  id             String   @id @default(uuid())
+  modelKeyword   String   @unique @map("model_keyword")                // Từ khóa dòng máy (VD: Ultima, Delica)
+  warrantyMonths Int      @map("warranty_months")                     // Số tháng bảo hành tiêu chuẩn (VD: 12)
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  @@map("warranty_policies")
 }
 
