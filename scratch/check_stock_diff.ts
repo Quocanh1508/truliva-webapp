@@ -68,27 +68,22 @@ async function checkStock() {
       console.log(`- Đơn #${o.pancakeOrderId} | adminStatus: ${o.adminStatus} | Số lượng giữ: ${item?.quantity}`);
     });
 
-    // 4. Tìm các đơn hàng đã HOÀN THÀNH cục bộ Truliva
-    const completedOrders = await prisma.order.findMany({
-      where: {
-        warehouseId: ktv.warehouseId,
-        adminStatus: 'hoàn thành',
-        items: {
-          some: {
-            productName: product.name
-          }
-        }
-      },
-      include: {
-        items: true
+    // 5. Mô phỏng API /api/inventory/stock
+    console.log('\n--- MÔ PHỎNG PHẢN HỒI API /stock ---');
+    const rawData = (product.rawData as any) || {};
+    const vwList = rawData.variations_warehouses || [];
+    const stocks: Record<string, number> = {};
+    const actualStocks: Record<string, number> = {};
+    vwList.forEach((vw: any) => {
+      if (vw.warehouse_id) {
+        stocks[vw.warehouse_id] = Number(vw.remain_quantity) || 0;
+        actualStocks[vw.warehouse_id] = Number(vw.actual_remain_quantity) || Number(vw.remain_quantity) || 0;
       }
     });
 
-    console.log(`\n📋 Đơn hàng đã hoàn thành cục bộ Truliva: ${completedOrders.length}`);
-    completedOrders.forEach((o: any) => {
-      const item = o.items.find((i: any) => i.productName === product.name);
-      console.log(`- Đơn #${o.pancakeOrderId} | adminStatus: ${o.adminStatus} | Số lượng: ${item?.quantity}`);
-    });
+    console.log(`Sản phẩm: ${product.name}`);
+    console.log(`- Có thể bán tại Kho KTV Khánh Bắc Ninh (stocks['e426...']):`, stocks[ktv.warehouseId || '']);
+    console.log(`- Thực tế tại Kho KTV Khánh Bắc Ninh (actualStocks['e426...']):`, actualStocks[ktv.warehouseId || '']);
 
   } catch (error: any) {
     console.error('Lỗi:', error.message);
