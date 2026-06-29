@@ -3,6 +3,7 @@ import { fetchApi } from '../../api/client';
 import { Plus, Edit2, Trash2, Lock, Unlock, Search, Calendar, Tag, CheckCircle, AlertCircle, Loader2, X } from 'lucide-react';
 import { useConfirm } from '../../context/ConfirmContext';
 import { useAuth } from '../../context/AuthContext';
+import CategoryTreeSelect from '../../components/CategoryTreeSelect';
 
 interface Promo {
   id: string;
@@ -38,6 +39,8 @@ export default function PromoManage() {
   const [endDate, setEndDate] = useState('');
   const [applicableModelsInput, setApplicableModelsInput] = useState('');
   const [isLocked, setIsLocked] = useState(false);
+  const [productsStock, setProductsStock] = useState<any[]>([]);
+  const [selectedModels, setSelectedModels] = useState<string[]>([]);
 
   const loadPromos = async () => {
     try {
@@ -54,6 +57,11 @@ export default function PromoManage() {
 
   useEffect(() => {
     loadPromos();
+    fetchApi('/inventory/stock')
+      .then(data => {
+        setProductsStock(data.products || []);
+      })
+      .catch(err => console.error('Lỗi tải sản phẩm:', err));
   }, []);
 
   const openCreateModal = () => {
@@ -65,6 +73,7 @@ export default function PromoManage() {
     setStartDate('');
     setEndDate('');
     setApplicableModelsInput('');
+    setSelectedModels([]);
     setIsLocked(false);
     setShowModal(true);
     setMessage(null);
@@ -79,6 +88,7 @@ export default function PromoManage() {
     setStartDate(promo.startDate ? promo.startDate.substring(0, 10) : '');
     setEndDate(promo.endDate ? promo.endDate.substring(0, 10) : '');
     setApplicableModelsInput(promo.applicableModels.join(', '));
+    setSelectedModels(promo.applicableModels.map(m => `PROD:${m}`));
     setIsLocked(promo.isLocked);
     setShowModal(true);
     setMessage(null);
@@ -91,9 +101,9 @@ export default function PromoManage() {
       return;
     }
 
-    const applicableModels = applicableModelsInput
-      ? applicableModelsInput.split(',').map(s => s.trim()).filter(Boolean)
-      : [];
+    const applicableModels = selectedModels
+      .filter(id => id.startsWith('PROD:'))
+      .map(id => id.substring(5));
 
     const payload = {
       code: code.trim().toUpperCase(),
@@ -399,15 +409,14 @@ export default function PromoManage() {
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">Dòng máy áp dụng (Phân cách bằng dấu phẩy)</label>
-                <div className="relative">
-                  <Tag size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-                  <input
-                    type="text"
-                    placeholder="Ultima, Delica, Tanka (Để trống = Áp dụng tất cả)"
-                    value={applicableModelsInput}
-                    onChange={(e) => setApplicableModelsInput(e.target.value)}
-                    className="w-full pl-9 pr-4 py-2 border border-gray-300 rounded-md text-sm outline-none focus:ring-1 focus:ring-blue-500"
+                <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">Dòng máy áp dụng</label>
+                <div className="w-full">
+                  <CategoryTreeSelect
+                    categories={Array.from(new Set(productsStock.map(p => p.category).filter(Boolean))) as string[]}
+                    products={productsStock.map(p => ({ name: p.name, category: p.category, sku: p.sku }))}
+                    selected={selectedModels}
+                    placeholder="-- Chọn dòng máy/sản phẩm (Để trống = Áp dụng tất cả) --"
+                    onChange={(nextSelected) => setSelectedModels(nextSelected)}
                   />
                 </div>
                 <p className="text-[10px] text-gray-400 mt-1 italic">Hệ thống sẽ đối chiếu tương đối với model thiết bị khi kích hoạt</p>
