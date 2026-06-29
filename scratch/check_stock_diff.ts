@@ -41,7 +41,8 @@ async function checkStock() {
     }
 
     if (products.length === 0) return;
-    const product = products[0]; // Dùng sản phẩm đầu tiên cho các phần tiếp theo
+    const product = products.find(p => p.sku === '104321-0002') || products[0]; // Chọn Máy lọc nước Truliva UR61096H
+    console.log(`\nUsing product for orders check: ${product.name}`);
 
     // 3. Tìm các đơn hàng chứa sản phẩm này và thuộc kho KTV này mà ở trạng thái ACTIVE (hold hàng)
     const activeOrders = await prisma.order.findMany({
