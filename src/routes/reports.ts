@@ -6,7 +6,7 @@ import { requireAuth, requireAdmin, requireCoordinatorOrAdmin, requireDashboardA
 import { sendPushNotification } from '../services/notificationService';
 import { sendWebPushNotification } from '../services/webPushService';
 import { syncOrderInventoryState } from '../services/inventoryService';
-import { activateSerialWarranty } from '../services/warrantyService';
+import { activateSerialWarranty, syncSerialFromReport } from '../services/warrantyService';
 import ExcelJS from 'exceljs';
 import axios from 'axios';
 
@@ -471,35 +471,13 @@ router.post('/', async (req: Request, res: Response): Promise<void> => {
     // ── Đối chiếu ngược: Cập nhật bảng Serial khi báo cáo có serialNumber ──
     if (report.serialNumber) {
       try {
-        const installWorkTypes = ['Lắp đặt', 'Giao hàng và Lắp đặt'];
-        if (installWorkTypes.includes(workType || '')) {
-          await activateSerialWarranty(
-            report.serialNumber,
-            orderId || null,
-            { customerName, customerPhone, address, province },
-            'KTV'
-          );
-        } else {
-          // Chỉ cập nhật thông tin khách hàng nếu chưa có mà không thay đổi trạng thái kích hoạt
-          const existingSerial = await prisma.serial.findUnique({
-            where: { serialNumber: report.serialNumber },
-          });
-          if (existingSerial) {
-            const serialUpdate: any = {};
-            if (!existingSerial.customerName && customerName) serialUpdate.customerName = customerName;
-            if (!existingSerial.customerPhone && customerPhone) serialUpdate.customerPhone = customerPhone;
-            if (!existingSerial.address && address) serialUpdate.address = address;
-            if (!existingSerial.province && province) serialUpdate.province = province;
-            if (Object.keys(serialUpdate).length > 0) {
-              await prisma.serial.update({
-                where: { id: existingSerial.id },
-                data: serialUpdate,
-              });
-            }
-          }
-        }
+        await syncSerialFromReport(
+          report.serialNumber,
+          orderId || null,
+          { customerName, customerPhone, address, province }
+        );
       } catch (serialErr: any) {
-        logger.error('Lỗi đối chiếu hoặc kích hoạt bảo hành serial khi tạo báo cáo', { error: serialErr.message, serialNumber: report.serialNumber });
+        logger.error('Lỗi đối chiếu hoặc đồng bộ serial khi tạo báo cáo', { error: serialErr.message, serialNumber: report.serialNumber });
       }
     }
 
@@ -1595,39 +1573,18 @@ router.put('/:id', requireAuth, async (req: Request, res: Response): Promise<voi
     // ── Đối chiếu ngược: Cập nhật bảng Serial khi cập nhật báo cáo có serialNumber ──
     if (report.serialNumber) {
       try {
-        const installWorkTypes = ['Lắp đặt', 'Giao hàng và Lắp đặt'];
-        if (installWorkTypes.includes(report.workType || '')) {
-          await activateSerialWarranty(
-            report.serialNumber,
-            report.orderId || null,
-            {
-              customerName: report.customerName,
-              customerPhone: report.customerPhone,
-              address: report.address,
-              province: report.province
-            },
-            'KTV'
-          );
-        } else {
-          const existingSerial = await prisma.serial.findUnique({
-            where: { serialNumber: report.serialNumber },
-          });
-          if (existingSerial) {
-            const serialUpdate: any = {};
-            if (!existingSerial.customerName && report.customerName) serialUpdate.customerName = report.customerName;
-            if (!existingSerial.customerPhone && report.customerPhone) serialUpdate.customerPhone = report.customerPhone;
-            if (!existingSerial.address && report.address) serialUpdate.address = report.address;
-            if (!existingSerial.province && report.province) serialUpdate.province = report.province;
-            if (Object.keys(serialUpdate).length > 0) {
-              await prisma.serial.update({
-                where: { id: existingSerial.id },
-                data: serialUpdate,
-              });
-            }
+        await syncSerialFromReport(
+          report.serialNumber,
+          report.orderId || null,
+          {
+            customerName: report.customerName,
+            customerPhone: report.customerPhone,
+            address: report.address,
+            province: report.province
           }
-        }
+        );
       } catch (serialErr: any) {
-        logger.error('Lỗi đối chiếu hoặc kích hoạt bảo hành serial khi cập nhật báo cáo', { error: serialErr.message, serialNumber: report.serialNumber });
+        logger.error('Lỗi đối chiếu hoặc đồng bộ serial khi cập nhật báo cáo', { error: serialErr.message, serialNumber: report.serialNumber });
       }
     }
 

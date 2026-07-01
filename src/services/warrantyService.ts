@@ -154,3 +154,68 @@ export async function activateSerialWarranty(
 
   return updatedSerial;
 }
+
+export async function syncSerialFromReport(
+  serialNumber: string,
+  orderId: string | null,
+  customerInfo: {
+    customerName?: string | null;
+    customerPhone?: string | null;
+    address?: string | null;
+    province?: string | null;
+  }
+) {
+  const cleanedSerial = serialNumber.trim().replace(/[^a-zA-Z0-9_]/g, '').toUpperCase();
+  if (!cleanedSerial) return null;
+
+  let existingSerial = await prisma.serial.findUnique({
+    where: { serialNumber: cleanedSerial }
+  });
+
+  let model = 'Máy lọc nước Truliva';
+  if (orderId) {
+    const order = await prisma.order.findUnique({
+      where: { id: orderId },
+      include: { items: true }
+    });
+    if (order && order.items && order.items.length > 0) {
+      model = order.items[0].productName || 'Máy lọc nước Truliva';
+    }
+  }
+
+  const serialData: any = {};
+  if (customerInfo.customerName) serialData.customerName = customerInfo.customerName.trim();
+  if (customerInfo.customerPhone) serialData.customerPhone = customerInfo.customerPhone.trim();
+  if (customerInfo.address) serialData.address = customerInfo.address.trim();
+  if (customerInfo.province) serialData.province = customerInfo.province.trim();
+  if (orderId) serialData.orderId = orderId;
+
+  if (!existingSerial) {
+    existingSerial = await prisma.serial.create({
+      data: {
+        serialNumber: cleanedSerial,
+        model,
+        status: 'Chưa kích hoạt',
+        ...serialData
+      }
+    });
+    logger.info('Created new Serial from KTV report in sync-only mode', { serialNumber: cleanedSerial });
+  } else {
+    const dataToUpdate: any = {};
+    if (!existingSerial.customerName && serialData.customerName) dataToUpdate.customerName = serialData.customerName;
+    if (!existingSerial.customerPhone && serialData.customerPhone) dataToUpdate.customerPhone = serialData.customerPhone;
+    if (!existingSerial.address && serialData.address) dataToUpdate.address = serialData.address;
+    if (!existingSerial.province && serialData.province) dataToUpdate.province = serialData.province;
+    if (!existingSerial.orderId && serialData.orderId) dataToUpdate.orderId = serialData.orderId;
+
+    if (Object.keys(dataToUpdate).length > 0) {
+      existingSerial = await prisma.serial.update({
+        where: { id: existingSerial.id },
+        data: dataToUpdate
+      });
+      logger.info('Updated existing Serial customer details from KTV report', { serialNumber: cleanedSerial });
+    }
+  }
+
+  return existingSerial;
+}
