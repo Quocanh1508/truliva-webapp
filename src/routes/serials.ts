@@ -308,6 +308,13 @@ router.get('/', requireCoordinatorOrAdmin, async (req: Request, res: Response): 
         orderBy: { createdAt: 'desc' },
         skip,
         take: limit,
+        include: {
+          importedBy: {
+            select: {
+              fullName: true
+            }
+          }
+        }
       }),
       prisma.serial.count({ where }),
     ]);
@@ -634,6 +641,13 @@ router.get('/:id', requireCoordinatorOrAdmin, async (req: Request, res: Response
   try {
     const serial = await prisma.serial.findUnique({
       where: { id: req.params.id as string },
+      include: {
+        importedBy: {
+          select: {
+            fullName: true
+          }
+        }
+      }
     });
 
     if (!serial) {
@@ -811,6 +825,165 @@ router.post('/:id/approve-warranty', requireCoordinatorOrAdmin, async (req: Requ
   } catch (error: any) {
     logger.error('Lỗi phê duyệt bảo hành', { error: error.message });
     res.status(500).json({ error: error.message || 'Lỗi hệ thống khi phê duyệt bảo hành' });
+  }
+});
+
+/**
+ * PATCH /api/serials/:id
+ * Admin/Coordinator chỉnh sửa thông tin Serial
+ */
+router.patch('/:id', requireCoordinatorOrAdmin, async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { id } = req.params;
+    const { 
+      serialNumber, 
+      model, 
+      status,
+      customerName, 
+      customerPhone, 
+      address, 
+      province, 
+      activationDate, 
+      warrantyExpiryDate, 
+      activatedBy, 
+      promoCode, 
+      importBatchId 
+    } = req.body;
+
+    const serial = await prisma.serial.findUnique({
+      where: { id: id as string }
+    });
+
+    if (!serial) {
+      res.status(404).json({ error: 'Không tìm thấy Serial' });
+      return;
+    }
+
+    // Nếu thay đổi số serial, kiểm tra xem số mới có bị trùng với serial khác không
+    if (serialNumber && serialNumber !== serial.serialNumber) {
+      const existing = await prisma.serial.findUnique({
+        where: { serialNumber }
+      });
+      if (existing) {
+        res.status(400).json({ error: 'Số Serial này đã tồn tại trong hệ thống' });
+        return;
+      }
+    }
+
+    const updateData: any = {};
+    if (serialNumber !== undefined) updateData.serialNumber = serialNumber;
+    if (model !== undefined) updateData.model = model;
+    if (status !== undefined) updateData.status = status;
+    if (customerName !== undefined) updateData.customerName = customerName;
+    if (customerPhone !== undefined) updateData.customerPhone = customerPhone;
+    if (address !== undefined) updateData.address = address;
+    if (province !== undefined) updateData.province = province;
+    if (activatedBy !== undefined) updateData.activatedBy = activatedBy;
+    if (promoCode !== undefined) updateData.promoCode = promoCode;
+    if (importBatchId !== undefined) updateData.importBatchId = importBatchId;
+
+    if (activationDate !== undefined) {
+      updateData.activationDate = activationDate ? new Date(activationDate) : null;
+    }
+    if (warrantyExpiryDate !== undefined) {
+      updateData.warrantyExpiryDate = warrantyExpiryDate ? new Date(warrantyExpiryDate) : null;
+    }
+
+    const updated = await prisma.serial.update({
+      where: { id: id as string },
+      data: updateData,
+      include: {
+        importedBy: {
+          select: {
+            fullName: true
+          }
+        }
+      }
+    });
+
+    // Ghi Audit Log
+    await prisma.auditLog.create({
+      data: {
+        entityType: 'Serial',
+        entityId: serial.id,
+        action: 'updated',
+        changes: {
+          from: serial,
+          to: updated
+        },
+        userId: req.user!.id,
+        userName: req.user!.fullName
+      }
+    });
+
+    res.json({ success: true, serial: updated });
+  } catch (error: any) {
+    logger.error('Lỗi Admin cập nhật serial', { error: error.message });
+    res.status(500).json({ error: 'Lỗi hệ thống khi cập nhật Serial' });
+  }
+});
+
+/**
+ * POST /api/serials/:id/restore
+ * Khôi phục serial về trạng thái chưa kích hoạt (xóa trắng các thông tin kích hoạt)
+ */
+router.post('/:id/restore', requireCoordinatorOrAdmin, async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { id } = req.params;
+
+    const serial = await prisma.serial.findUnique({
+      where: { id: id as string }
+    });
+
+    if (!serial) {
+      res.status(404).json({ error: 'Không tìm thấy Serial' });
+      return;
+    }
+
+    const restored = await prisma.serial.update({
+      where: { id: id as string },
+      data: {
+        status: 'Chưa kích hoạt',
+        activationDate: null,
+        warrantyExpiryDate: null,
+        customerConfirmationDate: null,
+        customerName: null,
+        customerPhone: null,
+        address: null,
+        province: null,
+        invoiceImageUrl: null,
+        activatedBy: null,
+        orderId: null,
+        promoCode: null
+      },
+      include: {
+        importedBy: {
+          select: {
+            fullName: true
+          }
+        }
+      }
+    });
+
+    // Ghi Audit Log
+    await prisma.auditLog.create({
+      data: {
+        entityType: 'Serial',
+        entityId: serial.id,
+        action: 'restored',
+        changes: {
+          status: { from: serial.status, to: 'Chưa kích hoạt' },
+          restored: true
+        },
+        userId: req.user!.id,
+        userName: req.user!.fullName
+      }
+    });
+
+    res.json({ success: true, serial: restored });
+  } catch (error: any) {
+    logger.error('Lỗi Admin khôi phục serial', { error: error.message });
+    res.status(500).json({ error: 'Lỗi hệ thống khi khôi phục Serial' });
   }
 });
 

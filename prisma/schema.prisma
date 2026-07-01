@@ -232,6 +232,7 @@ model User {
   techStation     TechStation?  @relation(fields: [techStationId], references: [id])
   feedbacks       Feedback[]
   notifications   Notification[]
+  importedSerials Serial[]
 
   @@map("users")
 }
@@ -361,6 +362,7 @@ model Serial {
   importBatchId            String?   @map("import_batch_id")                // Nhóm theo đợt import
   importedById             String?   @map("imported_by_id")                 // ID người thực hiện import
   rawData                  Json?     @map("raw_data")                       // JSON row gốc từ Excel
+  importedBy               User?     @relation(fields: [importedById], references: [id])
 
   createdAt                DateTime  @default(now()) @map("created_at")
   updatedAt                DateTime  @updatedAt @map("updated_at")

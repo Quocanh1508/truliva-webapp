@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { fetchApi, API_URL } from '../../api/client';
-import { Hash, Upload, Download, Search, X, Clock, ChevronLeft, ChevronRight, AlertTriangle, CheckCircle, User, Phone, MapPin, Calendar, Wrench, FileText, Filter } from 'lucide-react';
+import { Hash, Upload, Download, Search, X, Clock, ChevronLeft, ChevronRight, AlertTriangle, CheckCircle, User, Phone, MapPin, Wrench, FileText, Filter, Edit3, RotateCcw } from 'lucide-react';
 
 interface Serial {
   id: string;
@@ -19,6 +19,9 @@ interface Serial {
   invoiceImageUrl?: string | null;
   activatedBy?: string | null;
   promoCode?: string | null;
+  importedBy?: {
+    fullName: string;
+  } | null;
 }
 
 interface SerialStats {
@@ -87,11 +90,7 @@ export default function SerialManage() {
   const [manualStartDate, setManualStartDate] = useState(new Date().toISOString().substring(0, 10));
   const [selectedPromoCode, setSelectedPromoCode] = useState('');
   const [submittingApprove, setSubmittingApprove] = useState(false);
-  const [showManualForm, setShowManualForm] = useState(false);
-  const [manualName, setManualName] = useState('');
-  const [manualPhone, setManualPhone] = useState('');
-  const [manualAddress, setManualAddress] = useState('');
-  const [manualProvince, setManualProvince] = useState('');
+
 
   useEffect(() => {
     const fetchPromos = async () => {
@@ -126,31 +125,56 @@ export default function SerialManage() {
     }
   };
 
-  const handleManualActivate = async (serialId: string) => {
-    if (!manualName.trim() || !manualPhone.trim() || !manualAddress.trim() || !manualProvince.trim()) {
-      alert('Vui lòng điền đầy đủ thông tin bắt buộc');
-      return;
-    }
-    setSubmittingApprove(true);
+
+
+  const handleConfirmRestore = async (serial: Serial) => {
+    const isConfirmed = window.confirm(`Bạn có chắc chắn muốn khôi phục Serial ${serial.serialNumber} về trạng thái chưa kích hoạt? Toàn bộ thông tin bảo hành và khách hàng sẽ bị xóa sạch.`);
+    if (!isConfirmed) return;
+
     try {
-      await fetchApi(`/serials/${serialId}/activate`, {
-        method: 'POST',
-        body: JSON.stringify({
-          customerName: manualName.trim(),
-          customerPhone: manualPhone.trim(),
-          address: manualAddress.trim(),
-          province: manualProvince.trim(),
-          manualStartDate: manualStartDate,
-          promoCode: selectedPromoCode || null
-        })
+      await fetchApi(`/serials/${serial.id}/restore`, {
+        method: 'POST'
       });
-      alert('Kích hoạt bảo hành thủ công thành công!');
-      setSelectedSerial(null);
-      setShowManualForm(false);
+      alert('Đã khôi phục Serial về trạng thái chưa kích hoạt thành công!');
+      if (selectedSerial && selectedSerial.id === serial.id) {
+        setSelectedSerial(null);
+      }
       loadSerials();
     } catch (err: any) {
       console.error(err);
-      alert(err.message || 'Lỗi khi kích hoạt bảo hành');
+      alert(err.message || 'Lỗi khi khôi phục Serial');
+    }
+  };
+
+  const handleSaveSerialDetails = async () => {
+    if (!selectedSerial) return;
+    
+    setSubmittingApprove(true);
+    try {
+      const res = await fetchApi(`/serials/${selectedSerial.id}`, {
+        method: 'PATCH',
+        body: JSON.stringify({
+          serialNumber: selectedSerial.serialNumber,
+          model: selectedSerial.model,
+          status: selectedSerial.status,
+          customerName: selectedSerial.customerName,
+          customerPhone: selectedSerial.customerPhone,
+          address: selectedSerial.address,
+          province: selectedSerial.province,
+          activationDate: selectedSerial.activationDate,
+          warrantyExpiryDate: selectedSerial.warrantyExpiryDate,
+          activatedBy: selectedSerial.activatedBy,
+          importBatchId: selectedSerial.importBatchId,
+          promoCode: selectedSerial.promoCode
+        })
+      });
+      
+      alert('Cập nhật thông tin Serial thành công!');
+      setSelectedSerial(res.serial);
+      loadSerials();
+    } catch (err: any) {
+      console.error(err);
+      alert(err.message || 'Lỗi khi cập nhật Serial');
     } finally {
       setSubmittingApprove(false);
     }
@@ -239,21 +263,10 @@ export default function SerialManage() {
     setHistory([]);
     setManualStartDate(new Date().toISOString().substring(0, 10));
     setSelectedPromoCode('');
-    setShowManualForm(false);
-    setManualName(serial.customerName || '');
-    setManualPhone(serial.customerPhone || '');
-    setManualAddress(serial.address || '');
-    setManualProvince(serial.province || '');
     try {
       const data = await fetchApi(`/serials/${serial.id}`);
       setSelectedSerial(data.serial);
       setHistory(data.history || []);
-      if (data.serial) {
-        setManualName(data.serial.customerName || '');
-        setManualPhone(data.serial.customerPhone || '');
-        setManualAddress(data.serial.address || '');
-        setManualProvince(data.serial.province || '');
-      }
     } catch (err: any) {
       console.error('Lỗi tải chi tiết serial:', err);
     } finally {
@@ -276,10 +289,10 @@ export default function SerialManage() {
 
   const getStatusBadge = (status: string) => {
     const styles: Record<string, { bg: string; color: string; icon: any }> = {
-      'Đã kích hoạt': { bg: '#dcfce7', color: '#166534', icon: <CheckCircle size={14} /> },
-      'Chưa kích hoạt': { bg: '#fef3c7', color: '#92400e', icon: <AlertTriangle size={14} /> },
-      'KH xác nhận': { bg: '#dbeafe', color: '#1e40af', icon: <User size={14} /> },
-      'Chờ duyệt': { bg: '#fee2e2', color: '#991b1b', icon: <Clock size={14} /> },
+      'Đã kích hoạt': { bg: '#dcfce7', color: '#15803d', icon: <CheckCircle size={14} /> },
+      'KH xác nhận': { bg: '#dcfce7', color: '#15803d', icon: <User size={14} /> },
+      'Chưa kích hoạt': { bg: '#fef3c7', color: '#b45309', icon: <AlertTriangle size={14} /> },
+      'Chờ duyệt': { bg: '#fee2e2', color: '#b91c1c', icon: <Clock size={14} /> },
     };
     const s = styles[status] || { bg: '#f3f4f6', color: '#374151', icon: null };
     return (
@@ -421,7 +434,7 @@ export default function SerialManage() {
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 14 }}>
             <thead>
               <tr style={{ background: '#f8fafc', borderBottom: '2px solid #e2e8f0' }}>
-                {['Số Serial', 'Model', 'Trạng thái', 'Ngày kích hoạt', 'Tên KH', 'SĐT', 'Tỉnh/TP'].map(h => (
+                {['Serial/ Model', 'Dòng máy', 'Thông tin khách hàng', 'Trạng thái', 'Ngày kích hoạt', 'Ngày hết hạn bảo hành'].map(h => (
                   <th key={h} style={{
                     padding: '12px 16px', textAlign: 'left',
                     fontWeight: 600, color: '#475569', whiteSpace: 'nowrap',
@@ -433,9 +446,9 @@ export default function SerialManage() {
             </thead>
             <tbody>
               {loading ? (
-                <tr><td colSpan={7} style={{ padding: 40, textAlign: 'center', color: '#94a3b8' }}>Đang tải...</td></tr>
+                <tr><td colSpan={6} style={{ padding: 40, textAlign: 'center', color: '#94a3b8' }}>Đang tải...</td></tr>
               ) : serials.length === 0 ? (
-                <tr><td colSpan={7} style={{ padding: 40, textAlign: 'center', color: '#94a3b8' }}>Không có dữ liệu serial</td></tr>
+                <tr><td colSpan={6} style={{ padding: 40, textAlign: 'center', color: '#94a3b8' }}>Không có dữ liệu serial</td></tr>
               ) : serials.map(s => (
                 <tr
                   key={s.id}
@@ -447,13 +460,109 @@ export default function SerialManage() {
                   onMouseEnter={e => (e.currentTarget.style.background = '#f8fafc')}
                   onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
                 >
-                  <td style={{ padding: '12px 16px', fontWeight: 600, fontFamily: 'monospace', color: '#1e40af' }}>{s.serialNumber}</td>
-                  <td style={{ padding: '12px 16px', maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{s.model}</td>
-                  <td style={{ padding: '12px 16px' }}>{getStatusBadge(s.status)}</td>
-                  <td style={{ padding: '12px 16px', color: '#64748b' }}>{formatDate(s.activationDate)}</td>
-                  <td style={{ padding: '12px 16px' }}>{s.customerName || '—'}</td>
-                  <td style={{ padding: '12px 16px', color: '#64748b' }}>{s.customerPhone || '—'}</td>
-                  <td style={{ padding: '12px 16px', color: '#64748b' }}>{s.province || '—'}</td>
+                  {/* Column 1: Serial / Model + Quick Actions */}
+                  <td style={{ padding: '12px 16px', verticalAlign: 'top' }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                      <span style={{ fontWeight: 600, fontFamily: 'monospace', color: '#1e40af', fontSize: 14 }}>
+                        {s.serialNumber}
+                      </span>
+                      <span style={{ color: '#dc2626', fontSize: 12, fontWeight: 500 }}>
+                        {s.model}
+                      </span>
+                      {/* Action Icons */}
+                      <div style={{ display: 'flex', gap: 12, marginTop: 6 }}>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            openDetail(s);
+                          }}
+                          style={{
+                            background: 'none', border: 'none', padding: 0, cursor: 'pointer',
+                            color: '#64748b', display: 'flex', alignItems: 'center'
+                          }}
+                          title="Chỉnh sửa thông tin"
+                        >
+                          <Edit3 size={14} />
+                        </button>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleConfirmRestore(s);
+                          }}
+                          style={{
+                            background: 'none', border: 'none', padding: 0, cursor: 'pointer',
+                            color: '#ef4444', display: 'flex', alignItems: 'center'
+                          }}
+                          title="Khôi phục trạng thái"
+                        >
+                          <RotateCcw size={14} />
+                        </button>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            window.open(`${window.location.origin}/admin/reports?search=${s.serialNumber}`, '_blank');
+                          }}
+                          style={{
+                            background: 'none', border: 'none', padding: 0, cursor: 'pointer',
+                            color: '#4f46e5', display: 'flex', alignItems: 'center'
+                          }}
+                          title="Xem lịch sử / Chính sách"
+                        >
+                          <FileText size={14} />
+                        </button>
+                      </div>
+                    </div>
+                  </td>
+
+                  {/* Column 2: Dòng máy */}
+                  <td style={{ padding: '12px 16px', verticalAlign: 'top', fontWeight: 550, color: '#334155' }}>
+                    {s.model}
+                  </td>
+
+                  {/* Column 3: Thông tin khách hàng */}
+                  <td style={{ padding: '12px 16px', verticalAlign: 'top', color: '#334155' }}>
+                    {s.customerName || s.customerPhone || s.address ? (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 4, fontSize: 12 }}>
+                        {s.customerName && (
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                            <User size={13} color="#64748b" /> <strong>{s.customerName}</strong>
+                          </div>
+                        )}
+                        {s.customerPhone && (
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                            <Phone size={13} color="#64748b" /> <span style={{ color: '#0f766e', fontWeight: 600 }}>{s.customerPhone}</span>
+                          </div>
+                        )}
+                        {s.address && (
+                          <div style={{ display: 'flex', alignItems: 'start', gap: 6 }}>
+                            <MapPin size={13} color="#64748b" style={{ marginTop: 2, flexShrink: 0 }} /> <span>{s.address}</span>
+                          </div>
+                        )}
+                        {s.province && (
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                            <MapPin size={13} color="#3b82f6" /> <span>{s.province}</span>
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      <span style={{ color: '#94a3b8', fontStyle: 'italic' }}>—</span>
+                    )}
+                  </td>
+
+                  {/* Column 4: Trạng thái */}
+                  <td style={{ padding: '12px 16px', verticalAlign: 'top' }}>
+                    {getStatusBadge(s.status)}
+                  </td>
+
+                  {/* Column 5: Ngày kích hoạt */}
+                  <td style={{ padding: '12px 16px', verticalAlign: 'top', color: '#475569', fontWeight: 500 }}>
+                    {formatDateTime(s.activationDate)}
+                  </td>
+
+                  {/* Column 6: Ngày hết hạn bảo hành */}
+                  <td style={{ padding: '12px 16px', verticalAlign: 'top', color: '#dc2626', fontWeight: 600 }}>
+                    {formatDate(s.warrantyExpiryDate)}
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -636,62 +745,168 @@ export default function SerialManage() {
               </button>
             </div>
 
-            {/* Serial Info Card */}
+            {/* Serial Info Card & Edit Form */}
             <div style={{
               background: '#f8fafc', borderRadius: 12, padding: 20, marginBottom: 24,
               border: '1px solid #e2e8f0',
             }}>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px 24px', fontSize: 14 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px 20px', fontSize: 13 }}>
+                {/* 1. Số Serial */}
                 <div>
-                  <span style={{ color: '#64748b', fontSize: 12, fontWeight: 600, textTransform: 'uppercase' }}>Model</span>
-                  <div style={{ fontWeight: 600, color: '#1e293b', marginTop: 2 }}>{selectedSerial.model}</div>
+                  <label style={{ fontSize: 11, fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>Số Serial (*)</label>
+                  <input
+                    type="text"
+                    value={selectedSerial.serialNumber || ''}
+                    onChange={e => setSelectedSerial(prev => prev ? { ...prev, serialNumber: e.target.value } : null)}
+                    style={{ width: '100%', padding: '8px 12px', borderRadius: 8, border: '1px solid #cbd5e1', fontSize: 13, marginTop: 4, background: 'white' }}
+                  />
                 </div>
+
+                {/* 2. Dòng máy / Model */}
                 <div>
-                  <span style={{ color: '#64748b', fontSize: 12, fontWeight: 600, textTransform: 'uppercase' }}>Trạng thái</span>
-                  <div style={{ marginTop: 4 }}>{getStatusBadge(selectedSerial.status)}</div>
+                  <label style={{ fontSize: 11, fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>Dòng máy / Model (*)</label>
+                  <input
+                    type="text"
+                    value={selectedSerial.model || ''}
+                    onChange={e => setSelectedSerial(prev => prev ? { ...prev, model: e.target.value } : null)}
+                    style={{ width: '100%', padding: '8px 12px', borderRadius: 8, border: '1px solid #cbd5e1', fontSize: 13, marginTop: 4, background: 'white' }}
+                  />
                 </div>
+
+                {/* 3. Trạng thái */}
                 <div>
-                  <span style={{ color: '#64748b', fontSize: 12, fontWeight: 600, textTransform: 'uppercase' }}>Ngày kích hoạt</span>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 2 }}>
-                    <Calendar size={14} color="#64748b" /> {formatDate(selectedSerial.activationDate)}
-                  </div>
+                  <label style={{ fontSize: 11, fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>Trạng thái</label>
+                  <select
+                    value={selectedSerial.status || 'Chưa kích hoạt'}
+                    onChange={e => setSelectedSerial(prev => prev ? { ...prev, status: e.target.value } : null)}
+                    style={{ width: '100%', padding: '8px 12px', borderRadius: 8, border: '1px solid #cbd5e1', fontSize: 13, marginTop: 4, background: 'white' }}
+                  >
+                    <option value="Chưa kích hoạt">Chưa kích hoạt</option>
+                    <option value="Chờ duyệt">Chờ duyệt</option>
+                    <option value="Đã kích hoạt">Đã kích hoạt</option>
+                    <option value="KH xác nhận">KH xác nhận</option>
+                  </select>
                 </div>
+
+                {/* 4. Người kích hoạt */}
                 <div>
-                  <span style={{ color: '#64748b', fontSize: 12, fontWeight: 600, textTransform: 'uppercase' }}>Hết hạn bảo hành</span>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 2 }}>
-                    <Calendar size={14} color="#64748b" /> {formatDate(selectedSerial.warrantyExpiryDate)}
-                  </div>
+                  <label style={{ fontSize: 11, fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>Kích hoạt bởi / Chức danh</label>
+                  <select
+                    value={selectedSerial.activatedBy || ''}
+                    onChange={e => setSelectedSerial(prev => prev ? { ...prev, activatedBy: e.target.value || null } : null)}
+                    style={{ width: '100%', padding: '8px 12px', borderRadius: 8, border: '1px solid #cbd5e1', fontSize: 13, marginTop: 4, background: 'white' }}
+                  >
+                    <option value="">Không rõ</option>
+                    <option value="CUSTOMER">CUSTOMER</option>
+                    <option value="KTV">KTV</option>
+                    <option value="ADMIN">ADMIN</option>
+                  </select>
+                </div>
+
+                {/* 5. Tên khách hàng */}
+                <div>
+                  <label style={{ fontSize: 11, fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>Tên khách hàng</label>
+                  <input
+                    type="text"
+                    value={selectedSerial.customerName || ''}
+                    onChange={e => setSelectedSerial(prev => prev ? { ...prev, customerName: e.target.value || null } : null)}
+                    style={{ width: '100%', padding: '8px 12px', borderRadius: 8, border: '1px solid #cbd5e1', fontSize: 13, marginTop: 4, background: 'white' }}
+                  />
+                </div>
+
+                {/* 6. Số điện thoại */}
+                <div>
+                  <label style={{ fontSize: 11, fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>Số điện thoại</label>
+                  <input
+                    type="text"
+                    value={selectedSerial.customerPhone || ''}
+                    onChange={e => setSelectedSerial(prev => prev ? { ...prev, customerPhone: e.target.value || null } : null)}
+                    style={{ width: '100%', padding: '8px 12px', borderRadius: 8, border: '1px solid #cbd5e1', fontSize: 13, marginTop: 4, background: 'white' }}
+                  />
+                </div>
+
+                {/* 7. Địa chỉ cụ thể */}
+                <div style={{ gridColumn: 'span 2' }}>
+                  <label style={{ fontSize: 11, fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>Địa chỉ cụ thể</label>
+                  <input
+                    type="text"
+                    value={selectedSerial.address || ''}
+                    onChange={e => setSelectedSerial(prev => prev ? { ...prev, address: e.target.value || null } : null)}
+                    style={{ width: '100%', padding: '8px 12px', borderRadius: 8, border: '1px solid #cbd5e1', fontSize: 13, marginTop: 4, background: 'white' }}
+                  />
+                </div>
+
+                {/* 8. Tỉnh / Thành phố */}
+                <div>
+                  <label style={{ fontSize: 11, fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>Tỉnh / Thành phố</label>
+                  <input
+                    type="text"
+                    value={selectedSerial.province || ''}
+                    onChange={e => setSelectedSerial(prev => prev ? { ...prev, province: e.target.value || null } : null)}
+                    style={{ width: '100%', padding: '8px 12px', borderRadius: 8, border: '1px solid #cbd5e1', fontSize: 13, marginTop: 4, background: 'white' }}
+                  />
+                </div>
+
+                {/* 9. Mã lô nhập */}
+                <div>
+                  <label style={{ fontSize: 11, fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>Mã lô nhập</label>
+                  <input
+                    type="text"
+                    value={selectedSerial.importBatchId || ''}
+                    onChange={e => setSelectedSerial(prev => prev ? { ...prev, importBatchId: e.target.value || null } : null)}
+                    style={{ width: '100%', padding: '8px 12px', borderRadius: 8, border: '1px solid #cbd5e1', fontSize: 13, marginTop: 4, background: 'white' }}
+                  />
+                </div>
+
+                {/* 10. Ngày kích hoạt bảo hành */}
+                <div>
+                  <label style={{ fontSize: 11, fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>Ngày kích hoạt bảo hành</label>
+                  <input
+                    type="date"
+                    value={selectedSerial.activationDate ? new Date(selectedSerial.activationDate).toISOString().split('T')[0] : ''}
+                    onChange={e => setSelectedSerial(prev => prev ? { ...prev, activationDate: e.target.value ? new Date(e.target.value).toISOString() : null } : null)}
+                    style={{ width: '100%', padding: '8px 12px', borderRadius: 8, border: '1px solid #cbd5e1', fontSize: 13, marginTop: 4, background: 'white' }}
+                  />
+                </div>
+
+                {/* 11. Ngày hết hạn bảo hành */}
+                <div>
+                  <label style={{ fontSize: 11, fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>Ngày hết hạn bảo hành</label>
+                  <input
+                    type="date"
+                    value={selectedSerial.warrantyExpiryDate ? new Date(selectedSerial.warrantyExpiryDate).toISOString().split('T')[0] : ''}
+                    onChange={e => setSelectedSerial(prev => prev ? { ...prev, warrantyExpiryDate: e.target.value ? new Date(e.target.value).toISOString() : null } : null)}
+                    style={{ width: '100%', padding: '8px 12px', borderRadius: 8, border: '1px solid #cbd5e1', fontSize: 13, marginTop: 4, background: 'white' }}
+                  />
+                </div>
+
+                {/* 12. Mã khuyến mãi (Promo Code) */}
+                <div>
+                  <label style={{ fontSize: 11, fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>Mã khuyến mãi áp dụng</label>
+                  <select
+                    value={selectedSerial.promoCode || ''}
+                    onChange={e => setSelectedSerial(prev => prev ? { ...prev, promoCode: e.target.value || null } : null)}
+                    style={{ width: '100%', padding: '8px 12px', borderRadius: 8, border: '1px solid #cbd5e1', fontSize: 13, marginTop: 4, background: 'white' }}
+                  >
+                    <option value="">Không áp dụng</option>
+                    {promosList.map(p => (
+                      <option key={p.id} value={p.code}>
+                        {p.code} (+{p.promoMonths} tháng)
+                      </option>
+                    ))}
+                  </select>
                 </div>
               </div>
 
-              {/* Customer info */}
-              {(selectedSerial.customerName || selectedSerial.customerPhone || selectedSerial.address) && (
-                <div style={{ marginTop: 16, paddingTop: 16, borderTop: '1px solid #e2e8f0' }}>
-                  <div style={{ fontSize: 13, fontWeight: 700, color: '#475569', marginBottom: 8 }}>Thông tin khách hàng</div>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px 24px', fontSize: 14 }}>
-                    {selectedSerial.customerName && (
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                        <User size={14} color="#64748b" /> {selectedSerial.customerName}
-                      </div>
-                    )}
-                    {selectedSerial.customerPhone && (
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                        <Phone size={14} color="#64748b" /> {selectedSerial.customerPhone}
-                      </div>
-                    )}
-                    {selectedSerial.address && (
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, gridColumn: '1 / -1' }}>
-                        <MapPin size={14} color="#64748b" style={{ flexShrink: 0 }} /> {selectedSerial.address}
-                      </div>
-                    )}
-                    {selectedSerial.province && (
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                        <MapPin size={14} color="#64748b" /> {selectedSerial.province}
-                      </div>
-                    )}
-                  </div>
+              {/* Creator & Import metadata (Read-only) */}
+              <div style={{ marginTop: 16, paddingTop: 16, borderTop: '1px solid #e2e8f0', fontSize: 12, color: '#64748b', display: 'flex', flexDirection: 'column', gap: 4 }}>
+                <div>
+                  <strong>Người import lô hàng:</strong> {selectedSerial.importedBy?.fullName || 'Hệ thống / Đồng bộ'}
                 </div>
-              )}
+                <div>
+                  <strong>Thời gian tạo bản ghi:</strong> {formatDateTime(selectedSerial.createdAt)}
+                </div>
+              </div>
 
               {/* Invoice Image view if present */}
               {selectedSerial.invoiceImageUrl && (
@@ -701,7 +916,7 @@ export default function SerialManage() {
                     <img 
                       src={selectedSerial.invoiceImageUrl} 
                       alt="Hóa đơn" 
-                      style={{ maxWidth: '100%', maxHeight: 240, borderRadius: 8, objectFit: 'contain', border: '1px solid #cbd5e1' }} 
+                      style={{ maxWidth: '100%', maxHeight: 200, borderRadius: 8, objectFit: 'contain', border: '1px solid #cbd5e1' }} 
                     />
                   </a>
                 </div>
@@ -709,20 +924,20 @@ export default function SerialManage() {
 
               {/* Approval Form for pending verification */}
               {selectedSerial.status === 'Chờ duyệt' && (
-                <div style={{ marginTop: 16, paddingTop: 16, borderTop: '1px solid #e2e8f0' }}>
-                  <div style={{ fontSize: 13, fontWeight: 700, color: '#475569', marginBottom: 8 }}>Phê duyệt bảo hành</div>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
-                     <div>
-                       <label style={{ fontSize: 12, fontWeight: 600, color: '#64748b' }}>Ngày bắt đầu bảo hành</label>
+                <div style={{ marginTop: 16, paddingTop: 16, borderTop: '1px solid #e2e8f0', background: '#fffbeb', border: '1px solid #fef3c7', borderRadius: 8, padding: 12, marginBottom: 16 }}>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: '#b45309', marginBottom: 8 }}>Duyệt nhanh yêu cầu bảo hành từ khách hàng</div>
+                  <div style={{ display: 'flex', gap: 12, alignItems: 'end' }}>
+                     <div style={{ flex: 1 }}>
+                       <label style={{ fontSize: 11, fontWeight: 600, color: '#64748b' }}>Ngày bắt đầu bảo hành</label>
                        <input 
                          type="date" 
                          value={manualStartDate}
                          onChange={e => setManualStartDate(e.target.value)}
-                         style={{ width: '100%', padding: '6px 10px', borderRadius: 6, border: '1px solid #cbd5e1', fontSize: 13, marginTop: 4 }}
+                         style={{ width: '100%', padding: '6px 10px', borderRadius: 6, border: '1px solid #cbd5e1', fontSize: 13, marginTop: 4, background: 'white' }}
                        />
                      </div>
-                     <div>
-                       <label style={{ fontSize: 12, fontWeight: 600, color: '#64748b' }}>Mã khuyến mãi (nếu có)</label>
+                     <div style={{ flex: 1 }}>
+                       <label style={{ fontSize: 11, fontWeight: 600, color: '#64748b' }}>Mã khuyến mãi (nếu có)</label>
                        <select
                          value={selectedPromoCode}
                          onChange={e => setSelectedPromoCode(e.target.value)}
@@ -736,128 +951,52 @@ export default function SerialManage() {
                          ))}
                        </select>
                      </div>
-                  </div>
-                  <div style={{ display: 'flex', gap: 8, justifyContent: 'end' }}>
                      <button
                        onClick={() => handleApproveWarranty(selectedSerial.id)}
                        disabled={submittingApprove}
                        style={{
                          padding: '8px 16px', background: '#16a34a', color: 'white', border: 'none',
                          borderRadius: 6, fontSize: 13, fontWeight: 600, cursor: 'pointer',
-                         opacity: submittingApprove ? 0.6 : 1
+                         opacity: submittingApprove ? 0.6 : 1, height: 35
                        }}
                      >
-                       {submittingApprove ? 'Đang duyệt...' : 'Phê duyệt bảo hành'}
+                       {submittingApprove ? 'Đang duyệt...' : 'Phê duyệt ngay'}
                      </button>
                   </div>
                 </div>
               )}
 
-              {/* Manual Activation Form for unactivated serials */}
-              {selectedSerial.status === 'Chưa kích hoạt' && !showManualForm && (
-                <div style={{ display: 'flex', justifyContent: 'end', marginTop: 16 }}>
-                  <button
-                    onClick={() => setShowManualForm(true)}
-                    style={{
-                      padding: '8px 16px', background: '#4472C4', color: 'white', border: 'none',
-                      borderRadius: 6, fontSize: 13, fontWeight: 600, cursor: 'pointer'
-                    }}
-                  >
-                    Kích hoạt bảo hành thủ công
-                  </button>
-                </div>
-              )}
-
-              {showManualForm && (
-                <div style={{ marginTop: 16, paddingTop: 16, borderTop: '1px solid #e2e8f0' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-                    <div style={{ fontSize: 13, fontWeight: 700, color: '#475569' }}>Thông tin kích hoạt thủ công</div>
-                    <button 
-                      onClick={() => setShowManualForm(false)} 
-                      style={{ background: 'none', border: 'none', color: '#64748b', cursor: 'pointer', fontSize: 12 }}
-                    >
-                      Hủy
-                    </button>
-                  </div>
-                  
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px 16px', marginBottom: 12 }}>
-                    <div>
-                      <label style={{ fontSize: 11, fontWeight: 600, color: '#64748b' }}>Họ và tên KH (*)</label>
-                      <input 
-                        type="text" 
-                        value={manualName}
-                        onChange={e => setManualName(e.target.value)}
-                        style={{ width: '100%', padding: '6px 10px', borderRadius: 6, border: '1px solid #cbd5e1', fontSize: 13, marginTop: 2 }}
-                      />
-                    </div>
-                    <div>
-                      <label style={{ fontSize: 11, fontWeight: 600, color: '#64748b' }}>Số điện thoại (*)</label>
-                      <input 
-                        type="text" 
-                        value={manualPhone}
-                        onChange={e => setManualPhone(e.target.value)}
-                        style={{ width: '100%', padding: '6px 10px', borderRadius: 6, border: '1px solid #cbd5e1', fontSize: 13, marginTop: 2 }}
-                      />
-                    </div>
-                    <div>
-                      <label style={{ fontSize: 11, fontWeight: 600, color: '#64748b' }}>Tỉnh/Thành phố (*)</label>
-                      <input 
-                        type="text" 
-                        value={manualProvince}
-                        onChange={e => setManualProvince(e.target.value)}
-                        style={{ width: '100%', padding: '6px 10px', borderRadius: 6, border: '1px solid #cbd5e1', fontSize: 13, marginTop: 2 }}
-                      />
-                    </div>
-                    <div>
-                      <label style={{ fontSize: 11, fontWeight: 600, color: '#64748b' }}>Địa chỉ cụ thể (*)</label>
-                      <input 
-                        type="text" 
-                        value={manualAddress}
-                        onChange={e => setManualAddress(e.target.value)}
-                        style={{ width: '100%', padding: '6px 10px', borderRadius: 6, border: '1px solid #cbd5e1', fontSize: 13, marginTop: 2 }}
-                      />
-                    </div>
-                    <div>
-                      <label style={{ fontSize: 11, fontWeight: 600, color: '#64748b' }}>Ngày bắt đầu bảo hành</label>
-                      <input 
-                        type="date" 
-                        value={manualStartDate}
-                        onChange={e => setManualStartDate(e.target.value)}
-                        style={{ width: '100%', padding: '6px 10px', borderRadius: 6, border: '1px solid #cbd5e1', fontSize: 13, marginTop: 2 }}
-                      />
-                    </div>
-                    <div>
-                      <label style={{ fontSize: 11, fontWeight: 600, color: '#64748b' }}>Mã khuyến mãi</label>
-                      <select
-                        value={selectedPromoCode}
-                        onChange={e => setSelectedPromoCode(e.target.value)}
-                        style={{ width: '100%', padding: '6px 10px', borderRadius: 6, border: '1px solid #cbd5e1', fontSize: 13, marginTop: 2, background: 'white' }}
-                      >
-                        <option value="">Không áp dụng</option>
-                        {promosList.filter(p => !p.isLocked).map(p => (
-                          <option key={p.id} value={p.code}>
-                            {p.code} (+{p.promoMonths} tháng)
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                  </div>
-                  
-                  <div style={{ display: 'flex', gap: 8, justifySelf: 'end' }}>
+              {/* Form Buttons */}
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 20, paddingTop: 16, borderTop: '1px solid #e2e8f0' }}>
+                <div>
+                  {selectedSerial.status !== 'Chưa kích hoạt' && (
                     <button
-                      onClick={() => handleManualActivate(selectedSerial.id)}
-                      disabled={submittingApprove}
+                      onClick={() => handleConfirmRestore(selectedSerial)}
                       style={{
-                        padding: '8px 16px', background: '#16a34a', color: 'white', border: 'none',
-                        borderRadius: 6, fontSize: 13, fontWeight: 600, cursor: 'pointer',
-                        opacity: submittingApprove ? 0.6 : 1
+                        padding: '8px 16px', background: '#fee2e2', color: '#b91c1c', border: '1px solid #fca5a5',
+                        borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: 'pointer',
+                        display: 'flex', alignItems: 'center', gap: 6
                       }}
                     >
-                      {submittingApprove ? 'Đang kích hoạt...' : 'Kích hoạt ngay'}
+                      <RotateCcw size={14} /> Khôi phục Serial
                     </button>
-                  </div>
+                  )}
                 </div>
-              )}
+                
+                <div style={{ display: 'flex', gap: 10 }}>
+                  <button
+                    onClick={handleSaveSerialDetails}
+                    disabled={submittingApprove}
+                    style={{
+                      padding: '8px 20px', background: '#16a34a', color: 'white', border: 'none',
+                      borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: 'pointer',
+                      opacity: submittingApprove ? 0.6 : 1
+                    }}
+                  >
+                    {submittingApprove ? 'Đang lưu...' : 'Lưu thay đổi'}
+                  </button>
+                </div>
+              </div>
             </div>
 
             {/* History Timeline */}
