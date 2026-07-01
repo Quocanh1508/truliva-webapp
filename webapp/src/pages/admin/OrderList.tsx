@@ -3025,7 +3025,7 @@ export default function OrderList() {
 
                 {selectedKtv && ktvs.some((k: any) => k.id === selectedKtv) && (
                   <div className="p-3 bg-green-50 border border-green-200 text-green-800 rounded text-sm mt-2">
-                    Đơn sẽ được chuyển sang trạng thái <b>"Đang thực hiện"</b> khi lưu.
+                    Đơn sẽ được chuyển sang trạng thái <b>"Đã phân công"</b> khi lưu.
                   </div>
                 )}
               </div>
@@ -3165,6 +3165,11 @@ export default function OrderList() {
                     const formatValue = (field: string, val: any) => {
                       if (val === null || val === undefined || val === '' || val === 'Trống' || val === 'null') {
                         return 'Trống';
+                      }
+                      if (field === 'adminStatus') {
+                        if (String(val).toLowerCase() === 'đang thực hiện') {
+                          return 'đã phân công';
+                        }
                       }
                       if (field === 'mainStationId' || field === 'techStationId') {
                         return getStationName(String(val));

@@ -97,7 +97,7 @@ const geoUrl = '/vn-provinces.json';
 const WORK_TYPE_OPTIONS = ['Giao hàng và Lắp đặt', 'Lắp đặt', 'Giao hàng', 'Thay lọc', 'Bảo hành', 'Sửa chữa'];
 const STATUS_OPTIONS = [
   { value: 'chờ xử lý', label: 'Chờ xử lý' },
-  { value: 'đang thực hiện', label: 'Đang thực hiện' },
+  { value: 'đang thực hiện', label: 'Đã phân công' },
   { value: 'hoàn thành', label: 'Hoàn thành' },
   { value: 'hủy đơn', label: 'Hủy đơn' }
 ];

@@ -284,7 +284,7 @@ export default function ReportList() {
       return <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-200">Hoàn thành</span>;
     }
     if (s === 'đang thực hiện' || s === 'đang làm') {
-      return <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">Đang thực hiện</span>;
+      return <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">Đã phân công</span>;
     }
     if (s === 'chưa làm' || s === 'chờ xử lý') {
       return <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200">Chưa làm</span>;
