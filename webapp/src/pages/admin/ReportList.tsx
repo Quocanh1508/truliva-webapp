@@ -180,13 +180,15 @@ function MultiSelectObjectDropdown({
   options,
   selectedIds,
   onChange,
-  placeholder = "Tất cả"
+  placeholder = "Tất cả",
+  onBeforeOpen
 }: {
   label: string;
   options: { id: string; name: string }[];
   selectedIds: string[];
   onChange: (ids: string[]) => void;
   placeholder?: string;
+  onBeforeOpen?: () => boolean;
 }) {
   const [isOpen, setIsOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -221,7 +223,13 @@ function MultiSelectObjectDropdown({
     <div className="flex flex-col gap-1 relative w-full text-left" ref={containerRef}>
       <label className="text-[11px] font-bold text-gray-500 uppercase tracking-wider">{label}</label>
       <div 
-        onClick={() => setIsOpen(!isOpen)}
+        onClick={() => {
+          if (!isOpen && onBeforeOpen) {
+            const allowed = onBeforeOpen();
+            if (!allowed) return;
+          }
+          setIsOpen(!isOpen);
+        }}
         className="w-full bg-white border border-gray-300 rounded-md px-3 py-2 text-[13px] text-gray-700 cursor-pointer flex justify-between items-center hover:border-blue-400 focus:border-blue-500 transition-colors"
       >
         <span className="truncate">
@@ -1002,7 +1010,7 @@ export default function ReportList() {
               </select>
             </div>
 
-            {/* Trạm kỹ thuật (Multi Select cascading) */}
+             {/* Trạm kỹ thuật (Multi Select cascading) */}
             <MultiSelectObjectDropdown
               label="Trạm kỹ thuật"
               options={
@@ -1012,13 +1020,20 @@ export default function ReportList() {
               }
               selectedIds={tempTechStations}
               onChange={handleTechStationsChange}
+              onBeforeOpen={() => {
+                if (!tempMainStationId) {
+                  alert('Vui lòng chọn Trạm chính trước khi chọn Trạm kỹ thuật.');
+                  return false;
+                }
+                return true;
+              }}
             />
 
             {/* KTV (Multi Select cascading) */}
             <MultiSelectObjectDropdown
               label="Kỹ thuật viên (KTV)"
               options={
-                tempTechStations.length > 0
+                (tempTechStations.length > 0
                   ? (filterOptions?.ktvs.filter(k => tempTechStations.includes(k.techStationId)) || [])
                   : (tempMainStationId
                       ? (filterOptions?.ktvs.filter(k => {
@@ -1027,9 +1042,21 @@ export default function ReportList() {
                         }) || [])
                       : (filterOptions?.ktvs || [])
                     )
+                ).map((k: any) => ({ id: k.id, name: k.fullName || k.name || '' }))
               }
               selectedIds={tempKtvs}
               onChange={setTempKtvs}
+              onBeforeOpen={() => {
+                if (!tempMainStationId) {
+                  alert('Vui lòng chọn Trạm chính trước khi chọn Kỹ thuật viên.');
+                  return false;
+                }
+                if (tempTechStations.length === 0) {
+                  alert('Vui lòng chọn Trạm kỹ thuật trước khi chọn Kỹ thuật viên.');
+                  return false;
+                }
+                return true;
+              }}
             />
 
             {/* Tỉnh / Thành phố */}
