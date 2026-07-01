@@ -3,6 +3,25 @@ import { useSearchParams } from 'react-router-dom';
 import { ShieldCheck, ArrowRight, UploadCloud, CheckCircle, AlertTriangle, Smartphone, User, MapPin, Loader2, Sparkles } from 'lucide-react';
 import { API_URL } from '../../api/client';
 
+// Định dạng hiển thị Số Serial dạng: XXXX XXX XXX XXXXX
+const formatSerialNumber = (value: string): string => {
+  const clean = value.replace(/[^a-zA-Z0-9]/g, '').substring(0, 15);
+  let formatted = '';
+  if (clean.length > 0) {
+    formatted += clean.substring(0, 4);
+  }
+  if (clean.length > 4) {
+    formatted += ' ' + clean.substring(4, 7);
+  }
+  if (clean.length > 7) {
+    formatted += ' ' + clean.substring(7, 10);
+  }
+  if (clean.length > 10) {
+    formatted += ' ' + clean.substring(10, 15);
+  }
+  return formatted.trim();
+};
+
 export default function WarrantyActivate() {
   const [searchParams] = useSearchParams();
   const serialFromUrl = searchParams.get('serial') || '';
@@ -41,8 +60,13 @@ export default function WarrantyActivate() {
   }, [serialFromUrl]);
 
   const checkSerialNumber = async (sn: string) => {
-    if (!sn.trim()) {
+    const clean = sn.replace(/[^a-zA-Z0-9]/g, '');
+    if (!clean) {
       setSerialError('Vui lòng nhập số Serial của sản phẩm');
+      return;
+    }
+    if (clean.length !== 15) {
+      setSerialError('Số Serial bắt buộc phải gồm đúng 15 ký tự chữ và số.');
       return;
     }
 
@@ -180,9 +204,9 @@ export default function WarrantyActivate() {
               </label>
               <input
                 type="text"
-                placeholder="Nhập số Serial (VD: RCJV1101...)"
+                placeholder="Mẫu: 1858 260 207 *****"
                 value={serialInput}
-                onChange={(e) => setSerialInput(e.target.value)}
+                onChange={(e) => setSerialInput(formatSerialNumber(e.target.value))}
                 disabled={checkingSerial}
                 className="w-full bg-[#111827]/80 border border-gray-700 focus:border-blue-500 rounded-xl px-4 py-3 text-sm outline-none text-white font-mono font-bold tracking-wider transition-all placeholder:text-gray-600"
               />
@@ -457,10 +481,9 @@ export default function WarrantyActivate() {
 
       </div>
 
-      {/* Footer */}
       <div className="text-center text-[10px] text-gray-500 relative z-10 max-w-xs leading-relaxed">
         <p>© 2026 Truliva Vietnam. Tất cả quyền được bảo lưu.</p>
-        <p className="mt-1">Hotline CSKH: 1900 xxxx (Hỗ trợ 8h00 - 18h00 hàng ngày)</p>
+        <p className="mt-1">Hotline CSKH: 1900 638463 (Hỗ trợ 8h00 - 18h00 hàng ngày)</p>
       </div>
 
     </div>
