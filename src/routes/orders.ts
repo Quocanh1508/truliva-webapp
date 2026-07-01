@@ -537,6 +537,16 @@ router.get('/', requireAuth, async (req: Request, res: Response): Promise<void> 
             createdAt: true,
           }
         },
+        serials: {
+          select: {
+            id: true,
+            serialNumber: true,
+            status: true,
+            activationDate: true,
+            warrantyExpiryDate: true,
+            customerConfirmationDate: true,
+          }
+        },
         customer: {
           select: {
             fullName: true,
@@ -596,6 +606,16 @@ router.get('/', requireAuth, async (req: Request, res: Response): Promise<void> 
             discount: true,
             variationInfo: true,
             createdAt: true,
+          }
+        },
+        serials: {
+          select: {
+            id: true,
+            serialNumber: true,
+            status: true,
+            activationDate: true,
+            warrantyExpiryDate: true,
+            customerConfirmationDate: true,
           }
         },
         customer: {
@@ -1399,7 +1419,8 @@ router.get('/:id', requireAuth, async (req: Request, res: Response): Promise<voi
           }
         },
         mainStation: true,
-        techStation: true
+        techStation: true,
+        serials: true
       }
     });
 

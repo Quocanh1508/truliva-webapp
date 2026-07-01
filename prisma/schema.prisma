@@ -109,6 +109,7 @@ model Order {
   mainStation         MainStation?  @relation(fields: [mainStationId], references: [id])
   techStation         TechStation?  @relation(fields: [techStationId], references: [id])
   serviceReports      ServiceReport[]
+  serials             Serial[]
 
   @@map("orders")
 }
@@ -354,6 +355,7 @@ model Serial {
   activatedBy              String?   @map("activated_by")                   // Cách thức kích hoạt: "CUSTOMER" | "KTV" | "ADMIN"
   orderId                  String?   @map("order_id")                       // Đơn hàng liên kết khi kích hoạt qua dịch vụ
   promoCode                String?   @map("promo_code")                     // Mã khuyến mãi đã áp dụng (nếu có)
+  order                    Order?    @relation(fields: [orderId], references: [id])
 
   // Metadata
   importBatchId            String?   @map("import_batch_id")                // Nhóm theo đợt import

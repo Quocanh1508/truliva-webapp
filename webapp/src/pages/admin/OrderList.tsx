@@ -2139,6 +2139,7 @@ export default function OrderList() {
                 <th className="px-4 py-2 w-[70px]">Mã đơn</th>
                 <th className="px-4 py-2 w-[180px]">Khách hàng</th>
                 <th className="px-4 py-2 w-[220px]">Công việc</th>
+                <th className="px-4 py-2 w-[200px]">Thông tin máy</th>
                 <th className="px-4 py-2 min-w-[320px]">Ghi chú</th>
                 <th className="px-4 py-2 text-center w-[140px]">Thao tác</th>
                 <th className="px-4 py-2 w-[160px]">Trạm - KTV</th>
@@ -2248,28 +2249,9 @@ export default function OrderList() {
                           <div className="flex flex-col gap-1 mt-0.5">
                             {order.items.map((item: any, i: number) => {
                               const pName = item.productName || item.rawData?.variation_info?.name || item.rawData?.name || 'Sản phẩm';
-                              
-                              // Tìm các báo cáo của đơn hàng này có serialNumber và khớp với tên sản phẩm/linh kiện này
-                              const matchedReports = (order.serviceReports || []).filter((r: any) => {
-                                if (!r.serialNumber) return false;
-                                const itemClean = removeAccents(pName);
-                                const matchesProduct = (r.products || []).some((p: string) => removeAccents(p).includes(itemClean) || itemClean.includes(removeAccents(p)));
-                                const matchesSparePart = (r.spareParts || []).some((sp: string) => removeAccents(sp).includes(itemClean) || itemClean.includes(removeAccents(sp)));
-                                return matchesProduct || matchesSparePart;
-                              });
-
                               return (
                                 <div key={item.id || i} className="flex items-center flex-wrap gap-1">
                                   <span>📦 {pName} (x{item.quantity})</span>
-                                  {matchedReports.map((r: any) => (
-                                    <span 
-                                      key={r.id} 
-                                      className="inline-flex items-center gap-0.5 px-1.5 py-0.25 rounded text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-100 font-mono" 
-                                      title={`Serial từ báo cáo: ${r.workType || 'Báo cáo dịch vụ'}`}
-                                    >
-                                      #{r.serialNumber}
-                                    </span>
-                                  ))}
                                 </div>
                               );
                             })}
@@ -2285,6 +2267,67 @@ export default function OrderList() {
                           Thu: {(order.moneyToCollect).toLocaleString('vi-VN')} đ
                         </div>
                       )}
+                    </td>
+
+                    {/* 3.5. Thông tin máy */}
+                    <td className="px-4 py-2 whitespace-normal align-top w-[200px]">
+                      {(() => {
+                        const orderSerials = order.serials || [];
+                        const reportSerials = (order.serviceReports || [])
+                          .filter((r: any) => r.serialNumber)
+                          .map((r: any) => ({
+                            id: r.id,
+                            serialNumber: r.serialNumber,
+                            status: 'Chưa kích hoạt',
+                            activationDate: null,
+                            warrantyExpiryDate: null
+                          }));
+                        
+                        const serialsToShow = orderSerials.length > 0 ? orderSerials : reportSerials;
+
+                        if (serialsToShow.length === 0) {
+                          return <span className="text-gray-400 italic text-[11px]">Chưa kích hoạt</span>;
+                        }
+
+                        return (
+                          <div className="space-y-3">
+                            {serialsToShow.map((serial: any) => {
+                              const getStatusColor = (status: string) => {
+                                if (status === 'Đã kích hoạt' || status === 'KH xác nhận') return 'text-green-600 font-bold';
+                                if (status === 'Chờ duyệt') return 'text-amber-600 font-bold';
+                                return 'text-gray-500 font-medium';
+                              };
+                              return (
+                                <div key={serial.id} className="border border-gray-200 rounded overflow-hidden bg-white shadow-sm max-w-[190px]">
+                                  <div className="bg-gray-100 px-2 py-1 text-[11px] font-bold text-gray-700 border-b border-gray-200">
+                                    Thông tin máy
+                                  </div>
+                                  <div className="p-2 space-y-1.5 text-[11px] text-gray-700 leading-tight">
+                                    <div>
+                                      <span className="text-gray-500">Serial:</span> <strong className="font-mono text-gray-900">{serial.serialNumber}</strong>
+                                    </div>
+                                    <div className={getStatusColor(serial.status || 'Chưa kích hoạt')}>
+                                      {serial.status || 'Chưa kích hoạt'}
+                                    </div>
+                                    {serial.activationDate && (
+                                      <div>
+                                        <span className="text-gray-500 block">Ngày kích hoạt bảo hành:</span>
+                                        <span className="font-semibold text-gray-800">{new Date(serial.activationDate).toLocaleDateString('vi-VN')}</span>
+                                      </div>
+                                    )}
+                                    {serial.warrantyExpiryDate && (
+                                      <div>
+                                        <span className="text-red-500 block">Ngày hết hạn bảo hành:</span>
+                                        <span className="font-semibold text-red-500">{new Date(serial.warrantyExpiryDate).toLocaleDateString('vi-VN')}</span>
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        );
+                      })()}
                     </td>
 
                     {/* 4. Ghi chú (Hiển thị đầy đủ như yêu cầu) */}
