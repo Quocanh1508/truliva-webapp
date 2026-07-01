@@ -1988,7 +1988,7 @@ router.post('/sync', requireAuth, async (req: Request, res: Response): Promise<v
     }
 
     logger.info('Manual orders sync initiated by user', { userId: req.user?.id, role });
-    const count = await syncRecentOrders(500);
+    const count = await syncRecentOrders(50);
     res.json({ success: true, message: `Đồng bộ thành công ${count} đơn hàng gần đây từ Pancake.` });
   } catch (error: any) {
     logger.error('Manual orders sync failed', { error: error.message });
