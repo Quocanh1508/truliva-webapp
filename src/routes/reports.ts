@@ -1120,8 +1120,8 @@ router.get('/filter-options', async (req: Request, res: Response): Promise<void>
       prisma.serviceReport.findMany({ select: { serviceType: true }, distinct: ['serviceType'] }),
        prisma.product.findMany({ select: { name: true, category: true }, orderBy: { name: 'asc' } }),
       prisma.product.findMany({ select: { category: true }, distinct: ['category'] }),
-      prisma.mainStation.findMany({ select: { id: true, name: true }, orderBy: { name: 'asc' } }),
-      prisma.techStation.findMany({ select: { id: true, name: true, mainStationId: true }, orderBy: { name: 'asc' } }),
+      prisma.mainStation.findMany({ where: { isActive: true }, select: { id: true, name: true }, orderBy: { name: 'asc' } }),
+      prisma.techStation.findMany({ where: { isActive: true }, select: { id: true, name: true, mainStationId: true }, orderBy: { name: 'asc' } }),
       prisma.user.findMany({
         where: { role: 'KTV', isActive: true },
         select: { id: true, fullName: true, techStationId: true },
