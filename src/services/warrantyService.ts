@@ -172,14 +172,25 @@ export async function syncSerialFromReport(
     where: { serialNumber: cleanedSerial }
   });
 
-  let model = 'Máy lọc nước Truliva';
+  let model = 'Không rõ dòng máy';
   if (orderId) {
     const order = await prisma.order.findUnique({
       where: { id: orderId },
       include: { items: true }
     });
     if (order && order.items && order.items.length > 0) {
-      model = order.items[0].productName || 'Máy lọc nước Truliva';
+      const productNames = order.items.map(i => i.productName).filter(Boolean) as string[];
+      if (productNames.length > 0) {
+        const deviceProduct = await prisma.product.findFirst({
+          where: {
+            name: { in: productNames },
+            category: { contains: 'Device', mode: 'insensitive' }
+          }
+        });
+        if (deviceProduct) {
+          model = deviceProduct.name;
+        }
+      }
     }
   }
 
