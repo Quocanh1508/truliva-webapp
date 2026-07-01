@@ -30,12 +30,30 @@ export async function activateSerialWarranty(
 ) {
   const cleanedSerial = serialNumber.trim().replace(/[^a-zA-Z0-9_]/g, '').toUpperCase();
   
-  const existingSerial = await prisma.serial.findUnique({
+  let existingSerial = await prisma.serial.findUnique({
     where: { serialNumber: cleanedSerial }
   });
 
   if (!existingSerial) {
-    throw new Error(`Không tìm thấy số Serial "${serialNumber}" trong hệ thống.`);
+    // Tự động tạo mới Serial nếu không tồn tại trong hệ thống
+    let model = 'Máy lọc nước Truliva';
+    if (orderId) {
+      const order = await prisma.order.findUnique({
+        where: { id: orderId },
+        include: { items: true }
+      });
+      if (order && order.items && order.items.length > 0) {
+        model = order.items[0].productName || 'Máy lọc nước Truliva';
+      }
+    }
+
+    existingSerial = await prisma.serial.create({
+      data: {
+        serialNumber: cleanedSerial,
+        model,
+        status: 'Chưa kích hoạt'
+      }
+    });
   }
 
   // Quyết định trạng thái
