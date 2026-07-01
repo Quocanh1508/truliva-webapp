@@ -634,6 +634,19 @@ router.get('/export', requireCoordinatorOrAdmin, async (req: Request, res: Respo
 });
 
 // ══════════════════════════════════════
+//  GET /api/serials/policies - Danh sách chính sách bảo hành
+// ══════════════════════════════════════
+router.get('/policies', requireCoordinatorOrAdmin, async (req: Request, res: Response): Promise<void> => {
+  try {
+    const policies = await prisma.warrantyPolicy.findMany();
+    res.json(policies);
+  } catch (error: any) {
+    logger.error('Lỗi lấy chính sách bảo hành', { error: error.message });
+    res.status(500).json({ error: 'Lỗi lấy chính sách bảo hành' });
+  }
+});
+
+// ══════════════════════════════════════
 //  GET /api/serials/:id - Chi tiết serial + Lịch sử
 // ══════════════════════════════════════
 

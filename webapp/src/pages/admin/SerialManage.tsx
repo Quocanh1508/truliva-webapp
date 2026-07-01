@@ -87,6 +87,7 @@ export default function SerialManage() {
 
   // Form states for approval & manual activation
   const [promosList, setPromosList] = useState<any[]>([]);
+  const [policiesList, setPoliciesList] = useState<any[]>([]);
   const [manualStartDate, setManualStartDate] = useState(new Date().toISOString().substring(0, 10));
   const [selectedPromoCode, setSelectedPromoCode] = useState('');
   const [submittingApprove, setSubmittingApprove] = useState(false);
@@ -101,8 +102,47 @@ export default function SerialManage() {
         console.error('Lỗi tải danh sách khuyến mãi', err);
       }
     };
+    const fetchPolicies = async () => {
+      try {
+        const data = await fetchApi('/serials/policies');
+        setPoliciesList(data || []);
+      } catch (err) {
+        console.error('Lỗi tải chính sách bảo hành', err);
+      }
+    };
     fetchPromos();
+    fetchPolicies();
   }, []);
+
+  const calculateExpiryDate = (activationDateStr: string | null, modelName: string, selectedPromoCodeStr: string | null) => {
+    if (!activationDateStr) return null;
+
+    const startDate = new Date(activationDateStr);
+    if (isNaN(startDate.getTime())) return null;
+
+    // 1. Tính toán thời gian bảo hành tiêu chuẩn (mặc định 12 tháng)
+    let standardMonths = 12;
+    const matchedPolicy = policiesList.find(p => 
+      modelName.toLowerCase().includes(p.modelKeyword.toLowerCase())
+    );
+    if (matchedPolicy) {
+      standardMonths = matchedPolicy.warrantyMonths;
+    }
+
+    // 2. Tính toán thời gian khuyến mãi cộng thêm
+    let promoMonths = 0;
+    if (selectedPromoCodeStr) {
+      const promo = promosList.find(p => p.code === selectedPromoCodeStr);
+      if (promo) {
+        promoMonths = promo.promoMonths;
+      }
+    }
+
+    const totalMonths = standardMonths + promoMonths;
+    const expiryDate = new Date(startDate);
+    expiryDate.setMonth(expiryDate.getMonth() + totalMonths);
+    return expiryDate.toISOString();
+  };
 
   const handleApproveWarranty = async (serialId: string) => {
     setSubmittingApprove(true);
@@ -768,7 +808,14 @@ export default function SerialManage() {
                   <input
                     type="text"
                     value={selectedSerial.model || ''}
-                    onChange={e => setSelectedSerial(prev => prev ? { ...prev, model: e.target.value } : null)}
+                    onChange={e => {
+                      const newModel = e.target.value;
+                      setSelectedSerial(prev => {
+                        if (!prev) return null;
+                        const expiry = calculateExpiryDate(prev.activationDate, newModel, prev.promoCode || null);
+                        return { ...prev, model: newModel, warrantyExpiryDate: expiry };
+                      });
+                    }}
                     style={{ width: '100%', padding: '8px 12px', borderRadius: 8, border: '1px solid #cbd5e1', fontSize: 13, marginTop: 4, background: 'white' }}
                   />
                 </div>
@@ -864,7 +911,14 @@ export default function SerialManage() {
                   <input
                     type="date"
                     value={selectedSerial.activationDate ? new Date(selectedSerial.activationDate).toISOString().split('T')[0] : ''}
-                    onChange={e => setSelectedSerial(prev => prev ? { ...prev, activationDate: e.target.value ? new Date(e.target.value).toISOString() : null } : null)}
+                    onChange={e => {
+                      const newDate = e.target.value ? new Date(e.target.value).toISOString() : null;
+                      setSelectedSerial(prev => {
+                        if (!prev) return null;
+                        const expiry = calculateExpiryDate(newDate, prev.model, prev.promoCode || null);
+                        return { ...prev, activationDate: newDate, warrantyExpiryDate: expiry };
+                      });
+                    }}
                     style={{ width: '100%', padding: '8px 12px', borderRadius: 8, border: '1px solid #cbd5e1', fontSize: 13, marginTop: 4, background: 'white' }}
                   />
                 </div>
@@ -885,7 +939,14 @@ export default function SerialManage() {
                   <label style={{ fontSize: 11, fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>Mã khuyến mãi áp dụng</label>
                   <select
                     value={selectedSerial.promoCode || ''}
-                    onChange={e => setSelectedSerial(prev => prev ? { ...prev, promoCode: e.target.value || null } : null)}
+                    onChange={e => {
+                      const newPromo = e.target.value || null;
+                      setSelectedSerial(prev => {
+                        if (!prev) return null;
+                        const expiry = calculateExpiryDate(prev.activationDate, prev.model, newPromo);
+                        return { ...prev, promoCode: newPromo, warrantyExpiryDate: expiry };
+                      });
+                    }}
                     style={{ width: '100%', padding: '8px 12px', borderRadius: 8, border: '1px solid #cbd5e1', fontSize: 13, marginTop: 4, background: 'white' }}
                   >
                     <option value="">Không áp dụng</option>
