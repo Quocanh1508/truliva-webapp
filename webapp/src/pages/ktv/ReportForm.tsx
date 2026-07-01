@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { fetchApi, getOrders, getFiltersData } from '../../api/client';
+import { fetchApi, getOrders, getFiltersData, getOrderDetails } from '../../api/client';
 import LabeledImageUploader from '../../components/LabeledImageUploader';
 import { CheckCircle, ChevronLeft, Send, AlertCircle, Camera, Loader2, ChevronDown, X } from 'lucide-react';
 import { Html5Qrcode } from 'html5-qrcode';
@@ -422,46 +422,16 @@ export default function ReportForm() {
           }
           setOrders(list);
           setSelectedOrderId(stateOrder.id);
-          
-          setCustomerName(stateOrder.billFullName || stateOrder.customer?.fullName || '');
-          setCustomerPhone(stateOrder.billPhoneNumber || stateOrder.customer?.phoneNumber || '');
-          setProvince(stateOrder.shippingAddress?.province_name || stateOrder.customer?.provinceName || '');
-          setAddress(stateOrder.shippingAddress?.full_address || stateOrder.customer?.fullAddress || '');
-          
-          if (stateOrder.workType) {
-            setWorkType(stateOrder.workType);
-            const noServiceTypes = ['Giao hàng và Lắp đặt', 'Lắp đặt', 'Giao hàng', 'Thay lọc'];
-            if (noServiceTypes.includes(stateOrder.workType) && !stateOrder.serviceType) {
-              setSelectedServices(['Công việc đã bao gồm dịch vụ']);
-            } else {
-              setSelectedServices(stateOrder.serviceType ? stateOrder.serviceType.split(',').map((s: string) => s.trim()).filter(Boolean) : []);
-            }
-          } else {
-            setSelectedServices(stateOrder.serviceType ? stateOrder.serviceType.split(',').map((s: string) => s.trim()).filter(Boolean) : []);
-          }
+          prefillOrderInfo(stateOrder);
 
-          if (stateOrder.items && stateOrder.items.length > 0) {
-            const initialItems = stateOrder.items.map((item: any) => {
-              const name = item.productName
-                || item.variationInfo?.name
-                || (item.sku ? `Sản phẩm (${item.sku})` : 'Sản phẩm không tên');
-              const qty = item.quantity || 1;
-              return {
-                productName: name,
-                sku: item.sku || '',
-                quantity: qty,
-                price: item.price || 0
-              };
-            });
-            setSelectedItems(initialItems);
-          } else {
-            setSelectedItems([]);
-          }
-          
-          const amount = stateOrder.moneyToCollect !== undefined && stateOrder.moneyToCollect !== null
-            ? stateOrder.moneyToCollect
-            : (stateOrder.totalPrice !== undefined && stateOrder.totalPrice !== null ? stateOrder.totalPrice : 0);
-          setActualAmount(String(amount));
+          // Tải thông tin chi tiết nhất từ server để cập nhật items
+          getOrderDetails(stateOrder.id)
+            .then(latest => {
+              if (latest) {
+                prefillOrderInfo(latest);
+              }
+            })
+            .catch(e => console.error('Lỗi lấy chi tiết đơn hàng stateOrder:', e));
 
         } else {
           setOrders(list);
@@ -495,46 +465,15 @@ export default function ReportForm() {
               }
               setOrders(list);
               setSelectedOrderId(stateOrder.id);
-              
-              setCustomerName(stateOrder.billFullName || stateOrder.customer?.fullName || '');
-              setCustomerPhone(stateOrder.billPhoneNumber || stateOrder.customer?.phoneNumber || '');
-              setProvince(stateOrder.shippingAddress?.province_name || stateOrder.customer?.provinceName || '');
-              setAddress(stateOrder.shippingAddress?.full_address || stateOrder.customer?.fullAddress || '');
-              
-              if (stateOrder.workType) {
-                setWorkType(stateOrder.workType);
-                const noServiceTypes = ['Giao hàng và Lắp đặt', 'Lắp đặt', 'Giao hàng', 'Thay lọc'];
-                if (noServiceTypes.includes(stateOrder.workType) && !stateOrder.serviceType) {
-                  setSelectedServices(['Công việc đã bao gồm dịch vụ']);
-                } else {
-                  setSelectedServices(stateOrder.serviceType ? stateOrder.serviceType.split(',').map((s: string) => s.trim()).filter(Boolean) : []);
-                }
-              } else {
-                setSelectedServices(stateOrder.serviceType ? stateOrder.serviceType.split(',').map((s: string) => s.trim()).filter(Boolean) : []);
-              }
+              prefillOrderInfo(stateOrder);
 
-              if (stateOrder.items && stateOrder.items.length > 0) {
-                const initialItems = stateOrder.items.map((item: any) => {
-                  const name = item.productName
-                    || item.variationInfo?.name
-                    || (item.sku ? `Sản phẩm (${item.sku})` : 'Sản phẩm không tên');
-                  const qty = item.quantity || 1;
-                  return {
-                    productName: name,
-                    sku: item.sku || '',
-                    quantity: qty,
-                    price: item.price || 0
-                  };
-                });
-                setSelectedItems(initialItems);
-              } else {
-                setSelectedItems([]);
-              }
-              
-              const amount = stateOrder.moneyToCollect !== undefined && stateOrder.moneyToCollect !== null
-                ? stateOrder.moneyToCollect
-                : (stateOrder.totalPrice !== undefined && stateOrder.totalPrice !== null ? stateOrder.totalPrice : 0);
-              setActualAmount(String(amount));
+              getOrderDetails(stateOrder.id)
+                .then(latest => {
+                  if (latest) {
+                    prefillOrderInfo(latest);
+                  }
+                })
+                .catch(e => console.error('Lỗi lấy chi tiết đơn hàng stateOrder cache:', e));
             } else {
               setOrders(list);
             }
@@ -545,7 +484,51 @@ export default function ReportForm() {
       });
   }, [location.state, editReportId]);
 
-  const handleOrderSelect = (orderId: string) => {
+  const prefillOrderInfo = (order: any) => {
+    setCustomerName(order.billFullName || order.customer?.fullName || '');
+    setCustomerPhone(order.billPhoneNumber || order.customer?.phoneNumber || '');
+    setProvince(order.shippingAddress?.province_name || order.customer?.provinceName || '');
+    const fullAddr = order.shippingAddress?.full_address || order.customer?.fullAddress || '';
+    setAddress(fullAddr);
+    if (order.workType) {
+      setWorkType(order.workType);
+      const noServiceTypes = ['Giao hàng và Lắp đặt', 'Lắp đặt', 'Giao hàng', 'Thay lọc'];
+      if (noServiceTypes.includes(order.workType) && !order.serviceType) {
+        setSelectedServices(['Công việc đã bao gồm dịch vụ']);
+      } else {
+        setSelectedServices(order.serviceType ? order.serviceType.split(',').map((s: string) => s.trim()).filter(Boolean) : []);
+      }
+    } else {
+      setSelectedServices(order.serviceType ? order.serviceType.split(',').map((s: string) => s.trim()).filter(Boolean) : []);
+    }
+
+    // ── Mapping sản phẩm x số lượng từ items ──
+    if (order.items && order.items.length > 0) {
+      const initialItems = order.items.map((item: any) => {
+        const name = item.productName
+          || item.variationInfo?.name
+          || (item.sku ? `Sản phẩm (${item.sku})` : 'Sản phẩm không tên');
+        const qty = item.quantity || 1;
+        return {
+          productName: name,
+          sku: item.sku || '',
+          quantity: qty,
+          price: item.price || 0
+        };
+      });
+      setSelectedItems(initialItems);
+    } else {
+      setSelectedItems([]);
+    }
+
+    // ── Mapping tiền thu thực tế (moneyToCollect hoặc totalPrice) ──
+    const amount = order.moneyToCollect !== undefined && order.moneyToCollect !== null
+      ? order.moneyToCollect
+      : (order.totalPrice !== undefined && order.totalPrice !== null ? order.totalPrice : 0);
+    setActualAmount(String(amount));
+  };
+
+  const handleOrderSelect = async (orderId: string) => {
     setSelectedOrderId(orderId);
     if (!orderId) {
       setCustomerName('');
@@ -558,49 +541,21 @@ export default function ReportForm() {
       setActualAmount('');
       return;
     }
-    const order = orders.find(o => o.id === orderId);
-    if (order) {
-      setCustomerName(order.billFullName || order.customer?.fullName || '');
-      setCustomerPhone(order.billPhoneNumber || order.customer?.phoneNumber || '');
-      setProvince(order.shippingAddress?.province_name || order.customer?.provinceName || '');
-      const fullAddr = order.shippingAddress?.full_address || order.customer?.fullAddress || '';
-      setAddress(fullAddr);
-      if (order.workType) {
-        setWorkType(order.workType);
-        const noServiceTypes = ['Giao hàng và Lắp đặt', 'Lắp đặt', 'Giao hàng', 'Thay lọc'];
-        if (noServiceTypes.includes(order.workType) && !order.serviceType) {
-          setSelectedServices(['Công việc đã bao gồm dịch vụ']);
-        } else {
-          setSelectedServices(order.serviceType ? order.serviceType.split(',').map((s: string) => s.trim()).filter(Boolean) : []);
-        }
-      } else {
-        setSelectedServices(order.serviceType ? order.serviceType.split(',').map((s: string) => s.trim()).filter(Boolean) : []);
-      }
+    
+    // Prefill nhanh từ local list
+    const localOrder = orders.find(o => o.id === orderId);
+    if (localOrder) {
+      prefillOrderInfo(localOrder);
+    }
 
-      // ── Mapping sản phẩm x số lượng từ items ──
-      if (order.items && order.items.length > 0) {
-        const initialItems = order.items.map((item: any) => {
-          const name = item.productName
-            || item.variationInfo?.name
-            || (item.sku ? `Sản phẩm (${item.sku})` : 'Sản phẩm không tên');
-          const qty = item.quantity || 1;
-          return {
-            productName: name,
-            sku: item.sku || '',
-            quantity: qty,
-            price: item.price || 0
-          };
-        });
-        setSelectedItems(initialItems);
-      } else {
-        setSelectedItems([]);
+    // Luôn tải trực tiếp chi tiết từ server để có items mới nhất
+    try {
+      const latestOrder = await getOrderDetails(orderId);
+      if (latestOrder) {
+        prefillOrderInfo(latestOrder);
       }
-
-      // ── Mapping tiền thu thực tế (moneyToCollect hoặc totalPrice) ──
-      const amount = order.moneyToCollect !== undefined && order.moneyToCollect !== null
-        ? order.moneyToCollect
-        : (order.totalPrice !== undefined && order.totalPrice !== null ? order.totalPrice : 0);
-      setActualAmount(String(amount));
+    } catch (err) {
+      console.error('Lỗi khi tải chi tiết đơn hàng:', err);
     }
   };
 

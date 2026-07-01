@@ -1381,6 +1381,41 @@ router.get('/customers/search', requireAuth, async (req: Request, res: Response)
 });
 
 /**
+ * GET /api/orders/:id
+ * Lấy chi tiết một đơn hàng
+ */
+router.get('/:id', requireAuth, async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { id } = req.params;
+    const order = await prisma.order.findUnique({
+      where: { id: id as string },
+      include: {
+        items: true,
+        customer: true,
+        assignedKtv: {
+          select: {
+            id: true,
+            fullName: true
+          }
+        },
+        mainStation: true,
+        techStation: true
+      }
+    });
+
+    if (!order) {
+      res.status(404).json({ error: 'Không tìm thấy đơn hàng' });
+      return;
+    }
+
+    res.json(order);
+  } catch (error: any) {
+    logger.error('Get order detail error', { id: req.params.id, error: error.message });
+    res.status(500).json({ error: 'Lỗi lấy chi tiết đơn hàng' });
+  }
+});
+
+/**
  * GET /api/orders/:id/audit
  * Lấy lịch sử thay đổi của 1 đơn hàng
  */

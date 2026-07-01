@@ -84,6 +84,10 @@ export async function getOrders(params: Record<string, any> = {}) {
   return fetchApi(endpoint);
 }
 
+export async function getOrderDetails(id: string) {
+  return fetchApi(`/orders/${id}`);
+}
+
 export async function updateOrder(id: string, data: any) {
   return fetchApi(`/orders/${id}`, {
     method: 'PATCH',
