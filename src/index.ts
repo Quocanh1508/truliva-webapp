@@ -27,6 +27,7 @@ import promoRoutes from './routes/promos';
 import { startOrderSyncScheduler } from './services/orderSyncScheduler';
 import { startReportCleanupScheduler } from './services/reportCleanupScheduler';
 import { startPancakeRetryScheduler } from './services/pancakeRetryScheduler';
+import { startProductSyncScheduler } from './services/productSyncScheduler';
 import { initWebSocketServer } from './services/websocketService';
 import { apiLimiter, loginLimiter } from './middleware/rateLimiter';
 import { securityMiddleware } from './middleware/security';
@@ -211,6 +212,9 @@ const server = app.listen(PORT, () => {
 
   // Khởi động lập lịch tự động đồng bộ lại đơn lỗi sang Pancake POS
   startPancakeRetryScheduler(10); // Chạy định kỳ mỗi 10 phút
+
+  // Khởi động lập lịch đồng bộ sản phẩm & tồn kho từ Pancake POS (mỗi 12 tiếng)
+  startProductSyncScheduler(12);
 });
 
 initWebSocketServer(server);
