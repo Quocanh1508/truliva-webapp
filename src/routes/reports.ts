@@ -1823,6 +1823,68 @@ router.delete('/:id', requireCoordinatorOrAdmin, async (req: Request, res: Respo
       logger.error('Failed to trigger Web Push notification for report deletion', { error: err.message });
     });
 
+    // Tự động hủy đơn hàng liên kết và đồng bộ sang Pancake POS
+    if (existingReport.orderId) {
+      const oldOrder = await prisma.order.findUnique({
+        where: { id: existingReport.orderId },
+        include: { items: true }
+      });
+
+      if (oldOrder && oldOrder.adminStatus !== 'hủy đơn') {
+        // 1. Cập nhật trạng thái đơn hàng cục bộ
+        const updatedOrder = await prisma.order.update({
+          where: { id: existingReport.orderId },
+          data: {
+            adminStatus: 'hủy đơn',
+            statusCode: 6,
+            statusName: 'cancelled'
+          }
+        });
+
+        // 2. Đồng bộ và hoàn lại kho hàng cục bộ
+        try {
+          await syncOrderInventoryState(oldOrder.id, {
+            adminStatus: oldOrder.adminStatus,
+            warehouseId: oldOrder.warehouseId,
+            items: oldOrder.items.map(item => ({
+              productName: item.productName || '',
+              quantity: item.quantity || 1
+            }))
+          }, {
+            adminStatus: 'hủy đơn',
+            warehouseId: updatedOrder.warehouseId,
+            items: oldOrder.items.map(item => ({
+              productName: item.productName || '',
+              quantity: item.quantity || 1
+            }))
+          });
+        } catch (invErr: any) {
+          logger.error('Lỗi hoàn kho khi hủy đơn do xóa báo cáo', { orderId: oldOrder.id, error: invErr.message });
+        }
+
+        // 3. Đồng bộ trạng thái Hủy sang Pancake POS
+        if (oldOrder.pancakeOrderId > 0) {
+          try {
+            await syncOrderStatusToPancake(oldOrder.pancakeOrderId, 'hủy đơn');
+            await prisma.order.update({
+              where: { id: oldOrder.id },
+              data: { pancakeSyncStatus: 'SUCCESS' }
+            });
+            logger.info('Synced cancelled order status to Pancake POS due to report deletion', { pancakeOrderId: oldOrder.pancakeOrderId });
+          } catch (syncErr: any) {
+            await prisma.order.update({
+              where: { id: oldOrder.id },
+              data: { pancakeSyncStatus: 'FAILED' }
+            });
+            logger.warn('Failed to sync cancelled status to Pancake POS on report deletion', {
+              pancakeOrderId: oldOrder.pancakeOrderId,
+              error: syncErr.message
+            });
+          }
+        }
+      }
+    }
+
     // 2. Thực hiện xóa báo cáo khỏi cơ sở dữ liệu
     await prisma.serviceReport.delete({
       where: { id: reportId },

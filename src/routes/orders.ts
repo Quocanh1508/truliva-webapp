@@ -1889,6 +1889,16 @@ router.patch('/:id', requireAuth, async (req: Request, res: Response): Promise<v
       data: updateData,
     });
 
+    // Nếu chuyển sang hủy đơn, tự động xóa các báo cáo kỹ thuật liên quan
+    if (adminStatus === 'hủy đơn') {
+      const deletedReports = await prisma.serviceReport.deleteMany({
+        where: { orderId: id }
+      });
+      if (deletedReports.count > 0) {
+        logger.info(`Automatically deleted ${deletedReports.count} service reports for order cancelled by Admin`, { orderId: id });
+      }
+    }
+
     // Tích hợp đồng bộ tồn kho cục bộ
     try {
       const newOrderItems = await prisma.orderItem.findMany({

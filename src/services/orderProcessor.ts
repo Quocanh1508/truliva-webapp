@@ -409,6 +409,19 @@ export async function processOrderEvent(rawEventId: string | null, payload: any)
       logger.error('Lỗi khấu trừ kho khi đồng bộ webhook Pancake', { orderId: order.id, error: invErr.message });
     }
 
+    // Nếu đơn hàng bị hủy, tự động xóa các báo cáo kỹ thuật liên quan
+    if (newAdminStatus === 'hủy đơn') {
+      const deletedReports = await prisma.serviceReport.deleteMany({
+        where: { orderId: order.id }
+      });
+      if (deletedReports.count > 0) {
+        logger.info(`Automatically deleted ${deletedReports.count} service reports for cancelled order`, {
+          orderId: order.id,
+          pancakeOrderId: systemId
+        });
+      }
+    }
+
     // ══════════════════════════════════════
     // 4. Đánh dấu raw event đã xử lý
     // ══════════════════════════════════════
