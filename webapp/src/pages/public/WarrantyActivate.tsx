@@ -167,39 +167,44 @@ export default function WarrantyActivate() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-[#111827] to-[#1f2937] text-white flex flex-col items-center justify-center p-4 font-sans antialiased">
+    <div className="min-h-screen bg-gradient-to-b from-[#FDF8F5] via-[#F9EBE0] to-[#F3DCD0] text-gray-800 flex flex-col items-center justify-center p-4 font-sans antialiased relative overflow-hidden">
       
       {/* Decorative background glow */}
-      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full max-w-7xl h-[400px] bg-blue-600/10 blur-[120px] rounded-full pointer-events-none" />
+      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full max-w-7xl h-[400px] bg-orange-400/5 blur-[120px] rounded-full pointer-events-none" />
 
       {/* Main Container */}
-      <div className="w-full max-w-md bg-[#1f2937]/60 backdrop-blur-xl border border-gray-800 rounded-2xl shadow-2xl p-6 relative z-10 my-8">
+      <div className="w-full max-w-md bg-white/95 backdrop-blur-xl border border-orange-100 rounded-2xl shadow-xl shadow-orange-950/5 p-6 relative z-10 my-8">
         
+        {/* Banner Image */}
+        <div className="w-full rounded-xl overflow-hidden mb-6 shadow-sm border border-orange-100">
+          <img src="/banner.png" alt="Pure Vita Banner" className="w-full h-auto object-cover" />
+        </div>
+
         {/* Branding Header */}
         <div className="text-center mb-6">
-          <div className="w-16 h-16 bg-blue-600/20 border border-blue-500/40 rounded-full flex items-center justify-center mx-auto mb-3 shadow-lg shadow-blue-500/10">
-            <ShieldCheck size={36} className="text-blue-500 animate-pulse" />
+          <div className="w-16 h-16 bg-orange-50 border border-orange-200/50 rounded-full flex items-center justify-center mx-auto mb-3 shadow-md shadow-orange-500/5">
+            <ShieldCheck size={36} className="text-orange-500" />
           </div>
-          <h1 className="text-xl font-black uppercase tracking-wider text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-indigo-400">
+          <h1 className="text-xl font-extrabold uppercase tracking-wider text-transparent bg-clip-text bg-gradient-to-r from-orange-600 to-amber-600">
             KÍCH HOẠT BẢO HÀNH
           </h1>
-          <p className="text-xs text-gray-400 font-semibold mt-1 uppercase tracking-widest">
-            Truliva Official
+          <p className="text-[10px] text-gray-500 font-bold mt-1 uppercase tracking-widest">
+            Pure Vita Official
           </p>
         </div>
 
         {/* STEP 1: Enter Serial */}
         {step === 1 && (
           <div className="space-y-4">
-            <div className="bg-gray-800/40 border border-gray-700/50 rounded-xl p-4 text-center">
-              <Sparkles size={20} className="mx-auto text-blue-400 mb-2" />
-              <p className="text-xs text-gray-300 leading-relaxed font-medium">
+            <div className="bg-orange-50/40 border border-orange-100/60 rounded-xl p-4 text-center">
+              <Sparkles size={20} className="mx-auto text-orange-500 mb-2" />
+              <p className="text-xs text-gray-600 leading-relaxed font-medium">
                 Vui lòng nhập số Serial (phía sau thân máy hoặc vỏ hộp) để kiểm tra thông tin thiết bị và bắt đầu quá trình kích hoạt bảo hành điện tử.
               </p>
             </div>
 
             <div>
-              <label className="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">
+              <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">
                 Số Serial sản phẩm
               </label>
               <input
@@ -208,12 +213,12 @@ export default function WarrantyActivate() {
                 value={serialInput}
                 onChange={(e) => setSerialInput(formatSerialNumber(e.target.value))}
                 disabled={checkingSerial}
-                className="w-full bg-[#111827]/80 border border-gray-700 focus:border-blue-500 rounded-xl px-4 py-3 text-sm outline-none text-white font-mono font-bold tracking-wider transition-all placeholder:text-gray-600"
+                className="w-full bg-orange-50/10 border border-gray-200 focus:border-orange-500 focus:ring-2 focus:ring-orange-500/20 rounded-xl px-4 py-3 text-sm outline-none text-gray-800 font-mono font-bold tracking-wider transition-all placeholder:text-gray-400"
               />
             </div>
 
             {serialError && (
-              <div className="bg-rose-500/10 border border-rose-500/20 text-rose-400 text-xs px-3.5 py-2.5 rounded-xl flex items-start gap-2 animate-fade-in font-medium">
+              <div className="bg-rose-500/5 border border-rose-500/10 text-rose-600 text-xs px-3.5 py-2.5 rounded-xl flex items-start gap-2 animate-fade-in font-medium">
                 <AlertTriangle size={16} className="shrink-0 text-rose-500 mt-0.5" />
                 <span>{serialError}</span>
               </div>
@@ -222,7 +227,7 @@ export default function WarrantyActivate() {
             <button
               onClick={() => checkSerialNumber(serialInput)}
               disabled={checkingSerial || !serialInput.trim()}
-              className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-xl text-sm transition-all shadow-lg shadow-blue-500/25 active:scale-[0.98] disabled:opacity-50 flex items-center justify-center gap-2"
+              className="w-full bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white font-bold py-3 px-4 rounded-xl text-sm transition-all shadow-md shadow-orange-500/10 active:scale-[0.98] disabled:opacity-50 flex items-center justify-center gap-2"
             >
               {checkingSerial ? (
                 <>
@@ -242,88 +247,88 @@ export default function WarrantyActivate() {
           <form onSubmit={handleSubmitActivation} className="space-y-4">
             
             {/* Display Product Info */}
-            <div className="bg-gradient-to-r from-blue-900/30 to-indigo-900/30 border border-blue-800/40 rounded-xl p-4">
-              <span className="text-[10px] font-bold text-blue-400 bg-blue-500/10 px-2 py-0.5 rounded border border-blue-500/20 uppercase tracking-wider">
+            <div className="bg-gradient-to-r from-orange-50 to-amber-50/50 border border-orange-100 rounded-xl p-4">
+              <span className="text-[10px] font-bold text-orange-600 bg-orange-100 px-2 py-0.5 rounded border border-orange-200/50 uppercase tracking-wider">
                 Thiết bị hợp lệ
               </span>
-              <h3 className="font-bold text-white text-base mt-2">{productInfo.model}</h3>
-              <div className="mt-2 space-y-1 text-xs text-gray-300 font-medium">
+              <h3 className="font-bold text-gray-800 text-base mt-2">{productInfo.model}</h3>
+              <div className="mt-2 space-y-1 text-xs text-gray-600 font-medium">
                 <div className="flex justify-between">
-                  <span className="text-gray-500">Số Serial:</span>
-                  <span className="font-mono text-gray-200">{productInfo.serialNumber}</span>
+                  <span className="text-gray-400">Số Serial:</span>
+                  <span className="font-mono text-gray-700">{productInfo.serialNumber}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-gray-500">Bảo hành mặc định:</span>
-                  <span className="text-blue-400">{productInfo.standardMonths} tháng</span>
+                  <span className="text-gray-400">Bảo hành mặc định:</span>
+                  <span className="text-orange-600">{productInfo.standardMonths} tháng</span>
                 </div>
               </div>
             </div>
 
-            <div className="border-t border-gray-800/80 my-4" />
+            <div className="border-t border-gray-100 my-4" />
 
             {/* Customer Inputs */}
-            <h4 className="text-xs font-bold text-gray-400 uppercase tracking-widest">
+            <h4 className="text-xs font-bold text-gray-500 uppercase tracking-widest">
               Thông tin khách hàng mua máy
             </h4>
 
             <div className="space-y-3">
               <div className="relative">
-                <User size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" />
+                <User size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
                 <input
                   type="text"
                   required
                   placeholder="Họ và tên người sử dụng *"
                   value={customerName}
                   onChange={(e) => setCustomerName(e.target.value)}
-                  className="w-full bg-[#111827]/80 border border-gray-700 focus:border-blue-500 rounded-xl pl-10 pr-4 py-2.5 text-sm outline-none text-white transition-all"
+                  className="w-full bg-orange-50/10 border border-gray-200 focus:border-orange-500 focus:ring-2 focus:ring-orange-500/20 rounded-xl pl-10 pr-4 py-2.5 text-sm outline-none text-gray-800 transition-all"
                 />
               </div>
 
               <div className="relative">
-                <Smartphone size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" />
+                <Smartphone size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
                 <input
                   type="tel"
                   required
                   placeholder="Số điện thoại di động *"
                   value={customerPhone}
                   onChange={(e) => setCustomerPhone(e.target.value)}
-                  className="w-full bg-[#111827]/80 border border-gray-700 focus:border-blue-500 rounded-xl pl-10 pr-4 py-2.5 text-sm outline-none text-white transition-all"
+                  className="w-full bg-orange-50/10 border border-gray-200 focus:border-orange-500 focus:ring-2 focus:ring-orange-500/20 rounded-xl pl-10 pr-4 py-2.5 text-sm outline-none text-gray-800 transition-all"
                 />
               </div>
 
               <div className="relative">
-                <MapPin size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" />
+                <MapPin size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
                 <input
                   type="text"
                   required
                   placeholder="Tỉnh/Thành phố nơi lắp đặt *"
                   value={province}
                   onChange={(e) => setProvince(e.target.value)}
-                  className="w-full bg-[#111827]/80 border border-gray-700 focus:border-blue-500 rounded-xl pl-10 pr-4 py-2.5 text-sm outline-none text-white transition-all"
+                  className="w-full bg-orange-50/10 border border-gray-200 focus:border-orange-500 focus:ring-2 focus:ring-orange-500/20 rounded-xl pl-10 pr-4 py-2.5 text-sm outline-none text-gray-800 transition-all"
                 />
               </div>
 
               <div className="relative">
-                <MapPin size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" />
+                <MapPin size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
                 <input
                   type="text"
                   required
                   placeholder="Địa chỉ cụ thể (Số nhà, đường, phường...) *"
                   value={address}
                   onChange={(e) => setAddress(e.target.value)}
-                  className="w-full bg-[#111827]/80 border border-gray-700 focus:border-blue-500 rounded-xl pl-10 pr-4 py-2.5 text-sm outline-none text-white transition-all"
+                  className="w-full bg-orange-50/10 border border-gray-200 focus:border-orange-500 focus:ring-2 focus:ring-orange-500/20 rounded-xl pl-10 pr-4 py-2.5 text-sm outline-none text-gray-800 transition-all"
                 />
               </div>
             </div>
 
             {/* Upload Invoice Image */}
             <div className="mt-4">
-              <label className="block text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">
+              <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">
                 Ảnh chụp hóa đơn mua hàng (*)
               </label>
 
               {invoiceImageUrl ? (
-                <div className="relative rounded-xl border border-gray-700 overflow-hidden h-[160px] group bg-[#111827]">
+                <div className="relative rounded-xl border border-gray-200 overflow-hidden h-[160px] group bg-gray-50">
                   <img
                     src={invoiceImageUrl}
                     alt="Invoice"
@@ -346,17 +351,17 @@ export default function WarrantyActivate() {
                   </div>
                 </div>
               ) : (
-                <label className="border-2 border-dashed border-gray-700 hover:border-blue-500 hover:bg-blue-500/5 transition-all rounded-xl p-4 flex flex-col items-center justify-center cursor-pointer h-[140px] text-center">
+                <label className="border-2 border-dashed border-gray-200 hover:border-orange-500 hover:bg-orange-500/5 transition-all rounded-xl p-4 flex flex-col items-center justify-center cursor-pointer h-[140px] text-center">
                   {uploadingImage ? (
                     <div className="flex flex-col items-center gap-2">
-                      <Loader2 size={32} className="animate-spin text-blue-500" />
-                      <span className="text-xs text-gray-400 font-medium">Đang tải ảnh lên...</span>
+                      <Loader2 size={32} className="animate-spin text-orange-500" />
+                      <span className="text-xs text-gray-500 font-medium">Đang tải ảnh lên...</span>
                     </div>
                   ) : (
                     <>
-                      <UploadCloud size={36} className="text-gray-500 mb-2" />
-                      <span className="text-xs font-bold text-gray-300">Chụp/Tải lên hóa đơn mua hàng</span>
-                      <span className="text-[10px] text-gray-500 mt-1">Định dạng JPG, PNG, HEIC (tối đa 20MB)</span>
+                      <UploadCloud size={36} className="text-gray-400 mb-2" />
+                      <span className="text-xs font-bold text-gray-600">Chụp/Tải lên hóa đơn mua hàng</span>
+                      <span className="text-[10px] text-gray-400 mt-1">Định dạng JPG, PNG, HEIC (tối đa 20MB)</span>
                     </>
                   )}
                   <input
@@ -374,7 +379,7 @@ export default function WarrantyActivate() {
             </div>
 
             {submitError && (
-              <div className="bg-rose-500/10 border border-rose-500/20 text-rose-400 text-xs px-3.5 py-2.5 rounded-xl flex items-start gap-2 animate-fade-in font-medium">
+              <div className="bg-rose-500/5 border border-rose-500/10 text-rose-600 text-xs px-3.5 py-2.5 rounded-xl flex items-start gap-2 animate-fade-in font-medium">
                 <AlertTriangle size={16} className="shrink-0 text-rose-500 mt-0.5" />
                 <span>{submitError}</span>
               </div>
@@ -384,21 +389,21 @@ export default function WarrantyActivate() {
               <button
                 type="button"
                 onClick={() => setStep(1)}
-                className="w-1/3 bg-gray-800 hover:bg-gray-700 text-gray-300 font-semibold py-3 px-4 rounded-xl text-sm transition-all"
+                className="w-1/3 bg-gray-100 hover:bg-gray-200 text-gray-600 font-semibold py-3 px-4 rounded-xl text-sm transition-all"
               >
                 Quay lại
               </button>
               <button
                 type="submit"
                 disabled={submitting || uploadingImage || !invoiceImageUrl}
-                className="w-2/3 bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-xl text-sm transition-all shadow-lg shadow-blue-500/25 active:scale-[0.98] disabled:opacity-50 flex items-center justify-center gap-1.5"
+                className="w-2/3 bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white font-bold py-3 px-4 rounded-xl text-sm transition-all shadow-md shadow-orange-500/10 active:scale-[0.98] disabled:opacity-50 flex items-center justify-center gap-1.5"
               >
                 {submitting ? (
                   <>
-                    <Loader2 size={16} className="animate-spin" /> Đang gửi yêu cầu...
+                    <Loader2 size={16} className="animate-spin" /> Đang gửi...
                   </>
                 ) : (
-                  'Gửi yêu cầu kích hoạt'
+                  'Kích hoạt ngay'
                 )}
               </button>
             </div>
@@ -408,55 +413,55 @@ export default function WarrantyActivate() {
         {/* STEP 3: Success Screen (e-Warranty Card) */}
         {step === 3 && productInfo && (
           <div className="text-center space-y-6 animate-fade-in">
-            <div className="w-14 h-14 bg-emerald-500/15 border border-emerald-500/30 rounded-full flex items-center justify-center mx-auto mb-1">
-              <CheckCircle size={32} className="text-emerald-500" />
+            <div className="w-14 h-14 bg-emerald-500/10 border border-emerald-500/20 rounded-full flex items-center justify-center mx-auto mb-1">
+              <CheckCircle size={32} className="text-emerald-600" />
             </div>
 
             <div>
-              <h2 className="text-lg font-black text-white uppercase tracking-wider">
+              <h2 className="text-lg font-extrabold text-gray-800 uppercase tracking-wider">
                 Đăng ký thành công!
               </h2>
-              <p className="text-xs text-gray-400 mt-2 leading-relaxed px-2 font-medium">
+              <p className="text-xs text-gray-500 mt-2 leading-relaxed px-2 font-medium">
                 {successMessage || 'Yêu cầu kích hoạt bảo hành điện tử của quý khách đã được lưu nhận trên hệ thống.'}
               </p>
-              <p className="text-xs text-amber-400 mt-2 font-semibold bg-amber-500/10 border border-amber-500/20 px-3 py-2 rounded-xl">
-                Đội ngũ chăm sóc khách hàng của Truliva sẽ đối chiếu hình ảnh hóa đơn mua hàng và phê duyệt bảo hành chính thức cho sản phẩm trong vòng 24h làm việc.
+              <p className="text-xs text-orange-700 mt-2 font-semibold bg-orange-500/5 border border-orange-500/10 px-3 py-2 rounded-xl">
+                Đội ngũ chăm sóc khách hàng của Pure Vita sẽ đối chiếu hình ảnh hóa đơn mua hàng và phê duyệt bảo hành chính thức cho sản phẩm trong vòng 24h làm việc.
               </p>
             </div>
 
             {/* Electronic Warranty Card Mockup */}
-            <div className="bg-gradient-to-br from-[#1f2937] to-[#111827] border border-gray-800 rounded-xl p-4 text-left shadow-lg relative overflow-hidden">
-              <div className="absolute right-0 bottom-0 translate-x-4 translate-y-4 w-24 h-24 bg-blue-500/5 rounded-full blur-xl pointer-events-none" />
+            <div className="bg-gradient-to-br from-white to-orange-50/30 border border-orange-100 rounded-xl p-4 text-left shadow-md relative overflow-hidden">
+              <div className="absolute right-0 bottom-0 translate-x-4 translate-y-4 w-24 h-24 bg-orange-500/5 rounded-full blur-xl pointer-events-none" />
               
-              <div className="flex justify-between items-center border-b border-gray-800 pb-2.5 mb-3">
+              <div className="flex justify-between items-center border-b border-gray-100 pb-2.5 mb-3">
                 <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">
                   Thẻ bảo hành điện tử
                 </span>
-                <span className="text-[10px] font-bold text-amber-500 uppercase tracking-wider">
+                <span className="text-[10px] font-bold text-orange-600 uppercase tracking-wider">
                   Chờ phê duyệt
                 </span>
               </div>
 
               <div className="space-y-2 text-xs font-semibold">
                 <div>
-                  <span className="text-gray-500 block text-[9px] uppercase tracking-wider">Model Thiết bị</span>
-                  <span className="text-white mt-0.5 block">{productInfo.model}</span>
+                  <span className="text-gray-400 block text-[9px] uppercase tracking-wider">Model Thiết bị</span>
+                  <span className="text-gray-800 mt-0.5 block">{productInfo.model}</span>
                 </div>
                 <div>
-                  <span className="text-gray-500 block text-[9px] uppercase tracking-wider">Số Serial</span>
-                  <span className="text-white mt-0.5 block font-mono tracking-wider">{productInfo.serialNumber}</span>
+                  <span className="text-gray-400 block text-[9px] uppercase tracking-wider">Số Serial</span>
+                  <span className="text-gray-800 mt-0.5 block font-mono tracking-wider">{productInfo.serialNumber}</span>
                 </div>
                 <div>
-                  <span className="text-gray-500 block text-[9px] uppercase tracking-wider">Thời hạn bảo hành</span>
-                  <span className="text-blue-400 mt-0.5 block">{productInfo.standardMonths} tháng</span>
+                  <span className="text-gray-400 block text-[9px] uppercase tracking-wider">Thời hạn bảo hành</span>
+                  <span className="text-orange-600 mt-0.5 block">{productInfo.standardMonths} tháng</span>
                 </div>
                 <div>
-                  <span className="text-gray-500 block text-[9px] uppercase tracking-wider">Họ và tên khách hàng</span>
-                  <span className="text-gray-200 mt-0.5 block">{customerName}</span>
+                  <span className="text-gray-400 block text-[9px] uppercase tracking-wider">Họ và tên khách hàng</span>
+                  <span className="text-gray-700 mt-0.5 block">{customerName}</span>
                 </div>
                 <div>
-                  <span className="text-gray-500 block text-[9px] uppercase tracking-wider">Số điện thoại</span>
-                  <span className="text-gray-200 mt-0.5 block font-mono">{customerPhone}</span>
+                  <span className="text-gray-400 block text-[9px] uppercase tracking-wider">Số điện thoại</span>
+                  <span className="text-gray-700 mt-0.5 block font-mono">{customerPhone}</span>
                 </div>
               </div>
             </div>
@@ -472,7 +477,7 @@ export default function WarrantyActivate() {
                 setProvince('');
                 setInvoiceImageUrl('');
               }}
-              className="w-full bg-gray-800 hover:bg-gray-700 text-gray-200 font-bold py-3 px-4 rounded-xl text-sm transition-all"
+              className="w-full bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold py-3 px-4 rounded-xl text-sm transition-all"
             >
               Đăng ký kích hoạt sản phẩm khác
             </button>
@@ -481,8 +486,21 @@ export default function WarrantyActivate() {
 
       </div>
 
-      <div className="text-center text-[10px] text-gray-500 relative z-10 max-w-xs leading-relaxed">
-        <p>© 2026 Truliva Vietnam. Tất cả quyền được bảo lưu.</p>
+      {/* Zalo OA Button */}
+      <a
+        href="https://zalo.me/3870382725035413507"
+        target="_blank"
+        rel="noopener noreferrer"
+        className="w-full max-w-md bg-white hover:bg-orange-50/50 border border-orange-100 text-gray-700 hover:text-orange-600 font-bold py-3.5 px-4 rounded-xl text-xs transition-all shadow-sm flex items-center justify-center gap-2.5 mb-4 relative z-10 active:scale-[0.98]"
+      >
+        <svg viewBox="0 0 24 24" className="w-5 h-5 fill-[#0068ff] shrink-0">
+          <path d="M12.003 2C6.478 2 2 6.136 2 11.238c0 3.125 1.688 5.88 4.298 7.48-.12.443-.655 2.417-.655 2.417-.06.223.167.387.352.268 0 0 2.278-1.52 3.162-2.09.91.246 1.875.38 2.846.38 5.525 0 10.003-4.137 10.003-9.24C22.006 6.137 17.528 2 12.003 2zm3.36 12.164h-4.32l4.316-5.064c.2-.236.033-.593-.274-.593H10.15a.394.394 0 0 0-.394.394v.822c0 .218.176.394.394.394h3.766L9.6 13.18a.394.394 0 0 0 .274.593h4.945a.394.394 0 0 0 .394-.394V12.56a.394.394 0 0 0-.394-.394z"/>
+        </svg>
+        <span className="tracking-wide">Hỗ trợ Zalo OA: Pure Vita chuyên nghiệp và tận tâm</span>
+      </a>
+
+      <div className="text-center text-[10px] text-gray-400 relative z-10 max-w-xs leading-relaxed">
+        <p>© 2026 Pure Vita Vietnam. Tất cả quyền được bảo lưu.</p>
         <p className="mt-1">Hotline CSKH: 1900 638463 (Hỗ trợ 8h00 - 18h00 hàng ngày)</p>
       </div>
 
