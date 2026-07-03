@@ -1309,7 +1309,7 @@ export default function OrderList() {
 
       {/* Advanced Filter Popover Backdrop overlay */}
       {activeDropdown && (
-        <div className="fixed inset-0 z-40 bg-transparent" onClick={() => setActiveDropdown(null)} />
+        <div className="fixed inset-0 z-40 bg-black/40 md:bg-transparent" onClick={() => setActiveDropdown(null)} />
       )}
 
       {/* Toolbar */}
@@ -1378,7 +1378,7 @@ export default function OrderList() {
 
               {/* Popover Card */}
               {activeDropdown && (
-                <div className="absolute right-0 mt-2 bg-white border rounded-lg shadow-xl z-50 text-left min-w-[240px]">
+                <div className="fixed md:absolute top-1/2 left-1/2 md:top-auto md:left-auto md:right-0 -translate-x-1/2 -translate-y-1/2 md:translate-x-0 md:translate-y-0 md:mt-2 bg-white border rounded-lg shadow-xl z-50 text-left min-w-[240px] m-0 md:m-0">
                   {activeDropdown === 'main' && (
                     <div className="w-60 py-1 text-sm text-gray-700 max-h-96 overflow-y-auto">
                       <div className="px-3 py-2 text-xs font-semibold text-gray-400 border-b uppercase">Thêm điều kiện lọc</div>
