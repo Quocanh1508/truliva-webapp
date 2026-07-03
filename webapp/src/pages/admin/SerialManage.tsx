@@ -825,7 +825,39 @@ export default function SerialManage() {
                   <label style={{ fontSize: 11, fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>Trạng thái</label>
                   <select
                     value={selectedSerial.status || 'Chưa kích hoạt'}
-                    onChange={e => setSelectedSerial(prev => prev ? { ...prev, status: e.target.value } : null)}
+                    onChange={e => {
+                      const newStatus = e.target.value;
+                      setSelectedSerial(prev => {
+                        if (!prev) return null;
+
+                        let actDate = prev.activationDate;
+                        let expDate = prev.warrantyExpiryDate;
+                        let actBy = prev.activatedBy;
+
+                        const isNewActive = newStatus === 'Đã kích hoạt' || newStatus === 'KH xác nhận';
+                        const isOldActive = prev.status === 'Đã kích hoạt' || prev.status === 'KH xác nhận';
+
+                        if (isNewActive && !isOldActive) {
+                          if (!actDate) {
+                            actDate = new Date().toISOString();
+                          }
+                          if (!expDate) {
+                            expDate = calculateExpiryDate(actDate, prev.model, prev.promoCode || null);
+                          }
+                          if (!actBy) {
+                            actBy = 'ADMIN';
+                          }
+                        }
+
+                        return {
+                          ...prev,
+                          status: newStatus,
+                          activationDate: actDate,
+                          warrantyExpiryDate: expDate,
+                          activatedBy: actBy
+                        };
+                      });
+                    }}
                     style={{ width: '100%', padding: '8px 12px', borderRadius: 8, border: '1px solid #cbd5e1', fontSize: 13, marginTop: 4, background: 'white' }}
                   >
                     <option value="Chưa kích hoạt">Chưa kích hoạt</option>

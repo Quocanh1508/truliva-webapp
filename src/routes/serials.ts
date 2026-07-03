@@ -902,6 +902,51 @@ router.patch('/:id', requireCoordinatorOrAdmin, async (req: Request, res: Respon
       updateData.warrantyExpiryDate = warrantyExpiryDate ? new Date(warrantyExpiryDate) : null;
     }
 
+    // Tự động gán ngày kích hoạt & hết hạn nếu trạng thái chuyển sang Đã kích hoạt/KH xác nhận mà không truyền ngày
+    const newStatus = status !== undefined ? status : serial.status;
+    const isNewActive = newStatus === 'Đã kích hoạt' || newStatus === 'KH xác nhận';
+    const isOldActive = serial.status === 'Đã kích hoạt' || serial.status === 'KH xác nhận';
+
+    if (isNewActive && !isOldActive) {
+      // 1. Gán ngày kích hoạt
+      const finalActivationDate = updateData.activationDate !== undefined ? updateData.activationDate : (serial.activationDate || new Date());
+      updateData.activationDate = finalActivationDate;
+
+      // 2. Tính toán ngày hết hạn nếu chưa có
+      if (updateData.warrantyExpiryDate === undefined || !updateData.warrantyExpiryDate) {
+        let standardMonths = 12;
+        const currentModel = model !== undefined ? model : serial.model;
+        const policies = await prisma.warrantyPolicy.findMany();
+        const matchedPolicy = policies.find((p: any) => 
+          currentModel.toLowerCase().includes(p.modelKeyword.toLowerCase())
+        );
+        if (matchedPolicy) {
+          standardMonths = matchedPolicy.warrantyMonths;
+        }
+
+        let promoMonths = 0;
+        const currentPromo = promoCode !== undefined ? promoCode : serial.promoCode;
+        if (currentPromo) {
+          const promo = await prisma.warrantyPromo.findUnique({
+            where: { code: currentPromo.trim().toUpperCase() }
+          });
+          if (promo) {
+            promoMonths = promo.promoMonths;
+          }
+        }
+
+        const totalMonths = standardMonths + promoMonths;
+        const expiry = new Date(finalActivationDate.getTime());
+        expiry.setMonth(expiry.getMonth() + totalMonths);
+        updateData.warrantyExpiryDate = expiry;
+      }
+
+      // Tự động gán activatedBy nếu chưa có
+      if (updateData.activatedBy === undefined && !serial.activatedBy) {
+        updateData.activatedBy = 'ADMIN';
+      }
+    }
+
     const updated = await prisma.serial.update({
       where: { id: id as string },
       data: updateData,
