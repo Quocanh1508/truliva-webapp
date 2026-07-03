@@ -2127,13 +2127,13 @@ export default function OrderList() {
       </div>
 
       {/* Table Area */}
-      <div className="flex-1 bg-white">
+      <div className="flex-1 bg-white overflow-x-auto">
         {loading ? (
           <div className="flex justify-center py-12"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div></div>
         ) : orders.length === 0 ? (
           <div className="text-center py-12 text-gray-400">Không tìm thấy yêu cầu nào</div>
         ) : (
-          <table className="w-full text-left text-[13px]">
+          <table className="min-w-[1300px] lg:w-full text-left text-[13px]">
             <thead className="sticky top-[64px] lg:top-0 bg-[#f8f9fa] text-gray-600 font-semibold border-b border-gray-200 z-20">
               <tr>
                 <th className="px-4 py-2 w-[70px]">Mã đơn</th>
