@@ -3083,7 +3083,7 @@ export default function OrderList() {
       )}
 
       {/* CANCEL MODAL */}
-      {cancelModal?.isOpen && (
+{cancelModal?.isOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
           <div className="bg-white rounded-lg p-6 w-[400px]">
             <h3 className="text-lg font-bold text-red-600 mb-4">Hủy yêu cầu dịch vụ</h3>
@@ -3141,32 +3141,50 @@ export default function OrderList() {
 
       {/* AUDIT LOG MODAL */}
       {auditModal?.isOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-          <div className="bg-white rounded-lg p-6 w-[600px] max-h-[80vh] flex flex-col">
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="text-lg font-bold text-gray-900">Lịch sử thay đổi yêu cầu</h3>
-              <button onClick={() => setAuditModal(null)}><XCircle size={20} className="text-gray-500" /></button>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 backdrop-blur-sm p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-[650px] max-h-[85vh] flex flex-col overflow-hidden border border-gray-100">
+            <div className="px-6 py-4 bg-gray-50 border-b border-gray-200 flex justify-between items-center">
+              <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2">
+                <History size={20} className="text-gray-500" />
+                <span>Lịch sử thay đổi yêu cầu</span>
+              </h3>
+              <button 
+                onClick={() => setAuditModal(null)}
+                className="text-gray-400 hover:text-gray-600 transition-colors p-1.5 hover:bg-gray-100 rounded-full"
+              >
+                <XCircle size={22} />
+              </button>
             </div>
 
-            <div className="flex-1 overflow-auto bg-gray-50 p-4 rounded border">
+            <div className="flex-1 overflow-auto bg-slate-50 p-6 space-y-4">
               {loadingAudit ? (
-                <div className="text-center py-8">Đang tải...</div>
+                <div className="flex flex-col items-center justify-center py-16 gap-3">
+                  <div className="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+                  <div className="text-gray-500 text-sm font-medium">Đang tải dữ liệu...</div>
+                </div>
               ) : auditLogs.length === 0 ? (
-                <div className="text-center py-8 text-gray-500">Chưa có thay đổi nào.</div>
+                <div className="text-center py-16 text-gray-400 bg-white rounded-xl border border-dashed p-6">
+                  Chưa có lịch sử thay đổi nào được ghi nhận cho ca này.
+                </div>
               ) : (
                 <div className="space-y-4">
                   {auditLogs.map(log => {
-                    const translateAction = (act: string) => {
-                      const map: Record<string, string> = {
-                        created_manual: 'Tạo ca thủ công',
-                        created: 'Tạo ca',
-                        updated: 'Cập nhật',
-                        assigned: 'Phân công',
-                        cancelled: 'Hủy đơn',
-                        restored: 'Khôi phục',
-                        rescheduled: 'Hẹn lại lịch',
+                    const getActionBadge = (act: string) => {
+                      const map: Record<string, { label: string; style: string }> = {
+                        created_manual: { label: 'Tạo ca thủ công', style: 'bg-green-50 text-green-700 border-green-200' },
+                        created: { label: 'Tạo ca', style: 'bg-green-50 text-green-700 border-green-200' },
+                        updated: { label: 'Cập nhật', style: 'bg-blue-50 text-blue-700 border-blue-200' },
+                        assigned: { label: 'Phân công', style: 'bg-purple-50 text-purple-700 border-purple-200' },
+                        cancelled: { label: 'Hủy đơn', style: 'bg-red-50 text-red-700 border-red-200' },
+                        restored: { label: 'Khôi phục', style: 'bg-teal-50 text-teal-700 border-teal-200' },
+                        rescheduled: { label: 'Hẹn lại lịch', style: 'bg-amber-50 text-amber-700 border-amber-200' },
                       };
-                      return map[act] || act;
+                      const config = map[act] || { label: act, style: 'bg-gray-50 text-gray-700 border-gray-200' };
+                      return (
+                        <span className={`px-2.5 py-0.5 rounded-full text-xs font-semibold border ${config.style}`}>
+                          {config.label}
+                        </span>
+                      );
                     };
 
                     const translateField = (field: string) => {
@@ -3241,39 +3259,76 @@ export default function OrderList() {
                       return String(val);
                     };
 
+                    let changesArr: any[] = [];
+                    if (log.changes) {
+                      if (Array.isArray(log.changes)) {
+                        changesArr = log.changes;
+                      } else if (typeof log.changes === 'string') {
+                        try { changesArr = JSON.parse(log.changes); } catch { changesArr = []; }
+                        if (!Array.isArray(changesArr)) changesArr = [changesArr];
+                      } else if (typeof log.changes === 'object' && log.changes !== null) {
+                        changesArr = [log.changes];
+                      }
+                    }
+
+                    const filteredChanges = changesArr.filter((c: any) => {
+                      const fieldName = c.field || Object.keys(c)[0] || 'N/A';
+                      if (fieldName === 'warehouseId') return false;
+                      
+                      const fromVal = c.from ?? c[Object.keys(c)[0]] ?? 'Trống';
+                      const toVal = c.to ?? 'Trống';
+                      
+                      return formatValue(fieldName, fromVal) !== formatValue(fieldName, toVal);
+                    });
+
                     return (
-                      <div key={log.id} className="bg-white p-3 rounded shadow-sm border text-sm">
-                        <div className="flex justify-between text-gray-500 mb-2">
-                          <span className="font-semibold text-gray-700">{log.userName}</span>
-                          <span>{new Date(log.createdAt).toLocaleString('vi-VN')}</span>
+                      <div key={log.id} className="bg-white border border-gray-200 rounded-xl p-4 shadow-sm hover:shadow transition-shadow flex flex-col gap-3 relative overflow-hidden text-sm">
+                        {/* Header của thẻ Log */}
+                        <div className="flex items-center justify-between border-b border-gray-100 pb-2">
+                          <div className="flex flex-col">
+                            <span className="font-bold text-gray-800 text-[13px]">{log.userName}</span>
+                            <span className="text-[11px] text-gray-400 font-medium">Người thực hiện</span>
+                          </div>
+                          <div className="flex flex-col items-end gap-1">
+                            <span className="text-[11px] text-gray-500 font-medium">{new Date(log.createdAt).toLocaleString('vi-VN')}</span>
+                            {getActionBadge(log.action)}
+                          </div>
                         </div>
-                        <div className="text-blue-600 font-medium mb-1">Hành động: {translateAction(log.action)}</div>
-                        {log.changes && (() => {
-                          let changesArr: any[] = [];
-                          if (Array.isArray(log.changes)) {
-                            changesArr = log.changes;
-                          } else if (typeof log.changes === 'string') {
-                            try { changesArr = JSON.parse(log.changes); } catch { changesArr = []; }
-                            if (!Array.isArray(changesArr)) changesArr = [changesArr];
-                          } else if (typeof log.changes === 'object' && log.changes !== null) {
-                            changesArr = [log.changes];
-                          }
-                          return changesArr
-                            .filter((c: any) => {
-                              const fieldName = c.field || Object.keys(c)[0] || 'N/A';
-                              return fieldName !== 'warehouseId';
-                            })
-                            .map((c: any, i: number) => {
+
+                        {/* Danh sách thay đổi thực tế */}
+                        <div className="space-y-2">
+                          {filteredChanges.length === 0 ? (
+                            <div className="text-[12px] text-gray-400 italic">
+                              Cập nhật các thông tin phụ hoặc đồng bộ không có sự thay đổi giá trị.
+                            </div>
+                          ) : (
+                            filteredChanges.map((c: any, i: number) => {
                               const fieldName = c.field || Object.keys(c)[0] || 'N/A';
                               const fromVal = c.from ?? c[Object.keys(c)[0]] ?? 'Trống';
                               const toVal = c.to ?? 'Trống';
+                              
+                              const fromValFormatted = formatValue(fieldName, fromVal);
+                              const toValFormatted = formatValue(fieldName, toVal);
+
                               return (
-                                <div key={i} className="text-gray-600">
-                                  - <span className="font-medium text-gray-800">{translateField(fieldName)}</span>: <span className="line-through text-red-400">{formatValue(fieldName, fromVal)}</span> &rarr; <span className="text-green-600 font-medium">{formatValue(fieldName, toVal)}</span>
+                                <div key={i} className="flex flex-col sm:flex-row sm:items-start justify-between py-1.5 border-b border-dashed border-gray-50 last:border-0 gap-1 sm:gap-4">
+                                  <div className="text-[11px] font-bold text-gray-500 uppercase tracking-wider w-full sm:w-[150px] shrink-0 pt-0.5">
+                                    {translateField(fieldName)}
+                                  </div>
+                                  <div className="flex items-center gap-1.5 flex-1 flex-wrap text-xs">
+                                    <span className="bg-red-50 text-red-600 px-2 py-0.5 rounded border border-red-100 line-through break-all max-w-[200px] sm:max-w-none">
+                                      {fromValFormatted}
+                                    </span>
+                                    <span className="text-gray-400 font-bold">&rarr;</span>
+                                    <span className="bg-green-50 text-green-700 px-2 py-0.5 rounded border border-green-100 font-semibold break-all max-w-[200px] sm:max-w-none">
+                                      {toValFormatted}
+                                    </span>
+                                  </div>
                                 </div>
                               );
-                            });
-                        })()}
+                            })
+                          )}
+                        </div>
                       </div>
                     );
                   })}
