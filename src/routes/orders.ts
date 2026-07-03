@@ -521,6 +521,7 @@ router.get('/', requireAuth, async (req: Request, res: Response): Promise<void> 
         ktvCalledAt: true,
         warehouseId: true,
         pancakeSyncStatus: true,
+        promoCode: true,
         rawData: true,
         createdAt: true,
         updatedAt: true,

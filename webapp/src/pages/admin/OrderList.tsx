@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getOrders, updateOrder, getKtvUsers, getStations, getOrderAuditLog, syncOrders, getFiltersData, fetchApi, createOrder, searchCustomers } from '../../api/client';
-import { Search, ChevronLeft, ChevronRight, History, XCircle, Filter, RefreshCw, FileText, CheckCircle2, Copy, UserPlus, Download, Wrench, Settings, FolderOpen, Building2, MapPin, Users, Calendar, Plus, AlertTriangle, ExternalLink, RotateCcw, Edit3 } from 'lucide-react';
+import { Search, ChevronLeft, ChevronRight, History, XCircle, Filter, RefreshCw, FileText, CheckCircle2, Copy, UserPlus, Download, Wrench, Settings, FolderOpen, Building2, MapPin, Users, Calendar, Plus, AlertTriangle, ExternalLink, RotateCcw, Edit3, Tag } from 'lucide-react';
 import { WARRANTY_SERVICE_GROUPS, REPAIR_SERVICE_GROUPS, WORK_TYPE_SERVICES } from '../../utils/workTypes';
 import { useConfirm } from '../../context/ConfirmContext';
 import DateRangePicker from '../../components/DateRangePicker';
@@ -2162,36 +2162,49 @@ export default function OrderList() {
                   <tr key={order.id} className={`${idx % 2 === 0 ? 'bg-white' : 'bg-[#fafafa]'} hover:bg-blue-50/50 transition-colors`}>
                     {/* 1. Mã đơn */}
                     <td className="px-4 py-2 font-medium align-top">
-                      <div>{formatOrderId(order.pancakeOrderId)}</div>
-                      {order.orderSource && /shopee|lazada|tiktok|tiki/i.test(order.orderSource) && (
-                        <div className="flex flex-col gap-0.5 items-start">
-                          <div className="text-[10px] font-bold text-blue-600 bg-blue-50 border border-blue-100 rounded px-1.5 py-0.5 mt-0.5 inline-block cursor-help" title={`Nguồn: ${order.orderSource}`}>
-                            Đơn Ecom
+                      <div className="flex flex-col items-start gap-1">
+                        <div>{formatOrderId(order.pancakeOrderId)}</div>
+                        
+                        {order.promoCode && (
+                          <span 
+                            className="inline-flex items-center gap-1 text-[9px] font-bold text-amber-700 bg-amber-50 border border-amber-200 rounded px-1.5 py-0.5 mt-0.5"
+                            title={`Mã khuyến mãi áp dụng: ${order.promoCode}`}
+                          >
+                            <Tag size={10} className="text-amber-500 shrink-0" />
+                            <span>{order.promoCode}</span>
+                          </span>
+                        )}
+
+                        {order.orderSource && /shopee|lazada|tiktok|tiki/i.test(order.orderSource) && (
+                          <div className="flex flex-col gap-0.5 items-start">
+                            <div className="text-[10px] font-bold text-blue-600 bg-blue-50 border border-blue-100 rounded px-1.5 py-0.5 mt-0.5 inline-block cursor-help" title={`Nguồn: ${order.orderSource}`}>
+                              Đơn Ecom
+                            </div>
+                            {(() => {
+                              if (!order.rawData) return null;
+                              try {
+                                const raw = typeof order.rawData === 'string' ? JSON.parse(order.rawData) : order.rawData;
+                                const originalId = raw?.id;
+                                if (!originalId) return null;
+                                return (
+                                  <span
+                                    onClick={() => {
+                                      navigator.clipboard.writeText(String(originalId));
+                                      alert(`Đã sao chép mã đơn gốc: ${originalId}`);
+                                    }}
+                                    className="text-[9px] text-gray-500 font-mono bg-gray-50 border border-gray-200 rounded px-1.5 py-0.5 mt-0.5 cursor-pointer hover:text-blue-600 hover:bg-blue-50 hover:border-blue-200 transition-colors inline-block break-all max-w-[85px] leading-tight select-all"
+                                    title="Click để sao chép mã đơn gốc từ POS"
+                                  >
+                                    {originalId}
+                                  </span>
+                                );
+                              } catch (e) {
+                                return null;
+                              }
+                            })()}
                           </div>
-                          {(() => {
-                            if (!order.rawData) return null;
-                            try {
-                              const raw = typeof order.rawData === 'string' ? JSON.parse(order.rawData) : order.rawData;
-                              const originalId = raw?.id;
-                              if (!originalId) return null;
-                              return (
-                                <span
-                                  onClick={() => {
-                                    navigator.clipboard.writeText(String(originalId));
-                                    alert(`Đã sao chép mã đơn gốc: ${originalId}`);
-                                  }}
-                                  className="text-[9px] text-gray-500 font-mono bg-gray-50 border border-gray-200 rounded px-1.5 py-0.5 mt-0.5 cursor-pointer hover:text-blue-600 hover:bg-blue-50 hover:border-blue-200 transition-colors inline-block break-all max-w-[85px] leading-tight select-all"
-                                  title="Click để sao chép mã đơn gốc từ POS"
-                                >
-                                  {originalId}
-                                </span>
-                              );
-                            } catch (e) {
-                              return null;
-                            }
-                          })()}
-                        </div>
-                      )}
+                        )}
+                      </div>
                     </td>
 
                     {/* 2. Khách hàng */}
