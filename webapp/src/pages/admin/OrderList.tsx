@@ -2134,7 +2134,7 @@ export default function OrderList() {
           <div className="text-center py-12 text-gray-400">Không tìm thấy yêu cầu nào</div>
         ) : (
           <table className="min-w-[1300px] lg:w-full text-left text-[13px]">
-            <thead className="sticky top-[64px] lg:top-0 bg-[#f8f9fa] text-gray-600 font-semibold border-b border-gray-200 z-20">
+            <thead className="bg-[#f8f9fa] text-gray-600 font-semibold border-b border-gray-200 z-20 lg:sticky lg:top-0">
               <tr>
                 <th className="px-4 py-2 w-[70px]">Mã đơn</th>
                 <th className="px-4 py-2 w-[180px]">Khách hàng</th>
