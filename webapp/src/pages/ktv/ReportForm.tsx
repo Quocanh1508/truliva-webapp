@@ -665,8 +665,8 @@ export default function ReportForm() {
       orderId: selectedOrderId,
       items: selectedItems.map(item => ({ productName: item.productName, quantity: item.quantity })),
       mainStationId: selectedMainStationId || undefined,
-      techStationId: selectedTechStationId || undefined,
-      assignedKtvId: selectedKtvId || undefined,
+      techStationId: (mainStations.find(s => s.id === selectedMainStationId)?.name?.trim().toLowerCase() === 'đơn vị vận chuyển') ? null : (selectedTechStationId || undefined),
+      assignedKtvId: (mainStations.find(s => s.id === selectedMainStationId)?.name?.trim().toLowerCase() === 'đơn vị vận chuyển') ? null : (selectedKtvId || undefined),
     };
 
     try {
@@ -840,7 +840,7 @@ export default function ReportForm() {
             )}
 
             {/* Trạm kỹ thuật (Không bắt buộc) */}
-            {user && user.role !== 'KTV' && selectedMainStationId && (
+            {user && user.role !== 'KTV' && selectedMainStationId && (mainStations.find(s => s.id === selectedMainStationId)?.name?.trim().toLowerCase() !== 'đơn vị vận chuyển') && (
               <div className="form-group bg-purple-50/50 p-4 rounded-lg border border-purple-100 mb-6 -mt-4">
                 <label className="form-label text-purple-800 font-semibold mb-2 flex items-center gap-2">
                   🛠️ Chọn Trạm kỹ thuật (Không bắt buộc)
@@ -864,7 +864,7 @@ export default function ReportForm() {
             )}
 
             {/* Kỹ thuật viên (Không bắt buộc) */}
-            {user && user.role !== 'KTV' && selectedTechStationId && (
+            {user && user.role !== 'KTV' && selectedTechStationId && (mainStations.find(s => s.id === selectedMainStationId)?.name?.trim().toLowerCase() !== 'đơn vị vận chuyển') && (
               <div className="form-group bg-purple-50/50 p-4 rounded-lg border border-purple-100 mb-6 -mt-4">
                 <label className="form-label text-purple-800 font-semibold mb-2 flex items-center gap-2">
                   👨‍🔧 Chọn Kỹ thuật viên (Không bắt buộc)

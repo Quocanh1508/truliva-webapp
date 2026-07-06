@@ -2314,8 +2314,11 @@ export default function OrderList() {
                           </button>
                         )}
 
-                        {/* Báo cáo đóng ca hộ (chỉ dành cho đơn tự tạo thủ công chưa hoàn thành) */}
-                        {!isViewOnlyStaff && order.pancakeOrderId < 0 && order.adminStatus !== 'hoàn thành' && order.adminStatus !== 'hủy đơn' && (currentUser?.role !== 'SALER' || order.rawData?.creator?.id === currentUser?.id || order.rawData?.creator?.name === currentUser?.fullName) && (
+                        {/* Báo cáo đóng ca hộ (dành cho đơn tự tạo thủ công của saler và đơn pancake của admin/coordinator) */}
+                        {!isViewOnlyStaff && order.adminStatus !== 'hoàn thành' && order.adminStatus !== 'hủy đơn' && (
+                          (order.pancakeOrderId < 0 && (currentUser?.role !== 'SALER' || order.rawData?.creator?.id === currentUser?.id || order.rawData?.creator?.name === currentUser?.fullName)) ||
+                          (order.pancakeOrderId > 0 && ['ADMIN', 'COORDINATOR', 'DEV'].includes(currentUser?.role || ''))
+                        ) && (
                           <button
                             onClick={() => navigate('/ktv/report', { state: { order } })}
                             className="p-1.5 text-emerald-600 hover:bg-emerald-50 rounded border border-transparent hover:border-emerald-100 transition-colors"

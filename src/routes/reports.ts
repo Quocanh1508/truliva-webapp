@@ -770,8 +770,10 @@ router.post('/', async (req: Request, res: Response): Promise<void> => {
               data: orderUpdateData,
             });
 
-            // Tích hợp đồng bộ tồn kho cục bộ (chỉ dành cho KTV thực tế)
-            if (userRole === 'KTV') {
+            // Tích hợp đồng bộ tồn kho cục bộ (KTV thực tế, hoặc Admin/Coordinator đóng ca hộ cho đơn hàng Pancake)
+            const isPancakeOrder = oldOrder.pancakeOrderId > 0;
+            const shouldSyncInventory = userRole === 'KTV' || (isPancakeOrder && ['ADMIN', 'COORDINATOR', 'DEV'].includes(userRole));
+            if (shouldSyncInventory) {
               try {
                 const newOrderItems = await prisma.orderItem.findMany({
                   where: { orderId }
