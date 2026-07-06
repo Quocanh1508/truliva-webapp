@@ -2313,17 +2313,17 @@ export default function OrderList() {
                             <Edit3 size={15} />
                           </button>
                         )}
- 
-                        {/* Hoàn thành (Tạm thời disable theo yêu cầu của user) */}
-                        {/* {!isViewOnlyStaff && order.adminStatus !== 'hoàn thành' && order.adminStatus !== 'hủy đơn' && (
+
+                        {/* Báo cáo đóng ca hộ (chỉ dành cho đơn tự tạo thủ công chưa hoàn thành) */}
+                        {!isViewOnlyStaff && order.pancakeOrderId < 0 && order.adminStatus !== 'hoàn thành' && order.adminStatus !== 'hủy đơn' && (
                           <button
-                            onClick={() => handleStatusChange(order.id, 'hoàn thành')}
+                            onClick={() => navigate('/ktv/report', { state: { order } })}
                             className="p-1.5 text-emerald-600 hover:bg-emerald-50 rounded border border-transparent hover:border-emerald-100 transition-colors"
-                            title="Xác nhận Hoàn thành"
+                            title="Báo cáo đóng ca hộ"
                           >
                             <CheckCircle2 size={15} />
                           </button>
-                        )} */}
+                        )}
  
                         {/* Hủy đơn (chỉ hiện khi chưa hoàn thành/hủy) */}
                         {!isViewOnlyStaff && order.adminStatus !== 'hoàn thành' && order.adminStatus !== 'hủy đơn' && (

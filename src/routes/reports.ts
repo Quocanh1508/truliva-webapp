@@ -315,6 +315,7 @@ router.post('/', async (req: Request, res: Response): Promise<void> => {
       issueType,
       handlingMethod,
       items, // unified items
+      mainStationId, // <-- NEW
     } = req.body;
 
     // Validation
@@ -328,7 +329,15 @@ router.post('/', async (req: Request, res: Response): Promise<void> => {
       return;
     }
 
-    if (!imageUrls || !Array.isArray(imageUrls) || imageUrls.length === 0) {
+    const userRole = req.user!.role;
+    const isKtv = userRole === 'KTV';
+
+    if (userRole === 'STAFF' && !mainStationId) {
+      res.status(400).json({ error: 'Nhân viên (Staff) bắt buộc phải chọn Trạm chính' });
+      return;
+    }
+
+    if (isKtv && (!imageUrls || !Array.isArray(imageUrls) || imageUrls.length === 0)) {
       res.status(400).json({ error: 'Báo cáo bắt buộc phải có hình ảnh xác nhận' });
       return;
     }
@@ -434,6 +443,10 @@ router.post('/', async (req: Request, res: Response): Promise<void> => {
       isApprovalRequired = false;
     }
 
+    if (req.user!.role !== 'KTV') {
+      isApprovalRequired = false;
+    }
+
     const report = await prisma.serviceReport.create({
       data: {
         month: reportMonth,
@@ -450,6 +463,7 @@ router.post('/', async (req: Request, res: Response): Promise<void> => {
         serviceCost: (serviceCost !== undefined && serviceCost !== null && serviceCost !== '') ? parseFloat(serviceCost) : null,
         additionalCost: (additionalCost !== undefined && additionalCost !== null && additionalCost !== '') ? parseFloat(additionalCost) : null,
         orderId: orderId || null,
+        mainStationId: mainStationId || null, // <-- NEW
         // ── Trường mới ──
         workType: workType || null,
         address: address || null,
@@ -739,33 +753,39 @@ router.post('/', async (req: Request, res: Response): Promise<void> => {
               warehouseInfo: targetWarehouseId ? { id: targetWarehouseId, name: targetWarehouseName } : undefined
             };
 
+            if (mainStationId) {
+              orderUpdateData.mainStationId = mainStationId;
+            }
+
             const updatedOrder = await prisma.order.update({
               where: { id: orderId },
               data: orderUpdateData,
             });
 
-            // Tích hợp đồng bộ tồn kho cục bộ
-            try {
-              const newOrderItems = await prisma.orderItem.findMany({
-                where: { orderId }
-              });
-              await syncOrderInventoryState(orderId, {
-                adminStatus: oldOrder.adminStatus,
-                warehouseId: oldOrder.warehouseId,
-                items: oldOrder.items.map(item => ({
-                  productName: item.productName || '',
-                  quantity: item.quantity || 1
-                }))
-              }, {
-                adminStatus: updatedOrder.adminStatus,
-                warehouseId: updatedOrder.warehouseId,
-                items: newOrderItems.map(item => ({
-                  productName: item.productName || '',
-                  quantity: item.quantity || 1
-                }))
-              });
-            } catch (invErr: any) {
-              logger.error('Lỗi khấu trừ kho khi hoàn thành đơn qua báo cáo', { orderId, error: invErr.message });
+            // Tích hợp đồng bộ tồn kho cục bộ (chỉ dành cho KTV thực tế)
+            if (userRole === 'KTV') {
+              try {
+                const newOrderItems = await prisma.orderItem.findMany({
+                  where: { orderId }
+                });
+                await syncOrderInventoryState(orderId, {
+                  adminStatus: oldOrder.adminStatus,
+                  warehouseId: oldOrder.warehouseId,
+                  items: oldOrder.items.map(item => ({
+                    productName: item.productName || '',
+                    quantity: item.quantity || 1
+                  }))
+                }, {
+                  adminStatus: updatedOrder.adminStatus,
+                  warehouseId: updatedOrder.warehouseId,
+                  items: newOrderItems.map(item => ({
+                    productName: item.productName || '',
+                    quantity: item.quantity || 1
+                  }))
+                });
+              } catch (invErr: any) {
+                logger.error('Lỗi khấu trừ kho khi hoàn thành đơn qua báo cáo', { orderId, error: invErr.message });
+              }
             }
 
             await prisma.auditLog.create({
@@ -842,6 +862,7 @@ router.get('/', async (req: Request, res: Response): Promise<void> => {
               orderSource: true
             } 
           },
+          mainStation: { select: { name: true } }, // <-- NEW
         },
         orderBy: { createdAt: 'desc' },
         skip,

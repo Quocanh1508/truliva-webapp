@@ -1190,7 +1190,11 @@ export default function ReportList() {
                 const isPopupOpen = openPopupId === r.id;
 
                 return (
-                  <tr key={r.id} style={{ borderBottom: '1px solid var(--border-color)' }} className="hover:bg-gray-50">
+                  <tr
+                    key={r.id}
+                    style={{ borderBottom: '1px solid var(--border-color)' }}
+                    className={`hover:bg-gray-50 transition-colors ${r.mainStationId ? 'bg-purple-50/30' : ''}`}
+                  >
                     {/* Mã đơn */}
                     <td style={{ padding: '12px 16px' }}>
                       {r.order?.pancakeOrderId ? (
@@ -1327,7 +1331,7 @@ export default function ReportList() {
                       <div>
                         <span className="text-gray-400">Trạm chính:</span>{' '}
                         <span className="font-semibold text-gray-800">
-                          {r.order?.mainStation?.name || r.ktvUser?.techStation?.mainStation?.name || '---'}
+                          {r.mainStation?.name || r.order?.mainStation?.name || r.ktvUser?.techStation?.mainStation?.name || '---'}
                         </span>
                       </div>
                       <div>
@@ -1337,8 +1341,15 @@ export default function ReportList() {
                         </span>
                       </div>
                       <div className="mt-1 font-bold text-blue-750">
-                        KTV: {r.ktvUser.fullName}
+                        {r.mainStationId ? 'Người báo cáo:' : 'KTV:'} {r.ktvUser.fullName}
                       </div>
+                      {r.mainStationId && (
+                        <div className="mt-1">
+                          <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-semibold bg-purple-100 text-purple-800 border border-purple-200">
+                            Báo cáo hộ
+                          </span>
+                        </div>
+                      )}
                     </td>
 
                     {/* Tạo bởi - lúc */}

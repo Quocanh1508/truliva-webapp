@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { fetchApi, getOrders, getFiltersData, getOrderDetails } from '../../api/client';
 import LabeledImageUploader from '../../components/LabeledImageUploader';
+import { useAuth } from '../../context/AuthContext';
 import { CheckCircle, ChevronLeft, Send, AlertCircle, Camera, Loader2, ChevronDown, X } from 'lucide-react';
 import { Html5Qrcode } from 'html5-qrcode';
 import { enqueueReport } from '../../utils/offlineStorage';
@@ -41,6 +42,10 @@ export default function ReportForm() {
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+
+  const { user } = useAuth();
+  const [mainStations, setMainStations] = useState<any[]>([]);
+  const [selectedMainStationId, setSelectedMainStationId] = useState('');
 
   // ── Đơn hàng ──
   const [orders, setOrders] = useState<any[]>([]);
@@ -121,6 +126,19 @@ export default function ReportForm() {
           .catch(filterErr => console.error('Lỗi tải danh mục sản phẩm', filterErr));
       });
   }, []);
+
+  // Tải trạm chính dành cho STAFF
+  useEffect(() => {
+    if (user?.role === 'STAFF') {
+      fetchApi('/stations')
+        .then(res => {
+          if (Array.isArray(res)) {
+            setMainStations(res);
+          }
+        })
+        .catch(err => console.error('Lỗi tải trạm chính:', err));
+    }
+  }, [user]);
 
   // Tải báo cáo cũ nếu đang ở chế độ chỉnh sửa (Edit Mode)
   useEffect(() => {
@@ -570,6 +588,7 @@ export default function ReportForm() {
 
   // Validate Step 1 trước khi tiếp
   const canProceedStep1 = (): boolean => {
+    if (user?.role === 'STAFF' && !selectedMainStationId) return false;
     if (!serialNumber) return false;
     if (selectedServices.length === 0) return false;
     if (selectedItems.length === 0) return false;
@@ -632,20 +651,24 @@ export default function ReportForm() {
       notes,
       imageUrls: navigator.onLine ? imageUrls : [], // Dùng url rỗng khi offline để SyncManager điền sau
       orderId: selectedOrderId,
-      items: selectedItems.map(item => ({ productName: item.productName, quantity: item.quantity }))
+      items: selectedItems.map(item => ({ productName: item.productName, quantity: item.quantity })),
+      mainStationId: selectedMainStationId || undefined,
     };
 
     try {
-      if (navigator.onLine && imageUrls.length === 0) {
-        setError('Báo cáo bắt buộc phải có hình ảnh xác nhận. Vui lòng quay lại bước 2 để tải ảnh.');
-        setLoading(false);
-        return;
-      }
+      const isKtvUser = user?.role === 'KTV';
+      if (isKtvUser) {
+        if (navigator.onLine && imageUrls.length === 0) {
+          setError('Báo cáo bắt buộc phải có hình ảnh xác nhận. Vui lòng quay lại bước 2 để tải ảnh.');
+          setLoading(false);
+          return;
+        }
 
-      if (!navigator.onLine && reportFiles.length === 0) {
-        setError('Báo cáo bắt buộc phải có hình ảnh xác nhận. Vui lòng quay lại bước 2 để chọn ảnh.');
-        setLoading(false);
-        return;
+        if (!navigator.onLine && reportFiles.length === 0) {
+          setError('Báo cáo bắt buộc phải có hình ảnh xác nhận. Vui lòng quay lại bước 2 để chọn ảnh.');
+          setLoading(false);
+          return;
+        }
       }
 
       if (editReportId) {
@@ -659,14 +682,22 @@ export default function ReportForm() {
           method: 'PUT',
           body: JSON.stringify(payload)
         });
-        navigate('/ktv/my-reports');
+        if (user?.role !== 'KTV') {
+          navigate('/admin/orders');
+        } else {
+          navigate('/ktv/my-reports');
+        }
         return;
       }
 
       if (!navigator.onLine) {
         await enqueueReport(selectedOrderId, payload, reportFiles);
         alert('Báo cáo đã được lưu tạm ngoại tuyến và sẽ tự động đồng bộ khi thiết bị của bạn có kết nối mạng.');
-        navigate('/ktv/my-orders');
+        if (user?.role !== 'KTV') {
+          navigate('/admin/orders');
+        } else {
+          navigate('/ktv/my-orders');
+        }
         return;
       }
 
@@ -674,7 +705,11 @@ export default function ReportForm() {
         method: 'POST',
         body: JSON.stringify(payload)
       });
-      navigate('/ktv/my-reports');
+      if (user?.role !== 'KTV') {
+        navigate('/admin/orders');
+      } else {
+        navigate('/ktv/my-reports');
+      }
     } catch (err: any) {
       setError(err.message);
       setLoading(false);
@@ -760,6 +795,31 @@ export default function ReportForm() {
                 <p className="text-xs text-red-500 mt-1">⚠ Bắt buộc phải chọn đơn hàng để Admin có thể tracking.</p>
               )}
             </div>
+
+            {/* Nếu là Staff, bắt buộc chọn Trạm chính */}
+            {user?.role === 'STAFF' && (
+              <div className="form-group bg-purple-50/50 p-4 rounded-lg border border-purple-100 mb-6">
+                <label className="form-label text-purple-800 font-semibold mb-2 flex items-center gap-2">
+                  🏢 Chọn Trạm chính *
+                </label>
+                <select
+                  className="form-select bg-white border-purple-200 focus:border-purple-500 focus:ring-purple-500 text-sm"
+                  value={selectedMainStationId}
+                  onChange={(e) => setSelectedMainStationId(e.target.value)}
+                  required
+                >
+                  <option value="">-- Vui lòng chọn Trạm chính --</option>
+                  {mainStations.map(s => (
+                    <option key={s.id} value={s.id}>
+                      {s.name}
+                    </option>
+                  ))}
+                </select>
+                {!selectedMainStationId && (
+                  <p className="text-xs text-red-500 mt-1">⚠ Bắt buộc phải chọn Trạm chính để đối soát.</p>
+                )}
+              </div>
+            )}
 
             {/* Khung thông tin tự động mapping */}
             {selectedOrderId && (

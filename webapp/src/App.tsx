@@ -308,8 +308,11 @@ export default function App() {
               
               <Route element={<Layout />}>
               {/* KTV Routes */}
-              <Route element={<ProtectedRoute allowedRoles={['KTV']} />}>
+              <Route element={<ProtectedRoute allowedRoles={['KTV', 'ADMIN', 'COORDINATOR', 'SALE_SUPERVISOR', 'SALER', 'HOTLINE', 'STAFF']} />}>
                 <Route path="/ktv/report" element={<ReportForm />} />
+              </Route>
+
+              <Route element={<ProtectedRoute allowedRoles={['KTV']} />}>
                 <Route path="/ktv/my-reports" element={<MyReports />} />
                 <Route path="/ktv/my-orders" element={<MyOrders />} />
                 <Route path="/ktv/inventory" element={<KtvInventory />} />

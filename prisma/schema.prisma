@@ -167,8 +167,9 @@ model MainStation {
   createdAt     DateTime      @default(now()) @map("created_at")
 
   // Relations
-  techStations  TechStation[]
-  orders        Order[]
+  techStations   TechStation[]
+  orders         Order[]
+  serviceReports ServiceReport[]
 
   @@map("main_stations")
 }
@@ -287,9 +288,12 @@ model ServiceReport {
   createdAt         DateTime  @default(now()) @map("created_at")
   updatedAt         DateTime  @updatedAt @map("updated_at")
 
+  mainStationId     String?   @map("main_station_id") // Trạm chính (luồng Staff báo cáo hộ)
+
   // Relations
   ktvUser           User      @relation(fields: [ktvUserId], references: [id])
   order             Order?    @relation(fields: [orderId], references: [id])
+  mainStation       MainStation? @relation(fields: [mainStationId], references: [id])
 
   @@map("service_reports")
   @@index([serialNumber])
