@@ -332,8 +332,8 @@ router.post('/', async (req: Request, res: Response): Promise<void> => {
     const userRole = req.user!.role;
     const isKtv = userRole === 'KTV';
 
-    if (userRole === 'STAFF' && !mainStationId) {
-      res.status(400).json({ error: 'Nhân viên (Staff) bắt buộc phải chọn Trạm chính' });
+    if (!isKtv && !mainStationId) {
+      res.status(400).json({ error: 'Tài khoản văn phòng bắt buộc phải chọn Trạm chính khi báo cáo' });
       return;
     }
 

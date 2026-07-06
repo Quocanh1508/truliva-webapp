@@ -127,9 +127,9 @@ export default function ReportForm() {
       });
   }, []);
 
-  // Tải trạm chính dành cho STAFF
+  // Tải trạm chính dành cho tất cả role văn phòng (không phải KTV)
   useEffect(() => {
-    if (user?.role === 'STAFF') {
+    if (user && user.role !== 'KTV') {
       fetchApi('/stations')
         .then(res => {
           if (Array.isArray(res)) {
@@ -588,7 +588,7 @@ export default function ReportForm() {
 
   // Validate Step 1 trước khi tiếp
   const canProceedStep1 = (): boolean => {
-    if (user?.role === 'STAFF' && !selectedMainStationId) return false;
+    if (user && user.role !== 'KTV' && !selectedMainStationId) return false;
     if (!serialNumber) return false;
     if (selectedServices.length === 0) return false;
     if (selectedItems.length === 0) return false;
@@ -797,7 +797,7 @@ export default function ReportForm() {
             </div>
 
             {/* Nếu là Staff, bắt buộc chọn Trạm chính */}
-            {user?.role === 'STAFF' && (
+            {user && user.role !== 'KTV' && (
               <div className="form-group bg-purple-50/50 p-4 rounded-lg border border-purple-100 mb-6">
                 <label className="form-label text-purple-800 font-semibold mb-2 flex items-center gap-2">
                   🏢 Chọn Trạm chính *
