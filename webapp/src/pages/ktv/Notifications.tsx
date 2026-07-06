@@ -341,164 +341,192 @@ export default function Notifications() {
       </div>
       )}
 
-      {selectedReport && (
-        <div className="fixed inset-0 bg-black/55 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-fade-in">
-          <div className="bg-white rounded-2xl w-full max-w-xl max-h-[85vh] overflow-y-auto shadow-2xl flex flex-col">
-            <div className="flex justify-between items-center px-6 py-4 border-b border-gray-100 bg-[#1B3A6B] text-white rounded-t-2xl">
-              <h3 className="font-bold text-lg">
-                Chi tiết báo cáo {selectedReport.order?.pancakeOrderId ? `#${selectedReport.order.pancakeOrderId}` : selectedReport.id.substring(0, 8)}
-              </h3>
-              <button onClick={() => setSelectedReport(null)} className="text-white/80 hover:text-white transition-colors">
-                <X size={20} />
-              </button>
-            </div>
-            
-            <div className="p-6 space-y-4 text-sm text-gray-700 overflow-y-auto flex-1 text-left">
-              {/* Khách hàng */}
-              <div className="grid grid-cols-2 gap-4 bg-gray-50 p-4 rounded-xl border border-gray-100">
-                <div>
-                  <span className="block text-[11px] font-bold text-gray-450 uppercase tracking-wider">Khách hàng</span>
-                  <strong className="text-gray-900">{selectedReport.customerName}</strong>
-                </div>
-                <div>
-                  <span className="block text-[11px] font-bold text-gray-450 uppercase tracking-wider">Số điện thoại</span>
-                  <strong className="text-gray-900">{selectedReport.customerPhone}</strong>
-                </div>
-                <div className="col-span-2">
-                  <span className="block text-[11px] font-bold text-gray-450 uppercase tracking-wider">Địa chỉ</span>
-                  <span className="text-gray-800 font-medium">{selectedReport.address || '-'} ({selectedReport.province})</span>
-                </div>
+      {selectedReport && (() => {
+        const correspondingNotification = notifications.find(n => n.rawData?.reportId === selectedReport.id);
+        return (
+          <div className="fixed inset-0 bg-black/55 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-fade-in">
+            <div className="bg-white rounded-2xl w-full max-w-xl max-h-[85vh] shadow-2xl flex flex-col">
+              <div className="flex justify-between items-center px-6 py-4 border-b border-gray-100 bg-[#1B3A6B] text-white rounded-t-2xl">
+                <h3 className="font-bold text-lg">
+                  Chi tiết báo cáo {selectedReport.order?.pancakeOrderId ? `#${selectedReport.order.pancakeOrderId}` : selectedReport.id.substring(0, 8)}
+                </h3>
+                <button onClick={() => setSelectedReport(null)} className="text-white/80 hover:text-white transition-colors">
+                  <X size={20} />
+                </button>
               </div>
+              
+              <div className="p-6 space-y-4 text-sm text-gray-700 overflow-y-auto flex-1 text-left">
+                {/* PHẦN 1: THÔNG TIN DỊCH VỤ & LINH KIỆN (QUAN TRỌNG NHẤT) */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {/* Cột trái: Danh sách sản phẩm & linh kiện */}
+                  <div className="border border-slate-150 p-3.5 rounded-xl bg-slate-50/50 space-y-2 flex flex-col">
+                    <span className="block text-[11px] font-bold text-gray-500 uppercase tracking-wider">Sản phẩm & Linh kiện sử dụng</span>
+                    <div className="space-y-1.5 max-h-[140px] overflow-y-auto flex-1">
+                      {selectedReport.products && selectedReport.products.length > 0 ? (
+                        selectedReport.products.map((p: string, idx: number) => (
+                          <div key={idx} className="flex justify-between items-center text-xs font-semibold text-gray-700 bg-white px-2.5 py-1.5 rounded border border-gray-100 shadow-sm">
+                            <span className="truncate mr-2" title={p}>{p}</span>
+                            <span className="px-2 py-0.5 bg-blue-50 text-blue-700 rounded font-semibold text-[9px] shrink-0">Thiết bị</span>
+                          </div>
+                        ))
+                      ) : null}
+                      {selectedReport.spareParts && selectedReport.spareParts.length > 0 ? (
+                        selectedReport.spareParts.map((p: string, idx: number) => (
+                          <div key={idx} className="flex justify-between items-center text-xs font-semibold text-gray-700 bg-white px-2.5 py-1.5 rounded border border-gray-100 shadow-sm">
+                            <span className="truncate mr-2" title={p}>{p}</span>
+                            <span className="px-2 py-0.5 bg-amber-50 text-amber-700 rounded font-semibold text-[9px] shrink-0">Linh kiện</span>
+                          </div>
+                        ))
+                      ) : null}
+                      {(!selectedReport.products?.length && !selectedReport.spareParts?.length) && (
+                        <div className="text-xs text-gray-450 italic text-center py-4">Không dùng sản phẩm/linh kiện</div>
+                      )}
+                    </div>
+                  </div>
 
-              {/* Thông tin công việc */}
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <span className="block text-[11px] font-bold text-gray-450 uppercase tracking-wider">Kỹ thuật viên</span>
-                  <span className="font-semibold text-gray-855">{selectedReport.ktvUser?.fullName || 'N/A'}</span>
-                </div>
-                <div>
-                  <span className="block text-[11px] font-bold text-gray-450 uppercase tracking-wider">Loại công việc</span>
-                  <span className="font-semibold text-gray-855">{selectedReport.workType || '-'}</span>
-                </div>
-                <div className="col-span-2">
-                  <span className="block text-[11px] font-bold text-gray-450 uppercase tracking-wider">Dịch vụ thực tế</span>
-                  <span className="font-semibold text-gray-855">{selectedReport.serviceType || '-'}</span>
-                </div>
-              </div>
-
-              {/* Linh kiện/sản phẩm */}
-              <div>
-                <span className="block text-[11px] font-bold text-gray-450 uppercase tracking-wider mb-1.5">Sản phẩm & Linh kiện sử dụng</span>
-                <div className="bg-slate-50 border border-slate-150 p-3 rounded-lg flex flex-col gap-1.5">
-                  {selectedReport.products && selectedReport.products.length > 0 ? (
-                    selectedReport.products.map((p: string, idx: number) => (
-                      <div key={idx} className="flex justify-between items-center text-xs font-medium text-gray-700 bg-white px-2.5 py-1.5 rounded border border-gray-100">
-                        <span>{p}</span>
-                        <span className="px-2 py-0.5 bg-blue-50 text-blue-700 rounded font-semibold text-[10px]">Thiết bị/Lọc</span>
+                  {/* Cột phải: Số máy & Số tiền & Công việc */}
+                  <div className="border border-slate-150 p-3.5 rounded-xl bg-[#1B3A6B]/5 space-y-2.5">
+                    <span className="block text-[11px] font-bold text-[#1B3A6B] uppercase tracking-wider">Chi tiết doanh thu</span>
+                    <div className="space-y-2 text-xs">
+                      <div className="flex justify-between border-b border-gray-200/50 pb-1.5">
+                        <span className="text-gray-500">Số máy (Serial):</span>
+                        <strong className="font-mono text-gray-800 font-bold">{selectedReport.serialNumber || '-'}</strong>
                       </div>
-                    ))
-                  ) : null}
-                  {selectedReport.spareParts && selectedReport.spareParts.length > 0 ? (
-                    selectedReport.spareParts.map((p: string, idx: number) => (
-                      <div key={idx} className="flex justify-between items-center text-xs font-medium text-gray-700 bg-white px-2.5 py-1.5 rounded border border-gray-100">
-                        <span>{p}</span>
-                        <span className="px-2 py-0.5 bg-amber-50 text-amber-700 rounded font-semibold text-[10px]">Linh kiện</span>
+                      <div className="flex justify-between border-b border-gray-200/50 pb-1.5">
+                        <span className="text-gray-500">Tiền thu thực tế:</span>
+                        <strong className="text-emerald-700 font-bold text-sm">{(selectedReport.actualAmount || 0).toLocaleString('vi-VN')} đ</strong>
                       </div>
-                    ))
-                  ) : null}
-                  {(!selectedReport.products?.length && !selectedReport.spareParts?.length) && (
-                    <span className="text-xs text-gray-450 italic text-center py-1">Không sử dụng sản phẩm/linh kiện</span>
-                  )}
-                </div>
-              </div>
-
-              {/* Thông số kỹ thuật */}
-              {selectedReport.waterSource && (
-                <div className="grid grid-cols-2 gap-3 bg-slate-50/50 p-3.5 rounded-xl border border-slate-100">
-                  <div>
-                    <span className="block text-[10px] font-bold text-gray-450 uppercase tracking-wider">Nguồn nước</span>
-                    <span className="text-xs font-semibold text-gray-800">{selectedReport.waterSource}</span>
-                  </div>
-                  <div>
-                    <span className="block text-[10px] font-bold text-gray-450 uppercase tracking-wider">Áp suất nước</span>
-                    <span className="text-xs font-semibold text-gray-800">{selectedReport.waterPressure ? `${selectedReport.waterPressure} psi` : '-'}</span>
-                  </div>
-                  <div>
-                    <span className="block text-[10px] font-bold text-gray-450 uppercase tracking-wider">TDS Đầu vào</span>
-                    <span className="text-xs font-semibold text-gray-800">{selectedReport.tdsIn || 0} ppm</span>
-                  </div>
-                  <div>
-                    <span className="block text-[10px] font-bold text-gray-450 uppercase tracking-wider">TDS Đầu ra</span>
-                    <span className="text-xs font-semibold text-gray-800">{selectedReport.tdsOut || 0} ppm</span>
+                      <div className="flex justify-between border-b border-gray-200/50 pb-1.5">
+                        <span className="text-gray-500">Loại công việc:</span>
+                        <strong className="text-gray-800">{selectedReport.workType || '-'}</strong>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-500">Khoảng cách:</span>
+                        <strong className="text-gray-800">{selectedReport.distanceKm ? `${selectedReport.distanceKm} km` : '-'}</strong>
+                      </div>
+                    </div>
                   </div>
                 </div>
-              )}
 
-              {/* Nguyên nhân / Cách xử lý */}
-              {selectedReport.handlingMethod && (
-                <div className="space-y-2.5">
-                  {selectedReport.issueType && (
-                    <div>
-                      <span className="block text-[11px] font-bold text-gray-450 uppercase tracking-wider">Nguyên nhân lỗi</span>
-                      <span className="text-xs font-medium text-gray-855">{selectedReport.issueType}</span>
+                {/* PHẦN 2: GHI CHÚ KTV & XỬ LÝ LỖI */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="space-y-1.5">
+                    <span className="block text-[11px] font-bold text-gray-500 uppercase tracking-wider">Cách xử lý & Ghi chú của KTV</span>
+                    <div className="p-3 bg-gray-50 rounded-xl border border-gray-150 text-xs min-h-[75px] max-h-[100px] overflow-y-auto">
+                      {selectedReport.issueType && (
+                        <div className="mb-1">
+                          <span className="font-semibold text-gray-700">Lỗi: </span>
+                          <span>{selectedReport.issueType}</span>
+                        </div>
+                      )}
+                      {selectedReport.handlingMethod && (
+                        <div className="mb-1">
+                          <span className="font-semibold text-gray-700">Xử lý: </span>
+                          <span>{selectedReport.handlingMethod}</span>
+                        </div>
+                      )}
+                      <div className="text-gray-650 italic mt-1 whitespace-pre-wrap">
+                        "{selectedReport.notes || 'Không có ghi chú thêm.'}"
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Ảnh nghiệm thu */}
+                  <div className="space-y-1.5">
+                    <span className="block text-[11px] font-bold text-gray-500 uppercase tracking-wider">Ảnh nghiệm thu</span>
+                    {selectedReport.imageUrls && selectedReport.imageUrls.length > 0 ? (
+                      <div className="grid grid-cols-3 gap-2">
+                        {selectedReport.imageUrls.map((url: string, idx: number) => (
+                          <img
+                            key={idx}
+                            src={url}
+                            alt={`Ảnh ${idx + 1}`}
+                            className="w-full aspect-square object-cover rounded-lg border border-gray-200 cursor-pointer hover:opacity-90 transition-opacity"
+                            onClick={() => window.open(url, '_blank')}
+                          />
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="h-[75px] flex items-center justify-center border border-dashed border-gray-200 rounded-lg text-xs text-gray-400 italic">
+                        Không có ảnh
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* PHẦN 3: THÔNG TIN KHÁCH HÀNG & TRẠM (Ẩn bớt độ ưu tiên xuống dưới) */}
+                <div className="p-4 bg-gray-50/50 rounded-xl border border-gray-100 space-y-2 text-xs">
+                  <span className="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">Thông tin khách hàng & Trạm</span>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1.5">
+                    <div className="flex justify-between">
+                      <span className="text-gray-450">Khách hàng:</span>
+                      <strong className="text-gray-800 font-semibold">{selectedReport.customerName}</strong>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-450">SĐT:</span>
+                      <strong className="text-gray-800 font-semibold">{selectedReport.customerPhone}</strong>
+                    </div>
+                    <div className="sm:col-span-2 flex justify-between">
+                      <span className="text-gray-450 shrink-0 mr-4">Địa chỉ:</span>
+                      <span className="text-gray-700 text-right">{selectedReport.address || '-'} ({selectedReport.province})</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-450">Kỹ thuật viên:</span>
+                      <strong className="text-gray-800 font-semibold">{selectedReport.ktvUser?.fullName || 'N/A'}</strong>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-450">Trạm chính:</span>
+                      <strong className="text-gray-800 font-semibold">{selectedReport.mainStation?.name || selectedReport.ktvUser?.techStation?.mainStation?.name || 'N/A'}</strong>
+                    </div>
+                  </div>
+
+                  {selectedReport.waterSource && (
+                    <div className="grid grid-cols-4 gap-2 pt-2 border-t border-gray-200/50 text-[10px] text-gray-550">
+                      <div className="truncate" title={selectedReport.waterSource}>Nguồn: {selectedReport.waterSource}</div>
+                      <div>Áp suất: {selectedReport.waterPressure ? `${selectedReport.waterPressure} psi` : '-'}</div>
+                      <div>TDS In: {selectedReport.tdsIn || 0}</div>
+                      <div>TDS Out: {selectedReport.tdsOut || 0}</div>
                     </div>
                   )}
-                  <div>
-                    <span className="block text-[11px] font-bold text-gray-450 uppercase tracking-wider">Cách xử lý của KTV</span>
-                    <span className="text-xs font-medium text-gray-855">{selectedReport.handlingMethod}</span>
-                  </div>
-                </div>
-              )}
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <span className="block text-[11px] font-bold text-gray-450 uppercase tracking-wider">Số máy (Serial Number)</span>
-                  <span className="font-semibold text-gray-850 font-mono tracking-wider">{selectedReport.serialNumber || '-'}</span>
-                </div>
-                <div>
-                  <span className="block text-[11px] font-bold text-gray-450 uppercase tracking-wider">Tiền thu thực tế</span>
-                  <span className="font-bold text-[#1B3A6B]">{(selectedReport.actualAmount || 0).toLocaleString('vi-VN')} đ</span>
                 </div>
               </div>
 
-              {/* Ghi chú */}
-              <div>
-                <span className="block text-[11px] font-bold text-gray-450 uppercase tracking-wider">Ghi chú của KTV</span>
-                <p className="text-xs text-gray-650 bg-gray-50 p-2.5 rounded border border-gray-150 whitespace-pre-wrap mt-1">
-                  {selectedReport.notes || 'Không có ghi chú.'}
-                </p>
+              <div className="px-6 py-4 border-t border-gray-100 flex justify-end gap-2.5">
+                <button
+                  onClick={() => setSelectedReport(null)}
+                  className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold rounded-lg text-xs transition-colors"
+                >
+                  Đóng
+                </button>
+                {selectedReport.approvalStatus === 'PENDING' && correspondingNotification && (
+                  <>
+                    <button
+                      onClick={async (e) => {
+                        await handleReject(e, correspondingNotification.id, selectedReport.id);
+                        setSelectedReport(null);
+                      }}
+                      disabled={!!actionLoadingId}
+                      className="px-4 py-2 bg-red-600 hover:bg-red-700 disabled:bg-gray-400 text-white font-bold rounded-lg text-xs transition-colors flex items-center gap-1 shadow-sm cursor-pointer"
+                    >
+                      Từ chối
+                    </button>
+                    <button
+                      onClick={async (e) => {
+                        await handleApprove(e, correspondingNotification.id, selectedReport.id);
+                        setSelectedReport(null);
+                      }}
+                      disabled={!!actionLoadingId}
+                      className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 disabled:bg-gray-400 text-white font-bold rounded-lg text-xs transition-colors flex items-center gap-1 shadow-sm cursor-pointer"
+                    >
+                      Duyệt
+                    </button>
+                  </>
+                )}
               </div>
-
-              {/* Ảnh nghiệm thu */}
-              {selectedReport.imageUrls && selectedReport.imageUrls.length > 0 && (
-                <div>
-                  <span className="block text-[11px] font-bold text-gray-450 uppercase tracking-wider mb-2">Ảnh nghiệm thu ({selectedReport.imageUrls.length})</span>
-                  <div className="grid grid-cols-3 gap-2">
-                    {selectedReport.imageUrls.map((url: string, idx: number) => (
-                      <img
-                        key={idx}
-                        src={url}
-                        alt={`Ảnh ${idx + 1}`}
-                        className="w-full aspect-square object-cover rounded-lg border border-gray-200 cursor-pointer hover:opacity-90 transition-opacity"
-                        onClick={() => window.open(url, '_blank')}
-                      />
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-
-            <div className="px-6 py-4 border-t border-gray-100 flex justify-end">
-              <button
-                onClick={() => setSelectedReport(null)}
-                className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold rounded-lg text-xs transition-colors"
-              >
-                Đóng
-              </button>
             </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
     </div>
     </PullToRefresh>
   );
