@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { fetchApi } from '../../api/client';
 import { 
   Calculator, 
@@ -13,7 +13,8 @@ import {
   FileSpreadsheet,
   X,
   TrendingUp,
-  UserCheck
+  UserCheck,
+  ChevronDown
 } from 'lucide-react';
 import { useConfirm } from '../../context/ConfirmContext';
 import { useAuth } from '../../context/AuthContext';
@@ -30,6 +31,9 @@ interface CaseDetail {
   distanceCost: number;
   totalCost: number;
   createdAt: string;
+  appointmentTime?: string | null;
+  ktvCalledAt?: string | null;
+  products?: string[] | null;
 }
 
 interface SalaryData {
@@ -81,6 +85,48 @@ export default function SalaryManage() {
   // Detail Modal State
   const [selectedKtv, setSelectedKtv] = useState<SalaryData | null>(null);
   const [showDetailModal, setShowDetailModal] = useState(false);
+
+  // States for inline unit price editing and row expansion
+  const [editingReportId, setEditingReportId] = useState<string | null>(null);
+  const [editingBaseCost, setEditingBaseCost] = useState<string>('');
+  const [expandedReportIds, setExpandedReportIds] = useState<Set<string>>(new Set());
+
+  // Function to toggle row expansion
+  const toggleRowExpand = (reportId: string) => {
+    setExpandedReportIds(prev => {
+      const next = new Set(prev);
+      if (next.has(reportId)) {
+        next.delete(reportId);
+      } else {
+        next.add(reportId);
+      }
+      return next;
+    });
+  };
+
+  // Function to save base cost changes
+  const saveBaseCostChange = async (reportId: string, value: string) => {
+    const cost = value === '' ? null : Number(value.replace(/\D/g, ''));
+    if (cost !== null && isNaN(cost)) return;
+    
+    try {
+      await fetchApi('/salaries/update-base-cost', {
+        method: 'POST',
+        body: JSON.stringify({ reportId, baseCost: cost })
+      });
+      // Fetch latest salaries to sync everything
+      const data = await fetchApi(`/salaries/calculate?month=${selectedMonth}`);
+      setSalaries(data.salaries || []);
+      // Update selected KTV in modal
+      const updatedKtv = (data.salaries || []).find((s: any) => s.userId === selectedKtv?.userId);
+      if (updatedKtv) {
+        setSelectedKtv(updatedKtv);
+      }
+      setEditingReportId(null);
+    } catch (err: any) {
+      alert(err.message || 'Lỗi khi cập nhật đơn giá ca');
+    }
+  };
 
   // Search/Filter state
   const [searchQuery, setSearchQuery] = useState('');
@@ -545,40 +591,117 @@ export default function SalaryManage() {
                           : 'Báo cáo';
 
                         return (
-                          <tr key={c.reportId} className="hover:bg-gray-50/50 transition">
-                            <td className="px-4 py-3 text-center text-gray-400">{index + 1}</td>
-                            <td className="px-4 py-3 font-semibold text-blue-600">{formattedId}</td>
-                            <td className="px-4 py-3 font-medium text-gray-800">{c.customerName}</td>
-                            <td className="px-4 py-3 text-gray-600">{c.workType}</td>
-                            <td className="px-4 py-3 text-center">
-                              {c.isSunday ? (
-                                <span className="px-2 py-0.5 text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-100 rounded-md">
-                                  Chủ Nhật
-                                </span>
-                              ) : (
-                                <span className="text-gray-400">-</span>
-                              )}
-                            </td>
-                            <td className="px-4 py-3 text-right font-medium text-gray-700">
-                              {c.baseCost.toLocaleString('vi-VN')}
-                            </td>
-                            <td className="px-4 py-3 text-center text-gray-600">
-                              {c.distance > 0 ? (
-                                <span className="flex items-center justify-center gap-0.5">
-                                  <MapPin className="h-3.5 w-3.5 text-gray-400" />
-                                  {c.distance} km
-                                </span>
-                              ) : (
-                                '-'
-                              )}
-                            </td>
-                            <td className="px-4 py-3 text-right text-gray-600">
-                              {c.distanceCost > 0 ? c.distanceCost.toLocaleString('vi-VN') : '-'}
-                            </td>
-                            <td className="px-4 py-3 text-right font-bold text-gray-900">
-                              {c.totalCost.toLocaleString('vi-VN')}
-                            </td>
-                          </tr>
+                          <React.Fragment key={c.reportId}>
+                            <tr className="hover:bg-gray-50/50 transition">
+                              <td className="px-4 py-3 text-center text-gray-400">
+                                <div className="flex items-center justify-center gap-1">
+                                  <button
+                                    onClick={() => toggleRowExpand(c.reportId)}
+                                    className="p-0.5 hover:bg-gray-100 rounded text-gray-400 hover:text-gray-600 transition"
+                                    title="Xem thêm thông tin"
+                                  >
+                                    <ChevronDown 
+                                      size={14} 
+                                      className={`transform transition-transform duration-250 ${
+                                        expandedReportIds.has(c.reportId) ? 'rotate-180 text-blue-600' : ''
+                                      }`} 
+                                    />
+                                  </button>
+                                  <span>{index + 1}</span>
+                                </div>
+                              </td>
+                              <td className="px-4 py-3 font-semibold text-blue-600">{formattedId}</td>
+                              <td className="px-4 py-3 font-medium text-gray-800">{c.customerName}</td>
+                              <td className="px-4 py-3 text-gray-600">{c.workType}</td>
+                              <td className="px-4 py-3 text-center">
+                                {c.isSunday ? (
+                                  <span className="px-2 py-0.5 text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-100 rounded-md">
+                                    Chủ Nhật
+                                  </span>
+                                ) : (
+                                  <span className="text-gray-400">-</span>
+                                )}
+                              </td>
+                              <td className="px-4 py-3 text-right font-medium text-gray-700">
+                                {editingReportId === c.reportId ? (
+                                  <input
+                                    type="text"
+                                    className="w-24 text-right px-1 py-0.5 border border-blue-400 rounded focus:ring-1 focus:ring-blue-400 focus:outline-none text-xs"
+                                    value={editingBaseCost}
+                                    onChange={(e) => setEditingBaseCost(e.target.value)}
+                                    onBlur={() => saveBaseCostChange(c.reportId, editingBaseCost)}
+                                    onKeyDown={(e) => {
+                                      if (e.key === 'Enter') {
+                                        saveBaseCostChange(c.reportId, editingBaseCost);
+                                      } else if (e.key === 'Escape') {
+                                        setEditingReportId(null);
+                                      }
+                                    }}
+                                    autoFocus
+                                  />
+                                ) : (
+                                  <div 
+                                    onClick={() => {
+                                      setEditingReportId(c.reportId);
+                                      setEditingBaseCost(c.baseCost.toLocaleString('vi-VN'));
+                                    }}
+                                    className="cursor-pointer hover:bg-gray-100/80 px-1 py-0.5 rounded border border-dashed border-transparent hover:border-gray-300 inline-block w-full text-right font-semibold text-blue-700"
+                                    title="Nhấp để chỉnh sửa đơn giá"
+                                  >
+                                    {c.baseCost.toLocaleString('vi-VN')}
+                                  </div>
+                                )}
+                              </td>
+                              <td className="px-4 py-3 text-center text-gray-600">
+                                {c.distance > 0 ? (
+                                  <span className="flex items-center justify-center gap-0.5">
+                                    <MapPin className="h-3.5 w-3.5 text-gray-400" />
+                                    {c.distance} km
+                                  </span>
+                                ) : (
+                                  '-'
+                                )}
+                              </td>
+                              <td className="px-4 py-3 text-right text-gray-600">
+                                {c.distanceCost > 0 ? c.distanceCost.toLocaleString('vi-VN') : '-'}
+                              </td>
+                              <td className="px-4 py-3 text-right font-bold text-gray-900">
+                                {c.totalCost.toLocaleString('vi-VN')}
+                              </td>
+                            </tr>
+                            {expandedReportIds.has(c.reportId) && (
+                              <tr className="bg-blue-50/20 border-b border-gray-100">
+                                <td colSpan={9} className="px-6 py-4 text-xs text-gray-655 text-left">
+                                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
+                                    <div className="bg-white p-2.5 rounded-lg border border-gray-100 shadow-sm flex flex-col justify-center min-h-[45px]">
+                                      <span className="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-0.5">Sản phẩm / Máy</span>
+                                      <span className="font-semibold text-gray-800 break-words">
+                                        {c.products && c.products.length > 0 ? c.products.join(', ') : 'Không có'}
+                                      </span>
+                                    </div>
+                                    <div className="bg-white p-2.5 rounded-lg border border-gray-100 shadow-sm flex flex-col justify-center min-h-[45px]">
+                                      <span className="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-0.5">Ngày giờ hẹn khách</span>
+                                      <span className="font-semibold text-gray-800">
+                                        {c.appointmentTime ? new Date(c.appointmentTime).toLocaleString('vi-VN') : 'Không có'}
+                                      </span>
+                                    </div>
+                                    <div className="bg-white p-2.5 rounded-lg border border-gray-100 shadow-sm flex flex-col justify-center min-h-[45px]">
+                                      <span className="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-0.5">Thời gian đã gọi</span>
+                                      <span className="font-semibold text-gray-800">
+                                        {c.ktvCalledAt ? new Date(c.ktvCalledAt).toLocaleString('vi-VN') : 'Chưa gọi'}
+                                      </span>
+                                    </div>
+                                    <div className="bg-white p-2.5 rounded-lg border border-gray-100 shadow-sm flex flex-col justify-center min-h-[45px]">
+                                      <span className="block text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-0.5">Ngày giờ đóng ca</span>
+                                      <span className="font-semibold text-gray-800">
+                                        {c.createdAt ? new Date(c.createdAt).toLocaleString('vi-VN') : 'Không có'}
+                                      </span>
+                                    </div>
+                                  </div>
+                                </td>
+                              </tr>
+                            )}
+                          </React.Fragment>
                         );
                       })}
                     </tbody>

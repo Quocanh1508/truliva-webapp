@@ -269,6 +269,7 @@ model ServiceReport {
   distanceKm        Float?    @map("distance_km")         // Khoảng cách (km)
   isPaid            Boolean   @default(false) @map("is_paid")    // Đã trả tiền công
   serviceCost       Float?    @map("service_cost")        // Chi phí dịch vụ (legacy)
+  customBaseCost    Float?    @map("custom_base_cost")    // Đơn giá ca điều chỉnh thủ công bởi Admin
   additionalCost    Float?    @map("additional_cost")     // Chi phí phát sinh (legacy)
   orderId           String?   @map("order_id")            // Đơn hàng liên kết
 

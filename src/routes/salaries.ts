@@ -197,7 +197,9 @@ router.get('/calculate', requireAuth, requireAdmin, async (req: Request, res: Re
         
         // a. Base Rate Calculation
         const isSunday = new Date(report.createdAt).getDay() === 0;
-        if (isStationPaid) {
+        if (report.customBaseCost !== null && report.customBaseCost !== undefined) {
+          baseCost = report.customBaseCost;
+        } else if (isStationPaid) {
           const rateType = getRateType(workType);
           baseCost = isSunday
             ? stationRate.sundayRates[rateType]
@@ -227,7 +229,10 @@ router.get('/calculate', requireAuth, requireAdmin, async (req: Request, res: Re
           distance,
           distanceCost,
           totalCost,
-          createdAt: report.createdAt
+          createdAt: report.createdAt,
+          appointmentTime: report.order?.appointmentTime,
+          ktvCalledAt: report.order?.ktvCalledAt,
+          products: report.products
         });
       }
 
@@ -336,6 +341,32 @@ router.post('/lock', requireAuth, requireAdmin, async (req: Request, res: Respon
   } catch (error: any) {
     logger.error('Lock salary records error', { error: error.message });
     res.status(500).json({ error: 'Lỗi khi chốt bảng thù lao' });
+  }
+});
+
+/**
+ * POST /api/salaries/update-base-cost
+ * Update custom base cost for a report
+ */
+router.post('/update-base-cost', requireAuth, requireAdmin, async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { reportId, baseCost } = req.body;
+    if (!reportId) {
+      res.status(400).json({ error: 'Thiếu reportId' });
+      return;
+    }
+    
+    await prisma.serviceReport.update({
+      where: { id: reportId },
+      data: {
+        customBaseCost: baseCost !== null && baseCost !== undefined ? Number(baseCost) : null
+      }
+    });
+    
+    res.json({ message: 'Cập nhật đơn giá ca thành công' });
+  } catch (error: any) {
+    logger.error('Update custom base cost error', { error: error.message });
+    res.status(500).json({ error: 'Lỗi khi cập nhật đơn giá ca' });
   }
 });
 
