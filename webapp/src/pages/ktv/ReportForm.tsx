@@ -778,7 +778,7 @@ export default function ReportForm() {
                 value={selectedOrderId}
                 onChange={(e) => handleOrderSelect(e.target.value)}
                 required
-                disabled={!!editReportId}
+                disabled={!!editReportId || !!location.state?.order}
               >
                 <option value="">-- Vui lòng chọn đơn hàng --</option>
                 {orders.map(o => {
