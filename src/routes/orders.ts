@@ -843,7 +843,14 @@ router.post('/', requireAuth, async (req: Request, res: Response): Promise<void>
         billFullName: customerName,
         billPhoneNumber: cleanPhone,
         pancakeCreatedAt: new Date(),
-        promoCode: promoCode || null
+        promoCode: promoCode || null,
+        rawData: {
+          creator: {
+            id: req.user!.id,
+            name: req.user!.fullName,
+            role: req.user!.role
+          }
+        }
       }
     });
 
