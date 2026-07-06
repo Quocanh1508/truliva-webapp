@@ -233,6 +233,7 @@ model User {
   feedbacks       Feedback[]
   notifications   Notification[]
   importedSerials Serial[]
+  salaryRecords   SalaryRecord[]
 
   @@map("users")
 }
@@ -395,5 +396,23 @@ model WarrantyPolicy {
   updatedAt      DateTime @updatedAt @map("updated_at")
 
   @@map("warranty_policies")
+}
+
+// ── Bảng bảng lương chi tiết của từng KTV/Trạm theo tháng ──
+model SalaryRecord {
+  id              String   @id @default(uuid())
+  month           String            // Định dạng "MM/YYYY" (VD: "07/2026")
+  userId          String   @map("user_id")
+  calculatedCost  Float    @map("calculated_cost")  // Tiền tính tự động từ ca dịch vụ
+  adjustedCost    Float    @map("adjusted_cost")    // Tiền sau khi Admin điều chỉnh thủ công
+  adjustmentNote  String?  @map("adjustment_note")  // Ghi chú lý do điều chỉnh
+  status          String   @default("DRAFT") @map("status") // "DRAFT" | "FINAL"
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([month, userId])
+  @@map("salary_records")
 }
 

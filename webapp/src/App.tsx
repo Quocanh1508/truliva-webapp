@@ -34,6 +34,7 @@ import InventoryManage from './pages/admin/InventoryManage';
 import BroadcastNotification from './pages/admin/BroadcastNotification';
 import SerialManage from './pages/admin/SerialManage';
 import PromoManage from './pages/admin/PromoManage';
+import SalaryManage from './pages/admin/SalaryManage';
 import WarrantyActivate from './pages/public/WarrantyActivate';
 
 // Feedback / DEV Pages
@@ -331,6 +332,11 @@ export default function App() {
               {/* Admin & Dev Broadcast Routes */}
               <Route element={<ProtectedRoute allowedRoles={['ADMIN', 'DEV']} />}>
                 <Route path="/admin/broadcast" element={<BroadcastNotification />} />
+              </Route>
+
+              {/* Admin Only Salary Route */}
+              <Route element={<ProtectedRoute allowedRoles={['ADMIN']} />}>
+                <Route path="/admin/salaries" element={<SalaryManage />} />
               </Route>
 
               {/* All Office/Administrative Routes */}
