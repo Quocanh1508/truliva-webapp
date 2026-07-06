@@ -179,8 +179,9 @@ export default function Notifications() {
   }
 
   return (
-    <PullToRefresh onRefresh={() => loadNotifications(true)}>
-      <div className="animate-fade-in max-w-2xl mx-auto text-left">
+    <>
+      <PullToRefresh onRefresh={() => loadNotifications(true)}>
+        <div className="animate-fade-in max-w-2xl mx-auto text-left">
       <div className="flex justify-between items-center mb-6">
         <div>
           <h2 className="font-bold text-2xl text-[#1B3A6B] flex items-center gap-2">
@@ -340,6 +341,8 @@ export default function Notifications() {
         })}
       </div>
       )}
+      </div>
+      </PullToRefresh>
 
       {selectedReport && (() => {
         const correspondingNotification = notifications.find(n => n.rawData?.reportId === selectedReport.id);
@@ -527,7 +530,6 @@ export default function Notifications() {
           </div>
         );
       })()}
-    </div>
-    </PullToRefresh>
+    </>
   );
 }
