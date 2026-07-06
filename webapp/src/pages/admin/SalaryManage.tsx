@@ -84,7 +84,6 @@ export default function SalaryManage() {
 
   // Search/Filter state
   const [searchQuery, setSearchQuery] = useState('');
-  const [filterType, setFilterType] = useState<'all' | 'ktv' | 'station'>('all');
 
   const fetchSalaries = async (silent = false) => {
     if (!silent) setLoading(true);
@@ -229,13 +228,9 @@ export default function SalaryManage() {
 
   // Filter and search
   const filteredSalaries = salaries.filter(s => {
-    const matchSearch = s.fullName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                        s.username.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                        s.phoneNumber.includes(searchQuery);
-    
-    if (filterType === 'ktv') return matchSearch && !s.isStationPaid;
-    if (filterType === 'station') return matchSearch && s.isStationPaid;
-    return matchSearch;
+    return s.fullName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+           s.username.toLowerCase().includes(searchQuery.toLowerCase()) ||
+           s.phoneNumber.includes(searchQuery);
   });
 
   const formatMoney = (val: number) => {
@@ -342,32 +337,6 @@ export default function SalaryManage() {
             onChange={(e) => setSearchQuery(e.target.value)}
             className="w-full sm:w-64 px-4 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
           />
-          <div className="flex rounded-lg border border-gray-200 p-0.5 bg-gray-50 self-stretch sm:self-auto">
-            <button
-              onClick={() => setFilterType('all')}
-              className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-all ${
-                filterType === 'all' ? 'bg-white text-gray-800 shadow-sm' : 'text-gray-500 hover:text-gray-800'
-              }`}
-            >
-              Tất cả
-            </button>
-            <button
-              onClick={() => setFilterType('ktv')}
-              className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-all ${
-                filterType === 'ktv' ? 'bg-white text-gray-800 shadow-sm' : 'text-gray-500 hover:text-gray-800'
-              }`}
-            >
-              KTV Nội bộ
-            </button>
-            <button
-              onClick={() => setFilterType('station')}
-              className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-all ${
-                filterType === 'station' ? 'bg-white text-gray-800 shadow-sm' : 'text-gray-500 hover:text-gray-800'
-              }`}
-            >
-              Trạm liên kết
-            </button>
-          </div>
         </div>
 
         {/* Action Buttons */}
@@ -427,13 +396,12 @@ export default function SalaryManage() {
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="min-w-[1300px] w-full text-left border-collapse text-sm">
+            <table className="min-w-[1100px] w-full text-left border-collapse text-sm">
               <thead>
                 <tr className="bg-gray-50 border-b border-gray-100 text-gray-500 font-semibold">
                   <th className="px-6 py-4 w-12 text-center">STT</th>
                   <th className="px-6 py-4">KTV / Trạm</th>
-                  <th className="px-6 py-4 w-40 text-center">Phân loại</th>
-                  <th className="px-6 py-4 w-44">Trạm quản lý</th>
+                  <th className="px-6 py-4 w-48">Trạm quản lý</th>
                   <th className="px-6 py-4 w-28 text-center">Số ca</th>
                   <th className="px-6 py-4 w-48 text-right">Thù lao tính tự động</th>
                   <th className="px-6 py-4 w-52">Điều chỉnh thực nhận</th>
@@ -456,15 +424,6 @@ export default function SalaryManage() {
                             {item.phoneNumber}
                           </div>
                         </div>
-                      </td>
-                      <td className="px-6 py-4 text-center">
-                        <span className={`px-2.5 py-1 text-xs font-semibold rounded-full ${
-                          item.isStationPaid 
-                            ? 'bg-purple-50 text-purple-700 border border-purple-100' 
-                            : 'bg-blue-50 text-blue-700 border border-blue-100'
-                        }`}>
-                          {item.isStationPaid ? 'Trạm/Cộng tác' : 'KTV Nội bộ'}
-                        </span>
                       </td>
                       <td className="px-6 py-4 text-gray-600">
                         {item.stationName}
@@ -549,7 +508,7 @@ export default function SalaryManage() {
             <div className="p-6 overflow-y-auto flex-1">
               <div className="mb-4 flex flex-wrap gap-4 items-center justify-between text-sm text-gray-500 bg-gray-50 p-4 rounded-xl border border-gray-100">
                 <div>
-                  Vai trò: <span className="font-semibold text-gray-700">{selectedKtv.isStationPaid ? 'Trạm kỹ thuật liên kết' : 'KTV Nội bộ'}</span>
+                  Trạm quản lý: <span className="font-semibold text-gray-700">{selectedKtv.stationName}</span>
                 </div>
                 <div>
                   Kỳ tính lương: <span className="font-semibold text-gray-700">{selectedMonth}</span>

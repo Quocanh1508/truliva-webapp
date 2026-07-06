@@ -380,7 +380,6 @@ router.get('/export', requireAuth, requireAdmin, async (req: Request, res: Respo
       { header: 'Tên KTV / Trạm', key: 'fullName', width: 25 },
       { header: 'Số điện thoại', key: 'phone', width: 15 },
       { header: 'Trạm quản lý', key: 'station', width: 20 },
-      { header: 'Phân loại', key: 'type', width: 15 },
       { header: 'Số ca', key: 'casesCount', width: 10 },
       { header: 'Thù lao tự động (VND)', key: 'calculated', width: 22 },
       { header: 'Thực nhận (VND)', key: 'adjusted', width: 22 },
@@ -407,7 +406,6 @@ router.get('/export', requireAuth, requireAdmin, async (req: Request, res: Respo
       });
 
       const saved = savedMap.get(ktv.id);
-      const isStation = !!(ktv.phoneNumber && stationRates.has(normalizePhone(ktv.phoneNumber)));
 
       const calculated = saved ? saved.calculatedCost : 0;
       const adjusted = saved ? saved.adjustedCost : 0;
@@ -419,7 +417,6 @@ router.get('/export', requireAuth, requireAdmin, async (req: Request, res: Respo
         fullName: ktv.fullName,
         phone: ktv.phoneNumber || '',
         station: ktv.techStation?.name || '',
-        type: isStation ? 'Trạm/Cộng tác' : 'KTV Nội bộ',
         casesCount: reportsCount,
         calculated,
         adjusted,
