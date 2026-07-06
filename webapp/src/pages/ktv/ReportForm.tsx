@@ -46,6 +46,8 @@ export default function ReportForm() {
   const { user } = useAuth();
   const [mainStations, setMainStations] = useState<any[]>([]);
   const [selectedMainStationId, setSelectedMainStationId] = useState('');
+  const [selectedTechStationId, setSelectedTechStationId] = useState('');
+  const [selectedKtvId, setSelectedKtvId] = useState('');
 
   // ── Đơn hàng ──
   const [orders, setOrders] = useState<any[]>([]);
@@ -520,6 +522,16 @@ export default function ReportForm() {
       setSelectedServices(order.serviceType ? order.serviceType.split(',').map((s: string) => s.trim()).filter(Boolean) : []);
     }
 
+    if (order.mainStationId) {
+      setSelectedMainStationId(order.mainStationId);
+    }
+    if (order.techStationId) {
+      setSelectedTechStationId(order.techStationId);
+    }
+    if (order.assignedKtvId) {
+      setSelectedKtvId(order.assignedKtvId);
+    }
+
     // ── Mapping sản phẩm x số lượng từ items ──
     if (order.items && order.items.length > 0) {
       const initialItems = order.items.map((item: any) => {
@@ -653,6 +665,8 @@ export default function ReportForm() {
       orderId: selectedOrderId,
       items: selectedItems.map(item => ({ productName: item.productName, quantity: item.quantity })),
       mainStationId: selectedMainStationId || undefined,
+      techStationId: selectedTechStationId || undefined,
+      assignedKtvId: selectedKtvId || undefined,
     };
 
     try {
@@ -805,7 +819,11 @@ export default function ReportForm() {
                 <select
                   className="form-select bg-white border-purple-200 focus:border-purple-500 focus:ring-purple-500 text-sm"
                   value={selectedMainStationId}
-                  onChange={(e) => setSelectedMainStationId(e.target.value)}
+                  onChange={(e) => {
+                    setSelectedMainStationId(e.target.value);
+                    setSelectedTechStationId('');
+                    setSelectedKtvId('');
+                  }}
                   required
                 >
                   <option value="">-- Vui lòng chọn Trạm chính --</option>
@@ -818,6 +836,54 @@ export default function ReportForm() {
                 {!selectedMainStationId && (
                   <p className="text-xs text-red-500 mt-1">⚠ Bắt buộc phải chọn Trạm chính để đối soát.</p>
                 )}
+              </div>
+            )}
+
+            {/* Trạm kỹ thuật (Không bắt buộc) */}
+            {user && user.role !== 'KTV' && selectedMainStationId && (
+              <div className="form-group bg-purple-50/50 p-4 rounded-lg border border-purple-100 mb-6 -mt-4">
+                <label className="form-label text-purple-800 font-semibold mb-2 flex items-center gap-2">
+                  🛠️ Chọn Trạm kỹ thuật (Không bắt buộc)
+                </label>
+                <select
+                  className="form-select bg-white border-purple-200 focus:border-purple-500 focus:ring-purple-500 text-sm"
+                  value={selectedTechStationId}
+                  onChange={(e) => {
+                    setSelectedTechStationId(e.target.value);
+                    setSelectedKtvId('');
+                  }}
+                >
+                  <option value="">-- Vui lòng chọn Trạm kỹ thuật --</option>
+                  {(mainStations.find(s => s.id === selectedMainStationId)?.techStations || []).map((s: any) => (
+                    <option key={s.id} value={s.id}>
+                      {s.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+
+            {/* Kỹ thuật viên (Không bắt buộc) */}
+            {user && user.role !== 'KTV' && selectedTechStationId && (
+              <div className="form-group bg-purple-50/50 p-4 rounded-lg border border-purple-100 mb-6 -mt-4">
+                <label className="form-label text-purple-800 font-semibold mb-2 flex items-center gap-2">
+                  👨‍🔧 Chọn Kỹ thuật viên (Không bắt buộc)
+                </label>
+                <select
+                  className="form-select bg-white border-purple-200 focus:border-purple-500 focus:ring-purple-500 text-sm"
+                  value={selectedKtvId}
+                  onChange={(e) => setSelectedKtvId(e.target.value)}
+                >
+                  <option value="">-- Vui lòng chọn Kỹ thuật viên --</option>
+                  {(
+                    (mainStations.find(s => s.id === selectedMainStationId)?.techStations || [])
+                      .find((ts: any) => ts.id === selectedTechStationId)?.users || []
+                  ).map((u: any) => (
+                    <option key={u.id} value={u.id}>
+                      {u.fullName} {u.phoneNumber ? `(${u.phoneNumber})` : ''}
+                    </option>
+                  ))}
+                </select>
               </div>
             )}
 

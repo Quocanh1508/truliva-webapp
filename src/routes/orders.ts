@@ -45,6 +45,10 @@ async function buildOrderFilter(user: any): Promise<Prisma.OrderWhereInput | nul
   if (role === 'SALER' || role === 'STAFF') {
     const creatorName = pancakeAccountName || '';
     const orConditions: Prisma.OrderWhereInput[] = [];
+    // Cho phép xem đơn tự tạo bởi chính mình trên Truliva
+    orConditions.push(
+      { rawData: { path: ['creator', 'id'], equals: user.id } }
+    );
 
     if (creatorName) {
       orConditions.push(

@@ -316,6 +316,8 @@ router.post('/', async (req: Request, res: Response): Promise<void> => {
       handlingMethod,
       items, // unified items
       mainStationId, // <-- NEW
+      techStationId, // <-- NEW
+      assignedKtvId, // <-- NEW
     } = req.body;
 
     // Validation
@@ -755,6 +757,12 @@ router.post('/', async (req: Request, res: Response): Promise<void> => {
 
             if (mainStationId) {
               orderUpdateData.mainStationId = mainStationId;
+            }
+            if (techStationId !== undefined) {
+              orderUpdateData.techStationId = techStationId || null;
+            }
+            if (assignedKtvId !== undefined) {
+              orderUpdateData.assignedKtvId = assignedKtvId || null;
             }
 
             const updatedOrder = await prisma.order.update({

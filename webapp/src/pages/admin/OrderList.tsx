@@ -2315,7 +2315,7 @@ export default function OrderList() {
                         )}
 
                         {/* Báo cáo đóng ca hộ (chỉ dành cho đơn tự tạo thủ công chưa hoàn thành) */}
-                        {!isViewOnlyStaff && order.pancakeOrderId < 0 && order.adminStatus !== 'hoàn thành' && order.adminStatus !== 'hủy đơn' && (
+                        {!isViewOnlyStaff && order.pancakeOrderId < 0 && order.adminStatus !== 'hoàn thành' && order.adminStatus !== 'hủy đơn' && (currentUser?.role !== 'SALER' || order.rawData?.creator?.id === currentUser?.id || order.rawData?.creator?.name === currentUser?.fullName) && (
                           <button
                             onClick={() => navigate('/ktv/report', { state: { order } })}
                             className="p-1.5 text-emerald-600 hover:bg-emerald-50 rounded border border-transparent hover:border-emerald-100 transition-colors"
