@@ -9,6 +9,27 @@ export default defineConfig({
       'react-simple-maps': 'react-simple-maps/dist/index.es.js',
     }
   },
+  build: {
+    target: 'es2020',
+    cssCodeSplit: true,
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (id.includes('node_modules')) {
+            if (id.includes('react') || id.includes('lucide-react')) {
+              return 'vendor';
+            }
+            if (id.includes('exceljs') || id.includes('xlsx')) {
+              return 'excel';
+            }
+            if (id.includes('react-simple-maps') || id.includes('d3')) {
+              return 'maps';
+            }
+          }
+        }
+      }
+    }
+  },
   server: {
     host: true,
     proxy: {
