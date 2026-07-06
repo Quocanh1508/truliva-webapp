@@ -427,7 +427,7 @@ export default function SalaryManage() {
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse text-sm">
+            <table className="min-w-[1300px] w-full text-left border-collapse text-sm">
               <thead>
                 <tr className="bg-gray-50 border-b border-gray-100 text-gray-500 font-semibold">
                   <th className="px-6 py-4 w-12 text-center">STT</th>
@@ -437,7 +437,7 @@ export default function SalaryManage() {
                   <th className="px-6 py-4 w-28 text-center">Số ca</th>
                   <th className="px-6 py-4 w-48 text-right">Thù lao tính tự động</th>
                   <th className="px-6 py-4 w-52">Điều chỉnh thực nhận</th>
-                  <th className="px-6 py-4">Ghi chú điều chỉnh</th>
+                  <th className="px-6 py-4 min-w-[220px]">Ghi chú điều chỉnh</th>
                   <th className="px-6 py-4 w-32 text-center">Thao tác</th>
                 </tr>
               </thead>
