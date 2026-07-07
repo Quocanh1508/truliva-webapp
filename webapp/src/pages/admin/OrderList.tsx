@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { getOrders, updateOrder, getKtvUsers, getStations, getOrderAuditLog, syncOrders, syncSingleOrder, getFiltersData, fetchApi, createOrder, searchCustomers, bulkAssignOrders } from '../../api/client';
-import { Search, ChevronLeft, ChevronRight, History, XCircle, Filter, RefreshCw, FileText, CheckCircle2, ClipboardCheck, Copy, UserPlus, Download, Wrench, Settings, FolderOpen, Building2, MapPin, Users, Calendar, Plus, AlertTriangle, ExternalLink, RotateCcw, Edit3, Tag } from 'lucide-react';
+import { getOrders, updateOrder, getKtvUsers, getStations, getOrderAuditLog, syncOrders, syncSingleOrder, getFiltersData, fetchApi, createOrder, searchCustomers, bulkAssignOrders, bulkCancelOrders } from '../../api/client';
+import { Search, ChevronLeft, ChevronRight, History, XCircle, Filter, RefreshCw, FileText, CheckCircle2, ClipboardCheck, Copy, UserPlus, Download, Wrench, Settings, FolderOpen, Building2, MapPin, Users, Calendar, Plus, AlertTriangle, ExternalLink, RotateCcw, Edit3, Tag, Trash2 } from 'lucide-react';
 import { WARRANTY_SERVICE_GROUPS, REPAIR_SERVICE_GROUPS, WORK_TYPE_SERVICES } from '../../utils/workTypes';
 import { useConfirm } from '../../context/ConfirmContext';
 import DateRangePicker from '../../components/DateRangePicker';
@@ -752,11 +752,6 @@ export default function OrderList() {
   }, [bulkWarehouseId, warehouses]);
 
   const submitBulkAssign = async () => {
-    if (!bulkMainStationId) {
-      alert('Vui lòng chọn Trạm chính.');
-      return;
-    }
-
     let appointmentTimeISO: string | undefined = undefined;
     if (bulkAppointmentDate) {
       const finalTime = bulkAppointmentTime ? bulkAppointmentTime.trim() : '08:30';
@@ -776,7 +771,7 @@ export default function OrderList() {
     try {
       setLoading(true);
       const res = await bulkAssignOrders(selectedOrderIds, {
-        mainStationId: bulkMainStationId,
+        mainStationId: bulkMainStationId || null,
         techStationId: bulkTechStationId || null,
         assignedKtvId: bulkAssignedKtvId || null,
         appointmentTime: appointmentTimeISO,
@@ -3879,12 +3874,46 @@ export default function OrderList() {
                 setBulkAppointmentTime('08:30');
                 setBulkRescheduleReason('');
                 setBulkWarehouseId('');
+                setBulkWarehouseSearch('');
+                
+                if (warehouses.length === 0) {
+                  fetchApi('/inventory/stock')
+                    .then(invData => {
+                      const whs = invData.warehouses || [];
+                      const prods = invData.products || [];
+                      setWarehouses(whs);
+                      setProductsStock(prods);
+                    })
+                    .catch(console.error);
+                }
+
                 setIsBulkAssignOpen(true);
               }}
               className="bg-blue-600 hover:bg-blue-500 active:bg-blue-700 text-white text-xs font-bold px-4 py-2 rounded-full transition-all flex items-center gap-1.5 shadow-md shadow-blue-900/30"
             >
               <Users size={14} />
               <span>Phân bổ hàng loạt</span>
+            </button>
+            <button
+              onClick={async () => {
+                const confirmed = window.confirm(`Bạn có chắc chắn muốn HỦY ${selectedOrderIds.length} đơn hàng đã chọn?\n\nHành động này sẽ:\n- Chuyển trạng thái tất cả đơn sang \"hủy đơn\"\n- Xóa các báo cáo kỹ thuật liên quan\n- Hoàn trả tồn kho\n\nThao tác này KHÔNG THỂ hoàn tác tự động.`);
+                if (!confirmed) return;
+                try {
+                  setLoading(true);
+                  const res = await bulkCancelOrders(selectedOrderIds);
+                  alert(res.message);
+                  setSelectedOrderIds([]);
+                  fetchOrdersData();
+                } catch (err: any) {
+                  alert(err.message || 'Lỗi hủy đơn hàng loạt');
+                } finally {
+                  setLoading(false);
+                }
+              }}
+              className="bg-red-600 hover:bg-red-500 active:bg-red-700 text-white text-xs font-bold px-4 py-2 rounded-full transition-all flex items-center gap-1.5 shadow-md shadow-red-900/30"
+            >
+              <Trash2 size={14} />
+              <span>Hủy đơn hàng loạt</span>
             </button>
             <button
               onClick={() => setSelectedOrderIds([])}
@@ -3910,15 +3939,15 @@ export default function OrderList() {
               </button>
             </div>
 
-            <div className="p-6 overflow-auto flex-1 space-y-4 text-gray-800">
+            <div className="px-6 pt-6 pb-48 overflow-auto flex-1 space-y-4 text-gray-800">
               <div className="p-3 bg-amber-50 border border-amber-200 rounded-md text-xs text-amber-800 leading-relaxed">
                 📌 <b>Lưu ý:</b> Chỉ những trường được chọn giá trị mới được cập nhật hàng loạt cho các đơn hàng đã chọn. 
-                Trạm chính là bắt buộc. Trạm kỹ thuật, KTV, Giờ hẹn và Kho xuất hàng là không bắt buộc (bỏ trống sẽ giữ nguyên giá trị cũ của từng đơn).
+                Tất cả các trường (Trạm chính, Trạm kỹ thuật, KTV, Giờ hẹn và Kho xuất hàng) đều là không bắt buộc (bỏ trống sẽ giữ nguyên giá trị cũ của từng đơn).
               </div>
 
-              {/* Trạm chính (Bắt buộc) */}
+              {/* Trạm chính */}
               <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-1">Trạm chính *</label>
+                <label className="block text-sm font-semibold text-gray-700 mb-1">Trạm chính</label>
                 <select 
                   className="w-full border rounded p-2 text-sm outline-none focus:border-blue-500 bg-white"
                   value={bulkMainStationId} 
@@ -3928,7 +3957,7 @@ export default function OrderList() {
                     setBulkAssignedKtvId(''); 
                   }}
                 >
-                  <option value="">-- Chọn Trạm chính (Bắt buộc) --</option>
+                  <option value="">-- Giữ nguyên trạm chính cũ (Không thay đổi) --</option>
                   {stations.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
                 </select>
               </div>

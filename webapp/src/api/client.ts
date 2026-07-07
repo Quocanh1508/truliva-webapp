@@ -102,6 +102,13 @@ export async function bulkAssignOrders(orderIds: string[], data: any) {
   });
 }
 
+export async function bulkCancelOrders(orderIds: string[]) {
+  return fetchApi('/orders/bulk/cancel', {
+    method: 'PATCH',
+    body: JSON.stringify({ orderIds }),
+  });
+}
+
 
 export async function syncOrders() {
   return fetchApi('/orders/sync', {

@@ -2107,18 +2107,15 @@ router.patch('/bulk/assign', requireAuth, async (req: Request, res: Response): P
       return;
     }
 
-    if (!mainStationId) {
-      res.status(400).json({ error: 'Trạm chính là bắt buộc khi thực hiện phân bổ.' });
-      return;
-    }
-
-    // Kiểm tra trạm chính tồn tại
-    const mainStation = await prisma.mainStation.findUnique({
-      where: { id: mainStationId }
-    });
-    if (!mainStation) {
-      res.status(404).json({ error: 'Trạm chính không tồn tại trên hệ thống.' });
-      return;
+    if (mainStationId) {
+      // Kiểm tra trạm chính tồn tại
+      const mainStation = await prisma.mainStation.findUnique({
+        where: { id: mainStationId }
+      });
+      if (!mainStation) {
+        res.status(404).json({ error: 'Trạm chính không tồn tại trên hệ thống.' });
+        return;
+      }
     }
 
     // Lọc quyền xem đơn hàng
@@ -2160,8 +2157,8 @@ router.patch('/bulk/assign', requireAuth, async (req: Request, res: Response): P
       const updateData: any = {};
       const changes: any[] = [];
 
-      // Main Station (always present and checked)
-      if (mainStationId !== oldOrder.mainStationId) {
+      // Main Station (optional)
+      if (mainStationId && mainStationId !== oldOrder.mainStationId) {
         updateData.mainStationId = mainStationId;
         changes.push({ field: 'mainStationId', from: oldOrder.mainStationId, to: mainStationId });
       }
@@ -2344,6 +2341,111 @@ router.patch('/bulk/assign', requireAuth, async (req: Request, res: Response): P
   } catch (error: any) {
     logger.error('Bulk assign order error', { error: error.message });
     res.status(500).json({ error: 'Lỗi cập nhật đơn hàng hàng loạt' });
+  }
+});
+
+/**
+ * PATCH /api/orders/bulk/cancel
+ * Bulk cancel multiple orders
+ */
+router.patch('/bulk/cancel', requireAuth, async (req: Request, res: Response): Promise<void> => {
+  try {
+    const role = req.user?.role;
+    if (role !== 'ADMIN' && role !== 'DEV' && role !== 'COORDINATOR') {
+      res.status(403).json({ error: 'Bạn không có quyền hủy đơn hàng loạt.' });
+      return;
+    }
+
+    const { orderIds } = req.body;
+
+    if (!Array.isArray(orderIds) || orderIds.length === 0) {
+      res.status(400).json({ error: 'Danh sách ID đơn hàng không hợp lệ hoặc rỗng.' });
+      return;
+    }
+
+    // Lọc quyền xem đơn hàng
+    const iamFilter = await buildOrderFilter(req.user);
+    const oldOrders = await prisma.order.findMany({
+      where: {
+        id: { in: orderIds },
+        ...(iamFilter || {})
+      },
+      include: { items: true }
+    });
+
+    if (oldOrders.length === 0) {
+      res.status(400).json({ error: 'Không tìm thấy đơn hàng nào hợp lệ hoặc bạn không có quyền chỉnh sửa.' });
+      return;
+    }
+
+    let cancelledCount = 0;
+    let skippedCount = 0;
+
+    for (const oldOrder of oldOrders) {
+      // Bỏ qua đơn đã hủy rồi
+      if (oldOrder.adminStatus === 'hủy đơn') {
+        skippedCount++;
+        continue;
+      }
+
+      // Cập nhật trạng thái sang hủy đơn
+      const updatedOrder = await prisma.order.update({
+        where: { id: oldOrder.id },
+        data: { adminStatus: 'hủy đơn' }
+      });
+
+      // Xóa các báo cáo kỹ thuật liên quan
+      const deletedReports = await prisma.serviceReport.deleteMany({
+        where: { orderId: oldOrder.id }
+      });
+      if (deletedReports.count > 0) {
+        logger.info(`Bulk cancel: deleted ${deletedReports.count} service reports for order`, { orderId: oldOrder.id });
+      }
+
+      // Đồng bộ tồn kho
+      try {
+        await syncOrderInventoryState(oldOrder.id, {
+          adminStatus: oldOrder.adminStatus,
+          warehouseId: oldOrder.warehouseId,
+          items: oldOrder.items.map(item => ({
+            productName: item.productName || '',
+            quantity: item.quantity || 1
+          }))
+        }, {
+          adminStatus: 'hủy đơn',
+          warehouseId: updatedOrder.warehouseId,
+          items: oldOrder.items.map(item => ({
+            productName: item.productName || '',
+            quantity: item.quantity || 1
+          }))
+        });
+      } catch (invErr: any) {
+        logger.error('Lỗi đồng bộ kho khi hủy đơn hàng loạt', { orderId: oldOrder.id, error: invErr.message });
+      }
+
+      // Ghi audit log
+      await prisma.auditLog.create({
+        data: {
+          entityType: 'Order',
+          entityId: oldOrder.id,
+          action: 'cancelled',
+          changes: [{ field: 'adminStatus', from: oldOrder.adminStatus, to: 'hủy đơn' }],
+          userId: req.user!.id,
+          userName: req.user!.fullName
+        }
+      });
+
+      broadcastEvent('ORDER_UPDATED', { orderId: updatedOrder.id, pancakeOrderId: updatedOrder.pancakeOrderId });
+      cancelledCount++;
+    }
+
+    res.json({
+      success: true,
+      message: `Đã hủy thành công ${cancelledCount} đơn hàng.${skippedCount > 0 ? ` (${skippedCount} đơn đã hủy trước đó, bỏ qua)` : ''}`
+    });
+  } catch (error: any) {
+    logger.error('Bulk cancel order error', { error: error.message });
+    res.status(500).json({ error: 'Lỗi hủy đơn hàng hàng loạt' });
   }
 });
 
