@@ -851,6 +851,7 @@ router.get('/', async (req: Request, res: Response): Promise<void> => {
             select: { 
               fullName: true, 
               username: true,
+              role: true,
               techStation: {
                 select: {
                   name: true,

@@ -286,6 +286,17 @@ export default function ReportList() {
     return `${timeStr} - ${dateStr}`;
   };
 
+  const getRoleLabel = (role: string) => {
+    if (!role) return 'Văn phòng';
+    const r = role.toUpperCase();
+    if (r === 'ADMIN') return 'Admin';
+    if (r === 'COORDINATOR') return 'Điều phối';
+    if (r === 'SALER') return 'Saler';
+    if (r === 'DEV') return 'Dev';
+    if (r === 'KTV') return 'KTV';
+    return role;
+  };
+
   const getStatusBadge = (status: string) => {
     const s = (status || 'hoàn thành').toLowerCase();
     if (s === 'hoàn thành') {
@@ -1346,7 +1357,7 @@ export default function ReportList() {
                       {r.mainStationId && (
                         <div className="mt-1">
                           <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-semibold bg-purple-100 text-purple-800 border border-purple-200">
-                            Báo cáo hộ
+                            Báo cáo từ {getRoleLabel(r.ktvUser?.role)}
                           </span>
                         </div>
                       )}
