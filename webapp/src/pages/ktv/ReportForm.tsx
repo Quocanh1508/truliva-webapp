@@ -864,7 +864,7 @@ export default function ReportForm() {
             {user && user.role !== 'KTV' && selectedMainStationId && (mainStations.find(s => s.id === selectedMainStationId)?.name?.trim().toLowerCase() !== 'đơn vị vận chuyển') && (
               <div className="form-group bg-purple-50/50 p-4 rounded-lg border border-purple-100 mb-6 -mt-4">
                 <label className="form-label text-purple-800 font-semibold mb-2 flex items-center gap-2">
-                  🛠️ Chọn Trạm kỹ thuật (Không bắt buộc)
+                  🛠️ Chọn Trạm kỹ thuật
                 </label>
                 <select
                   className="form-select bg-white border-purple-200 focus:border-purple-500 focus:ring-purple-500 text-sm"
@@ -888,7 +888,7 @@ export default function ReportForm() {
             {user && user.role !== 'KTV' && selectedTechStationId && (mainStations.find(s => s.id === selectedMainStationId)?.name?.trim().toLowerCase() !== 'đơn vị vận chuyển') && (
               <div className="form-group bg-purple-50/50 p-4 rounded-lg border border-purple-100 mb-6 -mt-4">
                 <label className="form-label text-purple-800 font-semibold mb-2 flex items-center gap-2">
-                  👨‍🔧 Chọn Kỹ thuật viên (Không bắt buộc)
+                  👨‍🔧 Chọn Kỹ thuật viên
                 </label>
                 <select
                   className="form-select bg-white border-purple-200 focus:border-purple-500 focus:ring-purple-500 text-sm"
