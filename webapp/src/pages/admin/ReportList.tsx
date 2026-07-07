@@ -1210,7 +1210,17 @@ export default function ReportList() {
                     <td style={{ padding: '12px 16px' }}>
                       {r.order?.pancakeOrderId ? (
                         <div className="flex flex-col gap-0.5 items-start">
-                          <span className="font-bold text-blue-700">{formatOrderId(r.order.pancakeOrderId)}</span>
+                          <span
+                            onClick={() => {
+                              const idStr = formatOrderId(r.order.pancakeOrderId);
+                              navigator.clipboard.writeText(idStr);
+                              alert(`Đã sao chép mã đơn: ${idStr}`);
+                            }}
+                            className="font-bold text-blue-700 cursor-pointer hover:underline"
+                            title="Click để sao chép mã đơn"
+                          >
+                            {formatOrderId(r.order.pancakeOrderId)}
+                          </span>
                           {r.order.orderSource && /shopee|lazada|tiktok|tiki/i.test(r.order.orderSource) && (() => {
                             try {
                               const raw = typeof r.order.rawData === 'string' ? JSON.parse(r.order.rawData) : r.order.rawData;

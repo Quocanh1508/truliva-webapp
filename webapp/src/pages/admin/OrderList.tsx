@@ -2257,7 +2257,7 @@ export default function OrderList() {
                   </th>
                 )}
                 <th className="px-4 py-2 w-[70px]">Mã đơn</th>
-                <th className="px-4 py-2 w-[180px]">Khách hàng</th>
+                <th className="px-4 py-2 w-[150px]">Khách hàng</th>
                 <th className="px-4 py-2 w-[220px]">Công việc</th>
                 <th className="px-4 py-2 min-w-[320px]">Ghi chú</th>
                 <th className="px-4 py-2 text-center w-[140px]">Thao tác</th>
@@ -2299,7 +2299,17 @@ export default function OrderList() {
                     {/* 1. Mã đơn */}
                     <td className="px-4 py-2 font-medium align-top">
                       <div className="flex flex-col items-start gap-1">
-                        <div>{formatOrderId(order.pancakeOrderId)}</div>
+                        <div
+                          onClick={() => {
+                            const idStr = formatOrderId(order.pancakeOrderId);
+                            navigator.clipboard.writeText(idStr);
+                            alert(`Đã sao chép mã đơn: ${idStr}`);
+                          }}
+                          className="cursor-pointer hover:text-blue-600 hover:underline"
+                          title="Click để sao chép mã đơn"
+                        >
+                          {formatOrderId(order.pancakeOrderId)}
+                        </div>
                         
                         {order.promoCode && (
                           <span 
