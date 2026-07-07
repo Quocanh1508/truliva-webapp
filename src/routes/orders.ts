@@ -1338,7 +1338,7 @@ router.get('/filters-data', requireAuth, async (req: Request, res: Response): Pr
     const [products, stations, customers] = await Promise.all([
       prisma.product.findMany({
         where: { isActive: true },
-        select: { name: true, category: true }
+        select: { name: true, category: true, sku: true, sellingPrice: true }
       }),
       prisma.techStation.findMany({
         where: { isActive: true },
@@ -1358,7 +1358,7 @@ router.get('/filters-data', requireAuth, async (req: Request, res: Response): Pr
     res.json({
       categories,
       productNames,
-      products: products.map(p => ({ name: p.name, category: p.category })),
+      products: products.map(p => ({ name: p.name, category: p.category, sku: p.sku || '', sellingPrice: p.sellingPrice || 0 })),
       techStations: stations,
       provinces
     });
@@ -2002,9 +2002,9 @@ router.post('/:id/sync', requireAuth, async (req: Request, res: Response): Promi
   try {
     const id = req.params.id as string;
     
-    // Check permissions (Only ADMIN and DEV can sync single order)
+    // Check permissions (Only ADMIN can sync single order)
     const role = req.user?.role;
-    if (role !== 'ADMIN' && role !== 'DEV') {
+    if (role !== 'ADMIN') {
       res.status(403).json({ error: 'Chỉ Admin mới có quyền đồng bộ đơn hàng từ Pancake.' });
       return;
     }

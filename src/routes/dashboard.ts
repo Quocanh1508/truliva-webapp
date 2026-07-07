@@ -1,9 +1,24 @@
 import { Router, Request, Response } from 'express';
+import { Prisma } from '@prisma/client';
 import prisma from '../config/database';
 import logger from '../utils/logger';
 import { requireAuth, requireDashboardAccess } from '../middleware/authSession';
 
 const router = Router();
+
+const nonEcomFilter: Prisma.OrderWhereInput = {
+  OR: [
+    { orderSource: null },
+    {
+      NOT: [
+        { orderSource: { contains: 'shopee', mode: 'insensitive' } },
+        { orderSource: { contains: 'lazada', mode: 'insensitive' } },
+        { orderSource: { contains: 'tiktok', mode: 'insensitive' } },
+        { orderSource: { contains: 'tiki', mode: 'insensitive' } }
+      ]
+    }
+  ]
+};
 
 // Tất cả dashboard routes yêu cầu quyền dashboard access
 router.use(requireAuth, requireDashboardAccess);
@@ -30,14 +45,22 @@ router.get('/stats', async (req: Request, res: Response): Promise<void> => {
       select: {
         name: true,
         _count: {
-          select: { orders: true }
+          select: {
+            orders: {
+              where: nonEcomFilter
+            }
+          }
         },
         techStations: {
           where: { isActive: true },
           select: {
             name: true,
             _count: {
-              select: { orders: true }
+              select: {
+                orders: {
+                  where: nonEcomFilter
+                }
+              }
             }
           }
         }
@@ -59,7 +82,11 @@ router.get('/stats', async (req: Request, res: Response): Promise<void> => {
       select: {
         provinceName: true,
         _count: {
-          select: { orders: true }
+          select: {
+            orders: {
+              where: nonEcomFilter
+            }
+          }
         }
       }
     });
@@ -75,18 +102,23 @@ router.get('/stats', async (req: Request, res: Response): Promise<void> => {
     // 3. Tổng quan đơn hàng theo trạng thái
     const statusCounts = await prisma.order.groupBy({
       by: ['adminStatus'],
+      where: nonEcomFilter,
       _count: { id: true }
     });
 
     // 4. Thống kê theo yêu cầu của user có áp dụng bộ lọc (Lọc theo Ngày tạo đơn hàng trên Pancake)
-    const where: any = {};
-
-    // Chỉ hiển thị các đơn hàng đã được xác nhận bên POS (ẩn các đơn nháp status = 0)
-    where.OR = [
-      { statusCode: { not: 0 } },
-      { statusCode: null },
-      { pancakeOrderId: { lt: 0 } } // Đơn thủ công (luôn hiện, bất kể statusCode)
-    ];
+    const where: any = {
+      AND: [
+        {
+          OR: [
+            { statusCode: { not: 0 } },
+            { statusCode: null },
+            { pancakeOrderId: { lt: 0 } } // Đơn thủ công (luôn hiện, bất kể statusCode)
+          ]
+        },
+        nonEcomFilter
+      ]
+    };
 
     if (startDate || endDate) {
       where.pancakeCreatedAt = {
@@ -242,14 +274,18 @@ router.get('/dispatch-analysis', async (req: Request, res: Response): Promise<vo
       assignedKtvId
     } = req.query;
 
-    const where: any = {};
-
-    // Chỉ hiển thị các đơn hàng đã được xác nhận bên POS (ẩn các đơn nháp status = 0)
-    where.OR = [
-      { statusCode: { not: 0 } },
-      { statusCode: null },
-      { pancakeOrderId: { lt: 0 } } // Đơn thủ công (luôn hiện, bất kể statusCode)
-    ];
+    const where: any = {
+      AND: [
+        {
+          OR: [
+            { statusCode: { not: 0 } },
+            { statusCode: null },
+            { pancakeOrderId: { lt: 0 } } // Đơn thủ công (luôn hiện, bất kể statusCode)
+          ]
+        },
+        nonEcomFilter
+      ]
+    };
 
     // Áp dụng bộ lọc thời gian tạo đơn hàng trên Pancake
     if (startDate || endDate) {
@@ -638,6 +674,17 @@ router.get('/product-quality', async (req: Request, res: Response): Promise<void
         where.createdAt.lte = new Date(`${endDate}T23:59:59.999Z`);
       }
     }
+
+    where.AND = [
+      {
+        OR: [
+          { orderId: null },
+          {
+            order: nonEcomFilter
+          }
+        ]
+      }
+    ];
 
     // Lấy tất cả báo cáo dịch vụ
     let reports = await prisma.serviceReport.findMany({

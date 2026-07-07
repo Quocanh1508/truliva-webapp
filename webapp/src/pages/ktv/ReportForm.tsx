@@ -121,7 +121,7 @@ export default function ReportForm() {
         getFiltersData()
           .then(res => {
             if (res && res.products) {
-              setStockProducts(res.products.map((p: any) => ({ name: p.name, category: p.category })));
+              setStockProducts(res.products.map((p: any) => ({ name: p.name, category: p.category, sku: p.sku || '', sellingPrice: p.sellingPrice || 0 })));
               setCategories(res.categories || []);
             }
           })
@@ -250,8 +250,9 @@ export default function ReportForm() {
             return {
               ...item,
               productName: matched.name,
-              sku: matched.sku || '',
-              price: matched.sellingPrice || 0
+              // Chỉ ghi đè nếu matched có dữ liệu tốt hơn, không ghi đè dữ liệu có sẵn bằng rỗng
+              sku: (matched.sku && matched.sku !== '') ? matched.sku : (item.sku || ''),
+              price: (matched.sellingPrice && matched.sellingPrice > 0) ? matched.sellingPrice : (item.price || 0)
             };
           }
         }
@@ -546,9 +547,29 @@ export default function ReportForm() {
           price: item.price || 0
         };
       });
+      console.log('[ReportForm] prefillOrderInfo: Mapping', initialItems.length, 'sản phẩm từ đơn hàng #' + (order.pancakeOrderId || order.id));
       setSelectedItems(initialItems);
+
+      // Đảm bảo sản phẩm từ đơn hàng luôn có mặt trong danh mục để CategoryTreeSelect hiển thị đúng
+      setStockProducts(prev => {
+        const next = [...prev];
+        let added = false;
+        initialItems.forEach((item: any) => {
+          if (!next.some(p => p.name.toLowerCase() === item.productName.toLowerCase())) {
+            next.push({
+              name: item.productName,
+              sku: item.sku || '',
+              category: 'Device',
+              sellingPrice: item.price || 0
+            });
+            added = true;
+          }
+        });
+        return added ? next : prev;
+      });
     } else {
-      setSelectedItems([]);
+      console.warn('[ReportForm] prefillOrderInfo: Đơn hàng không có items!', { orderId: order.id, pancakeOrderId: order.pancakeOrderId, hasItems: !!order.items, itemsLength: order.items?.length });
+      // Không xóa selectedItems nếu đã có sẵn (tránh mất dữ liệu đã prefill trước đó)
     }
 
     // ── Mapping tiền thu thực tế (moneyToCollect hoặc totalPrice) ──

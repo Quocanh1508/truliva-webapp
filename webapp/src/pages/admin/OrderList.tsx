@@ -2328,7 +2328,7 @@ export default function OrderList() {
                         )}
 
                         {/* Đồng bộ đơn từ Pancake */}
-                        {order.pancakeOrderId > 0 && (currentUser?.role === 'ADMIN' || currentUser?.role === 'DEV') && (
+                        {order.pancakeOrderId > 0 && currentUser?.role === 'ADMIN' && (
                           <button
                             onClick={() => handleSyncSingle(order.id)}
                             className="p-1.5 text-blue-600 hover:bg-blue-50 rounded border border-transparent hover:border-blue-100 transition-colors"
