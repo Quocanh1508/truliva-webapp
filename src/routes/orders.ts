@@ -3,7 +3,7 @@ import prisma from '../config/database';
 import logger from '../utils/logger';
 import { requireAuth, requireAdmin } from '../middleware/authSession';
 import { Prisma } from '@prisma/client';
-import { syncOrderStatusToPancake } from '../services/orderProcessor';
+import { syncOrderStatusToPancake, processOrderEvent } from '../services/orderProcessor';
 import { syncRecentOrders } from '../services/orderSyncScheduler';
 import { sendPushNotification } from '../services/notificationService';
 import { sendWebPushNotification } from '../services/webPushService';
@@ -1991,6 +1991,68 @@ router.patch('/:id', requireAuth, async (req: Request, res: Response): Promise<v
   } catch (error: any) {
     logger.error('Update order error', { error: error.message });
     res.status(500).json({ error: 'Lỗi cập nhật đơn hàng' });
+  }
+});
+
+/**
+ * POST /api/orders/:id/sync
+ * Manually sync a single Pancake order by pulling its latest data from Pancake POS API
+ */
+router.post('/:id/sync', requireAuth, async (req: Request, res: Response): Promise<void> => {
+  try {
+    const id = req.params.id as string;
+    
+    // Check permissions (Only non-KTV and non-Service STAFF can sync)
+    const role = req.user?.role;
+    const group = req.user?.group;
+    if (role === 'KTV' || (role === 'STAFF' && group === 'Service')) {
+      res.status(403).json({ error: 'Bạn không có quyền đồng bộ đơn hàng từ Pancake.' });
+      return;
+    }
+
+    const order = await prisma.order.findUnique({
+      where: { id },
+      select: { pancakeOrderId: true }
+    });
+
+    if (!order || !order.pancakeOrderId || order.pancakeOrderId <= 0) {
+      res.status(400).json({ error: 'Đơn hàng không thuộc Pancake hoặc không tìm thấy' });
+      return;
+    }
+
+    const apiKey = process.env.PANCAKE_API_KEY;
+    const shopId = '1635300067'; // Default Shop ID
+
+    if (!apiKey) {
+      res.status(500).json({ error: 'Chưa cấu hình API Key cho Pancake POS' });
+      return;
+    }
+
+    const response = await axios.get(`https://pos.pages.fm/api/v1/shops/${shopId}/orders/${order.pancakeOrderId}`, {
+      params: { api_key: apiKey },
+      timeout: 10000
+    });
+
+    if (response.data && response.data.success && response.data.data) {
+      const orderPayload = response.data.data;
+      // Re-use processOrderEvent to parse and update the order
+      await processOrderEvent(null, orderPayload);
+      
+      const updatedOrder = await prisma.order.findUnique({
+        where: { id },
+        include: {
+          assignedKtv: true,
+          mainStation: true,
+          techStation: true
+        }
+      });
+      res.json({ success: true, message: 'Đồng bộ đơn hàng thành công', order: updatedOrder });
+    } else {
+      res.status(400).json({ error: 'Không thể lấy thông tin chi tiết đơn hàng từ Pancake POS API' });
+    }
+  } catch (error: any) {
+    logger.error('Manual single order sync failed', { orderId: req.params.id, error: error.message });
+    res.status(500).json({ error: 'Lỗi khi đồng bộ đơn hàng: ' + error.message });
   }
 });
 

@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { getOrders, updateOrder, getKtvUsers, getStations, getOrderAuditLog, syncOrders, getFiltersData, fetchApi, createOrder, searchCustomers } from '../../api/client';
+import { getOrders, updateOrder, getKtvUsers, getStations, getOrderAuditLog, syncOrders, syncSingleOrder, getFiltersData, fetchApi, createOrder, searchCustomers } from '../../api/client';
 import { Search, ChevronLeft, ChevronRight, History, XCircle, Filter, RefreshCw, FileText, CheckCircle2, ClipboardCheck, Copy, UserPlus, Download, Wrench, Settings, FolderOpen, Building2, MapPin, Users, Calendar, Plus, AlertTriangle, ExternalLink, RotateCcw, Edit3, Tag } from 'lucide-react';
 import { WARRANTY_SERVICE_GROUPS, REPAIR_SERVICE_GROUPS, WORK_TYPE_SERVICES } from '../../utils/workTypes';
 import { useConfirm } from '../../context/ConfirmContext';
@@ -1226,6 +1226,19 @@ export default function OrderList() {
     }
   };
 
+  const handleSyncSingle = async (orderId: string) => {
+    try {
+      setSyncing(true);
+      const res = await syncSingleOrder(orderId);
+      alert(res.message || 'Đồng bộ đơn hàng thành công.');
+      fetchOrdersData();
+    } catch (err: any) {
+      alert(err.message || 'Lỗi đồng bộ.');
+    } finally {
+      setSyncing(false);
+    }
+  };
+
   const todayStr = (() => {
     const d = new Date();
     const year = d.getFullYear();
@@ -2328,6 +2341,27 @@ export default function OrderList() {
                           </button>
                         )}
  
+                        {/* Copy nhanh thông tin đi Zalo */}
+                        <button
+                          onClick={() => handleCopyOrderInfo(order)}
+                          className="p-1.5 text-indigo-600 hover:bg-indigo-50 rounded border border-transparent hover:border-indigo-100 transition-colors"
+                          title="Copy thông tin"
+                        >
+                          <Copy size={15} />
+                        </button>
+
+                        {/* Đồng bộ đơn từ Pancake */}
+                        {order.pancakeOrderId > 0 && !isViewOnlyStaff && (
+                           <button
+                             onClick={() => handleSyncSingle(order.id)}
+                             className="p-1.5 text-blue-600 hover:bg-blue-50 rounded border border-transparent hover:border-blue-100 transition-colors"
+                             title="Đồng bộ lại từ Pancake"
+                             disabled={syncing}
+                           >
+                             <RefreshCw size={15} className={syncing ? "animate-spin" : ""} />
+                           </button>
+                        )}
+
                         {/* Hủy đơn (chỉ hiện khi chưa hoàn thành/hủy) */}
                         {!isViewOnlyStaff && order.adminStatus !== 'hoàn thành' && order.adminStatus !== 'hủy đơn' && (
                           <button
@@ -2350,14 +2384,7 @@ export default function OrderList() {
                           </button>
                         )}
 
-                        {/* Copy nhanh thông tin đi Zalo */}
-                        <button
-                          onClick={() => handleCopyOrderInfo(order)}
-                          className="p-1.5 text-indigo-600 hover:bg-indigo-50 rounded border border-transparent hover:border-indigo-100 transition-colors"
-                          title="Copy thông tin"
-                        >
-                          <Copy size={15} />
-                        </button>
+
 
                         {/* Xem báo cáo dịch vụ (nếu có) */}
                         {order.serviceReports && order.serviceReports.length > 0 && (

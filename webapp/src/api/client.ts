@@ -101,6 +101,12 @@ export async function syncOrders() {
   });
 }
 
+export async function syncSingleOrder(id: string) {
+  return fetchApi(`/orders/${id}/sync`, {
+    method: 'POST',
+  });
+}
+
 export async function createOrder(data: any) {
   return fetchApi('/orders', {
     method: 'POST',
