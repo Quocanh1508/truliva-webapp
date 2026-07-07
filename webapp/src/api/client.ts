@@ -95,6 +95,14 @@ export async function updateOrder(id: string, data: any) {
   });
 }
 
+export async function bulkAssignOrders(orderIds: string[], data: any) {
+  return fetchApi('/orders/bulk/assign', {
+    method: 'PATCH',
+    body: JSON.stringify({ orderIds, ...data }),
+  });
+}
+
+
 export async function syncOrders() {
   return fetchApi('/orders/sync', {
     method: 'POST',

@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { getOrders, updateOrder, getKtvUsers, getStations, getOrderAuditLog, syncOrders, syncSingleOrder, getFiltersData, fetchApi, createOrder, searchCustomers } from '../../api/client';
+import { getOrders, updateOrder, getKtvUsers, getStations, getOrderAuditLog, syncOrders, syncSingleOrder, getFiltersData, fetchApi, createOrder, searchCustomers, bulkAssignOrders } from '../../api/client';
 import { Search, ChevronLeft, ChevronRight, History, XCircle, Filter, RefreshCw, FileText, CheckCircle2, ClipboardCheck, Copy, UserPlus, Download, Wrench, Settings, FolderOpen, Building2, MapPin, Users, Calendar, Plus, AlertTriangle, ExternalLink, RotateCcw, Edit3, Tag } from 'lucide-react';
 import { WARRANTY_SERVICE_GROUPS, REPAIR_SERVICE_GROUPS, WORK_TYPE_SERVICES } from '../../utils/workTypes';
 import { useConfirm } from '../../context/ConfirmContext';
@@ -196,6 +196,21 @@ export default function OrderList() {
   const [warehouseSearch, setWarehouseSearch] = useState('');
   const [showWarehouseDropdown, setShowWarehouseDropdown] = useState(false);
   const [tempItems, setTempItems] = useState<any[]>([]);
+
+  // Bulk Assign States
+  const [selectedOrderIds, setSelectedOrderIds] = useState<string[]>([]);
+  const [isBulkAssignOpen, setIsBulkAssignOpen] = useState(false);
+  const [bulkMainStationId, setBulkMainStationId] = useState('');
+  const [bulkTechStationId, setBulkTechStationId] = useState('');
+  const [bulkAssignedKtvId, setBulkAssignedKtvId] = useState('');
+  const [bulkAppointmentDate, setBulkAppointmentDate] = useState('');
+  const [bulkAppointmentTime, setBulkAppointmentTime] = useState('08:30');
+  const [bulkRescheduleReason, setBulkRescheduleReason] = useState('');
+  const [bulkWarehouseId, setBulkWarehouseId] = useState('');
+  const [bulkKtvs, setBulkKtvs] = useState<any[]>([]);
+  const [bulkWarehouseSearch, setBulkWarehouseSearch] = useState('');
+  const [showBulkWarehouseDropdown, setShowBulkWarehouseDropdown] = useState(false);
+
 
   useEffect(() => {
     const selectedWh = warehouses.find(w => w.id === selectedWarehouseId);
@@ -713,6 +728,87 @@ export default function OrderList() {
     setKtvSearch('');
     setTechStationSearch('');
   }, [activeDropdown]);
+
+  // Load KTVs for bulk assign based on bulkTechStationId
+  useEffect(() => {
+    if (bulkTechStationId) {
+      getKtvUsers({
+        techStationId: bulkTechStationId
+      }).then(data => setBulkKtvs(data)).catch(console.error);
+    } else {
+      setBulkKtvs([]);
+    }
+  }, [bulkTechStationId]);
+
+  // Reset selected orders when orders data changes
+  useEffect(() => {
+    setSelectedOrderIds([]);
+  }, [orders]);
+
+  // Sync warehouse search string when bulkWarehouseId changes
+  useEffect(() => {
+    const selectedWh = warehouses.find(w => w.id === bulkWarehouseId);
+    setBulkWarehouseSearch(selectedWh ? selectedWh.name : '');
+  }, [bulkWarehouseId, warehouses]);
+
+  const submitBulkAssign = async () => {
+    if (!bulkMainStationId) {
+      alert('Vui lòng chọn Trạm chính.');
+      return;
+    }
+
+    let appointmentTimeISO: string | undefined = undefined;
+    if (bulkAppointmentDate) {
+      const finalTime = bulkAppointmentTime ? bulkAppointmentTime.trim() : '08:30';
+      const appointmentDateTimeStr = `${bulkAppointmentDate}T${finalTime}`;
+      const appointmentDateObj = new Date(appointmentDateTimeStr);
+      if (isNaN(appointmentDateObj.getTime())) {
+        alert('Thời gian hẹn khách không hợp lệ.');
+        return;
+      }
+      if (appointmentDateObj < new Date()) {
+        alert('Thời gian hẹn khách không được ở trong quá khứ.');
+        return;
+      }
+      appointmentTimeISO = appointmentDateObj.toISOString();
+    }
+
+    try {
+      setLoading(true);
+      const res = await bulkAssignOrders(selectedOrderIds, {
+        mainStationId: bulkMainStationId,
+        techStationId: bulkTechStationId || null,
+        assignedKtvId: bulkAssignedKtvId || null,
+        appointmentTime: appointmentTimeISO,
+        rescheduleReason: bulkRescheduleReason || null,
+        warehouseId: bulkWarehouseId || null
+      });
+
+      alert(res.message);
+      if (res.warnings && res.warnings.length > 0) {
+        alert("Một số cảnh báo đồng bộ Pancake:\n" + res.warnings.join("\n"));
+      }
+
+      setIsBulkAssignOpen(false);
+      setSelectedOrderIds([]);
+      
+      // Reset form states
+      setBulkMainStationId('');
+      setBulkTechStationId('');
+      setBulkAssignedKtvId('');
+      setBulkAppointmentDate('');
+      setBulkAppointmentTime('08:30');
+      setBulkRescheduleReason('');
+      setBulkWarehouseId('');
+
+      fetchOrdersData();
+    } catch (err: any) {
+      alert(err.message || 'Lỗi phân công hàng loạt');
+    } finally {
+      setLoading(false);
+    }
+  };
+
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
@@ -2149,6 +2245,22 @@ export default function OrderList() {
           <table className="min-w-[1300px] lg:w-full text-left text-[13px]">
             <thead className="bg-[#f8f9fa] text-gray-600 font-semibold border-b border-gray-200 z-20 lg:sticky lg:top-0">
               <tr>
+                {(currentUser?.role === 'ADMIN' || currentUser?.role === 'DEV' || currentUser?.role === 'COORDINATOR') && (
+                  <th className="px-4 py-2 w-[40px] text-center">
+                    <input
+                      type="checkbox"
+                      className="rounded text-blue-600 focus:ring-blue-500 cursor-pointer"
+                      checked={orders.length > 0 && orders.every(o => selectedOrderIds.includes(o.id))}
+                      onChange={(e) => {
+                        if (e.target.checked) {
+                          setSelectedOrderIds(orders.map(o => o.id));
+                        } else {
+                          setSelectedOrderIds([]);
+                        }
+                      }}
+                    />
+                  </th>
+                )}
                 <th className="px-4 py-2 w-[70px]">Mã đơn</th>
                 <th className="px-4 py-2 w-[180px]">Khách hàng</th>
                 <th className="px-4 py-2 w-[220px]">Công việc</th>
@@ -2173,6 +2285,22 @@ export default function OrderList() {
 
                 return (
                   <tr key={order.id} className={`${idx % 2 === 0 ? 'bg-white' : 'bg-[#fafafa]'} hover:bg-blue-50/50 transition-colors`}>
+                    {(currentUser?.role === 'ADMIN' || currentUser?.role === 'DEV' || currentUser?.role === 'COORDINATOR') && (
+                      <td className="px-4 py-2 text-center align-top">
+                        <input
+                          type="checkbox"
+                          className="rounded text-blue-600 focus:ring-blue-500 cursor-pointer"
+                          checked={selectedOrderIds.includes(order.id)}
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              setSelectedOrderIds([...selectedOrderIds, order.id]);
+                            } else {
+                              setSelectedOrderIds(selectedOrderIds.filter(id => id !== order.id));
+                            }
+                          }}
+                        />
+                      </td>
+                    )}
                     {/* 1. Mã đơn */}
                     <td className="px-4 py-2 font-medium align-top">
                       <div className="flex flex-col items-start gap-1">
@@ -3729,6 +3857,237 @@ export default function OrderList() {
             <div className="px-6 py-4 border-t border-gray-200 bg-gray-50 flex justify-end gap-3">
               <button onClick={() => { setShowCreateModal(false); setEditingOrderId(null); }} className="px-4 py-2 bg-white border rounded text-gray-700 hover:bg-gray-100 text-sm font-semibold transition-colors">Hủy</button>
               <button onClick={submitCreateManualOrder} className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm font-semibold shadow-sm transition-colors">{editingOrderId ? 'Cập nhật' : 'Tạo ca dịch vụ'}</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* BULK ACTION BAR */}
+      {selectedOrderIds.length > 0 && (currentUser?.role === 'ADMIN' || currentUser?.role === 'DEV' || currentUser?.role === 'COORDINATOR') && (
+        <div className="fixed bottom-6 left-1/2 transform -translate-x-1/2 z-40 bg-slate-900/90 backdrop-blur-md text-white px-6 py-3.5 rounded-full shadow-2xl flex items-center gap-6 border border-slate-700/50 transition-all duration-300 animate-slide-up">
+          <span className="text-sm font-semibold text-slate-200">
+            Đã chọn <strong className="text-blue-400 text-base">{selectedOrderIds.length}</strong> đơn hàng
+          </span>
+          <div className="h-4 w-px bg-slate-700" />
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => {
+                setBulkMainStationId('');
+                setBulkTechStationId('');
+                setBulkAssignedKtvId('');
+                setBulkAppointmentDate('');
+                setBulkAppointmentTime('08:30');
+                setBulkRescheduleReason('');
+                setBulkWarehouseId('');
+                setIsBulkAssignOpen(true);
+              }}
+              className="bg-blue-600 hover:bg-blue-500 active:bg-blue-700 text-white text-xs font-bold px-4 py-2 rounded-full transition-all flex items-center gap-1.5 shadow-md shadow-blue-900/30"
+            >
+              <Users size={14} />
+              <span>Phân bổ hàng loạt</span>
+            </button>
+            <button
+              onClick={() => setSelectedOrderIds([])}
+              className="bg-slate-800 hover:bg-slate-700 active:bg-slate-900 text-slate-300 hover:text-white text-xs font-medium px-4 py-2 rounded-full transition-all"
+            >
+              Bỏ chọn
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* BULK ASSIGN MODAL */}
+      {isBulkAssignOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-lg overflow-hidden flex flex-col max-h-[90vh] animate-scale-up">
+            <div className="px-6 py-4 border-b border-gray-200 bg-gray-50 flex justify-between items-center">
+              <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2">
+                <Users className="text-blue-600" size={20} />
+                <span>Phân bổ hàng loạt ({selectedOrderIds.length} đơn)</span>
+              </h3>
+              <button onClick={() => setIsBulkAssignOpen(false)} className="text-gray-400 hover:text-gray-600 transition-colors">
+                <XCircle size={24} />
+              </button>
+            </div>
+
+            <div className="p-6 overflow-auto flex-1 space-y-4 text-gray-800">
+              <div className="p-3 bg-amber-50 border border-amber-200 rounded-md text-xs text-amber-800 leading-relaxed">
+                📌 <b>Lưu ý:</b> Chỉ những trường được chọn giá trị mới được cập nhật hàng loạt cho các đơn hàng đã chọn. 
+                Trạm chính là bắt buộc. Trạm kỹ thuật, KTV, Giờ hẹn và Kho xuất hàng là không bắt buộc (bỏ trống sẽ giữ nguyên giá trị cũ của từng đơn).
+              </div>
+
+              {/* Trạm chính (Bắt buộc) */}
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-1">Trạm chính *</label>
+                <select 
+                  className="w-full border rounded p-2 text-sm outline-none focus:border-blue-500 bg-white"
+                  value={bulkMainStationId} 
+                  onChange={e => { 
+                    setBulkMainStationId(e.target.value); 
+                    setBulkTechStationId(''); 
+                    setBulkAssignedKtvId(''); 
+                  }}
+                >
+                  <option value="">-- Chọn Trạm chính (Bắt buộc) --</option>
+                  {stations.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                </select>
+              </div>
+
+              {/* Trạm kỹ thuật (Không bắt buộc) */}
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-1">Trạm kỹ thuật</label>
+                <select 
+                  className="w-full border rounded p-2 text-sm outline-none focus:border-blue-500 bg-white disabled:bg-gray-50 disabled:text-gray-400"
+                  value={bulkTechStationId} 
+                  onChange={e => { 
+                    setBulkTechStationId(e.target.value); 
+                    setBulkAssignedKtvId(''); 
+                  }}
+                  disabled={!bulkMainStationId}
+                >
+                  <option value="">-- Giữ nguyên trạm cũ (Không thay đổi) --</option>
+                  {(() => {
+                    const currentMain = stations.find(s => s.id === bulkMainStationId);
+                    if (!currentMain || !currentMain.techStations) return null;
+                    return currentMain.techStations.map((t: any) => (
+                      <option key={t.id} value={t.id}>{t.name}</option>
+                    ));
+                  })()}
+                </select>
+              </div>
+
+              {/* Kỹ thuật viên (Không bắt buộc) */}
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-1">Kỹ thuật viên</label>
+                <select 
+                  className="w-full border rounded p-2 text-sm outline-none focus:border-blue-500 bg-white disabled:bg-gray-50 disabled:text-gray-400"
+                  value={bulkAssignedKtvId} 
+                  onChange={e => setBulkAssignedKtvId(e.target.value)}
+                  disabled={!bulkTechStationId}
+                >
+                  <option value="">-- Giữ nguyên KTV cũ (Không thay đổi) --</option>
+                  {bulkKtvs.map((k: any) => (
+                    <option key={k.id} value={k.id}>
+                      {k.fullName} ({k.pendingOrderCount || 0} đơn đang xử lý)
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Giờ hẹn khách (Không bắt buộc) */}
+              <div className="border-t pt-4">
+                <label className="block text-sm font-semibold text-gray-700 mb-1">Ngày & Giờ hẹn khách</label>
+                <div className="grid grid-cols-2 gap-3">
+                  <input 
+                    type="date" 
+                    className="w-full border rounded p-2 text-sm outline-none focus:border-blue-500 bg-white" 
+                    value={bulkAppointmentDate} 
+                    min={new Date().toISOString().split('T')[0]}
+                    onChange={e => setBulkAppointmentDate(e.target.value)} 
+                  />
+                  <input 
+                    type="time" 
+                    className="w-full border rounded p-2 text-sm outline-none focus:border-blue-500 bg-white disabled:bg-gray-50" 
+                    value={bulkAppointmentTime} 
+                    onChange={e => setBulkAppointmentTime(e.target.value)}
+                    disabled={!bulkAppointmentDate}
+                  />
+                </div>
+              </div>
+
+              {/* Lý do hẹn lịch */}
+              {bulkAppointmentDate && (
+                <div className="animate-fade-in">
+                  <label className="block text-sm font-semibold text-gray-700 mb-1">Lý do cập nhật hẹn khách (nếu có)</label>
+                  <textarea 
+                    rows={2} 
+                    className="w-full border rounded p-2 text-sm outline-none focus:border-blue-500 bg-white" 
+                    value={bulkRescheduleReason} 
+                    onChange={e => setBulkRescheduleReason(e.target.value)} 
+                    placeholder="Nhập lý do hẹn lại..."
+                  />
+                </div>
+              )}
+
+              {/* Kho xuất hàng (Không bắt buộc) */}
+              <div className="border-t pt-4 relative">
+                <label className="block text-sm font-semibold text-gray-700 mb-1">Chọn kho xuất hàng hàng loạt</label>
+                <div className="relative">
+                  <input 
+                    type="text"
+                    placeholder="Gõ để tìm & chọn kho..."
+                    className="w-full border rounded p-2 pr-8 text-sm outline-none focus:border-blue-500 bg-white text-gray-800"
+                    value={bulkWarehouseSearch}
+                    onChange={(e) => {
+                      setBulkWarehouseSearch(e.target.value);
+                      setShowBulkWarehouseDropdown(true);
+                      if (!e.target.value) {
+                        setBulkWarehouseId('');
+                      }
+                    }}
+                    onFocus={() => setShowBulkWarehouseDropdown(true)}
+                  />
+                  <button
+                    type="button"
+                    className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 text-xs focus:outline-none"
+                    onClick={() => setShowBulkWarehouseDropdown(!showBulkWarehouseDropdown)}
+                  >
+                    {showBulkWarehouseDropdown ? '▲' : '▼'}
+                  </button>
+                </div>
+
+                {showBulkWarehouseDropdown && (
+                  <>
+                    <div className="fixed inset-0 z-10" onClick={() => setShowBulkWarehouseDropdown(false)} />
+                    <div className="absolute left-0 right-0 mt-1 max-h-40 overflow-y-auto bg-white border rounded shadow-lg z-20 divide-y divide-gray-100">
+                      <button
+                        type="button"
+                        className="w-full text-left px-3 py-2 text-xs hover:bg-blue-50 text-amber-600 font-semibold"
+                        onClick={() => {
+                          setBulkWarehouseId('');
+                          setBulkWarehouseSearch('');
+                          setShowBulkWarehouseDropdown(false);
+                        }}
+                      >
+                        -- Giữ nguyên kho cũ (Không thay đổi) --
+                      </button>
+                      {warehouses
+                        .filter(w => removeAccents(w.name).includes(removeAccents(bulkWarehouseSearch)))
+                        .map(w => (
+                          <button
+                            key={w.id}
+                            type="button"
+                            className={`w-full text-left px-3 py-2 text-xs hover:bg-blue-50 transition-colors ${
+                              bulkWarehouseId === w.id ? 'bg-blue-50/70 font-semibold text-blue-700' : 'text-gray-700'
+                            }`}
+                            onClick={() => {
+                              setBulkWarehouseId(w.id);
+                              setBulkWarehouseSearch(w.name);
+                              setShowBulkWarehouseDropdown(false);
+                            }}
+                          >
+                            {w.name}
+                          </button>
+                        ))}
+                    </div>
+                  </>
+                )}
+              </div>
+            </div>
+
+            <div className="px-6 py-4 border-t border-gray-200 bg-gray-50 flex justify-end gap-3 shrink-0">
+              <button 
+                onClick={() => setIsBulkAssignOpen(false)} 
+                className="px-4 py-2 bg-white border rounded text-gray-700 hover:bg-gray-100 text-sm font-semibold transition-colors"
+              >
+                Hủy
+              </button>
+              <button 
+                onClick={submitBulkAssign} 
+                className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm font-semibold shadow-sm transition-colors"
+              >
+                Xác nhận Phân bổ hàng loạt
+              </button>
             </div>
           </div>
         </div>

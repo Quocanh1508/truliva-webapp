@@ -2079,4 +2079,273 @@ router.post('/sync', requireAuth, async (req: Request, res: Response): Promise<v
   }
 });
 
+/**
+ * PATCH /api/orders/bulk/assign
+ * Bulk assign stations, KTV, warehouse, and reschedule multiple orders
+ */
+router.patch('/bulk/assign', requireAuth, async (req: Request, res: Response): Promise<void> => {
+  try {
+    const role = req.user?.role;
+    // Phân quyền: Chỉ ADMIN, DEV, COORDINATOR
+    if (role !== 'ADMIN' && role !== 'DEV' && role !== 'COORDINATOR') {
+      res.status(403).json({ error: 'Bạn không có quyền thực hiện phân bổ hàng loạt.' });
+      return;
+    }
+
+    const {
+      orderIds,
+      mainStationId,
+      techStationId,
+      assignedKtvId,
+      appointmentTime,
+      rescheduleReason,
+      warehouseId
+    } = req.body;
+
+    if (!Array.isArray(orderIds) || orderIds.length === 0) {
+      res.status(400).json({ error: 'Danh sách ID đơn hàng không hợp lệ hoặc rỗng.' });
+      return;
+    }
+
+    if (!mainStationId) {
+      res.status(400).json({ error: 'Trạm chính là bắt buộc khi thực hiện phân bổ.' });
+      return;
+    }
+
+    // Kiểm tra trạm chính tồn tại
+    const mainStation = await prisma.mainStation.findUnique({
+      where: { id: mainStationId }
+    });
+    if (!mainStation) {
+      res.status(404).json({ error: 'Trạm chính không tồn tại trên hệ thống.' });
+      return;
+    }
+
+    // Lọc quyền xem đơn hàng
+    const iamFilter = await buildOrderFilter(req.user);
+    const oldOrders = await prisma.order.findMany({
+      where: {
+        id: { in: orderIds },
+        ...(iamFilter || {})
+      },
+      include: { items: true }
+    });
+
+    if (oldOrders.length === 0) {
+      res.status(400).json({ error: 'Không tìm thấy đơn hàng nào hợp lệ hoặc bạn không có quyền chỉnh sửa.' });
+      return;
+    }
+
+    // Fetch warehouse list once for Pancake sync if warehouseId is provided
+    let warehouses: any[] = [];
+    const apiKey = process.env.PANCAKE_API_KEY;
+    const shopId = '1635300067';
+    if (warehouseId && apiKey) {
+      try {
+        const whResponse = await axios.get(`https://pos.pages.fm/api/v1/shops/${shopId}/warehouses`, {
+          params: { api_key: apiKey },
+          timeout: 5000
+        });
+        warehouses = whResponse.data?.data || whResponse.data?.warehouses || [];
+      } catch (err) {
+        logger.warn('Failed to fetch warehouse list from Pancake POS API in bulk assign', err);
+      }
+    }
+
+    const results: any[] = [];
+    const warnings: string[] = [];
+
+    // Loop through each order and update sequentially
+    for (const oldOrder of oldOrders) {
+      const updateData: any = {};
+      const changes: any[] = [];
+
+      // Main Station (always present and checked)
+      if (mainStationId !== oldOrder.mainStationId) {
+        updateData.mainStationId = mainStationId;
+        changes.push({ field: 'mainStationId', from: oldOrder.mainStationId, to: mainStationId });
+      }
+
+      // Tech Station
+      if (techStationId !== undefined && techStationId !== oldOrder.techStationId) {
+        updateData.techStationId = techStationId || null;
+        changes.push({ field: 'techStationId', from: oldOrder.techStationId, to: techStationId || null });
+      }
+
+      // KTV Assignment
+      if (assignedKtvId !== undefined && assignedKtvId !== oldOrder.assignedKtvId) {
+        updateData.assignedKtvId = assignedKtvId || null;
+        changes.push({ field: 'assignedKtvId', from: oldOrder.assignedKtvId, to: assignedKtvId || null });
+        
+        // Auto update adminStatus if KTV is assigned
+        if (assignedKtvId && (!oldOrder.adminStatus || oldOrder.adminStatus === 'chờ xử lý')) {
+          updateData.adminStatus = 'đang thực hiện';
+          changes.push({ field: 'adminStatus', from: oldOrder.adminStatus, to: 'đang thực hiện' });
+        }
+      }
+
+      // Appointment Time
+      if (appointmentTime !== undefined) {
+        const newAppTime = appointmentTime ? new Date(appointmentTime) : null;
+        const oldAppTime = oldOrder.appointmentTime ? new Date(oldOrder.appointmentTime) : null;
+        if (String(newAppTime) !== String(oldAppTime)) {
+          updateData.appointmentTime = newAppTime;
+          changes.push({ field: 'appointmentTime', from: oldOrder.appointmentTime, to: newAppTime });
+          
+          if (rescheduleReason) {
+            updateData.rescheduleReason = rescheduleReason;
+            changes.push({ field: 'rescheduleReason', from: oldOrder.rescheduleReason, to: rescheduleReason });
+          }
+        }
+      }
+
+      // Warehouse
+      if (warehouseId !== undefined && warehouseId !== oldOrder.warehouseId) {
+        const isInstallation = oldOrder.workType === 'Lắp đặt';
+        let originallyHasProducts = false;
+        if (oldOrder.rawData) {
+          try {
+            const raw = typeof oldOrder.rawData === 'string' ? JSON.parse(oldOrder.rawData) : oldOrder.rawData;
+            const itemsList = raw.items || raw.order_items || [];
+            originallyHasProducts = Array.isArray(itemsList) && itemsList.length > 0;
+          } catch (e) {
+            originallyHasProducts = false;
+          }
+        }
+        const isManualOrder = oldOrder.pancakeOrderId < 0;
+        const shouldSyncWarehouseToPancake = !isInstallation && originallyHasProducts && !isManualOrder;
+
+        try {
+          let warehouseName = 'Kho hàng';
+          const matchedWh = warehouses.find((w: any) => String(w.id) === String(warehouseId));
+          if (matchedWh) {
+            warehouseName = matchedWh.name;
+          }
+
+          if (shouldSyncWarehouseToPancake && warehouseId && apiKey) {
+            await axios.patch(
+              `https://pos.pages.fm/api/v1/shops/${shopId}/orders/${oldOrder.pancakeOrderId}`,
+              { warehouse_id: warehouseId },
+              {
+                params: { api_key: apiKey },
+                headers: { 'Content-Type': 'application/json' },
+                timeout: 10000
+              }
+            );
+          }
+
+          updateData.warehouseId = warehouseId;
+          updateData.warehouseInfo = { id: warehouseId, name: warehouseName };
+          updateData.pancakeSyncStatus = 'SUCCESS';
+
+          changes.push({ field: 'warehouseId', from: oldOrder.warehouseId, to: warehouseId });
+          changes.push({ field: 'warehouseInfo', from: oldOrder.warehouseInfo, to: updateData.warehouseInfo });
+        } catch (err: any) {
+          const errorMsg = err.response?.data?.message || err.message || 'Lỗi không xác định từ Pancake POS';
+          warnings.push(`Đơn #${oldOrder.pancakeOrderId}: Lỗi đổi kho sang Pancake: ${errorMsg}`);
+        }
+      }
+
+      // Sync status to Pancake POS if it changed in bulk assign
+      if (updateData.adminStatus) {
+        try {
+          await syncOrderStatusToPancake(oldOrder.pancakeOrderId, updateData.adminStatus);
+          updateData.pancakeSyncStatus = 'SUCCESS';
+        } catch (err: any) {
+          updateData.pancakeSyncStatus = 'FAILED';
+          const errorMsg = err.response?.data?.message || err.response?.data?.errors?.order || err.message || 'Lỗi không xác định từ Pancake POS';
+          warnings.push(`Đơn #${oldOrder.pancakeOrderId}: Không thể đồng bộ trạng thái sang Pancake: ${errorMsg}`);
+        }
+      }
+
+      if (changes.length > 0) {
+        // Save to Database
+        const updatedOrder = await prisma.order.update({
+          where: { id: oldOrder.id },
+          data: updateData,
+        });
+
+        // Local inventory sync logic
+        try {
+          const newOrderItems = await prisma.orderItem.findMany({
+            where: { orderId: oldOrder.id }
+          });
+          await syncOrderInventoryState(oldOrder.id, {
+            adminStatus: oldOrder.adminStatus,
+            warehouseId: oldOrder.warehouseId,
+            items: oldOrder.items.map(item => ({
+              productName: item.productName || '',
+              quantity: item.quantity || 1
+            }))
+          }, {
+            adminStatus: updatedOrder.adminStatus,
+            warehouseId: updatedOrder.warehouseId,
+            items: newOrderItems.map(item => ({
+              productName: item.productName || '',
+              quantity: item.quantity || 1
+            }))
+          });
+        } catch (invErr: any) {
+          logger.error('Lỗi khấu trừ kho khi cập nhật đơn hàng hàng loạt', { orderId: oldOrder.id, error: invErr.message });
+        }
+
+        // Audit Log
+        let action = 'updated';
+        if (updateData.adminStatus === 'hủy đơn') action = 'cancelled';
+        if (assignedKtvId && !oldOrder.assignedKtvId) action = 'assigned';
+
+        await prisma.auditLog.create({
+          data: {
+            entityType: 'Order',
+            entityId: oldOrder.id,
+            action,
+            changes,
+            userId: req.user!.id,
+            userName: req.user!.fullName
+          }
+        });
+
+        // KTV Push Notification
+        if (assignedKtvId && assignedKtvId !== oldOrder.assignedKtvId) {
+          const customerName = updatedOrder.billFullName || 'Khách hàng';
+          const workTypeText = updatedOrder.workType || 'công việc';
+          const title = 'Dịch vụ mới được phân công (hàng loạt)';
+          const displayOrderId = updatedOrder.pancakeOrderId < 0 ? `M${Math.abs(updatedOrder.pancakeOrderId)}` : `#${updatedOrder.pancakeOrderId}`;
+          const body = `Bạn vừa được phân công dịch vụ mới ${displayOrderId} (${workTypeText}) cho khách hàng ${customerName}`;
+
+          sendPushNotification(assignedKtvId, title, body, {
+            type: 'ORDER_ASSIGNED',
+            orderId: updatedOrder.id,
+            pancakeOrderId: updatedOrder.pancakeOrderId < 0 ? `M${Math.abs(updatedOrder.pancakeOrderId)}` : String(updatedOrder.pancakeOrderId)
+          }).catch(err => {
+            logger.error('Failed to trigger push notification for KTV bulk assignment', { error: err.message });
+          });
+
+          sendWebPushNotification(assignedKtvId, title, body, {
+            type: 'ORDER_ASSIGNED',
+            orderId: updatedOrder.id,
+            pancakeOrderId: updatedOrder.pancakeOrderId < 0 ? `M${Math.abs(updatedOrder.pancakeOrderId)}` : String(updatedOrder.pancakeOrderId)
+          }).catch(err => {
+            logger.error('Failed to trigger Web Push notification for KTV bulk assignment', { error: err.message });
+          });
+        }
+
+        logger.info('Order updated via bulk assign', { orderId: oldOrder.id, changes });
+        broadcastEvent('ORDER_UPDATED', { orderId: updatedOrder.id, pancakeOrderId: updatedOrder.pancakeOrderId });
+        results.push(updatedOrder);
+      }
+    }
+
+    res.json({
+      success: true,
+      message: `Đã xử lý phân bổ cho ${oldOrders.length} đơn hàng. Cập nhật thành công ${results.length} đơn.`,
+      warnings: warnings.length > 0 ? warnings : null
+    });
+  } catch (error: any) {
+    logger.error('Bulk assign order error', { error: error.message });
+    res.status(500).json({ error: 'Lỗi cập nhật đơn hàng hàng loạt' });
+  }
+});
+
 export default router;
+
