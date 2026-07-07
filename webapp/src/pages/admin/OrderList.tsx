@@ -2327,6 +2327,18 @@ export default function OrderList() {
                           </button>
                         )}
 
+                        {/* Đồng bộ đơn từ Pancake */}
+                        {order.pancakeOrderId > 0 && (currentUser?.role === 'ADMIN' || currentUser?.role === 'DEV') && (
+                          <button
+                            onClick={() => handleSyncSingle(order.id)}
+                            className="p-1.5 text-blue-600 hover:bg-blue-50 rounded border border-transparent hover:border-blue-100 transition-colors"
+                            title="Đồng bộ lại từ Pancake"
+                            disabled={syncing}
+                          >
+                            <RefreshCw size={15} className={syncing ? "animate-spin" : ""} />
+                          </button>
+                        )}
+
                         {/* Báo cáo hoàn thành ca (dành cho đơn tự tạo thủ công của saler và đơn pancake của admin/coordinator - đơn pancake phải được phân bổ trước) */}
                         {!isViewOnlyStaff && order.adminStatus !== 'hoàn thành' && order.adminStatus !== 'hủy đơn' && (
                           (order.pancakeOrderId < 0 && (currentUser?.role !== 'SALER' || order.rawData?.creator?.id === currentUser?.id || order.rawData?.creator?.name === currentUser?.fullName)) ||
@@ -2350,17 +2362,6 @@ export default function OrderList() {
                           <Copy size={15} />
                         </button>
 
-                        {/* Đồng bộ đơn từ Pancake */}
-                        {order.pancakeOrderId > 0 && !isViewOnlyStaff && (
-                           <button
-                             onClick={() => handleSyncSingle(order.id)}
-                             className="p-1.5 text-blue-600 hover:bg-blue-50 rounded border border-transparent hover:border-blue-100 transition-colors"
-                             title="Đồng bộ lại từ Pancake"
-                             disabled={syncing}
-                           >
-                             <RefreshCw size={15} className={syncing ? "animate-spin" : ""} />
-                           </button>
-                        )}
 
                         {/* Hủy đơn (chỉ hiện khi chưa hoàn thành/hủy) */}
                         {!isViewOnlyStaff && order.adminStatus !== 'hoàn thành' && order.adminStatus !== 'hủy đơn' && (

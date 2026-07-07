@@ -2002,11 +2002,10 @@ router.post('/:id/sync', requireAuth, async (req: Request, res: Response): Promi
   try {
     const id = req.params.id as string;
     
-    // Check permissions (Only non-KTV and non-Service STAFF can sync)
+    // Check permissions (Only ADMIN and DEV can sync single order)
     const role = req.user?.role;
-    const group = req.user?.group;
-    if (role === 'KTV' || (role === 'STAFF' && group === 'Service')) {
-      res.status(403).json({ error: 'Bạn không có quyền đồng bộ đơn hàng từ Pancake.' });
+    if (role !== 'ADMIN' && role !== 'DEV') {
+      res.status(403).json({ error: 'Chỉ Admin mới có quyền đồng bộ đơn hàng từ Pancake.' });
       return;
     }
 
