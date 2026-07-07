@@ -1455,6 +1455,10 @@ export default function Dashboard() {
                         <span>PNN Home</span>
                       </div>
                       <div className="flex items-center space-x-1.5">
+                        <span className="w-3 h-3 rounded bg-[#94a3b8]"></span>
+                        <span>Khác</span>
+                      </div>
+                      <div className="flex items-center space-x-1.5">
                         <span className="w-3 h-3 rounded bg-[#e2e8f0]"></span>
                         <span>Lack (Không có đơn)</span>
                       </div>

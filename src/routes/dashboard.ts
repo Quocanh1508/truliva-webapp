@@ -84,7 +84,8 @@ router.get('/stats', async (req: Request, res: Response): Promise<void> => {
     // Chỉ hiển thị các đơn hàng đã được xác nhận bên POS (ẩn các đơn nháp status = 0)
     where.OR = [
       { statusCode: { not: 0 } },
-      { statusCode: null }
+      { statusCode: null },
+      { pancakeOrderId: { lt: 0 } } // Đơn thủ công (luôn hiện, bất kể statusCode)
     ];
 
     if (startDate || endDate) {
@@ -246,7 +247,8 @@ router.get('/dispatch-analysis', async (req: Request, res: Response): Promise<vo
     // Chỉ hiển thị các đơn hàng đã được xác nhận bên POS (ẩn các đơn nháp status = 0)
     where.OR = [
       { statusCode: { not: 0 } },
-      { statusCode: null }
+      { statusCode: null },
+      { pancakeOrderId: { lt: 0 } } // Đơn thủ công (luôn hiện, bất kể statusCode)
     ];
 
     // Áp dụng bộ lọc thời gian tạo đơn hàng trên Pancake
