@@ -6,6 +6,29 @@ import CategoryTreeSelect from '../../components/CategoryTreeSelect';
 import { formatOrderId } from '../../utils/text';
 import { useAuth } from '../../context/AuthContext';
 
+function copyToClipboard(text: string): boolean {
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(text);
+    return true;
+  }
+  try {
+    const textArea = document.createElement("textarea");
+    textArea.value = text;
+    textArea.style.position = "fixed";
+    textArea.style.left = "-999999px";
+    textArea.style.top = "-999999px";
+    document.body.appendChild(textArea);
+    textArea.focus();
+    textArea.select();
+    const successful = document.execCommand('copy');
+    document.body.removeChild(textArea);
+    return successful;
+  } catch (err) {
+    console.error('Fallback copy failed', err);
+    return false;
+  }
+}
+
 // Check if a URL points to a directly viewable image
 function isDirectImage(url: string): boolean {
   if (url.includes('cloudinary.com') || url.includes('res.cloudinary.com')) return true;
@@ -1213,7 +1236,7 @@ export default function ReportList() {
                           <span
                             onClick={() => {
                               const idStr = formatOrderId(r.order.pancakeOrderId);
-                              navigator.clipboard.writeText(idStr);
+                              copyToClipboard(idStr);
                               alert(`Đã sao chép mã đơn: ${idStr}`);
                             }}
                             className="font-bold text-blue-700 cursor-pointer hover:underline"
@@ -1229,7 +1252,7 @@ export default function ReportList() {
                                 return (
                                   <span
                                     onClick={() => {
-                                      navigator.clipboard.writeText(String(originalId));
+                                      copyToClipboard(String(originalId));
                                       alert(`Đã sao chép mã đơn gốc: ${originalId}`);
                                     }}
                                     className="text-[9px] text-gray-500 font-mono bg-gray-50 border border-gray-200 rounded px-1.5 py-0.5 mt-0.5 cursor-pointer hover:text-blue-600 hover:bg-blue-50 hover:border-blue-200 transition-colors inline-block break-all max-w-[85px] leading-tight select-all"
@@ -1254,7 +1277,7 @@ export default function ReportList() {
                       <div 
                         onClick={() => {
                           if (r.customerPhone) {
-                            navigator.clipboard.writeText(r.customerPhone);
+                            copyToClipboard(r.customerPhone);
                             alert(`Đã sao chép SĐT: ${r.customerPhone}`);
                           }
                         }}
@@ -1505,7 +1528,7 @@ export default function ReportList() {
                         <span 
                           onClick={() => {
                             if (selectedDetailReport.customerPhone) {
-                              navigator.clipboard.writeText(selectedDetailReport.customerPhone);
+                              copyToClipboard(selectedDetailReport.customerPhone);
                               alert(`Đã sao chép SĐT: ${selectedDetailReport.customerPhone}`);
                             }
                           }}

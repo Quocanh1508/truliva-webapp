@@ -29,6 +29,29 @@ function formatDate(dateStr: string): string {
   return `${d}/${m}/${y}`;
 }
 
+function copyToClipboard(text: string): boolean {
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(text);
+    return true;
+  }
+  try {
+    const textArea = document.createElement("textarea");
+    textArea.value = text;
+    textArea.style.position = "fixed";
+    textArea.style.left = "-999999px";
+    textArea.style.top = "-999999px";
+    document.body.appendChild(textArea);
+    textArea.focus();
+    textArea.select();
+    const successful = document.execCommand('copy');
+    document.body.removeChild(textArea);
+    return successful;
+  } catch (err) {
+    console.error('Fallback copy failed', err);
+    return false;
+  }
+}
+
 const ROW_STATUS_OPTIONS = [
   { value: 'chờ xử lý', label: 'Chờ xử lý' },
   { value: 'đang thực hiện', label: 'Đã phân công' },
@@ -904,14 +927,11 @@ export default function OrderList() {
 
     const text = `Khách hàng: ${customerName}\nSĐT: ${phone}\nĐịa chỉ: ${address}\n${appTimeStr}\nGhi chú: ${notes}`;
 
-    navigator.clipboard.writeText(text)
-      .then(() => {
-        alert(`Đã copy thông tin đơn ${formatOrderId(order.pancakeOrderId)} thành công!`);
-      })
-      .catch(err => {
-        console.error('Không thể copy', err);
-        alert('Có lỗi khi copy thông tin.');
-      });
+    if (copyToClipboard(text)) {
+      alert(`Đã copy thông tin đơn ${formatOrderId(order.pancakeOrderId)} thành công!`);
+    } else {
+      alert('Có lỗi khi copy thông tin.');
+    }
   };
 
   const openAssignModal = (order: any) => {
@@ -2302,7 +2322,7 @@ export default function OrderList() {
                         <div
                           onClick={() => {
                             const idStr = formatOrderId(order.pancakeOrderId);
-                            navigator.clipboard.writeText(idStr);
+                            copyToClipboard(idStr);
                             alert(`Đã sao chép mã đơn: ${idStr}`);
                           }}
                           className="cursor-pointer hover:text-blue-600 hover:underline"
@@ -2335,7 +2355,7 @@ export default function OrderList() {
                                 return (
                                   <span
                                     onClick={() => {
-                                      navigator.clipboard.writeText(String(originalId));
+                                      copyToClipboard(String(originalId));
                                       alert(`Đã sao chép mã đơn gốc: ${originalId}`);
                                     }}
                                     className="text-[9px] text-gray-500 font-mono bg-gray-50 border border-gray-200 rounded px-1.5 py-0.5 mt-0.5 cursor-pointer hover:text-blue-600 hover:bg-blue-50 hover:border-blue-200 transition-colors inline-block break-all max-w-[85px] leading-tight select-all"
@@ -2359,7 +2379,7 @@ export default function OrderList() {
                       <div 
                         onClick={() => {
                           if (phone) {
-                            navigator.clipboard.writeText(phone);
+                            copyToClipboard(phone);
                             alert(`Đã sao chép SĐT: ${phone}`);
                           }
                         }}
@@ -2712,7 +2732,7 @@ export default function OrderList() {
                         return (
                           <span 
                             onClick={() => {
-                              navigator.clipboard.writeText(String(originalId));
+                              copyToClipboard(String(originalId));
                               alert(`Đã sao chép mã đơn gốc: ${originalId}`);
                             }}
                             className="text-xs font-normal text-gray-500 font-mono bg-gray-100 border border-gray-200 rounded px-2 py-0.5 cursor-pointer hover:text-blue-600 hover:bg-blue-50 transition-colors"
