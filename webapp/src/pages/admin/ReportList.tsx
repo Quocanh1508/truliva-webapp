@@ -1371,7 +1371,7 @@ export default function ReportList() {
                     </td>
 
                     {/* Trạm-KTV */}
-                    <td style={{ padding: '12px 16px' }} className="text-xs leading-relaxed text-gray-700">
+                    <td style={{ padding: '12px 16px' }} className="text-xs leading-relaxed text-gray-750">
                       <div>
                         <span className="text-gray-400">Trạm chính:</span>{' '}
                         <span className="font-semibold text-gray-800">
@@ -1384,10 +1384,34 @@ export default function ReportList() {
                           {r.order?.techStation?.name || r.ktvUser?.techStation?.name || '---'}
                         </span>
                       </div>
-                      <div className="mt-1 font-bold text-blue-750">
-                        {r.mainStationId ? 'Người báo cáo:' : 'KTV:'} {r.ktvUser.fullName}
+                      
+                      {/* Hiển thị KTV Phân bổ */}
+                      <div className="mt-1">
+                        <span className="text-gray-400">KTV phân bổ:</span>{' '}
+                        <span className="font-bold text-blue-750">
+                          {r.ktvUser?.role === 'KTV' ? r.ktvUser.fullName : '---'}
+                        </span>
                       </div>
-                      {r.mainStationId && (
+
+                      {/* Hiển thị Người báo cáo */}
+                      <div className="mt-0.5">
+                        <span className="text-gray-400">Người báo cáo:</span>{' '}
+                        <span className="font-semibold text-gray-800">
+                          {r.reportedByUser ? r.reportedByUser.fullName : r.ktvUser?.fullName}
+                        </span>
+                      </div>
+
+                      {/* Badge báo cáo hộ */}
+                      {r.reportedByUser && r.reportedById !== r.ktvUserId && (
+                        <div className="mt-1">
+                          <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-semibold bg-purple-100 text-purple-800 border border-purple-200">
+                            Báo cáo từ {getRoleLabel(r.reportedByUser.role)}
+                          </span>
+                        </div>
+                      )}
+                      
+                      {/* Backward compatibility: Nếu là báo cáo cũ nộp bởi văn phòng (không có reportedByUser nhưng ktvUser không phải KTV) */}
+                      {!r.reportedByUser && r.ktvUser?.role !== 'KTV' && (
                         <div className="mt-1">
                           <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-semibold bg-purple-100 text-purple-800 border border-purple-200">
                             Báo cáo từ {getRoleLabel(r.ktvUser?.role)}

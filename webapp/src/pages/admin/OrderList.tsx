@@ -2437,6 +2437,18 @@ export default function OrderList() {
                         )}
                       </div>
 
+                      {/* Hiển thị lý do hẹn lại hoặc lý do hủy đơn ngay sau lịch hẹn */}
+                      {order.rescheduleReason && (
+                        <div className="text-[11px] text-amber-800 bg-amber-50 border border-amber-200/60 rounded px-2 py-1 mt-1 mb-1.5 break-words font-medium inline-block max-w-[280px]">
+                          ⚠️ <span className="font-bold">Lý do hẹn lại:</span> {order.rescheduleReason}
+                        </div>
+                      )}
+                      {order.adminStatus === 'hủy đơn' && order.cancelReason && (
+                        <div className="text-[11px] text-red-800 bg-red-50 border border-red-200/60 rounded px-2 py-1 mt-1 mb-1.5 break-words font-medium inline-block max-w-[280px]">
+                          🚫 <span className="font-bold">Lý do hủy:</span> {order.cancelReason}
+                        </div>
+                      )}
+
                       {/* Loại công việc & dịch vụ */}
                       <div className="text-[11px] font-medium text-gray-800 leading-tight">
                         <span>CV: </span>
@@ -2516,10 +2528,9 @@ export default function OrderList() {
                           </button>
                         )}
 
-                        {/* Báo cáo hoàn thành ca (dành cho đơn tự tạo thủ công của saler và đơn pancake của admin/coordinator - đơn pancake phải được phân bổ trước) */}
+                        {/* Báo cáo hoàn thành ca (dành cho saler, coordinator và admin cho các ca tự tạo và các ca link từ POS) */}
                         {!isViewOnlyStaff && order.adminStatus !== 'hoàn thành' && order.adminStatus !== 'hủy đơn' && (
-                          (order.pancakeOrderId < 0 && (currentUser?.role !== 'SALER' || order.rawData?.creator?.id === currentUser?.id || order.rawData?.creator?.name === currentUser?.fullName)) ||
-                          (order.pancakeOrderId > 0 && order.adminStatus === 'đang thực hiện' && ['ADMIN', 'COORDINATOR', 'DEV', 'SALER'].includes(currentUser?.role || ''))
+                          ['ADMIN', 'COORDINATOR', 'DEV', 'SALER'].includes(currentUser?.role || '')
                         ) && (
                           <button
                             onClick={() => navigate('/ktv/report', { state: { order } })}

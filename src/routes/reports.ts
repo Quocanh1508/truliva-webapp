@@ -76,7 +76,8 @@ async function buildReportFilter(query: any, user: any): Promise<any> {
         
         // Cho phép xem báo cáo của đơn tự tạo bởi chính mình trên Truliva
         orConditions.push(
-          { order: { rawData: { path: ['creator', 'id'], equals: user.id } } }
+          { order: { rawData: { path: ['creator', 'id'], equals: user.id } } },
+          { reportedById: user.id }
         );
 
         if (creatorName) {
@@ -501,10 +502,14 @@ router.post('/', async (req: Request, res: Response): Promise<void> => {
       isApprovalRequired = false;
     }
 
+    const targetKtvUserId = isKtv ? req.user!.id : (assignedKtvId || req.user!.id);
+    const reportedById = req.user!.id;
+
     const report = await prisma.serviceReport.create({
       data: {
         month: reportMonth,
-        ktvUserId: req.user!.id,
+        ktvUserId: targetKtvUserId,
+        reportedById,
         customerName,
         customerPhone,
         province: province || 'N/A',
@@ -911,6 +916,13 @@ router.get('/', async (req: Request, res: Response): Promise<void> => {
                 }
               }
             } 
+          },
+          reportedByUser: {
+            select: {
+              fullName: true,
+              username: true,
+              role: true
+            }
           },
           order: { 
             select: { 
@@ -1497,7 +1509,8 @@ router.get('/:id', async (req: Request, res: Response): Promise<void> => {
         ...reportFilter
       },
       include: {
-        ktvUser: { select: { fullName: true, username: true } },
+        ktvUser: { select: { fullName: true, username: true, role: true } },
+        reportedByUser: { select: { fullName: true, username: true, role: true } },
         order: {
           select: {
             id: true,
