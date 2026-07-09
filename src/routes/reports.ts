@@ -73,6 +73,12 @@ async function buildReportFilter(query: any, user: any): Promise<any> {
       
       if (role === 'SALER' || role === 'STAFF') {
         const creatorName = pancakeAccountName || '';
+        
+        // Cho phép xem báo cáo của đơn tự tạo bởi chính mình trên Truliva
+        orConditions.push(
+          { order: { rawData: { path: ['creator', 'id'], equals: user.id } } }
+        );
+
         if (creatorName) {
           orConditions.push(
             { order: { rawData: { path: ['creator', 'name'], equals: creatorName } } },
@@ -80,6 +86,25 @@ async function buildReportFilter(query: any, user: any): Promise<any> {
             { order: { rawData: { path: ['assigning_care', 'name'], equals: creatorName } } }
           );
         }
+
+        // Lấy danh sách các đơn hàng thủ công do chính người dùng này tạo ra
+        const createdManualLogs = await prisma.auditLog.findMany({
+          where: {
+            entityType: 'Order',
+            action: 'created_manual',
+            userId: user.id
+          },
+          select: {
+            entityId: true
+          }
+        });
+        const createdManualOrderIds = createdManualLogs.map(log => log.entityId);
+        if (createdManualOrderIds.length > 0) {
+          orConditions.push({
+            order: { id: { in: createdManualOrderIds } }
+          });
+        }
+
         if (group && group.toLowerCase() === 'ecom') {
           orConditions.push(
             { order: { orderSource: { contains: 'shopee', mode: 'insensitive' } } },
@@ -92,8 +117,9 @@ async function buildReportFilter(query: any, user: any): Promise<any> {
         if (group) {
           const groupUsers = await prisma.user.findMany({
             where: { group: group, isActive: true },
-            select: { pancakeAccountName: true }
+            select: { id: true, pancakeAccountName: true }
           });
+          const groupUserIds = groupUsers.map(u => u.id);
           const pancakeNames = groupUsers
             .map(u => u.pancakeAccountName?.trim())
             .filter(Boolean) as string[];
@@ -107,6 +133,32 @@ async function buildReportFilter(query: any, user: any): Promise<any> {
               );
             });
           }
+
+          // Cho phép xem báo cáo của đơn tự tạo bởi các thành viên nhóm trên Truliva
+          groupUserIds.forEach(uid => {
+            orConditions.push(
+              { order: { rawData: { path: ['creator', 'id'], equals: uid } } }
+            );
+          });
+
+          // Lấy danh sách các đơn hàng thủ công do các thành viên nhóm tạo ra
+          const createdManualLogs = await prisma.auditLog.findMany({
+            where: {
+              entityType: 'Order',
+              action: 'created_manual',
+              userId: { in: groupUserIds }
+            },
+            select: {
+              entityId: true
+            }
+          });
+          const createdManualOrderIds = createdManualLogs.map(log => log.entityId);
+          if (createdManualOrderIds.length > 0) {
+            orConditions.push({
+              order: { id: { in: createdManualOrderIds } }
+            });
+          }
+
           if (group.toLowerCase() === 'ecom') {
             orConditions.push(
               { order: { orderSource: { contains: 'shopee', mode: 'insensitive' } } },
