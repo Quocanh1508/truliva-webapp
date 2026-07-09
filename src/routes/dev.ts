@@ -125,4 +125,56 @@ router.get('/system-health', requireAuth, requireDev, async (req: Request, res: 
   }
 });
 
+router.get('/check-nga', async (req: Request, res: Response) => {
+  try {
+    const user = await prisma.user.findFirst({
+      where: { fullName: { contains: 'Phạm Thị Nga' } }
+    });
+    if (!user) {
+      res.json({ error: 'Nga not found' });
+      return;
+    }
+
+    const creatorName = user.pancakeAccountName || '';
+    
+    const createdManualLogs = await prisma.auditLog.findMany({
+      where: {
+        entityType: 'Order',
+        action: 'created_manual',
+        userId: user.id
+      },
+      select: { entityId: true }
+    });
+    const createdManualOrderIds = createdManualLogs.map(log => log.entityId);
+
+    const specificOrders = await prisma.order.findMany({
+      where: { pancakeOrderId: { in: [-38, -37, -36, -30, -29, -45] } },
+      select: {
+        id: true,
+        pancakeOrderId: true,
+        billFullName: true,
+        adminStatus: true,
+        rawData: true,
+        serviceReports: {
+          select: { id: true, customerName: true, approvalStatus: true }
+        }
+      }
+    });
+
+    res.json({
+      user: {
+        id: user.id,
+        fullName: user.fullName,
+        role: user.role,
+        group: user.group,
+        pancakeAccountName: user.pancakeAccountName
+      },
+      createdManualOrderIds,
+      specificOrders
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 export default router;
