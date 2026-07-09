@@ -1645,6 +1645,22 @@ router.patch('/:id', requireAuth, async (req: Request, res: Response): Promise<v
       }
     }
 
+    // Validation: Require workType and serviceType if KTV is being assigned or already assigned
+    const finalKtvId = assignedKtvId !== undefined ? assignedKtvId : oldOrder.assignedKtvId;
+    const finalWorkType = workType !== undefined ? workType : oldOrder.workType;
+    const finalServiceType = serviceType !== undefined ? serviceType : oldOrder.serviceType;
+
+    if (finalKtvId) {
+      if (!finalWorkType || !finalWorkType.trim() || finalWorkType === 'Chưa xác định') {
+        res.status(400).json({ error: 'Vui lòng chọn loại công việc trước khi phân công KTV.' });
+        return;
+      }
+      if (!finalServiceType || !finalServiceType.trim() || finalServiceType === 'Chưa xác định') {
+        res.status(400).json({ error: 'Vui lòng chọn loại dịch vụ chi tiết trước khi phân công KTV.' });
+        return;
+      }
+    }
+
     const updateData: any = {};
     const changes: any[] = [];
 
@@ -2099,7 +2115,9 @@ router.patch('/bulk/assign', requireAuth, async (req: Request, res: Response): P
       assignedKtvId,
       appointmentTime,
       rescheduleReason,
-      warehouseId
+      warehouseId,
+      workType,
+      serviceType
     } = req.body;
 
     if (!Array.isArray(orderIds) || orderIds.length === 0) {
@@ -2131,6 +2149,25 @@ router.patch('/bulk/assign', requireAuth, async (req: Request, res: Response): P
     if (oldOrders.length === 0) {
       res.status(400).json({ error: 'Không tìm thấy đơn hàng nào hợp lệ hoặc bạn không có quyền chỉnh sửa.' });
       return;
+    }
+
+    // Validation: Require workType and serviceType if KTV is being assigned or already assigned
+    for (const oldOrder of oldOrders) {
+      const finalKtvId = assignedKtvId !== undefined ? assignedKtvId : oldOrder.assignedKtvId;
+      const finalWorkType = workType !== undefined ? workType : oldOrder.workType;
+      const finalServiceType = serviceType !== undefined ? serviceType : oldOrder.serviceType;
+
+      if (finalKtvId) {
+        const displayId = oldOrder.pancakeOrderId < 0 ? `M${Math.abs(oldOrder.pancakeOrderId)}` : `#${oldOrder.pancakeOrderId}`;
+        if (!finalWorkType || !finalWorkType.trim() || finalWorkType === 'Chưa xác định') {
+          res.status(400).json({ error: `Đơn hàng ${displayId} chưa chọn Loại công việc. Vui lòng chọn Loại công việc trước khi phân công KTV.` });
+          return;
+        }
+        if (!finalServiceType || !finalServiceType.trim() || finalServiceType === 'Chưa xác định') {
+          res.status(400).json({ error: `Đơn hàng ${displayId} chưa chọn Loại dịch vụ chi tiết. Vui lòng chọn Loại dịch vụ chi tiết trước khi phân công KTV.` });
+          return;
+        }
+      }
     }
 
     // Fetch warehouse list once for Pancake sync if warehouseId is provided
@@ -2167,6 +2204,18 @@ router.patch('/bulk/assign', requireAuth, async (req: Request, res: Response): P
       if (techStationId !== undefined && techStationId !== oldOrder.techStationId) {
         updateData.techStationId = techStationId || null;
         changes.push({ field: 'techStationId', from: oldOrder.techStationId, to: techStationId || null });
+      }
+
+      // Work Type
+      if (workType !== undefined && workType !== oldOrder.workType) {
+        updateData.workType = workType || null;
+        changes.push({ field: 'workType', from: oldOrder.workType, to: workType || null });
+      }
+
+      // Service Type
+      if (serviceType !== undefined && serviceType !== oldOrder.serviceType) {
+        updateData.serviceType = serviceType || null;
+        changes.push({ field: 'serviceType', from: oldOrder.serviceType, to: serviceType || null });
       }
 
       // KTV Assignment

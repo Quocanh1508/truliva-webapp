@@ -233,6 +233,9 @@ export default function OrderList() {
   const [bulkKtvs, setBulkKtvs] = useState<any[]>([]);
   const [bulkWarehouseSearch, setBulkWarehouseSearch] = useState('');
   const [showBulkWarehouseDropdown, setShowBulkWarehouseDropdown] = useState(false);
+  const [bulkWorkType, setBulkWorkType] = useState('');
+  const [bulkServiceType, setBulkServiceType] = useState('');
+  const [showBulkServiceDropdown, setShowBulkServiceDropdown] = useState(false);
 
 
   useEffect(() => {
@@ -775,6 +778,23 @@ export default function OrderList() {
   }, [bulkWarehouseId, warehouses]);
 
   const submitBulkAssign = async () => {
+    if (bulkAssignedKtvId) {
+      const selectedOrders = orders.filter(o => selectedOrderIds.includes(o.id));
+      const hasMissingWorkType = selectedOrders.some(o => !o.workType || o.workType === 'Chưa xác định');
+      
+      if (!bulkWorkType && hasMissingWorkType) {
+        alert('Có đơn hàng được chọn chưa có Loại công việc. Vui lòng chọn Loại công việc chung cho các đơn này trước khi phân công KTV.');
+        return;
+      }
+    }
+
+    if (bulkWorkType) {
+      if (!bulkServiceType || !bulkServiceType.trim()) {
+        alert('Vui lòng chọn/nhập loại dịch vụ chi tiết cho loại công việc đã chọn.');
+        return;
+      }
+    }
+
     let appointmentTimeISO: string | undefined = undefined;
     if (bulkAppointmentDate) {
       const finalTime = bulkAppointmentTime ? bulkAppointmentTime.trim() : '08:30';
@@ -799,7 +819,9 @@ export default function OrderList() {
         assignedKtvId: bulkAssignedKtvId || null,
         appointmentTime: appointmentTimeISO,
         rescheduleReason: bulkRescheduleReason || null,
-        warehouseId: bulkWarehouseId || null
+        warehouseId: bulkWarehouseId || null,
+        workType: bulkWorkType || null,
+        serviceType: bulkServiceType || null
       });
 
       alert(res.message);
@@ -818,6 +840,8 @@ export default function OrderList() {
       setBulkAppointmentTime('08:30');
       setBulkRescheduleReason('');
       setBulkWarehouseId('');
+      setBulkWorkType('');
+      setBulkServiceType('');
 
       fetchOrdersData();
     } catch (err: any) {
@@ -3905,6 +3929,8 @@ export default function OrderList() {
                 setBulkRescheduleReason('');
                 setBulkWarehouseId('');
                 setBulkWarehouseSearch('');
+                setBulkWorkType('');
+                setBulkServiceType('');
                 
                 if (warehouses.length === 0) {
                   fetchApi('/inventory/stock')
@@ -3970,9 +3996,106 @@ export default function OrderList() {
             </div>
 
             <div className="px-6 pt-6 pb-48 overflow-auto flex-1 space-y-4 text-gray-800">
-              <div className="p-3 bg-amber-50 border border-amber-200 rounded-md text-xs text-amber-800 leading-relaxed">
+               <div className="p-3 bg-amber-50 border border-amber-200 rounded-md text-xs text-amber-800 leading-relaxed">
                 📌 <b>Lưu ý:</b> Chỉ những trường được chọn giá trị mới được cập nhật hàng loạt cho các đơn hàng đã chọn. 
-                Tất cả các trường (Trạm chính, Trạm kỹ thuật, KTV, Giờ hẹn và Kho xuất hàng) đều là không bắt buộc (bỏ trống sẽ giữ nguyên giá trị cũ của từng đơn).
+                Tất cả các trường (Loại công việc, Loại dịch vụ chi tiết, Trạm chính, Trạm kỹ thuật, KTV, Giờ hẹn và Kho xuất hàng) đều là không bắt buộc (bỏ trống sẽ giữ nguyên giá trị cũ của từng đơn).
+              </div>
+
+              {/* Loại công việc */}
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-1">Loại công việc</label>
+                <select 
+                  className="w-full border rounded p-2 text-sm outline-none focus:border-blue-500 bg-white"
+                  value={bulkWorkType} 
+                  onChange={e => {
+                    const wt = e.target.value;
+                    setBulkWorkType(wt);
+                    const noServiceTypes = ['Giao hàng và Lắp đặt', 'Lắp đặt', 'Giao hàng', 'Thay lọc'];
+                    if (noServiceTypes.includes(wt)) {
+                      setBulkServiceType('Công việc đã bao gồm dịch vụ');
+                    } else {
+                      setBulkServiceType('');
+                    }
+                  }}
+                >
+                  <option value="">-- Giữ nguyên loại công việc cũ (Không thay đổi) --</option>
+                  <option value="Giao hàng và Lắp đặt">Giao hàng và Lắp đặt</option>
+                  <option value="Lắp đặt">Lắp đặt</option>
+                  <option value="Giao hàng">Giao hàng</option>
+                  <option value="Thay lọc">Thay lọc</option>
+                  <option value="Bảo hành">Bảo hành</option>
+                  <option value="Sửa chữa">Sửa chữa</option>
+                </select>
+              </div>
+
+              {/* Loại dịch vụ chi tiết */}
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-1">Loại dịch vụ chi tiết</label>
+                {['Giao hàng và Lắp đặt', 'Lắp đặt', 'Giao hàng', 'Thay lọc'].includes(bulkWorkType) ? (
+                  <input type="text" className="w-full border rounded p-2 text-sm outline-none bg-gray-50 text-gray-500" value="Công việc đã bao gồm dịch vụ" readOnly />
+                ) : (bulkWorkType === 'Bảo hành' || bulkWorkType === 'Sửa chữa') ? (
+                  <div className="relative">
+                    <input 
+                      type="text"
+                      className="w-full border rounded p-2 text-sm outline-none focus:border-blue-500 text-gray-800 bg-white"
+                      placeholder="Gõ để tìm kiếm & chọn dịch vụ..."
+                      value={bulkServiceType}
+                      onChange={e => setBulkServiceType(e.target.value)}
+                      onFocus={() => setShowBulkServiceDropdown(true)}
+                      onBlur={() => setTimeout(() => setShowBulkServiceDropdown(false), 200)}
+                    />
+                    <div className="absolute right-2 top-2.5 text-gray-400 pointer-events-none">
+                      <Search size={16} />
+                    </div>
+                    {showBulkServiceDropdown && (
+                      <div className="absolute left-0 right-0 z-50 mt-1 bg-white border border-gray-200 rounded-md shadow-lg max-h-60 overflow-y-auto text-left">
+                        {(() => {
+                          const options = bulkWorkType === 'Bảo hành' 
+                            ? Object.values(WARRANTY_SERVICE_GROUPS).flat() 
+                            : Object.values(REPAIR_SERVICE_GROUPS).flat();
+                          const query = removeAccents(bulkServiceType || '');
+                          const filteredOptions = options.filter(opt => 
+                            removeAccents(opt).includes(query)
+                          );
+
+                          if (filteredOptions.length === 0) {
+                            return <div className="px-3 py-2 text-sm text-gray-400 italic">Không tìm thấy dịch vụ nào</div>;
+                          }
+
+                          const groups = bulkWorkType === 'Bảo hành' ? WARRANTY_SERVICE_GROUPS : REPAIR_SERVICE_GROUPS;
+                          return Object.entries(groups).map(([groupName, services]) => {
+                            const matchingServices = services.filter(s => filteredOptions.includes(s));
+                            if (matchingServices.length === 0) return null;
+                            return (
+                              <div key={groupName} className="border-b border-gray-100 last:border-0">
+                                <div className="px-3 py-1 text-xs font-semibold text-gray-500 bg-gray-50">
+                                  {groupName}
+                                </div>
+                                <div className="divide-y divide-gray-50">
+                                  {matchingServices.map(s => (
+                                    <button
+                                      key={s}
+                                      type="button"
+                                      className="w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-700 transition-colors"
+                                      onClick={() => {
+                                        setBulkServiceType(s);
+                                        setShowBulkServiceDropdown(false);
+                                      }}
+                                    >
+                                      {s}
+                                    </button>
+                                  ))}
+                                </div>
+                              </div>
+                            );
+                          });
+                        })()}
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <input type="text" className="w-full border rounded p-2 text-sm outline-none bg-gray-50 text-gray-400" value="-- Vui lòng chọn loại công việc trước --" disabled />
+                )}
               </div>
 
               {/* Trạm chính */}
