@@ -2519,7 +2519,7 @@ export default function OrderList() {
                         {/* Báo cáo hoàn thành ca (dành cho đơn tự tạo thủ công của saler và đơn pancake của admin/coordinator - đơn pancake phải được phân bổ trước) */}
                         {!isViewOnlyStaff && order.adminStatus !== 'hoàn thành' && order.adminStatus !== 'hủy đơn' && (
                           (order.pancakeOrderId < 0 && (currentUser?.role !== 'SALER' || order.rawData?.creator?.id === currentUser?.id || order.rawData?.creator?.name === currentUser?.fullName)) ||
-                          (order.pancakeOrderId > 0 && order.adminStatus === 'đang thực hiện' && ['ADMIN', 'COORDINATOR', 'DEV'].includes(currentUser?.role || ''))
+                          (order.pancakeOrderId > 0 && order.adminStatus === 'đang thực hiện' && ['ADMIN', 'COORDINATOR', 'DEV', 'SALER'].includes(currentUser?.role || ''))
                         ) && (
                           <button
                             onClick={() => navigate('/ktv/report', { state: { order } })}
