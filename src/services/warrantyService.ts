@@ -10,6 +10,33 @@ export interface ActivationCustomerInfo {
 }
 
 /**
+ * Trích xuất thời gian bảo hành (số tháng) từ ghi chú/note.
+ * Nhận diện các mẫu: "bảo hành 24 tháng", "bh 12 thang", "BH 24T", "bh 2 năm", "bao hanh 1 nam", "bh 3n"
+ */
+export function extractWarrantyMonths(note: string | null | undefined): number | null {
+  if (!note) return null;
+  const normalized = note.toLowerCase().trim();
+
+  // 1. Matches "bảo hành X tháng", "bh X tháng", "bh Xt", "bh Xthang"
+  const monthRegex = /(?:bảo hành|bao hanh|bh)\s*(\d+)\s*(?:tháng|thang|t)(?:\s|$|[^a-z])/i;
+  const matchMonth = normalized.match(monthRegex);
+  if (matchMonth) {
+    const val = parseInt(matchMonth[1], 10);
+    if (val > 0 && val <= 120) return val;
+  }
+
+  // 2. Matches "bảo hành X năm", "bh X năm", "bh Xn", "bh Xnam"
+  const yearRegex = /(?:bảo hành|bao hanh|bh)\s*(\d+)\s*(?:năm|nam|n)(?:\s|$|[^a-z])/i;
+  const matchYear = normalized.match(yearRegex);
+  if (matchYear) {
+    const val = parseInt(matchYear[1], 10);
+    if (val > 0 && val <= 10) return val * 12;
+  }
+
+  return null;
+}
+
+/**
  * Kích hoạt hoặc chuyển trạng thái chờ duyệt bảo hành cho một số Serial
  * @param serialNumber Số serial cần kích hoạt
  * @param orderId ID đơn hàng liên kết (nếu có)
@@ -79,12 +106,42 @@ export async function activateSerialWarranty(
 
     // 1. Tính toán thời gian bảo hành tiêu chuẩn (mặc định 12 tháng)
     let standardMonths = 12;
-    const policies = await prisma.warrantyPolicy.findMany();
-    const matchedPolicy = policies.find((p: any) => 
-      existingSerial.model.toLowerCase().includes(p.modelKeyword.toLowerCase())
-    );
-    if (matchedPolicy) {
-      standardMonths = matchedPolicy.warrantyMonths;
+    let noteMonths: number | null = null;
+    let finalOrderId = orderId;
+    if (!finalOrderId && existingSerial.orderId) {
+      finalOrderId = existingSerial.orderId;
+    }
+
+    if (finalOrderId) {
+      const order = await prisma.order.findUnique({
+        where: { id: finalOrderId },
+        select: { note: true, rawData: true }
+      });
+      if (order) {
+        noteMonths = extractWarrantyMonths(order.note);
+        if (!noteMonths && order.rawData) {
+          let rawJson: any = order.rawData;
+          if (typeof rawJson === 'string') {
+            try { rawJson = JSON.parse(rawJson); } catch (e) {}
+          }
+          if (rawJson) {
+            noteMonths = extractWarrantyMonths(rawJson.note) || extractWarrantyMonths(rawJson.description) || extractWarrantyMonths(rawJson.customer_note);
+          }
+        }
+      }
+    }
+
+    if (noteMonths !== null) {
+      standardMonths = noteMonths;
+      logger.info(`Extracted custom standard warranty of ${standardMonths} months from order notes`, { serialNumber: cleanedSerial });
+    } else {
+      const policies = await prisma.warrantyPolicy.findMany();
+      const matchedPolicy = policies.find((p: any) => 
+        existingSerial.model.toLowerCase().includes(p.modelKeyword.toLowerCase())
+      );
+      if (matchedPolicy) {
+        standardMonths = matchedPolicy.warrantyMonths;
+      }
     }
 
     // 2. Tính toán thời gian khuyến mãi cộng thêm từ mã khuyến mãi của Đơn hàng hoặc mã truyền tay

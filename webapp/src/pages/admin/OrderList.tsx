@@ -6,7 +6,7 @@ import { WARRANTY_SERVICE_GROUPS, REPAIR_SERVICE_GROUPS, WORK_TYPE_SERVICES } fr
 import { useConfirm } from '../../context/ConfirmContext';
 import DateRangePicker from '../../components/DateRangePicker';
 import CategoryTreeSelect from '../../components/CategoryTreeSelect';
-import { formatOrderId } from '../../utils/text';
+import { formatOrderId, extractWarrantyMonths } from '../../utils/text';
 import { useAuth } from '../../context/AuthContext';
 
 
@@ -2489,6 +2489,19 @@ export default function OrderList() {
                       <div className="text-gray-700 text-[12px] italic whitespace-pre-wrap leading-relaxed">
                         {order.note || '-'}
                       </div>
+                      {(() => {
+                        const months = extractWarrantyMonths(order.note);
+                        if (months) {
+                          return (
+                            <div className="mt-1">
+                              <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-emerald-100 text-emerald-800 border border-emerald-200" title="Hệ thống tự động nhận diện thời gian bảo hành từ ghi chú">
+                                🛡️ BH {months} tháng (Nhận diện)
+                              </span>
+                            </div>
+                          );
+                        }
+                        return null;
+                      })()}
                     </td>
 
                     {/* 5. Thao tác */}
