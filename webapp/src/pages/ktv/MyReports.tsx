@@ -14,7 +14,11 @@ import {
   Tag, 
   FileText,
   BarChart3,
-  Edit
+  Edit,
+  CheckCircle,
+  Loader2,
+  Send,
+  X
 } from 'lucide-react';
 import PullToRefresh from '../../components/PullToRefresh';
 
@@ -45,6 +49,49 @@ export default function MyReports() {
 
   const [stats, setStats] = useState<any>(null);
   const [statsLoading, setStatsLoading] = useState(false);
+
+  // ── Kích hoạt bảo hành (ZNS) state ──
+  const [showActivationModal, setShowActivationModal] = useState(false);
+  const [activationData, setActivationData] = useState<any>(null);
+  const [znsPhone, setZnsPhone] = useState('');
+  const [znsSending, setZnsSending] = useState(false);
+  const [activationStep, setActivationStep] = useState(1);
+
+  const handleOpenActivation = (report: any) => {
+    setActivationData({
+      reportId: report.id,
+      serialNumber: report.serialNumber,
+      customerName: report.customerName,
+      customerPhone: report.customerPhone,
+      address: report.address || '',
+      model: report.products && report.products.length > 0 ? report.products[0] : 'Máy lọc nước Truliva',
+    });
+    setZnsPhone(report.customerPhone);
+    setActivationStep(1);
+    setShowActivationModal(true);
+  };
+
+  const handleSendZns = async () => {
+    if (!znsPhone.trim()) {
+      alert('Vui lòng nhập Số điện thoại nhận tin nhắn Zalo');
+      return;
+    }
+    setZnsSending(true);
+    try {
+      await fetchApi('/serials/zns-activate', {
+        method: 'POST',
+        body: JSON.stringify({
+          serialNumber: activationData.serialNumber,
+          recipientPhone: znsPhone.trim()
+        })
+      });
+      setActivationStep(2);
+    } catch (err: any) {
+      alert(err.message || 'Lỗi khi gửi yêu cầu kích hoạt ZNS.');
+    } finally {
+      setZnsSending(false);
+    }
+  };
 
   useEffect(() => {
     loadReports();
@@ -452,29 +499,40 @@ export default function MyReports() {
                   )}
 
                   {/* Action Buttons */}
-                  <div className="flex items-center gap-3 mt-3 pt-2.5 border-t border-gray-100">
-                    <button 
-                      type="button"
-                      onClick={() => navigate('/ktv/report', { state: { editReportId: r.id } })}
-                      className="flex-1 flex items-center justify-center gap-1.5 text-xs text-blue-600 hover:text-blue-700 font-bold py-2 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors border border-blue-100"
-                    >
-                      <Edit className="w-3.5 h-3.5" /> Sửa báo cáo
-                    </button>
-                    <button 
-                      type="button"
-                      onClick={() => toggleExpand(r.id)}
-                      className="flex-1 flex items-center justify-center gap-1.5 text-xs text-gray-500 hover:text-gray-700 font-bold py-2 bg-gray-50 hover:bg-gray-100 rounded-lg transition-colors border border-gray-200"
-                    >
-                      {isExpanded ? (
-                        <>
-                          Thu gọn <ChevronUp className="w-3.5 h-3.5" />
-                        </>
-                      ) : (
-                        <>
-                          Chi tiết <ChevronDown className="w-3.5 h-3.5" />
-                        </>
-                      )}
-                    </button>
+                  <div className="flex flex-col gap-2 mt-3 pt-2.5 border-t border-gray-100">
+                    {['lắp đặt', 'giao hàng và lắp đặt'].includes(r.workType?.trim().toLowerCase()) && r.serialNumber && r.serialNumber !== 'XXXXXXXXXXXXXXX' && (
+                      <button 
+                        type="button"
+                        onClick={() => handleOpenActivation(r)}
+                        className="w-full flex items-center justify-center gap-1.5 text-xs text-white bg-green-600 hover:bg-green-700 font-bold py-2 rounded-lg transition-colors border border-green-500"
+                      >
+                        <CheckCircle className="w-3.5 h-3.5" /> Kích hoạt bảo hành (ZNS)
+                      </button>
+                    )}
+                    <div className="flex items-center gap-3 w-full">
+                      <button 
+                        type="button"
+                        onClick={() => navigate('/ktv/report', { state: { editReportId: r.id } })}
+                        className="flex-1 flex items-center justify-center gap-1.5 text-xs text-blue-600 hover:text-blue-700 font-bold py-2 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors border border-blue-100"
+                      >
+                        <Edit className="w-3.5 h-3.5" /> Sửa báo cáo
+                      </button>
+                      <button 
+                        type="button"
+                        onClick={() => toggleExpand(r.id)}
+                        className="flex-1 flex items-center justify-center gap-1.5 text-xs text-gray-500 hover:text-gray-700 font-bold py-2 bg-gray-50 hover:bg-gray-100 rounded-lg transition-colors border border-gray-200"
+                      >
+                        {isExpanded ? (
+                          <>
+                            Thu gọn <ChevronUp className="w-3.5 h-3.5" />
+                          </>
+                        ) : (
+                          <>
+                            Chi tiết <ChevronDown className="w-3.5 h-3.5" />
+                          </>
+                        )}
+                      </button>
+                    </div>
                   </div>
                 </div>
               );
@@ -844,6 +902,135 @@ export default function MyReports() {
               )}
             </>
           )}
+        </div>
+      )}
+
+      {showActivationModal && activationData && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs">
+          <div className="bg-white rounded-2xl max-w-md w-full overflow-hidden shadow-2xl border border-gray-150 animate-slide-up">
+            {activationStep === 1 ? (
+              <>
+                {/* Step 1: Xác nhận thông tin gửi */}
+                <div className="p-5 border-b border-gray-100 flex justify-between items-center bg-gray-50">
+                  <div className="text-left">
+                    <h3 className="font-bold text-gray-800 text-base">Kích Hoạt Bảo Hành</h3>
+                    <p className="text-[11px] text-gray-500 mt-0.5">Xác nhận thông tin gửi tin nhắn Zalo ZNS</p>
+                  </div>
+                  <button 
+                    type="button" 
+                    onClick={() => setShowActivationModal(false)}
+                    className="p-1.5 rounded-lg hover:bg-gray-200 text-gray-400 hover:text-gray-600 transition-colors"
+                  >
+                    <X size={20} />
+                  </button>
+                </div>
+
+                <div className="p-5 overflow-y-auto max-h-[60vh] space-y-4 text-left">
+                  {/* Máy & Serial Card */}
+                  <div className="bg-blue-50/40 border border-blue-100/50 rounded-xl p-4 flex gap-3 items-start">
+                    <div className="bg-blue-100 p-2 rounded-lg text-blue-600">
+                      <CheckCircle size={20} />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <h4 className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Thiết bị lắp đặt</h4>
+                      <p className="text-sm font-bold text-gray-800 mt-0.5 truncate">{activationData.model}</p>
+                      <p className="text-xs font-mono text-blue-600 mt-1 bg-blue-50 inline-block px-2 py-0.5 rounded">
+                        S/N: {activationData.serialNumber}
+                      </p>
+                      <p className="text-[11px] text-gray-500 mt-2">
+                        ⏱️ Hạn bảo hành: <strong className="text-gray-700">12 tháng</strong> (Tính từ hôm báo cáo được duyệt)
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Khách hàng Card */}
+                  <div className="border border-gray-100 rounded-xl p-4 space-y-2.5 bg-white">
+                    <h4 className="text-[10px] font-bold text-gray-400 uppercase tracking-wider border-b border-gray-100 pb-1.5">Thông tin khách hàng</h4>
+                    
+                    <div className="grid grid-cols-3 gap-1.5 text-xs text-gray-600">
+                      <span className="font-medium text-gray-400">Họ tên:</span>
+                      <span className="col-span-2 font-semibold text-gray-800">{activationData.customerName}</span>
+                      
+                      <span className="font-medium text-gray-400">Địa chỉ:</span>
+                      <span className="col-span-2 text-gray-700 leading-relaxed truncate">{activationData.address}</span>
+                    </div>
+                  </div>
+
+                  {/* Gửi tin nhắn Input */}
+                  <div className="space-y-1.5 text-left">
+                    <label className="block text-xs font-bold text-gray-600 uppercase">Số điện thoại nhận tin Zalo</label>
+                    <input 
+                      type="tel" 
+                      className="form-input w-full font-semibold text-sm tracking-wider px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500"
+                      value={znsPhone}
+                      onChange={(e) => setZnsPhone(e.target.value)}
+                      placeholder="Nhập số điện thoại nhận ZNS..."
+                    />
+                    <p className="text-[10px] text-gray-400 leading-relaxed mt-1">
+                      ⚠️ KTV có thể thay đổi SĐT này nếu khách hàng dùng số Zalo khác SĐT đăng ký đơn hàng.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="p-4 bg-gray-50 border-t border-gray-100 flex gap-3">
+                  <button
+                    type="button"
+                    className="btn btn-outline flex-1 py-2 text-sm border border-gray-300 rounded-lg"
+                    onClick={() => { setShowActivationModal(false); }}
+                  >
+                    Để sau
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-primary flex-1 py-2 text-sm bg-blue-600 hover:bg-blue-700 text-white rounded-lg flex justify-center items-center gap-1.5"
+                    onClick={handleSendZns}
+                    disabled={znsSending}
+                  >
+                    {znsSending ? (
+                      <>
+                        <Loader2 size={16} className="animate-spin" /> Đang gửi...
+                      </>
+                    ) : (
+                      <>
+                        <Send size={16} /> Kích hoạt ZNS
+                      </>
+                    )}
+                  </button>
+                </div>
+              </>
+            ) : (
+              <>
+                {/* Step 2: Kích hoạt gửi thành công */}
+                <div className="p-6 text-center space-y-4">
+                  <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto text-green-600 shadow-sm">
+                    <CheckCircle size={36} />
+                  </div>
+                  
+                  <div className="space-y-1">
+                    <h3 className="font-bold text-gray-800 text-lg">Kích Hoạt Thành Công!</h3>
+                    <p className="text-xs text-gray-500 px-4 leading-relaxed">
+                      Bảo hành thiết bị đã được kích hoạt thành công trên hệ thống. Tin nhắn ZNS thông báo đã được gửi đến số Zalo:
+                    </p>
+                    <p className="text-base font-bold text-blue-600 tracking-wider mt-1">{znsPhone}</p>
+                  </div>
+
+                  <div className="bg-emerald-50 border border-emerald-100 rounded-xl p-3.5 text-left text-xs text-emerald-800 leading-relaxed max-w-sm mx-auto">
+                    💡 <strong>Thông tin gửi khách hàng:</strong> Khách hàng sẽ nhận được tin nhắn xác nhận bảo hành từ Zalo OA <strong>Pure Vita</strong>. Khách hàng không cần thực hiện thêm bất cứ thao tác xác nhận nào khác.
+                  </div>
+                </div>
+
+                <div className="p-4 bg-gray-50 border-t border-gray-100 flex gap-3">
+                  <button
+                    type="button"
+                    className="btn btn-primary flex-1 py-2 text-sm bg-blue-600 hover:bg-blue-700 text-white rounded-lg"
+                    onClick={() => { setShowActivationModal(false); loadReports(); }}
+                  >
+                    Đóng
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
         </div>
       )}
     </div>
