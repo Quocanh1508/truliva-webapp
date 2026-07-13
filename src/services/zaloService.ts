@@ -203,17 +203,22 @@ export async function sendZnsWarrantyActivation(serialNumber: string, recipientP
   const fnsSecretKey = process.env.FNS_SECRET_KEY || '';
 
   if (fnsAppId && fnsSecretKey) {
-    // Chuẩn bị dữ liệu gửi theo chuẩn FNS (gộp cả biến Zalo dài/rút gọn để tăng khả năng tương thích)
+    // Chuẩn bị dữ liệu gửi theo chuẩn FNS (gộp cả biến Tiếng Việt theo template 495107 của bạn)
     const fnsPayload = {
       phone: formattedPhone,
       template_id: templateId,
       template_data: {
+        // Biến tiếng Việt khớp chính xác với template 495107 của bạn
+        Ten_Khach_Hang: customerName,
+        Ten_San_Pham: productName,
+        So_Seri: cleanSerial,
+        Ngay_Het_Bao_Hanh: expiryDateStr,
+
+        // Các biến dự phòng định dạng tiếng Anh dài/rút gọn
         customer_name: customerName,
         product_name: productName,
         serial_number: cleanSerial,
         expiry_date: expiryDateStr,
-
-        // Định dạng rút gọn phòng trường hợp mẫu ZNS sử dụng tên biến ngắn
         customer: customerName,
         product: productName,
         serial: cleanSerial,
@@ -256,6 +261,11 @@ export async function sendZnsWarrantyActivation(serialNumber: string, recipientP
     phone: formattedPhone,
     template_id: templateId,
     template_data: {
+      Ten_Khach_Hang: customerName,
+      Ten_San_Pham: productName,
+      So_Seri: cleanSerial,
+      Ngay_Het_Bao_Hanh: expiryDateStr,
+
       customer_name: customerName,
       product_name: productName,
       serial_number: cleanSerial,
