@@ -1584,13 +1584,13 @@ export default function ReportForm() {
                     <div className="space-y-1">
                       <h3 className="font-bold text-gray-800 text-lg">Kích Hoạt Thành Công!</h3>
                       <p className="text-xs text-gray-500 px-4 leading-relaxed">
-                        Yêu cầu kích hoạt bảo hành đã được ghi nhận. Hệ thống đã gửi tin nhắn ZNS xác nhận đến số Zalo:
+                        Bảo hành thiết bị đã được kích hoạt thành công trên hệ thống. Tin nhắn ZNS thông báo đã được gửi đến số Zalo:
                       </p>
                       <p className="text-base font-bold text-blue-600 tracking-wider mt-1">{znsPhone}</p>
                     </div>
 
-                    <div className="bg-amber-50 border border-amber-100 rounded-xl p-3.5 text-left text-xs text-amber-800 leading-relaxed max-w-sm mx-auto">
-                      💡 <strong>Hướng dẫn Khách hàng:</strong> Hãy nhắc khách hàng kiểm tra tin nhắn từ Zalo OA <strong>Pure Vita</strong> và nhấn nút <strong>"Xác nhận KHBH"</strong> để hoàn tất quá trình bảo hành thiết bị.
+                    <div className="bg-emerald-50 border border-emerald-100 rounded-xl p-3.5 text-left text-xs text-emerald-800 leading-relaxed max-w-sm mx-auto">
+                      💡 <strong>Thông tin gửi khách hàng:</strong> Khách hàng sẽ nhận được tin nhắn xác nhận bảo hành từ Zalo OA <strong>Pure Vita</strong>. Khách hàng không cần thực hiện thêm bất cứ thao tác xác nhận nào khác.
                     </div>
                   </div>
 

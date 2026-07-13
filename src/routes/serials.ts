@@ -1579,7 +1579,7 @@ router.get('/zalo/status', requireCoordinatorOrAdmin, async (req: Request, res: 
  * POST /api/serials/zns-activate
  * API từ KTV App để kích hoạt bảo hành qua ZNS gửi tin nhắn đến số điện thoại khách hàng
  */
-router.post('/zns-activate', requireCoordinatorOrAdmin, async (req: Request, res: Response): Promise<void> => {
+router.post('/zns-activate', requireAuth, async (req: Request, res: Response): Promise<void> => {
   try {
     const { serialNumber, recipientPhone } = req.body;
     if (!serialNumber || !recipientPhone) {
@@ -1589,26 +1589,35 @@ router.post('/zns-activate', requireCoordinatorOrAdmin, async (req: Request, res
 
     const cleanSerial = serialNumber.trim().replace(/[^a-zA-Z0-9_]/g, '').toUpperCase();
     
-    // 1. Thực hiện gửi tin nhắn ZNS qua API
-    const znsResult = await sendZnsWarrantyActivation(cleanSerial, recipientPhone);
-
-    // 2. Chuyển trạng thái Serial sang "KH xác nhận" (chờ khách hàng click nút trong Zalo)
-    await prisma.serial.update({
-      where: { serialNumber: cleanSerial },
-      data: {
-        status: 'KH xác nhận',
-        customerPhone: recipientPhone.trim() // Cập nhật số Zalo nhận tin nhắn
-      }
+    // 1. Kích hoạt trực tiếp trạng thái Serial sang "Đã kích hoạt"
+    const existingSerial = await prisma.serial.findUnique({
+      where: { serialNumber: cleanSerial }
     });
+
+    await activateSerialWarranty(
+      cleanSerial,
+      existingSerial?.orderId || null,
+      {
+        customerName: existingSerial?.customerName,
+        customerPhone: recipientPhone.trim(),
+        address: existingSerial?.address,
+        province: existingSerial?.province
+      },
+      'KTV',
+      'Đã kích hoạt'
+    );
+
+    // 2. Thực hiện gửi tin nhắn ZNS qua API thông báo kích hoạt thành công
+    const znsResult = await sendZnsWarrantyActivation(cleanSerial, recipientPhone);
 
     res.json({
       success: true,
-      message: 'Gửi tin nhắn kích hoạt bảo hành qua Zalo ZNS thành công!',
+      message: 'Kích hoạt bảo hành và gửi tin nhắn Zalo ZNS thành công!',
       znsResult
     });
   } catch (error: any) {
     logger.error('ZNS activation route error', { error: error.message });
-    res.status(500).json({ error: error.message || 'Lỗi hệ thống khi gửi tin nhắn kích hoạt ZNS' });
+    res.status(500).json({ error: error.message || 'Lỗi hệ thống khi kích hoạt ZNS' });
   }
 });
 
