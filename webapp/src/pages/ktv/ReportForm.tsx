@@ -751,7 +751,22 @@ export default function ReportForm() {
         if (user?.role !== 'KTV') {
           navigate('/admin/orders');
         } else {
-          navigate('/ktv/my-reports');
+          const isInstallJob = ['lắp đặt', 'giao hàng và lắp đặt'].includes(payload.workType?.trim().toLowerCase());
+          if (isInstallJob) {
+            setActivationData({
+              serialNumber: payload.serialNumber,
+              customerName: payload.customerName,
+              customerPhone: payload.customerPhone,
+              address: payload.address,
+              model: selectedItems.length > 0 ? selectedItems[0].productName : 'Máy lọc nước Truliva',
+            });
+            setZnsPhone(payload.customerPhone);
+            setActivationStep(1);
+            setShowActivationModal(true);
+            setLoading(false);
+          } else {
+            navigate('/ktv/my-reports');
+          }
         }
         return;
       }
