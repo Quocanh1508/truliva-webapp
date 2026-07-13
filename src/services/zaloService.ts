@@ -198,10 +198,60 @@ export async function sendZnsWarrantyActivation(serialNumber: string, recipientP
     ? new Date(serial.warrantyExpiryDate).toLocaleDateString('vi-VN')
     : new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toLocaleDateString('vi-VN');
 
-  // 2. Lấy Access Token hợp lệ
+  // 2. Kiểm tra nếu có cấu hình cổng FNS (FPT Notification Service)
+  const fnsAppId = process.env.FNS_APP_ID || '';
+  const fnsSecretKey = process.env.FNS_SECRET_KEY || '';
+
+  if (fnsAppId && fnsSecretKey) {
+    // Chuẩn bị dữ liệu gửi theo chuẩn FNS (gộp cả biến Zalo dài/rút gọn để tăng khả năng tương thích)
+    const fnsPayload = {
+      phone: formattedPhone,
+      template_id: templateId,
+      template_data: {
+        customer_name: customerName,
+        product_name: productName,
+        serial_number: cleanSerial,
+        expiry_date: expiryDateStr,
+
+        // Định dạng rút gọn phòng trường hợp mẫu ZNS sử dụng tên biến ngắn
+        customer: customerName,
+        product: productName,
+        serial: cleanSerial,
+        expiry: expiryDateStr,
+        phone: recipientPhone.trim(),
+        address: serial.address || ''
+      },
+      ref_id: `${cleanSerial}-${Date.now()}`
+    };
+
+    logger.info('Sending ZNS warranty activation message via FNS API', { phone: formattedPhone, templateId, fnsAppId });
+
+    try {
+      const response = await axios.post('https://api-fns.fpt.work/api/send-message', fnsPayload, {
+        headers: {
+          'Content-Type': 'application/json',
+          'app-id': fnsAppId,
+          'secret-key': fnsSecretKey
+        }
+      });
+
+      const data = response.data;
+      if (data.code !== 1) {
+        throw new Error(`FNS Send Error: ${data.message} (Code: ${data.code})`);
+      }
+
+      logger.info('ZNS message sent successfully via FNS API', { refId: fnsPayload.ref_id, messageId: data.data?.message_id });
+      return data;
+    } catch (error: any) {
+      logger.error('Error sending ZNS message via FNS API', { error: error.message, details: error.response?.data });
+      throw new Error(`Gửi ZNS qua FNS thất bại: ${error.message}`);
+    }
+  }
+
+  // 3. Fallback: Lấy Access Token hợp lệ của Zalo trực tiếp nếu không dùng FNS
   const accessToken = await getValidAccessToken();
 
-  // 3. Chuẩn bị dữ liệu gửi (Template parameters)
+  // 4. Chuẩn bị dữ liệu gửi (Zalo OpenAPI)
   const payload = {
     phone: formattedPhone,
     template_id: templateId,
@@ -214,7 +264,7 @@ export async function sendZnsWarrantyActivation(serialNumber: string, recipientP
     tracking_id: `${cleanSerial}-${Date.now()}`
   };
 
-  logger.info('Sending ZNS warranty activation message', { phone: formattedPhone, templateId });
+  logger.info('Sending ZNS warranty activation message via Zalo Direct API', { phone: formattedPhone, templateId });
 
   try {
     const response = await axios.post('https://business.openapi.zalo.me/message/template', payload, {
@@ -229,10 +279,10 @@ export async function sendZnsWarrantyActivation(serialNumber: string, recipientP
       throw new Error(`Zalo ZNS Send Error: ${data.message} (Code: ${data.error})`);
     }
 
-    logger.info('ZNS message sent successfully', { trackingId: payload.tracking_id, messageId: data.data?.message_id });
+    logger.info('ZNS message sent successfully via Zalo Direct API', { trackingId: payload.tracking_id, messageId: data.data?.message_id });
     return data;
   } catch (error: any) {
-    logger.error('Error sending ZNS message via Zalo API', { error: error.message, details: error.response?.data });
+    logger.error('Error sending ZNS message via Zalo Direct API', { error: error.message, details: error.response?.data });
     throw error;
   }
 }
