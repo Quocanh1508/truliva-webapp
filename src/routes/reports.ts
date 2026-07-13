@@ -505,6 +505,35 @@ router.post('/', async (req: Request, res: Response): Promise<void> => {
     const targetKtvUserId = isKtv ? req.user!.id : (assignedKtvId || req.user!.id);
     const reportedById = req.user!.id;
 
+    // ── Kiểm tra điều kiện bắt buộc & tính hợp lệ của Serial ──
+    const serviceTypeClean = (serviceType || '').trim().toLowerCase();
+    const workTypeClean = (workType || oldOrder?.workType || '').trim().toLowerCase();
+
+    const isSurveyInRepair = workTypeClean === 'sửa chữa' && serviceTypeClean.includes('khảo sát vị trí');
+    const isDeliveryOnly = workTypeClean === 'giao hàng';
+    const requiresSerial = !isSurveyInRepair && !isDeliveryOnly;
+
+    let cleanedSn: string | null = null;
+    if (serialNumber) {
+      cleanedSn = serialNumber.replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
+    }
+
+    if (requiresSerial) {
+      if (!cleanedSn) {
+        res.status(400).json({ error: 'Loại công việc/dịch vụ này bắt buộc phải nhập số Serial thiết bị.' });
+        return;
+      }
+      if (cleanedSn !== 'XXXXXXXXXXXXXXX') {
+        const serialRecord = await prisma.serial.findUnique({
+          where: { serialNumber: cleanedSn }
+        });
+        if (!serialRecord) {
+          res.status(400).json({ error: 'Số Serial này không tồn tại trên hệ thống. Vui lòng kiểm tra lại hoặc liên hệ Admin để khai báo trước khi đóng ca.' });
+          return;
+        }
+      }
+    }
+
     const report = await prisma.serviceReport.create({
       data: {
         month: reportMonth,
@@ -517,7 +546,7 @@ router.post('/', async (req: Request, res: Response): Promise<void> => {
         serviceType: serviceType || 'N/A',
         imageUrls: imageUrls || [],
         notes: notes || null,
-        serialNumber: serialNumber ? serialNumber.replace(/[^a-zA-Z0-9]/g, '').toUpperCase() : null,
+        serialNumber: cleanedSn,
         distanceKm: (distanceKm !== undefined && distanceKm !== null && distanceKm !== '') ? parseFloat(distanceKm) : null,
         serviceCost: (serviceCost !== undefined && serviceCost !== null && serviceCost !== '') ? parseFloat(serviceCost) : null,
         additionalCost: (additionalCost !== undefined && additionalCost !== null && additionalCost !== '') ? parseFloat(additionalCost) : null,
@@ -542,15 +571,27 @@ router.post('/', async (req: Request, res: Response): Promise<void> => {
     });
 
     // ── Đối chiếu ngược: Cập nhật bảng Serial khi báo cáo có serialNumber ──
-    if (report.serialNumber) {
+    if (report.serialNumber && report.serialNumber !== 'XXXXXXXXXXXXXXX') {
       try {
-        await syncSerialFromReport(
-          report.serialNumber,
-          orderId || null,
-          { customerName, customerPhone, address, province }
-        );
+        if (report.approvalStatus === 'APPROVED') {
+          // Kích hoạt ngay lập tức nếu báo cáo được duyệt tự động
+          await activateSerialWarranty(
+            report.serialNumber,
+            orderId || null,
+            { customerName, customerPhone, address, province },
+            'KTV',
+            'Đã kích hoạt'
+          );
+        } else {
+          // Nếu báo cáo PENDING (chờ duyệt), chỉ cập nhật thông tin khách hàng và liên kết order
+          await syncSerialFromReport(
+            report.serialNumber,
+            orderId || null,
+            { customerName, customerPhone, address, province }
+          );
+        }
       } catch (serialErr: any) {
-        logger.error('Lỗi đối chiếu hoặc đồng bộ serial khi tạo báo cáo', { error: serialErr.message, serialNumber: report.serialNumber });
+        logger.error('Lỗi đối chiếu hoặc kích hoạt/đồng bộ serial khi tạo báo cáo', { error: serialErr.message, serialNumber: report.serialNumber });
       }
     }
 
@@ -1631,6 +1672,39 @@ router.put('/:id', requireAuth, async (req: Request, res: Response): Promise<voi
       finalSpareParts = parsedSpareParts;
     }
 
+    // ── Kiểm tra điều kiện bắt buộc & tính hợp lệ của Serial khi sửa báo cáo ──
+    const targetServiceType = serviceType !== undefined ? serviceType : existingReport.serviceType;
+    const targetWorkType = workType !== undefined ? workType : (existingReport.workType || '');
+    const targetSerialNumber = serialNumber !== undefined ? serialNumber : existingReport.serialNumber;
+
+    const serviceTypeClean = (targetServiceType || '').trim().toLowerCase();
+    const workTypeClean = (targetWorkType || '').trim().toLowerCase();
+
+    const isSurveyInRepair = workTypeClean === 'sửa chữa' && serviceTypeClean.includes('khảo sát vị trí');
+    const isDeliveryOnly = workTypeClean === 'giao hàng';
+    const requiresSerial = !isSurveyInRepair && !isDeliveryOnly;
+
+    let cleanedSn: string | null = null;
+    if (targetSerialNumber) {
+      cleanedSn = targetSerialNumber.replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
+    }
+
+    if (requiresSerial) {
+      if (!cleanedSn) {
+        res.status(400).json({ error: 'Loại công việc/dịch vụ này bắt buộc phải nhập số Serial thiết bị.' });
+        return;
+      }
+      if (cleanedSn !== 'XXXXXXXXXXXXXXX') {
+        const serialRecord = await prisma.serial.findUnique({
+          where: { serialNumber: cleanedSn }
+        });
+        if (!serialRecord) {
+          res.status(400).json({ error: 'Số Serial này không tồn tại trên hệ thống. Vui lòng kiểm tra lại hoặc liên hệ Admin để khai báo trước khi đóng ca.' });
+          return;
+        }
+      }
+    }
+
     const updateData: any = {};
     if (isPaid !== undefined) updateData.isPaid = isPaid;
     if (serviceCost !== undefined) updateData.serviceCost = parseFloat(serviceCost);
@@ -1648,7 +1722,7 @@ router.put('/:id', requireAuth, async (req: Request, res: Response): Promise<voi
     if (actualAmount !== undefined) updateData.actualAmount = actualAmount !== null && actualAmount !== '' ? parseFloat(actualAmount) : null;
 
     // ── Trường kỹ thuật ──
-    if (serialNumber !== undefined) updateData.serialNumber = serialNumber ? serialNumber.replace(/[^a-zA-Z0-9]/g, '').toUpperCase() : null;
+    if (serialNumber !== undefined) updateData.serialNumber = cleanedSn;
     if (distanceKm !== undefined) updateData.distanceKm = distanceKm !== null && distanceKm !== '' ? parseFloat(distanceKm) : null;
     if (waterSource !== undefined) updateData.waterSource = waterSource || null;
     if (tdsIn !== undefined) updateData.tdsIn = tdsIn !== null && tdsIn !== '' ? parseFloat(tdsIn) : null;
@@ -1668,20 +1742,35 @@ router.put('/:id', requireAuth, async (req: Request, res: Response): Promise<voi
     });
 
     // ── Đối chiếu ngược: Cập nhật bảng Serial khi cập nhật báo cáo có serialNumber ──
-    if (report.serialNumber) {
+    if (report.serialNumber && report.serialNumber !== 'XXXXXXXXXXXXXXX') {
       try {
-        await syncSerialFromReport(
-          report.serialNumber,
-          report.orderId || null,
-          {
-            customerName: report.customerName,
-            customerPhone: report.customerPhone,
-            address: report.address,
-            province: report.province
-          }
-        );
+        if (report.approvalStatus === 'APPROVED') {
+          await activateSerialWarranty(
+            report.serialNumber,
+            report.orderId || null,
+            {
+              customerName: report.customerName,
+              customerPhone: report.customerPhone,
+              address: report.address,
+              province: report.province
+            },
+            'KTV',
+            'Đã kích hoạt'
+          );
+        } else {
+          await syncSerialFromReport(
+            report.serialNumber,
+            report.orderId || null,
+            {
+              customerName: report.customerName,
+              customerPhone: report.customerPhone,
+              address: report.address,
+              province: report.province
+            }
+          );
+        }
       } catch (serialErr: any) {
-        logger.error('Lỗi đối chiếu hoặc đồng bộ serial khi cập nhật báo cáo', { error: serialErr.message, serialNumber: report.serialNumber });
+        logger.error('Lỗi đối chiếu hoặc kích hoạt/đồng bộ serial khi cập nhật báo cáo', { error: serialErr.message, serialNumber: report.serialNumber });
       }
     }
 
@@ -2290,6 +2379,33 @@ router.post('/:id/approve', async (req: Request, res: Response): Promise<void> =
           userName: req.user!.fullName,
         }
       });
+    }
+
+    // ── Kích hoạt bảo hành cho Serial khi duyệt báo cáo thành công ──
+    if (report.serialNumber) {
+      const cleanedSn = report.serialNumber.replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
+      if (cleanedSn !== 'XXXXXXXXXXXXXXX') {
+        try {
+          await activateSerialWarranty(
+            report.serialNumber,
+            report.orderId || null,
+            {
+              customerName: report.customerName,
+              customerPhone: report.customerPhone,
+              address: report.address,
+              province: report.province,
+            },
+            'KTV',
+            'Đã kích hoạt'
+          );
+        } catch (serialErr: any) {
+          logger.error('Lỗi tự động kích hoạt bảo hành khi duyệt báo cáo', {
+            error: serialErr.message,
+            serialNumber: report.serialNumber,
+            reportId: report.id
+          });
+        }
+      }
     }
 
     // 2. Gửi thông báo đến KTV báo cáo thành công

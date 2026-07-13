@@ -1,13 +1,14 @@
 import { Router, Request, Response } from 'express';
 import multer from 'multer';
 import ExcelJS from 'exceljs';
+import XLSX from 'xlsx';
 import { v4 as uuidv4 } from 'uuid';
 import { v2 as cloudinary } from 'cloudinary';
 import { CloudinaryStorage } from 'multer-storage-cloudinary';
 import prisma from '../config/database';
 import logger from '../utils/logger';
 import { requireAuth, requireCoordinatorOrAdmin } from '../middleware/authSession';
-import { activateSerialWarranty } from '../services/warrantyService';
+import { activateSerialWarranty, extractWarrantyMonths } from '../services/warrantyService';
 
 // Cấu hình Cloudinary cho hóa đơn
 cloudinary.config({
@@ -280,6 +281,7 @@ router.get('/', requireCoordinatorOrAdmin, async (req: Request, res: Response): 
     const search = (req.query.search as string || '').trim();
     const status = req.query.status as string || '';
     const modelFilter = req.query.model as string || '';
+    const batchFilter = req.query.batch as string || '';
 
     const where: any = {};
 
@@ -300,6 +302,11 @@ router.get('/', requireCoordinatorOrAdmin, async (req: Request, res: Response): 
     // Lọc theo model máy
     if (modelFilter) {
       where.model = { contains: modelFilter, mode: 'insensitive' };
+    }
+
+    // Lọc theo lô import
+    if (batchFilter) {
+      where.importBatchId = batchFilter;
     }
 
     const [serials, total] = await Promise.all([
@@ -351,6 +358,112 @@ router.get('/', requireCoordinatorOrAdmin, async (req: Request, res: Response): 
 });
 
 // ══════════════════════════════════════
+//  GET /api/serials/batches - Lấy danh sách các lô import
+// ══════════════════════════════════════
+router.get('/batches', requireCoordinatorOrAdmin, async (req: Request, res: Response): Promise<void> => {
+  try {
+    const batches = await prisma.serial.groupBy({
+      by: ['importBatchId'],
+      where: {
+        importBatchId: {
+          not: null,
+          startsWith: 'Lô '
+        }
+      },
+      _count: {
+        _all: true
+      }
+    });
+
+    const formatted = batches.map(b => ({
+      batchId: b.importBatchId,
+      count: b._count._all
+    })).sort((a, b) => String(b.batchId).localeCompare(String(a.batchId)));
+
+    res.json({ success: true, batches: formatted });
+  } catch (error: any) {
+    logger.error('Lỗi lấy danh sách lô serial', { error: error.message });
+    res.status(500).json({ error: 'Lỗi hệ thống khi lấy danh sách lô' });
+  }
+});
+
+// ══════════════════════════════════════
+//  POST /api/serials/rollback - Revert lô import (Ctrl+Z)
+// ══════════════════════════════════════
+router.post('/rollback', requireCoordinatorOrAdmin, async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { batchId } = req.body;
+    if (!batchId) {
+      res.status(400).json({ error: 'Vui lòng cung cấp mã Lô cần rollback' });
+      return;
+    }
+
+    // Tìm lịch sử import của lô này trong AuditLog
+    const auditLog = await prisma.auditLog.findFirst({
+      where: {
+        entityType: 'Serial',
+        entityId: batchId,
+        action: 'import_batch'
+      }
+    });
+
+    if (!auditLog) {
+      res.status(400).json({ error: 'Không tìm thấy lịch sử import của Lô này hoặc không thể rollback' });
+      return;
+    }
+
+    const changes = auditLog.changes as any;
+    if (!changes) {
+      res.status(400).json({ error: 'Dữ liệu rollback không hợp lệ' });
+      return;
+    }
+
+    let deletedCount = 0;
+    let revertedCount = 0;
+
+    // 1. Xóa các serial mới được tạo trong lô này
+    if (changes.newSerialNumbers && changes.newSerialNumbers.length > 0) {
+      const deleteResult = await prisma.serial.deleteMany({
+        where: {
+          serialNumber: { in: changes.newSerialNumbers }
+        }
+      });
+      deletedCount = deleteResult.count;
+    }
+
+    // 2. Khôi phục lại trạng thái cũ cho các serial bị ghi đè/cập nhật
+    if (changes.updatedSerials && changes.updatedSerials.length > 0) {
+      for (const item of changes.updatedSerials) {
+        await prisma.serial.update({
+          where: { id: item.id },
+          data: item.before
+        });
+        revertedCount++;
+      }
+    }
+
+    // Xóa audit log sau khi đã rollback để tránh bấm rollback nhiều lần
+    await prisma.auditLog.delete({
+      where: { id: auditLog.id }
+    });
+
+    logger.info(`Rollback batch success`, { batchId, deletedCount, revertedCount });
+
+    res.json({
+      success: true,
+      message: `Rollback thành công Lô ${batchId}. Đã xóa ${deletedCount} serial mới tạo và khôi phục ${revertedCount} serial cập nhật.`,
+      summary: {
+        deletedCount,
+        revertedCount
+      }
+    });
+  } catch (error: any) {
+    logger.error('Lỗi rollback lô serial', { error: error.message });
+    res.status(500).json({ error: 'Lỗi hệ thống khi rollback lô serial' });
+  }
+});
+
+// ══════════════════════════════════════
 //  POST /api/serials/import - Import Excel
 // ══════════════════════════════════════
 
@@ -373,20 +486,51 @@ router.post('/import', requireCoordinatorOrAdmin, (req, res, next) => {
       return;
     }
 
-    const workbook = new ExcelJS.Workbook();
-    await workbook.xlsx.load(req.file.buffer as any);
-
-    // Tìm sheet "Data" hoặc dùng sheet đầu tiên
-    let worksheet = workbook.getWorksheet('Data');
-    if (!worksheet) {
-      worksheet = workbook.worksheets[0];
-    }
-    if (!worksheet) {
-      res.status(400).json({ error: 'File Excel không có sheet dữ liệu' });
+    // Sử dụng SheetJS (xlsx) để đọc cả file .xls và .xlsx
+    let workbook: XLSX.WorkBook;
+    try {
+      workbook = XLSX.read(req.file.buffer, { type: 'buffer', cellDates: true });
+    } catch (readErr: any) {
+      res.status(400).json({ error: `Không thể đọc file Excel: ${readErr.message}` });
       return;
     }
 
-    const batchId = uuidv4();
+    const sheetName = workbook.SheetNames[0];
+    if (!sheetName) {
+      res.status(400).json({ error: 'File Excel không có sheet dữ liệu nào' });
+      return;
+    }
+    const worksheet = workbook.Sheets[sheetName];
+    const rawRows = XLSX.utils.sheet_to_json(worksheet, { header: 1, defval: '' }) as any[][];
+
+    if (rawRows.length <= 1) {
+      res.status(400).json({ error: 'File Excel không có dữ liệu để import' });
+      return;
+    }
+
+    // Tính số lô tiếp theo (ví dụ: Lô 0001, Lô 0002)
+    let nextLotNum = 1;
+    const lastSerialWithLot = await prisma.serial.findFirst({
+      where: {
+        importBatchId: {
+          startsWith: 'Lô '
+        }
+      },
+      orderBy: {
+        createdAt: 'desc'
+      },
+      select: {
+        importBatchId: true
+      }
+    });
+
+    if (lastSerialWithLot && lastSerialWithLot.importBatchId) {
+      const match = lastSerialWithLot.importBatchId.match(/\d+/);
+      if (match) {
+        nextLotNum = parseInt(match[0], 10) + 1;
+      }
+    }
+    const batchId = `Lô ${String(nextLotNum).padStart(4, '0')}`;
     const userId = req.user!.id;
 
     let totalRowsProcessed = 0;
@@ -395,163 +539,383 @@ router.post('/import', requireCoordinatorOrAdmin, (req, res, next) => {
     let errorCount = 0;
     const errors: Array<{ row: number; error: string }> = [];
 
-    // Header ở dòng 1, dữ liệu bắt đầu từ dòng 2
-    // Cột theo template:
-    // 1: Serial *
-    // 2: Model *
-    // 3: Trạng thái
-    // 4: Ngày kích hoạt (dd/MM/yyyy HH:mm:ss)
-    // 5: Ngày hết hạn bảo hành (dd/MM/yyyy HH:mm:ss)
-    // 6: Ngày khách hàng xác nhận (dd/MM/yyyy HH:mm:ss)
-    // 7: Tên khách hàng
-    // 8: SĐT khách hàng
-    // 9: Địa chỉ
-    // 10: Tỉnh/Thành phố
+    // 1. Nhận diện các cột động từ Header ở dòng 1
+    const headerRow = rawRows[0] || [];
+    let productCodeColIdx = -1;
+    let modelColIdx = -1;
+    let deliveryDateColIdx = -1;
+    let serialColIdx = -1;
+    let isNewFormat = false;
 
-    // Lấy tất cả serial hiện có trong DB để check trùng nhanh (batch query)
-    const existingSerials = await prisma.serial.findMany({
-      select: { serialNumber: true },
+    headerRow.forEach((val: any, idx: number) => {
+      const str = String(val || '').toLowerCase().trim();
+      if (str.includes('product code') || str === 'mã sp' || str === 'mã sản phẩm' || str === 'productcode') {
+        productCodeColIdx = idx;
+        isNewFormat = true;
+      } else if (str.includes('serial') || str === 'số máy' || str === 'số serial') {
+        serialColIdx = idx;
+      } else if (str.includes('model') || str === 'dòng máy') {
+        modelColIdx = idx;
+      } else if (str.includes('delivery date') || str === 'ngày giao' || str === 'ngày xuất' || str === 'deliverydate') {
+        deliveryDateColIdx = idx;
+        isNewFormat = true;
+      }
     });
-    const existingSet = new Set(existingSerials.map(s => s.serialNumber));
 
-    // Chuẩn bị batch insert
-    const newSerials: any[] = [];
+    // Fallback nếu có 4 cột nhưng tên cột không chính xác hoàn toàn
+    if (!isNewFormat && headerRow.length === 4) {
+      productCodeColIdx = 0;
+      modelColIdx = 1;
+      deliveryDateColIdx = 2;
+      serialColIdx = 3;
+      isNewFormat = true;
+    }
 
-    worksheet.eachRow({ includeEmpty: false }, (row, rowNumber) => {
-      if (rowNumber === 1) return; // Bỏ qua header
+    // Nạp toàn bộ danh mục sản phẩm từ DB để đối chiếu product code lấy tên sp trên POS
+    const dbProducts = await prisma.product.findMany({ select: { sku: true, name: true } });
+    const productMap = new Map<string, string>();
+    for (const p of dbProducts) {
+      if (p.sku) {
+        productMap.set(p.sku.trim().toLowerCase(), p.name);
+      }
+    }
 
-      totalRowsProcessed++;
+    // Nạp các chính sách bảo hành tiêu chuẩn từ DB
+    const policies = await prisma.warrantyPolicy.findMany();
 
-      const rawSerial = getCellText(row.getCell(1));
-      const rawModel = getCellText(row.getCell(2));
+    // Thu thập danh sách serial thô để truy vấn hàng loạt (batch query)
+    const rawDataRows = rawRows.slice(1);
+    const cleanedSerialsInBatch: string[] = [];
+    const rowMappings: Array<{
+      rowNumber: number;
+      rawSerial: string;
+      cleanedSerial: string;
+      rawModel: string;
+      rawProductCode: string;
+      rawDeliveryDateVal: any;
+      rawData: Record<string, any>;
+    }> = [];
 
-      // Validation: Serial và Model bắt buộc
+    rawDataRows.forEach((row, idx) => {
+      const rowNumber = idx + 2; // Dòng excel thực tế (1-indexed, bỏ qua header)
+      if (row.length === 0 || row.every(cell => cell === '')) return; // Bỏ qua dòng trống hoàn toàn
+
+      let rawSerial = '';
+      let rawModel = '';
+      let rawProductCode = '';
+      let rawDeliveryDateVal: any = null;
+
+      if (isNewFormat) {
+        rawSerial = serialColIdx !== -1 && row[serialColIdx] !== undefined ? String(row[serialColIdx]) : '';
+        rawModel = modelColIdx !== -1 && row[modelColIdx] !== undefined ? String(row[modelColIdx]) : '';
+        rawProductCode = productCodeColIdx !== -1 && row[productCodeColIdx] !== undefined ? String(row[productCodeColIdx]) : '';
+        rawDeliveryDateVal = deliveryDateColIdx !== -1 && row[deliveryDateColIdx] !== undefined ? row[deliveryDateColIdx] : null;
+      } else {
+        // Định dạng cũ (10 cột)
+        rawSerial = row[0] !== undefined ? String(row[0]) : '';
+        rawModel = row[1] !== undefined ? String(row[1]) : '';
+      }
+
       if (!rawSerial) {
         errorCount++;
-        errors.push({ row: rowNumber, error: 'Thiếu số Serial (cột 1)' });
-        return;
-      }
-      if (!rawModel) {
-        errorCount++;
-        errors.push({ row: rowNumber, error: 'Thiếu Model máy (cột 2)' });
+        errors.push({ row: rowNumber, error: 'Thiếu số Serial' });
         return;
       }
 
-      const cleanedSerial = cleanSerialNumber(rawSerial);
+      const cleanedSerial = rawSerial.trim().replace(/[^a-zA-Z0-9_]/g, '').toUpperCase();
       if (!cleanedSerial) {
         errorCount++;
         errors.push({ row: rowNumber, error: `Số Serial không hợp lệ: "${rawSerial}"` });
         return;
       }
 
-      // Kiểm tra trùng
-      if (existingSet.has(cleanedSerial)) {
-        skippedCount++;
-        return;
-      }
-
-      // Kiểm tra trùng trong batch hiện tại
-      if (newSerials.some(s => s.serialNumber === cleanedSerial)) {
-        skippedCount++;
-        return;
-      }
-
-      const statusVal = getCellText(row.getCell(3)) || 'Chưa kích hoạt';
-      const activationDate = parseExcelDate(row.getCell(4).value);
-      const warrantyExpiryDate = parseExcelDate(row.getCell(5).value);
-      const customerConfirmationDate = parseExcelDate(row.getCell(6).value);
-      const customerName = getCellText(row.getCell(7)) || null;
-      const customerPhone = getCellText(row.getCell(8)) || null;
-      const address = getCellText(row.getCell(9)) || null;
-      const province = getCellText(row.getCell(10)) || null;
-
-      // Lưu raw data
+      // Lưu thông tin thô của dòng
       const rawData: Record<string, any> = {};
-      row.eachCell({ includeEmpty: false }, (cell, colNumber) => {
-        rawData[`col_${colNumber}`] = getCellText(cell);
+      row.forEach((cellVal, colIdx) => {
+        rawData[`col_${colIdx + 1}`] = cellVal !== undefined && cellVal !== null ? String(cellVal) : '';
       });
 
-      newSerials.push({
-        serialNumber: cleanedSerial,
-        model: rawModel.trim(),
-        status: statusVal,
-        activationDate,
-        warrantyExpiryDate,
-        customerConfirmationDate,
-        customerName,
-        customerPhone,
-        address,
-        province,
-        importBatchId: batchId,
-        importedById: userId,
-        rawData,
+      cleanedSerialsInBatch.push(cleanedSerial);
+      rowMappings.push({
+        rowNumber,
+        rawSerial,
+        cleanedSerial,
+        rawModel,
+        rawProductCode,
+        rawDeliveryDateVal,
+        rawData
       });
     });
 
-    // Đối chiếu ngược với ServiceReport cũ trước khi insert
-    if (newSerials.length > 0) {
-      const serialNumbers = newSerials.map(s => s.serialNumber);
+    // Truy vấn hàng loạt các Báo cáo hoàn thành ca (ServiceReport) và Đơn hàng tương ứng của list serial này
+    const dbReports = await prisma.serviceReport.findMany({
+      where: {
+        serialNumber: { in: cleanedSerialsInBatch }
+      },
+      include: {
+        order: true
+      },
+      orderBy: { createdAt: 'asc' } // Ưu tiên báo cáo đầu tiên
+    });
 
-      // Tìm báo cáo lắp đặt có serial trùng
-      const matchingReports = await prisma.serviceReport.findMany({
-        where: {
-          serialNumber: { in: serialNumbers },
-          workType: { in: ['Lắp đặt', 'Giao hàng và Lắp đặt'] },
-        },
-        orderBy: { createdAt: 'asc' },
-      });
-
-      // Tạo map serial -> report (lấy report đầu tiên)
-      const reportMap = new Map<string, any>();
-      for (const report of matchingReports) {
-        const cleanSn = (report.serialNumber || '').replace(/[^a-zA-Z0-9_]/g, '').toUpperCase();
+    const reportMap = new Map<string, any>();
+    for (const rep of dbReports) {
+      if (rep.serialNumber) {
+        const cleanSn = rep.serialNumber.trim().replace(/[^a-zA-Z0-9_]/g, '').toUpperCase();
         if (!reportMap.has(cleanSn)) {
-          reportMap.set(cleanSn, report);
+          reportMap.set(cleanSn, rep);
         }
       }
-
-      // Auto-fill thông tin từ báo cáo nếu Excel không có
-      for (const serial of newSerials) {
-        const matchedReport = reportMap.get(serial.serialNumber);
-        if (matchedReport) {
-          if (!serial.customerName && matchedReport.customerName) {
-            serial.customerName = matchedReport.customerName;
-          }
-          if (!serial.customerPhone && matchedReport.customerPhone) {
-            serial.customerPhone = matchedReport.customerPhone;
-          }
-          if (!serial.address && matchedReport.address) {
-            serial.address = matchedReport.address;
-          }
-          if (!serial.province && matchedReport.province) {
-            serial.province = matchedReport.province;
-          }
-          if (!serial.activationDate) {
-            serial.activationDate = matchedReport.createdAt;
-          }
-          // Cập nhật trạng thái nếu đang ở "Chưa kích hoạt"
-          if (serial.status === 'Chưa kích hoạt') {
-            serial.status = 'Đã kích hoạt';
-          }
-        }
-      }
-
-      // Batch insert
-      await prisma.serial.createMany({
-        data: newSerials,
-        skipDuplicates: true,
-      });
-
-      importedCount = newSerials.length;
     }
 
-    logger.info('Serial import completed', {
+    // Truy vấn hàng loạt các Serial đang tồn tại trong DB để thực hiện "matching và vá dữ liệu"
+    const dbSerials = await prisma.serial.findMany({
+      where: {
+        serialNumber: { in: cleanedSerialsInBatch }
+      }
+    });
+
+    const existingSerialsMap = new Map<string, any>();
+    for (const s of dbSerials) {
+      existingSerialsMap.set(s.serialNumber, s);
+    }
+
+    // Danh sách serial mới cần insert
+    const newSerialsToCreate: any[] = [];
+    // Danh sách các Serial mới tạo và Serial được cập nhật để ghi Audit Log (Ctrl+Z)
+    const newlyCreatedSerialNumbers: string[] = [];
+    const updatedSerialsLog: Array<{
+      id: string;
+      serialNumber: string;
+      before: Record<string, any>;
+    }> = [];
+    // Danh sách serial trùng trong batch đang xử lý để tránh chèn lặp
+    const processedSerialsInBatch = new Set<string>();
+
+    for (const item of rowMappings) {
+      totalRowsProcessed++;
+
+      const cleanedSerial = item.cleanedSerial;
+
+      // Tránh trùng lặp trong chính file excel đang import
+      if (processedSerialsInBatch.has(cleanedSerial)) {
+        skippedCount++;
+        continue;
+      }
+      processedSerialsInBatch.add(cleanedSerial);
+
+      // Bước 1: Đối chiếu productcode để lấy tên sp trên POS
+      let modelName = '';
+      if (item.rawProductCode) {
+        const matchedProductName = productMap.get(item.rawProductCode.trim().toLowerCase());
+        if (matchedProductName) {
+          modelName = matchedProductName;
+        }
+      }
+      // Fallback lấy model ghi trong dòng
+      if (!modelName) {
+        modelName = item.rawModel.trim() || 'Không rõ dòng máy';
+      }
+
+      // Xử lý Ngày giao thô
+      let deliveryDate: Date | null = null;
+      if (item.rawDeliveryDateVal) {
+        if (item.rawDeliveryDateVal instanceof Date) {
+          deliveryDate = item.rawDeliveryDateVal;
+        } else if (typeof item.rawDeliveryDateVal === 'number') {
+          const excelEpoch = new Date(1899, 11, 30);
+          deliveryDate = new Date(excelEpoch.getTime() + item.rawDeliveryDateVal * 86400000);
+        } else {
+          const parsed = Date.parse(String(item.rawDeliveryDateVal));
+          if (!isNaN(parsed)) {
+            deliveryDate = new Date(parsed);
+          }
+        }
+      }
+
+      // Bước 2 & 3: Matching đối chiếu với ServiceReport để xác định kích hoạt bảo hành
+      let statusVal = isNewFormat ? 'Chưa kích hoạt' : (item.rawData.col_3 || 'Chưa kích hoạt');
+      let activationDate: Date | null = null;
+      let warrantyExpiryDate: Date | null = null;
+      let customerName: string | null = isNewFormat ? null : (item.rawData.col_7 || null);
+      let customerPhone: string | null = isNewFormat ? null : (item.rawData.col_8 || null);
+      let address: string | null = isNewFormat ? null : (item.rawData.col_9 || null);
+      let province: string | null = isNewFormat ? null : (item.rawData.col_10 || null);
+      let orderId: string | null = null;
+
+      if (!isNewFormat) {
+        // Nếu là format cũ, parse trực tiếp ngày tháng từ excel
+        activationDate = item.rawData.col_4 ? new Date(item.rawData.col_4) : null;
+        if (isNaN(activationDate?.getTime() || 0)) activationDate = null;
+
+        warrantyExpiryDate = item.rawData.col_5 ? new Date(item.rawData.col_5) : null;
+        if (isNaN(warrantyExpiryDate?.getTime() || 0)) warrantyExpiryDate = null;
+      }
+
+      // Lấy báo cáo hoàn thành ca lắp đặt
+      const matchedReport = reportMap.get(cleanedSerial);
+      if (matchedReport) {
+        // Tự động chuyển trạng thái kích hoạt bảo hành
+        statusVal = 'Đã kích hoạt';
+        // Thời gian kích hoạt = Hôm báo cáo được nộp (createdAt của báo cáo)
+        activationDate = matchedReport.createdAt;
+        orderId = matchedReport.orderId;
+
+        // Auto-fill thông tin khách hàng từ báo cáo
+        customerName = matchedReport.customerName || customerName;
+        customerPhone = matchedReport.customerPhone || customerPhone;
+        address = matchedReport.address || address;
+        province = matchedReport.province || province;
+
+        // Chắt lọc thời hạn bảo hành:
+        // Rank 1: Note của sale (Order.note / Order.rawData.note)
+        let warrantyMonths: number | null = null;
+        const order = matchedReport.order;
+        if (order) {
+          warrantyMonths = extractWarrantyMonths(order.note);
+          if (!warrantyMonths && order.rawData) {
+            let rawJson: any = order.rawData;
+            if (typeof rawJson === 'string') {
+              try { rawJson = JSON.parse(rawJson); } catch (e) {}
+            }
+            if (rawJson) {
+              warrantyMonths = extractWarrantyMonths(rawJson.note) || extractWarrantyMonths(rawJson.description) || extractWarrantyMonths(rawJson.customer_note);
+            }
+          }
+        }
+
+        // Rank 2: Thời gian mặc định của POS (WarrantyPolicy)
+        if (warrantyMonths === null) {
+          const matchedPolicy = policies.find((p: any) =>
+            modelName.toLowerCase().includes(p.modelKeyword.toLowerCase())
+          );
+          if (matchedPolicy) {
+            warrantyMonths = matchedPolicy.warrantyMonths;
+          } else {
+            warrantyMonths = 12; // Mặc định 12 tháng
+          }
+        }
+
+        // Tính ngày hết hạn
+        const expiry = new Date(activationDate!);
+        expiry.setMonth(expiry.getMonth() + warrantyMonths!);
+        warrantyExpiryDate = expiry;
+      }
+
+      // Kiểm tra xem serial đã tồn tại trong DB chưa để thực hiện vá dữ liệu còn thiếu
+      const existingSerial = existingSerialsMap.get(cleanedSerial);
+      if (existingSerial) {
+        // Vá lại dữ liệu còn thiếu
+        const updateData: any = {};
+        if (existingSerial.model === 'Không rõ dòng máy' || !existingSerial.model) {
+          updateData.model = modelName;
+        }
+        if (existingSerial.status === 'Chưa kích hoạt' && statusVal === 'Đã kích hoạt') {
+          updateData.status = 'Đã kích hoạt';
+        }
+        if (!existingSerial.activationDate && activationDate) {
+          updateData.activationDate = activationDate;
+        }
+        if (!existingSerial.warrantyExpiryDate && warrantyExpiryDate) {
+          updateData.warrantyExpiryDate = warrantyExpiryDate;
+        }
+        if (!existingSerial.customerName && customerName) {
+          updateData.customerName = customerName;
+        }
+        if (!existingSerial.customerPhone && customerPhone) {
+          updateData.customerPhone = customerPhone;
+        }
+        if (!existingSerial.address && address) {
+          updateData.address = address;
+        }
+        if (!existingSerial.province && province) {
+          updateData.province = province;
+        }
+        if (!existingSerial.orderId && orderId) {
+          updateData.orderId = orderId;
+        }
+
+        // Chỉ cập nhật nếu thực sự có thông tin mới cần vá
+        if (Object.keys(updateData).length > 0) {
+          updatedSerialsLog.push({
+            id: existingSerial.id,
+            serialNumber: existingSerial.serialNumber,
+            before: {
+              model: existingSerial.model,
+              status: existingSerial.status,
+              activationDate: existingSerial.activationDate,
+              warrantyExpiryDate: existingSerial.warrantyExpiryDate,
+              customerName: existingSerial.customerName,
+              customerPhone: existingSerial.customerPhone,
+              address: existingSerial.address,
+              province: existingSerial.province,
+              orderId: existingSerial.orderId
+            }
+          });
+
+          await prisma.serial.update({
+            where: { id: existingSerial.id },
+            data: updateData
+          });
+          importedCount++;
+        } else {
+          skippedCount++;
+        }
+      } else {
+        // Tạo Serial mới hoàn toàn
+        newSerialsToCreate.push({
+          serialNumber: cleanedSerial,
+          model: modelName,
+          status: statusVal,
+          activationDate,
+          warrantyExpiryDate,
+          customerName,
+          customerPhone,
+          address,
+          province,
+          orderId,
+          importBatchId: batchId,
+          importedById: userId,
+          rawData: item.rawData
+        });
+        newlyCreatedSerialNumbers.push(cleanedSerial);
+      }
+    }
+
+    // Insert các Serial mới vào DB
+    if (newSerialsToCreate.length > 0) {
+      await prisma.serial.createMany({
+        data: newSerialsToCreate,
+        skipDuplicates: true
+      });
+      importedCount += newSerialsToCreate.length;
+    }
+
+    // Ghi Audit Log cho lô import này phục vụ rollback (Ctrl+Z)
+    await prisma.auditLog.create({
+      data: {
+        entityType: 'Serial',
+        entityId: batchId,
+        action: 'import_batch',
+        changes: {
+          batchId,
+          newSerialsCount: newlyCreatedSerialNumbers.length,
+          updatedSerialsCount: updatedSerialsLog.length,
+          newSerialNumbers: newlyCreatedSerialNumbers,
+          updatedSerials: updatedSerialsLog
+        },
+        userId: req.user!.id,
+        userName: req.user!.fullName
+      }
+    });
+
+    logger.info('Serial import completed with matching and data patch logic', {
       batchId,
       userId,
       totalRowsProcessed,
       importedCount,
       skippedCount,
-      errorCount,
+      errorCount
     });
 
     res.json({
@@ -560,10 +924,10 @@ router.post('/import', requireCoordinatorOrAdmin, (req, res, next) => {
         totalRowsProcessed,
         importedCount,
         skippedCount,
-        errorCount,
+        errorCount
       },
-      errors: errors.slice(0, 50), // Giới hạn 50 lỗi hiển thị
-      batchId,
+      errors: errors.slice(0, 50),
+      batchId
     });
   } catch (error: any) {
     logger.error('Lỗi import serial', { error: error.message, stack: error.stack });

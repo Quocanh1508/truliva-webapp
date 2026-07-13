@@ -626,8 +626,34 @@ export default function SerialManage() {
             >
               <ChevronLeft size={16} /> Trước
             </button>
-            <span style={{ fontSize: 14, color: '#64748b' }}>
-              Trang {page} / {totalPages}
+            <span style={{ fontSize: 14, color: '#64748b', display: 'flex', alignItems: 'center', gap: 4 }}>
+              Trang
+              <input
+                type="number"
+                min={1}
+                max={totalPages}
+                value={page}
+                onChange={(e) => {
+                  const val = parseInt(e.target.value, 10);
+                  if (!isNaN(val) && val >= 1 && val <= totalPages) {
+                    setPage(val);
+                  }
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    const val = parseInt((e.target as HTMLInputElement).value, 10);
+                    if (!isNaN(val) && val >= 1 && val <= totalPages) {
+                      setPage(val);
+                    }
+                  }
+                }}
+                style={{
+                  width: 52, textAlign: 'center', padding: '4px 6px',
+                  borderRadius: 6, border: '1px solid #d1d5db', fontSize: 14,
+                  outline: 'none',
+                }}
+              />
+              / {totalPages}
             </span>
             <button
               disabled={page >= totalPages}
