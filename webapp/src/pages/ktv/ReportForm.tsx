@@ -103,6 +103,7 @@ export default function ReportForm() {
   const [znsPhone, setZnsPhone] = useState('');
   const [activationStep, setActivationStep] = useState(1); // 1: Confirm details, 2: Success
   const [znsSending, setZnsSending] = useState(false);
+  const [warrantyDurationText, setWarrantyDurationText] = useState('12 tháng');
   const [showScanner, setShowScanner] = useState(false);
 
   // ── Step 3: Ảnh ──
@@ -668,6 +669,36 @@ export default function ReportForm() {
     }
   };
 
+  const triggerActivationModal = (payload: any) => {
+    const modelName = selectedItems.length > 0 ? selectedItems[0].productName : 'Máy lọc nước Truliva';
+    setActivationData({
+      serialNumber: payload.serialNumber,
+      customerName: payload.customerName,
+      customerPhone: payload.customerPhone,
+      address: payload.address,
+      model: modelName,
+    });
+    setZnsPhone(payload.customerPhone);
+    setActivationStep(1);
+    setShowActivationModal(true);
+    setLoading(false);
+
+    setWarrantyDurationText('Đang tính toán...');
+    fetchApi(`/serials/public/preview-duration?model=${encodeURIComponent(modelName)}&orderId=${payload.orderId || ''}`)
+      .then(res => {
+        if (res && res.totalMonths) {
+          let text = `${res.totalMonths} tháng`;
+          if (res.promoMonths > 0) {
+            text += ` (${res.standardMonths} tháng tiêu chuẩn + ${res.promoMonths} tháng khuyến mãi)`;
+          }
+          setWarrantyDurationText(text);
+        } else {
+          setWarrantyDurationText('12 tháng');
+        }
+      })
+      .catch(() => setWarrantyDurationText('12 tháng'));
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
@@ -753,17 +784,7 @@ export default function ReportForm() {
         } else {
           const isInstallJob = ['lắp đặt', 'giao hàng và lắp đặt'].includes(payload.workType?.trim().toLowerCase());
           if (isInstallJob) {
-            setActivationData({
-              serialNumber: payload.serialNumber,
-              customerName: payload.customerName,
-              customerPhone: payload.customerPhone,
-              address: payload.address,
-              model: selectedItems.length > 0 ? selectedItems[0].productName : 'Máy lọc nước Truliva',
-            });
-            setZnsPhone(payload.customerPhone);
-            setActivationStep(1);
-            setShowActivationModal(true);
-            setLoading(false);
+            triggerActivationModal(payload);
           } else {
             navigate('/ktv/my-reports');
           }
@@ -791,17 +812,7 @@ export default function ReportForm() {
       } else {
         const isInstallJob = ['lắp đặt', 'giao hàng và lắp đặt'].includes(payload.workType?.trim().toLowerCase());
         if (isInstallJob) {
-          setActivationData({
-            serialNumber: payload.serialNumber,
-            customerName: payload.customerName,
-            customerPhone: payload.customerPhone,
-            address: payload.address,
-            model: selectedItems.length > 0 ? selectedItems[0].productName : 'Máy lọc nước Truliva',
-          });
-          setZnsPhone(payload.customerPhone);
-          setActivationStep(1);
-          setShowActivationModal(true);
-          setLoading(false);
+          triggerActivationModal(payload);
         } else {
           navigate('/ktv/my-reports');
         }
@@ -1528,7 +1539,7 @@ export default function ReportForm() {
                           S/N: {activationData.serialNumber}
                         </p>
                         <p className="text-[11px] text-gray-500 mt-2">
-                          ⏱️ Hạn bảo hành: <strong className="text-gray-700">12 tháng</strong> (Tính từ hôm báo cáo được duyệt)
+                          ⏱️ Hạn bảo hành: <strong className="text-gray-700">{warrantyDurationText}</strong> (Tính từ hôm báo cáo được duyệt)
                         </p>
                       </div>
                     </div>

@@ -74,6 +74,89 @@ router.post('/public/upload-invoice', (req, res, next) => {
 });
 
 /**
+ * GET /api/serials/public/preview-duration
+ * Xem trước thời gian bảo hành dự kiến dựa trên model và orderId
+ */
+router.get('/public/preview-duration', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const model = (req.query.model as string || '').trim();
+    const orderId = req.query.orderId as string | undefined;
+
+    let standardMonths = 12; // Mặc định 12
+    if (model) {
+      const policies = await prisma.warrantyPolicy.findMany();
+      const matchedPolicy = policies.find((p: any) => 
+        model.toLowerCase().includes(p.modelKeyword.toLowerCase())
+      );
+      if (matchedPolicy) {
+        standardMonths = matchedPolicy.warrantyMonths;
+      }
+    }
+
+    let promoMonths = 0;
+    let promoCode = null;
+
+    if (orderId) {
+      const order = await prisma.order.findUnique({
+        where: { id: orderId },
+        select: { promoCode: true, note: true, rawData: true }
+      });
+      if (order) {
+        // 1. Kiểm tra nếu có thời gian bảo hành ghi chú đặc biệt trong note đơn hàng
+        const noteMonths = extractWarrantyMonths(order.note);
+        if (noteMonths !== null) {
+          standardMonths = noteMonths;
+        } else if (order.rawData) {
+          let rawJson: any = order.rawData;
+          if (typeof rawJson === 'string') {
+            try { rawJson = JSON.parse(rawJson); } catch (e) {}
+          }
+          if (rawJson) {
+            const rawNoteMonths = extractWarrantyMonths(rawJson.note) || extractWarrantyMonths(rawJson.description) || extractWarrantyMonths(rawJson.customer_note);
+            if (rawNoteMonths !== null) {
+              standardMonths = rawNoteMonths;
+            }
+          }
+        }
+
+        // 2. Tính khuyến mãi
+        if (order.promoCode) {
+          const promo = await prisma.warrantyPromo.findUnique({
+            where: { code: order.promoCode }
+          });
+          if (promo && !promo.isLocked) {
+            const now = new Date();
+            const isStarted = !promo.startDate || now >= new Date(promo.startDate);
+            const isNotExpired = !promo.endDate || now <= new Date(promo.endDate);
+            const isModelApplicable = !promo.applicableModels || 
+                                     promo.applicableModels.length === 0 || 
+                                     promo.applicableModels.some(kw => 
+                                       model.toLowerCase().includes(kw.toLowerCase())
+                                     );
+            if (isStarted && isNotExpired && isModelApplicable) {
+              promoMonths = promo.promoMonths;
+              promoCode = order.promoCode;
+            }
+          }
+        }
+      }
+    }
+
+    const totalMonths = standardMonths + promoMonths;
+
+    res.json({
+      standardMonths,
+      promoMonths,
+      totalMonths,
+      promoCode
+    });
+  } catch (error: any) {
+    logger.error('Lỗi tính toán xem trước thời hạn bảo hành', { error: error.message });
+    res.status(500).json({ error: 'Lỗi hệ thống khi tính thời gian bảo hành' });
+  }
+});
+
+/**
  * GET /api/serials/public/check/:serialNumber
  * Kiểm tra số serial để kích hoạt bảo hành. Trả về model máy và thời gian bảo hành tiêu chuẩn.
  */
@@ -115,11 +198,46 @@ router.get('/public/check/:serialNumber', async (req: Request, res: Response): P
       standardMonths = matchedPolicy.warrantyMonths;
     }
 
+    // Tính toán thời gian bảo hành khuyến mãi cộng thêm nếu có orderId
+    let promoMonths = 0;
+    let promoCode = null;
+    const orderId = req.query.orderId as string | undefined;
+    if (orderId) {
+      const order = await prisma.order.findUnique({
+        where: { id: orderId },
+        select: { promoCode: true }
+      });
+      if (order && order.promoCode) {
+        const promo = await prisma.warrantyPromo.findUnique({
+          where: { code: order.promoCode }
+        });
+        if (promo && !promo.isLocked) {
+          const now = new Date();
+          const isStarted = !promo.startDate || now >= new Date(promo.startDate);
+          const isNotExpired = !promo.endDate || now <= new Date(promo.endDate);
+          const isModelApplicable = !promo.applicableModels || 
+                                   promo.applicableModels.length === 0 || 
+                                   promo.applicableModels.some(kw => 
+                                     serial.model.toLowerCase().includes(kw.toLowerCase())
+                                   );
+          if (isStarted && isNotExpired && isModelApplicable) {
+            promoMonths = promo.promoMonths;
+            promoCode = order.promoCode;
+          }
+        }
+      }
+    }
+
+    const totalMonths = standardMonths + promoMonths;
+
     res.json({
       serialNumber: serial.serialNumber,
       model: serial.model,
       status: serial.status,
-      standardMonths
+      standardMonths,
+      promoMonths,
+      totalMonths,
+      promoCode
     });
   } catch (error: any) {
     logger.error('Lỗi kiểm tra serial public', { error: error.message });

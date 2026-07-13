@@ -56,19 +56,36 @@ export default function MyReports() {
   const [znsPhone, setZnsPhone] = useState('');
   const [znsSending, setZnsSending] = useState(false);
   const [activationStep, setActivationStep] = useState(1);
+  const [warrantyDurationText, setWarrantyDurationText] = useState('12 tháng');
 
   const handleOpenActivation = (report: any) => {
+    const modelName = report.products && report.products.length > 0 ? report.products[0] : 'Máy lọc nước Truliva';
     setActivationData({
       reportId: report.id,
       serialNumber: report.serialNumber,
       customerName: report.customerName,
       customerPhone: report.customerPhone,
       address: report.address || '',
-      model: report.products && report.products.length > 0 ? report.products[0] : 'Máy lọc nước Truliva',
+      model: modelName,
     });
     setZnsPhone(report.customerPhone);
     setActivationStep(1);
     setShowActivationModal(true);
+
+    setWarrantyDurationText('Đang tính toán...');
+    fetchApi(`/serials/public/preview-duration?model=${encodeURIComponent(modelName)}&orderId=${report.orderId || ''}`)
+      .then(res => {
+        if (res && res.totalMonths) {
+          let text = `${res.totalMonths} tháng`;
+          if (res.promoMonths > 0) {
+            text += ` (${res.standardMonths} tháng tiêu chuẩn + ${res.promoMonths} tháng khuyến mãi)`;
+          }
+          setWarrantyDurationText(text);
+        } else {
+          setWarrantyDurationText('12 tháng');
+        }
+      })
+      .catch(() => setWarrantyDurationText('12 tháng'));
   };
 
   const handleSendZns = async () => {
@@ -938,7 +955,7 @@ export default function MyReports() {
                         S/N: {activationData.serialNumber}
                       </p>
                       <p className="text-[11px] text-gray-500 mt-2">
-                        ⏱️ Hạn bảo hành: <strong className="text-gray-700">12 tháng</strong> (Tính từ hôm báo cáo được duyệt)
+                        ⏱️ Hạn bảo hành: <strong className="text-gray-700">{warrantyDurationText}</strong> (Tính từ hôm báo cáo được duyệt)
                       </p>
                     </div>
                   </div>
