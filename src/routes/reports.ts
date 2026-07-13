@@ -523,15 +523,6 @@ router.post('/', async (req: Request, res: Response): Promise<void> => {
         res.status(400).json({ error: 'Loại công việc/dịch vụ này bắt buộc phải nhập số Serial thiết bị.' });
         return;
       }
-      if (cleanedSn !== 'XXXXXXXXXXXXXXX') {
-        const serialRecord = await prisma.serial.findUnique({
-          where: { serialNumber: cleanedSn }
-        });
-        if (!serialRecord) {
-          res.status(400).json({ error: 'Số Serial này không tồn tại trên hệ thống. Vui lòng kiểm tra lại hoặc liên hệ Admin để khai báo trước khi đóng ca.' });
-          return;
-        }
-      }
     }
 
     const report = await prisma.serviceReport.create({
@@ -1693,15 +1684,6 @@ router.put('/:id', requireAuth, async (req: Request, res: Response): Promise<voi
       if (!cleanedSn) {
         res.status(400).json({ error: 'Loại công việc/dịch vụ này bắt buộc phải nhập số Serial thiết bị.' });
         return;
-      }
-      if (cleanedSn !== 'XXXXXXXXXXXXXXX') {
-        const serialRecord = await prisma.serial.findUnique({
-          where: { serialNumber: cleanedSn }
-        });
-        if (!serialRecord) {
-          res.status(400).json({ error: 'Số Serial này không tồn tại trên hệ thống. Vui lòng kiểm tra lại hoặc liên hệ Admin để khai báo trước khi đóng ca.' });
-          return;
-        }
       }
     }
 
