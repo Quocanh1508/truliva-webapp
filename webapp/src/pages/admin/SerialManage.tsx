@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { fetchApi, API_URL } from '../../api/client';
-import { Hash, Upload, Download, Search, X, Clock, ChevronLeft, ChevronRight, AlertTriangle, CheckCircle, User, Phone, MapPin, Wrench, FileText, Filter, Edit3, RotateCcw } from 'lucide-react';
+import { Hash, Upload, Download, Search, X, Clock, ChevronLeft, ChevronRight, AlertTriangle, CheckCircle, User, Phone, MapPin, Wrench, FileText, Filter, Edit3, RotateCcw, Sparkles } from 'lucide-react';
 
 interface Serial {
   id: string;
@@ -92,6 +92,37 @@ export default function SerialManage() {
   const [selectedPromoCode, setSelectedPromoCode] = useState('');
   const [submittingApprove, setSubmittingApprove] = useState(false);
 
+  // Zalo OA state
+  const [zaloStatus, setZaloStatus] = useState<any>(null);
+
+  const loadZaloStatus = async () => {
+    try {
+      const data = await fetchApi('/serials/zalo/status');
+      setZaloStatus(data);
+    } catch (err) {
+      console.error('Lỗi tải trạng thái Zalo:', err);
+    }
+  };
+
+  const handleConnectZalo = () => {
+    const width = 600;
+    const height = 700;
+    const left = window.screen.width / 2 - width / 2;
+    const top = window.screen.height / 2 - height / 2;
+    
+    const popup = window.open(
+      `${API_URL}/serials/zalo/authorize`,
+      'Liên kết Zalo OA',
+      `width=${width},height=${height},left=${left},top=${top},resizable=yes,scrollbars=yes,status=yes`
+    );
+
+    const timer = setInterval(() => {
+      if (!popup || popup.closed) {
+        clearInterval(timer);
+        loadZaloStatus();
+      }
+    }, 1000);
+  };
 
   useEffect(() => {
     const fetchPromos = async () => {
@@ -112,6 +143,7 @@ export default function SerialManage() {
     };
     fetchPromos();
     fetchPolicies();
+    loadZaloStatus();
   }, []);
 
   const calculateExpiryDate = (activationDateStr: string | null, modelName: string, selectedPromoCodeStr: string | null) => {
@@ -460,6 +492,20 @@ export default function SerialManage() {
             }}
           >
             <Download size={16} /> Xuất Excel
+          </button>
+
+          {/* Zalo OA OAuth Button */}
+          <button
+            onClick={handleConnectZalo}
+            style={{
+              display: 'flex', alignItems: 'center', gap: 6,
+              padding: '8px 16px', borderRadius: 8,
+              background: zaloStatus?.isConnected ? '#10b981' : '#ef4444',
+              color: 'white', border: 'none',
+              fontSize: 14, fontWeight: 600, cursor: 'pointer',
+            }}
+          >
+            <Sparkles size={16} /> {zaloStatus?.isConnected ? 'Đã kết nối Zalo OA' : 'Kết nối Zalo OA'}
           </button>
         </div>
       </div>

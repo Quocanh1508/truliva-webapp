@@ -423,3 +423,17 @@ model SalaryRecord {
   @@map("salary_records")
 }
 
+// ── Cấu hình kết nối Zalo OA và Tokens ──
+model ZaloConfig {
+  id              String    @id @default(uuid())
+  appId           String    @map("app_id")
+  appSecret       String    @map("app_secret")
+  oaId            String    @map("oa_id")
+  accessToken     String?   @map("access_token")
+  refreshToken    String?   @map("refresh_token")
+  tokenExpiredAt  DateTime? @map("token_expired_at")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+
+  @@map("zalo_config")
+}

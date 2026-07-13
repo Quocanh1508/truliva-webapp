@@ -9,6 +9,7 @@ import prisma from '../config/database';
 import logger from '../utils/logger';
 import { requireAuth, requireCoordinatorOrAdmin } from '../middleware/authSession';
 import { activateSerialWarranty, extractWarrantyMonths } from '../services/warrantyService';
+import { getZaloConfig, exchangeAuthorizationCode, sendZnsWarrantyActivation } from '../services/zaloService';
 
 // Cấu hình Cloudinary cho hóa đơn
 cloudinary.config({
@@ -181,6 +182,52 @@ router.post('/public/activate', async (req: Request, res: Response): Promise<voi
   } catch (error: any) {
     logger.error('Lỗi gửi yêu cầu kích hoạt bảo hành public', { error: error.message });
     res.status(500).json({ error: 'Lỗi hệ thống khi gửi yêu cầu kích hoạt bảo hành' });
+  }
+});
+
+/**
+ * POST /api/serials/public/confirm
+ * Khách hàng bấm nút Xác nhận KHBH từ Zalo ZNS để xác nhận kích hoạt bảo hành thành công
+ */
+router.post('/public/confirm', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { serialNumber } = req.body;
+    if (!serialNumber) {
+      res.status(400).json({ error: 'Thiếu số Serial' });
+      return;
+    }
+
+    const cleaned = serialNumber.trim().replace(/[^a-zA-Z0-9_]/g, '').toUpperCase();
+    const serial = await prisma.serial.findUnique({
+      where: { serialNumber: cleaned }
+    });
+
+    if (!serial) {
+      res.status(404).json({ error: 'Không tìm thấy số Serial trong hệ thống' });
+      return;
+    }
+
+    // Cập nhật trạng thái sang "Đã kích hoạt" và lưu ngày xác nhận
+    const updatedSerial = await prisma.serial.update({
+      where: { id: serial.id },
+      data: {
+        status: 'Đã kích hoạt',
+        customerConfirmationDate: new Date()
+      }
+    });
+
+    res.json({
+      success: true,
+      message: 'Xác nhận kích hoạt bảo hành thành công!',
+      serial: {
+        serialNumber: updatedSerial.serialNumber,
+        model: updatedSerial.model,
+        warrantyExpiryDate: updatedSerial.warrantyExpiryDate
+      }
+    });
+  } catch (error: any) {
+    logger.error('Public confirm serial error', { error: error.message });
+    res.status(500).json({ error: 'Lỗi hệ thống khi xác nhận bảo hành' });
   }
 });
 
@@ -1406,6 +1453,162 @@ router.post('/:id/restore', requireCoordinatorOrAdmin, async (req: Request, res:
   } catch (error: any) {
     logger.error('Lỗi Admin khôi phục serial', { error: error.message });
     res.status(500).json({ error: 'Lỗi hệ thống khi khôi phục Serial' });
+  }
+});
+
+// ══════════════════════════════════════
+//  ZALO OA OAUTH & ZNS ROUTES
+// ══════════════════════════════════════
+
+/**
+ * GET /api/serials/zalo/authorize
+ * Chuyển hướng Admin tới trang OAuth của Zalo để bắt đầu cấp quyền liên kết OA
+ */
+router.get('/zalo/authorize', requireCoordinatorOrAdmin, async (req: Request, res: Response): Promise<void> => {
+  try {
+    const config = await getZaloConfig();
+    if (!config.appId) {
+      res.status(400).send('Cấu hình Zalo OA chưa được thiết lập App ID trong DB hoặc file .env');
+      return;
+    }
+    
+    // Zalo yêu cầu redirect_uri phải khớp chính xác với những gì đã cấu hình trên Zalo Developer portal.
+    const redirectUri = process.env.ZALO_REDIRECT_URI || `${req.protocol}://${req.get('host')}/api/serials/zalo/callback`;
+    const authorizeUrl = `https://oauth.zalo.me/pc/oauth/authorize?app_id=${config.appId}&redirect_uri=${encodeURIComponent(redirectUri)}&state=truliva`;
+    
+    logger.info('Redirecting admin to Zalo OAuth page', { appId: config.appId, redirectUri });
+    res.redirect(authorizeUrl);
+  } catch (error: any) {
+    logger.error('Error initiating Zalo OAuth redirect', { error: error.message });
+    res.status(500).send(`Lỗi hệ thống khi bắt đầu liên kết Zalo OA: ${error.message}`);
+  }
+});
+
+/**
+ * GET /api/serials/zalo/callback
+ * Endpoint nhận callback từ Zalo OAuth, nhận authorization_code để đổi lấy tokens
+ */
+router.get('/zalo/callback', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const code = req.query.code as string;
+    if (!code) {
+      res.status(400).send('Thiếu mã authorization code từ Zalo OA');
+      return;
+    }
+
+    await exchangeAuthorizationCode(code);
+
+    // Trả về trang thông báo liên kết thành công đẹp mắt
+    res.send(`
+      <html>
+        <head>
+          <title>Liên kết Zalo OA thành công</title>
+          <meta charset="utf-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1">
+          <style>
+            body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh; background-color: #f0f4f8; margin: 0; padding: 20px; }
+            .card { background: white; padding: 40px 30px; border-radius: 12px; box-shadow: 0 10px 25px rgba(0,0,0,0.05); text-align: center; max-width: 450px; width: 100%; border-top: 4px solid #3182ce; }
+            .icon { font-size: 48px; color: #48bb78; margin-bottom: 20px; }
+            h1 { color: #2b6cb0; font-size: 22px; margin-bottom: 12px; font-weight: 700; }
+            p { color: #4a5568; font-size: 15px; line-height: 1.6; margin-bottom: 24px; }
+            .btn { background: #3182ce; color: white; padding: 12px 30px; text-decoration: none; border-radius: 6px; font-weight: bold; border: none; cursor: pointer; transition: all 0.2s; font-size: 15px; box-shadow: 0 4px 6px rgba(49,130,206,0.2); }
+            .btn:hover { background: #2b6cb0; box-shadow: 0 6px 12px rgba(49,130,206,0.3); transform: translateY(-1px); }
+          </style>
+        </head>
+        <body>
+          <div class="card">
+            <div class="icon">✓</div>
+            <h1>Liên kết thành công!</h1>
+            <p>Hệ thống Truliva đã kết nối thành công với Zalo Official Account. Bây giờ bạn có thể đóng cửa sổ này và quay trở về trang quản lý.</p>
+            <button onclick="window.close()" class="btn">Đóng cửa sổ</button>
+          </div>
+        </body>
+      </html>
+    `);
+  } catch (error: any) {
+    logger.error('Zalo OAuth callback route error', { error: error.message });
+    res.status(500).send(`
+      <html>
+        <head>
+          <title>Liên kết Zalo OA thất bại</title>
+          <meta charset="utf-8">
+          <style>
+            body { font-family: sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh; background-color: #fff5f5; margin: 0; }
+            .card { background: white; padding: 40px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); text-align: center; max-width: 400px; border-top: 4px solid #e53e3e; }
+            h1 { color: #c53030; margin-bottom: 16px; }
+            p { color: #4a5568; margin-bottom: 24px; line-height: 1.5; }
+            .btn { background: #e53e3e; color: white; padding: 10px 20px; text-decoration: none; border-radius: 4px; border: none; cursor: pointer; }
+          </style>
+        </head>
+        <body>
+          <div class="card">
+            <h1>Liên kết thất bại</h1>
+            <p>Có lỗi xảy ra trong quá trình thiết lập liên kết với Zalo OA: ${error.message}</p>
+            <button onclick="window.close()" class="btn">Đóng cửa sổ</button>
+          </div>
+        </body>
+      </html>
+    `);
+  }
+});
+
+/**
+ * GET /api/serials/zalo/status
+ * Kiểm tra trạng thái kết nối và tokens hiện tại của Zalo OA
+ */
+router.get('/zalo/status', requireCoordinatorOrAdmin, async (req: Request, res: Response): Promise<void> => {
+  try {
+    const config = await getZaloConfig();
+    const isConnected = !!config.accessToken && !!config.refreshToken;
+    const isExpired = config.tokenExpiredAt ? new Date(config.tokenExpiredAt).getTime() < Date.now() : true;
+    
+    res.json({
+      success: true,
+      isConnected,
+      isExpired,
+      oaId: config.oaId || null,
+      appId: config.appId || null,
+      tokenExpiredAt: config.tokenExpiredAt || null
+    });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message || 'Lỗi hệ thống khi kiểm tra trạng thái Zalo' });
+  }
+});
+
+/**
+ * POST /api/serials/zns-activate
+ * API từ KTV App để kích hoạt bảo hành qua ZNS gửi tin nhắn đến số điện thoại khách hàng
+ */
+router.post('/zns-activate', requireCoordinatorOrAdmin, async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { serialNumber, recipientPhone } = req.body;
+    if (!serialNumber || !recipientPhone) {
+      res.status(400).json({ error: 'Thiếu số Serial hoặc Số điện thoại nhận ZNS' });
+      return;
+    }
+
+    const cleanSerial = serialNumber.trim().replace(/[^a-zA-Z0-9_]/g, '').toUpperCase();
+    
+    // 1. Thực hiện gửi tin nhắn ZNS qua API
+    const znsResult = await sendZnsWarrantyActivation(cleanSerial, recipientPhone);
+
+    // 2. Chuyển trạng thái Serial sang "KH xác nhận" (chờ khách hàng click nút trong Zalo)
+    await prisma.serial.update({
+      where: { serialNumber: cleanSerial },
+      data: {
+        status: 'KH xác nhận',
+        customerPhone: recipientPhone.trim() // Cập nhật số Zalo nhận tin nhắn
+      }
+    });
+
+    res.json({
+      success: true,
+      message: 'Gửi tin nhắn kích hoạt bảo hành qua Zalo ZNS thành công!',
+      znsResult
+    });
+  } catch (error: any) {
+    logger.error('ZNS activation route error', { error: error.message });
+    res.status(500).json({ error: error.message || 'Lỗi hệ thống khi gửi tin nhắn kích hoạt ZNS' });
   }
 });
 

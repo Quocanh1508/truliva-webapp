@@ -96,6 +96,13 @@ export default function ReportForm() {
   const [serialChecking, setSerialChecking] = useState(false);
   const [serialInfo, setSerialInfo] = useState<any>(null);
   const [serialWarning, setSerialWarning] = useState('');
+
+  // ── States Kích hoạt bảo hành qua ZNS ──
+  const [showActivationModal, setShowActivationModal] = useState(false);
+  const [activationData, setActivationData] = useState<any>(null);
+  const [znsPhone, setZnsPhone] = useState('');
+  const [activationStep, setActivationStep] = useState(1); // 1: Confirm details, 2: Success
+  const [znsSending, setZnsSending] = useState(false);
   const [showScanner, setShowScanner] = useState(false);
 
   // ── Step 3: Ảnh ──
@@ -637,6 +644,30 @@ export default function ReportForm() {
     return true;
   };
 
+  const handleSendZns = async () => {
+    if (!znsPhone.trim()) {
+      alert('Vui lòng nhập Số điện thoại nhận tin nhắn Zalo');
+      return;
+    }
+    setZnsSending(true);
+    try {
+      await fetchApi('/serials/zns-activate', {
+        method: 'POST',
+        body: JSON.stringify({
+          serialNumber: activationData.serialNumber,
+          recipientPhone: znsPhone.trim()
+        })
+      });
+      setActivationStep(2);
+    } catch (err: any) {
+      alert(err.message || 'Lỗi khi gửi yêu cầu kích hoạt ZNS. Hệ thống vẫn lưu báo cáo, Admin sẽ kích hoạt bảo hành sau.');
+      setShowActivationModal(false);
+      navigate('/ktv/my-reports');
+    } finally {
+      setZnsSending(false);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
@@ -743,7 +774,22 @@ export default function ReportForm() {
       if (user?.role !== 'KTV') {
         navigate('/admin/orders');
       } else {
-        navigate('/ktv/my-reports');
+        const isInstallJob = ['lắp đặt', 'giao hàng và lắp đặt'].includes(payload.workType?.trim().toLowerCase());
+        if (isInstallJob) {
+          setActivationData({
+            serialNumber: payload.serialNumber,
+            customerName: payload.customerName,
+            customerPhone: payload.customerPhone,
+            address: payload.address,
+            model: selectedItems.length > 0 ? selectedItems[0].productName : 'Máy lọc nước Truliva',
+          });
+          setZnsPhone(payload.customerPhone);
+          setActivationStep(1);
+          setShowActivationModal(true);
+          setLoading(false);
+        } else {
+          navigate('/ktv/my-reports');
+        }
       }
     } catch (err: any) {
       setError(err.message);
@@ -1424,6 +1470,148 @@ export default function ReportForm() {
                   Đưa camera điện thoại song song và căn chỉnh mã vạch vào ô quét hình chữ nhật.
                 </p>
               </div>
+            </div>
+          </div>
+        )}
+
+        {/* Modal Kích hoạt Bảo hành ZNS */}
+        {showActivationModal && activationData && (
+          <div 
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4"
+          >
+            <div 
+              className="bg-white rounded-2xl w-full max-w-md overflow-hidden shadow-2xl flex flex-col"
+              style={{ borderTop: '5px solid #2563EB' }}
+            >
+              {activationStep === 1 ? (
+                <>
+                  {/* Step 1: Xác nhận thông tin gửi ZNS */}
+                  <div className="p-5 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
+                    <div>
+                      <h3 className="font-bold text-gray-800 text-base">Kích Hoạt Bảo Hành</h3>
+                      <p className="text-[11px] text-gray-500 mt-0.5">Xác nhận gửi tin nhắn ZNS cho Khách hàng</p>
+                    </div>
+                    <button 
+                      type="button" 
+                      className="text-gray-400 hover:text-gray-600 text-xs font-bold"
+                      onClick={() => { setShowActivationModal(false); navigate('/ktv/my-reports'); }}
+                    >
+                      <X size={18} />
+                    </button>
+                  </div>
+
+                  <div className="p-5 overflow-y-auto max-h-[60vh] space-y-4 text-left">
+                    {/* Máy & Serial Card */}
+                    <div className="bg-blue-50/40 border border-blue-100/50 rounded-xl p-4 flex gap-3 items-start">
+                      <div className="bg-blue-100 p-2 rounded-lg text-blue-600">
+                        <CheckCircle size={20} />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <h4 className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Thiết bị lắp đặt</h4>
+                        <p className="text-sm font-bold text-gray-800 mt-0.5 truncate">{activationData.model}</p>
+                        <p className="text-xs font-mono text-blue-600 mt-1 bg-blue-50 inline-block px-2 py-0.5 rounded">
+                          S/N: {activationData.serialNumber}
+                        </p>
+                        <p className="text-[11px] text-gray-500 mt-2">
+                          ⏱️ Hạn bảo hành: <strong className="text-gray-700">12 tháng</strong> (Tính từ hôm báo cáo được duyệt)
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Khách hàng Card */}
+                    <div className="border border-gray-100 rounded-xl p-4 space-y-2.5 bg-white">
+                      <h4 className="text-[10px] font-bold text-gray-400 uppercase tracking-wider border-b border-gray-100 pb-1.5">Thông tin khách hàng</h4>
+                      
+                      <div className="grid grid-cols-3 gap-1.5 text-xs text-gray-600">
+                        <span className="font-medium text-gray-400">Họ tên:</span>
+                        <span className="col-span-2 font-semibold text-gray-800">{activationData.customerName}</span>
+                        
+                        <span className="font-medium text-gray-400">Địa chỉ:</span>
+                        <span className="col-span-2 text-gray-700 leading-relaxed truncate">{activationData.address}</span>
+                      </div>
+                    </div>
+
+                    {/* Gửi tin nhắn Input */}
+                    <div className="space-y-1.5">
+                      <label className="block text-xs font-bold text-gray-600 uppercase">Số điện thoại nhận tin Zalo</label>
+                      <input 
+                        type="tel" 
+                        className="form-input w-full font-semibold text-sm tracking-wider"
+                        value={znsPhone}
+                        onChange={(e) => setZnsPhone(e.target.value)}
+                        placeholder="Nhập số điện thoại nhận ZNS..."
+                      />
+                      <p className="text-[10px] text-gray-400 leading-relaxed mt-1">
+                        ⚠️ KTV có thể thay đổi SĐT này nếu khách hàng dùng số Zalo khác SĐT đăng ký đơn hàng.
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="p-4 bg-gray-50 border-t border-gray-100 flex gap-3">
+                    <button
+                      type="button"
+                      className="btn btn-outline flex-1 py-2 text-sm"
+                      onClick={() => { setShowActivationModal(false); navigate('/ktv/my-reports'); }}
+                    >
+                      Để sau
+                    </button>
+                    <button
+                      type="button"
+                      className="btn btn-primary flex-1 py-2 text-sm flex justify-center items-center gap-1.5"
+                      onClick={handleSendZns}
+                      disabled={znsSending}
+                    >
+                      {znsSending ? (
+                        <>
+                          <Loader2 size={16} className="animate-spin" /> Đang gửi...
+                        </>
+                      ) : (
+                        <>
+                          <Send size={16} /> Kích hoạt ZNS
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </>
+              ) : (
+                <>
+                  {/* Step 2: Kích hoạt gửi thành công */}
+                  <div className="p-6 text-center space-y-4">
+                    <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto text-green-600 shadow-sm">
+                      <CheckCircle size={36} />
+                    </div>
+                    
+                    <div className="space-y-1">
+                      <h3 className="font-bold text-gray-800 text-lg">Kích Hoạt Thành Công!</h3>
+                      <p className="text-xs text-gray-500 px-4 leading-relaxed">
+                        Yêu cầu kích hoạt bảo hành đã được ghi nhận. Hệ thống đã gửi tin nhắn ZNS xác nhận đến số Zalo:
+                      </p>
+                      <p className="text-base font-bold text-blue-600 tracking-wider mt-1">{znsPhone}</p>
+                    </div>
+
+                    <div className="bg-amber-50 border border-amber-100 rounded-xl p-3.5 text-left text-xs text-amber-800 leading-relaxed max-w-sm mx-auto">
+                      💡 <strong>Hướng dẫn Khách hàng:</strong> Hãy nhắc khách hàng kiểm tra tin nhắn từ Zalo OA <strong>Pure Vita</strong> và nhấn nút <strong>"Xác nhận KHBH"</strong> để hoàn tất quá trình bảo hành thiết bị.
+                    </div>
+                  </div>
+
+                  <div className="p-4 bg-gray-50 border-t border-gray-100 flex gap-3">
+                    <button
+                      type="button"
+                      className="btn btn-outline flex-1 py-2 text-sm"
+                      onClick={() => { setShowActivationModal(false); navigate('/ktv/my-orders'); }}
+                    >
+                      Danh sách công việc
+                    </button>
+                    <button
+                      type="button"
+                      className="btn btn-primary flex-1 py-2 text-sm"
+                      onClick={() => { setShowActivationModal(false); navigate('/ktv/my-reports'); }}
+                    >
+                      Báo cáo của tôi
+                    </button>
+                  </div>
+                </>
+              )}
             </div>
           </div>
         )}
