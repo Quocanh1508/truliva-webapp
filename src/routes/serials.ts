@@ -882,6 +882,29 @@ router.post('/import', requireCoordinatorOrAdmin, (req, res, next) => {
         modelName = item.rawModel.trim() || 'Không rõ dòng máy';
       }
 
+      // ── Chuẩn hóa: Nếu model là "lõi lọc" thì trích xuất mã máy gốc ──
+      // Serial sản phẩm luôn gắn với MÁY, không gắn với lõi lọc.
+      // Ví dụ: "Lõi lọc CTO Truliva UR5840" → "Máy lọc nước Truliva UR5840"
+      //         "Lõi lọc CTO Delica UR5640/UR5440" → "Máy lọc nước Delica UR5640/UR5440"
+      //         "Lõi lọc CTO UR5840 (Pureit)" → "Máy lọc nước Truliva UR5840"
+      const modelLower = modelName.toLowerCase();
+      if (modelLower.includes('lõi lọc') || modelLower.includes('loi loc') || modelLower.includes('lõi cto') || modelLower.includes('loi cto')) {
+        // Trích xuất mã dòng máy (UR****, RO****, hoặc các mã model khác)
+        const modelCodeMatch = modelName.match(/\b(UR\d{3,5}(?:\/UR\d{3,5})?|RO\d{3,5}|[A-Z]{2,}\d{3,})/i);
+        if (modelCodeMatch) {
+          const modelCode = modelCodeMatch[1].toUpperCase();
+          // Xác định thương hiệu từ tên gốc
+          let brand = 'Truliva';
+          if (modelLower.includes('delica')) brand = 'Delica';
+          else if (modelLower.includes('pureit')) brand = 'Truliva';
+          modelName = `Máy lọc nước ${brand} ${modelCode}`;
+        } else {
+          // Không tìm được mã model cụ thể → đặt mặc định
+          modelName = 'Máy lọc nước Truliva';
+        }
+        logger.info('Serial import: Chuẩn hóa lõi lọc → máy', { serial: cleanedSerial, original: item.rawModel || item.rawProductCode, normalized: modelName });
+      }
+
       // Xử lý Ngày giao thô
       let deliveryDate: Date | null = null;
       if (item.rawDeliveryDateVal) {
@@ -972,7 +995,9 @@ router.post('/import', requireCoordinatorOrAdmin, (req, res, next) => {
       if (existingSerial) {
         // Vá lại dữ liệu còn thiếu
         const updateData: any = {};
-        if (existingSerial.model === 'Không rõ dòng máy' || !existingSerial.model) {
+        const existingModelLower = (existingSerial.model || '').toLowerCase();
+        const isExistingModelFilterCartridge = existingModelLower.includes('lõi lọc') || existingModelLower.includes('loi loc') || existingModelLower.includes('lõi cto') || existingModelLower.includes('loi cto');
+        if (existingSerial.model === 'Không rõ dòng máy' || !existingSerial.model || isExistingModelFilterCartridge) {
           updateData.model = modelName;
         }
         if (existingSerial.status === 'Chưa kích hoạt' && statusVal === 'Đã kích hoạt') {
