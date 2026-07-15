@@ -178,16 +178,6 @@ router.get('/public/check/:serialNumber', async (req: Request, res: Response): P
       return;
     }
 
-    if (serial.status === 'Đã kích hoạt' || serial.status === 'KH xác nhận') {
-      res.status(400).json({ error: 'Số Serial này đã được kích hoạt bảo hành trước đó.' });
-      return;
-    }
-
-    if (serial.status === 'Chờ duyệt') {
-      res.status(400).json({ error: 'Yêu cầu kích hoạt bảo hành cho số Serial này đang ở trạng thái chờ duyệt.' });
-      return;
-    }
-
     // Tra cứu WarrantyPolicy để tìm thời gian bảo hành tiêu chuẩn
     let standardMonths = 12; // Mặc định 12 tháng
     const policies = await prisma.warrantyPolicy.findMany();
@@ -237,7 +227,13 @@ router.get('/public/check/:serialNumber', async (req: Request, res: Response): P
       standardMonths,
       promoMonths,
       totalMonths,
-      promoCode
+      promoCode,
+      activationDate: serial.activationDate,
+      warrantyExpiryDate: serial.warrantyExpiryDate,
+      customerName: serial.customerName,
+      customerPhone: serial.customerPhone,
+      address: serial.address,
+      province: serial.province
     });
   } catch (error: any) {
     logger.error('Lỗi kiểm tra serial public', { error: error.message });
@@ -279,7 +275,7 @@ router.post('/public/activate', async (req: Request, res: Response): Promise<voi
     }
 
     // Tiến hành đăng ký kích hoạt (Chuyển trạng thái sang Chờ duyệt)
-    await activateSerialWarranty(
+    const updated = await activateSerialWarranty(
       cleaned,
       null,
       {
@@ -293,9 +289,24 @@ router.post('/public/activate', async (req: Request, res: Response): Promise<voi
       'Chờ duyệt'
     );
 
+    // Gửi tin nhắn ZNS xác nhận bảo hành đến Zalo khách hàng
+    let znsResult = null;
+    try {
+      znsResult = await sendZnsWarrantyActivation(cleaned, customerPhone.trim());
+    } catch (znsError: any) {
+      logger.error('Lỗi gửi tin nhắn ZNS khi khách hàng tự kích hoạt', { serialNumber: cleaned, phone: customerPhone, error: znsError.message });
+    }
+
     res.json({
       success: true,
-      message: 'Gửi yêu cầu kích hoạt bảo hành thành công. Vui lòng chờ bộ phận CSKH phê duyệt.'
+      message: 'Gửi yêu cầu kích hoạt bảo hành thành công. Vui lòng chờ bộ phận CSKH phê duyệt.',
+      serial: {
+        serialNumber: updated.serialNumber,
+        model: updated.model,
+        warrantyExpiryDate: updated.warrantyExpiryDate,
+        activationDate: updated.activationDate
+      },
+      znsResult
     });
   } catch (error: any) {
     logger.error('Lỗi gửi yêu cầu kích hoạt bảo hành public', { error: error.message });
@@ -383,7 +394,9 @@ const excelUpload = multer({
  */
 function parseExcelDate(value: any): Date | null {
   if (!value) return null;
-  if (value instanceof Date) return value;
+  if (value instanceof Date) {
+    return isNaN(value.getTime()) ? null : value;
+  }
   if (typeof value === 'string') {
     const trimmed = value.trim();
     // Thử parse dd/MM/yyyy HH:mm:ss
@@ -710,6 +723,14 @@ router.post('/import', requireCoordinatorOrAdmin, (req, res, next) => {
     let modelColIdx = -1;
     let deliveryDateColIdx = -1;
     let serialColIdx = -1;
+    let customerNameColIdx = -1;
+    let customerPhoneColIdx = -1;
+    let addressColIdx = -1;
+    let provinceColIdx = -1;
+    let statusColIdx = -1;
+    let activationDateColIdx = -1;
+    let expiryDateColIdx = -1;
+
     let isNewFormat = false;
 
     headerRow.forEach((val: any, idx: number) => {
@@ -719,21 +740,50 @@ router.post('/import', requireCoordinatorOrAdmin, (req, res, next) => {
         isNewFormat = true;
       } else if (str.includes('serial') || str === 'số máy' || str === 'số serial') {
         serialColIdx = idx;
-      } else if (str.includes('model') || str === 'dòng máy') {
+      } else if (str === 'model') {
+        modelColIdx = idx;
+      } else if (str === 'dòng máy' && modelColIdx === -1) {
         modelColIdx = idx;
       } else if (str.includes('delivery date') || str === 'ngày giao' || str === 'ngày xuất' || str === 'deliverydate') {
         deliveryDateColIdx = idx;
         isNewFormat = true;
+      } else if (str === 'họ tên' || str === 'tên khách hàng' || str === 'khách hàng' || str === 'ho ten') {
+        customerNameColIdx = idx;
+      } else if (str === 'số điện thoại' || str === 'sđt' || str === 'điện thoại' || str === 'so dien thoai') {
+        customerPhoneColIdx = idx;
+      } else if (str === 'địa chỉ' || str === 'dia chi') {
+        addressColIdx = idx;
+      } else if (str === 'thành phố' || str === 'tỉnh' || str === 'tỉnh/thành phố' || str === 'thanh pho') {
+        provinceColIdx = idx;
+      } else if (str === 'trạng thái' || str === 'tình trạng' || str === 'trang thai') {
+        statusColIdx = idx;
+      } else if (str === 'ngày kích hoạt' || str === 'kích hoạt lúc' || str === 'ngay kich hoat') {
+        activationDateColIdx = idx;
+      } else if (str === 'ngày hết hạn bảo hành' || str === 'hạn bảo hành' || str === 'ngày hết hạn' || str === 'ngay het han bao hanh') {
+        expiryDateColIdx = idx;
       }
     });
 
     // Fallback nếu có 4 cột nhưng tên cột không chính xác hoàn toàn
-    if (!isNewFormat && headerRow.length === 4) {
+    if (productCodeColIdx === -1 && modelColIdx === -1 && serialColIdx === -1 && headerRow.length === 4) {
       productCodeColIdx = 0;
       modelColIdx = 1;
       deliveryDateColIdx = 2;
       serialColIdx = 3;
       isNewFormat = true;
+    }
+
+    // Fallback định dạng cũ (10 cột) nếu không nhận dạng được cột serial
+    if (serialColIdx === -1 && headerRow.length >= 10) {
+      serialColIdx = 0;
+      modelColIdx = 1;
+      statusColIdx = 2;
+      activationDateColIdx = 3;
+      expiryDateColIdx = 4;
+      customerNameColIdx = 6;
+      customerPhoneColIdx = 7;
+      addressColIdx = 8;
+      provinceColIdx = 9;
     }
 
     // Nạp toàn bộ danh mục sản phẩm từ DB để đối chiếu product code lấy tên sp trên POS
@@ -758,6 +808,13 @@ router.post('/import', requireCoordinatorOrAdmin, (req, res, next) => {
       rawModel: string;
       rawProductCode: string;
       rawDeliveryDateVal: any;
+      customerName: string | null;
+      customerPhone: string | null;
+      address: string | null;
+      province: string | null;
+      statusVal: string;
+      activationDate: Date | null;
+      warrantyExpiryDate: Date | null;
       rawData: Record<string, any>;
     }> = [];
 
@@ -765,21 +822,10 @@ router.post('/import', requireCoordinatorOrAdmin, (req, res, next) => {
       const rowNumber = idx + 2; // Dòng excel thực tế (1-indexed, bỏ qua header)
       if (row.length === 0 || row.every(cell => cell === '')) return; // Bỏ qua dòng trống hoàn toàn
 
-      let rawSerial = '';
-      let rawModel = '';
-      let rawProductCode = '';
-      let rawDeliveryDateVal: any = null;
-
-      if (isNewFormat) {
-        rawSerial = serialColIdx !== -1 && row[serialColIdx] !== undefined ? String(row[serialColIdx]) : '';
-        rawModel = modelColIdx !== -1 && row[modelColIdx] !== undefined ? String(row[modelColIdx]) : '';
-        rawProductCode = productCodeColIdx !== -1 && row[productCodeColIdx] !== undefined ? String(row[productCodeColIdx]) : '';
-        rawDeliveryDateVal = deliveryDateColIdx !== -1 && row[deliveryDateColIdx] !== undefined ? row[deliveryDateColIdx] : null;
-      } else {
-        // Định dạng cũ (10 cột)
-        rawSerial = row[0] !== undefined ? String(row[0]) : '';
-        rawModel = row[1] !== undefined ? String(row[1]) : '';
-      }
+      const rawSerial = serialColIdx !== -1 && row[serialColIdx] !== undefined ? String(row[serialColIdx]) : '';
+      const rawModel = modelColIdx !== -1 && row[modelColIdx] !== undefined ? String(row[modelColIdx]) : '';
+      const rawProductCode = productCodeColIdx !== -1 && row[productCodeColIdx] !== undefined ? String(row[productCodeColIdx]) : '';
+      const rawDeliveryDateVal = deliveryDateColIdx !== -1 && row[deliveryDateColIdx] !== undefined ? row[deliveryDateColIdx] : null;
 
       if (!rawSerial) {
         errorCount++;
@@ -793,6 +839,23 @@ router.post('/import', requireCoordinatorOrAdmin, (req, res, next) => {
         errors.push({ row: rowNumber, error: `Số Serial không hợp lệ: "${rawSerial}"` });
         return;
       }
+
+      // Đọc các cột thông tin bổ sung nếu có
+      const customerName = customerNameColIdx !== -1 && row[customerNameColIdx] !== undefined ? String(row[customerNameColIdx]).trim() : null;
+      const customerPhone = customerPhoneColIdx !== -1 && row[customerPhoneColIdx] !== undefined ? String(row[customerPhoneColIdx]).trim() : null;
+      const address = addressColIdx !== -1 && row[addressColIdx] !== undefined ? String(row[addressColIdx]).trim() : null;
+      const province = provinceColIdx !== -1 && row[provinceColIdx] !== undefined ? String(row[provinceColIdx]).trim() : null;
+      
+      let statusVal = 'Chưa kích hoạt';
+      if (statusColIdx !== -1 && row[statusColIdx] !== undefined) {
+        statusVal = String(row[statusColIdx]).trim();
+      }
+
+      const rawActivationDateVal = activationDateColIdx !== -1 && row[activationDateColIdx] !== undefined ? row[activationDateColIdx] : null;
+      const rawExpiryDateVal = expiryDateColIdx !== -1 && row[expiryDateColIdx] !== undefined ? row[expiryDateColIdx] : null;
+
+      const activationDate = parseExcelDate(rawActivationDateVal);
+      const warrantyExpiryDate = parseExcelDate(rawExpiryDateVal);
 
       // Lưu thông tin thô của dòng
       const rawData: Record<string, any> = {};
@@ -808,6 +871,13 @@ router.post('/import', requireCoordinatorOrAdmin, (req, res, next) => {
         rawModel,
         rawProductCode,
         rawDeliveryDateVal,
+        customerName,
+        customerPhone,
+        address,
+        province,
+        statusVal,
+        activationDate,
+        warrantyExpiryDate,
         rawData
       });
     });
@@ -922,23 +992,14 @@ router.post('/import', requireCoordinatorOrAdmin, (req, res, next) => {
       }
 
       // Bước 2 & 3: Matching đối chiếu với ServiceReport để xác định kích hoạt bảo hành
-      let statusVal = isNewFormat ? 'Chưa kích hoạt' : (item.rawData.col_3 || 'Chưa kích hoạt');
-      let activationDate: Date | null = null;
-      let warrantyExpiryDate: Date | null = null;
-      let customerName: string | null = isNewFormat ? null : (item.rawData.col_7 || null);
-      let customerPhone: string | null = isNewFormat ? null : (item.rawData.col_8 || null);
-      let address: string | null = isNewFormat ? null : (item.rawData.col_9 || null);
-      let province: string | null = isNewFormat ? null : (item.rawData.col_10 || null);
+      let statusVal = item.statusVal;
+      let activationDate = item.activationDate;
+      let warrantyExpiryDate = item.warrantyExpiryDate;
+      let customerName = item.customerName;
+      let customerPhone = item.customerPhone;
+      let address = item.address;
+      let province = item.province;
       let orderId: string | null = null;
-
-      if (!isNewFormat) {
-        // Nếu là format cũ, parse trực tiếp ngày tháng từ excel
-        activationDate = item.rawData.col_4 ? new Date(item.rawData.col_4) : null;
-        if (isNaN(activationDate?.getTime() || 0)) activationDate = null;
-
-        warrantyExpiryDate = item.rawData.col_5 ? new Date(item.rawData.col_5) : null;
-        if (isNaN(warrantyExpiryDate?.getTime() || 0)) warrantyExpiryDate = null;
-      }
 
       // Lấy báo cáo hoàn thành ca lắp đặt
       const matchedReport = reportMap.get(cleanedSerial);
@@ -1609,6 +1670,35 @@ router.post('/:id/restore', requireCoordinatorOrAdmin, async (req: Request, res:
  */
 router.get('/zalo/authorize', requireCoordinatorOrAdmin, async (req: Request, res: Response): Promise<void> => {
   try {
+    const fnsAppId = process.env.FNS_APP_ID || '';
+    const fnsSecretKey = process.env.FNS_SECRET_KEY || '';
+    if (fnsAppId && fnsSecretKey) {
+      res.send(`
+        <html>
+          <head>
+            <title>Liên kết Zalo OA</title>
+            <meta charset="utf-8">
+            <style>
+              body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; background-color: #f3f4f6; }
+              .card { background: white; padding: 32px; border-radius: 12px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); text-align: center; max-width: 400px; }
+              h2 { color: #10b981; margin-top: 0; }
+              p { color: #4b5563; font-size: 14px; line-height: 1.5; }
+              .btn { background: #3b82f6; color: white; border: none; padding: 10px 20px; border-radius: 6px; font-weight: 600; cursor: pointer; margin-top: 16px; }
+            </style>
+          </head>
+          <body>
+            <div class="card">
+              <h2>Đã kết nối qua FPT FNS</h2>
+              <p>Hệ thống hiện tại đang sử dụng cấu hình gửi tin nhắn ZNS thông qua cổng <strong>FPT FNS Gateway (App ID: ${fnsAppId})</strong>.</p>
+              <p>Trạng thái kết nối là hoạt động và bạn không cần thực hiện liên kết OAuth trực tiếp.</p>
+              <button onclick="window.close()" class="btn">Đóng cửa sổ</button>
+            </div>
+          </body>
+        </html>
+      `);
+      return;
+    }
+
     const config = await getZaloConfig();
     if (!config.appId) {
       res.status(400).send('Cấu hình Zalo OA chưa được thiết lập App ID trong DB hoặc file .env');
@@ -1701,6 +1791,20 @@ router.get('/zalo/callback', async (req: Request, res: Response): Promise<void> 
  */
 router.get('/zalo/status', requireCoordinatorOrAdmin, async (req: Request, res: Response): Promise<void> => {
   try {
+    const fnsAppId = process.env.FNS_APP_ID || '';
+    const fnsSecretKey = process.env.FNS_SECRET_KEY || '';
+    if (fnsAppId && fnsSecretKey) {
+      res.json({
+        success: true,
+        isConnected: true,
+        isExpired: false,
+        oaId: 'Cổng FPT FNS Gateway',
+        appId: fnsAppId,
+        tokenExpiredAt: null
+      });
+      return;
+    }
+
     const config = await getZaloConfig();
     const isConnected = !!config.accessToken && !!config.refreshToken;
     const isExpired = config.tokenExpiredAt ? new Date(config.tokenExpiredAt).getTime() < Date.now() : true;

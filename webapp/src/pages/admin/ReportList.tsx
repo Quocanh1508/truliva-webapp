@@ -486,7 +486,7 @@ export default function ReportList() {
   const [tempWorkTypes, setTempWorkTypes] = useState<string[]>([]);
   const [tempServiceTypes, setTempServiceTypes] = useState<string[]>([]);
   const [tempCategories, setTempCategories] = useState<string[]>([]);
-  const [tempMainStationId, setTempMainStationId] = useState('');
+  const [tempMainStationIds, setTempMainStationIds] = useState<string[]>([]);
   const [tempTechStations, setTempTechStations] = useState<string[]>([]);
   const [tempKtvs, setTempKtvs] = useState<string[]>([]);
   const [tempProvince, setTempProvince] = useState('');
@@ -503,7 +503,7 @@ export default function ReportList() {
     serviceTypes: [] as string[],
     categories: [] as string[],
     products: [] as string[],
-    mainStationId: '',
+    mainStationIds: [] as string[],
     techStations: [] as string[],
     ktvs: [] as string[],
     province: '',
@@ -603,8 +603,8 @@ export default function ReportList() {
       if (appliedFilters.products.length > 0) {
         params.append('products', appliedFilters.products.join(','));
       }
-      if (appliedFilters.mainStationId) {
-        params.append('mainStationId', appliedFilters.mainStationId);
+      if (appliedFilters.mainStationIds.length > 0) {
+        params.append('mainStationIds', appliedFilters.mainStationIds.join(','));
       }
       if (appliedFilters.techStations.length > 0) {
         params.append('techStationIds', appliedFilters.techStations.join(','));
@@ -652,10 +652,30 @@ export default function ReportList() {
     setPage(1);
   };
 
-  const handleMainStationChange = (id: string) => {
-    setTempMainStationId(id);
-    setTempTechStations([]);
-    setTempKtvs([]);
+  const handleMainStationChange = (ids: string[]) => {
+    setTempMainStationIds(ids);
+    if (ids.length > 0 && filterOptions) {
+      // Keep only tech stations that belong to one of the selected main stations
+      const validTechStations = tempTechStations.filter(techId => {
+        const ts = filterOptions.techStations.find(t => t.id === techId);
+        return ts && ids.includes(ts.mainStationId);
+      });
+      setTempTechStations(validTechStations);
+
+      // Keep only KTVs that belong to one of the selected tech stations
+      if (validTechStations.length > 0) {
+        const validKtvs = tempKtvs.filter(ktvId => {
+          const ktv = filterOptions.ktvs.find(k => k.id === ktvId);
+          return ktv && validTechStations.includes(ktv.techStationId);
+        });
+        setTempKtvs(validKtvs);
+      } else {
+        setTempKtvs([]);
+      }
+    } else {
+      setTempTechStations([]);
+      setTempKtvs([]);
+    }
   };
 
   const handleTechStationsChange = (ids: string[]) => {
@@ -679,7 +699,7 @@ export default function ReportList() {
       serviceTypes: tempServiceTypes,
       categories: selectedCategories,
       products: selectedProducts,
-      mainStationId: tempMainStationId,
+      mainStationIds: tempMainStationIds,
       techStations: tempTechStations,
       ktvs: tempKtvs,
       province: tempProvince,
@@ -697,7 +717,7 @@ export default function ReportList() {
     setTempWorkTypes([]);
     setTempServiceTypes([]);
     setTempCategories([]);
-    setTempMainStationId('');
+    setTempMainStationIds([]);
     setTempTechStations([]);
     setTempKtvs([]);
     setTempProvince('');
@@ -713,7 +733,7 @@ export default function ReportList() {
       serviceTypes: [],
       categories: [],
       products: [],
-      mainStationId: '',
+      mainStationIds: [],
       techStations: [],
       ktvs: [],
       province: '',
@@ -749,8 +769,8 @@ export default function ReportList() {
     if (appliedFilters.products.length > 0) {
       params.append('products', appliedFilters.products.join(','));
     }
-    if (appliedFilters.mainStationId) {
-      params.append('mainStationId', appliedFilters.mainStationId);
+    if (appliedFilters.mainStationIds.length > 0) {
+      params.append('mainStationIds', appliedFilters.mainStationIds.join(','));
     }
     if (appliedFilters.techStations.length > 0) {
       params.append('techStationIds', appliedFilters.techStations.join(','));
@@ -1029,33 +1049,26 @@ export default function ReportList() {
 
           {/* Row 2: Trạm & KTV & Tỉnh */}
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            {/* Trạm chính (Single Select) */}
-            <div className="flex flex-col gap-1 relative w-full text-left">
-              <label className="text-[11px] font-bold text-gray-500 uppercase tracking-wider">Trạm chính</label>
-              <select
-                value={tempMainStationId}
-                onChange={(e) => handleMainStationChange(e.target.value)}
-                className="w-full bg-white border border-gray-300 rounded-md px-3 py-2 text-[13px] text-gray-700 outline-none hover:border-blue-400 focus:border-blue-500 transition-colors"
-              >
-                <option value="">Tất cả</option>
-                {filterOptions?.mainStations.map(station => (
-                  <option key={station.id} value={station.id}>{station.name}</option>
-                ))}
-              </select>
-            </div>
+            {/* Trạm chính (Multi Select) */}
+            <MultiSelectObjectDropdown
+              label="Trạm chính"
+              options={filterOptions?.mainStations || []}
+              selectedIds={tempMainStationIds}
+              onChange={handleMainStationChange}
+            />
 
              {/* Trạm kỹ thuật (Multi Select cascading) */}
             <MultiSelectObjectDropdown
               label="Trạm kỹ thuật"
               options={
-                tempMainStationId
-                  ? (filterOptions?.techStations.filter(t => t.mainStationId === tempMainStationId) || [])
+                tempMainStationIds.length > 0
+                  ? (filterOptions?.techStations.filter(t => tempMainStationIds.includes(t.mainStationId)) || [])
                   : (filterOptions?.techStations || [])
               }
               selectedIds={tempTechStations}
               onChange={handleTechStationsChange}
               onBeforeOpen={() => {
-                if (!tempMainStationId) {
+                if (tempMainStationIds.length === 0) {
                   alert('Vui lòng chọn Trạm chính trước khi chọn Trạm kỹ thuật.');
                   return false;
                 }
@@ -1069,10 +1082,10 @@ export default function ReportList() {
               options={
                 (tempTechStations.length > 0
                   ? (filterOptions?.ktvs.filter(k => tempTechStations.includes(k.techStationId)) || [])
-                  : (tempMainStationId
+                  : (tempMainStationIds.length > 0
                       ? (filterOptions?.ktvs.filter(k => {
                           const ts = filterOptions?.techStations.find(t => t.id === k.techStationId);
-                          return ts && ts.mainStationId === tempMainStationId;
+                          return ts && tempMainStationIds.includes(ts.mainStationId);
                         }) || [])
                       : (filterOptions?.ktvs || [])
                     )
@@ -1081,7 +1094,7 @@ export default function ReportList() {
               selectedIds={tempKtvs}
               onChange={setTempKtvs}
               onBeforeOpen={() => {
-                if (!tempMainStationId) {
+                if (tempMainStationIds.length === 0) {
                   alert('Vui lòng chọn Trạm chính trước khi chọn Kỹ thuật viên.');
                   return false;
                 }

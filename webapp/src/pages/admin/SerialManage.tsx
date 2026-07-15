@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { fetchApi, API_URL } from '../../api/client';
-import { Hash, Upload, Download, Search, X, Clock, ChevronLeft, ChevronRight, AlertTriangle, CheckCircle, User, Phone, MapPin, Wrench, FileText, Filter, Edit3, RotateCcw, Sparkles } from 'lucide-react';
+import { useAuth } from '../../context/AuthContext';
+import { Hash, Upload, Download, Search, X, Clock, ChevronLeft, ChevronRight, AlertTriangle, CheckCircle, User, Phone, MapPin, Wrench, FileText, Filter, RotateCcw, Sparkles, FolderPlus, Database } from 'lucide-react';
 
 interface Serial {
   id: string;
@@ -65,6 +66,9 @@ interface ImportError {
 }
 
 export default function SerialManage() {
+  const { user: currentUser } = useAuth();
+  const canChangeWarrantyPeriod = currentUser?.role === 'ADMIN' || currentUser?.role === 'DEV' || currentUser?.role === 'COORDINATOR';
+
   const [serials, setSerials] = useState<Serial[]>([]);
   const [stats, setStats] = useState<SerialStats>({ total: 0, activated: 0, unactivated: 0, confirmed: 0 });
   const [loading, setLoading] = useState(true);
@@ -84,6 +88,7 @@ export default function SerialManage() {
   const [selectedSerial, setSelectedSerial] = useState<Serial | null>(null);
   const [history, setHistory] = useState<HistoryItem[]>([]);
   const [loadingDetail, setLoadingDetail] = useState(false);
+  const [focusWarrantyDateOnOpen, setFocusWarrantyDateOnOpen] = useState(false);
 
   // Form states for approval & manual activation
   const [promosList, setPromosList] = useState<any[]>([]);
@@ -329,8 +334,9 @@ export default function SerialManage() {
     }
   };
 
-  const openDetail = async (serial: Serial) => {
+  const openDetail = async (serial: Serial, focusWarranty = false) => {
     setSelectedSerial(serial);
+    setFocusWarrantyDateOnOpen(focusWarranty);
     setLoadingDetail(true);
     setHistory([]);
     setManualStartDate(new Date().toISOString().substring(0, 10));
@@ -538,7 +544,7 @@ export default function SerialManage() {
               ) : serials.map(s => (
                 <tr
                   key={s.id}
-                  onClick={() => openDetail(s)}
+                  onClick={() => openDetail(s, false)}
                   style={{
                     borderBottom: '1px solid #f1f5f9', cursor: 'pointer',
                     transition: 'background 0.15s',
@@ -546,21 +552,31 @@ export default function SerialManage() {
                   onMouseEnter={e => (e.currentTarget.style.background = '#f8fafc')}
                   onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
                 >
-                  {/* Column 1: Serial / Model + Quick Actions */}
+                  {/* Column 1: Serial / Model */}
                   <td style={{ padding: '12px 16px', verticalAlign: 'top' }}>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
                       <span style={{ fontWeight: 600, fontFamily: 'monospace', color: '#1e40af', fontSize: 14 }}>
                         {s.serialNumber}
                       </span>
                       <span style={{ color: '#dc2626', fontSize: 12, fontWeight: 500 }}>
                         {s.model}
                       </span>
-                      {/* Action Icons */}
-                      <div style={{ display: 'flex', gap: 12, marginTop: 6 }}>
+                    </div>
+                  </td>
+
+                  {/* Column 2: Dòng máy + Action Icons */}
+                  <td style={{ padding: '12px 16px', verticalAlign: 'top' }}>
+                    <div style={{ display: 'flex', alignItems: 'start', justifyContent: 'space-between', gap: 12 }}>
+                      <span style={{ fontWeight: 550, color: '#334155', fontSize: 14 }}>
+                        {s.model}
+                      </span>
+                      
+                      {/* Action Icons Column stacked vertically */}
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 6, alignItems: 'center' }}>
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
-                            openDetail(s);
+                            openDetail(s, false);
                           }}
                           style={{
                             background: 'none', border: 'none', padding: 0, cursor: 'pointer',
@@ -568,7 +584,7 @@ export default function SerialManage() {
                           }}
                           title="Chỉnh sửa thông tin"
                         >
-                          <Edit3 size={14} />
+                          <FolderPlus size={16} />
                         </button>
                         <button
                           onClick={(e) => {
@@ -577,32 +593,29 @@ export default function SerialManage() {
                           }}
                           style={{
                             background: 'none', border: 'none', padding: 0, cursor: 'pointer',
-                            color: '#ef4444', display: 'flex', alignItems: 'center'
+                            color: '#64748b', display: 'flex', alignItems: 'center'
                           }}
                           title="Khôi phục trạng thái"
                         >
-                          <RotateCcw size={14} />
+                          <RotateCcw size={16} />
                         </button>
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
-                            window.open(`${window.location.origin}/admin/reports?search=${s.serialNumber}`, '_blank');
+                            openDetail(s, true);
                           }}
                           style={{
-                            background: 'none', border: 'none', padding: 0, cursor: 'pointer',
-                            color: '#4f46e5', display: 'flex', alignItems: 'center'
+                            background: 'none', border: 'none', padding: 0,
+                            cursor: canChangeWarrantyPeriod ? 'pointer' : 'not-allowed',
+                            color: canChangeWarrantyPeriod ? '#64748b' : '#cbd5e1',
+                            display: 'flex', alignItems: 'center'
                           }}
-                          title="Xem lịch sử / Chính sách"
+                          title="Thay đổi thời gian bảo hành"
                         >
-                          <FileText size={14} />
+                          <Database size={16} />
                         </button>
                       </div>
                     </div>
-                  </td>
-
-                  {/* Column 2: Dòng máy */}
-                  <td style={{ padding: '12px 16px', verticalAlign: 'top', fontWeight: 550, color: '#334155' }}>
-                    {s.model}
                   </td>
 
                   {/* Column 3: Thông tin khách hàng */}
@@ -611,22 +624,26 @@ export default function SerialManage() {
                       <div style={{ display: 'flex', flexDirection: 'column', gap: 4, fontSize: 12 }}>
                         {s.customerName && (
                           <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                            <User size={13} color="#64748b" /> <strong>{s.customerName}</strong>
+                            <User size={13} color="#64748b" style={{ flexShrink: 0 }} /> 
+                            <span style={{ color: '#1d4ed8', fontWeight: 600 }}>{s.customerName}</span>
                           </div>
                         )}
                         {s.customerPhone && (
                           <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                            <Phone size={13} color="#64748b" /> <span style={{ color: '#0f766e', fontWeight: 600 }}>{s.customerPhone}</span>
+                            <Phone size={13} color="#64748b" style={{ flexShrink: 0 }} /> 
+                            <span style={{ color: '#0f766e', fontWeight: 600 }}>{s.customerPhone}</span>
                           </div>
                         )}
                         {s.address && (
                           <div style={{ display: 'flex', alignItems: 'start', gap: 6 }}>
-                            <MapPin size={13} color="#64748b" style={{ marginTop: 2, flexShrink: 0 }} /> <span>{s.address}</span>
+                            <MapPin size={13} color="#64748b" style={{ marginTop: 2, flexShrink: 0 }} /> 
+                            <span>{s.address}</span>
                           </div>
                         )}
                         {s.province && (
                           <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                            <MapPin size={13} color="#3b82f6" /> <span>{s.province}</span>
+                            <MapPin size={13} color="#3b82f6" style={{ flexShrink: 0 }} /> 
+                            <span style={{ color: '#475569' }}>{s.province}</span>
                           </div>
                         )}
                       </div>
@@ -1014,6 +1031,8 @@ export default function SerialManage() {
                   <label style={{ fontSize: 11, fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>Ngày kích hoạt bảo hành</label>
                   <input
                     type="date"
+                    autoFocus={focusWarrantyDateOnOpen}
+                    disabled={!canChangeWarrantyPeriod}
                     value={selectedSerial.activationDate ? new Date(selectedSerial.activationDate).toISOString().split('T')[0] : ''}
                     onChange={e => {
                       const newDate = e.target.value ? new Date(e.target.value).toISOString() : null;
@@ -1032,6 +1051,7 @@ export default function SerialManage() {
                   <label style={{ fontSize: 11, fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>Ngày hết hạn bảo hành</label>
                   <input
                     type="date"
+                    disabled={!canChangeWarrantyPeriod}
                     value={selectedSerial.warrantyExpiryDate ? new Date(selectedSerial.warrantyExpiryDate).toISOString().split('T')[0] : ''}
                     onChange={e => setSelectedSerial(prev => prev ? { ...prev, warrantyExpiryDate: e.target.value ? new Date(e.target.value).toISOString() : null } : null)}
                     style={{ width: '100%', padding: '8px 12px', borderRadius: 8, border: '1px solid #cbd5e1', fontSize: 13, marginTop: 4, background: 'white' }}

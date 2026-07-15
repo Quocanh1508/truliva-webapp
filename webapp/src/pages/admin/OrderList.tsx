@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getOrders, updateOrder, getKtvUsers, getStations, getOrderAuditLog, syncOrders, syncSingleOrder, getFiltersData, fetchApi, createOrder, searchCustomers, bulkAssignOrders, bulkCancelOrders } from '../../api/client';
-import { Search, ChevronLeft, ChevronRight, History, XCircle, Filter, RefreshCw, FileText, CheckCircle2, ClipboardCheck, Copy, UserPlus, Download, Wrench, Settings, FolderOpen, Building2, MapPin, Users, Calendar, Plus, AlertTriangle, ExternalLink, RotateCcw, Edit3, Tag, Trash2 } from 'lucide-react';
+import { Search, ChevronLeft, ChevronRight, History, XCircle, Filter, RefreshCw, FileText, CheckCircle2, ClipboardCheck, Copy, UserPlus, Download, Wrench, Settings, FolderOpen, Building2, MapPin, Users, Calendar, Plus, AlertTriangle, ExternalLink, RotateCcw, Edit3, Tag, Trash2, User } from 'lucide-react';
 import { WARRANTY_SERVICE_GROUPS, REPAIR_SERVICE_GROUPS, WORK_TYPE_SERVICES } from '../../utils/workTypes';
 import { useConfirm } from '../../context/ConfirmContext';
 import DateRangePicker from '../../components/DateRangePicker';
@@ -98,9 +98,25 @@ export default function OrderList() {
   const wsDebounceTimerRef = useRef<any>(null);
   const ordersFingerprint = useRef<string>('');
 
+  // Helper to load saved filters from sessionStorage
+  const getSavedFilter = (key: string, defaultValue: any) => {
+    try {
+      const saved = sessionStorage.getItem('truliva_order_filters');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed[key] !== undefined) {
+          return parsed[key];
+        }
+      }
+    } catch (e) {
+      console.error('Error parsing saved filters:', e);
+    }
+    return defaultValue;
+  };
+
   // Filters
-  const [search, setSearch] = useState('');
-  const [debouncedSearch, setDebouncedSearch] = useState('');
+  const [search, setSearch] = useState<string>(() => getSavedFilter('search', ''));
+  const [debouncedSearch, setDebouncedSearch] = useState<string>(() => getSavedFilter('search', ''));
 
   useEffect(() => {
     const handler = setTimeout(() => {
@@ -109,18 +125,25 @@ export default function OrderList() {
     return () => clearTimeout(handler);
   }, [search]);
 
+  // Only reset page to 1 when search text changes IF it is not the initial mount load
+  const isInitialSearchMountRef = useRef(true);
   useEffect(() => {
+    if (isInitialSearchMountRef.current) {
+      isInitialSearchMountRef.current = false;
+      return;
+    }
     setPage(1);
   }, [debouncedSearch]);
+
   const [sortBy, setSortBy] = useState('createdAt');
   const [sortOrder, setSortOrder] = useState('desc');
 
   // Date Filters
-  const [customStartDate, setCustomStartDate] = useState('');
-  const [customEndDate, setCustomEndDate] = useState('');
+  const [customStartDate, setCustomStartDate] = useState<string>(() => getSavedFilter('customStartDate', ''));
+  const [customEndDate, setCustomEndDate] = useState<string>(() => getSavedFilter('customEndDate', ''));
 
   // Pagination
-  const [page, setPage] = useState(1);
+  const [page, setPage] = useState<number>(() => getSavedFilter('page', 1));
   const [totalPages, setTotalPages] = useState(1);
   const [_totalItems, setTotalItems] = useState(0);
   const [pageInput, setPageInput] = useState('1');
@@ -130,26 +153,77 @@ export default function OrderList() {
   }, [page]);
 
   // Advanced Filtering States
-  const [filterPancakeOrderId, setFilterPancakeOrderId] = useState('');
-  const [filterAdminStatuses, setFilterAdminStatuses] = useState<string[]>([]);
-  const [filterKtvIds, setFilterKtvIds] = useState<string[]>([]);
-  const [filterWorkTypes, setFilterWorkTypes] = useState<string[]>([]);
-  const [filterMainStationIds, setFilterMainStationIds] = useState<string[]>([]);
-  const [filterCustomerName, setFilterCustomerName] = useState('');
-  const [filterCustomerPhone, setFilterCustomerPhone] = useState('');
+  const [filterPancakeOrderId, setFilterPancakeOrderId] = useState<string>(() => getSavedFilter('filterPancakeOrderId', ''));
+  const [filterAdminStatuses, setFilterAdminStatuses] = useState<string[]>(() => getSavedFilter('filterAdminStatuses', []));
+  const [filterKtvIds, setFilterKtvIds] = useState<string[]>(() => getSavedFilter('filterKtvIds', []));
+  const [filterWorkTypes, setFilterWorkTypes] = useState<string[]>(() => getSavedFilter('filterWorkTypes', []));
+  const [filterMainStationIds, setFilterMainStationIds] = useState<string[]>(() => getSavedFilter('filterMainStationIds', []));
+  const [filterCustomerName, setFilterCustomerName] = useState<string>(() => getSavedFilter('filterCustomerName', ''));
+  const [filterCustomerPhone, setFilterCustomerPhone] = useState<string>(() => getSavedFilter('filterCustomerPhone', ''));
 
   // Added filters
-  const [dateType, setDateType] = useState<string>('createdAt');
+  const [dateType, setDateType] = useState<string>(() => getSavedFilter('dateType', 'createdAt'));
   const [ktvSearch, setKtvSearch] = useState('');
   const [techStationSearch, setTechStationSearch] = useState('');
-  const [filterServiceTypes, setFilterServiceTypes] = useState<string[]>([]);
-  const [filterProductCategories, setFilterProductCategories] = useState<string[]>([]);
-  const [filterProductNames, setFilterProductNames] = useState<string[]>([]);
-  const [filterTechStationIds, setFilterTechStationIds] = useState<string[]>([]);
-  const [filterProvinces, setFilterProvinces] = useState<string[]>([]);
+  const [creatorSearch, setCreatorSearch] = useState('');
+  const [filterServiceTypes, setFilterServiceTypes] = useState<string[]>(() => getSavedFilter('filterServiceTypes', []));
+  const [filterProductCategories, setFilterProductCategories] = useState<string[]>(() => getSavedFilter('filterProductCategories', []));
+  const [filterProductNames, setFilterProductNames] = useState<string[]>(() => getSavedFilter('filterProductNames', []));
+  const [filterTechStationIds, setFilterTechStationIds] = useState<string[]>(() => getSavedFilter('filterTechStationIds', []));
+  const [filterProvinces, setFilterProvinces] = useState<string[]>(() => getSavedFilter('filterProvinces', []));
+  const [filterCreators, setFilterCreators] = useState<string[]>(() => {
+    const legacy = getSavedFilter('filterCreator', '');
+    const saved = getSavedFilter('filterCreators', null);
+    if (saved !== null) return saved;
+    return legacy ? [legacy] : [];
+  });
+
+  // Save filters to sessionStorage on change
+  useEffect(() => {
+    const filterState = {
+      search,
+      customStartDate,
+      customEndDate,
+      dateType,
+      filterPancakeOrderId,
+      filterAdminStatuses,
+      filterKtvIds,
+      filterWorkTypes,
+      filterMainStationIds,
+      filterCustomerName,
+      filterCustomerPhone,
+      filterServiceTypes,
+      filterProductCategories,
+      filterProductNames,
+      filterTechStationIds,
+      filterProvinces,
+      filterCreators,
+      page
+    };
+    sessionStorage.setItem('truliva_order_filters', JSON.stringify(filterState));
+  }, [
+    search,
+    customStartDate,
+    customEndDate,
+    dateType,
+    filterPancakeOrderId,
+    filterAdminStatuses,
+    filterKtvIds,
+    filterWorkTypes,
+    filterMainStationIds,
+    filterCustomerName,
+    filterCustomerPhone,
+    filterServiceTypes,
+    filterProductCategories,
+    filterProductNames,
+    filterTechStationIds,
+    filterProvinces,
+    filterCreators,
+    page
+  ]);
 
   // Dropdown / Popover states
-  const [activeDropdown, setActiveDropdown] = useState<'main' | 'pancakeOrderId' | 'adminStatuses' | 'ktvIds' | 'workTypes' | 'mainStationIds' | 'customerName' | 'customerPhone' | 'serviceTypes' | 'productCategories' | 'productNames' | 'techStationIds' | 'provinces' | 'appointmentTimeFilter' | 'completedTimeFilter' | 'createdTimeFilter' | 'updatedTimeFilter' | null>(null);
+  const [activeDropdown, setActiveDropdown] = useState<'main' | 'pancakeOrderId' | 'adminStatuses' | 'ktvIds' | 'workTypes' | 'mainStationIds' | 'customerName' | 'customerPhone' | 'serviceTypes' | 'productCategories' | 'productNames' | 'techStationIds' | 'provinces' | 'appointmentTimeFilter' | 'completedTimeFilter' | 'createdTimeFilter' | 'updatedTimeFilter' | 'creator' | null>(null);
 
   // Temporary filter states for the popover/modal
   const [tempPancakeOrderId, setTempPancakeOrderId] = useState('');
@@ -159,6 +233,7 @@ export default function OrderList() {
   const [tempMainStationIds, setTempMainStationIds] = useState<string[]>([]);
   const [tempCustomerName, setTempCustomerName] = useState('');
   const [tempCustomerPhone, setTempCustomerPhone] = useState('');
+  const [tempCreators, setTempCreators] = useState<string[]>([]);
 
   const [tempServiceTypes, setTempServiceTypes] = useState<string[]>([]);
   const [tempProductCategories, setTempProductCategories] = useState<string[]>([]);
@@ -172,12 +247,14 @@ export default function OrderList() {
     products: any[];
     techStations: any[];
     provinces: string[];
+    creators: string[];
   }>({
     categories: [],
     productNames: [],
     products: [],
     techStations: [],
-    provinces: []
+    provinces: [],
+    creators: []
   });
 
   const [stats, setStats] = useState<{
@@ -532,7 +609,8 @@ export default function OrderList() {
         productNames: filterProductNames,
         techStationIds: filterTechStationIds,
         provinces: filterProvinces,
-        dateType: dateType
+        dateType: dateType,
+        creators: filterCreators
       });
 
       // Only update orders state if data actually changed (avoid unnecessary re-renders / glitch)
@@ -679,6 +757,7 @@ export default function OrderList() {
     filterProductNames,
     filterTechStationIds,
     filterProvinces,
+    filterCreators,
     dateType,
     debouncedSearch
   ]);
@@ -729,6 +808,7 @@ export default function OrderList() {
     filterProductNames,
     filterTechStationIds,
     filterProvinces,
+    filterCreators,
     dateType
   ]);
 
@@ -1210,7 +1290,7 @@ export default function OrderList() {
       alert(err.message);
     }
   };
-  const toggleDropdown = (type: 'main' | 'pancakeOrderId' | 'adminStatuses' | 'ktvIds' | 'workTypes' | 'mainStationIds' | 'customerName' | 'customerPhone' | 'serviceTypes' | 'productCategories' | 'productNames' | 'techStationIds' | 'provinces' | 'appointmentTimeFilter' | 'completedTimeFilter' | 'createdTimeFilter' | 'updatedTimeFilter') => {
+  const toggleDropdown = (type: 'main' | 'pancakeOrderId' | 'adminStatuses' | 'ktvIds' | 'workTypes' | 'mainStationIds' | 'customerName' | 'customerPhone' | 'serviceTypes' | 'productCategories' | 'productNames' | 'techStationIds' | 'provinces' | 'appointmentTimeFilter' | 'completedTimeFilter' | 'createdTimeFilter' | 'updatedTimeFilter' | 'creator') => {
     if (activeDropdown === type) {
       setActiveDropdown(null);
     } else {
@@ -1234,10 +1314,11 @@ export default function OrderList() {
       if (type === 'productNames') setTempProductNames(filterProductNames);
       if (type === 'techStationIds') setTempTechStationIds(filterTechStationIds);
       if (type === 'provinces') setTempProvinces(filterProvinces);
+      if (type === 'creator') setTempCreators(filterCreators);
     }
   };
 
-  const applyFilter = (type: 'pancakeOrderId' | 'adminStatuses' | 'ktvIds' | 'workTypes' | 'mainStationIds' | 'customerName' | 'customerPhone' | 'serviceTypes' | 'productCategories' | 'productNames' | 'techStationIds' | 'provinces') => {
+  const applyFilter = (type: 'pancakeOrderId' | 'adminStatuses' | 'ktvIds' | 'workTypes' | 'mainStationIds' | 'customerName' | 'customerPhone' | 'serviceTypes' | 'productCategories' | 'productNames' | 'techStationIds' | 'provinces' | 'creator') => {
     setPage(1);
     if (type === 'pancakeOrderId') setFilterPancakeOrderId(tempPancakeOrderId);
     if (type === 'adminStatuses') setFilterAdminStatuses(tempAdminStatuses);
@@ -1256,6 +1337,7 @@ export default function OrderList() {
     if (type === 'productNames') setFilterProductNames(tempProductNames);
     if (type === 'techStationIds') setFilterTechStationIds(tempTechStationIds);
     if (type === 'provinces') setFilterProvinces(tempProvinces);
+    if (type === 'creator') setFilterCreators(tempCreators);
     setActiveDropdown(null);
   };
 
@@ -1273,6 +1355,7 @@ export default function OrderList() {
     setFilterProductNames([]);
     setFilterTechStationIds([]);
     setFilterProvinces([]);
+    setFilterCreators([]);
     setCustomStartDate('');
     setCustomEndDate('');
     setDateType('createdAt');
@@ -1329,7 +1412,8 @@ export default function OrderList() {
       productNames: filterProductNames,
       techStationIds: filterTechStationIds,
       provinces: filterProvinces,
-      dateType: dateType
+      dateType: dateType,
+      creators: filterCreators
     };
 
     for (const [key, value] of Object.entries(params)) {
@@ -1561,6 +1645,10 @@ export default function OrderList() {
                       <button className="w-full flex items-center space-x-2.5 px-4 py-2 hover:bg-gray-50 text-rose-700 font-medium transition-colors text-[13px]" onClick={() => toggleDropdown('provinces')}>
                         <MapPin size={15} className="text-rose-500" />
                         <span>Tỉnh/Thành phố</span>
+                      </button>
+                      <button className="w-full flex items-center space-x-2.5 px-4 py-2 hover:bg-gray-50 text-indigo-700 font-medium transition-colors text-[13px]" onClick={() => toggleDropdown('creator')}>
+                        <User size={15} className="text-indigo-500" />
+                        <span>Người tạo</span>
                       </button>
                       <div className="h-px bg-gray-200 my-1"></div>
                       <button className="w-full flex items-center space-x-2.5 px-4 py-2 hover:bg-gray-50 text-blue-700 font-medium transition-colors text-[13px]" onClick={() => toggleDropdown('appointmentTimeFilter')}>
@@ -2104,6 +2192,71 @@ export default function OrderList() {
                     </div>
                   )}
 
+                  {activeDropdown === 'creator' && (
+                    <div className="p-4 w-72 space-y-3">
+                      <h4 className="font-semibold text-[14px] text-gray-800">Lọc theo Người tạo</h4>
+                      <input
+                        type="text"
+                        placeholder="Tìm người tạo đơn..."
+                        className="w-full px-2.5 py-1.5 text-xs border border-gray-300 rounded-md outline-none focus:border-blue-500 bg-white text-gray-800"
+                        value={creatorSearch}
+                        onChange={(e) => setCreatorSearch(e.target.value)}
+                      />
+                      <div className="space-y-2 max-h-48 overflow-y-auto">
+                        <label className="flex items-center space-x-2 text-sm text-gray-700 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            className="rounded text-blue-600 focus:ring-blue-500"
+                            checked={tempCreators.length === 0}
+                            onChange={() => setTempCreators([])}
+                          />
+                          <span className="font-semibold text-gray-500">Tất cả (Không lọc)</span>
+                        </label>
+                        {creatorSearch.trim() && (
+                          <label className="flex items-center space-x-2 text-sm text-blue-600 cursor-pointer font-medium border-b pb-1.5 mb-1.5">
+                            <input
+                              type="checkbox"
+                              className="rounded text-blue-600 focus:ring-blue-500"
+                              checked={tempCreators.includes(creatorSearch.trim())}
+                              onChange={(e) => {
+                                const val = creatorSearch.trim();
+                                if (e.target.checked) {
+                                  setTempCreators(prev => [...prev, val]);
+                                } else {
+                                  setTempCreators(prev => prev.filter(c => c !== val));
+                                }
+                              }}
+                            />
+                            <span>Khớp từ khóa: "{creatorSearch.trim()}"</span>
+                          </label>
+                        )}
+                        {dbFilterOptions.creators
+                          ?.filter(c => removeAccents(c).includes(removeAccents(creatorSearch)))
+                          .map(creatorName => (
+                            <label key={creatorName} className="flex items-center space-x-2 text-sm text-gray-700 cursor-pointer">
+                              <input
+                                type="checkbox"
+                                className="rounded text-blue-600 focus:ring-blue-500"
+                                checked={tempCreators.includes(creatorName)}
+                                onChange={(e) => {
+                                  if (e.target.checked) {
+                                    setTempCreators(prev => [...prev, creatorName]);
+                                  } else {
+                                    setTempCreators(prev => prev.filter(c => c !== creatorName));
+                                  }
+                                }}
+                              />
+                              <span>{creatorName}</span>
+                            </label>
+                          ))}
+                      </div>
+                      <div className="flex justify-between mt-2 pt-2 border-t">
+                        <button className="text-gray-500 text-xs px-2 py-1 hover:bg-gray-100 rounded" onClick={() => setActiveDropdown('main')}>Quay lại</button>
+                        <button className="bg-blue-600 text-white text-xs px-3 py-1 rounded hover:bg-blue-700 font-semibold" onClick={() => applyFilter('creator')}>Áp dụng</button>
+                      </div>
+                    </div>
+                  )}
+
                 </div>
               )}
             </div>
@@ -2236,6 +2389,15 @@ export default function OrderList() {
               </span>
             )}
 
+            {filterCreators.length > 0 && (
+              <span className="inline-flex items-center bg-gray-100 text-gray-800 text-xs font-medium px-2.5 py-1 rounded-md border border-gray-200">
+                Người tạo: {filterCreators.join(', ')}
+                <button type="button" className="ml-1.5 text-gray-400 hover:text-gray-600 outline-none" onClick={() => { setFilterCreators([]); setPage(1); }}>
+                  <XCircle size={14} className="fill-gray-200 hover:fill-gray-300 text-gray-500" />
+                </button>
+              </span>
+            )}
+
             <button
               onClick={clearAllFilters}
               className="text-xs text-red-600 hover:text-red-800 font-semibold px-2 py-1.5 rounded hover:bg-red-50 transition-colors"
@@ -2274,14 +2436,22 @@ export default function OrderList() {
         </div>
       </div>
 
-      {/* Table Area */}
-      <div className="flex-1 bg-white overflow-x-auto">
-        {loading ? (
-          <div className="flex justify-center py-12"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div></div>
-        ) : orders.length === 0 ? (
-          <div className="text-center py-12 text-gray-400">Không tìm thấy yêu cầu nào</div>
+      <div className="flex-1 bg-white overflow-x-auto relative min-h-[300px]">
+        {loading && orders.length === 0 ? (
+          <div className="flex justify-center py-12">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+          </div>
         ) : (
-          <table className="min-w-[1300px] lg:w-full text-left text-[13px]">
+          <div className={`${loading ? 'opacity-60 pointer-events-none' : ''} transition-opacity`}>
+            {loading && (
+              <div className="absolute inset-0 bg-white/40 flex items-center justify-center z-50">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+              </div>
+            )}
+            {orders.length === 0 ? (
+              <div className="text-center py-12 text-gray-400">Không tìm thấy yêu cầu nào</div>
+            ) : (
+              <table className="min-w-[1300px] lg:w-full text-left text-[13px]">
             <thead className="bg-[#f8f9fa] text-gray-600 font-semibold border-b border-gray-200 z-20 lg:sticky lg:top-0">
               <tr>
                 {(currentUser?.role === 'ADMIN' || currentUser?.role === 'DEV' || currentUser?.role === 'COORDINATOR') && (
@@ -2716,11 +2886,13 @@ export default function OrderList() {
             </tbody>
           </table>
         )}
+          </div>
+        )}
       </div>
 
       {/* Pagination */}
-      {!loading && totalPages > 1 && (
-        <div className="flex justify-between items-center px-4 py-3 border-t border-gray-200 text-[13px] text-gray-600 bg-white">
+      {totalPages > 1 && (
+        <div className={`flex justify-between items-center px-4 py-3 border-t border-gray-200 text-[13px] text-gray-600 bg-white ${loading ? 'pointer-events-none opacity-50' : ''}`}>
           <div className="flex items-center gap-1.5">
             <span>Trang</span>
             <input

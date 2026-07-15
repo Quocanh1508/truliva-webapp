@@ -517,7 +517,7 @@ export default function MyReports() {
 
                   {/* Action Buttons */}
                   <div className="flex flex-col gap-2 mt-3 pt-2.5 border-t border-gray-100">
-                    {['lắp đặt', 'giao hàng và lắp đặt'].includes(r.workType?.trim().toLowerCase()) && r.serialNumber && r.serialNumber !== 'XXXXXXXXXXXXXXX' && (
+                    {['lắp đặt', 'giao hàng và lắp đặt'].includes(r.workType?.trim().toLowerCase()) && r.serialNumber && r.serialNumber !== 'XXXXX' && r.serialNumber !== 'XXXXXXXXXXXXXXX' && (
                       <button 
                         type="button"
                         onClick={() => handleOpenActivation(r)}

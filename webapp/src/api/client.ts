@@ -140,6 +140,7 @@ export async function getFiltersData(): Promise<{
   products: any[];
   techStations: any[];
   provinces: string[];
+  creators: string[];
 }> {
   return fetchApi('/orders/filters-data');
 }

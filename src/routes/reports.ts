@@ -33,6 +33,7 @@ async function buildReportFilter(query: any, user: any): Promise<any> {
     productCategories,
     products,
     mainStationId,
+    mainStationIds,
     techStationIds,
     ktvIds,
     completedStart,
@@ -243,11 +244,15 @@ async function buildReportFilter(query: any, user: any): Promise<any> {
 
   // Lọc Trạm chính, Trạm kỹ thuật
   const orConditions: any[] = [];
-  if (mainStationId) {
-    orConditions.push(
-      { order: { mainStationId } },
-      { ktvUser: { techStation: { mainStationId } } }
-    );
+  const rawMainStationIds = mainStationIds || mainStationId;
+  if (rawMainStationIds) {
+    const list = String(rawMainStationIds).split(',').map((s: string) => s.trim()).filter(Boolean);
+    if (list.length > 0) {
+      orConditions.push(
+        { order: { mainStationId: { in: list } } },
+        { ktvUser: { techStation: { mainStationId: { in: list } } } }
+      );
+    }
   }
   if (techStationIds) {
     const list = (techStationIds as string).split(',').map((s: string) => s.trim()).filter(Boolean);
@@ -525,6 +530,18 @@ router.post('/', async (req: Request, res: Response): Promise<void> => {
       }
     }
 
+    if (cleanedSn && cleanedSn !== 'XXXXX' && cleanedSn !== 'XXXXXXXXXXXXXXX') {
+      const existingSerialRecord = await prisma.serial.findUnique({
+        where: { serialNumber: cleanedSn }
+      });
+      if (!existingSerialRecord) {
+        res.status(400).json({
+          error: `Số Serial "${cleanedSn}" không tồn tại trong hệ thống. Vui lòng kiểm tra lại thông tin trên thân máy hoặc liên hệ điều phối để đăng ký số Serial mới trước khi tạo báo cáo.`
+        });
+        return;
+      }
+    }
+
     const report = await prisma.serviceReport.create({
       data: {
         month: reportMonth,
@@ -562,7 +579,7 @@ router.post('/', async (req: Request, res: Response): Promise<void> => {
     });
 
     // ── Đối chiếu ngược: Cập nhật bảng Serial khi báo cáo có serialNumber ──
-    if (report.serialNumber && report.serialNumber !== 'XXXXXXXXXXXXXXX') {
+    if (report.serialNumber && report.serialNumber !== 'XXXXX' && report.serialNumber !== 'XXXXXXXXXXXXXXX') {
       try {
         if (report.approvalStatus === 'APPROVED') {
           // Kích hoạt ngay lập tức nếu báo cáo được duyệt tự động
@@ -1436,6 +1453,19 @@ router.get('/check-serial', async (req: Request, res: Response): Promise<void> =
       return;
     }
 
+    if (cleanInput === 'XXXXX' || cleanInput === 'XXXXXXXXXXXXXXX') {
+      res.json({
+        exists: true,
+        installDate: null,
+        customerName: null,
+        products: [],
+        serialNumber: cleanInput,
+        model: 'Thiết bị ngoại lệ',
+        source: 'exception',
+      });
+      return;
+    }
+
     // 1. Ưu tiên kiểm tra bảng Serial (quản lý serial mới)
     const serialRecord = await prisma.serial.findUnique({
       where: { serialNumber: cleanInput },
@@ -1687,6 +1717,18 @@ router.put('/:id', requireAuth, async (req: Request, res: Response): Promise<voi
       }
     }
 
+    if (cleanedSn && cleanedSn !== 'XXXXX' && cleanedSn !== 'XXXXXXXXXXXXXXX') {
+      const existingSerialRecord = await prisma.serial.findUnique({
+        where: { serialNumber: cleanedSn }
+      });
+      if (!existingSerialRecord) {
+        res.status(400).json({
+          error: `Số Serial "${cleanedSn}" không tồn tại trong hệ thống. Vui lòng kiểm tra lại thông tin trên thân máy hoặc liên hệ điều phối để đăng ký số Serial mới trước khi cập nhật báo cáo.`
+        });
+        return;
+      }
+    }
+
     const updateData: any = {};
     if (isPaid !== undefined) updateData.isPaid = isPaid;
     if (serviceCost !== undefined) updateData.serviceCost = parseFloat(serviceCost);
@@ -1724,7 +1766,7 @@ router.put('/:id', requireAuth, async (req: Request, res: Response): Promise<voi
     });
 
     // ── Đối chiếu ngược: Cập nhật bảng Serial khi cập nhật báo cáo có serialNumber ──
-    if (report.serialNumber && report.serialNumber !== 'XXXXXXXXXXXXXXX') {
+    if (report.serialNumber && report.serialNumber !== 'XXXXX' && report.serialNumber !== 'XXXXXXXXXXXXXXX') {
       try {
         if (report.approvalStatus === 'APPROVED') {
           await activateSerialWarranty(
@@ -2366,7 +2408,7 @@ router.post('/:id/approve', async (req: Request, res: Response): Promise<void> =
     // ── Kích hoạt bảo hành cho Serial khi duyệt báo cáo thành công ──
     if (report.serialNumber) {
       const cleanedSn = report.serialNumber.replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
-      if (cleanedSn !== 'XXXXXXXXXXXXXXX') {
+      if (cleanedSn !== 'XXXXX' && cleanedSn !== 'XXXXXXXXXXXXXXX') {
         try {
           await activateSerialWarranty(
             report.serialNumber,

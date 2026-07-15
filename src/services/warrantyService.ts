@@ -99,8 +99,8 @@ export async function activateSerialWarranty(
   if (customerInfo.invoiceImageUrl) serialUpdate.invoiceImageUrl = customerInfo.invoiceImageUrl.trim();
   if (orderId) serialUpdate.orderId = orderId;
 
-  // Nếu chuyển sang trạng thái "Đã kích hoạt", tiến hành tính toán thời hạn bảo hành
-  if (targetStatus === 'Đã kích hoạt') {
+  // Nếu chuyển sang trạng thái "Đã kích hoạt" hoặc "Chờ duyệt", tiến hành tính toán thời hạn bảo hành
+  if (targetStatus === 'Đã kích hoạt' || targetStatus === 'Chờ duyệt') {
     const startDate = manualStartDate || new Date();
     serialUpdate.activationDate = startDate;
 

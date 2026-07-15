@@ -181,7 +181,9 @@ router.get('/', requireAuth, async (req: Request, res: Response): Promise<void> 
       productNames,
       techStationIds,
       provinces,
-      dateType
+      dateType,
+      creator,
+      creators
     } = req.query;
 
     const pageNumber = parseInt(page as string, 10);
@@ -458,6 +460,48 @@ router.get('/', requireAuth, async (req: Request, res: Response): Promise<void> 
         searchOR.push({ pancakeOrderId: finalPancakeId });
       }
       conditions.push({ OR: searchOR });
+    }
+
+    let creatorList: string[] = [];
+    if (creators) {
+      creatorList = typeof creators === 'string' ? creators.split(',') : (Array.isArray(creators) ? creators as string[] : []);
+    } else if (creator) {
+      creatorList = typeof creator === 'string' ? creator.split(',') : (Array.isArray(creator) ? creator as string[] : []);
+    }
+
+    if (creatorList.length > 0) {
+      const creatorConditions = creatorList.map(creatorStr => {
+        const str = creatorStr.trim();
+        const variations = [
+          str,
+          str.toLowerCase(),
+          str.toUpperCase(),
+          str.split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(' ')
+        ];
+        const uniqueVariations = Array.from(new Set(variations));
+        
+        return {
+          OR: [
+            ...uniqueVariations.map(val => ({
+              rawData: {
+                path: ['creator', 'name'],
+                string_contains: val
+              }
+            })),
+            ...(str.toLowerCase().includes('hệ thống') || str.toLowerCase().includes('he thong') ? [
+              {
+                OR: [
+                  { orderSource: { contains: 'shopee', mode: 'insensitive' as const } },
+                  { orderSource: { contains: 'lazada', mode: 'insensitive' as const } },
+                  { orderSource: { contains: 'tiktok', mode: 'insensitive' as const } },
+                  { orderSource: { contains: 'tiki', mode: 'insensitive' as const } }
+                ]
+              }
+            ] : [])
+          ]
+        };
+      });
+      conditions.push({ OR: creatorConditions });
     }
 
     if (conditions.length > 0) {
@@ -949,7 +993,9 @@ router.get('/export', requireAuth, async (req: Request, res: Response): Promise<
       productNames,
       techStationIds,
       provinces,
-      dateType
+      dateType,
+      creator,
+      creators
     } = req.query;
 
     const conditions: Prisma.OrderWhereInput[] = [];
@@ -1189,6 +1235,48 @@ router.get('/export', requireAuth, async (req: Request, res: Response): Promise<
       conditions.push({ OR: searchOR });
     }
 
+    let creatorList: string[] = [];
+    if (creators) {
+      creatorList = typeof creators === 'string' ? creators.split(',') : (Array.isArray(creators) ? creators as string[] : []);
+    } else if (creator) {
+      creatorList = typeof creator === 'string' ? creator.split(',') : (Array.isArray(creator) ? creator as string[] : []);
+    }
+
+    if (creatorList.length > 0) {
+      const creatorConditions = creatorList.map(creatorStr => {
+        const str = creatorStr.trim();
+        const variations = [
+          str,
+          str.toLowerCase(),
+          str.toUpperCase(),
+          str.split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(' ')
+        ];
+        const uniqueVariations = Array.from(new Set(variations));
+        
+        return {
+          OR: [
+            ...uniqueVariations.map(val => ({
+              rawData: {
+                path: ['creator', 'name'],
+                string_contains: val
+              }
+            })),
+            ...(str.toLowerCase().includes('hệ thống') || str.toLowerCase().includes('he thong') ? [
+              {
+                OR: [
+                  { orderSource: { contains: 'shopee', mode: 'insensitive' as const } },
+                  { orderSource: { contains: 'lazada', mode: 'insensitive' as const } },
+                  { orderSource: { contains: 'tiktok', mode: 'insensitive' as const } },
+                  { orderSource: { contains: 'tiki', mode: 'insensitive' as const } }
+                ]
+              }
+            ] : [])
+          ]
+        };
+      });
+      conditions.push({ OR: creatorConditions });
+    }
+
     const where: Prisma.OrderWhereInput = {};
     if (conditions.length > 0) {
       where.AND = conditions;
@@ -1335,7 +1423,7 @@ router.get('/export', requireAuth, async (req: Request, res: Response): Promise<
  */
 router.get('/filters-data', requireAuth, async (req: Request, res: Response): Promise<void> => {
   try {
-    const [products, stations, customers] = await Promise.all([
+    const [products, stations, customers, rawCreators] = await Promise.all([
       prisma.product.findMany({
         where: { isActive: true },
         select: { name: true, category: true, sku: true, sellingPrice: true }
@@ -1348,19 +1436,30 @@ router.get('/filters-data', requireAuth, async (req: Request, res: Response): Pr
         where: { provinceName: { not: null } },
         select: { provinceName: true },
         distinct: ['provinceName']
-      })
+      }),
+      prisma.$queryRaw<Array<{ name: string }>>`
+        SELECT DISTINCT "raw_data"->'creator'->>'name' as name
+        FROM "orders"
+        WHERE "raw_data"->'creator'->>'name' IS NOT NULL
+        ORDER BY name ASC;
+      `
     ]);
 
     const categories = Array.from(new Set(products.map(p => p.category).filter(Boolean))) as string[];
     const productNames = Array.from(new Set(products.map(p => p.name).filter(Boolean))) as string[];
     const provinces = Array.from(new Set(customers.map(c => c.provinceName).filter(Boolean))) as string[];
+    const creators = [
+      'Hệ thống (Shopee, Lazada, Tiktok, Tiki)',
+      ...Array.from(new Set(rawCreators.map(c => c.name).filter(Boolean)))
+    ] as string[];
 
     res.json({
       categories,
       productNames,
       products: products.map(p => ({ name: p.name, category: p.category, sku: p.sku || '', sellingPrice: p.sellingPrice || 0 })),
       techStations: stations,
-      provinces
+      provinces,
+      creators
     });
   } catch (error: any) {
     logger.error('Get filters data error', { error: error.message });
