@@ -1301,6 +1301,7 @@ router.get('/export', requireCoordinatorOrAdmin, async (req: Request, res: Respo
     worksheet.columns = [
       { header: 'Số Serial', key: 'serialNumber', width: 20 },
       { header: 'Model', key: 'model', width: 30 },
+      { header: 'Dòng máy', key: 'productLine', width: 25 },
       { header: 'Trạng thái', key: 'status', width: 18 },
       { header: 'Ngày kích hoạt', key: 'activationDate', width: 22 },
       { header: 'Ngày hết hạn BH', key: 'warrantyExpiryDate', width: 22 },
@@ -1325,6 +1326,7 @@ router.get('/export', requireCoordinatorOrAdmin, async (req: Request, res: Respo
       worksheet.addRow({
         serialNumber: serial.serialNumber,
         model: serial.model,
+        productLine: serial.model,
         status: serial.status,
         activationDate: serial.activationDate || '',
         warrantyExpiryDate: serial.warrantyExpiryDate || '',
