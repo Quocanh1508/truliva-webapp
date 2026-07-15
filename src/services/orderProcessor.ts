@@ -13,17 +13,32 @@ import { broadcastEvent } from './websocketService';
  *   3. Thay thế OrderItems (xóa cũ, tạo mới)
  *   4. Đánh dấu WebhookRawEvent = PROCESSED
  */
-export async function processOrderEvent(rawEventId: string | null, payload: any): Promise<void> {
-  try {
-    const systemId = payload.system_id;
+const orderLocks = new Map<string, Promise<void>>();
 
-    if (!systemId) {
-      logger.warn('Order event missing system_id, skipping', { rawEventId });
-      if (rawEventId) {
-        await markProcessed(rawEventId);
-      }
-      return;
+export async function processOrderEvent(rawEventId: string | null, payload: any): Promise<void> {
+  const systemId = payload.system_id;
+
+  if (!systemId) {
+    logger.warn('Order event missing system_id, skipping', { rawEventId });
+    if (rawEventId) {
+      await markProcessed(rawEventId);
     }
+    return;
+  }
+
+  // ── MUTEX LOCK TO PREVENT CONCURRENT SYNC/WEBHOOK RACE CONDITIONS ──
+  const lockKey = String(systemId);
+  while (orderLocks.has(lockKey)) {
+    await orderLocks.get(lockKey);
+  }
+
+  let resolveLock: () => void = () => {};
+  const lockPromise = new Promise<void>((resolve) => {
+    resolveLock = resolve;
+  });
+  orderLocks.set(lockKey, lockPromise);
+
+  try {
 
     // ══════════════════════════════════════
     // 1. Upsert Customer từ thông tin đơn hàng
@@ -361,27 +376,45 @@ export async function processOrderEvent(rawEventId: string | null, payload: any)
     }
 
     // ══════════════════════════════════════
-    // 3. Xử lý Order Items
+    // 3. Xử lý Order Items (Có gộp trùng sản phẩm để tránh chia nhỏ dòng)
     // ══════════════════════════════════════
     const items = payload.items || payload.order_items || [];
 
     if (items.length > 0) {
+      // Nhóm các items cùng sản phẩm (trùng SKU hoặc trùng tên sản phẩm)
+      const groupedItemsMap = new Map<string, any>();
+      for (const item of items) {
+        const name = item.product_name || item.name || item.variation_info?.name || item.variations?.name || 'Sản phẩm không tên';
+        const sku = item.sku || item.product_sku || item.variation_info?.display_id || '';
+        const key = sku ? `sku:${sku}` : `name:${name}`;
+
+        if (groupedItemsMap.has(key)) {
+          const existing = groupedItemsMap.get(key);
+          existing.quantity += (item.quantity ?? 1);
+          existing.discount += (item.discount ?? 0);
+        } else {
+          groupedItemsMap.set(key, {
+            orderId: order.id,
+            productName: name,
+            sku: sku || null,
+            quantity: item.quantity ?? 1,
+            price: isWarrantyOrder ? 0 : (item.price ?? item.product_price ?? null),
+            discount: item.discount ?? 0,
+            variationInfo: item.variation_info || item.variations || null,
+            rawData: item,
+          });
+        }
+      }
+
+      const newItemsData = Array.from(groupedItemsMap.values());
+
       // Xóa items cũ rồi tạo mới (đảm bảo đồng bộ)
       await prisma.orderItem.deleteMany({
         where: { orderId: order.id },
       });
 
       await prisma.orderItem.createMany({
-        data: items.map((item: any) => ({
-          orderId: order.id,
-          productName: item.product_name || item.name || item.variation_info?.name || item.variations?.name || 'Sản phẩm không tên',
-          sku: item.sku || item.product_sku || item.variation_info?.display_id || null,
-          quantity: item.quantity ?? 1,
-          price: isWarrantyOrder ? 0 : (item.price ?? item.product_price ?? null),
-          discount: item.discount ?? 0,
-          variationInfo: item.variation_info || item.variations || null,
-          rawData: item,
-        })),
+        data: newItemsData,
       });
     }
 
@@ -449,6 +482,9 @@ export async function processOrderEvent(rawEventId: string | null, payload: any)
     if (rawEventId) {
       await markFailed(rawEventId, error.message);
     }
+  } finally {
+    orderLocks.delete(lockKey);
+    resolveLock();
   }
 }
 
