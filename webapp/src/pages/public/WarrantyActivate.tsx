@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { ShieldCheck, ArrowRight, UploadCloud, CheckCircle, AlertTriangle, Smartphone, User, MapPin, Loader2, Sparkles, ChevronLeft, Phone } from 'lucide-react';
+import { ShieldCheck, ArrowRight, UploadCloud, CheckCircle, AlertTriangle, Smartphone, User, MapPin, Loader2, Sparkles, ChevronLeft, Phone, Wrench } from 'lucide-react';
 import { API_URL } from '../../api/client';
 
 // Định dạng hiển thị Số Serial dạng: XXXX XXX XXX XXXXX
@@ -279,21 +279,18 @@ export default function WarrantyActivate() {
               </div>
             </button>
 
-            {/* Quan tâm Zalo Truliva */}
+            {/* Hỗ trợ kỹ thuật */}
             <a
               href="https://zalo.me/3870382725035413507"
               target="_blank"
               rel="noopener noreferrer"
-              className="w-full bg-[#0068FF] hover:bg-[#0055DD] active:scale-[0.98] text-white font-bold py-4 px-5 rounded-xl text-base transition-all shadow-lg shadow-blue-900/30 flex items-center gap-4 border border-blue-400/20"
+              className="w-full bg-[#2E7D32] hover:bg-[#1B5E20] active:scale-[0.98] text-white font-bold py-4 px-5 rounded-xl text-base transition-all shadow-lg shadow-green-900/30 flex items-center gap-4 border border-green-400/20"
             >
               <div className="w-12 h-12 bg-white/15 rounded-xl flex items-center justify-center shrink-0">
-                <svg viewBox="0 0 24 24" className="w-6 h-6 fill-white">
-                  <path d="M12.003 2C6.478 2 2 6.136 2 11.238c0 3.125 1.688 5.88 4.298 7.48-.12.443-.655 2.417-.655 2.417-.06.223.167.387.352.268 0 0 2.278-1.52 3.162-2.09.91.246 1.875.38 2.846.38 5.525 0 10.003-4.137 10.003-9.24C22.006 6.137 17.528 2 12.003 2zm3.36 12.164h-4.32l4.316-5.064c.2-.236.033-.593-.274-.593H10.15a.394.394 0 0 0-.394.394v.822c0 .218.176.394.394.394h3.766L9.6 13.18a.394.394 0 0 0 .274.593h4.945a.394.394 0 0 0 .394-.394V12.56a.394.394 0 0 0-.394-.394z"/>
-                </svg>
+                <Wrench size={26} className="text-white" />
               </div>
               <div className="text-left">
-                <span className="block text-[15px] font-extrabold leading-tight">Quan tâm Zalo</span>
-                <span className="block text-[15px] font-extrabold leading-tight">Truliva Vietnam</span>
+                <span className="block text-[15px] font-extrabold leading-tight">Hỗ trợ kỹ thuật</span>
               </div>
             </a>
 
