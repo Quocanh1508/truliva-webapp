@@ -1187,6 +1187,71 @@ router.post('/import', requireCoordinatorOrAdmin, (req, res, next) => {
 });
 
 // ══════════════════════════════════════
+//  GET /api/serials/import-template - Tải file Excel mẫu
+// ══════════════════════════════════════
+router.get('/import-template', requireCoordinatorOrAdmin, async (req: Request, res: Response): Promise<void> => {
+  try {
+    const workbook = new ExcelJS.Workbook();
+    const worksheet = workbook.addWorksheet('Template Import');
+
+    worksheet.columns = [
+      { header: 'Số Serial', key: 'serialNumber', width: 25 },
+      { header: 'Model', key: 'model', width: 30 },
+      { header: 'Trạng thái', key: 'status', width: 18 },
+      { header: 'Ngày kích hoạt', key: 'activationDate', width: 22 },
+      { header: 'Ngày hết hạn bảo hành', key: 'warrantyExpiryDate', width: 22 },
+      { header: 'Tên khách hàng', key: 'customerName', width: 25 },
+      { header: 'Số điện thoại', key: 'customerPhone', width: 18 },
+      { header: 'Địa chỉ', key: 'address', width: 40 },
+      { header: 'Tỉnh/Thành phố', key: 'province', width: 20 },
+    ];
+
+    // Style header
+    const headerRow = worksheet.getRow(1);
+    headerRow.font = { bold: true, color: { argb: 'FFFFFFFF' } };
+    headerRow.fill = {
+      type: 'pattern',
+      pattern: 'solid',
+      fgColor: { argb: 'FF4472C4' },
+    };
+
+    // Add sample rows
+    worksheet.addRow({
+      serialNumber: 'TRULIVA12345678',
+      model: 'Truliva RO-100',
+      status: 'Chưa kích hoạt',
+      activationDate: '',
+      warrantyExpiryDate: '',
+      customerName: '',
+      customerPhone: '',
+      address: '',
+      province: '',
+    });
+
+    worksheet.addRow({
+      serialNumber: 'TRULIVA87654321',
+      model: 'Truliva RO-200',
+      status: 'Đã kích hoạt',
+      activationDate: new Date().toISOString().slice(0, 10),
+      warrantyExpiryDate: new Date(new Date().setFullYear(new Date().getFullYear() + 1)).toISOString().slice(0, 10),
+      customerName: 'Nguyễn Văn A',
+      customerPhone: '0987654321',
+      address: '123 Đường Lê Lợi, Phường 1',
+      province: 'TP Hồ Chí Minh',
+    });
+
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', 'attachment; filename=template_import_serial.xlsx');
+
+    await workbook.xlsx.write(res);
+    res.end();
+  } catch (error: any) {
+    logger.error('Lỗi tải file import mẫu', { error: error.message });
+    res.status(500).json({ error: 'Lỗi tải file Excel mẫu' });
+  }
+});
+
+// ══════════════════════════════════════
 //  GET /api/serials/export - Xuất Excel
 // ══════════════════════════════════════
 

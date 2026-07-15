@@ -334,6 +334,25 @@ export default function SerialManage() {
     }
   };
 
+  const handleDownloadTemplate = async () => {
+    try {
+      const token = localStorage.getItem('session_token');
+      const response = await fetch(`${API_URL}/serials/import-template`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+      if (!response.ok) throw new Error('Không thể tải file mẫu');
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'template_import_serial.xlsx';
+      a.click();
+      window.URL.revokeObjectURL(url);
+    } catch (err: any) {
+      alert('Lỗi tải file mẫu: ' + err.message);
+    }
+  };
+
   const openDetail = async (serial: Serial, focusWarranty = false) => {
     setSelectedSerial(serial);
     setFocusWarrantyDateOnOpen(focusWarranty);
@@ -754,6 +773,28 @@ export default function SerialManage() {
               <button onClick={() => !importing && setShowImportModal(false)}
                 style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4 }}>
                 <X size={20} color="#64748b" />
+              </button>
+            </div>
+
+            {/* Template download link */}
+            <div style={{
+              background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 10,
+              padding: '10px 14px', marginBottom: 18, display: 'flex',
+              alignItems: 'center', justifyContent: 'space-between', fontSize: 13
+            }}>
+              <span style={{ color: '#166534', fontWeight: 500 }}>Chưa có file Excel mẫu nhập liệu?</span>
+              <button
+                onClick={handleDownloadTemplate}
+                style={{
+                  background: '#16a34a', color: 'white', border: 'none',
+                  borderRadius: 6, padding: '6px 12px', fontWeight: 600,
+                  cursor: 'pointer', display: 'inline-flex', alignItems: 'center',
+                  gap: 6, fontSize: 12, transition: 'background-color 0.2s'
+                }}
+                onMouseOver={e => e.currentTarget.style.background = '#15803d'}
+                onMouseOut={e => e.currentTarget.style.background = '#16a34a'}
+              >
+                <Download size={14} /> Tải file mẫu
               </button>
             </div>
 
