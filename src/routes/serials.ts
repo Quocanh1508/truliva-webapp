@@ -1195,15 +1195,24 @@ router.get('/import-template', requireCoordinatorOrAdmin, async (req: Request, r
     const worksheet = workbook.addWorksheet('Template Import');
 
     worksheet.columns = [
-      { header: 'Số Serial', key: 'serialNumber', width: 25 },
-      { header: 'Model', key: 'model', width: 30 },
+      { header: 'Serial', key: 'serialNumber', width: 22 },
+      { header: 'Model', key: 'model', width: 25 },
+      { header: 'Dòng máy', key: 'modelDevice', width: 25 },
+      { header: 'Họ tên', key: 'customerName', width: 25 },
+      { header: 'Số điện thoại', key: 'customerPhone', width: 18 },
+      { header: 'Địa chỉ', key: 'address', width: 40 },
+      { header: 'Thành phố', key: 'province', width: 20 },
       { header: 'Trạng thái', key: 'status', width: 18 },
       { header: 'Ngày kích hoạt', key: 'activationDate', width: 22 },
       { header: 'Ngày hết hạn bảo hành', key: 'warrantyExpiryDate', width: 22 },
-      { header: 'Tên khách hàng', key: 'customerName', width: 25 },
-      { header: 'Số điện thoại', key: 'customerPhone', width: 18 },
-      { header: 'Địa chỉ', key: 'address', width: 40 },
-      { header: 'Tỉnh/Thành phố', key: 'province', width: 20 },
+      { header: 'Kích hoạt bởi', key: 'activatedBy', width: 25 },
+      { header: 'Quyền', key: 'role', width: 18 },
+      { header: 'Khách hàng xác nhận lúc', key: 'customerConfirmationDate', width: 22 },
+      { header: 'Lô nhập', key: 'importBatchId', width: 20 },
+      { header: 'Tạo bởi', key: 'createdBy', width: 20 },
+      { header: 'Tạo lúc', key: 'createdAt', width: 22 },
+      { header: 'Cập nhật bởi', key: 'updatedBy', width: 20 },
+      { header: 'Cập nhật lúc', key: 'updatedAt', width: 22 },
     ];
 
     // Style header
@@ -1215,30 +1224,55 @@ router.get('/import-template', requireCoordinatorOrAdmin, async (req: Request, r
       fgColor: { argb: 'FF4472C4' },
     };
 
-    // Add sample rows
+    // Add sample row
     worksheet.addRow({
-      serialNumber: 'TRULIVA12345678',
-      model: 'Truliva RO-100',
-      status: 'Chưa kích hoạt',
-      activationDate: '',
-      warrantyExpiryDate: '',
-      customerName: '',
-      customerPhone: '',
-      address: '',
-      province: '',
+      serialNumber: '892820072100002',
+      model: 'Delica-UR5640',
+      modelDevice: 'Delica-UR5640',
+      customerName: 'Anh Việt ',
+      customerPhone: '0876984987',
+      address: 'Block D, khu Topaz 38 Bờ Bao Tân Thắng, Sơn Kỳ, Tân Phú ',
+      province: 'TP. Hồ Chí Minh',
+      status: 'Đã kích hoạt',
+      activationDate: '01/12/2020 18:47:15',
+      warrantyExpiryDate: '01/12/2021 18:47:15',
+      activatedBy: 'Phan Thanh Tuấn(84963277732)',
+      role: 'Kỹ thuật viên',
+      customerConfirmationDate: '',
+      importBatchId: 'Lot_20200929135510',
+      createdBy: 'tunha@twin.vn',
+      createdAt: '29/09/2020 13:55:10',
+      updatedBy: 'system',
+      updatedAt: '01/12/2020 18:47:15',
     });
 
-    worksheet.addRow({
-      serialNumber: 'TRULIVA87654321',
-      model: 'Truliva RO-200',
-      status: 'Đã kích hoạt',
-      activationDate: new Date().toISOString().slice(0, 10),
-      warrantyExpiryDate: new Date(new Date().setFullYear(new Date().getFullYear() + 1)).toISOString().slice(0, 10),
-      customerName: 'Nguyễn Văn A',
-      customerPhone: '0987654321',
-      address: '123 Đường Lê Lợi, Phường 1',
-      province: 'TP Hồ Chí Minh',
-    });
+    // Add dropdown data validations for columns Model (B), Dòng máy (C), Trạng thái (H) for rows 2 to 500
+    for (let i = 2; i <= 500; i++) {
+      worksheet.getCell(`B${i}`).dataValidation = {
+        type: 'list',
+        allowBlank: true,
+        formulae: ['"Delica-UR5440,Delica-UR5640,Delica-UR5840,Lavita,Lọc trong suốt âm tủ bếp-UX5010,Tanka-UR3140"'],
+        showErrorMessage: true,
+        errorTitle: 'Lỗi nhập liệu',
+        error: 'Vui lòng chọn model từ danh sách có sẵn.'
+      };
+      worksheet.getCell(`C${i}`).dataValidation = {
+        type: 'list',
+        allowBlank: true,
+        formulae: ['"Delica-UR5440,Delica-UR5640,Delica-UR5840,Lavita-CR5240,Lọc trong suốt âm tủ bếp-UX5010,Tanka-UR3140"'],
+        showErrorMessage: true,
+        errorTitle: 'Lỗi nhập liệu',
+        error: 'Vui lòng chọn dòng máy từ danh sách có sẵn.'
+      };
+      worksheet.getCell(`H${i}`).dataValidation = {
+        type: 'list',
+        allowBlank: true,
+        formulae: ['"Chưa kích hoạt,Đã kích hoạt,Hủy,KH xác nhận"'],
+        showErrorMessage: true,
+        errorTitle: 'Lỗi nhập liệu',
+        error: 'Vui lòng chọn trạng thái từ danh sách có sẵn.'
+      };
+    }
 
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
     res.setHeader('Content-Disposition', 'attachment; filename=template_import_serial.xlsx');
