@@ -2535,7 +2535,7 @@ export default function OrderList() {
                           </span>
                         )}
 
-                        {order.orderSource && /shopee|lazada|tiktok|tiki/i.test(order.orderSource) && (
+                        {order.orderSource && /shopee|lazada|tiktok|tiki/i.test(order.orderSource) && !(order.orderSource?.toLowerCase().includes('tiktok') && (order.rawData as any)?.page_id?.startsWith?.('ttm_')) && (
                           <div className="flex flex-col gap-0.5 items-start">
                             <div className="text-[10px] font-bold text-blue-600 bg-blue-50 border border-blue-100 rounded px-1.5 py-0.5 mt-0.5 inline-block cursor-help" title={`Nguồn: ${order.orderSource}`}>
                               Đơn Ecom
@@ -2872,7 +2872,8 @@ export default function OrderList() {
                             return <span className="font-medium text-gray-600">{creatorName}</span>;
                           }
                           const source = (order.orderSource || order.rawData?.order_sources_name || '').toLowerCase();
-                          const isEcom = source.includes('shopee') || source.includes('lazada') || source.includes('tiktok') || source.includes('tiki');
+                          const isTiktokDTC = source.includes('tiktok') && (order.rawData as any)?.page_id?.startsWith?.('ttm_');
+                          const isEcom = (source.includes('shopee') || source.includes('lazada') || source.includes('tiktok') || source.includes('tiki')) && !isTiktokDTC;
                           if (isEcom) {
                             return <span className="text-blue-600 bg-blue-50 px-1 py-0.2 rounded text-[10px] font-semibold">Hệ thống</span>;
                           }

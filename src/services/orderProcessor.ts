@@ -253,7 +253,23 @@ export async function processOrderEvent(rawEventId: string | null, payload: any)
       totalDiscount: payload.total_discount ?? null,
       totalQuantity: payload.total_quantity ?? null,
       moneyToCollect: isWarrantyOrder ? 0 : (payload.money_to_collect ?? null),
-      orderSource: payload.order_sources_name || null,
+      orderSource: (() => {
+        const srcName = payload.order_sources_name || null;
+        if (srcName && srcName.toLowerCase().includes('tiktok')) {
+          // TikTok Shop (eCom): page_id starts with "tts_" → giữ nguyên "Tiktok"
+          // TikTok DTC: page_id starts with "ttm_" hoặc page name là "Truliva Việt Nam" → chuyển thành "DTC"
+          const pageId = payload.page_id || '';
+          const pageName = (payload.page?.name || '').toLowerCase();
+          if (typeof pageId === 'string' && pageId.startsWith('tts_')) {
+            return srcName; // TikTok Shop eCom → giữ "Tiktok"
+          }
+          if ((typeof pageId === 'string' && pageId.startsWith('ttm_')) || pageName.includes('truliva vi')) {
+            return 'DTC'; // TikTok DTC → đổi thành DTC
+          }
+          return srcName; // Fallback: giữ nguyên
+        }
+        return srcName;
+      })(),
       orderSourceId: payload.marketplace_id ? String(payload.marketplace_id) : null,
       orderLink: payload.order_link || null,
       checkoutLink: payload.tracking_link
@@ -337,7 +353,8 @@ export async function processOrderEvent(rawEventId: string | null, payload: any)
     }
 
     const orderSource = (payload.order_sources_name || '').toLowerCase();
-    const isEcom = orderSource.includes('shopee') || orderSource.includes('lazada') || orderSource.includes('tiktok') || orderSource.includes('tiki');
+    const isTiktokEcom = orderSource.includes('tiktok') && typeof payload.page_id === 'string' && payload.page_id.startsWith('tts_');
+    const isEcom = orderSource.includes('shopee') || orderSource.includes('lazada') || isTiktokEcom || orderSource.includes('tiki');
     const defaultAppointmentTime = isEcom
       ? null
       : pancakeCreatedAt
