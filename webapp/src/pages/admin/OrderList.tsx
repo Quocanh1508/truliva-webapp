@@ -2816,9 +2816,13 @@ export default function OrderList() {
                         return (
                           <div className="space-y-3">
                             {serialsToShow.map((serial: any) => {
+                              const isExpired = serial.warrantyExpiryDate && new Date(serial.warrantyExpiryDate).getTime() < new Date().getTime();
+                              const displayStatus = isExpired ? 'Đã hết hạn' : (serial.status || 'Chưa kích hoạt');
+                              
                               const getStatusColor = (status: string) => {
                                 if (status === 'Đã kích hoạt' || status === 'KH xác nhận') return 'text-green-600 font-bold';
                                 if (status === 'Chờ duyệt') return 'text-amber-600 font-bold';
+                                if (status === 'Đã hết hạn') return 'text-gray-500 font-medium';
                                 return 'text-gray-500 font-medium';
                               };
                               return (
@@ -2830,8 +2834,8 @@ export default function OrderList() {
                                     <div>
                                       <span className="text-gray-500">Serial:</span> <strong className="font-mono text-gray-900">{serial.serialNumber}</strong>
                                     </div>
-                                    <div className={getStatusColor(serial.status || 'Chưa kích hoạt')}>
-                                      {serial.status || 'Chưa kích hoạt'}
+                                    <div className={getStatusColor(displayStatus)}>
+                                      {displayStatus}
                                     </div>
                                     {serial.activationDate && (
                                       <div>
