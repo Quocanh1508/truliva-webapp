@@ -30,6 +30,7 @@ interface SerialStats {
   activated: number;
   unactivated: number;
   confirmed: number;
+  expired: number;
 }
 
 interface HistoryItem {
@@ -70,7 +71,7 @@ export default function SerialManage() {
   const canChangeWarrantyPeriod = currentUser?.role === 'ADMIN' || currentUser?.role === 'DEV' || currentUser?.role === 'COORDINATOR';
 
   const [serials, setSerials] = useState<Serial[]>([]);
-  const [stats, setStats] = useState<SerialStats>({ total: 0, activated: 0, unactivated: 0, confirmed: 0 });
+  const [stats, setStats] = useState<SerialStats>({ total: 0, activated: 0, unactivated: 0, confirmed: 0, expired: 0 });
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
@@ -287,7 +288,7 @@ export default function SerialManage() {
 
       const data = await fetchApi(`/serials?${params.toString()}`);
       setSerials(data.serials || []);
-      setStats(data.stats || { total: 0, activated: 0, unactivated: 0, confirmed: 0 });
+      setStats(data.stats || { total: 0, activated: 0, unactivated: 0, confirmed: 0, expired: 0 });
       setTotalPages(data.pagination?.totalPages || 1);
     } catch (err: any) {
       console.error('Lỗi tải danh sách serial:', err);
@@ -448,6 +449,7 @@ export default function SerialManage() {
       'KH xác nhận': { bg: '#dcfce7', color: '#15803d', icon: <User size={14} /> },
       'Chưa kích hoạt': { bg: '#fef3c7', color: '#b45309', icon: <AlertTriangle size={14} /> },
       'Chờ duyệt': { bg: '#fee2e2', color: '#b91c1c', icon: <Clock size={14} /> },
+      'Đã hết hạn': { bg: '#f1f5f9', color: '#64748b', icon: <AlertTriangle size={14} /> },
     };
     const s = styles[status] || { bg: '#f3f4f6', color: '#374151', icon: null };
     return (
@@ -484,6 +486,7 @@ export default function SerialManage() {
           { label: 'Đã kích hoạt', value: stats.activated, color: '#16a34a', bg: '#dcfce7' },
           { label: 'Chưa kích hoạt', value: stats.unactivated, color: '#d97706', bg: '#fef3c7' },
           { label: 'KH xác nhận', value: stats.confirmed, color: '#1e40af', bg: '#e0e7ff' },
+          { label: 'Đã hết hạn', value: stats.expired, color: '#64748b', bg: '#f1f5f9' },
         ].map((stat, i) => (
           <div key={i} style={{
             background: 'white', borderRadius: 12, padding: '16px 20px',
@@ -544,6 +547,7 @@ export default function SerialManage() {
               <option value="Đã kích hoạt">Đã kích hoạt</option>
               <option value="KH xác nhận">KH xác nhận</option>
               <option value="Chờ duyệt">Chờ duyệt</option>
+              <option value="Đã hết hạn">Đã hết hạn</option>
             </select>
             <Filter size={14} style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none', color: '#9ca3af' }} />
           </div>
@@ -767,9 +771,11 @@ export default function SerialManage() {
                     )}
                   </td>
 
-                  {/* Column 4: Trạng thái */}
                   <td style={{ padding: '12px 16px', verticalAlign: 'top' }}>
-                    {getStatusBadge(s.status)}
+                    {(() => {
+                      const isExpired = s.warrantyExpiryDate && new Date(s.warrantyExpiryDate).getTime() < new Date().getTime();
+                      return getStatusBadge(isExpired ? 'Đã hết hạn' : s.status);
+                    })()}
                   </td>
 
                   {/* Column 5: Ngày kích hoạt */}

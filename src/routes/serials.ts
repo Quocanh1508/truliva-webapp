@@ -474,7 +474,24 @@ router.get('/', requireCoordinatorOrAdmin, async (req: Request, res: Response): 
 
     // Lọc theo trạng thái
     if (status) {
-      where.status = status;
+      if (status === 'Đã hết hạn') {
+        where.status = { in: ['Đã kích hoạt', 'KH xác nhận'] };
+        where.warrantyExpiryDate = { lt: new Date() };
+      } else if (status === 'Đã kích hoạt') {
+        where.status = 'Đã kích hoạt';
+        where.OR = [
+          { warrantyExpiryDate: null },
+          { warrantyExpiryDate: { gte: new Date() } }
+        ];
+      } else if (status === 'KH xác nhận') {
+        where.status = 'KH xác nhận';
+        where.OR = [
+          { warrantyExpiryDate: null },
+          { warrantyExpiryDate: { gte: new Date() } }
+        ];
+      } else {
+        where.status = status;
+      }
     }
 
     // Lọc theo model máy
@@ -505,12 +522,35 @@ router.get('/', requireCoordinatorOrAdmin, async (req: Request, res: Response): 
     ]);
 
     // Thống kê nhanh
-    const [totalAll, activated, unactivated, confirmed, pending] = await Promise.all([
+    const now = new Date();
+    const [totalAll, activated, unactivated, confirmed, pending, expired] = await Promise.all([
       prisma.serial.count(),
-      prisma.serial.count({ where: { status: 'Đã kích hoạt' } }),
+      prisma.serial.count({
+        where: {
+          status: 'Đã kích hoạt',
+          OR: [
+            { warrantyExpiryDate: null },
+            { warrantyExpiryDate: { gte: now } }
+          ]
+        }
+      }),
       prisma.serial.count({ where: { status: 'Chưa kích hoạt' } }),
-      prisma.serial.count({ where: { status: 'KH xác nhận' } }),
+      prisma.serial.count({
+        where: {
+          status: 'KH xác nhận',
+          OR: [
+            { warrantyExpiryDate: null },
+            { warrantyExpiryDate: { gte: now } }
+          ]
+        }
+      }),
       prisma.serial.count({ where: { status: 'Chờ duyệt' } }),
+      prisma.serial.count({
+        where: {
+          status: { in: ['Đã kích hoạt', 'KH xác nhận'] },
+          warrantyExpiryDate: { lt: now }
+        }
+      })
     ]);
 
     res.json({
@@ -527,6 +567,7 @@ router.get('/', requireCoordinatorOrAdmin, async (req: Request, res: Response): 
         unactivated,
         confirmed,
         pending,
+        expired
       },
     });
   } catch (error: any) {
@@ -1322,12 +1363,16 @@ router.get('/export', requireCoordinatorOrAdmin, async (req: Request, res: Respo
     };
     headerRow.font = { bold: true, color: { argb: 'FFFFFFFF' } };
 
+    const now = new Date();
     for (const serial of serials) {
+      const isExpired = serial.warrantyExpiryDate && new Date(serial.warrantyExpiryDate).getTime() < now.getTime();
+      const displayStatus = isExpired ? 'Đã hết hạn' : serial.status;
+
       worksheet.addRow({
         serialNumber: serial.serialNumber,
         model: serial.model,
         productLine: serial.model,
-        status: serial.status,
+        status: displayStatus,
         activationDate: serial.activationDate || '',
         warrantyExpiryDate: serial.warrantyExpiryDate || '',
         customerConfirmationDate: serial.customerConfirmationDate || '',
