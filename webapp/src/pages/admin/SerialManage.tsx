@@ -78,6 +78,12 @@ export default function SerialManage() {
   const [statusFilter, setStatusFilter] = useState('');
   const [searchInput, setSearchInput] = useState('');
 
+  // Batch states
+  const [batches, setBatches] = useState<{ batchId: string; count: number }[]>([]);
+  const [batchFilter, setBatchFilter] = useState('');
+  const [showBatchModal, setShowBatchModal] = useState(false);
+  const [rollingBack, setRollingBack] = useState<string | null>(null);
+
   // Import state
   const [importing, setImporting] = useState(false);
   const [importResult, setImportResult] = useState<{ summary: ImportSummary; errors: ImportError[] } | null>(null);
@@ -99,6 +105,17 @@ export default function SerialManage() {
 
   // Zalo OA state
   const [zaloStatus, setZaloStatus] = useState<any>(null);
+
+  const loadBatches = async () => {
+    try {
+      const data = await fetchApi('/serials/batches');
+      if (data && data.success) {
+        setBatches(data.batches || []);
+      }
+    } catch (err) {
+      console.error('Lỗi tải danh sách lô:', err);
+    }
+  };
 
   const loadZaloStatus = async () => {
     try {
@@ -149,6 +166,7 @@ export default function SerialManage() {
     fetchPromos();
     fetchPolicies();
     loadZaloStatus();
+    loadBatches();
   }, []);
 
   const calculateExpiryDate = (activationDateStr: string | null, modelName: string, selectedPromoCodeStr: string | null) => {
@@ -265,6 +283,7 @@ export default function SerialManage() {
       params.set('limit', '20');
       if (search) params.set('search', search);
       if (statusFilter) params.set('status', statusFilter);
+      if (batchFilter) params.set('batch', batchFilter);
 
       const data = await fetchApi(`/serials?${params.toString()}`);
       setSerials(data.serials || []);
@@ -277,7 +296,7 @@ export default function SerialManage() {
     }
   };
 
-  useEffect(() => { loadSerials(); }, [page, search, statusFilter]);
+  useEffect(() => { loadSerials(); }, [page, search, statusFilter, batchFilter]);
 
   const handleSearch = () => {
     setPage(1);
@@ -305,6 +324,7 @@ export default function SerialManage() {
 
       setImportResult({ summary: data.summary, errors: data.errors || [] });
       loadSerials();
+      loadBatches();
     } catch (err: any) {
       setImportResult({
         summary: { totalRowsProcessed: 0, importedCount: 0, skippedCount: 0, errorCount: 1 },
@@ -312,6 +332,44 @@ export default function SerialManage() {
       });
     } finally {
       setImporting(false);
+    }
+  };
+
+  const handleRollbackBatch = async (batchId: string) => {
+    if (!window.confirm(`Bạn có chắc chắn muốn rollback (hoàn tác) toàn bộ Lô import "${batchId}"? Tất cả các serial mới tạo thuộc lô này sẽ bị xóa bỏ và các serial bị cập nhật sẽ được khôi phục về trạng thái cũ.`)) {
+      return;
+    }
+
+    setRollingBack(batchId);
+    try {
+      const token = localStorage.getItem('session_token');
+      const response = await fetch(`${API_URL}/serials/rollback`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {})
+        },
+        body: JSON.stringify({ batchId })
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.error || 'Lỗi rollback');
+      }
+
+      alert(data.message || 'Rollback lô thành công!');
+      
+      // Reset filter if we rolled back the currently filtered batch
+      if (batchFilter === batchId) {
+        setBatchFilter('');
+      }
+
+      // Reload data
+      loadBatches();
+      loadSerials();
+    } catch (err: any) {
+      alert('Lỗi rollback: ' + err.message);
+    } finally {
+      setRollingBack(null);
     }
   };
 
@@ -489,9 +547,47 @@ export default function SerialManage() {
             </select>
             <Filter size={14} style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none', color: '#9ca3af' }} />
           </div>
+
+          {/* Batch filter */}
+          <div style={{ position: 'relative' }}>
+            <select
+              value={batchFilter}
+              onChange={e => { setBatchFilter(e.target.value); setPage(1); }}
+              style={{
+                padding: '8px 32px 8px 12px', borderRadius: 8,
+                border: '1px solid #d1d5db', background: 'white',
+                fontSize: 14, color: '#374151', cursor: 'pointer',
+                appearance: 'none',
+                maxWidth: 185,
+                textOverflow: 'ellipsis'
+              }}
+            >
+              <option value="">Tất cả các lô import</option>
+              {batches.map(b => (
+                <option key={b.batchId} value={b.batchId}>
+                  {b.batchId} ({b.count} máy)
+                </option>
+              ))}
+            </select>
+            <Filter size={14} style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none', color: '#9ca3af' }} />
+          </div>
         </div>
 
         <div style={{ display: 'flex', gap: 8 }}>
+          {/* Rollback batch button */}
+          <button
+            onClick={() => setShowBatchModal(true)}
+            style={{
+              display: 'flex', alignItems: 'center', gap: 6,
+              padding: '8px 16px', borderRadius: 8,
+              background: '#ef4444', color: 'white', border: 'none',
+              fontSize: 14, fontWeight: 600, cursor: 'pointer',
+            }}
+            title="Quản lý các lô đã import và hoàn tác (Rollback)"
+          >
+            <RotateCcw size={16} /> Lịch sử Lô
+          </button>
+
           {/* Import button */}
           <button
             onClick={() => setShowImportModal(true)}
@@ -1304,6 +1400,124 @@ export default function SerialManage() {
                   ))}
                 </div>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Batch management & Rollback modal */}
+      {showBatchModal && (
+        <div style={{
+          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+          background: 'rgba(15, 23, 42, 0.6)', display: 'flex',
+          alignItems: 'center', justifyContent: 'center', zIndex: 1000,
+          backdropFilter: 'blur(4px)', transition: 'all 0.3s ease'
+        }}>
+          <div style={{
+            background: 'white', borderRadius: 16, width: '100%',
+            maxWidth: 600, padding: 24, boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
+            position: 'relative', display: 'flex', flexDirection: 'column',
+            maxHeight: '85vh', border: '1px solid #e2e8f0'
+          }}>
+            {/* Modal Header */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20, borderBottom: '1px solid #f1f5f9', paddingBottom: 16 }}>
+              <div>
+                <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: '#0f172a', display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <RotateCcw size={20} color="#dc2626" /> Lịch sử Lô Import & Hoàn tác
+                </h2>
+                <p style={{ margin: '4px 0 0', fontSize: 13, color: '#64748b' }}>Quản lý các đợt nhập Serial hàng loạt từ file Excel và hoàn tác nếu lỗi.</p>
+              </div>
+              <button
+                onClick={() => setShowBatchModal(false)}
+                style={{
+                  background: '#f1f5f9', border: 'none', borderRadius: '50%',
+                  width: 32, height: 32, display: 'flex', alignItems: 'center',
+                  justifyContent: 'center', cursor: 'pointer', color: '#64748b',
+                  transition: 'background 0.2s'
+                }}
+                onMouseOver={e => e.currentTarget.style.background = '#e2e8f0'}
+                onMouseOut={e => e.currentTarget.style.background = '#f1f5f9'}
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div style={{ overflowY: 'auto', flex: 1, paddingRight: 4, display: 'flex', flexDirection: 'column', gap: 12 }}>
+              {batches.length === 0 ? (
+                <div style={{
+                  textAlign: 'center', padding: '40px 20px', color: '#94a3b8',
+                  background: '#f8fafc', borderRadius: 12, border: '1px dashed #cbd5e1'
+                }}>
+                  <Database size={36} color="#cbd5e1" style={{ marginBottom: 12 }} />
+                  <p style={{ margin: 0, fontSize: 14, fontWeight: 500 }}>Chưa ghi nhận lô import nào trong hệ thống</p>
+                </div>
+              ) : (
+                batches.map(batch => (
+                  <div key={batch.batchId} style={{
+                    display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                    padding: '14px 18px', background: '#f8fafc', borderRadius: 12,
+                    border: '1px solid #e2e8f0', transition: 'all 0.2s'
+                  }}>
+                    <div>
+                      <div style={{ fontWeight: 700, fontSize: 14, color: '#1e293b' }}>
+                        {batch.batchId}
+                      </div>
+                      <div style={{ fontSize: 12, color: '#64748b', marginTop: 4 }}>
+                        Số lượng: <strong>{batch.count}</strong> thiết bị
+                      </div>
+                    </div>
+
+                    <button
+                      onClick={() => handleRollbackBatch(batch.batchId)}
+                      disabled={rollingBack !== null}
+                      style={{
+                        display: 'flex', alignItems: 'center', gap: 6,
+                        padding: '8px 14px', borderRadius: 8,
+                        background: rollingBack === batch.batchId ? '#fca5a5' : '#fee2e2',
+                        color: rollingBack === batch.batchId ? '#ef4444' : '#b91c1c',
+                        border: '1px solid #fca5a5', fontSize: 13, fontWeight: 600,
+                        cursor: rollingBack !== null ? 'not-allowed' : 'pointer',
+                        transition: 'all 0.2s'
+                      }}
+                      onMouseOver={e => {
+                        if (rollingBack === null) {
+                          e.currentTarget.style.background = '#fca5a5';
+                        }
+                      }}
+                      onMouseOut={e => {
+                        if (rollingBack === null) {
+                          e.currentTarget.style.background = '#fee2e2';
+                        }
+                      }}
+                    >
+                      {rollingBack === batch.batchId ? (
+                        <>Đang hoàn tác...</>
+                      ) : (
+                        <>
+                          <RotateCcw size={14} /> Hoàn tác
+                        </>
+                      )}
+                    </button>
+                  </div>
+                ))
+              )}
+            </div>
+
+            {/* Modal Footer */}
+            <div style={{ marginTop: 20, paddingTop: 16, borderTop: '1px solid #f1f5f9', display: 'flex', justifyContent: 'flex-end' }}>
+              <button
+                onClick={() => setShowBatchModal(false)}
+                style={{
+                  padding: '8px 20px', background: '#f1f5f9', color: '#334155',
+                  border: 'none', borderRadius: 8, fontSize: 14, fontWeight: 600,
+                  cursor: 'pointer', transition: 'background 0.2s'
+                }}
+                onMouseOver={e => e.currentTarget.style.background = '#e2e8f0'}
+                onMouseOut={e => e.currentTarget.style.background = '#f1f5f9'}
+              >
+                Đóng
+              </button>
             </div>
           </div>
         </div>
