@@ -581,8 +581,9 @@ router.post('/', async (req: Request, res: Response): Promise<void> => {
     // ── Đối chiếu ngược: Cập nhật bảng Serial khi báo cáo có serialNumber ──
     if (report.serialNumber && report.serialNumber !== 'XXXXX' && report.serialNumber !== 'XXXXXXXXXXXXXXX') {
       try {
-        if (report.approvalStatus === 'APPROVED') {
-          // Kích hoạt ngay lập tức nếu báo cáo được duyệt tự động
+        const isActivationWorkType = ['lắp đặt', 'giao hàng và lắp đặt'].includes(workTypeClean);
+        if (report.approvalStatus === 'APPROVED' && isActivationWorkType) {
+          // Kích hoạt ngay lập tức nếu báo cáo được duyệt tự động và là ca lắp đặt
           await activateSerialWarranty(
             report.serialNumber,
             orderId || null,
@@ -591,7 +592,7 @@ router.post('/', async (req: Request, res: Response): Promise<void> => {
             'Đã kích hoạt'
           );
         } else {
-          // Nếu báo cáo PENDING (chờ duyệt), chỉ cập nhật thông tin khách hàng và liên kết order
+          // Nếu báo cáo PENDING (chờ duyệt) hoặc không phải ca lắp đặt (ví dụ ca thay lọc, sửa chữa), chỉ cập nhật thông tin khách hàng và liên kết order
           await syncSerialFromReport(
             report.serialNumber,
             orderId || null,
@@ -1768,7 +1769,8 @@ router.put('/:id', requireAuth, async (req: Request, res: Response): Promise<voi
     // ── Đối chiếu ngược: Cập nhật bảng Serial khi cập nhật báo cáo có serialNumber ──
     if (report.serialNumber && report.serialNumber !== 'XXXXX' && report.serialNumber !== 'XXXXXXXXXXXXXXX') {
       try {
-        if (report.approvalStatus === 'APPROVED') {
+        const isActivationWorkType = ['lắp đặt', 'giao hàng và lắp đặt'].includes(workTypeClean);
+        if (report.approvalStatus === 'APPROVED' && isActivationWorkType) {
           await activateSerialWarranty(
             report.serialNumber,
             report.orderId || null,
@@ -2410,18 +2412,35 @@ router.post('/:id/approve', async (req: Request, res: Response): Promise<void> =
       const cleanedSn = report.serialNumber.replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
       if (cleanedSn !== 'XXXXX' && cleanedSn !== 'XXXXXXXXXXXXXXX') {
         try {
-          await activateSerialWarranty(
-            report.serialNumber,
-            report.orderId || null,
-            {
-              customerName: report.customerName,
-              customerPhone: report.customerPhone,
-              address: report.address,
-              province: report.province,
-            },
-            'KTV',
-            'Đã kích hoạt'
-          );
+          const reportWorkType = report.workType || order?.workType || '';
+          const workTypeClean = reportWorkType.trim().toLowerCase();
+          const isActivationWorkType = ['lắp đặt', 'giao hàng và lắp đặt'].includes(workTypeClean);
+
+          if (isActivationWorkType) {
+            await activateSerialWarranty(
+              report.serialNumber,
+              report.orderId || null,
+              {
+                customerName: report.customerName,
+                customerPhone: report.customerPhone,
+                address: report.address,
+                province: report.province,
+              },
+              'KTV',
+              'Đã kích hoạt'
+            );
+          } else {
+            await syncSerialFromReport(
+              report.serialNumber,
+              report.orderId || null,
+              {
+                customerName: report.customerName,
+                customerPhone: report.customerPhone,
+                address: report.address,
+                province: report.province,
+              }
+            );
+          }
         } catch (serialErr: any) {
           logger.error('Lỗi tự động kích hoạt bảo hành khi duyệt báo cáo', {
             error: serialErr.message,
