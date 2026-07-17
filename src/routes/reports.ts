@@ -530,7 +530,7 @@ router.post('/', async (req: Request, res: Response): Promise<void> => {
       }
     }
 
-    if (cleanedSn && cleanedSn !== 'XXXXX' && cleanedSn !== 'XXXXXXXXXXXXXXX') {
+    if (cleanedSn && cleanedSn !== 'XXXXX') {
       const existingSerialRecord = await prisma.serial.findUnique({
         where: { serialNumber: cleanedSn }
       });
@@ -579,7 +579,7 @@ router.post('/', async (req: Request, res: Response): Promise<void> => {
     });
 
     // ── Đối chiếu ngược: Cập nhật bảng Serial khi báo cáo có serialNumber ──
-    if (report.serialNumber && report.serialNumber !== 'XXXXX' && report.serialNumber !== 'XXXXXXXXXXXXXXX') {
+    if (report.serialNumber && report.serialNumber !== 'XXXXX') {
       try {
         const isActivationWorkType = ['lắp đặt', 'giao hàng và lắp đặt'].includes(workTypeClean);
         if (report.approvalStatus === 'APPROVED' && isActivationWorkType) {
@@ -1454,7 +1454,7 @@ router.get('/check-serial', async (req: Request, res: Response): Promise<void> =
       return;
     }
 
-    if (cleanInput === 'XXXXX' || cleanInput === 'XXXXXXXXXXXXXXX') {
+    if (cleanInput === 'XXXXX') {
       res.json({
         exists: true,
         installDate: null,
@@ -1718,7 +1718,7 @@ router.put('/:id', requireAuth, async (req: Request, res: Response): Promise<voi
       }
     }
 
-    if (cleanedSn && cleanedSn !== 'XXXXX' && cleanedSn !== 'XXXXXXXXXXXXXXX') {
+    if (cleanedSn && cleanedSn !== 'XXXXX') {
       const existingSerialRecord = await prisma.serial.findUnique({
         where: { serialNumber: cleanedSn }
       });
@@ -1767,7 +1767,7 @@ router.put('/:id', requireAuth, async (req: Request, res: Response): Promise<voi
     });
 
     // ── Đối chiếu ngược: Cập nhật bảng Serial khi cập nhật báo cáo có serialNumber ──
-    if (report.serialNumber && report.serialNumber !== 'XXXXX' && report.serialNumber !== 'XXXXXXXXXXXXXXX') {
+    if (report.serialNumber && report.serialNumber !== 'XXXXX') {
       try {
         const isActivationWorkType = ['lắp đặt', 'giao hàng và lắp đặt'].includes(workTypeClean);
         if (report.approvalStatus === 'APPROVED' && isActivationWorkType) {
@@ -2410,7 +2410,7 @@ router.post('/:id/approve', async (req: Request, res: Response): Promise<void> =
     // ── Kích hoạt bảo hành cho Serial khi duyệt báo cáo thành công ──
     if (report.serialNumber) {
       const cleanedSn = report.serialNumber.replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
-      if (cleanedSn !== 'XXXXX' && cleanedSn !== 'XXXXXXXXXXXXXXX') {
+      if (cleanedSn !== 'XXXXX') {
         try {
           const reportWorkType = report.workType || order?.workType || '';
           const workTypeClean = reportWorkType.trim().toLowerCase();

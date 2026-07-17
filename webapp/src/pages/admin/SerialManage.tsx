@@ -7,6 +7,7 @@ interface Serial {
   id: string;
   serialNumber: string;
   model: string;
+  productLine: string | null;
   status: string;
   activationDate: string | null;
   warrantyExpiryDate: string | null;
@@ -31,6 +32,7 @@ interface SerialStats {
   unactivated: number;
   confirmed: number;
   expired: number;
+  valid: number;
 }
 
 interface HistoryItem {
@@ -71,7 +73,7 @@ export default function SerialManage() {
   const canChangeWarrantyPeriod = currentUser?.role === 'ADMIN' || currentUser?.role === 'DEV' || currentUser?.role === 'COORDINATOR';
 
   const [serials, setSerials] = useState<Serial[]>([]);
-  const [stats, setStats] = useState<SerialStats>({ total: 0, activated: 0, unactivated: 0, confirmed: 0, expired: 0 });
+  const [stats, setStats] = useState<SerialStats>({ total: 0, activated: 0, unactivated: 0, confirmed: 0, expired: 0, valid: 0 });
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
@@ -252,6 +254,7 @@ export default function SerialManage() {
         body: JSON.stringify({
           serialNumber: selectedSerial.serialNumber,
           model: selectedSerial.model,
+          productLine: selectedSerial.productLine,
           status: selectedSerial.status,
           customerName: selectedSerial.customerName,
           customerPhone: selectedSerial.customerPhone,
@@ -259,6 +262,7 @@ export default function SerialManage() {
           province: selectedSerial.province,
           activationDate: selectedSerial.activationDate,
           warrantyExpiryDate: selectedSerial.warrantyExpiryDate,
+          customerConfirmationDate: selectedSerial.customerConfirmationDate,
           activatedBy: selectedSerial.activatedBy,
           importBatchId: selectedSerial.importBatchId,
           promoCode: selectedSerial.promoCode
@@ -479,14 +483,13 @@ export default function SerialManage() {
         <h1 style={{ margin: 0, fontSize: 24, fontWeight: 700, color: '#1e293b' }}>Quản lý Serial</h1>
       </div>
 
-      {/* Stats Cards */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 16, marginBottom: 24 }}>
+      {/* Stats Cards - Tầng 1: Tổng thể */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 16, marginBottom: 12 }}>
         {[
           { label: 'Tổng Serial', value: stats.total, color: '#4472C4', bg: '#dbeafe' },
           { label: 'Đã kích hoạt', value: stats.activated, color: '#16a34a', bg: '#dcfce7' },
-          { label: 'Chưa kích hoạt', value: stats.unactivated, color: '#d97706', bg: '#fef3c7' },
           { label: 'KH xác nhận', value: stats.confirmed, color: '#1e40af', bg: '#e0e7ff' },
-          { label: 'Đã hết hạn', value: stats.expired, color: '#64748b', bg: '#f1f5f9' },
+          { label: 'Chưa kích hoạt', value: stats.unactivated, color: '#d97706', bg: '#fef3c7' },
         ].map((stat, i) => (
           <div key={i} style={{
             background: 'white', borderRadius: 12, padding: '16px 20px',
@@ -496,6 +499,37 @@ export default function SerialManage() {
             <div style={{ fontSize: 28, fontWeight: 700, color: stat.color }}>{stat.value.toLocaleString()}</div>
           </div>
         ))}
+      </div>
+
+      {/* Stats Cards - Tầng 2: Chi tiết bảo hành (tập con của Đã kích hoạt + KH xác nhận) */}
+      <div style={{ marginBottom: 24 }}>
+        <div style={{ fontSize: 12, color: '#94a3b8', fontWeight: 600, marginBottom: 8, paddingLeft: 4 }}>
+          Trong đó (Đã kích hoạt + KH xác nhận = {(stats.activated + stats.confirmed).toLocaleString()}):
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 12, maxWidth: 500 }}>
+          <div style={{
+            background: 'white', borderRadius: 10, padding: '12px 16px',
+            border: '2px solid #86efac', boxShadow: '0 1px 2px rgba(0,0,0,0.04)',
+            display: 'flex', alignItems: 'center', gap: 10,
+          }}>
+            <div style={{ width: 10, height: 10, borderRadius: '50%', background: '#22c55e', flexShrink: 0 }} />
+            <div>
+              <div style={{ fontSize: 12, color: '#64748b' }}>Còn hạn BH</div>
+              <div style={{ fontSize: 22, fontWeight: 700, color: '#16a34a' }}>{stats.valid.toLocaleString()}</div>
+            </div>
+          </div>
+          <div style={{
+            background: 'white', borderRadius: 10, padding: '12px 16px',
+            border: '2px solid #cbd5e1', boxShadow: '0 1px 2px rgba(0,0,0,0.04)',
+            display: 'flex', alignItems: 'center', gap: 10,
+          }}>
+            <div style={{ width: 10, height: 10, borderRadius: '50%', background: '#94a3b8', flexShrink: 0 }} />
+            <div>
+              <div style={{ fontSize: 12, color: '#64748b' }}>Đã hết hạn BH</div>
+              <div style={{ fontSize: 22, fontWeight: 700, color: '#64748b' }}>{stats.expired.toLocaleString()}</div>
+            </div>
+          </div>
+        </div>
       </div>
 
       {/* Toolbar */}
@@ -687,7 +721,7 @@ export default function SerialManage() {
                   <td style={{ padding: '12px 16px', verticalAlign: 'top' }}>
                     <div style={{ display: 'flex', alignItems: 'start', justifyContent: 'space-between', gap: 12 }}>
                       <span style={{ fontWeight: 550, color: '#334155', fontSize: 14 }}>
-                        {s.model}
+                        {s.productLine || s.model}
                       </span>
                       
                       {/* Action Icons Column stacked vertically */}
@@ -1034,9 +1068,9 @@ export default function SerialManage() {
                   />
                 </div>
 
-                {/* 2. Dòng máy / Model */}
+                {/* 2. Model */}
                 <div>
-                  <label style={{ fontSize: 11, fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>Dòng máy / Model (*)</label>
+                  <label style={{ fontSize: 11, fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>Model (*)</label>
                   <input
                     type="text"
                     value={selectedSerial.model || ''}
@@ -1048,6 +1082,17 @@ export default function SerialManage() {
                         return { ...prev, model: newModel, warrantyExpiryDate: expiry };
                       });
                     }}
+                    style={{ width: '100%', padding: '8px 12px', borderRadius: 8, border: '1px solid #cbd5e1', fontSize: 13, marginTop: 4, background: 'white' }}
+                  />
+                </div>
+
+                {/* 2.5. Dòng máy */}
+                <div>
+                  <label style={{ fontSize: 11, fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>Dòng máy</label>
+                  <input
+                    type="text"
+                    value={selectedSerial.productLine || ''}
+                    onChange={e => setSelectedSerial(prev => prev ? { ...prev, productLine: e.target.value || null } : null)}
                     style={{ width: '100%', padding: '8px 12px', borderRadius: 8, border: '1px solid #cbd5e1', fontSize: 13, marginTop: 4, background: 'white' }}
                   />
                 </div>
@@ -1197,6 +1242,18 @@ export default function SerialManage() {
                     disabled={!canChangeWarrantyPeriod}
                     value={selectedSerial.warrantyExpiryDate ? new Date(selectedSerial.warrantyExpiryDate).toISOString().split('T')[0] : ''}
                     onChange={e => setSelectedSerial(prev => prev ? { ...prev, warrantyExpiryDate: e.target.value ? new Date(e.target.value).toISOString() : null } : null)}
+                    style={{ width: '100%', padding: '8px 12px', borderRadius: 8, border: '1px solid #cbd5e1', fontSize: 13, marginTop: 4, background: 'white' }}
+                  />
+                </div>
+
+                {/* 11.5. Ngày KH xác nhận */}
+                <div>
+                  <label style={{ fontSize: 11, fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>Ngày KH xác nhận</label>
+                  <input
+                    type="date"
+                    disabled={!canChangeWarrantyPeriod}
+                    value={selectedSerial.customerConfirmationDate ? new Date(selectedSerial.customerConfirmationDate).toISOString().split('T')[0] : ''}
+                    onChange={e => setSelectedSerial(prev => prev ? { ...prev, customerConfirmationDate: e.target.value ? new Date(e.target.value).toISOString() : null } : null)}
                     style={{ width: '100%', padding: '8px 12px', borderRadius: 8, border: '1px solid #cbd5e1', fontSize: 13, marginTop: 4, background: 'white' }}
                   />
                 </div>

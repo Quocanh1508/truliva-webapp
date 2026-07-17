@@ -523,34 +523,31 @@ router.get('/', requireCoordinatorOrAdmin, async (req: Request, res: Response): 
 
     // Thống kê nhanh
     const now = new Date();
-    const [totalAll, activated, unactivated, confirmed, pending, expired] = await Promise.all([
+    const [totalAll, activated, unactivated, confirmed, pending, expired, valid] = await Promise.all([
       prisma.serial.count(),
-      prisma.serial.count({
-        where: {
-          status: 'Đã kích hoạt',
-          OR: [
-            { warrantyExpiryDate: null },
-            { warrantyExpiryDate: { gte: now } }
-          ]
-        }
-      }),
+      // Đã kích hoạt: đếm TẤT CẢ (bao gồm cả hết hạn)
+      prisma.serial.count({ where: { status: 'Đã kích hoạt' } }),
       prisma.serial.count({ where: { status: 'Chưa kích hoạt' } }),
-      prisma.serial.count({
-        where: {
-          status: 'KH xác nhận',
-          OR: [
-            { warrantyExpiryDate: null },
-            { warrantyExpiryDate: { gte: now } }
-          ]
-        }
-      }),
+      // KH xác nhận: đếm TẤT CẢ (bao gồm cả hết hạn)
+      prisma.serial.count({ where: { status: 'KH xác nhận' } }),
       prisma.serial.count({ where: { status: 'Chờ duyệt' } }),
+      // Đã hết hạn: tập con của Đã kích hoạt + KH xác nhận có warrantyExpiryDate < now
       prisma.serial.count({
         where: {
           status: { in: ['Đã kích hoạt', 'KH xác nhận'] },
           warrantyExpiryDate: { lt: now }
         }
-      })
+      }),
+      // Còn hạn BH: tập con của Đã kích hoạt + KH xác nhận có warrantyExpiryDate >= now (hoặc null)
+      prisma.serial.count({
+        where: {
+          status: { in: ['Đã kích hoạt', 'KH xác nhận'] },
+          OR: [
+            { warrantyExpiryDate: null },
+            { warrantyExpiryDate: { gte: now } }
+          ]
+        }
+      }),
     ]);
 
     res.json({
@@ -567,7 +564,8 @@ router.get('/', requireCoordinatorOrAdmin, async (req: Request, res: Response): 
         unactivated,
         confirmed,
         pending,
-        expired
+        expired,
+        valid,
       },
     });
   } catch (error: any) {
@@ -762,6 +760,7 @@ router.post('/import', requireCoordinatorOrAdmin, (req, res, next) => {
     const headerRow = rawRows[0] || [];
     let productCodeColIdx = -1;
     let modelColIdx = -1;
+    let productLineColIdx = -1;
     let deliveryDateColIdx = -1;
     let serialColIdx = -1;
     let customerNameColIdx = -1;
@@ -771,6 +770,7 @@ router.post('/import', requireCoordinatorOrAdmin, (req, res, next) => {
     let statusColIdx = -1;
     let activationDateColIdx = -1;
     let expiryDateColIdx = -1;
+    let customerConfirmationDateColIdx = -1;
 
     let isNewFormat = false;
 
@@ -783,14 +783,14 @@ router.post('/import', requireCoordinatorOrAdmin, (req, res, next) => {
         serialColIdx = idx;
       } else if (str === 'model') {
         modelColIdx = idx;
-      } else if (str === 'dòng máy' && modelColIdx === -1) {
-        modelColIdx = idx;
+      } else if (str === 'dòng máy' || str === 'dong may') {
+        productLineColIdx = idx;
       } else if (str.includes('delivery date') || str === 'ngày giao' || str === 'ngày xuất' || str === 'deliverydate') {
         deliveryDateColIdx = idx;
         isNewFormat = true;
       } else if (str === 'họ tên' || str === 'tên khách hàng' || str === 'khách hàng' || str === 'ho ten') {
         customerNameColIdx = idx;
-      } else if (str === 'số điện thoại' || str === 'sđt' || str === 'điện thoại' || str === 'so dien thoai') {
+      } else if (str === 'số điện thoại' || str === 'sđt' || str === 'điện thoại' || str === 'so dien thoai' || str.includes('sđt') || str.includes('sđt khách hàng')) {
         customerPhoneColIdx = idx;
       } else if (str === 'địa chỉ' || str === 'dia chi') {
         addressColIdx = idx;
@@ -800,8 +800,10 @@ router.post('/import', requireCoordinatorOrAdmin, (req, res, next) => {
         statusColIdx = idx;
       } else if (str === 'ngày kích hoạt' || str === 'kích hoạt lúc' || str === 'ngay kich hoat') {
         activationDateColIdx = idx;
-      } else if (str === 'ngày hết hạn bảo hành' || str === 'hạn bảo hành' || str === 'ngày hết hạn' || str === 'ngay het han bao hanh') {
+      } else if (str === 'ngày hết hạn bảo hành' || str === 'hạn bảo hành' || str === 'ngày hết hạn' || str === 'ngày hết hạn bh' || str === 'ngay het han bao hanh' || str === 'ngay het han bh') {
         expiryDateColIdx = idx;
+      } else if (str === 'ngày kh xác nhận' || str === 'kh xác nhận lúc' || str === 'kh xác nhận' || str === 'ngay kh xac nhan') {
+        customerConfirmationDateColIdx = idx;
       }
     });
 
@@ -847,6 +849,7 @@ router.post('/import', requireCoordinatorOrAdmin, (req, res, next) => {
       rawSerial: string;
       cleanedSerial: string;
       rawModel: string;
+      rawProductLine: string | null;
       rawProductCode: string;
       rawDeliveryDateVal: any;
       customerName: string | null;
@@ -856,6 +859,7 @@ router.post('/import', requireCoordinatorOrAdmin, (req, res, next) => {
       statusVal: string;
       activationDate: Date | null;
       warrantyExpiryDate: Date | null;
+      customerConfirmationDate: Date | null;
       rawData: Record<string, any>;
     }> = [];
 
@@ -865,6 +869,7 @@ router.post('/import', requireCoordinatorOrAdmin, (req, res, next) => {
 
       const rawSerial = serialColIdx !== -1 && row[serialColIdx] !== undefined ? String(row[serialColIdx]) : '';
       const rawModel = modelColIdx !== -1 && row[modelColIdx] !== undefined ? String(row[modelColIdx]) : '';
+      const rawProductLine = productLineColIdx !== -1 && row[productLineColIdx] !== undefined ? String(row[productLineColIdx]).trim() : null;
       const rawProductCode = productCodeColIdx !== -1 && row[productCodeColIdx] !== undefined ? String(row[productCodeColIdx]) : '';
       const rawDeliveryDateVal = deliveryDateColIdx !== -1 && row[deliveryDateColIdx] !== undefined ? row[deliveryDateColIdx] : null;
 
@@ -894,9 +899,11 @@ router.post('/import', requireCoordinatorOrAdmin, (req, res, next) => {
 
       const rawActivationDateVal = activationDateColIdx !== -1 && row[activationDateColIdx] !== undefined ? row[activationDateColIdx] : null;
       const rawExpiryDateVal = expiryDateColIdx !== -1 && row[expiryDateColIdx] !== undefined ? row[expiryDateColIdx] : null;
+      const rawCustomerConfirmationDateVal = customerConfirmationDateColIdx !== -1 && row[customerConfirmationDateColIdx] !== undefined ? row[customerConfirmationDateColIdx] : null;
 
       const activationDate = parseExcelDate(rawActivationDateVal);
       const warrantyExpiryDate = parseExcelDate(rawExpiryDateVal);
+      const customerConfirmationDate = parseExcelDate(rawCustomerConfirmationDateVal);
 
       // Lưu thông tin thô của dòng
       const rawData: Record<string, any> = {};
@@ -910,6 +917,7 @@ router.post('/import', requireCoordinatorOrAdmin, (req, res, next) => {
         rawSerial,
         cleanedSerial,
         rawModel,
+        rawProductLine,
         rawProductCode,
         rawDeliveryDateVal,
         customerName,
@@ -919,6 +927,7 @@ router.post('/import', requireCoordinatorOrAdmin, (req, res, next) => {
         statusVal,
         activationDate,
         warrantyExpiryDate,
+        customerConfirmationDate,
         rawData
       });
     });
@@ -1102,6 +1111,9 @@ router.post('/import', requireCoordinatorOrAdmin, (req, res, next) => {
         if (existingSerial.model === 'Không rõ dòng máy' || !existingSerial.model || isExistingModelFilterCartridge) {
           updateData.model = modelName;
         }
+        if (!existingSerial.productLine && item.rawProductLine) {
+          updateData.productLine = item.rawProductLine;
+        }
         if (existingSerial.status === 'Chưa kích hoạt' && statusVal === 'Đã kích hoạt') {
           updateData.status = 'Đã kích hoạt';
         }
@@ -1110,6 +1122,9 @@ router.post('/import', requireCoordinatorOrAdmin, (req, res, next) => {
         }
         if (!existingSerial.warrantyExpiryDate && warrantyExpiryDate) {
           updateData.warrantyExpiryDate = warrantyExpiryDate;
+        }
+        if (!existingSerial.customerConfirmationDate && item.customerConfirmationDate) {
+          updateData.customerConfirmationDate = item.customerConfirmationDate;
         }
         if (!existingSerial.customerName && customerName) {
           updateData.customerName = customerName;
@@ -1134,9 +1149,11 @@ router.post('/import', requireCoordinatorOrAdmin, (req, res, next) => {
             serialNumber: existingSerial.serialNumber,
             before: {
               model: existingSerial.model,
+              productLine: existingSerial.productLine,
               status: existingSerial.status,
               activationDate: existingSerial.activationDate,
               warrantyExpiryDate: existingSerial.warrantyExpiryDate,
+              customerConfirmationDate: existingSerial.customerConfirmationDate,
               customerName: existingSerial.customerName,
               customerPhone: existingSerial.customerPhone,
               address: existingSerial.address,
@@ -1158,9 +1175,11 @@ router.post('/import', requireCoordinatorOrAdmin, (req, res, next) => {
         newSerialsToCreate.push({
           serialNumber: cleanedSerial,
           model: modelName,
+          productLine: item.rawProductLine || null,
           status: statusVal,
           activationDate,
           warrantyExpiryDate,
+          customerConfirmationDate: item.customerConfirmationDate || null,
           customerName,
           customerPhone,
           address,
@@ -1236,24 +1255,17 @@ router.get('/import-template', requireCoordinatorOrAdmin, async (req: Request, r
     const worksheet = workbook.addWorksheet('Template Import');
 
     worksheet.columns = [
-      { header: 'Serial', key: 'serialNumber', width: 22 },
-      { header: 'Model', key: 'model', width: 25 },
-      { header: 'Dòng máy', key: 'modelDevice', width: 25 },
-      { header: 'Họ tên', key: 'customerName', width: 25 },
-      { header: 'Số điện thoại', key: 'customerPhone', width: 18 },
-      { header: 'Địa chỉ', key: 'address', width: 40 },
-      { header: 'Thành phố', key: 'province', width: 20 },
+      { header: 'Số Serial', key: 'serialNumber', width: 22 },
+      { header: 'Model', key: 'model', width: 15 },
+      { header: 'Dòng máy', key: 'productLine', width: 35 },
       { header: 'Trạng thái', key: 'status', width: 18 },
       { header: 'Ngày kích hoạt', key: 'activationDate', width: 22 },
-      { header: 'Ngày hết hạn bảo hành', key: 'warrantyExpiryDate', width: 22 },
-      { header: 'Kích hoạt bởi', key: 'activatedBy', width: 25 },
-      { header: 'Quyền', key: 'role', width: 18 },
-      { header: 'Khách hàng xác nhận lúc', key: 'customerConfirmationDate', width: 22 },
-      { header: 'Lô nhập', key: 'importBatchId', width: 20 },
-      { header: 'Tạo bởi', key: 'createdBy', width: 20 },
-      { header: 'Tạo lúc', key: 'createdAt', width: 22 },
-      { header: 'Cập nhật bởi', key: 'updatedBy', width: 20 },
-      { header: 'Cập nhật lúc', key: 'updatedAt', width: 22 },
+      { header: 'Ngày hết hạn BH', key: 'warrantyExpiryDate', width: 22 },
+      { header: 'Ngày KH xác nhận', key: 'customerConfirmationDate', width: 22 },
+      { header: 'Tên khách hàng', key: 'customerName', width: 25 },
+      { header: 'SĐT khách hàng', key: 'customerPhone', width: 18 },
+      { header: 'Địa chỉ', key: 'address', width: 45 },
+      { header: 'Tỉnh/Thành phố', key: 'province', width: 22 },
     ];
 
     // Style header
@@ -1268,31 +1280,24 @@ router.get('/import-template', requireCoordinatorOrAdmin, async (req: Request, r
     // Add sample row
     worksheet.addRow({
       serialNumber: '892820072100002',
-      model: 'Delica-UR5640',
-      modelDevice: 'Delica-UR5640',
-      customerName: 'Anh Việt ',
-      customerPhone: '0876984987',
-      address: 'Block D, khu Topaz 38 Bờ Bao Tân Thắng, Sơn Kỳ, Tân Phú ',
-      province: 'TP. Hồ Chí Minh',
+      model: 'UR5440',
+      productLine: 'Máy lọc nước Delica UR5440',
       status: 'Đã kích hoạt',
-      activationDate: '01/12/2020 18:47:15',
-      warrantyExpiryDate: '01/12/2021 18:47:15',
-      activatedBy: 'Phan Thanh Tuấn(84963277732)',
-      role: 'Kỹ thuật viên',
+      activationDate: '15/07/2024 15:30:01',
+      warrantyExpiryDate: '15/07/2026 15:30:01',
       customerConfirmationDate: '',
-      importBatchId: 'Lot_20200929135510',
-      createdBy: 'tunha@twin.vn',
-      createdAt: '29/09/2020 13:55:10',
-      updatedBy: 'system',
-      updatedAt: '01/12/2020 18:47:15',
+      customerName: 'Anh Việt',
+      customerPhone: '0876984987',
+      address: '38 Bờ Bao Tân Thắng, Sơn Kỳ, Tân Phú',
+      province: 'TP. Hồ Chí Minh',
     });
 
-    // Add dropdown data validations for columns Model (B), Dòng máy (C), Trạng thái (H) for rows 2 to 500
+    // Add dropdown data validations matching Excel file for rows 2 to 500
     for (let i = 2; i <= 500; i++) {
       worksheet.getCell(`B${i}`).dataValidation = {
         type: 'list',
         allowBlank: true,
-        formulae: ['"Delica-UR5440,Delica-UR5640,Delica-UR5840,Lavita,Lọc trong suốt âm tủ bếp-UX5010,Tanka-UR3140"'],
+        formulae: ['"CR5240,UR3140,UR5440,UR5640,UR5840,UX5010,KJ260,Không rõ dòng máy,UR61096H,QY/F-I20,UR5676,P1011,W6412,UR3626"'],
         showErrorMessage: true,
         errorTitle: 'Lỗi nhập liệu',
         error: 'Vui lòng chọn model từ danh sách có sẵn.'
@@ -1300,18 +1305,26 @@ router.get('/import-template', requireCoordinatorOrAdmin, async (req: Request, r
       worksheet.getCell(`C${i}`).dataValidation = {
         type: 'list',
         allowBlank: true,
-        formulae: ['"Delica-UR5440,Delica-UR5640,Delica-UR5840,Lavita-CR5240,Lọc trong suốt âm tủ bếp-UX5010,Tanka-UR3140"'],
+        formulae: ['"Máy lọc nước Lavita CR5240,Máy lọc nước Tanka UR3140,Máy lọc nước Delica UR5440,Máy lọc nước Delica UR5640,Máy lọc nước Delica UR5840,Lọc trong suốt âm tủ bếp-UX5010,Máy lọc không khí Airplus KJ260,Không rõ dòng máy,Máy lọc nước Truliva UR5840,Máy lọc nước Truliva UR61096H,Máy rửa rau Truliva QY/F-I20,Máy lọc nước Truliva UR5676,Bộ lọc sơ cấp Truliva P1011,Máy nóng lạnh treo tường Truliva W6412,Máy lọc nước Truliva UR3626"'],
         showErrorMessage: true,
         errorTitle: 'Lỗi nhập liệu',
         error: 'Vui lòng chọn dòng máy từ danh sách có sẵn.'
       };
-      worksheet.getCell(`H${i}`).dataValidation = {
+      worksheet.getCell(`D${i}`).dataValidation = {
         type: 'list',
         allowBlank: true,
-        formulae: ['"Chưa kích hoạt,Đã kích hoạt,Hủy,KH xác nhận"'],
+        formulae: ['"Chưa kích hoạt,Đã kích hoạt,KH xác nhận,Hủy"'],
         showErrorMessage: true,
         errorTitle: 'Lỗi nhập liệu',
         error: 'Vui lòng chọn trạng thái từ danh sách có sẵn.'
+      };
+      worksheet.getCell(`K${i}`).dataValidation = {
+        type: 'list',
+        allowBlank: true,
+        formulae: ['"TP. Hồ Chí Minh,TP. Hà Nội,Đồng Nai,Bình Dương,Bà Rịa-Vũng Tàu,Long An,Tiền Giang,Bến Tre,Vĩnh Long,TP. Cần Thơ,TP. Đà Nẵng,Hưng Yên,Khác"'],
+        showErrorMessage: true,
+        errorTitle: 'Lỗi nhập liệu',
+        error: 'Vui lòng chọn tỉnh/thành phố từ danh sách.'
       };
     }
 
@@ -1612,6 +1625,7 @@ router.patch('/:id', requireCoordinatorOrAdmin, async (req: Request, res: Respon
     const { 
       serialNumber, 
       model, 
+      productLine,
       status,
       customerName, 
       customerPhone, 
@@ -1619,6 +1633,7 @@ router.patch('/:id', requireCoordinatorOrAdmin, async (req: Request, res: Respon
       province, 
       activationDate, 
       warrantyExpiryDate, 
+      customerConfirmationDate,
       activatedBy, 
       promoCode, 
       importBatchId 
@@ -1647,6 +1662,7 @@ router.patch('/:id', requireCoordinatorOrAdmin, async (req: Request, res: Respon
     const updateData: any = {};
     if (serialNumber !== undefined) updateData.serialNumber = serialNumber;
     if (model !== undefined) updateData.model = model;
+    if (productLine !== undefined) updateData.productLine = productLine;
     if (status !== undefined) updateData.status = status;
     if (customerName !== undefined) updateData.customerName = customerName;
     if (customerPhone !== undefined) updateData.customerPhone = customerPhone;
@@ -1661,6 +1677,9 @@ router.patch('/:id', requireCoordinatorOrAdmin, async (req: Request, res: Respon
     }
     if (warrantyExpiryDate !== undefined) {
       updateData.warrantyExpiryDate = warrantyExpiryDate ? new Date(warrantyExpiryDate) : null;
+    }
+    if (customerConfirmationDate !== undefined) {
+      updateData.customerConfirmationDate = customerConfirmationDate ? new Date(customerConfirmationDate) : null;
     }
 
     // Tự động gán ngày kích hoạt & hết hạn nếu trạng thái chuyển sang Đã kích hoạt/KH xác nhận mà không truyền ngày

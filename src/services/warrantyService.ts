@@ -62,25 +62,7 @@ export async function activateSerialWarranty(
   });
 
   if (!existingSerial) {
-    // Tự động tạo mới Serial nếu không tồn tại trong hệ thống
-    let model = 'Máy lọc nước Truliva';
-    if (orderId) {
-      const order = await prisma.order.findUnique({
-        where: { id: orderId },
-        include: { items: true }
-      });
-      if (order && order.items && order.items.length > 0) {
-        model = order.items[0].productName || 'Máy lọc nước Truliva';
-      }
-    }
-
-    existingSerial = await prisma.serial.create({
-      data: {
-        serialNumber: cleanedSerial,
-        model,
-        status: 'Chưa kích hoạt'
-      }
-    });
+    throw new Error(`Số Serial "${cleanedSerial}" không tồn tại trong hệ thống.`);
   }
 
   // Quyết định trạng thái
@@ -259,15 +241,8 @@ export async function syncSerialFromReport(
   if (orderId) serialData.orderId = orderId;
 
   if (!existingSerial) {
-    existingSerial = await prisma.serial.create({
-      data: {
-        serialNumber: cleanedSerial,
-        model,
-        status: 'Chưa kích hoạt',
-        ...serialData
-      }
-    });
-    logger.info('Created new Serial from KTV report in sync-only mode', { serialNumber: cleanedSerial });
+    logger.warn('Skipping serial sync: serial number does not exist in system', { serialNumber: cleanedSerial });
+    return null;
   } else {
     const dataToUpdate: any = {};
     if (!existingSerial.customerName && serialData.customerName) dataToUpdate.customerName = serialData.customerName;

@@ -752,6 +752,41 @@ router.get('/', requireAuth, async (req: Request, res: Response): Promise<void> 
       }
     });
 
+    // ── Enrich serial info cho serviceReports ──
+    // Gom tất cả serialNumber từ service reports để lookup 1 lần
+    const reportSerialNumbers = new Set<string>();
+    orders.forEach((order: any) => {
+      (order.serviceReports || []).forEach((r: any) => {
+        if (r.serialNumber) reportSerialNumbers.add(r.serialNumber);
+      });
+    });
+
+    // Bỏ qua nếu không có serial nào từ reports
+    if (reportSerialNumbers.size > 0) {
+      const serialRecords = await prisma.serial.findMany({
+        where: { serialNumber: { in: Array.from(reportSerialNumbers) } },
+        select: {
+          serialNumber: true,
+          status: true,
+          activationDate: true,
+          warrantyExpiryDate: true,
+          customerConfirmationDate: true,
+          model: true,
+          productLine: true,
+        }
+      });
+      const serialMap = new Map(serialRecords.map(s => [s.serialNumber, s]));
+
+      // Gắn serialInfo vào mỗi service report
+      orders.forEach((order: any) => {
+        (order.serviceReports || []).forEach((r: any) => {
+          if (r.serialNumber) {
+            r.serialInfo = serialMap.get(r.serialNumber) || null;
+          }
+        });
+      });
+    }
+
     res.json({
       orders,
       pagination: {

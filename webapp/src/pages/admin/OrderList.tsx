@@ -1314,7 +1314,16 @@ export default function OrderList() {
       if (type === 'productNames') setTempProductNames(filterProductNames);
       if (type === 'techStationIds') setTempTechStationIds(filterTechStationIds);
       if (type === 'provinces') setTempProvinces(filterProvinces);
-      if (type === 'creator') setTempCreators(filterCreators);
+      if (type === 'creator') {
+        const allCreators = dbFilterOptions.creators || [];
+        if (filterCreators.length === 0) {
+          setTempCreators([...allCreators]);
+        } else if (filterCreators.includes('__NONE__')) {
+          setTempCreators([]);
+        } else {
+          setTempCreators(filterCreators);
+        }
+      }
     }
   };
 
@@ -1337,7 +1346,16 @@ export default function OrderList() {
     if (type === 'productNames') setFilterProductNames(tempProductNames);
     if (type === 'techStationIds') setFilterTechStationIds(tempTechStationIds);
     if (type === 'provinces') setFilterProvinces(tempProvinces);
-    if (type === 'creator') setFilterCreators(tempCreators);
+    if (type === 'creator') {
+      const allCreators = dbFilterOptions.creators || [];
+      if (tempCreators.length === 0) {
+        setFilterCreators(['__NONE__']);
+      } else if (allCreators.length > 0 && allCreators.every(c => tempCreators.includes(c))) {
+        setFilterCreators([]);
+      } else {
+        setFilterCreators(tempCreators);
+      }
+    }
     setActiveDropdown(null);
   };
 
@@ -2203,15 +2221,32 @@ export default function OrderList() {
                         onChange={(e) => setCreatorSearch(e.target.value)}
                       />
                       <div className="space-y-2 max-h-48 overflow-y-auto">
-                        <label className="flex items-center space-x-2 text-sm text-gray-700 cursor-pointer">
-                          <input
-                            type="checkbox"
-                            className="rounded text-blue-600 focus:ring-blue-500"
-                            checked={tempCreators.length === 0}
-                            onChange={() => setTempCreators([])}
-                          />
-                          <span className="font-semibold text-gray-500">Tất cả (Không lọc)</span>
-                        </label>
+                        {/* Nút Tất cả: tick = chọn tất cả người tạo */}
+                        {(() => {
+                          const allCreators = dbFilterOptions.creators || [];
+                          const allSelected = allCreators.length > 0 && allCreators.every(c => tempCreators.includes(c));
+                          const someSelected = allCreators.some(c => tempCreators.includes(c)) && !allSelected;
+                          return (
+                            <label className="flex items-center space-x-2 text-sm text-gray-700 cursor-pointer border-b pb-2 mb-1">
+                              <input
+                                type="checkbox"
+                                className="rounded text-blue-600 focus:ring-blue-500"
+                                checked={allSelected}
+                                ref={el => { if (el) el.indeterminate = someSelected; }}
+                                onChange={() => {
+                                  if (allSelected) {
+                                    // Đang tick tất cả → bỏ hết (clear)
+                                    setTempCreators([]);
+                                  } else {
+                                    // Chưa tick tất cả → tick hết
+                                    setTempCreators([...allCreators]);
+                                  }
+                                }}
+                              />
+                              <span className="font-semibold text-gray-500">Tất cả (Không lọc)</span>
+                            </label>
+                          );
+                        })()}
                         {creatorSearch.trim() && (
                           <label className="flex items-center space-x-2 text-sm text-blue-600 cursor-pointer font-medium border-b pb-1.5 mb-1.5">
                             <input
@@ -2250,8 +2285,12 @@ export default function OrderList() {
                             </label>
                           ))}
                       </div>
-                      <div className="flex justify-between mt-2 pt-2 border-t">
+                      <div className="flex justify-between items-center mt-2 pt-2 border-t gap-2">
                         <button className="text-gray-500 text-xs px-2 py-1 hover:bg-gray-100 rounded" onClick={() => setActiveDropdown('main')}>Quay lại</button>
+                        <button
+                          className="text-red-500 text-xs px-2 py-1 hover:bg-red-50 rounded border border-red-200 font-medium"
+                          onClick={() => setTempCreators([])}
+                        >Bỏ chọn tất cả</button>
                         <button className="bg-blue-600 text-white text-xs px-3 py-1 rounded hover:bg-blue-700 font-semibold" onClick={() => applyFilter('creator')}>Áp dụng</button>
                       </div>
                     </div>
@@ -2391,7 +2430,7 @@ export default function OrderList() {
 
             {filterCreators.length > 0 && (
               <span className="inline-flex items-center bg-gray-100 text-gray-800 text-xs font-medium px-2.5 py-1 rounded-md border border-gray-200">
-                Người tạo: {filterCreators.join(', ')}
+                Người tạo: {filterCreators.includes('__NONE__') ? 'Không chọn ai' : filterCreators.join(', ')}
                 <button type="button" className="ml-1.5 text-gray-400 hover:text-gray-600 outline-none" onClick={() => { setFilterCreators([]); setPage(1); }}>
                   <XCircle size={14} className="fill-gray-200 hover:fill-gray-300 text-gray-500" />
                 </button>
@@ -2802,9 +2841,12 @@ export default function OrderList() {
                           .map((r: any) => ({
                             id: r.id,
                             serialNumber: r.serialNumber,
-                            status: 'Chưa kích hoạt',
-                            activationDate: null,
-                            warrantyExpiryDate: null
+                            // Dùng serialInfo từ backend (đã lookup từ bảng Serial)
+                            // Nếu không có (serial chưa trong hệ thống), fallback là null
+                            status: r.serialInfo?.status || null,
+                            activationDate: r.serialInfo?.activationDate || null,
+                            warrantyExpiryDate: r.serialInfo?.warrantyExpiryDate || null,
+                            customerConfirmationDate: r.serialInfo?.customerConfirmationDate || null,
                           }));
                         
                         const serialsToShow = orderSerials.length > 0 ? orderSerials : reportSerials;

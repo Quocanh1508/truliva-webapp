@@ -348,6 +348,7 @@ model Serial {
   id                       String    @id @default(uuid())
   serialNumber             String    @unique @map("serial_number")          // Số Serial (Khóa duy nhất)
   model                    String                                           // Tên Model máy (VD: "Ultima White")
+  productLine              String?   @map("product_line")                   // Dòng máy (VD: "Máy lọc nước Delica UR5840")
   status                   String    @default("Chưa kích hoạt")            // Trạng thái: "Chưa kích hoạt" | "Chờ duyệt" | "Đã kích hoạt" | "KH xác nhận"
   activationDate           DateTime? @map("activation_date")                // Ngày kích hoạt
   warrantyExpiryDate       DateTime? @map("warranty_expiry_date")           // Ngày hết hạn bảo hành
