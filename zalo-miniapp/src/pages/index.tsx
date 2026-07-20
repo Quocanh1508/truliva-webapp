@@ -92,7 +92,7 @@ export default function IndexPage() {
   };
 
   useEffect(() => {
-    // Tự động kiểm tra session cũ hoặc thử xác thực
+    // Tự động kiểm tra session cũ nếu có
     const savedToken = getSafeStorage('zalo_session_token');
     if (savedToken) {
       fetchZaloApi('/zalo-miniapp/profile')
@@ -100,16 +100,14 @@ export default function IndexPage() {
           if (res.success && res.user) {
             setUser(res.user);
             loadUserContent(res.user);
-          } else {
-            handle1ClickZaloAuth();
           }
         })
-        .catch(() => {
-          handle1ClickZaloAuth();
+        .catch(err => {
+          console.warn('Profile fetch error:', err);
         })
         .finally(() => setLoading(false));
     } else {
-      handle1ClickZaloAuth();
+      setLoading(false);
     }
   }, []);
 
