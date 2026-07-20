@@ -44,6 +44,9 @@ export default function ReportForm() {
   const [error, setError] = useState('');
 
   const { user } = useAuth();
+  const isKtv = user?.role === 'KTV';
+  const reportsRedirectPath = isKtv ? '/ktv/my-reports' : '/admin/orders';
+  const jobsRedirectPath = isKtv ? '/ktv/my-orders' : '/admin/orders';
   const [mainStations, setMainStations] = useState<any[]>([]);
   const [selectedMainStationId, setSelectedMainStationId] = useState('');
   const [selectedTechStationId, setSelectedTechStationId] = useState('');
@@ -663,7 +666,7 @@ export default function ReportForm() {
     } catch (err: any) {
       alert(err.message || 'Lỗi khi gửi yêu cầu kích hoạt ZNS. Hệ thống vẫn lưu báo cáo, Admin sẽ kích hoạt bảo hành sau.');
       setShowActivationModal(false);
-      navigate('/ktv/my-reports');
+      navigate(reportsRedirectPath);
     } finally {
       setZnsSending(false);
     }
@@ -779,15 +782,11 @@ export default function ReportForm() {
           method: 'PUT',
           body: JSON.stringify(payload)
         });
-        if (user?.role !== 'KTV') {
-          navigate('/admin/orders');
+        const isInstallJob = ['lắp đặt', 'giao hàng và lắp đặt'].includes(payload.workType?.trim().toLowerCase());
+        if (isInstallJob) {
+          triggerActivationModal(payload);
         } else {
-          const isInstallJob = ['lắp đặt', 'giao hàng và lắp đặt'].includes(payload.workType?.trim().toLowerCase());
-          if (isInstallJob) {
-            triggerActivationModal(payload);
-          } else {
-            navigate('/ktv/my-reports');
-          }
+          navigate(reportsRedirectPath);
         }
         return;
       }
@@ -795,11 +794,7 @@ export default function ReportForm() {
       if (!navigator.onLine) {
         await enqueueReport(selectedOrderId, payload, reportFiles);
         alert('Báo cáo đã được lưu tạm ngoại tuyến và sẽ tự động đồng bộ khi thiết bị của bạn có kết nối mạng.');
-        if (user?.role !== 'KTV') {
-          navigate('/admin/orders');
-        } else {
-          navigate('/ktv/my-orders');
-        }
+        navigate(jobsRedirectPath);
         return;
       }
 
@@ -807,15 +802,11 @@ export default function ReportForm() {
         method: 'POST',
         body: JSON.stringify(payload)
       });
-      if (user?.role !== 'KTV') {
-        navigate('/admin/orders');
+      const isInstallJob = ['lắp đặt', 'giao hàng và lắp đặt'].includes(payload.workType?.trim().toLowerCase());
+      if (isInstallJob) {
+        triggerActivationModal(payload);
       } else {
-        const isInstallJob = ['lắp đặt', 'giao hàng và lắp đặt'].includes(payload.workType?.trim().toLowerCase());
-        if (isInstallJob) {
-          triggerActivationModal(payload);
-        } else {
-          navigate('/ktv/my-reports');
-        }
+        navigate(reportsRedirectPath);
       }
     } catch (err: any) {
       setError(err.message);
@@ -1520,7 +1511,7 @@ export default function ReportForm() {
                     <button 
                       type="button" 
                       className="text-gray-400 hover:text-gray-600 text-xs font-bold"
-                      onClick={() => { setShowActivationModal(false); navigate('/ktv/my-reports'); }}
+                      onClick={() => { setShowActivationModal(false); navigate(reportsRedirectPath); }}
                     >
                       <X size={18} />
                     </button>
@@ -1577,7 +1568,7 @@ export default function ReportForm() {
                     <button
                       type="button"
                       className="btn btn-outline flex-1 py-2 text-sm"
-                      onClick={() => { setShowActivationModal(false); navigate('/ktv/my-reports'); }}
+                      onClick={() => { setShowActivationModal(false); navigate(reportsRedirectPath); }}
                     >
                       Để sau
                     </button>
@@ -1624,14 +1615,14 @@ export default function ReportForm() {
                     <button
                       type="button"
                       className="btn btn-outline flex-1 py-2 text-sm"
-                      onClick={() => { setShowActivationModal(false); navigate('/ktv/my-orders'); }}
+                      onClick={() => { setShowActivationModal(false); navigate(jobsRedirectPath); }}
                     >
                       Danh sách công việc
                     </button>
                     <button
                       type="button"
                       className="btn btn-primary flex-1 py-2 text-sm"
-                      onClick={() => { setShowActivationModal(false); navigate('/ktv/my-reports'); }}
+                      onClick={() => { setShowActivationModal(false); navigate(reportsRedirectPath); }}
                     >
                       Báo cáo của tôi
                     </button>
