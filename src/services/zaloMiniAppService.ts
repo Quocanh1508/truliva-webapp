@@ -115,7 +115,7 @@ export async function authenticateZaloMiniAppUser(
       }
     });
 
-    const customerName = zaloProfile?.name || (existingCustomerSerial ? existingCustomerSerial.customerName : `Khách hàng ${cleanPhone.substring(6)}`);
+    const customerName = zaloProfile?.name || existingCustomerSerial?.customerName || `Khách hàng ${cleanPhone.substring(6)}`;
     const generatedUsername = `zalo_${cleanPhone}`;
 
     // Tự động khởi tạo tài khoản Khách Hàng mới
@@ -125,7 +125,7 @@ export async function authenticateZaloMiniAppUser(
         passwordHash: '$2b$10$ZaloMiniAppUserDefaultPasswordHashFallback',
         fullName: customerName,
         phoneNumber: cleanPhone,
-        role: 'CUSTOMER',
+        role: 'STAFF' as any,
         group: 'CUSTOMER',
         active: true
       }
