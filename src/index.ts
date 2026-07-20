@@ -48,17 +48,25 @@ app.use(helmet({
   contentSecurityPolicy: false, // Cho phép load ảnh từ Cloudinary/Local
 }));
 const allowedOrigins = [
+  'https://trulivaofficial.com',
+  'https://www.trulivaofficial.com',
   'http://localhost:5173',
+  'http://localhost:3000',
   'http://localhost',
   'capacitor://localhost'
 ];
 
 app.use(cors({
   origin: (origin, callback) => {
-    if (!origin || allowedOrigins.indexOf(origin) !== -1 || process.env.NODE_ENV === 'production') {
+    if (
+      !origin || 
+      allowedOrigins.includes(origin) || 
+      origin.endsWith('trulivaofficial.com') || 
+      origin.startsWith('zalo://')
+    ) {
       callback(null, true);
     } else {
-      callback(new Error('Not allowed by CORS'));
+      callback(null, true);
     }
   },
   credentials: true,
