@@ -9,5 +9,8 @@
   },
   "pages": [
     "pages/index"
-  ]
+  ],
+  "listCSS": [],
+  "listSyncJS": [],
+  "listAsyncJS": []
 }
