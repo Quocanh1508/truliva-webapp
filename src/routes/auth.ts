@@ -72,8 +72,8 @@ router.post('/login', async (req: Request, res: Response): Promise<void> => {
       },
     });
   } catch (error: any) {
-    logger.error('Login error', { error: error.message });
-    res.status(500).json({ error: 'Lỗi đăng nhập' });
+    logger.error('Login error', { error: error.message, stack: error.stack });
+    res.status(500).json({ error: error.message || 'Lỗi đăng nhập' });
   }
 });
 
