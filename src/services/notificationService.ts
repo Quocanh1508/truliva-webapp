@@ -6,38 +6,55 @@ import logger from '../utils/logger';
 
 let isFirebaseInitialized = false;
 
-try {
-  const serviceAccountPath = path.join(process.cwd(), 'firebase-service-account.json');
-  if (fs.existsSync(serviceAccountPath)) {
-    // Sử dụng require để nạp dữ liệu JSON động
-    const serviceAccount = JSON.parse(fs.readFileSync(serviceAccountPath, 'utf8'));
-    admin.initializeApp({
-      credential: admin.credential.cert(serviceAccount),
-    });
-    isFirebaseInitialized = true;
-    logger.info('Firebase Admin successfully initialized using service account JSON file.');
-  } else if (
-    process.env.FIREBASE_PROJECT_ID &&
-    process.env.FIREBASE_CLIENT_EMAIL &&
-    process.env.FIREBASE_PRIVATE_KEY
-  ) {
-    admin.initializeApp({
-      credential: admin.credential.cert({
-        projectId: process.env.FIREBASE_PROJECT_ID,
-        clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
-        privateKey: process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n'),
-      }),
-    });
-    isFirebaseInitialized = true;
-    logger.info('Firebase Admin successfully initialized using environment variables.');
-  } else {
-    logger.warn(
-      'Push notifications (Firebase) disabled: missing firebase-service-account.json or environment variables.'
-    );
+function initFirebase() {
+  if (isFirebaseInitialized) return;
+  try {
+    const serviceAccountPath = path.join(process.cwd(), 'firebase-service-account.json');
+    if (fs.existsSync(serviceAccountPath)) {
+      const serviceAccount = JSON.parse(fs.readFileSync(serviceAccountPath, 'utf8'));
+      admin.initializeApp({
+        credential: admin.credential.cert(serviceAccount),
+      });
+      isFirebaseInitialized = true;
+      if (typeof logger?.info === 'function') {
+        logger.info('Firebase Admin successfully initialized using service account JSON file.');
+      }
+    } else if (
+      process.env.FIREBASE_PROJECT_ID &&
+      process.env.FIREBASE_CLIENT_EMAIL &&
+      process.env.FIREBASE_PRIVATE_KEY
+    ) {
+      let privateKey = process.env.FIREBASE_PRIVATE_KEY;
+      if (privateKey.startsWith('"') && privateKey.endsWith('"')) {
+        privateKey = privateKey.substring(1, privateKey.length - 1);
+      }
+      privateKey = privateKey.replace(/\\n/g, '\n');
+
+      admin.initializeApp({
+        credential: admin.credential.cert({
+          projectId: process.env.FIREBASE_PROJECT_ID,
+          clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
+          privateKey,
+        }),
+      });
+      isFirebaseInitialized = true;
+      if (typeof logger?.info === 'function') {
+        logger.info('Firebase Admin successfully initialized using environment variables.');
+      }
+    } else {
+      if (typeof logger?.warn === 'function') {
+        logger.warn(
+          'Push notifications (Firebase) disabled: missing firebase-service-account.json or environment variables.'
+        );
+      }
+    }
+  } catch (error: any) {
+    console.error('[Firebase Init Warning] Error initializing Firebase Admin SDK:', error.message);
   }
-} catch (error: any) {
-  logger.error('Error initializing Firebase Admin SDK', { error: error.message });
 }
+
+// Gọi khởi tạo an toàn
+initFirebase();
 
 /**
  * Gửi thông báo đẩy đến một người dùng dựa trên ID của họ
