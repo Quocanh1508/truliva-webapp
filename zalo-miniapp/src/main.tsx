@@ -1,7 +1,6 @@
 import React, { Component, ErrorInfo, ReactNode } from 'react';
 import ReactDOM from 'react-dom/client';
-import { App, ZMPRouter, AnimationRoutes, Page } from 'zmp-ui';
-import { Route } from 'react-router-dom';
+import { App, ZMPRouter, AnimationRoutes, Route, Page } from 'zmp-ui';
 import 'zmp-ui/zaui.css';
 import IndexPage from './pages/index';
 
