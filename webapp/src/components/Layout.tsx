@@ -95,7 +95,6 @@ export default function Layout() {
     if (canSeeInventory) {
       items.push({ name: 'Quản lý kho', path: '/admin/inventory', icon: <Warehouse size={20} /> });
       items.push({ name: 'Quản lý Serial', path: '/admin/serials', icon: <Hash size={20} /> });
-      items.push({ name: 'Quản lý & Bắn ZNS', path: '/admin/zns-manage', icon: <Send size={20} /> });
     }
 
     const canSeePromos = ['ADMIN', 'COORDINATOR', 'SALE_SUPERVISOR', 'SALER', 'HOTLINE'].includes(user.role);

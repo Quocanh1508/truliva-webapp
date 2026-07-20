@@ -350,7 +350,6 @@ export default function App() {
                 <Route path="/admin/orders" element={<OrderList />} />
                 <Route path="/admin/reports" element={<ReportList />} />
                 <Route path="/admin/promos" element={<PromoManage />} />
-                <Route path="/admin/zns-manage" element={<ZnsManage />} />
               </Route>
 
               {/* Dev Routes */}

@@ -9,7 +9,7 @@ import axios from 'axios';
 import fs from 'fs';
 import prisma from '../config/database';
 import logger from '../utils/logger';
-import { requireAuth, requireCoordinatorOrAdmin } from '../middleware/authSession';
+import { requireAuth, requireCoordinatorOrAdmin, requireDev } from '../middleware/authSession';
 import { activateSerialWarranty, extractWarrantyMonths } from '../services/warrantyService';
 import { getZaloConfig, exchangeAuthorizationCode, sendZnsWarrantyActivation } from '../services/zaloService';
 
@@ -2037,9 +2037,9 @@ router.post('/zns-activate', requireAuth, async (req: Request, res: Response): P
 
 /**
  * POST /api/serials/zns/test-send
- * Thử nghiệm gửi tin nhắn ZNS trực tiếp và kiểm tra ngay kết quả từ FNS Gateway
+ * Thử nghiệm gửi tin nhắn ZNS trực tiếp và kiểm tra ngay kết quả từ FNS Gateway (DEV Only)
  */
-router.post('/zns/test-send', requireCoordinatorOrAdmin, async (req: Request, res: Response): Promise<void> => {
+router.post('/zns/test-send', requireAuth, requireDev, async (req: Request, res: Response): Promise<void> => {
   try {
     const { phone, serialNumber, customerName, productName, expiryDate } = req.body;
     if (!phone || !serialNumber) {
@@ -2123,9 +2123,9 @@ router.post('/zns/test-send', requireCoordinatorOrAdmin, async (req: Request, re
 
 /**
  * POST /api/serials/zns/check-status
- * Tra cứu trạng thái gửi thực tế của tin nhắn theo msg_id từ FNS Gateway
+ * Tra cứu trạng thái gửi thực tế của tin nhắn theo msg_id từ FNS Gateway (DEV Only)
  */
-router.post('/zns/check-status', requireCoordinatorOrAdmin, async (req: Request, res: Response): Promise<void> => {
+router.post('/zns/check-status', requireAuth, requireDev, async (req: Request, res: Response): Promise<void> => {
   try {
     const { msg_id } = req.body;
     if (!msg_id) {
@@ -2158,9 +2158,9 @@ router.post('/zns/check-status', requireCoordinatorOrAdmin, async (req: Request,
 
 /**
  * GET /api/serials/zns/logs
- * Lấy lịch sử gửi tin nhắn ZNS gần nhất từ nhật ký máy chủ và cơ sở dữ liệu
+ * Lấy lịch sử gửi tin nhắn ZNS gần nhất từ nhật ký máy chủ và cơ sở dữ liệu (DEV Only)
  */
-router.get('/zns/logs', requireCoordinatorOrAdmin, async (req: Request, res: Response): Promise<void> => {
+router.get('/zns/logs', requireAuth, requireDev, async (req: Request, res: Response): Promise<void> => {
   try {
     // Lấy 50 serial đã kích hoạt gần nhất có thông tin kích hoạt
     const activatedSerials = await prisma.serial.findMany({
