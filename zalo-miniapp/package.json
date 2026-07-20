@@ -8,9 +8,11 @@
     "framework": "vite"
   },
   "scripts": {
-    "dev": "zmp-cli start",
-    "start": "zmp-cli start",
-    "build": "tsc && vite build"
+    "dev": "zmp-cli start --zalo-app",
+    "start": "zmp-cli start --zalo-app",
+    "start:web": "zmp-cli start",
+    "build": "tsc && vite build",
+    "deploy": "zmp-cli deploy"
   },
   "dependencies": {
     "lucide-react": "^0.474.0",
