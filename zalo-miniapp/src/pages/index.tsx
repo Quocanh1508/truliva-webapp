@@ -15,7 +15,7 @@ import {
   LogIn
 } from 'lucide-react';
 import { getPhoneNumber, getUserInfo } from 'zmp-sdk/apis';
-import { fetchZaloApi } from '../api/client';
+import { fetchZaloApi, getSafeStorage, setSafeStorage } from '../api/client';
 
 export default function IndexPage() {
   const [loading, setLoading] = useState(true);
@@ -44,7 +44,7 @@ export default function IndexPage() {
       });
 
       if (data.success) {
-        localStorage.setItem('zalo_session_token', data.token);
+        setSafeStorage('zalo_session_token', data.token);
         setUser(data.user);
         await loadUserContent(data.user);
       }
@@ -93,7 +93,7 @@ export default function IndexPage() {
 
   useEffect(() => {
     // Tự động kiểm tra session cũ hoặc thử xác thực
-    const savedToken = localStorage.getItem('zalo_session_token');
+    const savedToken = getSafeStorage('zalo_session_token');
     if (savedToken) {
       fetchZaloApi('/zalo-miniapp/profile')
         .then(res => {

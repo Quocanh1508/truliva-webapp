@@ -1,7 +1,21 @@
 export const API_BASE_URL = 'https://trulivaofficial.com/api';
 
+export function getSafeStorage(key: string): string | null {
+  try {
+    return localStorage.getItem(key);
+  } catch (e) {
+    return null;
+  }
+}
+
+export function setSafeStorage(key: string, value: string): void {
+  try {
+    localStorage.setItem(key, value);
+  } catch (e) {}
+}
+
 export async function fetchZaloApi(endpoint: string, options: RequestInit = {}) {
-  const token = localStorage.getItem('zalo_session_token');
+  const token = getSafeStorage('zalo_session_token');
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
     ...(options.headers as Record<string, string>)
