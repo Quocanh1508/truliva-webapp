@@ -8,8 +8,6 @@
     "statusBarColor": "#1D4ED8"
   },
   "pages": [
-    "pages/index",
-    "pages/ktv/orders",
-    "pages/customer/warranty"
+    "pages/index"
   ]
 }

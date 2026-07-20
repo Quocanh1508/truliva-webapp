@@ -3,8 +3,13 @@
   "private": true,
   "version": "1.0.0",
   "type": "module",
+  "zmp": {
+    "type": "react",
+    "framework": "vite"
+  },
   "scripts": {
-    "dev": "vite",
+    "dev": "zmp-cli start",
+    "start": "zmp-cli start",
     "build": "tsc && vite build"
   },
   "dependencies": {
@@ -19,6 +24,7 @@
     "@types/react-dom": "^18.3.5",
     "@vitejs/plugin-react": "^4.3.4",
     "typescript": "~5.7.2",
-    "vite": "^6.0.11"
+    "vite": "^6.0.11",
+    "zmp-cli": "^4.0.3"
   }
 }
