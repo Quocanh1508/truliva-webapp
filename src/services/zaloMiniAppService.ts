@@ -21,7 +21,7 @@ export interface ZaloAuthResult {
  */
 export function normalizePhone(phone: string): string {
   let cleaned = phone.replace(/[^0-9]/g, '');
-  if (cleaned.startsWith('84')) {
+  if (cleaned.startsWith('84') && cleaned.length >= 11) {
     cleaned = '0' + cleaned.substring(2);
   }
   return cleaned;
@@ -31,6 +31,12 @@ export function normalizePhone(phone: string): string {
  * Giải mã phoneToken từ Zalo SDK thông qua Zalo Graph API
  */
 export async function decodeZaloPhoneToken(phoneToken: string, userAccessToken?: string): Promise<string> {
+  // 1. Kiểm tra nếu phoneToken đã là số điện thoại thuần (VD: 0915185982 hoặc 84915185982)
+  const cleanStr = phoneToken.replace(/[^0-9]/g, '');
+  if ((cleanStr.startsWith('0') && cleanStr.length === 10) || (cleanStr.startsWith('84') && cleanStr.length === 11)) {
+    return normalizePhone(cleanStr);
+  }
+
   const secretKey = process.env.ZALO_MINI_APP_SECRET || 'DYAiHF0BqLb9M2FtGLW4';
 
   try {
@@ -41,9 +47,16 @@ export async function decodeZaloPhoneToken(phoneToken: string, userAccessToken?:
       headers.access_token = userAccessToken;
     }
 
+    const params: Record<string, string> = {
+      code: phoneToken
+    };
+    if (userAccessToken) {
+      params.access_token = userAccessToken;
+    }
+
     const response = await axios.get('https://graph.zalo.me/v2.0/me/info', {
       headers,
-      params: { code: phoneToken }
+      params
     });
 
     const data = response.data;
@@ -59,8 +72,8 @@ export async function decodeZaloPhoneToken(phoneToken: string, userAccessToken?:
     return normalizePhone(rawNumber);
   } catch (error: any) {
     logger.error('Failed to decode Zalo Phone Token', { error: error.message, details: error.response?.data });
-    // Nếu trong môi trường phát triển (Dev Sandbox), cho phép số điện thoại test nếu giả lập
-    if (phoneToken.startsWith('0') || phoneToken.startsWith('84')) {
+    // Nếu truyền chuỗi số điện thoại test/fallback
+    if (phoneToken.length >= 9 && !isNaN(Number(phoneToken))) {
       return normalizePhone(phoneToken);
     }
     throw new Error(`Không thể giải mã số điện thoại Zalo: ${error.message}`);
@@ -102,39 +115,38 @@ export async function authenticateZaloMiniAppUser(
       }
     });
 
-    const fullName = zaloProfile?.name || existingCustomerSerial?.customerName || `Khách hàng ${cleanPhone.slice(-4)}`;
-    const username = `zalo_${cleanPhone}`;
-    const dummyPasswordHash = '$2b$10$ZaloMiniAppDefaultPasswordHashForSecurity1234567890';
+    const customerName = zaloProfile?.name || (existingCustomerSerial ? existingCustomerSerial.customerName : `Khách hàng ${cleanPhone.substring(6)}`);
+    const generatedUsername = `zalo_${cleanPhone}`;
 
-    // Tạo mới hồ sơ User với vai trò KHÁCH HÀNG (KTV/Admin tạo qua WebPC)
+    // Tự động khởi tạo tài khoản Khách Hàng mới
     user = await prisma.user.create({
       data: {
-        username,
-        passwordHash: dummyPasswordHash,
-        fullName,
+        username: generatedUsername,
+        passwordHash: '$2b$10$ZaloMiniAppUserDefaultPasswordHashFallback',
+        fullName: customerName,
         phoneNumber: cleanPhone,
-        role: 'STAFF', // Dùng vai trò Staff nhóm Customer hoặc mặc định
-        group: 'Customer',
-        isActive: true
+        role: 'CUSTOMER',
+        group: 'CUSTOMER',
+        active: true
       }
     });
 
     isNewUser = true;
-    logger.info('Created new Customer profile for Zalo Mini App', { userId: user.id, phone: cleanPhone });
+    logger.info('Created new Zalo Mini App Customer user', { userId: user.id, phone: cleanPhone });
   }
 
-  // 3. Tạo JWT Session Token
-  const jwtSecret = process.env.JWT_SECRET || 'dev-jwt-secret-change-me-in-production';
+  // 3. Tạo JWT Token đăng nhập hệ thống Truliva
+  const jwtSecret = process.env.JWT_SECRET || 'truliva-super-secret-jwt-key-2025';
   const token = jwt.sign(
     {
       id: user.id,
       username: user.username,
-      fullName: user.fullName,
       role: user.role,
-      group: user.group
+      fullName: user.fullName,
+      phoneNumber: user.phoneNumber
     },
     jwtSecret,
-    { expiresIn: '90d' } // Session 90 ngày trên điện thoại
+    { expiresIn: '90d' }
   );
 
   return {
@@ -144,8 +156,7 @@ export async function authenticateZaloMiniAppUser(
       username: user.username,
       fullName: user.fullName,
       phoneNumber: user.phoneNumber || cleanPhone,
-      role: user.role,
-      avatar: zaloProfile?.avatar || null
+      role: user.role
     },
     isNewUser
   };

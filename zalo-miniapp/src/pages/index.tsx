@@ -76,17 +76,21 @@ export default function IndexPage() {
     try {
       // 1. Thử gọi SDK Zalo để lấy phone token chính chủ
       const data: any = await getPhoneNumber({});
-      if (data && data.number) {
-        await authenticateWithToken(data.number);
-      } else if (data && data.token) {
-        await authenticateWithToken(data.token);
+      let userAccessToken = '';
+      try {
+        userAccessToken = await getAccessToken({});
+      } catch (tokenErr) {
+        console.warn('Could not get Zalo access token:', tokenErr);
+      }
+
+      const phoneToken = data?.number || data?.token || (data?.data && (data.data.number || data.data.token));
+      if (phoneToken) {
+        await authenticateWithToken(phoneToken, userAccessToken);
       } else {
-        // Fallback môi trường test
         await authenticateWithToken(testPhone);
       }
     } catch (sdkErr: any) {
       console.warn('Zalo SDK Phone Auth Fallback:', sdkErr);
-      // Dùng SĐT test nếu ở ngoài môi trường SDK
       await authenticateWithToken(testPhone);
     }
   };
