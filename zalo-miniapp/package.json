@@ -11,7 +11,7 @@
     "dev": "zmp-cli start",
     "start": "zmp-cli start",
     "deploy": "zmp-cli deploy",
-    "build": "tsc && vite build"
+    "build": "tsc && vite build && node -e \"require('fs').copyFileSync('app-config.json', 'www/app-config.json')\""
   },
   "dependencies": {
     "lucide-react": "^0.474.0",
