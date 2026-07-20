@@ -10,7 +10,11 @@
   "pages": [
     "pages/index"
   ],
-  "listCSS": [],
-  "listSyncJS": [],
+  "listCSS": [
+    "assets/index.css"
+  ],
+  "listSyncJS": [
+    "assets/index.js"
+  ],
   "listAsyncJS": []
 }
