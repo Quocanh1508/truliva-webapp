@@ -12,6 +12,7 @@ declare global {
         id: string;
         username: string;
         fullName: string;
+        phoneNumber?: string | null;
         role: 'KTV' | 'ADMIN' | 'DEV' | 'SALE_SUPERVISOR' | 'SALER' | 'HOTLINE' | 'COORDINATOR' | 'STAFF';
         group?: string | null;
         pancakeAccountName?: string | null;
@@ -62,7 +63,7 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
 
     const user = await prisma.user.findUnique({
       where: { id: decoded.id },
-      select: { id: true, username: true, fullName: true, role: true, isActive: true, group: true, pancakeAccountName: true },
+      select: { id: true, username: true, fullName: true, phoneNumber: true, role: true, isActive: true, group: true, pancakeAccountName: true },
     });
 
     if (!user || !user.isActive) {
@@ -74,6 +75,7 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
       id: user.id,
       username: user.username,
       fullName: user.fullName,
+      phoneNumber: user.phoneNumber,
       role: user.role,
       group: user.group,
       pancakeAccountName: user.pancakeAccountName,

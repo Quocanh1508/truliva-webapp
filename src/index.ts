@@ -25,6 +25,7 @@ import inventoryRoutes from './routes/inventory';
 import serialRoutes from './routes/serials';
 import promoRoutes from './routes/promos';
 import salaryRoutes from './routes/salaries';
+import zaloMiniAppRoutes from './routes/zaloMiniApp';
 import { startOrderSyncScheduler } from './services/orderSyncScheduler';
 import { startReportCleanupScheduler } from './services/reportCleanupScheduler';
 import { startPancakeRetryScheduler } from './services/pancakeRetryScheduler';
@@ -150,6 +151,7 @@ app.use('/api/inventory', inventoryRoutes);
 app.use('/api/serials', serialRoutes);
 app.use('/api/promos', promoRoutes);
 app.use('/api/salaries', salaryRoutes);
+app.use('/api/zalo-miniapp', zaloMiniAppRoutes);
 
 // ── Serve uploaded images ──
 app.use('/uploads', express.static(path.join(process.cwd(), 'uploads'), {
