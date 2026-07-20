@@ -2,6 +2,7 @@ import React, { Component, ErrorInfo, ReactNode } from 'react';
 import ReactDOM from 'react-dom/client';
 import { App, ZMPRouter, AnimationRoutes, Route, Page } from 'zmp-ui';
 import 'zmp-ui/zaui.css';
+import './app.css';
 import IndexPage from './pages/index';
 
 interface Props {
