@@ -58,6 +58,7 @@ export default function Layout() {
     
     if (user.role === 'DEV') {
       return [
+        { name: 'Quản lý & Bắn ZNS', path: '/dev/zns-manage', icon: <Send size={20} /> },
         { name: 'Sơ đồ hệ thống', path: '/dev/system-map', icon: <Network size={20} /> },
         { name: 'Phản hồi người dùng', path: '/dev/feedbacks', icon: <MessageSquare size={20} /> },
         { name: 'Gửi thông báo', path: '/admin/broadcast', icon: <Send size={20} /> },
@@ -94,6 +95,7 @@ export default function Layout() {
     if (canSeeInventory) {
       items.push({ name: 'Quản lý kho', path: '/admin/inventory', icon: <Warehouse size={20} /> });
       items.push({ name: 'Quản lý Serial', path: '/admin/serials', icon: <Hash size={20} /> });
+      items.push({ name: 'Quản lý & Bắn ZNS', path: '/admin/zns-manage', icon: <Send size={20} /> });
     }
 
     const canSeePromos = ['ADMIN', 'COORDINATOR', 'SALE_SUPERVISOR', 'SALER', 'HOTLINE'].includes(user.role);

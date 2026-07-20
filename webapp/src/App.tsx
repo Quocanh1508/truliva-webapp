@@ -42,6 +42,7 @@ import WarrantyConfirm from './pages/public/WarrantyConfirm';
 import FeedbackPage from './pages/FeedbackPage';
 import FeedbackList from './pages/dev/FeedbackList';
 import SystemMap from './pages/dev/SystemMap';
+import ZnsManage from './pages/dev/ZnsManage';
 
 function PushNotificationManager({ children }: { children: React.ReactNode }) {
   const { user } = useAuth();
@@ -349,12 +350,14 @@ export default function App() {
                 <Route path="/admin/orders" element={<OrderList />} />
                 <Route path="/admin/reports" element={<ReportList />} />
                 <Route path="/admin/promos" element={<PromoManage />} />
+                <Route path="/admin/zns-manage" element={<ZnsManage />} />
               </Route>
 
               {/* Dev Routes */}
               <Route element={<ProtectedRoute allowedRoles={['DEV']} />}>
                 <Route path="/dev/feedbacks" element={<FeedbackList />} />
                 <Route path="/dev/system-map" element={<SystemMap />} />
+                <Route path="/dev/zns-manage" element={<ZnsManage />} />
               </Route>
 
               {/* Shared Routes */}

@@ -193,43 +193,43 @@ export async function sendZnsWarrantyActivation(serialNumber: string, recipientP
   }
 
   const customerName = serial.customerName || 'Quý Khách';
-  const productName = serial.model || 'Máy lọc nước Truliva';
-  const expiryDateStr = serial.warrantyExpiryDate
-    ? new Date(serial.warrantyExpiryDate).toLocaleDateString('vi-VN')
-    : new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toLocaleDateString('vi-VN');
+  const productName = serial.productLine || serial.model || 'Máy lọc nước Truliva';
+  
+  let expiryDateStr = '';
+  if (serial.warrantyExpiryDate) {
+    const d = new Date(serial.warrantyExpiryDate);
+    const day = String(d.getDate()).padStart(2, '0');
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const year = d.getFullYear();
+    expiryDateStr = `${day}/${month}/${year}`;
+  } else {
+    const d = new Date(Date.now() + 365 * 24 * 60 * 60 * 1000);
+    const day = String(d.getDate()).padStart(2, '0');
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const year = d.getFullYear();
+    expiryDateStr = `${day}/${month}/${year}`;
+  }
 
   // 2. Kiểm tra nếu có cấu hình cổng FNS (FPT Notification Service)
   const fnsAppId = process.env.FNS_APP_ID || '';
   const fnsSecretKey = process.env.FNS_SECRET_KEY || '';
 
   if (fnsAppId && fnsSecretKey) {
-    // Chuẩn bị dữ liệu gửi theo chuẩn FNS (gộp cả biến Tiếng Việt theo template 495107 của bạn)
+    // Dữ liệu gửi chuẩn cho FNS Template 10232 (chỉ gửi các biến chính xác mà Template yêu cầu)
     const fnsPayload = {
       phone: formattedPhone,
       template_id: templateId,
       template_data: {
-        // Biến tiếng Việt khớp chính xác với template 495107 của bạn
         Ten_Khach_Hang: customerName,
         Ten_San_Pham: productName,
         So_Seri: cleanSerial,
-        Ngay_Het_Bao_Hanh: expiryDateStr,
-
-        // Các biến dự phòng định dạng tiếng Anh dài/rút gọn
-        customer_name: customerName,
-        product_name: productName,
-        serial_number: cleanSerial,
-        expiry_date: expiryDateStr,
-        customer: customerName,
-        product: productName,
-        serial: cleanSerial,
-        expiry: expiryDateStr,
-        phone: recipientPhone.trim(),
-        address: serial.address || ''
+        Ngay_Het_Bao_Hanh: expiryDateStr
       },
       ref_id: `${cleanSerial}-${Date.now()}`
     };
 
     logger.info('Sending ZNS warranty activation message via FNS API', { phone: formattedPhone, templateId, fnsAppId });
+    const startTime = Date.now();
 
     try {
       const response = await axios.post('https://api-fns.fpt.work/api/send-message', fnsPayload, {
@@ -245,10 +245,12 @@ export async function sendZnsWarrantyActivation(serialNumber: string, recipientP
         throw new Error(`FNS Send Error: ${data.message} (Code: ${data.code})`);
       }
 
-      logger.info('ZNS message sent successfully via FNS API', { refId: fnsPayload.ref_id, messageId: data.data?.message_id });
+      const durationMs = Date.now() - startTime;
+      logger.info('ZNS message sent successfully via FNS API', { refId: fnsPayload.ref_id, messageId: data.data?.message_id, durationMs: `${durationMs}ms` });
       return data;
     } catch (error: any) {
-      logger.error('Error sending ZNS message via FNS API', { error: error.message, details: error.response?.data });
+      const durationMs = Date.now() - startTime;
+      logger.error('Error sending ZNS message via FNS API', { error: error.message, details: error.response?.data, durationMs: `${durationMs}ms` });
       throw new Error(`Gửi ZNS qua FNS thất bại: ${error.message}`);
     }
   }
@@ -264,17 +266,13 @@ export async function sendZnsWarrantyActivation(serialNumber: string, recipientP
       Ten_Khach_Hang: customerName,
       Ten_San_Pham: productName,
       So_Seri: cleanSerial,
-      Ngay_Het_Bao_Hanh: expiryDateStr,
-
-      customer_name: customerName,
-      product_name: productName,
-      serial_number: cleanSerial,
-      expiry_date: expiryDateStr
+      Ngay_Het_Bao_Hanh: expiryDateStr
     },
     tracking_id: `${cleanSerial}-${Date.now()}`
   };
 
   logger.info('Sending ZNS warranty activation message via Zalo Direct API', { phone: formattedPhone, templateId });
+  const startTimeDirect = Date.now();
 
   try {
     const response = await axios.post('https://business.openapi.zalo.me/message/template', payload, {
@@ -289,10 +287,12 @@ export async function sendZnsWarrantyActivation(serialNumber: string, recipientP
       throw new Error(`Zalo ZNS Send Error: ${data.message} (Code: ${data.error})`);
     }
 
-    logger.info('ZNS message sent successfully via Zalo Direct API', { trackingId: payload.tracking_id, messageId: data.data?.message_id });
+    const durationMs = Date.now() - startTimeDirect;
+    logger.info('ZNS message sent successfully via Zalo Direct API', { trackingId: payload.tracking_id, messageId: data.data?.message_id, durationMs: `${durationMs}ms` });
     return data;
   } catch (error: any) {
-    logger.error('Error sending ZNS message via Zalo Direct API', { error: error.message, details: error.response?.data });
+    const durationMs = Date.now() - startTimeDirect;
+    logger.error('Error sending ZNS message via Zalo Direct API', { error: error.message, details: error.response?.data, durationMs: `${durationMs}ms` });
     throw error;
   }
 }

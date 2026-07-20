@@ -5,6 +5,8 @@ import XLSX from 'xlsx';
 import { v4 as uuidv4 } from 'uuid';
 import { v2 as cloudinary } from 'cloudinary';
 import { CloudinaryStorage } from 'multer-storage-cloudinary';
+import axios from 'axios';
+import fs from 'fs';
 import prisma from '../config/database';
 import logger from '../utils/logger';
 import { requireAuth, requireCoordinatorOrAdmin } from '../middleware/authSession';
@@ -2030,6 +2032,173 @@ router.post('/zns-activate', requireAuth, async (req: Request, res: Response): P
   } catch (error: any) {
     logger.error('ZNS activation route error', { error: error.message });
     res.status(500).json({ error: error.message || 'Lỗi hệ thống khi kích hoạt ZNS' });
+  }
+});
+
+/**
+ * POST /api/serials/zns/test-send
+ * Thử nghiệm gửi tin nhắn ZNS trực tiếp và kiểm tra ngay kết quả từ FNS Gateway
+ */
+router.post('/zns/test-send', requireCoordinatorOrAdmin, async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { phone, serialNumber, customerName, productName, expiryDate } = req.body;
+    if (!phone || !serialNumber) {
+      res.status(400).json({ error: 'Thiếu số điện thoại hoặc số Serial thử nghiệm' });
+      return;
+    }
+
+    const fnsAppId = process.env.FNS_APP_ID || '';
+    const fnsSecretKey = process.env.FNS_SECRET_KEY || '';
+    const templateId = process.env.ZALO_ZNS_TEMPLATE_ID || '10232';
+
+    if (!fnsAppId || !fnsSecretKey) {
+      res.status(400).json({ error: 'Chưa cấu hình cổng FPT FNS Gateway trong file .env' });
+      return;
+    }
+
+    let cleanedPhone = phone.replace(/[^0-9]/g, '');
+    if (cleanedPhone.startsWith('0')) {
+      cleanedPhone = '84' + cleanedPhone.substring(1);
+    }
+
+    const cleanSerial = serialNumber.trim().toUpperCase();
+    const custName = customerName?.trim() || 'Khách Hàng Test';
+    const prodName = productName?.trim() || 'Máy lọc nước Truliva UR61096H';
+    const expDate = expiryDate?.trim() || '20/07/2027';
+
+    const fnsPayload = {
+      phone: cleanedPhone,
+      template_id: templateId,
+      template_data: {
+        Ten_Khach_Hang: custName,
+        Ten_San_Pham: prodName,
+        So_Seri: cleanSerial,
+        Ngay_Het_Bao_Hanh: expDate
+      },
+      ref_id: `TEST-${cleanSerial}-${Date.now()}`
+    };
+
+    logger.info('Dev ZNS Test Send requested', { phone: cleanedPhone, serialNumber: cleanSerial });
+    const sendRes = await axios.post('https://api-fns.fpt.work/api/send-message', fnsPayload, {
+      headers: {
+        'Content-Type': 'application/json',
+        'app-id': fnsAppId,
+        'secret-key': fnsSecretKey
+      }
+    });
+
+    const msgId = sendRes.data?.data?.message_id;
+
+    // Tự động chờ 1.5s để query live status từ FNS
+    let statusData = null;
+    if (msgId) {
+      await new Promise(resolve => setTimeout(resolve, 1500));
+      try {
+        const checkRes = await axios.post('https://api-fns.fpt.work/api/check-status', {
+          msg_id: msgId
+        }, {
+          headers: {
+            'Content-Type': 'application/json',
+            'app-id': fnsAppId,
+            'secret-key': fnsSecretKey
+          }
+        });
+        statusData = checkRes.data?.data || checkRes.data;
+      } catch (err: any) {
+        statusData = { error: err.message };
+      }
+    }
+
+    res.json({
+      success: true,
+      sendResult: sendRes.data,
+      msgId,
+      statusResult: statusData
+    });
+  } catch (error: any) {
+    logger.error('Dev ZNS Test Send error', { error: error.message });
+    res.status(500).json({ error: error.response?.data?.message || error.message });
+  }
+});
+
+/**
+ * POST /api/serials/zns/check-status
+ * Tra cứu trạng thái gửi thực tế của tin nhắn theo msg_id từ FNS Gateway
+ */
+router.post('/zns/check-status', requireCoordinatorOrAdmin, async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { msg_id } = req.body;
+    if (!msg_id) {
+      res.status(400).json({ error: 'Thiếu mã msg_id cần kiểm tra' });
+      return;
+    }
+
+    const fnsAppId = process.env.FNS_APP_ID || '';
+    const fnsSecretKey = process.env.FNS_SECRET_KEY || '';
+
+    const checkRes = await axios.post('https://api-fns.fpt.work/api/check-status', {
+      msg_id
+    }, {
+      headers: {
+        'Content-Type': 'application/json',
+        'app-id': fnsAppId,
+        'secret-key': fnsSecretKey
+      }
+    });
+
+    res.json({
+      success: true,
+      data: checkRes.data?.data || checkRes.data
+    });
+  } catch (error: any) {
+    logger.error('ZNS Check Status error', { error: error.message });
+    res.status(500).json({ error: error.response?.data || error.message });
+  }
+});
+
+/**
+ * GET /api/serials/zns/logs
+ * Lấy lịch sử gửi tin nhắn ZNS gần nhất từ nhật ký máy chủ và cơ sở dữ liệu
+ */
+router.get('/zns/logs', requireCoordinatorOrAdmin, async (req: Request, res: Response): Promise<void> => {
+  try {
+    // Lấy 50 serial đã kích hoạt gần nhất có thông tin kích hoạt
+    const activatedSerials = await prisma.serial.findMany({
+      where: {
+        activationDate: { not: null }
+      },
+      orderBy: { activationDate: 'desc' },
+      take: 50
+    });
+
+    // Đọc các log gửi ZNS từ file log của server
+    const logFiles = ['/var/www/truliva/logs/combined.log', '/var/www/truliva/logs/combined1.log', '/var/www/truliva/logs/combined2.log', '/var/www/truliva/logs/combined3.log'];
+    const znsLogs: any[] = [];
+
+    for (const file of logFiles) {
+      if (fs.existsSync(file)) {
+        try {
+          const content = fs.readFileSync(file, 'utf-8');
+          const lines = content.split('\n');
+          for (const line of lines) {
+            if (line.includes('ZNS message sent') || line.includes('Error sending ZNS') || line.includes('Sending ZNS warranty activation')) {
+              try {
+                const parsed = JSON.parse(line);
+                znsLogs.push(parsed);
+              } catch (e) {}
+            }
+          }
+        } catch (e) {}
+      }
+    }
+
+    res.json({
+      success: true,
+      activatedSerials,
+      serverZnsLogs: znsLogs.slice(-50).reverse()
+    });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
   }
 });
 
