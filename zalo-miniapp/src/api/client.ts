@@ -1,4 +1,4 @@
-export const API_BASE_URL = 'https://truliva-ktv-webapp.onrender.com/api';
+export const API_BASE_URL = 'https://trulivaofficial.com/api';
 
 export async function fetchZaloApi(endpoint: string, options: RequestInit = {}) {
   const token = localStorage.getItem('zalo_session_token');
@@ -11,16 +11,29 @@ export async function fetchZaloApi(endpoint: string, options: RequestInit = {}) 
     headers['Authorization'] = `Bearer ${token}`;
   }
 
-  const response = await fetch(`${API_BASE_URL}${endpoint}`, {
-    ...options,
-    headers
-  });
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 10000); // 10s timeout
 
-  const data = await response.json();
+  try {
+    const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+      ...options,
+      headers,
+      signal: controller.signal
+    });
+    clearTimeout(timeoutId);
 
-  if (!response.ok) {
-    throw new Error(data.error || 'Có lỗi xảy ra khi kết nối máy chủ Truliva');
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(data.error || 'Có lỗi xảy ra khi kết nối máy chủ Truliva');
+    }
+
+    return data;
+  } catch (err: any) {
+    clearTimeout(timeoutId);
+    if (err.name === 'AbortError') {
+      throw new Error('Kết nối máy chủ Truliva hết thời gian chờ (Timeout). Vui lòng kiểm tra kết nối mạng.');
+    }
+    throw err;
   }
-
-  return data;
 }

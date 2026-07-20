@@ -11,8 +11,10 @@ import {
   AlertTriangle,
   RefreshCw,
   FileText,
-  User
+  User,
+  LogIn
 } from 'lucide-react';
+import { getPhoneNumber, getUserInfo } from 'zmp-sdk/apis';
 import { fetchZaloApi } from '../api/client';
 
 export default function IndexPage() {
@@ -25,7 +27,7 @@ export default function IndexPage() {
   // Dev simulation state
   const [testPhone, setTestPhone] = useState('0915185982');
 
-  const authenticateWithZalo = async (phoneToken: string) => {
+  const authenticateWithToken = async (phoneToken: string, userAccessToken?: string) => {
     setLoading(true);
     setError(null);
     try {
@@ -33,6 +35,7 @@ export default function IndexPage() {
         method: 'POST',
         body: JSON.stringify({
           phoneToken,
+          userAccessToken,
           zaloProfile: {
             name: 'Người dùng Zalo',
             avatar: ''
@@ -43,9 +46,10 @@ export default function IndexPage() {
       if (data.success) {
         localStorage.setItem('zalo_session_token', data.token);
         setUser(data.user);
-        loadUserContent(data.user);
+        await loadUserContent(data.user);
       }
     } catch (err: any) {
+      console.error('Auth Error:', err);
       setError(err.message || 'Lỗi xác thực Zalo');
     } finally {
       setLoading(false);
@@ -66,9 +70,47 @@ export default function IndexPage() {
     }
   };
 
+  const handle1ClickZaloAuth = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      // 1. Thử gọi SDK Zalo để lấy phone token chính chủ
+      const data: any = await getPhoneNumber({});
+      if (data && data.number) {
+        await authenticateWithToken(data.number);
+      } else if (data && data.token) {
+        await authenticateWithToken(data.token);
+      } else {
+        // Fallback môi trường test
+        await authenticateWithToken(testPhone);
+      }
+    } catch (sdkErr: any) {
+      console.warn('Zalo SDK Phone Auth Fallback:', sdkErr);
+      // Dùng SĐT test nếu ở ngoài môi trường SDK
+      await authenticateWithToken(testPhone);
+    }
+  };
+
   useEffect(() => {
-    // Tự động thử nghiệm đăng nhập từ môi trường Zalo Mini App
-    authenticateWithZalo(testPhone);
+    // Tự động kiểm tra session cũ hoặc thử xác thực
+    const savedToken = localStorage.getItem('zalo_session_token');
+    if (savedToken) {
+      fetchZaloApi('/zalo-miniapp/profile')
+        .then(res => {
+          if (res.success && res.user) {
+            setUser(res.user);
+            loadUserContent(res.user);
+          } else {
+            handle1ClickZaloAuth();
+          }
+        })
+        .catch(() => {
+          handle1ClickZaloAuth();
+        })
+        .finally(() => setLoading(false));
+    } else {
+      handle1ClickZaloAuth();
+    }
   }, []);
 
   return (
@@ -96,18 +138,47 @@ export default function IndexPage() {
       {loading && (
         <div className="bg-white p-6 rounded-2xl shadow-sm text-center space-y-3">
           <RefreshCw size={24} className="animate-spin text-blue-600 mx-auto" />
-          <p className="text-xs font-semibold text-slate-600">Đang kết nối tài khoản Zalo...</p>
+          <p className="text-xs font-semibold text-slate-600">Đang kết nối hệ thống Truliva...</p>
         </div>
       )}
 
-      {/* Error state */}
-      {error && (
-        <div className="bg-red-50 border border-red-200 p-4 rounded-2xl text-xs text-red-700 space-y-2 mb-4">
+      {/* Error state & Retry */}
+      {!loading && error && (
+        <div className="bg-red-50 border border-red-200 p-4 rounded-2xl text-xs text-red-700 space-y-3 mb-4">
           <div className="flex items-center space-x-1.5 font-bold">
             <AlertTriangle size={16} />
             <span>Thông báo từ hệ thống Truliva</span>
           </div>
           <p>{error}</p>
+
+          <button 
+            onClick={handle1ClickZaloAuth}
+            className="w-full py-2 bg-red-600 text-white rounded-xl font-bold flex items-center justify-center space-x-1"
+          >
+            <RefreshCw size={14} />
+            <span>Thử đăng nhập lại</span>
+          </button>
+        </div>
+      )}
+
+      {/* Chưa có user -> Hiển thị nút đăng nhập 1-Click */}
+      {!loading && !user && !error && (
+        <div className="bg-white p-6 rounded-2xl shadow-sm text-center space-y-4 border border-slate-200">
+          <div className="p-3 bg-blue-50 text-blue-600 rounded-full w-12 h-12 flex items-center justify-center mx-auto">
+            <LogIn size={24} />
+          </div>
+          <div>
+            <h2 className="font-bold text-slate-900 text-sm">Chào mừng bạn đến với Truliva</h2>
+            <p className="text-xs text-slate-500 mt-1">Đăng nhập 1-Click bằng số điện thoại Zalo để xem bảo hành và ca dịch vụ.</p>
+          </div>
+
+          <button
+            onClick={handle1ClickZaloAuth}
+            className="w-full py-3 bg-blue-600 text-white rounded-xl text-xs font-bold hover:bg-blue-700 shadow-md flex items-center justify-center space-x-2"
+          >
+            <ShieldCheck size={16} />
+            <span>Đăng Nhập 1-Click bằng Zalo</span>
+          </button>
         </div>
       )}
 
