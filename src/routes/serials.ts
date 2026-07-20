@@ -1256,10 +1256,52 @@ router.get('/import-template', requireCoordinatorOrAdmin, async (req: Request, r
     const workbook = new ExcelJS.Workbook();
     const worksheet = workbook.addWorksheet('Template Import');
 
+    // Tạo sheet phụ chứa dữ liệu tra cứu cho Dropdown List (tương thích 100% MS Excel & Office 365)
+    const lookupSheet = workbook.addWorksheet('LookupData');
+    lookupSheet.state = 'hidden';
+
+    // 1. Danh sách dữ liệu mẫu
+    const models = [
+      'CR5240', 'UR3140', 'UR5440', 'UR5640', 'UR5840', 'UX5010', 'KJ260',
+      'UR61096H', 'QY/F-I20', 'UR5676', 'P1011', 'W6412', 'UR3626', 'Không rõ dòng máy'
+    ];
+
+    const productLines = [
+      'Máy lọc nước Lavita CR5240',
+      'Máy lọc nước Tanka UR3140',
+      'Máy lọc nước Delica UR5440',
+      'Máy lọc nước Delica UR5640',
+      'Máy lọc nước Delica UR5840',
+      'Lọc trong suốt âm tủ bếp-UX5010',
+      'Máy lọc không khí Airplus KJ260',
+      'Máy lọc nước Truliva UR5840',
+      'Máy lọc nước Truliva UR61096H',
+      'Máy rửa rau Truliva QY/F-I20',
+      'Máy lọc nước Truliva UR5676',
+      'Bộ lọc sơ cấp Truliva P1011',
+      'Máy nóng lạnh treo tường Truliva W6412',
+      'Máy lọc nước Truliva UR3626',
+      'Không rõ dòng máy'
+    ];
+
+    const statuses = ['Chưa kích hoạt', 'Đã kích hoạt', 'KH xác nhận', 'Hủy'];
+
+    const provinces = [
+      'TP. Hồ Chí Minh', 'TP. Hà Nội', 'Đồng Nai', 'Bình Dương', 'Bà Rịa-Vũng Tàu',
+      'Long An', 'Tiền Giang', 'Bến Tre', 'Vĩnh Long', 'TP. Cần Thơ', 'TP. Đà Nẵng',
+      'Hưng Yên', 'Khác'
+    ];
+
+    // Nạp dữ liệu vào LookupSheet
+    models.forEach((m, idx) => { lookupSheet.getCell(`A${idx + 1}`).value = m; });
+    productLines.forEach((p, idx) => { lookupSheet.getCell(`B${idx + 1}`).value = p; });
+    statuses.forEach((s, idx) => { lookupSheet.getCell(`C${idx + 1}`).value = s; });
+    provinces.forEach((pv, idx) => { lookupSheet.getCell(`D${idx + 1}`).value = pv; });
+
     worksheet.columns = [
       { header: 'Số Serial', key: 'serialNumber', width: 22 },
-      { header: 'Model', key: 'model', width: 15 },
-      { header: 'Dòng máy', key: 'productLine', width: 35 },
+      { header: 'Model', key: 'model', width: 18 },
+      { header: 'Dòng máy', key: 'productLine', width: 38 },
       { header: 'Trạng thái', key: 'status', width: 18 },
       { header: 'Ngày kích hoạt', key: 'activationDate', width: 22 },
       { header: 'Ngày hết hạn BH', key: 'warrantyExpiryDate', width: 22 },
@@ -1294,12 +1336,18 @@ router.get('/import-template', requireCoordinatorOrAdmin, async (req: Request, r
       province: 'TP. Hồ Chí Minh',
     });
 
+    // Tham chiếu vị trí dòng chuẩn trong Excel
+    const modelFormula = `LookupData!$A$1:$A$${models.length}`;
+    const productLineFormula = `LookupData!$B$1:$B$${productLines.length}`;
+    const statusFormula = `LookupData!$C$1:$C$${statuses.length}`;
+    const provinceFormula = `LookupData!$D$1:$D$${provinces.length}`;
+
     // Add dropdown data validations matching Excel file for rows 2 to 500
     for (let i = 2; i <= 500; i++) {
       worksheet.getCell(`B${i}`).dataValidation = {
         type: 'list',
         allowBlank: true,
-        formulae: ['"CR5240,UR3140,UR5440,UR5640,UR5840,UX5010,KJ260,Không rõ dòng máy,UR61096H,QY/F-I20,UR5676,P1011,W6412,UR3626"'],
+        formulae: [modelFormula],
         showErrorMessage: true,
         errorTitle: 'Lỗi nhập liệu',
         error: 'Vui lòng chọn model từ danh sách có sẵn.'
@@ -1307,7 +1355,7 @@ router.get('/import-template', requireCoordinatorOrAdmin, async (req: Request, r
       worksheet.getCell(`C${i}`).dataValidation = {
         type: 'list',
         allowBlank: true,
-        formulae: ['"Máy lọc nước Lavita CR5240,Máy lọc nước Tanka UR3140,Máy lọc nước Delica UR5440,Máy lọc nước Delica UR5640,Máy lọc nước Delica UR5840,Lọc trong suốt âm tủ bếp-UX5010,Máy lọc không khí Airplus KJ260,Không rõ dòng máy,Máy lọc nước Truliva UR5840,Máy lọc nước Truliva UR61096H,Máy rửa rau Truliva QY/F-I20,Máy lọc nước Truliva UR5676,Bộ lọc sơ cấp Truliva P1011,Máy nóng lạnh treo tường Truliva W6412,Máy lọc nước Truliva UR3626"'],
+        formulae: [productLineFormula],
         showErrorMessage: true,
         errorTitle: 'Lỗi nhập liệu',
         error: 'Vui lòng chọn dòng máy từ danh sách có sẵn.'
@@ -1315,7 +1363,7 @@ router.get('/import-template', requireCoordinatorOrAdmin, async (req: Request, r
       worksheet.getCell(`D${i}`).dataValidation = {
         type: 'list',
         allowBlank: true,
-        formulae: ['"Chưa kích hoạt,Đã kích hoạt,KH xác nhận,Hủy"'],
+        formulae: [statusFormula],
         showErrorMessage: true,
         errorTitle: 'Lỗi nhập liệu',
         error: 'Vui lòng chọn trạng thái từ danh sách có sẵn.'
@@ -1323,7 +1371,7 @@ router.get('/import-template', requireCoordinatorOrAdmin, async (req: Request, r
       worksheet.getCell(`K${i}`).dataValidation = {
         type: 'list',
         allowBlank: true,
-        formulae: ['"TP. Hồ Chí Minh,TP. Hà Nội,Đồng Nai,Bình Dương,Bà Rịa-Vũng Tàu,Long An,Tiền Giang,Bến Tre,Vĩnh Long,TP. Cần Thơ,TP. Đà Nẵng,Hưng Yên,Khác"'],
+        formulae: [provinceFormula],
         showErrorMessage: true,
         errorTitle: 'Lỗi nhập liệu',
         error: 'Vui lòng chọn tỉnh/thành phố từ danh sách.'
