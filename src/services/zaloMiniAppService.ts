@@ -127,7 +127,7 @@ export async function authenticateZaloMiniAppUser(
         phoneNumber: cleanPhone,
         role: 'STAFF' as any,
         group: 'CUSTOMER',
-        active: true
+        isActive: true
       }
     });
 
