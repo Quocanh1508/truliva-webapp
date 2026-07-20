@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { fetchApi, deleteReportWithReason, updateReport, uploadImages, approveReport, rejectReport, getFiltersData } from '../../api/client';
-import { Download, X, ExternalLink, Image as ImageIcon, Loader, Search, Edit3, Save, Plus, Trash2, SlidersHorizontal, RotateCcw, Calendar, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Download, X, ExternalLink, Image as ImageIcon, Loader, Search, Edit3, Save, Plus, Trash2, SlidersHorizontal, RotateCcw, Calendar, ChevronLeft, ChevronRight, ShieldCheck, Send, CheckCircle, Loader2 } from 'lucide-react';
 import CategoryTreeSelect from '../../components/CategoryTreeSelect';
 import { formatOrderId } from '../../utils/text';
 import { useAuth } from '../../context/AuthContext';
@@ -523,6 +523,113 @@ export default function ReportList() {
   const [editImagePreviews, setEditImagePreviews] = useState<string[]>([]);
   const [editUploadingImages, setEditUploadingImages] = useState(false);
   const editFileInputRef = useRef<HTMLInputElement>(null);
+
+  // ── State Kích hoạt bảo hành & ZNS (Admin & Coordinator) ──
+  const [showActivationModal, setShowActivationModal] = useState(false);
+  const [activationStep, setActivationStep] = useState<1 | 2>(1);
+  const [activationData, setActivationData] = useState<{
+    reportId?: string;
+    serialNumber: string;
+    customerName: string;
+    customerPhone: string;
+    address: string;
+    model: string;
+    orderId?: string | null;
+  } | null>(null);
+  const [znsPhone, setZnsPhone] = useState('');
+  const [warrantyDurationText, setWarrantyDurationText] = useState('12 tháng');
+  const [znsSending, setZnsSending] = useState(false);
+  const [manualActivating, setManualActivating] = useState(false);
+
+  const openActivationModalForReport = (report: any) => {
+    const modelName = (report.products && report.products.length > 0)
+      ? report.products[0].split('x')[0].trim()
+      : 'Máy lọc nước Truliva';
+      
+    const serial = report.serialNumber || '';
+    setActivationData({
+      reportId: report.id,
+      serialNumber: serial,
+      customerName: report.customerName || '',
+      customerPhone: report.customerPhone || '',
+      address: report.address || '',
+      model: modelName,
+      orderId: report.orderId,
+    });
+    setZnsPhone(report.customerPhone || '');
+    setActivationStep(1);
+    setShowActivationModal(true);
+
+    setWarrantyDurationText('Đang tính toán...');
+    fetchApi(`/serials/public/preview-duration?model=${encodeURIComponent(modelName)}&orderId=${report.orderId || ''}`)
+      .then(res => {
+        if (res && res.totalMonths) {
+          let text = `${res.totalMonths} tháng`;
+          if (res.promoMonths > 0) {
+            text += ` (${res.standardMonths} tháng tiêu chuẩn + ${res.promoMonths} tháng khuyến mãi)`;
+          }
+          setWarrantyDurationText(text);
+        } else {
+          setWarrantyDurationText('12 tháng');
+        }
+      })
+      .catch(() => setWarrantyDurationText('12 tháng'));
+  };
+
+  const handleSendZns = async () => {
+    if (!activationData?.serialNumber.trim()) {
+      alert('Vui lòng nhập Số Serial thiết bị');
+      return;
+    }
+    if (!znsPhone.trim()) {
+      alert('Vui lòng nhập Số điện thoại nhận ZNS');
+      return;
+    }
+    setZnsSending(true);
+    try {
+      await fetchApi('/serials/zns-activate', {
+        method: 'POST',
+        body: JSON.stringify({
+          serialNumber: activationData.serialNumber.trim(),
+          recipientPhone: znsPhone.trim()
+        })
+      });
+      setActivationStep(2);
+      loadReports();
+    } catch (err: any) {
+      alert(err.message || 'Lỗi khi gửi yêu cầu kích hoạt ZNS.');
+    } finally {
+      setZnsSending(false);
+    }
+  };
+
+  const handleManualActivate = async () => {
+    if (!activationData?.serialNumber.trim()) {
+      alert('Vui lòng nhập Số Serial thiết bị');
+      return;
+    }
+    setManualActivating(true);
+    try {
+      await fetchApi('/serials/activate-manual', {
+        method: 'POST',
+        body: JSON.stringify({
+          serialNumber: activationData.serialNumber.trim(),
+          model: activationData.model,
+          customerName: activationData.customerName,
+          customerPhone: activationData.customerPhone,
+          address: activationData.address,
+          province: activationData.address || ''
+        })
+      });
+      alert('Kích hoạt bảo hành trực tiếp trên hệ thống thành công!');
+      setShowActivationModal(false);
+      loadReports();
+    } catch (err: any) {
+      alert(err.message || 'Lỗi khi kích hoạt bảo hành thủ công.');
+    } finally {
+      setManualActivating(false);
+    }
+  };
 
   const getDateRange = () => {
     if (!datePreset) return { startDate: '', endDate: '' };
@@ -1331,6 +1438,15 @@ export default function ReportList() {
                         >
                           • Chi tiết
                         </button>
+
+                        <button 
+                          onClick={() => openActivationModalForReport(r)}
+                          className="text-left text-emerald-600 hover:text-emerald-800 hover:underline flex items-center gap-1 font-bold"
+                          style={{ background: 'none', cursor: 'pointer' }}
+                          title="Kích hoạt bảo hành & Gửi ZNS cho khách hàng"
+                        >
+                          • 🛡 Kích hoạt BH & ZNS
+                        </button>
                         
                         {urls.length > 0 && (
                           <button 
@@ -2081,6 +2197,17 @@ export default function ReportList() {
                       <Edit3 size={15} /> Sửa báo cáo
                     </button>
                   )}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const rep = selectedDetailReport;
+                      setSelectedDetailReport(null);
+                      openActivationModalForReport(rep);
+                    }}
+                    className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold rounded-lg text-sm transition-colors cursor-pointer flex items-center gap-1.5"
+                  >
+                    <ShieldCheck size={16} /> Kích hoạt BH & ZNS
+                  </button>
                   <button 
                     onClick={() => setSelectedDetailReport(null)}
                     disabled={modalActionLoading}
@@ -2153,6 +2280,153 @@ export default function ReportList() {
                 {deleting ? 'Đang xóa...' : 'Xác nhận xóa'}
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Kích hoạt Bảo hành & ZNS (Admin & Coordinator) */}
+      {showActivationModal && activationData && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4">
+          <div 
+            className="bg-white rounded-2xl w-full max-w-md overflow-hidden shadow-2xl flex flex-col"
+            style={{ borderTop: '5px solid #059669' }}
+          >
+            {activationStep === 1 ? (
+              <>
+                <div className="p-5 border-b border-gray-100 flex justify-between items-center bg-emerald-50/50">
+                  <div>
+                    <h3 className="font-bold text-gray-800 text-base flex items-center gap-1.5">
+                      <ShieldCheck className="text-emerald-600" size={20} /> Kích Hoạt Bảo Hành & ZNS
+                    </h3>
+                    <p className="text-[11px] text-gray-500 mt-0.5">Dành cho Admin & Coordinator quản lý ca dịch vụ</p>
+                  </div>
+                  <button 
+                    type="button" 
+                    className="text-gray-400 hover:text-gray-600 text-xs font-bold"
+                    onClick={() => setShowActivationModal(false)}
+                  >
+                    <X size={18} />
+                  </button>
+                </div>
+
+                <div className="p-5 overflow-y-auto max-h-[65vh] space-y-4 text-left">
+                  {/* Serial input card */}
+                  <div className="space-y-1.5">
+                    <label className="block text-xs font-bold text-gray-700 uppercase">Số Serial sản phẩm (*)</label>
+                    <input 
+                      type="text"
+                      className="w-full border border-gray-300 rounded-lg p-2.5 text-sm font-mono font-bold text-emerald-700 uppercase focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500 outline-none bg-white"
+                      value={activationData.serialNumber}
+                      onChange={(e) => setActivationData({ ...activationData, serialNumber: e.target.value })}
+                      placeholder="Nhập số Serial (ví dụ: 892820072100002)..."
+                    />
+                  </div>
+
+                  {/* Thiết bị & Hạn bảo hành card */}
+                  <div className="bg-emerald-50/40 border border-emerald-100 rounded-xl p-3.5 flex gap-3 items-start">
+                    <div className="bg-emerald-100 p-2 rounded-lg text-emerald-700">
+                      <CheckCircle size={20} />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <h4 className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Thiết bị & Dự kiến bảo hành</h4>
+                      <p className="text-sm font-bold text-gray-800 mt-0.5 truncate">{activationData.model}</p>
+                      <p className="text-xs text-gray-600 mt-1">
+                        ⏱️ Hạn bảo hành: <strong className="text-emerald-700">{warrantyDurationText}</strong>
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Thông tin Khách hàng Card */}
+                  <div className="border border-gray-100 rounded-xl p-3.5 space-y-2 bg-white">
+                    <h4 className="text-[10px] font-bold text-gray-400 uppercase tracking-wider border-b border-gray-100 pb-1">Thông tin nhận bảo hành</h4>
+                    
+                    <div className="grid grid-cols-3 gap-1.5 text-xs text-gray-600">
+                      <span className="font-medium text-gray-400">Khách hàng:</span>
+                      <span className="col-span-2 font-semibold text-gray-800">{activationData.customerName || '---'}</span>
+                      
+                      <span className="font-medium text-gray-400">Địa chỉ:</span>
+                      <span className="col-span-2 text-gray-700 truncate">{activationData.address || '---'}</span>
+                    </div>
+                  </div>
+
+                  {/* SĐT Zalo */}
+                  <div className="space-y-1.5">
+                    <label className="block text-xs font-bold text-gray-700 uppercase">Số điện thoại nhận tin Zalo (ZNS)</label>
+                    <input 
+                      type="tel" 
+                      className="w-full border border-gray-300 rounded-lg p-2.5 text-sm font-semibold tracking-wider text-gray-800 focus:ring-1 focus:ring-blue-500 focus:border-blue-500 outline-none bg-white"
+                      value={znsPhone}
+                      onChange={(e) => setZnsPhone(e.target.value)}
+                      placeholder="Nhập số Zalo nhận tin nhắn..."
+                    />
+                    <p className="text-[10px] text-gray-400 mt-1">
+                      💡 Tin nhắn ZNS thông báo kích hoạt bảo hành sẽ được gửi đến số Zalo này.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="p-4 bg-gray-50 border-t border-gray-100 flex gap-2">
+                  <button
+                    type="button"
+                    className="px-3 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-semibold rounded-lg transition-colors flex-1 cursor-pointer"
+                    onClick={() => setShowActivationModal(false)}
+                  >
+                    Hủy
+                  </button>
+                  <button
+                    type="button"
+                    className="px-3 py-2 bg-slate-700 hover:bg-slate-800 text-white text-xs font-bold rounded-lg transition-colors flex-1 cursor-pointer disabled:opacity-50"
+                    onClick={handleManualActivate}
+                    disabled={manualActivating}
+                  >
+                    {manualActivating ? 'Đang kích hoạt...' : 'Kích hoạt thủ công'}
+                  </button>
+                  <button
+                    type="button"
+                    className="px-3 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-lg transition-colors flex-1 flex justify-center items-center gap-1 cursor-pointer disabled:opacity-50"
+                    onClick={handleSendZns}
+                    disabled={znsSending}
+                  >
+                    {znsSending ? (
+                      <>
+                        <Loader2 size={14} className="animate-spin" /> Đang gửi...
+                      </>
+                    ) : (
+                      <>
+                        <Send size={14} /> Gửi ZNS 1-Click
+                      </>
+                    )}
+                  </button>
+                </div>
+              </>
+            ) : (
+              <>
+                {/* Step 2: Gửi ZNS Thành công */}
+                <div className="p-6 text-center space-y-4">
+                  <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto text-green-600 shadow-sm">
+                    <CheckCircle size={36} />
+                  </div>
+                  
+                  <div className="space-y-1">
+                    <h3 className="font-bold text-gray-800 text-lg">Kích Hoạt Thành Công!</h3>
+                    <p className="text-xs text-gray-500 px-4 leading-relaxed">
+                      Bảo hành thiết bị đã được kích hoạt trên hệ thống. Tin nhắn ZNS thông báo đã được gửi đến Zalo:
+                    </p>
+                    <p className="text-base font-bold text-emerald-600 tracking-wider mt-1">{znsPhone}</p>
+                  </div>
+                </div>
+
+                <div className="p-4 bg-gray-50 border-t border-gray-100 flex justify-end">
+                  <button
+                    type="button"
+                    className="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-lg cursor-pointer"
+                    onClick={() => setShowActivationModal(false)}
+                  >
+                    Đóng
+                  </button>
+                </div>
+              </>
+            )}
           </div>
         </div>
       )}

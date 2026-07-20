@@ -2084,6 +2084,47 @@ router.post('/zns-activate', requireAuth, async (req: Request, res: Response): P
 });
 
 /**
+ * POST /api/serials/activate-manual
+ * Admin / Coordinator kích hoạt bảo hành trực tiếp trên hệ thống (thủ công)
+ */
+router.post('/activate-manual', requireCoordinatorOrAdmin, async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { serialNumber, model, customerName, customerPhone, address, province } = req.body;
+    if (!serialNumber) {
+      res.status(400).json({ error: 'Thiếu số Serial' });
+      return;
+    }
+
+    const cleanSerial = serialNumber.trim().replace(/[^a-zA-Z0-9_]/g, '').toUpperCase();
+    const existingSerial = await prisma.serial.findUnique({
+      where: { serialNumber: cleanSerial }
+    });
+
+    const updated = await activateSerialWarranty(
+      cleanSerial,
+      existingSerial?.orderId || null,
+      {
+        customerName: customerName || existingSerial?.customerName,
+        customerPhone: customerPhone || existingSerial?.customerPhone,
+        address: address || existingSerial?.address,
+        province: province || existingSerial?.province
+      },
+      'ADMIN',
+      'Đã kích hoạt'
+    );
+
+    res.json({
+      success: true,
+      message: 'Kích hoạt bảo hành trực tiếp trên hệ thống thành công!',
+      serial: updated
+    });
+  } catch (error: any) {
+    logger.error('Manual activation route error', { error: error.message });
+    res.status(500).json({ error: error.message || 'Lỗi hệ thống khi kích hoạt bảo hành thủ công' });
+  }
+});
+
+/**
  * POST /api/serials/zns/test-send
  * Thử nghiệm gửi tin nhắn ZNS trực tiếp và kiểm tra ngay kết quả từ FNS Gateway (DEV Only)
  */
