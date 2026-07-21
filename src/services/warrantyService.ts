@@ -22,6 +22,7 @@ export function extractWarrantyMonths(note: string | null | undefined): number |
   const matchMonth = normalized.match(monthRegex);
   if (matchMonth) {
     const val = parseInt(matchMonth[1], 10);
+    if (val === 24) return null; // Bỏ nhận diện bảo hành 24 tháng từ ghi chú (thường là tổng bảo hành tiêu chuẩn 12 + 12 km)
     if (val > 0 && val <= 120) return val;
   }
 
@@ -30,6 +31,7 @@ export function extractWarrantyMonths(note: string | null | undefined): number |
   const matchYear = normalized.match(yearRegex);
   if (matchYear) {
     const val = parseInt(matchYear[1], 10);
+    if (val === 2) return null; // Bỏ nhận diện bảo hành 2 năm (24 tháng)
     if (val > 0 && val <= 10) return val * 12;
   }
 
