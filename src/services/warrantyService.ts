@@ -14,27 +14,6 @@ export interface ActivationCustomerInfo {
  * Nhận diện các mẫu: "bảo hành 24 tháng", "bh 12 thang", "BH 24T", "bh 2 năm", "bao hanh 1 nam", "bh 3n"
  */
 export function extractWarrantyMonths(note: string | null | undefined): number | null {
-  if (!note) return null;
-  const normalized = note.toLowerCase().trim();
-
-  // 1. Matches "bảo hành X tháng", "bh X tháng", "bh Xt", "bh Xthang"
-  const monthRegex = /(?:bảo hành|bao hanh|bh)\s*(\d+)\s*(?:tháng|thang|t)(?:\s|$|[^a-z])/i;
-  const matchMonth = normalized.match(monthRegex);
-  if (matchMonth) {
-    const val = parseInt(matchMonth[1], 10);
-    if (val === 24) return null; // Bỏ nhận diện bảo hành 24 tháng từ ghi chú (thường là tổng bảo hành tiêu chuẩn 12 + 12 km)
-    if (val > 0 && val <= 120) return val;
-  }
-
-  // 2. Matches "bảo hành X năm", "bh X năm", "bh Xn", "bh Xnam"
-  const yearRegex = /(?:bảo hành|bao hanh|bh)\s*(\d+)\s*(?:năm|nam|n)(?:\s|$|[^a-z])/i;
-  const matchYear = normalized.match(yearRegex);
-  if (matchYear) {
-    const val = parseInt(matchYear[1], 10);
-    if (val === 2) return null; // Bỏ nhận diện bảo hành 2 năm (24 tháng)
-    if (val > 0 && val <= 10) return val * 12;
-  }
-
   return null;
 }
 
