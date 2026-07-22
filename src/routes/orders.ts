@@ -277,13 +277,24 @@ router.get('/', requireAuth, async (req: Request, res: Response): Promise<void> 
           conditions.push({
             OR: [
               { assignedKtvId: { in: actualKtvIds } },
+              { serviceReports: { some: { ktvUserId: { in: actualKtvIds } } } },
               { assignedKtvId: null }
             ]
           });
         } else if (hasNullKtv) {
-          conditions.push({ assignedKtvId: null });
+          conditions.push({
+            AND: [
+              { assignedKtvId: null },
+              { serviceReports: { none: {} } }
+            ]
+          });
         } else {
-          conditions.push({ assignedKtvId: { in: actualKtvIds } });
+          conditions.push({
+            OR: [
+              { assignedKtvId: { in: actualKtvIds } },
+              { serviceReports: { some: { ktvUserId: { in: actualKtvIds } } } }
+            ]
+          });
         }
       }
     }
@@ -343,9 +354,14 @@ router.get('/', requireAuth, async (req: Request, res: Response): Promise<void> 
       if (type === 'appointmentTime') {
         conditions.push({ appointmentTime: dateCond });
       } else if (type === 'completedAt') {
-        conditions.push({ 
-          adminStatus: 'hoàn thành',
-          updatedAt: dateCond 
+        conditions.push({ adminStatus: 'hoàn thành' });
+        conditions.push({
+          OR: [
+            { serviceReports: { some: { createdAt: dateCond } } },
+            { serviceReports: { some: { updatedAt: dateCond } } },
+            { updatedAt: dateCond },
+            { pancakeUpdatedAt: dateCond }
+          ]
         });
       } else if (type === 'updatedAt') {
         conditions.push({ pancakeUpdatedAt: dateCond });
@@ -1097,13 +1113,24 @@ router.get('/export', requireAuth, async (req: Request, res: Response): Promise<
           conditions.push({
             OR: [
               { assignedKtvId: { in: actualKtvIds } },
+              { serviceReports: { some: { ktvUserId: { in: actualKtvIds } } } },
               { assignedKtvId: null }
             ]
           });
         } else if (hasNullKtv) {
-          conditions.push({ assignedKtvId: null });
+          conditions.push({
+            AND: [
+              { assignedKtvId: null },
+              { serviceReports: { none: {} } }
+            ]
+          });
         } else {
-          conditions.push({ assignedKtvId: { in: actualKtvIds } });
+          conditions.push({
+            OR: [
+              { assignedKtvId: { in: actualKtvIds } },
+              { serviceReports: { some: { ktvUserId: { in: actualKtvIds } } } }
+            ]
+          });
         }
       }
     }
@@ -1163,9 +1190,14 @@ router.get('/export', requireAuth, async (req: Request, res: Response): Promise<
       if (type === 'appointmentTime') {
         conditions.push({ appointmentTime: dateCond });
       } else if (type === 'completedAt') {
-        conditions.push({ 
-          adminStatus: 'hoàn thành',
-          updatedAt: dateCond 
+        conditions.push({ adminStatus: 'hoàn thành' });
+        conditions.push({
+          OR: [
+            { serviceReports: { some: { createdAt: dateCond } } },
+            { serviceReports: { some: { updatedAt: dateCond } } },
+            { updatedAt: dateCond },
+            { pancakeUpdatedAt: dateCond }
+          ]
         });
       } else if (type === 'updatedAt') {
         conditions.push({ pancakeUpdatedAt: dateCond });
