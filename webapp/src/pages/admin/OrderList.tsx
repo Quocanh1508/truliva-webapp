@@ -2510,7 +2510,7 @@ export default function OrderList() {
                   </th>
                 )}
                 <th className="px-4 py-2 w-[70px]">Mã đơn</th>
-                <th className="px-4 py-2 w-[150px]">Khách hàng</th>
+                <th className="px-4 py-2 w-[190px] min-w-[190px] max-w-[200px]">Khách hàng</th>
                 <th className="px-4 py-2 w-[220px]">Công việc</th>
                 <th className="px-4 py-2 min-w-[320px]">Ghi chú</th>
                 <th className="px-4 py-2 text-center w-[140px]">Thao tác</th>
@@ -2607,8 +2607,8 @@ export default function OrderList() {
                     </td>
 
                     {/* 2. Khách hàng */}
-                    <td className="px-4 py-2 whitespace-normal align-top">
-                      <div className="font-bold text-gray-900 text-[13px]">{customerName}</div>
+                    <td className="px-4 py-2 whitespace-normal align-top w-[190px] min-w-[190px] max-w-[200px]">
+                      <div className="font-bold text-gray-900 text-[13px] break-all">{customerName}</div>
                       <div 
                         onClick={() => {
                           if (phone) {
@@ -2621,7 +2621,7 @@ export default function OrderList() {
                       >
                         {phone}
                       </div>
-                      <div className="text-gray-500 text-[11px] leading-tight mt-0.5 break-words" title={order.shippingAddress?.full_address || order.customer?.fullAddress || ''}>
+                      <div className="text-gray-500 text-[11px] leading-tight mt-0.5 break-all" title={order.shippingAddress?.full_address || order.customer?.fullAddress || ''}>
                         {order.shippingAddress?.full_address || order.customer?.fullAddress || 'Không có địa chỉ'}
                       </div>
                     </td>
