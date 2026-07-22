@@ -2664,7 +2664,7 @@ export default function OrderList() {
                         const dateStr = dateObj.toLocaleDateString('vi-VN');
                         return (
                           <div className="text-[11px] font-bold text-emerald-800 bg-emerald-50 border border-emerald-200/60 rounded px-2 py-0.5 mt-0.5 mb-1.5 inline-flex items-center gap-1">
-                            <CheckCircle size={12} className="text-emerald-600 shrink-0" />
+                            <CheckCircle2 size={12} className="text-emerald-600 shrink-0" />
                             <span>Hoàn thành lúc: {timeStr} - {dateStr}</span>
                           </div>
                         );
