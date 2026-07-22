@@ -47,6 +47,6 @@ export function formatOrderId(pancakeOrderId: number | string | null | undefined
  * Trích xuất thời gian bảo hành (số tháng) từ ghi chú/note.
  * Nhận diện các mẫu: "bảo hành 24 tháng", "bh 12 thang", "BH 24T", "bh 2 năm", "bao hanh 1 nam", "bh 3n"
  */
-export function extractWarrantyMonths(note: string | null | undefined): number | null {
+export function extractWarrantyMonths(_note?: string | null | undefined): number | null {
   return null;
 }
