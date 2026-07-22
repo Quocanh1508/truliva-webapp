@@ -60,7 +60,17 @@ export async function activateSerialWarranty(
   if (customerInfo.address) serialUpdate.address = customerInfo.address.trim();
   if (customerInfo.province) serialUpdate.province = customerInfo.province.trim();
   if (customerInfo.invoiceImageUrl) serialUpdate.invoiceImageUrl = customerInfo.invoiceImageUrl.trim();
-  if (orderId) serialUpdate.orderId = orderId;
+  if (orderId) {
+    // Huỷ liên kết tất cả các Serial cũ của đơn hàng này nếu khác với Serial mới
+    await prisma.serial.updateMany({
+      where: {
+        orderId,
+        serialNumber: { not: cleanedSerial }
+      },
+      data: { orderId: null }
+    });
+    serialUpdate.orderId = orderId;
+  }
 
   // Nếu chuyển sang trạng thái "Đã kích hoạt" hoặc "Chờ duyệt", tiến hành tính toán thời hạn bảo hành
   if (targetStatus === 'Đã kích hoạt' || targetStatus === 'Chờ duyệt') {
@@ -219,7 +229,17 @@ export async function syncSerialFromReport(
   if (customerInfo.customerPhone) serialData.customerPhone = customerInfo.customerPhone.trim();
   if (customerInfo.address) serialData.address = customerInfo.address.trim();
   if (customerInfo.province) serialData.province = customerInfo.province.trim();
-  if (orderId) serialData.orderId = orderId;
+  if (orderId) {
+    // Huỷ liên kết tất cả các Serial cũ của đơn hàng này nếu khác với Serial mới
+    await prisma.serial.updateMany({
+      where: {
+        orderId,
+        serialNumber: { not: cleanedSerial }
+      },
+      data: { orderId: null }
+    });
+    serialData.orderId = orderId;
+  }
 
   if (!existingSerial) {
     logger.warn('Skipping serial sync: serial number does not exist in system', { serialNumber: cleanedSerial });
@@ -230,7 +250,7 @@ export async function syncSerialFromReport(
     if (!existingSerial.customerPhone && serialData.customerPhone) dataToUpdate.customerPhone = serialData.customerPhone;
     if (!existingSerial.address && serialData.address) dataToUpdate.address = serialData.address;
     if (!existingSerial.province && serialData.province) dataToUpdate.province = serialData.province;
-    if (!existingSerial.orderId && serialData.orderId) dataToUpdate.orderId = serialData.orderId;
+    if (serialData.orderId && existingSerial.orderId !== serialData.orderId) dataToUpdate.orderId = serialData.orderId;
 
     if (Object.keys(dataToUpdate).length > 0) {
       existingSerial = await prisma.serial.update({

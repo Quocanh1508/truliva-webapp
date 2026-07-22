@@ -2836,19 +2836,34 @@ export default function OrderList() {
                       {(() => {
                         const orderSerials = order.serials || [];
                         const reportSerials = (order.serviceReports || [])
-                          .filter((r: any) => r.serialNumber)
+                          .filter((r: any) => r.serialNumber && r.serialNumber !== 'XXXXX')
                           .map((r: any) => ({
                             id: r.id,
                             serialNumber: r.serialNumber,
-                            // Dùng serialInfo từ backend (đã lookup từ bảng Serial)
-                            // Nếu không có (serial chưa trong hệ thống), fallback là null
                             status: r.serialInfo?.status || null,
                             activationDate: r.serialInfo?.activationDate || null,
                             warrantyExpiryDate: r.serialInfo?.warrantyExpiryDate || null,
                             customerConfirmationDate: r.serialInfo?.customerConfirmationDate || null,
                           }));
                         
-                        const serialsToShow = orderSerials.length > 0 ? orderSerials : reportSerials;
+                        // Lấy serial từ báo cáo mới nhất làm căn cứ ưu tiên
+                        const latestReport = (order.serviceReports || [])
+                          .filter((r: any) => r.serialNumber && r.serialNumber !== 'XXXXX')
+                          .sort((a: any, b: any) => new Date(b.updatedAt || b.createdAt).getTime() - new Date(a.updatedAt || a.createdAt).getTime())[0];
+                        const latestReportSerial = latestReport?.serialNumber;
+
+                        let baseSerials = orderSerials.length > 0 ? orderSerials : reportSerials;
+
+                        // Nếu báo cáo mới nhất có số serial cụ thể và có nhiều serials, lọc ưu tiên serial mới nhất
+                        if (latestReportSerial && baseSerials.length > 1) {
+                          const matched = baseSerials.filter((s: any) => s.serialNumber === latestReportSerial);
+                          if (matched.length > 0) {
+                            baseSerials = matched;
+                          }
+                        }
+
+                        // Deduplicate theo serialNumber
+                        const serialsToShow = Array.from(new Map(baseSerials.map((s: any) => [s.serialNumber, s])).values());
 
                         if (serialsToShow.length === 0) {
                           return <span className="text-gray-400 italic text-[11px]">Chưa kích hoạt</span>;
