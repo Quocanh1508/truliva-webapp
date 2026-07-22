@@ -27,3 +27,11 @@ Dưới đây là các đúc kết thực tế để tối ưu hóa việc deplo
 - Khi có thay đổi Frontend:
   - Chạy gộp: `cd /var/www/truliva/webapp && npm run build`.
 - Luôn kiểm tra PM2 status (`pm2 status`) để xác nhận server backend online sau khi restart.
+
+## 5. Quy Chuẩn Giao Diện (UI Design System)
+- Tất cả các chỉnh sửa hoặc tạo mới Component trên Frontend (Web App Admin, KTV, Zalo Mini App) **BẮT BUỘC** tuân thủ quy chuẩn thiết kế tại file [UI_DESIGN_SYSTEM.md](file:///c:/StudyZone/Project/Truliva/UI_DESIGN_SYSTEM.md).
+- Giữ vững tính nhất quán về:
+  - Màu thương hiệu: `#1B3A6B` (Navy), `#00A3FF` (Cyan), `#2563EB` (Royal Blue).
+  - Cặp màu Badges cho 5 loại trạng thái (Chờ xử lý, Đang thực hiện, Hoàn thành, Hủy đơn, Đổi hoàn).
+  - Bo góc `rounded-2xl` / `rounded-xl`, chiều cao nút tối thiểu 44px trên mobile, loading state với spinner icon `<Loader2 className="animate-spin" />`.
+
