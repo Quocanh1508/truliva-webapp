@@ -2657,6 +2657,18 @@ export default function OrderList() {
                           🚫 <span className="font-bold">Lý do hủy:</span> {order.cancelReason}
                         </div>
                       )}
+                      {order.adminStatus === 'hoàn thành' && (() => {
+                        const report = order.serviceReports && order.serviceReports.length > 0 ? order.serviceReports[0] : null;
+                        const dateObj = report ? new Date(report.updatedAt || report.createdAt) : new Date(order.updatedAt);
+                        const timeStr = dateObj.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
+                        const dateStr = dateObj.toLocaleDateString('vi-VN');
+                        return (
+                          <div className="text-[11px] font-bold text-emerald-800 bg-emerald-50 border border-emerald-200/60 rounded px-2 py-0.5 mt-0.5 mb-1.5 inline-flex items-center gap-1">
+                            <CheckCircle size={12} className="text-emerald-600 shrink-0" />
+                            <span>Hoàn thành lúc: {timeStr} - {dateStr}</span>
+                          </div>
+                        );
+                      })()}
 
                       {/* Loại công việc & dịch vụ */}
                       <div className="text-[11px] font-medium text-gray-800 leading-tight">

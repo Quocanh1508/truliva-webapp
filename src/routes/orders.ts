@@ -654,7 +654,9 @@ router.get('/', requireAuth, async (req: Request, res: Response): Promise<void> 
             products: true,
             spareParts: true,
             workType: true,
-            approvalStatus: true
+            approvalStatus: true,
+            createdAt: true,
+            updatedAt: true
           }
         }
       };
@@ -725,7 +727,9 @@ router.get('/', requireAuth, async (req: Request, res: Response): Promise<void> 
             products: true,
             spareParts: true,
             workType: true,
-            approvalStatus: true
+            approvalStatus: true,
+            createdAt: true,
+            updatedAt: true
           }
         }
       };
