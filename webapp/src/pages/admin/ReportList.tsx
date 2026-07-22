@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { fetchApi, deleteReportWithReason, updateReport, uploadImages, approveReport, rejectReport, getFiltersData } from '../../api/client';
-import { Download, X, ExternalLink, Image as ImageIcon, Loader, Search, Edit3, Save, Plus, Trash2, SlidersHorizontal, RotateCcw, Calendar, ChevronLeft, ChevronRight, ShieldCheck, Send, CheckCircle, Loader2 } from 'lucide-react';
+import { Download, X, ExternalLink, Image as ImageIcon, Loader, Search, Edit3, Save, Plus, Trash2, SlidersHorizontal, RotateCcw, Calendar, ChevronLeft, ChevronRight, ShieldCheck, CheckCircle, Loader2 } from 'lucide-react';
 import CategoryTreeSelect from '../../components/CategoryTreeSelect';
 import { formatOrderId } from '../../utils/text';
 import { useAuth } from '../../context/AuthContext';
@@ -538,6 +538,7 @@ export default function ReportList() {
   } | null>(null);
   const [znsPhone, setZnsPhone] = useState('');
   const [warrantyDurationText, setWarrantyDurationText] = useState('12 tháng');
+  const [warrantyExpiryDateStr, setWarrantyExpiryDateStr] = useState('');
   const [znsSending, setZnsSending] = useState(false);
   const [manualActivating, setManualActivating] = useState(false);
 
@@ -560,20 +561,30 @@ export default function ReportList() {
     setActivationStep(1);
     setShowActivationModal(true);
 
+    const initExp = new Date();
+    initExp.setMonth(initExp.getMonth() + 12);
+    setWarrantyExpiryDateStr(initExp.toLocaleDateString('vi-VN'));
+
     setWarrantyDurationText('Đang tính toán...');
     fetchApi(`/serials/public/preview-duration?model=${encodeURIComponent(modelName)}&orderId=${report.orderId || ''}`)
       .then(res => {
-        if (res && res.totalMonths) {
-          let text = `${res.totalMonths} tháng`;
-          if (res.promoMonths > 0) {
-            text += ` (${res.standardMonths} tháng tiêu chuẩn + ${res.promoMonths} tháng khuyến mãi)`;
-          }
-          setWarrantyDurationText(text);
-        } else {
-          setWarrantyDurationText('12 tháng');
+        const totalM = (res && res.totalMonths) ? res.totalMonths : 12;
+        let text = `${totalM} tháng`;
+        if (res && res.promoMonths > 0) {
+          text += ` (${res.standardMonths} tháng tiêu chuẩn + ${res.promoMonths} tháng khuyến mãi)`;
         }
+        setWarrantyDurationText(text);
+
+        const exp = new Date();
+        exp.setMonth(exp.getMonth() + totalM);
+        setWarrantyExpiryDateStr(exp.toLocaleDateString('vi-VN'));
       })
-      .catch(() => setWarrantyDurationText('12 tháng'));
+      .catch(() => {
+        setWarrantyDurationText('12 tháng');
+        const exp = new Date();
+        exp.setMonth(exp.getMonth() + 12);
+        setWarrantyExpiryDateStr(exp.toLocaleDateString('vi-VN'));
+      });
   };
 
   const handleSendZns = async () => {
@@ -2322,30 +2333,41 @@ export default function ReportList() {
                     />
                   </div>
 
-                  {/* Thiết bị & Hạn bảo hành card */}
-                  <div className="bg-emerald-50/40 border border-emerald-100 rounded-xl p-3.5 flex gap-3 items-start">
-                    <div className="bg-emerald-100 p-2 rounded-lg text-emerald-700">
-                      <CheckCircle size={20} />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <h4 className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Thiết bị & Dự kiến bảo hành</h4>
-                      <p className="text-sm font-bold text-gray-800 mt-0.5 truncate">{activationData.model}</p>
-                      <p className="text-xs text-gray-600 mt-1">
-                        ⏱️ Hạn bảo hành: <strong className="text-emerald-700">{warrantyDurationText}</strong>
-                      </p>
+                  {/* THÔNG TIN SẢN PHẨM Card */}
+                  <div className="border border-blue-100 rounded-xl p-4 bg-blue-50/30 space-y-2 text-left">
+                    <h4 className="text-[10px] font-bold text-gray-400 uppercase tracking-wider border-b border-blue-100/70 pb-1.5">
+                      THÔNG TIN SẢN PHẨM
+                    </h4>
+                    <p className="text-sm font-bold text-gray-800 leading-snug break-words">
+                      {activationData.model}
+                    </p>
+                    <div className="grid grid-cols-3 gap-1.5 text-xs text-gray-600 pt-1.5 border-t border-blue-100/50 mt-2">
+                      <span className="font-medium text-gray-500">Serial:</span>
+                      <span className="col-span-2 font-mono font-bold text-blue-700">{activationData.serialNumber}</span>
+
+                      <span className="font-medium text-gray-500">Bảo hành:</span>
+                      <span className="col-span-2 font-semibold text-gray-800">{warrantyDurationText}</span>
+
+                      <span className="font-medium text-gray-500">Đến ngày:</span>
+                      <span className="col-span-2 font-bold text-red-600">{warrantyExpiryDateStr || '---'}</span>
                     </div>
                   </div>
 
-                  {/* Thông tin Khách hàng Card */}
-                  <div className="border border-gray-100 rounded-xl p-3.5 space-y-2 bg-white">
-                    <h4 className="text-[10px] font-bold text-gray-400 uppercase tracking-wider border-b border-gray-100 pb-1">Thông tin nhận bảo hành</h4>
+                  {/* THÔNG TIN KHÁCH HÀNG Card */}
+                  <div className="border border-gray-100 rounded-xl p-4 space-y-2 bg-white text-left">
+                    <h4 className="text-[10px] font-bold text-gray-400 uppercase tracking-wider border-b border-gray-100 pb-1.5">
+                      THÔNG TIN KHÁCH HÀNG
+                    </h4>
                     
                     <div className="grid grid-cols-3 gap-1.5 text-xs text-gray-600">
-                      <span className="font-medium text-gray-400">Khách hàng:</span>
+                      <span className="font-medium text-gray-500">Họ tên:</span>
                       <span className="col-span-2 font-semibold text-gray-800">{activationData.customerName || '---'}</span>
                       
-                      <span className="font-medium text-gray-400">Địa chỉ:</span>
-                      <span className="col-span-2 text-gray-700 truncate">{activationData.address || '---'}</span>
+                      <span className="font-medium text-gray-500">Số điện thoại:</span>
+                      <span className="col-span-2 font-semibold text-gray-800">{activationData.customerPhone || znsPhone || '---'}</span>
+
+                      <span className="font-medium text-gray-500">Địa chỉ:</span>
+                      <span className="col-span-2 text-gray-700 leading-relaxed break-words">{activationData.address || '---'}</span>
                     </div>
                   </div>
 
@@ -2368,13 +2390,6 @@ export default function ReportList() {
                 <div className="p-4 bg-gray-50 border-t border-gray-100 flex gap-2">
                   <button
                     type="button"
-                    className="px-3 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-semibold rounded-lg transition-colors flex-1 cursor-pointer"
-                    onClick={() => setShowActivationModal(false)}
-                  >
-                    Hủy
-                  </button>
-                  <button
-                    type="button"
                     className="px-3 py-2 bg-slate-700 hover:bg-slate-800 text-white text-xs font-bold rounded-lg transition-colors flex-1 cursor-pointer disabled:opacity-50"
                     onClick={handleManualActivate}
                     disabled={manualActivating}
@@ -2389,11 +2404,11 @@ export default function ReportList() {
                   >
                     {znsSending ? (
                       <>
-                        <Loader2 size={14} className="animate-spin" /> Đang gửi...
+                        <Loader2 size={14} className="animate-spin" /> Đang kích hoạt...
                       </>
                     ) : (
                       <>
-                        <Send size={14} /> Gửi ZNS 1-Click
+                        <ShieldCheck size={14} /> Kích hoạt bảo hành
                       </>
                     )}
                   </button>
@@ -2401,18 +2416,25 @@ export default function ReportList() {
               </>
             ) : (
               <>
-                {/* Step 2: Gửi ZNS Thành công */}
+                {/* Step 2: Kích hoạt bảo hành thành công! */}
                 <div className="p-6 text-center space-y-4">
                   <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto text-green-600 shadow-sm">
                     <CheckCircle size={36} />
                   </div>
                   
                   <div className="space-y-1">
-                    <h3 className="font-bold text-gray-800 text-lg">Kích Hoạt Thành Công!</h3>
+                    <h3 className="font-bold text-gray-800 text-lg">Kích hoạt bảo hành thành công!</h3>
                     <p className="text-xs text-gray-500 px-4 leading-relaxed">
-                      Bảo hành thiết bị đã được kích hoạt trên hệ thống. Tin nhắn ZNS thông báo đã được gửi đến Zalo:
+                      Tin nhắn thông báo đã được gửi đến số Zalo:
                     </p>
                     <p className="text-base font-bold text-emerald-600 tracking-wider mt-1">{znsPhone}</p>
+                  </div>
+
+                  <div className="bg-emerald-50 border border-emerald-100 rounded-xl p-4 text-left text-xs text-emerald-900 leading-relaxed max-w-sm mx-auto space-y-1">
+                    <p className="font-medium">
+                      Hướng dẫn khách hàng kiểm tra tin nhắn, Xác nhận kích hoạt bảo hành và Quan tâm Zalo OA <strong>Pure Vita</strong>.
+                    </p>
+                    <p className="font-semibold text-emerald-800 pt-1">Xin cảm ơn!</p>
                   </div>
                 </div>
 
