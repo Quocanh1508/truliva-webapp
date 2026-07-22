@@ -1299,7 +1299,7 @@ export default function ReportForm() {
                       <ul className="list-disc pl-4 space-y-0.5 text-emerald-800">
                         <li>Dòng máy: <strong>{serialInfo.products?.join(', ') || 'Chưa rõ'}</strong></li>
                         <li>Khách hàng gốc: <strong>{serialInfo.customerName || 'Chưa rõ'}</strong></li>
-                        <li>Ngày lắp đặt: <strong>{new Date(serialInfo.installDate).toLocaleDateString('vi-VN')}</strong></li>
+                        <li>Ngày lắp đặt: <strong>{serialInfo.installDate && !isNaN(new Date(serialInfo.installDate).getTime()) && new Date(serialInfo.installDate).getFullYear() > 1970 ? new Date(serialInfo.installDate).toLocaleDateString('vi-VN') : 'Chưa ghi nhận'}</strong></li>
                       </ul>
                     </div>
                   )}
