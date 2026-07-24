@@ -434,13 +434,35 @@ router.get('/export', requireAuth, requireAdmin, async (req: Request, res: Respo
     wsSummary.addRow(['CÔNG TY TNHH THƯƠNG MẠI VÀ DỊCH VỤ PURE VITA']);
     wsSummary.addRow(['Nhãn hàng Máy lọc nước Truliva']);
     wsSummary.addRow([`BẢNG TỔNG HỢP CHI PHÍ VẬN HÀNH THÙ LAO KTV - THÁNG ${month}`]);
-    wsSummary.addRow([]); // Blank line
 
     wsSummary.getRow(1).font = { size: 13, bold: true, color: { argb: 'FF1B3A6B' } };
     wsSummary.getRow(2).font = { size: 10, italic: true, color: { argb: 'FF4B5563' } };
     wsSummary.getRow(3).font = { size: 14, bold: true, color: { argb: 'FF1B3A6B' } };
 
-    // Columns config for Sheet 1
+    const lastSummaryDataRow = 5 + ktvs.length;
+
+    // Top Summary Row Sheet 1 (Row 4 - Always visible above filter)
+    const topSummaryRow1 = wsSummary.addRow([
+      'TỔNG CỘNG THEO BỘ LỌC:',
+      '', '', '',
+      { formula: `SUBTOTAL(109, E6:E${lastSummaryDataRow})`, result: 0 },
+      { formula: `SUBTOTAL(109, F6:F${lastSummaryDataRow})`, result: 0 },
+      { formula: `SUBTOTAL(109, G6:G${lastSummaryDataRow})`, result: 0 },
+      '', ''
+    ]);
+    wsSummary.mergeCells(`A4:D4`);
+    topSummaryRow1.font = { bold: true, color: { argb: 'FF1B3A6B' } };
+    topSummaryRow1.fill = {
+      type: 'pattern',
+      pattern: 'solid',
+      fgColor: { argb: 'FFE2E8F0' }
+    };
+    topSummaryRow1.getCell(1).alignment = { horizontal: 'center' };
+    topSummaryRow1.getCell(5).alignment = { horizontal: 'center' };
+    topSummaryRow1.getCell(6).numFmt = '#,##0';
+    topSummaryRow1.getCell(7).numFmt = '#,##0';
+
+    // Columns config for Sheet 1 (Row 5 Header)
     const summaryHeaders = ['STT', 'Tên KTV', 'Số điện thoại', 'Trạm quản lý', 'Số ca hoàn thành', 'Thù lao tự động (VND)', 'Thực nhận (VND)', 'Ghi chú điều chỉnh', 'Trạng thái'];
     const summaryHeaderRow = wsSummary.addRow(summaryHeaders);
     summaryHeaderRow.font = { bold: true, color: { argb: 'FFFFFFFF' } };
@@ -494,17 +516,19 @@ router.get('/export', requireAuth, requireAdmin, async (req: Request, res: Respo
       row.getCell(9).alignment = { horizontal: 'center' };
     }
 
-    // Total Row Sheet 1
+    // Update Top Summary Row Sheet 1 Results
+    topSummaryRow1.getCell(5).value = { formula: `SUBTOTAL(109, E6:E${lastSummaryDataRow})`, result: sumTotalCases };
+    topSummaryRow1.getCell(6).value = { formula: `SUBTOTAL(109, F6:F${lastSummaryDataRow})`, result: sumCalculated };
+    topSummaryRow1.getCell(7).value = { formula: `SUBTOTAL(109, G6:G${lastSummaryDataRow})`, result: sumAdjusted };
+
+    // Bottom Total Row Sheet 1
     const totalRowSheet1 = wsSummary.addRow([
       'TỔNG CỘNG',
-      '',
-      '',
-      '',
-      sumTotalCases,
-      sumCalculated,
-      sumAdjusted,
-      '',
-      ''
+      '', '', '',
+      { formula: `SUBTOTAL(109, E6:E${lastSummaryDataRow})`, result: sumTotalCases },
+      { formula: `SUBTOTAL(109, F6:F${lastSummaryDataRow})`, result: sumCalculated },
+      { formula: `SUBTOTAL(109, G6:G${lastSummaryDataRow})`, result: sumAdjusted },
+      '', ''
     ]);
     wsSummary.mergeCells(`A${totalRowSheet1.number}:D${totalRowSheet1.number}`);
     totalRowSheet1.font = { bold: true };
@@ -519,15 +543,14 @@ router.get('/export', requireAuth, requireAdmin, async (req: Request, res: Respo
     };
 
     // Set AutoFilter and column widths Sheet 1
-    const summaryLastRow = 5 + ktvs.length;
-    wsSummary.autoFilter = `A5:I${summaryLastRow}`;
+    wsSummary.autoFilter = `A5:I${lastSummaryDataRow}`;
     [8, 25, 16, 22, 16, 22, 22, 35, 15].forEach((w, i) => {
       wsSummary.getColumn(i + 1).width = w;
     });
 
     // Style borders Sheet 1
     wsSummary.eachRow((row, rowNumber) => {
-      if (rowNumber >= 5) {
+      if (rowNumber >= 4) {
         row.eachCell((cell) => {
           cell.border = {
             top: { style: 'thin', color: { argb: 'FFCBD5E1' } },
@@ -548,12 +571,67 @@ router.get('/export', requireAuth, requireAdmin, async (req: Request, res: Respo
     wsDetail.addRow(['CÔNG TY TNHH THƯƠNG MẠI VÀ DỊCH VỤ PURE VITA']);
     wsDetail.addRow(['Nhãn hàng Máy lọc nước Truliva']);
     wsDetail.addRow([`BẢNG TỔNG HỢP CHI PHÍ CA DỊCH VỤ CHI TIẾT - THÁNG ${month}`]);
-    wsDetail.addRow([]); // Blank line
 
     wsDetail.getRow(1).font = { size: 13, bold: true, color: { argb: 'FF1B3A6B' } };
     wsDetail.getRow(2).font = { size: 10, italic: true, color: { argb: 'FF4B5563' } };
     wsDetail.getRow(3).font = { size: 14, bold: true, color: { argb: 'FF1B3A6B' } };
 
+    // Fetch all approved reports for the month
+    const reports = await prisma.serviceReport.findMany({
+      where: {
+        month: formattedMonth,
+        approvalStatus: 'APPROVED',
+        ...(ktvId ? { ktvUserId: ktvId } : {}),
+        ...(stationId ? { ktvUser: { techStationId: stationId } } : {}),
+        ...(workTypeFilter ? {
+          OR: [
+            { workType: { contains: workTypeFilter, mode: 'insensitive' } },
+            { serviceType: { contains: workTypeFilter, mode: 'insensitive' } }
+          ]
+        } : {})
+      },
+      include: {
+        ktvUser: {
+          select: {
+            fullName: true,
+            phoneNumber: true,
+            techStation: { select: { name: true } }
+          }
+        },
+        order: true
+      },
+      orderBy: { createdAt: 'asc' }
+    });
+
+    const startDataRow = 6;
+    const lastDataRow = reports.length > 0 ? startDataRow + reports.length - 1 : startDataRow;
+
+    // Top Summary Row Sheet 2 (Row 4 - Always visible above AutoFilter)
+    const topSummaryRow2 = wsDetail.addRow([
+      'TỔNG CỘNG THEO BỘ LỌC:',
+      '', '', '', '', '', '', '', '', '', '',
+      { formula: `SUBTOTAL(109, L${startDataRow}:L${lastDataRow})`, result: 0 },
+      { formula: `SUBTOTAL(109, M${startDataRow}:M${lastDataRow})`, result: 0 },
+      { formula: `SUBTOTAL(109, N${startDataRow}:N${lastDataRow})`, result: 0 },
+      { formula: `SUBTOTAL(109, O${startDataRow}:O${lastDataRow})`, result: 0 },
+      { formula: `SUBTOTAL(109, P${startDataRow}:P${lastDataRow})`, result: 0 },
+      { formula: `SUBTOTAL(109, Q${startDataRow}:Q${lastDataRow})`, result: 0 },
+      { formula: `SUBTOTAL(109, R${startDataRow}:R${lastDataRow})`, result: 0 },
+      { formula: `SUBTOTAL(109, S${startDataRow}:S${lastDataRow})`, result: 0 }
+    ]);
+    wsDetail.mergeCells(`A4:K4`);
+    topSummaryRow2.font = { bold: true, color: { argb: 'FF1B3A6B' } };
+    topSummaryRow2.fill = {
+      type: 'pattern',
+      pattern: 'solid',
+      fgColor: { argb: 'FFE2E8F0' }
+    };
+    topSummaryRow2.getCell(1).alignment = { horizontal: 'center' };
+    for (let c = 12; c <= 19; c++) {
+      topSummaryRow2.getCell(c).numFmt = '#,##0';
+    }
+
+    // Row 5 Header
     const detailHeaders = [
       'STT',
       'Ngày hoàn thành',
@@ -585,36 +663,7 @@ router.get('/export', requireAuth, requireAdmin, async (req: Request, res: Respo
     };
     detailHeaderRow.alignment = { vertical: 'middle', horizontal: 'center' };
 
-    // Fetch all approved reports for the month
-    const reports = await prisma.serviceReport.findMany({
-      where: {
-        month: formattedMonth,
-        approvalStatus: 'APPROVED',
-        ...(ktvId ? { ktvUserId: ktvId } : {}),
-        ...(stationId ? { ktvUser: { techStationId: stationId } } : {}),
-        ...(workTypeFilter ? {
-          OR: [
-            { workType: { contains: workTypeFilter, mode: 'insensitive' } },
-            { serviceType: { contains: workTypeFilter, mode: 'insensitive' } }
-          ]
-        } : {})
-      },
-      include: {
-        ktvUser: {
-          select: {
-            fullName: true,
-            phoneNumber: true,
-            techStation: { select: { name: true } }
-          }
-        },
-        order: true
-      },
-      orderBy: { createdAt: 'asc' }
-    });
-
     let detailIdx = 1;
-    const startDataRow = 6;
-
     let sumBaoHanh = 0;
     let sumGiaoHang = 0;
     let sumLapDat = 0;
@@ -703,21 +752,29 @@ router.get('/export', requireAuth, requireAdmin, async (req: Request, res: Respo
       }
     }
 
-    const lastDataRow = reports.length > 0 ? startDataRow + reports.length - 1 : startDataRow;
+    // Update Top Summary Row Sheet 2 Results
+    topSummaryRow2.getCell(12).value = { formula: `SUBTOTAL(109, L${startDataRow}:L${lastDataRow})`, result: sumBaoHanh };
+    topSummaryRow2.getCell(13).value = { formula: `SUBTOTAL(109, M${startDataRow}:M${lastDataRow})`, result: sumGiaoHang };
+    topSummaryRow2.getCell(14).value = { formula: `SUBTOTAL(109, N${startDataRow}:N${lastDataRow})`, result: sumLapDat };
+    topSummaryRow2.getCell(15).value = { formula: `SUBTOTAL(109, O${startDataRow}:O${lastDataRow})`, result: sumGiaoLap };
+    topSummaryRow2.getCell(16).value = { formula: `SUBTOTAL(109, P${startDataRow}:P${lastDataRow})`, result: sumThayLoc };
+    topSummaryRow2.getCell(17).value = { formula: `SUBTOTAL(109, Q${startDataRow}:Q${lastDataRow})`, result: sumDistanceCost };
+    topSummaryRow2.getCell(18).value = { formula: `SUBTOTAL(109, R${startDataRow}:R${lastDataRow})`, result: 0 };
+    topSummaryRow2.getCell(19).value = { formula: `SUBTOTAL(109, S${startDataRow}:S${lastDataRow})`, result: sumTotalCost };
 
-    // Total Row Sheet 2
+    // Bottom Total Row Sheet 2
     if (reports.length > 0) {
       const totalRowSheet2 = wsDetail.addRow([
         'TỔNG CỘNG',
         '', '', '', '', '', '', '', '', '', '',
-        { formula: `SUM(L${startDataRow}:L${lastDataRow})`, result: sumBaoHanh },
-        { formula: `SUM(M${startDataRow}:M${lastDataRow})`, result: sumGiaoHang },
-        { formula: `SUM(N${startDataRow}:N${lastDataRow})`, result: sumLapDat },
-        { formula: `SUM(O${startDataRow}:O${lastDataRow})`, result: sumGiaoLap },
-        { formula: `SUM(P${startDataRow}:P${lastDataRow})`, result: sumThayLoc },
-        { formula: `SUM(Q${startDataRow}:Q${lastDataRow})`, result: sumDistanceCost },
-        { formula: `SUM(R${startDataRow}:R${lastDataRow})`, result: 0 },
-        { formula: `SUM(S${startDataRow}:S${lastDataRow})`, result: sumTotalCost }
+        { formula: `SUBTOTAL(109, L${startDataRow}:L${lastDataRow})`, result: sumBaoHanh },
+        { formula: `SUBTOTAL(109, M${startDataRow}:M${lastDataRow})`, result: sumGiaoHang },
+        { formula: `SUBTOTAL(109, N${startDataRow}:N${lastDataRow})`, result: sumLapDat },
+        { formula: `SUBTOTAL(109, O${startDataRow}:O${lastDataRow})`, result: sumGiaoLap },
+        { formula: `SUBTOTAL(109, P${startDataRow}:P${lastDataRow})`, result: sumThayLoc },
+        { formula: `SUBTOTAL(109, Q${startDataRow}:Q${lastDataRow})`, result: sumDistanceCost },
+        { formula: `SUBTOTAL(109, R${startDataRow}:R${lastDataRow})`, result: 0 },
+        { formula: `SUBTOTAL(109, S${startDataRow}:S${lastDataRow})`, result: sumTotalCost }
       ]);
 
       wsDetail.mergeCells(`A${totalRowSheet2.number}:K${totalRowSheet2.number}`);
@@ -735,7 +792,7 @@ router.get('/export', requireAuth, requireAdmin, async (req: Request, res: Respo
       };
     }
 
-    // Set AutoFilter and Column Widths Sheet 2
+    // Set AutoFilter and Column Widths Sheet 2 (Header at Row 5)
     wsDetail.autoFilter = `A5:S${lastDataRow}`;
     [6, 18, 22, 20, 22, 15, 18, 30, 22, 30, 14, 15, 15, 15, 15, 15, 15, 15, 18].forEach((w, i) => {
       wsDetail.getColumn(i + 1).width = w;
@@ -743,7 +800,7 @@ router.get('/export', requireAuth, requireAdmin, async (req: Request, res: Respo
 
     // Style borders Sheet 2
     wsDetail.eachRow((row, rowNumber) => {
-      if (rowNumber >= 5) {
+      if (rowNumber >= 4) {
         row.eachCell((cell) => {
           cell.border = {
             top: { style: 'thin', color: { argb: 'FFCBD5E1' } },
