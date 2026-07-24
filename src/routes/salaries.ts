@@ -122,6 +122,10 @@ async function loadStationRates(): Promise<Map<string, any>> {
 
       const getNum = (val: any) => {
         if (val === null || val === undefined || val === '') return 0;
+        // ExcelJS formula cells return { formula: '...', result: <number> }
+        if (typeof val === 'object' && val.result !== undefined) {
+          val = val.result;
+        }
         const num = Number(String(val).replace(/,/g, ''));
         return isNaN(num) ? 0 : num;
       };
