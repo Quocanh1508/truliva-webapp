@@ -81,8 +81,35 @@ const FEATURED_NEWS = [
 export default function CustomerHome({ user, onOpenScanner, onOpenWarranty }: CustomerHomeProps) {
   const [showWheelModal, setShowWheelModal] = useState(false);
   const [selectedArticle, setSelectedArticle] = useState<any>(null);
+  const [articles, setArticles] = useState<any[]>(FEATURED_NEWS);
 
   const userName = user?.fullName || 'Guest';
+
+  React.useEffect(() => {
+    fetchZaloApi('/zalo-miniapp/articles')
+      .then(res => {
+        if (res.success && res.articles && res.articles.length > 0) {
+          setArticles(res.articles);
+        }
+      })
+      .catch(err => {
+        console.warn('Articles fetch error:', err);
+      });
+  }, []);
+
+  const handleArticleClick = async (news: any) => {
+    if (news.url && news.url !== 'https://zalo.me' && !news.url.includes('example')) {
+      try {
+        const { openWebview } = await import('zmp-sdk/apis');
+        await openWebview({ url: news.url });
+        return;
+      } catch (err) {
+        window.open(news.url, '_blank');
+        return;
+      }
+    }
+    setSelectedArticle(news);
+  };
 
   return (
     <div className="pb-20 bg-slate-50 min-h-screen">
@@ -156,15 +183,22 @@ export default function CustomerHome({ user, onOpenScanner, onOpenWarranty }: Cu
           </button>
 
           {/* Liên hệ */}
-          <a 
-            href="tel:19006368"
+          <button 
+            onClick={async () => {
+              try {
+                const { openPhone } = await import('zmp-sdk/apis');
+                await openPhone({ phoneNumber: '1900638463' });
+              } catch (err) {
+                window.location.href = 'tel:1900638463';
+              }
+            }}
             className="flex flex-col items-center justify-center space-y-1.5 p-2 rounded-xl hover:bg-emerald-50 active:scale-95 transition-all cursor-pointer"
           >
             <div className="w-12 h-12 rounded-full bg-emerald-50 text-emerald-700 flex items-center justify-center border border-emerald-100 shadow-sm">
               <PhoneCall size={22} className="text-emerald-600" />
             </div>
             <span className="text-xs font-semibold text-slate-700">Liên hệ</span>
-          </a>
+          </button>
         </div>
       </div>
 
@@ -220,10 +254,10 @@ export default function CustomerHome({ user, onOpenScanner, onOpenWarranty }: Cu
 
         {/* 2-Column Article Grid */}
         <div className="grid grid-cols-2 gap-3">
-          {FEATURED_NEWS.map((news) => (
+          {articles.map((news) => (
             <div 
               key={news.id}
-              onClick={() => setSelectedArticle(news)}
+              onClick={() => handleArticleClick(news)}
               className="bg-white rounded-2xl overflow-hidden border border-slate-200/80 shadow-sm hover:shadow-md transition-shadow cursor-pointer flex flex-col justify-between"
             >
               {/* Thumbnail Image */}

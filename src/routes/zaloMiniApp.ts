@@ -149,4 +149,21 @@ router.get('/ktv-orders', requireAuth, async (req: Request, res: Response): Prom
   }
 });
 
+/**
+ * GET /api/zalo-miniapp/articles
+ * Lấy danh sách bài viết truyền thông công khai từ Zalo OA cho Mini App
+ */
+router.get('/articles', async (_req: Request, res: Response): Promise<void> => {
+  try {
+    const { getZaloOaArticles } = await import('../services/zaloService');
+    const articles = await getZaloOaArticles();
+    res.json({
+      success: true,
+      articles
+    });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 export default router;
