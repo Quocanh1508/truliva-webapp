@@ -108,14 +108,21 @@ async function loadStationRates(): Promise<Map<string, any>> {
     sheet.eachRow((row, rowNumber) => {
       if (rowNumber < 4) return;
 
-      const province = String(row.getCell(1).value || '').trim();
-      const status = String(row.getCell(2).value || '').trim();
-      const contactName = String(row.getCell(4).value || '').trim();
+      // Helper to extract string from possible ExcelJS formula cell {formula, result}
+      const getStr = (val: any): string => {
+        if (val === null || val === undefined) return '';
+        if (typeof val === 'object' && val.result !== undefined) return String(val.result);
+        return String(val);
+      };
+
+      const province = getStr(row.getCell(1).value).trim();
+      const status = getStr(row.getCell(2).value).trim();
+      const contactName = getStr(row.getCell(4).value).trim();
       const contactPhoneRaw = row.getCell(5).value;
 
       if (status === 'Ngừng HĐ' || !contactPhoneRaw) return;
 
-      const phones = String(contactPhoneRaw)
+      const phones = getStr(contactPhoneRaw)
         .split(/[\n,;/\\&]+/)
         .map(p => normalizePhone(p.trim()))
         .filter(p => p.length > 0);
@@ -130,7 +137,7 @@ async function loadStationRates(): Promise<Map<string, any>> {
         return isNaN(num) ? 0 : num;
       };
 
-      const notes = String(row.getCell(30).value || row.getCell(29).value || '').trim();
+      const notes = (getStr(row.getCell(30).value) || getStr(row.getCell(29).value) || '').trim();
       let kmRate = getNum(row.getCell(29).value) || getNum(row.getCell(28).value) || 3000;
       let freeKmThreshold = 20;
       let noDistanceCost = false;
