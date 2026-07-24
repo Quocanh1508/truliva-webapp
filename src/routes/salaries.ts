@@ -39,17 +39,18 @@ function getRateType(workType: string | null | undefined): 'giaoHang' | 'baoHanh
   return 'baoHanh';
 }
 
-// Flat rates for internal KTVs based on Word document rules
-function getKtvFlatRate(workType: string | null | undefined): number {
+// Official Truliva KTV rates (from Quy định tính lương Kỹ thuật viên Máy lọc nước Truliva.docx)
+function getOfficialTrulivaBaseRate(workType: string | null | undefined): number {
   if (!workType) return 60000;
   const normalized = workType.toLowerCase().trim();
+
   if (normalized.includes('tháo máy & lắp đặt lại') || normalized.includes('tháo máy và lắp đặt lại')) {
     return 160000;
   }
-  if (normalized.includes('giao hàng và lắp đặt') || normalized.includes('giao_hang_lap_dat')) {
+  if (normalized.includes('giao hàng và lắp đặt') || normalized.includes('giao_hang_lap_dat') || normalized.includes('giao lắp')) {
     return 120000;
   }
-  if (normalized.includes('lắp đặt') || normalized.includes('lap_dat') || normalized.includes('lắp đặt lại')) {
+  if (normalized.includes('lắp đặt') || normalized.includes('lap_dat') || normalized.includes('lắp mới') || normalized.includes('lắp lại')) {
     return 100000;
   }
   if (normalized.includes('bảo hành') || normalized.includes('sửa chữa') || normalized.includes('tháo máy')) {
@@ -64,32 +65,56 @@ function getKtvFlatRate(workType: string | null | undefined): number {
   return 60000;
 }
 
-// Load Station rates from the Excel spreadsheet
+// Flat rates for unlisted external KTVs
+function getKtvFlatRate(workType: string | null | undefined): number {
+  if (!workType) return 120000;
+  const normalized = workType.toLowerCase().trim();
+  if (normalized.includes('giao hàng và lắp đặt') || normalized.includes('giao_hang_lap_dat') || normalized.includes('giao lắp')) {
+    return 120000;
+  }
+  if (normalized.includes('lắp đặt') || normalized.includes('lap_dat')) {
+    return 120000;
+  }
+  if (normalized.includes('bảo hành') || normalized.includes('sửa chữa')) {
+    return 120000;
+  }
+  if (normalized.includes('thay lọc') || normalized.includes('thay_loc') || normalized.includes('thay lõi')) {
+    return 120000;
+  }
+  if (normalized.includes('giao hàng') || normalized.includes('giao_hang')) {
+    return 0;
+  }
+  return 120000;
+}
+
+// Load Station rates from Excel spreadsheet ("cơ cấu tính lương.xlsx")
 async function loadStationRates(): Promise<Map<string, any>> {
   const ratesMap = new Map<string, any>();
   try {
+    const fs = require('fs');
     const workbook = new ExcelJS.Workbook();
-    const filePath = path.join(process.cwd(), 'SalaryDoc', 'Cơ cấu tính chi phí Trạm KT_KTV Truliva.xlsx');
-    await workbook.xlsx.readFile(filePath);
+    let filePath = path.join(process.cwd(), 'SalaryDoc', 'cơ cấu tính lương.xlsx');
+    if (!fs.existsSync(filePath)) {
+      filePath = path.join(process.cwd(), 'SalaryDoc', 'Cơ cấu tính chi phí Trạm KT_KTV Truliva.xlsx');
+    }
     
-    const sheet = workbook.getWorksheet('Trang tính1');
+    await workbook.xlsx.readFile(filePath);
+    const sheet = workbook.worksheets[0];
     if (!sheet) {
-      logger.warn('Worksheet "Trang tính1" not found in Excel file');
+      logger.warn('Worksheet not found in Excel file');
       return ratesMap;
     }
 
-    // Headers are on Row 3, data starts from Row 4
     sheet.eachRow((row, rowNumber) => {
       if (rowNumber < 4) return;
 
-      const stationName = row.getCell(3).value;
-      const contactName = row.getCell(4).value;
+      const province = String(row.getCell(1).value || '').trim();
+      const status = String(row.getCell(2).value || '').trim();
+      const contactName = String(row.getCell(4).value || '').trim();
       const contactPhoneRaw = row.getCell(5).value;
-      const role = row.getCell(16).value;
 
-      if (!contactPhoneRaw) return;
+      if (status === 'Ngừng HĐ' || !contactPhoneRaw) return;
 
-      // Extract and normalize each phone number in the contact cell
       const phones = String(contactPhoneRaw)
         .split(/[\n,;/\\&]+/)
         .map(p => normalizePhone(p.trim()))
@@ -101,25 +126,41 @@ async function loadStationRates(): Promise<Map<string, any>> {
         return isNaN(num) ? 0 : num;
       };
 
+      const notes = String(row.getCell(30).value || row.getCell(29).value || '').trim();
+      let kmRate = getNum(row.getCell(29).value) || getNum(row.getCell(28).value) || 3000;
+      let freeKmThreshold = 20;
+      let noDistanceCost = false;
+
+      // Special Rules from Notes / Phone Number
+      if (phones.includes('913092258')) {
+        // Nguyễn Văn Thế (Quảng Trị): >40km, 4000đ/km
+        freeKmThreshold = 40;
+        kmRate = 4000;
+      } else if (phones.includes('949601622')) {
+        // Lưu Đức Thắng: >20km, 4000đ/km
+        freeKmThreshold = 20;
+        kmRate = 4000;
+      } else if (notes.toLowerCase().includes('không khoảng cách')) {
+        noDistanceCost = true;
+      }
+
+      const isOfficialTruliva = phones.includes('392110073') || contactName.includes('Thuận');
+
       const rateInfo = {
-        stationName: String(stationName || ''),
-        contactName: String(contactName || ''),
-        role: String(role || ''),
-        weekdayRates: {
+        province,
+        contactName,
+        isOfficialTruliva,
+        rates: {
           giaoHang: getNum(row.getCell(17).value),
           baoHanh: getNum(row.getCell(18).value),
           thayLoc: getNum(row.getCell(19).value),
           lapDat: getNum(row.getCell(20).value),
           giaoHangLapDat: getNum(row.getCell(21).value),
         },
-        sundayRates: {
-          giaoHang: getNum(row.getCell(22).value),
-          baoHanh: getNum(row.getCell(23).value),
-          thayLoc: getNum(row.getCell(24).value),
-          lapDat: getNum(row.getCell(25).value),
-          giaoHangLapDat: getNum(row.getCell(26).value),
-        },
-        kmRate: getNum(row.getCell(28).value) || 3000,
+        kmRate,
+        freeKmThreshold,
+        noDistanceCost,
+        notes
       };
 
       for (const phone of phones) {
@@ -130,6 +171,69 @@ async function loadStationRates(): Promise<Map<string, any>> {
     logger.error('Failed to load station rates from Excel', { error: error.message });
   }
   return ratesMap;
+}
+
+// Single source of truth calculation helper for a single service report
+function calculateReportCost(report: any, ktvPhoneNorm: string, stationRate: any) {
+  let baseCost = 0;
+  let distanceCost = 0;
+  const workType = report.workType || report.order?.workType || 'Bảo hành';
+  const notes = (report.notes || report.order?.note || '').toLowerCase();
+  
+  const isOfficialTrulivaKtv = ktvPhoneNorm === '392110073' || (stationRate && stationRate.isOfficialTruliva);
+
+  if (report.customBaseCost !== null && report.customBaseCost !== undefined) {
+    baseCost = report.customBaseCost;
+  } else if (isOfficialTrulivaKtv) {
+    baseCost = getOfficialTrulivaBaseRate(workType);
+    if (notes.includes('hoàn thành') || notes.includes('tăng ca')) {
+      baseCost += 100000;
+    }
+  } else if (stationRate) {
+    const rateType = getRateType(workType);
+    if (stationRate.province === 'TP.HCM' && rateType === 'giaoHangLapDat' && notes.includes('giao lắp')) {
+      baseCost = 250000;
+    } else {
+      const specificRate = stationRate.rates[rateType];
+      baseCost = (specificRate !== undefined && specificRate !== null && specificRate > 0) 
+        ? specificRate 
+        : getKtvFlatRate(workType);
+    }
+  } else {
+    baseCost = getKtvFlatRate(workType);
+  }
+
+  // Distance Allowance
+  const distance = report.distanceKm ?? 0;
+  
+  if (isOfficialTrulivaKtv) {
+    if (distance > 20) {
+      distanceCost = (distance - 20) * 3000;
+    }
+  } else if (stationRate) {
+    if (stationRate.noDistanceCost) {
+      distanceCost = 0;
+    } else {
+      const threshold = stationRate.freeKmThreshold || 20;
+      const kmRate = stationRate.kmRate || 3000;
+      if (distance > threshold) {
+        distanceCost = (distance - threshold) * kmRate;
+      }
+    }
+  } else {
+    if (distance > 20) {
+      distanceCost = (distance - 20) * 3000;
+    }
+  }
+
+  return {
+    workType,
+    rateType: getRateType(workType),
+    baseCost,
+    distance,
+    distanceCost,
+    totalCost: baseCost + distanceCost
+  };
 }
 
 /**
@@ -191,32 +295,10 @@ router.get('/calculate', requireAuth, requireAdmin, async (req: Request, res: Re
       const reportsDetail = [];
 
       for (const report of reports) {
-        let baseCost = 0;
-        let distanceCost = 0;
-        const workType = report.workType || report.order?.workType || 'Bảo hành';
-        
-        // a. Base Rate Calculation
+        const costResult = calculateReportCost(report, ktvPhoneNorm, stationRate);
         const isSunday = new Date(report.createdAt).getDay() === 0;
-        if (report.customBaseCost !== null && report.customBaseCost !== undefined) {
-          baseCost = report.customBaseCost;
-        } else if (isStationPaid) {
-          const rateType = getRateType(workType);
-          baseCost = isSunday
-            ? stationRate.sundayRates[rateType]
-            : stationRate.weekdayRates[rateType];
-        } else {
-          baseCost = getKtvFlatRate(workType);
-        }
 
-        // b. Distance Allowance (>20km)
-        const distance = report.distanceKm ?? 0;
-        if (distance > 20) {
-          const kmRate = isStationPaid ? stationRate.kmRate : 3000;
-          distanceCost = (distance - 20) * kmRate;
-        }
-
-        const totalCost = baseCost + distanceCost;
-        calculatedCost += totalCost;
+        calculatedCost += costResult.totalCost;
 
         reportsDetail.push({
           reportId: report.id,
@@ -227,18 +309,18 @@ router.get('/calculate', requireAuth, requireAdmin, async (req: Request, res: Re
           province: report.province || '',
           address: report.address || '',
           notes: report.notes || report.order?.note || '',
-          workType,
+          workType: costResult.workType,
           isSunday,
-          baseCost,
-          distance,
-          distanceCost,
-          totalCost,
-          rateType: getRateType(workType),
-          baoHanhCost: getRateType(workType) === 'baoHanh' ? baseCost : 0,
-          giaoHangCost: getRateType(workType) === 'giaoHang' ? baseCost : 0,
-          lapDatCost: getRateType(workType) === 'lapDat' ? baseCost : 0,
-          giaoLapCost: getRateType(workType) === 'giaoHangLapDat' ? baseCost : 0,
-          thayLocCost: getRateType(workType) === 'thayLoc' ? baseCost : 0,
+          baseCost: costResult.baseCost,
+          distance: costResult.distance,
+          distanceCost: costResult.distanceCost,
+          totalCost: costResult.totalCost,
+          rateType: costResult.rateType,
+          baoHanhCost: costResult.rateType === 'baoHanh' ? costResult.baseCost : 0,
+          giaoHangCost: costResult.rateType === 'giaoHang' ? costResult.baseCost : 0,
+          lapDatCost: costResult.rateType === 'lapDat' ? costResult.baseCost : 0,
+          giaoLapCost: costResult.rateType === 'giaoHangLapDat' ? costResult.baseCost : 0,
+          thayLocCost: costResult.rateType === 'thayLoc' ? costResult.baseCost : 0,
           createdAt: report.createdAt,
           appointmentTime: report.order?.appointmentTime,
           ktvCalledAt: report.order?.ktvCalledAt,
@@ -495,29 +577,8 @@ router.get('/export', requireAuth, requireAdmin, async (req: Request, res: Respo
       let calculatedCost = 0;
 
       for (const report of reports) {
-        let baseCost = 0;
-        let distanceCost = 0;
-        const workType = report.workType || report.order?.workType || 'Bảo hành';
-        
-        const isSunday = new Date(report.createdAt).getDay() === 0;
-        if (report.customBaseCost !== null && report.customBaseCost !== undefined) {
-          baseCost = report.customBaseCost;
-        } else if (isStationPaid) {
-          const rateType = getRateType(workType);
-          baseCost = isSunday
-            ? stationRate.sundayRates[rateType]
-            : stationRate.weekdayRates[rateType];
-        } else {
-          baseCost = getKtvFlatRate(workType);
-        }
-
-        const distance = report.distanceKm ?? 0;
-        if (distance > 20) {
-          const kmRate = isStationPaid ? stationRate.kmRate : 3000;
-          distanceCost = (distance - 20) * kmRate;
-        }
-
-        calculatedCost += (baseCost + distanceCost);
+        const costResult = calculateReportCost(report, ktvPhoneNorm, stationRate);
+        calculatedCost += costResult.totalCost;
       }
 
       const saved = savedMap.get(ktv.id);
@@ -706,32 +767,16 @@ router.get('/export', requireAuth, requireAdmin, async (req: Request, res: Respo
     let sumTotalCost = 0;
 
     for (const r of reports) {
-      const workType = r.workType || r.order?.workType || 'Bảo hành';
-      const isSunday = new Date(r.createdAt).getDay() === 0;
-      
       const ktvPhoneNorm = normalizePhone(r.ktvUser?.phoneNumber);
       const stationRate = ktvPhoneNorm ? stationRates.get(ktvPhoneNorm) : null;
-      const isStationPaid = !!stationRate;
+      const costResult = calculateReportCost(r, ktvPhoneNorm, stationRate);
 
-      let baseCost = 0;
-      if (r.customBaseCost !== null && r.customBaseCost !== undefined) {
-        baseCost = r.customBaseCost;
-      } else if (isStationPaid) {
-        const rateType = getRateType(workType);
-        baseCost = isSunday ? stationRate.sundayRates[rateType] : stationRate.weekdayRates[rateType];
-      } else {
-        baseCost = getKtvFlatRate(workType);
-      }
-
-      let distanceCost = 0;
-      const distance = r.distanceKm ?? 0;
-      if (distance > 20) {
-        const kmRate = isStationPaid ? stationRate.kmRate : 3000;
-        distanceCost = (distance - 20) * kmRate;
-      }
-
-      const totalCost = baseCost + distanceCost;
-      const rateType = getRateType(workType);
+      const workType = costResult.workType;
+      const baseCost = costResult.baseCost;
+      const distance = costResult.distance;
+      const distanceCost = costResult.distanceCost;
+      const totalCost = costResult.totalCost;
+      const rateType = costResult.rateType;
 
       // Accumulate totals
       if (rateType === 'baoHanh') sumBaoHanh += baseCost;
