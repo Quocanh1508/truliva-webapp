@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import LuckyWheelModal from '../../components/LuckyWheelModal';
 import NewsDetailModal from '../../components/NewsDetailModal';
+import { openPhone, openWebview } from 'zmp-sdk/apis';
 
 interface CustomerHomeProps {
   user: any;
@@ -100,7 +101,6 @@ export default function CustomerHome({ user, onOpenScanner, onOpenWarranty }: Cu
   const handleArticleClick = async (news: any) => {
     if (news.url && news.url !== 'https://zalo.me' && !news.url.includes('example')) {
       try {
-        const { openWebview } = await import('zmp-sdk/apis');
         await openWebview({ url: news.url });
         return;
       } catch (err) {
@@ -186,7 +186,6 @@ export default function CustomerHome({ user, onOpenScanner, onOpenWarranty }: Cu
           <button 
             onClick={async () => {
               try {
-                const { openPhone } = await import('zmp-sdk/apis');
                 await openPhone({ phoneNumber: '1900638463' });
               } catch (err) {
                 window.location.href = 'tel:1900638463';
