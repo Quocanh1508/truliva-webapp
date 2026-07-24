@@ -223,12 +223,22 @@ router.get('/calculate', requireAuth, requireAdmin, async (req: Request, res: Re
           orderId: report.orderId,
           pancakeOrderId: report.order?.pancakeOrderId,
           customerName: report.customerName,
+          customerPhone: report.customerPhone || report.order?.billPhoneNumber || '',
+          province: report.province || '',
+          address: report.address || '',
+          notes: report.notes || report.order?.note || '',
           workType,
           isSunday,
           baseCost,
           distance,
           distanceCost,
           totalCost,
+          rateType: getRateType(workType),
+          baoHanhCost: getRateType(workType) === 'baoHanh' ? baseCost : 0,
+          giaoHangCost: getRateType(workType) === 'giaoHang' ? baseCost : 0,
+          lapDatCost: getRateType(workType) === 'lapDat' ? baseCost : 0,
+          giaoLapCost: getRateType(workType) === 'giaoHangLapDat' ? baseCost : 0,
+          thayLocCost: getRateType(workType) === 'thayLoc' ? baseCost : 0,
           createdAt: report.createdAt,
           appointmentTime: report.order?.appointmentTime,
           ktvCalledAt: report.order?.ktvCalledAt,
@@ -377,14 +387,25 @@ router.post('/update-base-cost', requireAuth, requireAdmin, async (req: Request,
 router.get('/export', requireAuth, requireAdmin, async (req: Request, res: Response): Promise<void> => {
   try {
     const month = req.query.month as string;
+    const ktvId = req.query.ktvId as string | undefined;
+    const stationId = req.query.stationId as string | undefined;
+    const workTypeFilter = req.query.workType as string | undefined;
+
     if (!month || !/^\d{2}\/\d{4}$/.test(month)) {
       res.status(400).json({ error: 'Định dạng tháng không hợp lệ (MM/YYYY)' });
       return;
     }
 
+    const formattedMonth = month.startsWith('0') ? `${Number(month.substring(0, 2))}/${month.substring(3)}` : month;
+
     // 1. Load active KTVs
     const ktvs = await prisma.user.findMany({
-      where: { role: 'KTV', isActive: true },
+      where: {
+        role: 'KTV',
+        isActive: true,
+        ...(ktvId ? { id: ktvId } : {}),
+        ...(stationId ? { techStationId: stationId } : {})
+      },
       select: {
         id: true,
         fullName: true,
@@ -403,68 +424,287 @@ router.get('/export', requireAuth, requireAdmin, async (req: Request, res: Respo
     const savedMap = new Map(savedRecords.map(r => [r.userId, r]));
 
     const workbook = new ExcelJS.Workbook();
-    const worksheet = workbook.addWorksheet(`Thù lao ${month.replace('/', '-')}`);
 
-    // Columns config
-    worksheet.columns = [
-      { header: 'STT', key: 'stt', width: 6 },
-      { header: 'Tên KTV / Trạm', key: 'fullName', width: 25 },
-      { header: 'Số điện thoại', key: 'phone', width: 15 },
-      { header: 'Trạm quản lý', key: 'station', width: 20 },
-      { header: 'Số ca', key: 'casesCount', width: 10 },
-      { header: 'Thù lao tự động (VND)', key: 'calculated', width: 22 },
-      { header: 'Thực nhận (VND)', key: 'adjusted', width: 22 },
-      { header: 'Ghi chú điều chỉnh', key: 'note', width: 35 },
-      { header: 'Trạng thái', key: 'status', width: 15 }
-    ];
+    // ==========================================
+    // SHEET 1: TỔNG HỢP THÙ LAO KTV
+    // ==========================================
+    const wsSummary = workbook.addWorksheet('Tong_Hop_KTV');
 
-    // Style headers
-    worksheet.getRow(1).font = { bold: true, color: { argb: 'FFFFFFFF' } };
-    worksheet.getRow(1).fill = {
+    // Title Block
+    wsSummary.addRow(['CÔNG TY TNHH THƯƠNG MẠI VÀ DỊCH VỤ PURE VITA']);
+    wsSummary.addRow(['Nhãn hàng Máy lọc nước Truliva']);
+    wsSummary.addRow([`BẢNG TỔNG HỢP CHI PHÍ VẬN HÀNH THÙ LAO KTV - THÁNG ${month}`]);
+    wsSummary.addRow([]); // Blank line
+
+    wsSummary.getRow(1).font = { size: 13, bold: true, color: { argb: 'FF1B3A6B' } };
+    wsSummary.getRow(2).font = { size: 10, italic: true, color: { argb: 'FF4B5563' } };
+    wsSummary.getRow(3).font = { size: 14, bold: true, color: { argb: 'FF1B3A6B' } };
+
+    // Columns config for Sheet 1
+    const summaryHeaders = ['STT', 'Tên KTV', 'Số điện thoại', 'Trạm quản lý', 'Số ca hoàn thành', 'Thù lao tự động (VND)', 'Thực nhận (VND)', 'Ghi chú điều chỉnh', 'Trạng thái'];
+    const summaryHeaderRow = wsSummary.addRow(summaryHeaders);
+    summaryHeaderRow.font = { bold: true, color: { argb: 'FFFFFFFF' } };
+    summaryHeaderRow.fill = {
       type: 'pattern',
       pattern: 'solid',
-      fgColor: { argb: 'FF1B3A6B' } // Truliva navy blue
+      fgColor: { argb: 'FF1B3A6B' } // Truliva Navy
     };
+    summaryHeaderRow.alignment = { vertical: 'middle', horizontal: 'center' };
 
-    let idx = 1;
+    let summaryIdx = 1;
+    let sumTotalCases = 0;
+    let sumCalculated = 0;
+    let sumAdjusted = 0;
+
     for (const ktv of ktvs) {
       const reportsCount = await prisma.serviceReport.count({
         where: {
           ktvUserId: ktv.id,
-          month: month.startsWith('0') ? `${Number(month.substring(0, 2))}/${month.substring(3)}` : month,
+          month: formattedMonth,
           approvalStatus: 'APPROVED'
         }
       });
 
       const saved = savedMap.get(ktv.id);
-
       const calculated = saved ? saved.calculatedCost : 0;
       const adjusted = saved ? saved.adjustedCost : 0;
       const note = saved ? saved.adjustmentNote : '';
       const status = saved ? (saved.status === 'FINAL' ? 'Đã chốt' : 'Nháp') : 'Chưa lưu';
 
-      worksheet.addRow({
-        stt: idx++,
-        fullName: ktv.fullName,
-        phone: ktv.phoneNumber || '',
-        station: ktv.techStation?.name || '',
-        casesCount: reportsCount,
+      sumTotalCases += reportsCount;
+      sumCalculated += calculated;
+      sumAdjusted += adjusted;
+
+      const row = wsSummary.addRow([
+        summaryIdx++,
+        ktv.fullName,
+        ktv.phoneNumber || '',
+        ktv.techStation?.name || '',
+        reportsCount,
         calculated,
         adjusted,
         note,
         status
-      });
+      ]);
+
+      row.getCell(1).alignment = { horizontal: 'center' };
+      row.getCell(5).alignment = { horizontal: 'center' };
+      row.getCell(6).numFmt = '#,##0';
+      row.getCell(7).numFmt = '#,##0';
+      row.getCell(9).alignment = { horizontal: 'center' };
     }
 
-    // Number format for currency columns
-    worksheet.eachRow((row, rowNumber) => {
-      if (rowNumber === 1) return;
-      row.getCell('calculated').numFmt = '#,##0';
-      row.getCell('adjusted').numFmt = '#,##0';
-      // Center alignment for code and counts
-      row.getCell('stt').alignment = { horizontal: 'center' };
-      row.getCell('casesCount').alignment = { horizontal: 'center' };
-      row.getCell('status').alignment = { horizontal: 'center' };
+    // Total Row Sheet 1
+    const totalRowSheet1 = wsSummary.addRow([
+      'TỔNG CỘNG',
+      '',
+      '',
+      '',
+      sumTotalCases,
+      sumCalculated,
+      sumAdjusted,
+      '',
+      ''
+    ]);
+    wsSummary.mergeCells(`A${totalRowSheet1.number}:D${totalRowSheet1.number}`);
+    totalRowSheet1.font = { bold: true };
+    totalRowSheet1.getCell(1).alignment = { horizontal: 'center' };
+    totalRowSheet1.getCell(5).alignment = { horizontal: 'center' };
+    totalRowSheet1.getCell(6).numFmt = '#,##0';
+    totalRowSheet1.getCell(7).numFmt = '#,##0';
+    totalRowSheet1.fill = {
+      type: 'pattern',
+      pattern: 'solid',
+      fgColor: { argb: 'FFE2E8F0' }
+    };
+
+    // Auto Column Widths Sheet 1
+    [8, 25, 16, 22, 16, 22, 22, 35, 15].forEach((w, i) => {
+      wsSummary.getColumn(i + 1).width = w;
+    });
+
+    // ==========================================
+    // SHEET 2: CHI TIẾT CA DỊCH VỤ (KTV / TRẠM)
+    // ==========================================
+    const wsDetail = workbook.addWorksheet('Chi_Tiet_Ca_Dich_Vu');
+
+    // Title Block Sheet 2
+    wsDetail.addRow(['CÔNG TY TNHH THƯƠNG MẠI VÀ DỊCH VỤ PURE VITA']);
+    wsDetail.addRow(['Nhãn hàng Máy lọc nước Truliva']);
+    wsDetail.addRow([`BẢNG TỔNG HỢP CHI PHÍ CA DỊCH VỤ CHI TIẾT - THÁNG ${month}`]);
+    wsDetail.addRow([]); // Blank line
+
+    wsDetail.getRow(1).font = { size: 13, bold: true, color: { argb: 'FF1B3A6B' } };
+    wsDetail.getRow(2).font = { size: 10, italic: true, color: { argb: 'FF4B5563' } };
+    wsDetail.getRow(3).font = { size: 14, bold: true, color: { argb: 'FF1B3A6B' } };
+
+    const detailHeaders = [
+      'STT',
+      'Ngày hoàn thành',
+      'KTV',
+      'Trạm',
+      'Tên KH',
+      'SĐT KH',
+      'Tỉnh/TP',
+      'Sản phẩm',
+      'Loại dịch vụ',
+      'Ghi chú',
+      'Khoảng cách (km)',
+      'Bảo Hành',
+      'Giao hàng',
+      'Lắp đặt',
+      'Giao lắp',
+      'Thay lọc',
+      'Phí KC',
+      'Khác',
+      'Tổng'
+    ];
+
+    const detailHeaderRow = wsDetail.addRow(detailHeaders);
+    detailHeaderRow.font = { bold: true, color: { argb: 'FFFFFFFF' } };
+    detailHeaderRow.fill = {
+      type: 'pattern',
+      pattern: 'solid',
+      fgColor: { argb: 'FF1B3A6B' }
+    };
+    detailHeaderRow.alignment = { vertical: 'middle', horizontal: 'center' };
+
+    // Fetch all approved reports for the month
+    const reports = await prisma.serviceReport.findMany({
+      where: {
+        month: formattedMonth,
+        approvalStatus: 'APPROVED',
+        ...(ktvId ? { ktvUserId: ktvId } : {}),
+        ...(stationId ? { ktvUser: { techStationId: stationId } } : {}),
+        ...(workTypeFilter ? {
+          OR: [
+            { workType: { contains: workTypeFilter, mode: 'insensitive' } },
+            { serviceType: { contains: workTypeFilter, mode: 'insensitive' } }
+          ]
+        } : {})
+      },
+      include: {
+        ktvUser: {
+          select: {
+            fullName: true,
+            phoneNumber: true,
+            techStation: { select: { name: true } }
+          }
+        },
+        order: true
+      },
+      orderBy: { createdAt: 'asc' }
+    });
+
+    let detailIdx = 1;
+    const startDataRow = 6;
+
+    for (const r of reports) {
+      const workType = r.workType || r.order?.workType || 'Bảo hành';
+      const isSunday = new Date(r.createdAt).getDay() === 0;
+      
+      const ktvPhoneNorm = normalizePhone(r.ktvUser?.phoneNumber);
+      const stationRate = ktvPhoneNorm ? stationRates.get(ktvPhoneNorm) : null;
+      const isStationPaid = !!stationRate;
+
+      let baseCost = 0;
+      if (r.customBaseCost !== null && r.customBaseCost !== undefined) {
+        baseCost = r.customBaseCost;
+      } else if (isStationPaid) {
+        const rateType = getRateType(workType);
+        baseCost = isSunday ? stationRate.sundayRates[rateType] : stationRate.weekdayRates[rateType];
+      } else {
+        baseCost = getKtvFlatRate(workType);
+      }
+
+      let distanceCost = 0;
+      const distance = r.distanceKm ?? 0;
+      if (distance > 20) {
+        const kmRate = isStationPaid ? stationRate.kmRate : 3000;
+        distanceCost = (distance - 20) * kmRate;
+      }
+
+      const totalCost = baseCost + distanceCost;
+      const rateType = getRateType(workType);
+
+      // Format date: DD/MM/YYYY HH:mm
+      const d = new Date(r.createdAt);
+      const formattedDate = `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+
+      const row = wsDetail.addRow([
+        detailIdx++,
+        formattedDate,
+        r.ktvUser?.fullName || '',
+        r.ktvUser?.techStation?.name || '',
+        r.customerName || '',
+        r.customerPhone || '',
+        r.province || '',
+        (r.products || []).join(', '),
+        workType,
+        r.notes || '',
+        distance > 0 ? distance : '-',
+        rateType === 'baoHanh' ? baseCost : '-',
+        rateType === 'giaoHang' ? baseCost : '-',
+        rateType === 'lapDat' ? baseCost : '-',
+        rateType === 'giaoHangLapDat' ? baseCost : '-',
+        rateType === 'thayLoc' ? baseCost : '-',
+        distanceCost > 0 ? distanceCost : '-',
+        '-',
+        totalCost
+      ]);
+
+      // Alignments & Number formats
+      row.getCell(1).alignment = { horizontal: 'center' };
+      row.getCell(2).alignment = { horizontal: 'center' };
+      row.getCell(6).alignment = { horizontal: 'center' };
+      row.getCell(11).alignment = { horizontal: 'right' };
+
+      // Currency columns L to S (index 12 to 19)
+      for (let c = 12; c <= 19; c++) {
+        const cell = row.getCell(c);
+        if (typeof cell.value === 'number') {
+          cell.numFmt = '#,##0';
+        } else {
+          cell.alignment = { horizontal: 'center' };
+        }
+      }
+    }
+
+    const lastDataRow = startDataRow + reports.length - 1;
+
+    // Total Row Sheet 2
+    if (reports.length > 0) {
+      const totalRowSheet2 = wsDetail.addRow([
+        'TỔNG CỘNG',
+        '', '', '', '', '', '', '', '', '', '',
+        { formula: `SUM(L${startDataRow}:L${lastDataRow})` },
+        { formula: `SUM(M${startDataRow}:M${lastDataRow})` },
+        { formula: `SUM(N${startDataRow}:N${lastDataRow})` },
+        { formula: `SUM(O${startDataRow}:O${lastDataRow})` },
+        { formula: `SUM(P${startDataRow}:P${lastDataRow})` },
+        { formula: `SUM(Q${startDataRow}:Q${lastDataRow})` },
+        { formula: `SUM(R${startDataRow}:R${lastDataRow})` },
+        { formula: `SUM(S${startDataRow}:S${lastDataRow})` }
+      ]);
+
+      wsDetail.mergeCells(`A${totalRowSheet2.number}:K${totalRowSheet2.number}`);
+      totalRowSheet2.font = { bold: true };
+      totalRowSheet2.getCell(1).alignment = { horizontal: 'center' };
+
+      for (let c = 12; c <= 19; c++) {
+        totalRowSheet2.getCell(c).numFmt = '#,##0';
+      }
+
+      totalRowSheet2.fill = {
+        type: 'pattern',
+        pattern: 'solid',
+        fgColor: { argb: 'FFE2E8F0' }
+      };
+    }
+
+    // Auto Column Widths Sheet 2
+    [6, 18, 22, 20, 22, 15, 18, 30, 22, 30, 14, 15, 15, 15, 15, 15, 15, 15, 18].forEach((w, i) => {
+      wsDetail.getColumn(i + 1).width = w;
     });
 
     res.setHeader(
@@ -473,7 +713,7 @@ router.get('/export', requireAuth, requireAdmin, async (req: Request, res: Respo
     );
     res.setHeader(
       'Content-Disposition',
-      `attachment; filename=Bang_thu_lao_Truliva_${month.replace('/', '_')}.xlsx`
+      `attachment; filename=Bang_chi_phi_dich_vu_Truliva_${month.replace('/', '_')}.xlsx`
     );
 
     await workbook.xlsx.write(res);
