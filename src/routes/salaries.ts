@@ -615,6 +615,14 @@ router.get('/export', requireAuth, requireAdmin, async (req: Request, res: Respo
     let detailIdx = 1;
     const startDataRow = 6;
 
+    let sumBaoHanh = 0;
+    let sumGiaoHang = 0;
+    let sumLapDat = 0;
+    let sumGiaoLap = 0;
+    let sumThayLoc = 0;
+    let sumDistanceCost = 0;
+    let sumTotalCost = 0;
+
     for (const r of reports) {
       const workType = r.workType || r.order?.workType || 'Bảo hành';
       const isSunday = new Date(r.createdAt).getDay() === 0;
@@ -642,6 +650,15 @@ router.get('/export', requireAuth, requireAdmin, async (req: Request, res: Respo
 
       const totalCost = baseCost + distanceCost;
       const rateType = getRateType(workType);
+
+      // Accumulate totals
+      if (rateType === 'baoHanh') sumBaoHanh += baseCost;
+      if (rateType === 'giaoHang') sumGiaoHang += baseCost;
+      if (rateType === 'lapDat') sumLapDat += baseCost;
+      if (rateType === 'giaoHangLapDat') sumGiaoLap += baseCost;
+      if (rateType === 'thayLoc') sumThayLoc += baseCost;
+      sumDistanceCost += distanceCost;
+      sumTotalCost += totalCost;
 
       // Format date: DD/MM/YYYY HH:mm
       const d = new Date(r.createdAt);
@@ -693,14 +710,14 @@ router.get('/export', requireAuth, requireAdmin, async (req: Request, res: Respo
       const totalRowSheet2 = wsDetail.addRow([
         'TỔNG CỘNG',
         '', '', '', '', '', '', '', '', '', '',
-        { formula: `SUM(L${startDataRow}:L${lastDataRow})` },
-        { formula: `SUM(M${startDataRow}:M${lastDataRow})` },
-        { formula: `SUM(N${startDataRow}:N${lastDataRow})` },
-        { formula: `SUM(O${startDataRow}:O${lastDataRow})` },
-        { formula: `SUM(P${startDataRow}:P${lastDataRow})` },
-        { formula: `SUM(Q${startDataRow}:Q${lastDataRow})` },
-        { formula: `SUM(R${startDataRow}:R${lastDataRow})` },
-        { formula: `SUM(S${startDataRow}:S${lastDataRow})` }
+        { formula: `SUM(L${startDataRow}:L${lastDataRow})`, result: sumBaoHanh },
+        { formula: `SUM(M${startDataRow}:M${lastDataRow})`, result: sumGiaoHang },
+        { formula: `SUM(N${startDataRow}:N${lastDataRow})`, result: sumLapDat },
+        { formula: `SUM(O${startDataRow}:O${lastDataRow})`, result: sumGiaoLap },
+        { formula: `SUM(P${startDataRow}:P${lastDataRow})`, result: sumThayLoc },
+        { formula: `SUM(Q${startDataRow}:Q${lastDataRow})`, result: sumDistanceCost },
+        { formula: `SUM(R${startDataRow}:R${lastDataRow})`, result: 0 },
+        { formula: `SUM(S${startDataRow}:S${lastDataRow})`, result: sumTotalCost }
       ]);
 
       wsDetail.mergeCells(`A${totalRowSheet2.number}:K${totalRowSheet2.number}`);

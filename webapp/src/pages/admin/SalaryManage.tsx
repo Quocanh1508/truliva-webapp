@@ -822,6 +822,34 @@ export default function SalaryManage() {
                     );
                   })}
                 </tbody>
+                <tfoot className="bg-slate-100 font-extrabold border-t-2 border-slate-300 text-xs">
+                  <tr>
+                    <td colSpan={11} className="px-3 py-3 text-center text-slate-800 uppercase tracking-wider font-extrabold">
+                      TỔNG CỘNG ({filteredCases.length} CA DỊCH VỤ)
+                    </td>
+                    <td className="px-3 py-3 text-right text-blue-900 font-extrabold bg-blue-100/50">
+                      {formatMoney(filteredCases.reduce((acc, c) => acc + (c.baoHanhCost || 0), 0))}
+                    </td>
+                    <td className="px-3 py-3 text-right text-blue-900 font-extrabold bg-blue-100/50">
+                      {formatMoney(filteredCases.reduce((acc, c) => acc + (c.giaoHangCost || 0), 0))}
+                    </td>
+                    <td className="px-3 py-3 text-right text-blue-900 font-extrabold bg-blue-100/50">
+                      {formatMoney(filteredCases.reduce((acc, c) => acc + (c.lapDatCost || 0), 0))}
+                    </td>
+                    <td className="px-3 py-3 text-right text-blue-900 font-extrabold bg-blue-100/50">
+                      {formatMoney(filteredCases.reduce((acc, c) => acc + (c.giaoLapCost || 0), 0))}
+                    </td>
+                    <td className="px-3 py-3 text-right text-blue-900 font-extrabold bg-blue-100/50">
+                      {formatMoney(filteredCases.reduce((acc, c) => acc + (c.thayLocCost || 0), 0))}
+                    </td>
+                    <td className="px-3 py-3 text-right text-amber-800 font-extrabold bg-amber-100/50">
+                      {formatMoney(filteredCases.reduce((acc, c) => acc + (c.distanceCost || 0), 0))}
+                    </td>
+                    <td className="px-3 py-3 text-right text-blue-950 font-black bg-blue-200 text-xs">
+                      {formatMoney(filteredCases.reduce((acc, c) => acc + c.totalCost, 0))}
+                    </td>
+                  </tr>
+                </tfoot>
               </table>
             </div>
           )}
