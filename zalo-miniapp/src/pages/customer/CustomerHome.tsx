@@ -253,17 +253,17 @@ export default function CustomerHome({ user, onOpenScanner, onOpenWarranty }: Cu
 
         {/* 2-Column Article Grid */}
         <div className="grid grid-cols-2 gap-3">
-          {articles.map((news) => (
+          {(Array.isArray(articles) ? articles : FEATURED_NEWS).map((news, idx) => (
             <div 
-              key={news.id}
+              key={news?.id || idx}
               onClick={() => handleArticleClick(news)}
               className="bg-white rounded-2xl overflow-hidden border border-slate-200/80 shadow-sm hover:shadow-md transition-shadow cursor-pointer flex flex-col justify-between"
             >
               {/* Thumbnail Image */}
               <div className="relative h-28 bg-slate-100 overflow-hidden">
                 <img 
-                  src={news.image} 
-                  alt={news.title} 
+                  src={news?.image || 'https://images.unsplash.com/photo-1548839140-29a749e1bc4e?w=500&auto=format&fit=crop&q=60'} 
+                  alt={news?.title || 'Tin tức Truliva'} 
                   className="w-full h-full object-cover hover:scale-105 transition-transform duration-300"
                 />
               </div>
@@ -271,14 +271,14 @@ export default function CustomerHome({ user, onOpenScanner, onOpenWarranty }: Cu
               {/* Card Content */}
               <div className="p-3 space-y-2 flex-1 flex flex-col justify-between">
                 <h3 className="font-bold text-xs text-slate-800 line-clamp-2 leading-snug">
-                  {news.title}
+                  {news?.title || 'Tin tức Truliva'}
                 </h3>
 
                 <div className="flex items-center justify-between text-[10px] text-slate-400 pt-1 border-t border-slate-100">
-                  <span className="truncate">{news.date ? String(news.date).split(',')[0] : ''}</span>
+                  <span className="truncate">{news?.date ? String(news.date).split(',')[0] : ''}</span>
                   <span className="flex items-center ml-1 flex-shrink-0">
                     <Eye size={10} className="mr-0.5" />
-                    {news.views || 0}
+                    {news?.views || 0}
                   </span>
                 </div>
               </div>

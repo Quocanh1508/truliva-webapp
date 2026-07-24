@@ -57,7 +57,7 @@ export default function CustomerProfile({ user, mySerials, onLogout, onOpenScann
           <div className="grid grid-cols-3 gap-2 bg-white/10 backdrop-blur-md rounded-2xl p-3 text-center border border-white/10 text-xs">
             <div>
               <p className="text-[10px] text-blue-200">Máy của tôi</p>
-              <p className="font-extrabold text-white text-sm mt-0.5">{mySerials.length}</p>
+              <p className="font-extrabold text-white text-sm mt-0.5">{(mySerials || []).length}</p>
             </div>
             <div className="border-x border-white/10">
               <p className="text-[10px] text-blue-200">Điểm thưởng</p>
@@ -77,7 +77,7 @@ export default function CustomerProfile({ user, mySerials, onLogout, onOpenScann
         <div className="space-y-2">
           <div className="flex justify-between items-center">
             <h2 className="text-xs font-extrabold text-slate-700 uppercase tracking-wider">
-              Máy lọc nước của tôi ({mySerials.length})
+              Máy lọc nước của tôi ({(mySerials || []).length})
             </h2>
             <button 
               onClick={onOpenScanner}
@@ -88,7 +88,7 @@ export default function CustomerProfile({ user, mySerials, onLogout, onOpenScann
             </button>
           </div>
 
-          {mySerials.length === 0 ? (
+          {!mySerials || mySerials.length === 0 ? (
             <div className="bg-white p-6 rounded-2xl text-center text-xs text-slate-400 border border-slate-200/80 shadow-sm space-y-2">
               <Droplets size={32} className="mx-auto text-slate-300" />
               <p>Bạn chưa liên kết máy lọc nước nào với tài khoản Zalo này.</p>
@@ -100,7 +100,7 @@ export default function CustomerProfile({ user, mySerials, onLogout, onOpenScann
               </button>
             </div>
           ) : (
-            mySerials.map((s) => (
+            (mySerials || []).map((s) => (
               <div key={s.id} className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm space-y-3">
                 <div className="flex justify-between items-start">
                   <div>
