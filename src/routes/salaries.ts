@@ -479,21 +479,54 @@ router.get('/export', requireAuth, requireAdmin, async (req: Request, res: Respo
     let sumAdjusted = 0;
 
     for (const ktv of ktvs) {
-      const reportsCount = await prisma.serviceReport.count({
+      const reports = await prisma.serviceReport.findMany({
         where: {
           ktvUserId: ktv.id,
           month: formattedMonth,
           approvalStatus: 'APPROVED'
-        }
+        },
+        include: { order: true }
       });
 
-      const saved = savedMap.get(ktv.id);
-      const calculated = saved ? saved.calculatedCost : 0;
-      const adjusted = saved ? saved.adjustedCost : 0;
-      const note = saved ? saved.adjustmentNote : '';
-      const status = saved ? (saved.status === 'FINAL' ? 'Đã chốt' : 'Nháp') : 'Chưa lưu';
+      const ktvPhoneNorm = normalizePhone(ktv.phoneNumber);
+      const stationRate = ktvPhoneNorm ? stationRates.get(ktvPhoneNorm) : null;
+      const isStationPaid = !!stationRate;
 
-      sumTotalCases += reportsCount;
+      let calculatedCost = 0;
+
+      for (const report of reports) {
+        let baseCost = 0;
+        let distanceCost = 0;
+        const workType = report.workType || report.order?.workType || 'Bảo hành';
+        
+        const isSunday = new Date(report.createdAt).getDay() === 0;
+        if (report.customBaseCost !== null && report.customBaseCost !== undefined) {
+          baseCost = report.customBaseCost;
+        } else if (isStationPaid) {
+          const rateType = getRateType(workType);
+          baseCost = isSunday
+            ? stationRate.sundayRates[rateType]
+            : stationRate.weekdayRates[rateType];
+        } else {
+          baseCost = getKtvFlatRate(workType);
+        }
+
+        const distance = report.distanceKm ?? 0;
+        if (distance > 20) {
+          const kmRate = isStationPaid ? stationRate.kmRate : 3000;
+          distanceCost = (distance - 20) * kmRate;
+        }
+
+        calculatedCost += (baseCost + distanceCost);
+      }
+
+      const saved = savedMap.get(ktv.id);
+      const calculated = calculatedCost;
+      const adjusted = saved ? saved.adjustedCost : calculatedCost;
+      const note = saved ? saved.adjustmentNote : '';
+      const status = saved ? (saved.status === 'FINAL' ? 'Đã chốt' : 'Nháp') : (reports.length > 0 ? 'Nháp' : 'Chưa lưu');
+
+      sumTotalCases += reports.length;
       sumCalculated += calculated;
       sumAdjusted += adjusted;
 
@@ -502,7 +535,7 @@ router.get('/export', requireAuth, requireAdmin, async (req: Request, res: Respo
         ktv.fullName,
         ktv.phoneNumber || '',
         ktv.techStation?.name || '',
-        reportsCount,
+        reports.length,
         calculated,
         adjusted,
         note,
