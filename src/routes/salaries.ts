@@ -518,9 +518,25 @@ router.get('/export', requireAuth, requireAdmin, async (req: Request, res: Respo
       fgColor: { argb: 'FFE2E8F0' }
     };
 
-    // Auto Column Widths Sheet 1
+    // Set AutoFilter and column widths Sheet 1
+    const summaryLastRow = 5 + ktvs.length;
+    wsSummary.autoFilter = `A5:I${summaryLastRow}`;
     [8, 25, 16, 22, 16, 22, 22, 35, 15].forEach((w, i) => {
       wsSummary.getColumn(i + 1).width = w;
+    });
+
+    // Style borders Sheet 1
+    wsSummary.eachRow((row, rowNumber) => {
+      if (rowNumber >= 5) {
+        row.eachCell((cell) => {
+          cell.border = {
+            top: { style: 'thin', color: { argb: 'FFCBD5E1' } },
+            left: { style: 'thin', color: { argb: 'FFCBD5E1' } },
+            bottom: { style: 'thin', color: { argb: 'FFCBD5E1' } },
+            right: { style: 'thin', color: { argb: 'FFCBD5E1' } }
+          };
+        });
+      }
     });
 
     // ==========================================
@@ -670,7 +686,7 @@ router.get('/export', requireAuth, requireAdmin, async (req: Request, res: Respo
       }
     }
 
-    const lastDataRow = startDataRow + reports.length - 1;
+    const lastDataRow = reports.length > 0 ? startDataRow + reports.length - 1 : startDataRow;
 
     // Total Row Sheet 2
     if (reports.length > 0) {
@@ -702,9 +718,24 @@ router.get('/export', requireAuth, requireAdmin, async (req: Request, res: Respo
       };
     }
 
-    // Auto Column Widths Sheet 2
+    // Set AutoFilter and Column Widths Sheet 2
+    wsDetail.autoFilter = `A5:S${lastDataRow}`;
     [6, 18, 22, 20, 22, 15, 18, 30, 22, 30, 14, 15, 15, 15, 15, 15, 15, 15, 18].forEach((w, i) => {
       wsDetail.getColumn(i + 1).width = w;
+    });
+
+    // Style borders Sheet 2
+    wsDetail.eachRow((row, rowNumber) => {
+      if (rowNumber >= 5) {
+        row.eachCell((cell) => {
+          cell.border = {
+            top: { style: 'thin', color: { argb: 'FFCBD5E1' } },
+            left: { style: 'thin', color: { argb: 'FFCBD5E1' } },
+            bottom: { style: 'thin', color: { argb: 'FFCBD5E1' } },
+            right: { style: 'thin', color: { argb: 'FFCBD5E1' } }
+          };
+        });
+      }
     });
 
     res.setHeader(
