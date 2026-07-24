@@ -60,7 +60,7 @@ export default function NewsDetailModal({ article, onClose }: NewsDetailModalPro
             {article.summary}
           </div>
 
-          {article.content.map((paragraph, idx) => (
+          {(article.content || []).map((paragraph, idx) => (
             <p key={idx} className="text-slate-600">
               {paragraph}
             </p>

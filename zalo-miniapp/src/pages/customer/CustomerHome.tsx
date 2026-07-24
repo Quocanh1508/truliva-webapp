@@ -275,10 +275,10 @@ export default function CustomerHome({ user, onOpenScanner, onOpenWarranty }: Cu
                 </h3>
 
                 <div className="flex items-center justify-between text-[10px] text-slate-400 pt-1 border-t border-slate-100">
-                  <span className="truncate">{news.date.split(',')[0]}</span>
+                  <span className="truncate">{news.date ? String(news.date).split(',')[0] : ''}</span>
                   <span className="flex items-center ml-1 flex-shrink-0">
                     <Eye size={10} className="mr-0.5" />
-                    {news.views}
+                    {news.views || 0}
                   </span>
                 </div>
               </div>
