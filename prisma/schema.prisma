@@ -235,6 +235,7 @@ model User {
   notifications   Notification[]
   importedSerials Serial[]
   salaryRecords   SalaryRecord[]
+  ktvServiceRates KtvServiceRate[]
 
   @@map("users")
 }
@@ -424,6 +425,21 @@ model SalaryRecord {
   @@map("salary_records")
 }
 
+// ── Cấu hình đơn giá công dịch vụ theo KTV ──
+model KtvServiceRate {
+  id          String   @id @default(uuid())
+  userId      String   @map("user_id")
+  workType    String   @map("work_type")   // 'giaoHang', 'baoHanh', 'thayLoc', 'lapDat', 'giaoHangLapDat', 'thaoLapLai'
+  rate        Float                        // Đơn giá công (VND)
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, workType])
+  @@map("ktv_service_rates")
+}
+
 // ── Cấu hình kết nối Zalo OA và Tokens ──
 model ZaloConfig {
   id              String    @id @default(uuid())
@@ -437,4 +453,67 @@ model ZaloConfig {
   updatedAt       DateTime  @updatedAt @map("updated_at")
 
   @@map("zalo_config")
+}
+
+// ══════════════════════════════════════
+//  PHASE IoT: ESP32 MQTT Integration
+// ══════════════════════════════════════
+
+// ── Thiết bị IoT (ESP32 gắn trên máy lọc nước) ──
+model IotDevice {
+  id              String    @id @default(uuid())
+  serialNumber    String    @unique @map("serial_number")     // Khớp với bảng Serial
+  mqttUsername     String?   @map("mqtt_username")             // Username MQTT (= serialNumber)
+  firmwareVersion String?   @map("firmware_version")
+  lastSeenAt      DateTime? @map("last_seen_at")              // Lần cuối gửi data
+  isOnline        Boolean   @default(false) @map("is_online")
+  configJson      Json?     @map("config_json")               // Cấu hình gửi xuống device
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+
+  // Relations
+  telemetryData   IotTelemetry[]
+  alerts          IotAlert[]
+
+  @@map("iot_devices")
+}
+
+// ── Dữ liệu cảm biến theo thời gian ──
+model IotTelemetry {
+  id              String    @id @default(uuid())
+  deviceId        String    @map("device_id")
+  tdsIn           Float?    @map("tds_in")                    // TDS đầu vào (ppm)
+  tdsOut          Float?    @map("tds_out")                   // TDS đầu ra (ppm)
+  waterFlowLpm    Float?    @map("water_flow_lpm")            // Lưu lượng nước (Lít/phút)
+  totalLiters     Float?    @map("total_liters")              // Tổng lít nước đã lọc
+  waterPressure   Float?    @map("water_pressure")            // Áp suất nước (psi)
+  pumpStatus      String?   @map("pump_status")               // OFF / RUNNING / ERROR
+  errorCode       Int       @default(0) @map("error_code")    // 0 = OK
+  rawPayload      Json?     @map("raw_payload")               // Lưu nguyên JSON gốc từ ESP32
+  recordedAt      DateTime  @default(now()) @map("recorded_at")
+
+  // Relations
+  device          IotDevice @relation(fields: [deviceId], references: [id])
+
+  @@index([deviceId, recordedAt])
+  @@map("iot_telemetry")
+}
+
+// ── Cảnh báo tự động từ dữ liệu IoT ──
+model IotAlert {
+  id              String    @id @default(uuid())
+  deviceId        String    @map("device_id")
+  alertType       String    @map("alert_type")                // TDS_HIGH, TDS_CRITICAL, PUMP_ERROR, OFFLINE
+  severity        String    @default("WARNING")               // INFO, WARNING, CRITICAL
+  message         String                                       // Mô tả cảnh báo
+  payload         Json?                                        // Dữ liệu liên quan
+  isResolved      Boolean   @default(false) @map("is_resolved")
+  resolvedAt      DateTime? @map("resolved_at")
+  createdAt       DateTime  @default(now()) @map("created_at")
+
+  // Relations
+  device          IotDevice @relation(fields: [deviceId], references: [id])
+
+  @@index([deviceId, createdAt])
+  @@map("iot_alerts")
 }

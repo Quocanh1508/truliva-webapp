@@ -1,0 +1,10 @@
+module.exports = {
+  app: {
+    title: "Truliva System",
+    headerTitle: "Truliva Service",
+    headerColor: "#2563EB",
+    textColor: "white",
+    leftButton: "back",
+    statusBarColor: "#1D4ED8"
+  }
+};

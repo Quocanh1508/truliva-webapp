@@ -15,10 +15,38 @@ import {
   UserCheck,
   ChevronDown,
   Layers,
-  ListFilter
+  ListFilter,
+  RotateCcw,
+  Sliders,
+  Loader2,
+  Search
 } from 'lucide-react';
 import { useConfirm } from '../../context/ConfirmContext';
 import { useAuth } from '../../context/AuthContext';
+
+interface KtvRateItem {
+  rate: number;
+  isCustom: boolean;
+}
+
+interface KtvRateRow {
+  userId: string;
+  fullName: string;
+  username: string;
+  phoneNumber: string;
+  stationName: string;
+  mainStationName: string;
+  rates: {
+    giaoHang: KtvRateItem;
+    baoHanh: KtvRateItem;
+    thayLoc: KtvRateItem;
+    lapDat: KtvRateItem;
+    giaoHangLapDat: KtvRateItem;
+    thaoLapLai?: KtvRateItem;
+    kmRate?: KtvRateItem;
+    freeKmThreshold?: KtvRateItem;
+  };
+}
 
 interface CaseDetail {
   reportId: string;
@@ -93,8 +121,128 @@ export default function SalaryManage() {
   const [exporting, setExporting] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
-  // View Mode: 'summary' (Tổng hợp KTV) or 'detail' (Chi tiết từng ca)
-  const [viewMode, setViewMode] = useState<'summary' | 'detail'>('summary');
+  // View Mode: 'summary' (Tổng hợp KTV), 'detail' (Chi tiết từng ca) or 'rates' (Ma trận đơn giá KTV)
+  const [viewMode, setViewMode] = useState<'summary' | 'detail' | 'rates'>('summary');
+
+  // Rates Matrix State
+  const [rateMatrix, setRateMatrix] = useState<KtvRateRow[]>([]);
+  const [defaultRates, setDefaultRates] = useState<Record<string, number>>({
+    giaoHang: 20000,
+    baoHanh: 60000,
+    thayLoc: 40000,
+    lapDat: 100000,
+    giaoHangLapDat: 120000,
+    thaoLapLai: 160000
+  });
+  const [ratesLoading, setRatesLoading] = useState(false);
+  const [ratesSaving, setRatesSaving] = useState(false);
+  const [rateSearchQuery, setRateSearchQuery] = useState('');
+  const [editedRates, setEditedRates] = useState<Record<string, Record<string, number>>>({});
+
+  const getRateVal = (item: any, fallback: number): number => {
+    if (item === null || item === undefined) return fallback;
+    if (typeof item === 'number') return item;
+    if (typeof item === 'object' && typeof item.rate === 'number') return item.rate;
+    if (typeof item === 'object' && item.rate !== undefined) {
+      const num = Number(item.rate);
+      return isNaN(num) ? fallback : num;
+    }
+    const num = Number(item);
+    return isNaN(num) ? fallback : num;
+  };
+
+  const fetchRateMatrix = async () => {
+    setRatesLoading(true);
+    try {
+      const data = await fetchApi('/salaries/rates');
+      if (data.success) {
+        setRateMatrix(data.matrix || []);
+        if (data.defaultRates) setDefaultRates(data.defaultRates);
+        const map: Record<string, Record<string, number>> = {};
+        (data.matrix || []).forEach((row: KtvRateRow) => {
+          const rates = row.rates || {};
+          const def = data.defaultRates || defaultRates;
+          map[row.userId] = {
+            giaoHang: getRateVal(rates.giaoHang, def.giaoHang ?? 20000),
+            baoHanh: getRateVal(rates.baoHanh, def.baoHanh ?? 60000),
+            thayLoc: getRateVal(rates.thayLoc, def.thayLoc ?? 40000),
+            lapDat: getRateVal(rates.lapDat, def.lapDat ?? 100000),
+            giaoHangLapDat: getRateVal(rates.giaoHangLapDat, def.giaoHangLapDat ?? 120000),
+            thaoLapLai: getRateVal(rates.thaoLapLai, def.thaoLapLai ?? 160000),
+            kmRate: getRateVal(rates.kmRate, def.kmRate ?? 3000),
+            freeKmThreshold: getRateVal(rates.freeKmThreshold, def.freeKmThreshold ?? 20),
+          };
+        });
+        setEditedRates(map);
+      }
+    } catch (err: any) {
+      console.error(err);
+      setMessage({ type: 'error', text: err.message || 'Lỗi khi tải ma trận đơn giá KTV' });
+    } finally {
+      setRatesLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (viewMode === 'rates') {
+      fetchRateMatrix();
+    }
+  }, [viewMode]);
+
+  const handleRateCellChange = (userId: string, workType: string, val: string) => {
+    const num = val === '' ? 0 : Number(val.replace(/\D/g, ''));
+    if (isNaN(num)) return;
+    setEditedRates(prev => ({
+      ...prev,
+      [userId]: {
+        ...(prev[userId] || {}),
+        [workType]: num
+      }
+    }));
+  };
+
+  const handleResetKtvRates = async (userId: string) => {
+    try {
+      await fetchApi(`/salaries/rates/${userId}`, { method: 'DELETE' });
+      setEditedRates(prev => {
+        const next = { ...prev };
+        delete next[userId];
+        return next;
+      });
+      fetchRateMatrix();
+    } catch (err: any) {
+      alert(err.message || 'Lỗi khi khôi phục đơn giá');
+    }
+  };
+
+  const handleSaveRateMatrix = async () => {
+    setRatesSaving(true);
+    setMessage(null);
+    try {
+      const ratesList: Array<{ userId: string; workType: string; rate: number }> = [];
+      Object.entries(editedRates).forEach(([userId, workTypes]) => {
+        Object.entries(workTypes).forEach(([workType, rate]) => {
+          ratesList.push({ userId, workType, rate });
+        });
+      });
+
+      const res = await fetchApi('/salaries/rates', {
+        method: 'POST',
+        body: JSON.stringify({ rates: ratesList })
+      });
+
+      if (res.success) {
+        setMessage({ type: 'success', text: res.message || 'Cập nhật ma trận đơn giá KTV thành công!' });
+        fetchRateMatrix();
+        fetchSalaries(true);
+      }
+    } catch (err: any) {
+      console.error(err);
+      setMessage({ type: 'error', text: err.message || 'Lỗi khi lưu đơn giá KTV' });
+    } finally {
+      setRatesSaving(false);
+    }
+  };
 
   // Detail Modal State (For Summary View)
   const [selectedKtv, setSelectedKtv] = useState<SalaryData | null>(null);
@@ -477,6 +625,20 @@ export default function SalaryManage() {
               <ListFilter className="h-4 w-4" />
               <span>📋 Chi Tiết Tất Cả Ca Dịch Vụ ({filteredCases.length})</span>
             </button>
+
+            {isAdmin && (
+              <button
+                onClick={() => setViewMode('rates')}
+                className={`px-4 py-2 rounded-lg text-xs font-bold transition flex items-center gap-2 cursor-pointer ${
+                  viewMode === 'rates' 
+                    ? 'bg-white text-[#1B3A6B] shadow-sm' 
+                    : 'text-gray-600 hover:text-gray-900'
+                }`}
+              >
+                <Sliders className="h-4 w-4 text-[#00A3FF]" />
+                <span>⚙️ Ma Trận Đơn Giá KTV</span>
+              </button>
+            )}
           </div>
 
           {/* Action Buttons */}
@@ -850,6 +1012,247 @@ export default function SalaryManage() {
                     </td>
                   </tr>
                 </tfoot>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* VIEW MODE 3: MA TRẬN ĐƠN GIÁ DỊCH VỤ THEO KTV                              */}
+      {/* ========================================================================= */}
+      {viewMode === 'rates' && (
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden space-y-4 p-5">
+          {/* Header & Controls bar */}
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-gray-100">
+            <div>
+              <h3 className="text-base font-bold text-gray-800 flex items-center gap-2">
+                <Sliders className="h-5 w-5 text-[#00A3FF]" />
+                Ma Trận Đơn Giá Cố Định Cho Từng Kỹ Thuật Viên
+              </h3>
+              <p className="text-xs text-gray-500 mt-1">
+                Tùy chỉnh đơn giá riêng cho từng KTV theo hợp đồng/thỏa thuận. Các KTV không cài riêng sẽ tự động áp dụng <strong>Đơn giá chuẩn của Truliva</strong>.
+              </p>
+            </div>
+
+            <div className="flex items-center gap-3">
+              <div className="relative">
+                <Search className="h-4 w-4 absolute left-3 top-2.5 text-gray-400" />
+                <input
+                  type="text"
+                  placeholder="Tìm KTV, trạm..."
+                  value={rateSearchQuery}
+                  onChange={(e) => setRateSearchQuery(e.target.value)}
+                  className="pl-9 pr-3 py-2 border border-gray-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 w-48 md:w-64"
+                />
+              </div>
+
+              <button
+                onClick={handleSaveRateMatrix}
+                disabled={ratesSaving}
+                className="px-5 py-2.5 bg-[#1B3A6B] hover:bg-[#152e55] text-white font-bold rounded-xl text-xs flex items-center gap-2 transition shadow-md cursor-pointer disabled:opacity-50 min-h-[44px]"
+              >
+                {ratesSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+                Lưu Thay Đổi Đơn Giá
+              </button>
+            </div>
+          </div>
+
+          {/* Quick Legend / Info Bar */}
+          <div className="flex flex-wrap items-center justify-between bg-blue-50/60 p-3 rounded-xl border border-blue-100 text-xs text-blue-900 gap-2">
+            <div className="flex items-center gap-4">
+              <span className="font-semibold text-blue-950">Chú thích đơn giá:</span>
+              <span className="inline-flex items-center gap-1.5 bg-cyan-100 border border-cyan-300 text-cyan-900 px-2 py-0.5 rounded-full font-bold text-[11px]">
+                Tùy chỉnh KTV
+              </span>
+              <span className="inline-flex items-center gap-1.5 bg-gray-100 border border-gray-300 text-gray-700 px-2 py-0.5 rounded-full font-medium text-[11px]">
+                Mặc định hệ thống
+              </span>
+            </div>
+            <div className="text-[11px] text-gray-500">
+              * Thay đổi đơn giá ở đây sẽ ngay lập tức được áp dụng khi tính toán thù lao thợ.
+            </div>
+          </div>
+
+          {/* Rate Matrix Table */}
+          {ratesLoading ? (
+            <div className="flex flex-col items-center justify-center py-20 gap-3">
+              <Loader2 className="h-8 w-8 animate-spin text-[#00A3FF]" />
+              <span className="text-gray-400 text-xs font-semibold">Đang tải danh sách đơn giá KTV...</span>
+            </div>
+          ) : (
+            <div className="overflow-x-auto rounded-xl border border-gray-200">
+              <table className="w-full text-left text-xs border-collapse">
+                <thead>
+                  <tr className="bg-[#1B3A6B] text-white text-xs uppercase font-bold tracking-wider">
+                    <th className="px-4 py-3 border-b border-blue-900 min-w-[180px]">Kỹ thuật viên</th>
+                    <th className="px-4 py-3 border-b border-blue-900 min-w-[140px]">Trạm quản lý</th>
+                    <th className="px-3 py-3 border-b border-blue-900 text-center min-w-[120px]">
+                      Giao hàng<br/>
+                      <span className="text-[10px] font-normal opacity-80">(Chuẩn: {(defaultRates.giaoHang || 20000).toLocaleString('vi-VN')}đ)</span>
+                    </th>
+                    <th className="px-3 py-3 border-b border-blue-900 text-center min-w-[130px]">
+                      Bảo hành & Sửa chữa<br/>
+                      <span className="text-[10px] font-normal opacity-80">(Chuẩn: {(defaultRates.baoHanh || 60000).toLocaleString('vi-VN')}đ)</span>
+                    </th>
+                    <th className="px-3 py-3 border-b border-blue-900 text-center min-w-[120px]">
+                      Thay lọc<br/>
+                      <span className="text-[10px] font-normal opacity-80">(Chuẩn: {(defaultRates.thayLoc || 40000).toLocaleString('vi-VN')}đ)</span>
+                    </th>
+                    <th className="px-3 py-3 border-b border-blue-900 text-center min-w-[120px]">
+                      Lắp đặt<br/>
+                      <span className="text-[10px] font-normal opacity-80">(Chuẩn: {(defaultRates.lapDat || 100000).toLocaleString('vi-VN')}đ)</span>
+                    </th>
+                    <th className="px-3 py-3 border-b border-blue-900 text-center min-w-[130px]">
+                      Giao + Lắp<br/>
+                      <span className="text-[10px] font-normal opacity-80">(Chuẩn: {(defaultRates.giaoHangLapDat || 120000).toLocaleString('vi-VN')}đ)</span>
+                    </th>
+                    <th className="px-3 py-3 border-b border-blue-900 text-center min-w-[160px]">
+                      Chi phí di chuyển<br/>
+                      <span className="text-[10px] font-normal opacity-80">(Chuẩn: 3.000đ/km &gt;20km)</span>
+                    </th>
+                    <th className="px-3 py-3 border-b border-blue-900 text-center min-w-[100px]">Thao tác</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100 bg-white">
+                  {rateMatrix
+                    .filter(ktv => {
+                      if (!rateSearchQuery.trim()) return true;
+                      const q = rateSearchQuery.toLowerCase();
+                      return (
+                        ktv.fullName.toLowerCase().includes(q) ||
+                        ktv.username.toLowerCase().includes(q) ||
+                        ktv.phoneNumber.includes(q) ||
+                        ktv.stationName.toLowerCase().includes(q)
+                      );
+                    })
+                    .map((ktv) => {
+                      const userEdited = editedRates[ktv.userId] || {};
+                      
+                      const renderCell = (workType: string, defaultVal: number) => {
+                        const currentVal = userEdited[workType] !== undefined ? userEdited[workType] : defaultVal;
+                        const isModified = currentVal !== defaultVal;
+
+                        return (
+                          <div className="flex flex-col items-center gap-1">
+                            <input
+                              type="text"
+                              value={currentVal === 0 ? '' : currentVal.toLocaleString('vi-VN')}
+                              onChange={(e) => handleRateCellChange(ktv.userId, workType, e.target.value)}
+                              className={`w-28 text-right px-2.5 py-1.5 rounded-lg border text-xs font-bold transition focus:outline-none focus:ring-2 ${
+                                isModified
+                                  ? 'bg-cyan-50 border-cyan-400 text-cyan-900 focus:ring-cyan-500 font-extrabold shadow-sm'
+                                  : 'bg-gray-50 border-gray-200 text-gray-800 focus:ring-blue-500'
+                              }`}
+                            />
+                            {isModified ? (
+                              <span className="text-[9px] font-extrabold text-cyan-700 bg-cyan-100 px-1.5 py-0.2 rounded">Tùy chỉnh</span>
+                            ) : (
+                              <span className="text-[9px] font-medium text-gray-400">Chuẩn</span>
+                            )}
+                          </div>
+                        );
+                      };
+
+                      const renderTravelCell = () => {
+                        const defaultKmRate = getRateVal(ktv.rates?.kmRate, defaultRates.kmRate || 3000);
+                        const defaultThreshold = getRateVal(ktv.rates?.freeKmThreshold, defaultRates.freeKmThreshold || 20);
+
+                        const currentKmRate = userEdited['kmRate'] !== undefined ? userEdited['kmRate'] : defaultKmRate;
+                        const currentThreshold = userEdited['freeKmThreshold'] !== undefined ? userEdited['freeKmThreshold'] : defaultThreshold;
+
+                        const isKmRateModified = currentKmRate !== defaultKmRate;
+                        const isThresholdModified = currentThreshold !== defaultThreshold;
+                        const isModified = isKmRateModified || isThresholdModified;
+
+                        return (
+                          <div className="flex flex-col items-center gap-1 min-w-[140px]">
+                            <div className="flex items-center gap-1">
+                              <input
+                                type="text"
+                                value={currentKmRate === 0 ? '' : currentKmRate.toLocaleString('vi-VN')}
+                                onChange={(e) => handleRateCellChange(ktv.userId, 'kmRate', e.target.value)}
+                                placeholder="3.000"
+                                className={`w-20 text-right px-2 py-1 rounded-lg border text-xs font-bold transition focus:outline-none focus:ring-2 ${
+                                  isKmRateModified
+                                    ? 'bg-cyan-50 border-cyan-400 text-cyan-900 font-extrabold shadow-sm'
+                                    : 'bg-gray-50 border-gray-200 text-gray-800 focus:ring-blue-500'
+                                }`}
+                                title="Đơn giá phụ cấp di chuyển (VND/km)"
+                              />
+                              <span className="text-[10px] text-gray-500 font-medium">đ/km</span>
+                            </div>
+
+                            <div className="flex items-center gap-1 text-[11px] text-gray-600">
+                              <span className="text-[10px] text-gray-400">Từ</span>
+                              <input
+                                type="number"
+                                value={currentThreshold}
+                                onChange={(e) => handleRateCellChange(ktv.userId, 'freeKmThreshold', e.target.value)}
+                                placeholder="20"
+                                className={`w-12 text-center px-1 py-0.5 rounded border text-xs font-bold transition focus:outline-none focus:ring-2 ${
+                                  isThresholdModified
+                                    ? 'bg-cyan-50 border-cyan-400 text-cyan-900 font-extrabold shadow-sm'
+                                    : 'bg-gray-50 border-gray-200 text-gray-800 focus:ring-blue-500'
+                                }`}
+                                title="Ngưỡng km bắt đầu tính phụ cấp di chuyển"
+                              />
+                              <span className="text-[10px] text-gray-400">km</span>
+                            </div>
+
+                            {isModified ? (
+                              <span className="text-[9px] font-extrabold text-cyan-700 bg-cyan-100 px-1.5 py-0.2 rounded">Tùy chỉnh</span>
+                            ) : (
+                              <span className="text-[9px] font-medium text-gray-400">Chuẩn</span>
+                            )}
+                          </div>
+                        );
+                      };
+
+                      return (
+                        <tr key={ktv.userId} className="hover:bg-blue-50/30 transition">
+                          <td className="px-4 py-3 font-semibold text-gray-900">
+                            <div className="font-bold text-gray-900">{ktv.fullName}</div>
+                            <div className="text-[11px] text-gray-400 font-normal">{ktv.phoneNumber || ktv.username}</div>
+                          </td>
+                          <td className="px-4 py-3 text-gray-600 font-medium">
+                            <span className="inline-flex items-center gap-1 bg-gray-100 text-gray-700 px-2 py-0.5 rounded-md text-xs">
+                              <MapPin className="h-3 w-3 text-gray-400" />
+                              {ktv.stationName || 'Chưa gán trạm'}
+                            </span>
+                          </td>
+                          <td className="px-3 py-3 text-center">
+                            {renderCell('giaoHang', defaultRates.giaoHang || 20000)}
+                          </td>
+                          <td className="px-3 py-3 text-center">
+                            {renderCell('baoHanh', defaultRates.baoHanh || 60000)}
+                          </td>
+                          <td className="px-3 py-3 text-center">
+                            {renderCell('thayLoc', defaultRates.thayLoc || 40000)}
+                          </td>
+                          <td className="px-3 py-3 text-center">
+                            {renderCell('lapDat', defaultRates.lapDat || 100000)}
+                          </td>
+                          <td className="px-3 py-3 text-center">
+                            {renderCell('giaoHangLapDat', defaultRates.giaoHangLapDat || 120000)}
+                          </td>
+                          <td className="px-3 py-3 text-center">
+                            {renderTravelCell()}
+                          </td>
+                          <td className="px-3 py-3 text-center">
+                            <button
+                              onClick={() => handleResetKtvRates(ktv.userId)}
+                              className="px-2.5 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-600 rounded-lg text-[11px] font-semibold flex items-center justify-center gap-1 transition cursor-pointer mx-auto"
+                              title="Khôi phục đơn giá chuẩn cho KTV này"
+                            >
+                              <RotateCcw className="h-3 w-3" />
+                              Khôi phục
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                </tbody>
               </table>
             </div>
           )}

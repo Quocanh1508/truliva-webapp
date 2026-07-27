@@ -26,11 +26,13 @@ import serialRoutes from './routes/serials';
 import promoRoutes from './routes/promos';
 import salaryRoutes from './routes/salaries';
 import zaloMiniAppRoutes from './routes/zaloMiniApp';
+import iotRoutes from './routes/iot';
 import { startOrderSyncScheduler } from './services/orderSyncScheduler';
 import { startReportCleanupScheduler } from './services/reportCleanupScheduler';
 import { startPancakeRetryScheduler } from './services/pancakeRetryScheduler';
 import { startProductSyncScheduler } from './services/productSyncScheduler';
 import { initWebSocketServer } from './services/websocketService';
+import { startMqttService } from './services/mqttService';
 import { apiLimiter, loginLimiter } from './middleware/rateLimiter';
 import { securityMiddleware } from './middleware/security';
 
@@ -160,6 +162,7 @@ app.use('/api/serials', serialRoutes);
 app.use('/api/promos', promoRoutes);
 app.use('/api/salaries', salaryRoutes);
 app.use('/api/zalo-miniapp', zaloMiniAppRoutes);
+app.use('/api/iot', iotRoutes);
 
 // ── Serve uploaded images ──
 app.use('/uploads', express.static(path.join(process.cwd(), 'uploads'), {
@@ -227,6 +230,9 @@ const server = app.listen(PORT, () => {
 
   // Khởi động lập lịch đồng bộ sản phẩm & tồn kho từ Pancake POS (mỗi 12 tiếng)
   startProductSyncScheduler(12);
+
+  // Khởi động MQTT service kết nối Mosquitto broker cho IoT
+  startMqttService();
 });
 
 initWebSocketServer(server);

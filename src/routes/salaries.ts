@@ -21,10 +21,13 @@ function normalizePhone(phone: any): string {
 }
 
 // Map workType to the Station rate fields
-function getRateType(workType: string | null | undefined): 'giaoHang' | 'baoHanh' | 'thayLoc' | 'lapDat' | 'giaoHangLapDat' {
+function getRateType(workType: string | null | undefined): 'giaoHang' | 'baoHanh' | 'thayLoc' | 'lapDat' | 'giaoHangLapDat' | 'thaoLapLai' {
   if (!workType) return 'baoHanh';
   const normalized = workType.toLowerCase().trim();
-  if (normalized.includes('giao hàng và lắp đặt') || normalized.includes('giao_hang_lap_dat')) {
+  if (normalized.includes('tháo máy & lắp đặt lại') || normalized.includes('tháo máy và lắp đặt lại') || normalized.includes('tháo lắp') || normalized.includes('thao_lap_lai')) {
+    return 'thaoLapLai';
+  }
+  if (normalized.includes('giao hàng và lắp đặt') || normalized.includes('giao_hang_lap_dat') || normalized.includes('giao lắp')) {
     return 'giaoHangLapDat';
   }
   if (normalized.includes('giao hàng') || normalized.includes('giao_hang')) {
@@ -33,7 +36,7 @@ function getRateType(workType: string | null | undefined): 'giaoHang' | 'baoHanh
   if (normalized.includes('thay lọc') || normalized.includes('thay_loc') || normalized.includes('thay lõi')) {
     return 'thayLoc';
   }
-  if (normalized.includes('lắp đặt') || normalized.includes('lap_dat') || normalized.includes('lắp đặt lại')) {
+  if (normalized.includes('lắp đặt') || normalized.includes('lap_dat') || normalized.includes('lắp mới') || normalized.includes('lắp lại')) {
     return 'lapDat';
   }
   return 'baoHanh';
@@ -185,23 +188,28 @@ async function loadStationRates(): Promise<Map<string, any>> {
 }
 
 // Single source of truth calculation helper for a single service report
-function calculateReportCost(report: any, ktvPhoneNorm: string, stationRate: any) {
+function calculateReportCost(report: any, ktvPhoneNorm: string, stationRate: any, customKtvRatesMap?: Map<string, number>) {
   let baseCost = 0;
   let distanceCost = 0;
   const workType = report.workType || report.order?.workType || 'Bảo hành';
+  const rateType = getRateType(workType);
   const notes = (report.notes || report.order?.note || '').toLowerCase();
   
   const isOfficialTrulivaKtv = ktvPhoneNorm === '392110073' || (stationRate && stationRate.isOfficialTruliva);
 
   if (report.customBaseCost !== null && report.customBaseCost !== undefined) {
     baseCost = report.customBaseCost;
+  } else if (customKtvRatesMap && customKtvRatesMap.has(rateType) && (customKtvRatesMap.get(rateType) ?? 0) > 0) {
+    baseCost = customKtvRatesMap.get(rateType)!;
+    if (isOfficialTrulivaKtv && (notes.includes('hoàn thành') || notes.includes('tăng ca'))) {
+      baseCost += 100000;
+    }
   } else if (isOfficialTrulivaKtv) {
     baseCost = getOfficialTrulivaBaseRate(workType);
     if (notes.includes('hoàn thành') || notes.includes('tăng ca')) {
       baseCost += 100000;
     }
   } else if (stationRate) {
-    const rateType = getRateType(workType);
     if (stationRate.province === 'TP.HCM' && rateType === 'giaoHangLapDat' && notes.includes('giao lắp')) {
       baseCost = 250000;
     } else {
@@ -217,23 +225,24 @@ function calculateReportCost(report: any, ktvPhoneNorm: string, stationRate: any
   // Distance Allowance
   const distance = report.distanceKm ?? 0;
   
-  if (isOfficialTrulivaKtv) {
-    if (distance > 20) {
-      distanceCost = (distance - 20) * 3000;
-    }
-  } else if (stationRate) {
-    if (stationRate.noDistanceCost) {
-      distanceCost = 0;
-    } else {
-      const threshold = stationRate.freeKmThreshold || 20;
-      const kmRate = stationRate.kmRate || 3000;
-      if (distance > threshold) {
-        distanceCost = (distance - threshold) * kmRate;
-      }
-    }
-  } else {
-    if (distance > 20) {
-      distanceCost = (distance - 20) * 3000;
+  let kmRate = 3000;
+  let threshold = 20;
+
+  if (customKtvRatesMap && customKtvRatesMap.has('kmRate') && (customKtvRatesMap.get('kmRate') ?? 0) > 0) {
+    kmRate = customKtvRatesMap.get('kmRate')!;
+  } else if (stationRate?.kmRate) {
+    kmRate = stationRate.kmRate;
+  }
+
+  if (customKtvRatesMap && customKtvRatesMap.has('freeKmThreshold') && customKtvRatesMap.get('freeKmThreshold') !== undefined) {
+    threshold = customKtvRatesMap.get('freeKmThreshold')!;
+  } else if (stationRate?.freeKmThreshold) {
+    threshold = stationRate.freeKmThreshold;
+  }
+
+  if (!stationRate?.noDistanceCost) {
+    if (distance > threshold) {
+      distanceCost = (distance - threshold) * kmRate;
     }
   }
 
@@ -276,8 +285,16 @@ router.get('/calculate', requireAuth, requireAdmin, async (req: Request, res: Re
       }
     });
 
-    // 2. Load station rates
+    // 2. Load station rates & DB custom KTV rates
     const stationRates = await loadStationRates();
+    const dbCustomRates = await prisma.ktvServiceRate.findMany();
+    const customKtvRatesByUser = new Map<string, Map<string, number>>();
+    for (const r of dbCustomRates) {
+      if (!customKtvRatesByUser.has(r.userId)) {
+        customKtvRatesByUser.set(r.userId, new Map());
+      }
+      customKtvRatesByUser.get(r.userId)!.set(r.workType, r.rate);
+    }
 
     // 3. Get existing records to preserve manual overrides
     const savedRecords = await prisma.salaryRecord.findMany({
@@ -301,12 +318,13 @@ router.get('/calculate', requireAuth, requireAdmin, async (req: Request, res: Re
       const ktvPhoneNorm = normalizePhone(ktv.phoneNumber);
       const stationRate = ktvPhoneNorm ? stationRates.get(ktvPhoneNorm) : null;
       const isStationPaid = !!stationRate;
+      const userCustomRates = customKtvRatesByUser.get(ktv.id);
 
       let calculatedCost = 0;
       const reportsDetail = [];
 
       for (const report of reports) {
-        const costResult = calculateReportCost(report, ktvPhoneNorm, stationRate);
+        const costResult = calculateReportCost(report, ktvPhoneNorm, stationRate, userCustomRates);
         const isSunday = new Date(report.createdAt).getDay() === 0;
 
         calculatedCost += costResult.totalCost;
@@ -914,6 +932,147 @@ router.get('/export', requireAuth, requireAdmin, async (req: Request, res: Respo
   } catch (error: any) {
     logger.error('Export salaries error', { error: error.message });
     res.status(500).json({ error: 'Lỗi khi xuất bảng lương Excel' });
+  }
+});
+
+/**
+ * GET /api/salaries/rates
+ * Fetch matrix of custom service rates for all KTVs
+ */
+router.get('/rates', requireAuth, requireAdmin, async (req: Request, res: Response): Promise<void> => {
+  try {
+    const ktvs = await prisma.user.findMany({
+      where: { role: 'KTV', isActive: true },
+      select: {
+        id: true,
+        fullName: true,
+        username: true,
+        phoneNumber: true,
+        techStation: {
+          select: {
+            name: true,
+            mainStation: { select: { name: true } }
+          }
+        }
+      },
+      orderBy: { fullName: 'asc' }
+    });
+
+    const rates = await prisma.ktvServiceRate.findMany();
+    const rateMapByUser = new Map<string, Record<string, number>>();
+    for (const r of rates) {
+      if (!rateMapByUser.has(r.userId)) {
+        rateMapByUser.set(r.userId, {});
+      }
+      rateMapByUser.get(r.userId)![r.workType] = r.rate;
+    }
+
+    const defaultRates: Record<string, number> = {
+      giaoHang: 20000,
+      baoHanh: 60000,
+      thayLoc: 40000,
+      lapDat: 100000,
+      giaoHangLapDat: 120000,
+      thaoLapLai: 160000,
+      kmRate: 3000,
+      freeKmThreshold: 20
+    };
+
+    const matrix = ktvs.map(ktv => {
+      const userRates = rateMapByUser.get(ktv.id) || {};
+      const ratesWithCustomFlag: Record<string, { rate: number; isCustom: boolean }> = {};
+
+      for (const [workType, defRate] of Object.entries(defaultRates)) {
+        if (userRates[workType] !== undefined && userRates[workType] !== null) {
+          ratesWithCustomFlag[workType] = { rate: userRates[workType], isCustom: true };
+        } else {
+          ratesWithCustomFlag[workType] = { rate: defRate, isCustom: false };
+        }
+      }
+
+      return {
+        userId: ktv.id,
+        fullName: ktv.fullName,
+        username: ktv.username,
+        phoneNumber: ktv.phoneNumber,
+        stationName: ktv.techStation?.name || 'Trực thuộc Truliva',
+        mainStationName: ktv.techStation?.mainStation?.name || 'Truliva Official',
+        rates: ratesWithCustomFlag
+      };
+    });
+
+    res.json({
+      success: true,
+      defaultRates,
+      matrix
+    });
+  } catch (error: any) {
+    logger.error('Fetch KTV service rates error', { error: error.message });
+    res.status(500).json({ error: 'Lỗi khi tải bảng ma trận đơn giá KTV' });
+  }
+});
+
+/**
+ * POST /api/salaries/rates
+ * Bulk save custom service rates for KTVs
+ */
+router.post('/rates', requireAuth, requireAdmin, async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { rates } = req.body as { rates: Array<{ userId: string; workType: string; rate: number }> };
+    if (!Array.isArray(rates)) {
+      res.status(400).json({ error: 'Dữ liệu đơn giá không hợp lệ (cần mảng rates)' });
+      return;
+    }
+
+    const upsertPromises = rates.map(item => {
+      return prisma.ktvServiceRate.upsert({
+        where: {
+          userId_workType: {
+            userId: item.userId,
+            workType: item.workType
+          }
+        },
+        update: {
+          rate: Number(item.rate) || 0
+        },
+        create: {
+          userId: item.userId,
+          workType: item.workType,
+          rate: Number(item.rate) || 0
+        }
+      });
+    });
+
+    await Promise.all(upsertPromises);
+
+    res.json({
+      success: true,
+      message: `Đã cập nhật đơn giá công dịch vụ cho ${rates.length} mục thành công`
+    });
+  } catch (error: any) {
+    logger.error('Save KTV service rates error', { error: error.message });
+    res.status(500).json({ error: 'Lỗi khi lưu bảng ma trận đơn giá KTV' });
+  }
+});
+
+/**
+ * DELETE /api/salaries/rates/:userId
+ * Reset custom service rates for a KTV back to defaults
+ */
+router.delete('/rates/:userId', requireAuth, requireAdmin, async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { userId } = req.params;
+    await prisma.ktvServiceRate.deleteMany({
+      where: { userId: userId as string }
+    });
+
+    res.json({
+      success: true,
+      message: 'Đã khôi phục đơn giá chuẩn cho KTV thành công'
+    });
+  } catch (error: any) {
+    logger.error('Reset KTV service rates error', { error: error.message });
+    res.status(500).json({ error: 'Lỗi khi khôi phục đơn giá KTV' });
   }
 });
 
