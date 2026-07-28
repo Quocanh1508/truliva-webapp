@@ -314,6 +314,9 @@ export default function SalaryManage() {
   };
 
   useEffect(() => {
+    setSelectedKtvFilter('');
+    setSelectedStationFilter('');
+    setSelectedWorkTypeFilter('');
     fetchSalaries();
   }, [selectedMonth]);
 
@@ -443,14 +446,19 @@ export default function SalaryManage() {
     }
   };
 
-  // Unique Lists for Dropdown Filters
+  // Danh sách KTV có ca hoàn thành hoặc có ghi chú điều chỉnh trong tháng được chọn
+  const activeKtvsInMonth = useMemo(() => {
+    return salaries.filter(s => s.casesCount > 0 || (s.adjustedCost !== s.calculatedCost) || !!s.adjustmentNote);
+  }, [salaries]);
+
+  // Unique Lists for Dropdown Filters (chỉ trích xuất các trạm có KTV làm ca trong tháng)
   const uniqueStations = useMemo(() => {
     const set = new Set<string>();
-    salaries.forEach(s => {
+    activeKtvsInMonth.forEach(s => {
       if (s.stationName && s.stationName !== 'Không có') set.add(s.stationName);
     });
     return Array.from(set).sort();
-  }, [salaries]);
+  }, [activeKtvsInMonth]);
 
   // Flattened Cases Array for Detailed View Mode
   const allCases = useMemo(() => {
@@ -472,7 +480,9 @@ export default function SalaryManage() {
   // Filtered Summary View
   const filteredSalaries = useMemo(() => {
     return salaries.filter(s => {
-      const matchKtv = !selectedKtvFilter || s.userId === selectedKtvFilter;
+      // Khi chọn "Tất cả KTV", chỉ hiển thị những KTV có làm ca trong tháng
+      const hasActivity = s.casesCount > 0 || (s.adjustedCost !== s.calculatedCost) || !!s.adjustmentNote;
+      const matchKtv = selectedKtvFilter ? s.userId === selectedKtvFilter : hasActivity;
       const matchStation = !selectedStationFilter || s.stationName === selectedStationFilter;
       const matchQuery = !searchQuery || 
         s.fullName.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -696,9 +706,11 @@ export default function SalaryManage() {
               onChange={(e) => setSelectedKtvFilter(e.target.value)}
               className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
             >
-              <option value="">Tất cả KTV ({salaries.length})</option>
-              {salaries.map(s => (
-                <option key={s.userId} value={s.userId}>{s.fullName} ({s.phoneNumber})</option>
+              <option value="">Tất cả KTV có ca ({activeKtvsInMonth.length})</option>
+              {activeKtvsInMonth.map(s => (
+                <option key={s.userId} value={s.userId}>
+                  {s.fullName} ({s.phoneNumber}) - {s.casesCount} ca
+                </option>
               ))}
             </select>
           </div>
