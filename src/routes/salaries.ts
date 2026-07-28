@@ -387,7 +387,7 @@ router.get('/calculate', requireAuth, requireAdmin, async (req: Request, res: Re
         fullName: ktv.fullName,
         username: ktv.username,
         phoneNumber: ktv.phoneNumber || 'Không có',
-        stationName: ktv.techStation?.name || 'Không có',
+        stationName: ktv.techStation?.name || (stationRate ? stationRate.province : 'Không có'),
         mainStationName: ktv.techStation?.mainStation?.name || 'Không có',
         isStationPaid,
         stationRateInfo: isStationPaid ? {
