@@ -9,6 +9,22 @@ import { routeEvent } from '../services/eventRouter';
 const router = Router();
 
 /**
+ * GET /webhooks/pancake
+ * Phục vụ kiểm tra kết nối (health check / url verification) từ Pancake POS.
+ */
+router.get(
+  '/pancake',
+  verifyPancakeToken,
+  (req: Request, res: Response): void => {
+    res.status(200).json({
+      status: 'active',
+      message: 'Pancake Webhook Endpoint is active and ready to receive events',
+      timestamp: new Date().toISOString()
+    });
+  }
+);
+
+/**
  * POST /webhooks/pancake
  * 
  * Endpoint chính nhận dữ liệu từ Pancake (Step 2).

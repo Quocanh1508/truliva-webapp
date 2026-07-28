@@ -195,31 +195,46 @@ function calculateReportCost(report: any, ktvPhoneNorm: string, stationRate: any
   const rateType = getRateType(workType);
   const notes = (report.notes || report.order?.note || '').toLowerCase();
   
-  const isOfficialTrulivaKtv = ktvPhoneNorm === '392110073' || (stationRate && stationRate.isOfficialTruliva);
+  // Chỉ duy nhất Nguyễn Minh Thuận (0392110073) thuộc Luồng KTV Trạm Truliva
+  const isOfficialTrulivaKtv = ktvPhoneNorm === '392110073';
 
+  // 1. Ghi đè thủ công theo ca cụ thể
   if (report.customBaseCost !== null && report.customBaseCost !== undefined) {
     baseCost = report.customBaseCost;
-  } else if (customKtvRatesMap && customKtvRatesMap.has(rateType) && (customKtvRatesMap.get(rateType) ?? 0) > 0) {
-    baseCost = customKtvRatesMap.get(rateType)!;
-    if (isOfficialTrulivaKtv && (notes.includes('hoàn thành') || notes.includes('tăng ca'))) {
-      baseCost += 100000;
+  } 
+  // 2. LUỒNG 1: KTV Trạm Truliva (Nguyễn Minh Thuận)
+  else if (isOfficialTrulivaKtv) {
+    if (customKtvRatesMap && customKtvRatesMap.has(rateType) && (customKtvRatesMap.get(rateType) ?? 0) > 0) {
+      baseCost = customKtvRatesMap.get(rateType)!;
+    } else {
+      baseCost = getOfficialTrulivaBaseRate(workType);
     }
-  } else if (isOfficialTrulivaKtv) {
-    baseCost = getOfficialTrulivaBaseRate(workType);
+    // Thưởng tăng ca / hoàn thành cho KTV trạm Truliva (+100.000đ)
     if (notes.includes('hoàn thành') || notes.includes('tăng ca')) {
       baseCost += 100000;
     }
-  } else if (stationRate) {
-    if (stationRate.province === 'TP.HCM' && rateType === 'giaoHangLapDat' && notes.includes('giao lắp')) {
-      baseCost = 250000;
-    } else {
-      const specificRate = stationRate.rates[rateType];
-      baseCost = (specificRate !== undefined && specificRate !== null && specificRate > 0) 
-        ? specificRate 
-        : getKtvFlatRate(workType);
+  } 
+  // 3. LUỒNG 2: KTV Ngoại / Trạm Ngoài (Song song với Luồng 1)
+  else {
+    // 3.1. Ưu tiên 1: Giá tùy chỉnh trong Ma trận đơn giá (nếu có)
+    if (customKtvRatesMap && customKtvRatesMap.has(rateType) && (customKtvRatesMap.get(rateType) ?? 0) > 0) {
+      baseCost = customKtvRatesMap.get(rateType)!;
+    } 
+    // 3.2. Ưu tiên 2: Đơn giá theo File Excel Trạm Kỹ Thuật
+    else if (stationRate) {
+      if (stationRate.province === 'TP.HCM' && rateType === 'giaoHangLapDat' && notes.includes('giao lắp')) {
+        baseCost = 250000;
+      } else {
+        const specificRate = stationRate.rates[rateType];
+        baseCost = (specificRate !== undefined && specificRate !== null && specificRate > 0) 
+          ? specificRate 
+          : getKtvFlatRate(workType);
+      }
+    } 
+    // 3.3. Ưu tiên 3: Flat Rate mặc định cho KTV ngoài
+    else {
+      baseCost = getKtvFlatRate(workType);
     }
-  } else {
-    baseCost = getKtvFlatRate(workType);
   }
 
   // Distance Allowance
@@ -358,6 +373,14 @@ router.get('/calculate', requireAuth, requireAdmin, async (req: Request, res: Re
       }
 
       const saved = savedRecordsMap.get(ktv.id);
+      const isFinal = saved?.status === 'FINAL';
+
+      // Nếu tháng đã KHÓA (FINAL), bảo lưu tuyệt đối con số lịch sử đã chốt!
+      // Nếu tháng chưa khóa (DRAFT hoặc chưa lưu), cập nhật con số mới nhất theo Ma trận đơn giá.
+      const finalCalculatedCost = isFinal ? saved.calculatedCost : calculatedCost;
+      const finalAdjustedCost = isFinal 
+        ? saved.adjustedCost 
+        : (saved ? (saved.adjustmentNote ? saved.adjustedCost : calculatedCost) : calculatedCost);
       
       result.push({
         userId: ktv.id,
@@ -372,9 +395,8 @@ router.get('/calculate', requireAuth, requireAdmin, async (req: Request, res: Re
           role: stationRate.role
         } : null,
         casesCount: reports.length,
-        calculatedCost,
-        // If saved, use saved adjustedCost/note, otherwise default to calculatedCost
-        adjustedCost: saved ? saved.adjustedCost : calculatedCost,
+        calculatedCost: finalCalculatedCost,
+        adjustedCost: finalAdjustedCost,
         adjustmentNote: saved ? saved.adjustmentNote : '',
         status: saved ? saved.status : 'DRAFT',
         cases: reportsDetail
@@ -408,6 +430,15 @@ router.post('/save', requireAuth, requireAdmin, async (req: Request, res: Respon
     for (const item of salaries) {
       const { userId, calculatedCost, adjustedCost, adjustmentNote } = item;
       if (!userId) continue;
+
+      const existing = await prisma.salaryRecord.findUnique({
+        where: { month_userId: { month, userId } }
+      });
+
+      // Nếu bản ghi tháng này đã CHỐT (FINAL) -> Không được ghi đè!
+      if (existing && existing.status === 'FINAL') {
+        continue;
+      }
 
       // Upsert record
       const record = await prisma.salaryRecord.upsert({
@@ -1044,6 +1075,69 @@ router.post('/rates', requireAuth, requireAdmin, async (req: Request, res: Respo
     });
 
     await Promise.all(upsertPromises);
+
+    // Tự động đồng bộ lại calculatedCost cho các tháng đang ở trạng thái DRAFT (Nháp/Chưa khóa)
+    // Các tháng ĐÃ CHỐT (FINAL) sẽ giữ nguyên con số lịch sử và KHÔNG bị ảnh hưởng!
+    try {
+      const draftRecords = await prisma.salaryRecord.findMany({
+        where: { status: 'DRAFT' },
+        select: { month: true }
+      });
+      const draftMonths = Array.from(new Set(draftRecords.map(r => r.month)));
+
+      if (draftMonths.length > 0) {
+        const stationRates = await loadStationRates();
+        const dbCustomRates = await prisma.ktvServiceRate.findMany();
+        const customKtvRatesByUser = new Map<string, Map<string, number>>();
+        for (const r of dbCustomRates) {
+          if (!customKtvRatesByUser.has(r.userId)) {
+            customKtvRatesByUser.set(r.userId, new Map());
+          }
+          customKtvRatesByUser.get(r.userId)!.set(r.workType, r.rate);
+        }
+
+        for (const draftMonth of draftMonths) {
+          const formattedMonth = draftMonth.startsWith('0') ? `${Number(draftMonth.substring(0, 2))}/${draftMonth.substring(3)}` : draftMonth;
+          const recordsToUpdate = await prisma.salaryRecord.findMany({
+            where: { month: draftMonth, status: 'DRAFT' },
+            include: { user: true }
+          });
+
+          for (const rec of recordsToUpdate) {
+            const reports = await prisma.serviceReport.findMany({
+              where: {
+                ktvUserId: rec.userId,
+                month: formattedMonth,
+                approvalStatus: 'APPROVED'
+              },
+              include: { order: true }
+            });
+
+            const ktvPhoneNorm = normalizePhone(rec.user.phoneNumber);
+            const stationRate = ktvPhoneNorm ? stationRates.get(ktvPhoneNorm) : null;
+            const userCustomRates = customKtvRatesByUser.get(rec.userId);
+
+            let newCalculated = 0;
+            for (const rep of reports) {
+              const cost = calculateReportCost(rep, ktvPhoneNorm, stationRate, userCustomRates);
+              newCalculated += cost.totalCost;
+            }
+
+            const newAdjusted = rec.adjustmentNote ? rec.adjustedCost : newCalculated;
+
+            await prisma.salaryRecord.update({
+              where: { id: rec.id },
+              data: {
+                calculatedCost: newCalculated,
+                adjustedCost: newAdjusted
+              }
+            });
+          }
+        }
+      }
+    } catch (syncErr: any) {
+      logger.warn('Auto-sync draft salary records warning', { error: syncErr.message });
+    }
 
     res.json({
       success: true,

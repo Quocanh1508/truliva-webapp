@@ -20,13 +20,16 @@ export function validateWebhookPayload(req: Request, res: Response, next: NextFu
     return;
   }
 
-  // Kiểm tra trường event_type bắt buộc
+  // Nếu là request ping / test từ Pancake (không có event_type hoặc payload rỗng) -> Trả về 200 OK
   if (!body.event_type && !body.eventType && !body.type) {
-    logger.warn('Invalid payload: missing event_type', {
+    logger.info('Test/ping webhook received without event_type', {
       ip: req.ip,
       bodyKeys: Object.keys(body),
     });
-    res.status(400).json({ error: 'Invalid payload: missing event_type field' });
+    res.status(200).json({
+      status: 'ok',
+      message: 'Pancake webhook endpoint active (ping/test received successfully)'
+    });
     return;
   }
 
