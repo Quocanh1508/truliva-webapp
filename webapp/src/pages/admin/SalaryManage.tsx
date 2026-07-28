@@ -1119,10 +1119,6 @@ export default function SalaryManage() {
                       Giao + Lắp<br/>
                       <span className="text-[10px] font-normal opacity-80">(Chuẩn: {(defaultRates.giaoHangLapDat || 120000).toLocaleString('vi-VN')}đ)</span>
                     </th>
-                    <th className="px-3 py-3 border-b border-blue-900 text-center min-w-[130px]">
-                      Tháo + Lắp Lại<br/>
-                      <span className="text-[10px] font-normal opacity-80">(Chuẩn: {(defaultRates.thaoLapLai || 160000).toLocaleString('vi-VN')}đ)</span>
-                    </th>
                     <th className="px-3 py-3 border-b border-blue-900 text-center min-w-[160px]">
                       Chi phí di chuyển<br/>
                       <span className="text-[10px] font-normal opacity-80">(Chuẩn: 3.000đ/km &gt;20km)</span>
@@ -1251,9 +1247,6 @@ export default function SalaryManage() {
                           </td>
                           <td className="px-3 py-3 text-center">
                             {renderCell('giaoHangLapDat', defaultRates.giaoHangLapDat || 120000)}
-                          </td>
-                          <td className="px-3 py-3 text-center">
-                            {renderCell('thaoLapLai', defaultRates.thaoLapLai || 160000)}
                           </td>
                           <td className="px-3 py-3 text-center">
                             {renderTravelCell()}
