@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { fetchApi } from '../../api/client';
 import { 
   Calculator, 
@@ -19,7 +19,8 @@ import {
   RotateCcw,
   Sliders,
   Loader2,
-  Search
+  Search,
+  Building2
 } from 'lucide-react';
 import { useConfirm } from '../../context/ConfirmContext';
 import { useAuth } from '../../context/AuthContext';
@@ -256,8 +257,22 @@ export default function SalaryManage() {
   // Search & Filter states
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedKtvFilter, setSelectedKtvFilter] = useState('');
-  const [selectedStationFilter, setSelectedStationFilter] = useState('');
+  const [selectedStationsFilter, setSelectedStationsFilter] = useState<string[]>([]);
   const [selectedWorkTypeFilter, setSelectedWorkTypeFilter] = useState('');
+
+  // Dropdown State & Ref for Multi-Select Station Tree Filter
+  const [isStationDropdownOpen, setIsStationDropdownOpen] = useState(false);
+  const stationDropdownRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (stationDropdownRef.current && !stationDropdownRef.current.contains(event.target as Node)) {
+        setIsStationDropdownOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   // Function to toggle row expansion
   const toggleRowExpand = (reportId: string) => {
@@ -315,7 +330,7 @@ export default function SalaryManage() {
 
   useEffect(() => {
     setSelectedKtvFilter('');
-    setSelectedStationFilter('');
+    setSelectedStationsFilter([]);
     setSelectedWorkTypeFilter('');
     fetchSalaries();
   }, [selectedMonth]);
@@ -419,7 +434,7 @@ export default function SalaryManage() {
       const token = localStorage.getItem('session_token');
       let url = `/api/salaries/export?month=${encodeURIComponent(selectedMonth)}`;
       if (selectedKtvFilter) url += `&ktvId=${encodeURIComponent(selectedKtvFilter)}`;
-      if (selectedStationFilter) url += `&stationId=${encodeURIComponent(selectedStationFilter)}`;
+      if (selectedStationsFilter.length > 0) url += `&stationId=${encodeURIComponent(selectedStationsFilter.join(','))}`;
       if (selectedWorkTypeFilter) url += `&workType=${encodeURIComponent(selectedWorkTypeFilter)}`;
 
       const response = await fetch(url, {
@@ -451,14 +466,53 @@ export default function SalaryManage() {
     return salaries.filter(s => s.casesCount > 0 || (s.adjustedCost !== s.calculatedCost) || !!s.adjustmentNote);
   }, [salaries]);
 
-  // Unique Lists for Dropdown Filters (chỉ trích xuất các trạm có KTV làm ca trong tháng)
-  const uniqueStations = useMemo(() => {
-    const set = new Set<string>();
+  // Cấu trúc Cây Trạm: Trạm Chính (Parent Group) -> Trạm Kỹ Thuật (Child Sub-stations)
+  const stationTree = useMemo(() => {
+    const map = new Map<string, Set<string>>();
+
     activeKtvsInMonth.forEach(s => {
-      if (s.stationName && s.stationName !== 'Không có') set.add(s.stationName);
+      const main = s.mainStationName && s.mainStationName !== 'Không có' ? s.mainStationName : 'Trực thuộc Truliva';
+      const tech = s.stationName && s.stationName !== 'Không có' ? s.stationName : 'Khác';
+      if (!map.has(main)) {
+        map.set(main, new Set());
+      }
+      map.get(main)!.add(tech);
     });
-    return Array.from(set).sort();
+
+    const list: Array<{ mainStationName: string; stations: string[] }> = [];
+    map.forEach((stationsSet, mainStationName) => {
+      list.push({
+        mainStationName,
+        stations: Array.from(stationsSet).sort()
+      });
+    });
+
+    return list.sort((a, b) => a.mainStationName.localeCompare(b.mainStationName));
   }, [activeKtvsInMonth]);
+
+  // Toggle single technical station selection
+  const toggleStation = (techStation: string) => {
+    setSelectedStationsFilter(prev => {
+      if (prev.includes(techStation)) {
+        return prev.filter(s => s !== techStation);
+      } else {
+        return [...prev, techStation];
+      }
+    });
+  };
+
+  // Toggle all technical stations under a main station group
+  const toggleMainStationGroup = (groupStations: string[]) => {
+    const allSelected = groupStations.every(st => selectedStationsFilter.includes(st));
+    setSelectedStationsFilter(prev => {
+      if (allSelected) {
+        return prev.filter(st => !groupStations.includes(st));
+      } else {
+        const next = new Set([...prev, ...groupStations]);
+        return Array.from(next);
+      }
+    });
+  };
 
   // Flattened Cases Array for Detailed View Mode
   const allCases = useMemo(() => {
@@ -483,20 +537,20 @@ export default function SalaryManage() {
       // Khi chọn "Tất cả KTV", chỉ hiển thị những KTV có làm ca trong tháng
       const hasActivity = s.casesCount > 0 || (s.adjustedCost !== s.calculatedCost) || !!s.adjustmentNote;
       const matchKtv = selectedKtvFilter ? s.userId === selectedKtvFilter : hasActivity;
-      const matchStation = !selectedStationFilter || s.stationName === selectedStationFilter;
+      const matchStation = selectedStationsFilter.length === 0 || selectedStationsFilter.includes(s.stationName);
       const matchQuery = !searchQuery || 
         s.fullName.toLowerCase().includes(searchQuery.toLowerCase()) ||
         s.username.toLowerCase().includes(searchQuery.toLowerCase()) ||
         s.phoneNumber.includes(searchQuery);
       return matchKtv && matchStation && matchQuery;
     });
-  }, [salaries, selectedKtvFilter, selectedStationFilter, searchQuery]);
+  }, [salaries, selectedKtvFilter, selectedStationsFilter, searchQuery]);
 
   // Filtered Detailed Cases View
   const filteredCases = useMemo(() => {
     return allCases.filter(c => {
       const matchKtv = !selectedKtvFilter || c.userId === selectedKtvFilter;
-      const matchStation = !selectedStationFilter || c.stationName === selectedStationFilter;
+      const matchStation = selectedStationsFilter.length === 0 || selectedStationsFilter.includes(c.stationName);
       const matchWorkType = !selectedWorkTypeFilter || c.workType.toLowerCase().includes(selectedWorkTypeFilter.toLowerCase());
       const matchQuery = !searchQuery ||
         c.ktvName.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -508,7 +562,7 @@ export default function SalaryManage() {
 
       return matchKtv && matchStation && matchWorkType && matchQuery;
     });
-  }, [allCases, selectedKtvFilter, selectedStationFilter, selectedWorkTypeFilter, searchQuery]);
+  }, [allCases, selectedKtvFilter, selectedStationsFilter, selectedWorkTypeFilter, searchQuery]);
 
   const formatMoney = (val: number) => {
     return val.toLocaleString('vi-VN') + ' đ';
@@ -715,19 +769,125 @@ export default function SalaryManage() {
             </select>
           </div>
 
-          {/* 2. Lọc theo Trạm */}
-          <div>
-            <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-1">Trạm quản lý</label>
-            <select
-              value={selectedStationFilter}
-              onChange={(e) => setSelectedStationFilter(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+          {/* 2. Lọc theo Trạm (Cây Phân Cấp: Trạm Chính -> Trạm Kỹ Thuật, Cho Chọn Nhiều) */}
+          <div className="relative" ref={stationDropdownRef}>
+            <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-1">
+              Trạm quản lý {selectedStationsFilter.length > 0 && `(${selectedStationsFilter.length} trạm)`}
+            </label>
+            <button
+              type="button"
+              onClick={() => setIsStationDropdownOpen(!isStationDropdownOpen)}
+              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white flex items-center justify-between gap-2 shadow-sm text-gray-800 cursor-pointer hover:border-gray-300"
             >
-              <option value="">Tất cả Trạm</option>
-              {uniqueStations.map(st => (
-                <option key={st} value={st}>{st}</option>
-              ))}
-            </select>
+              <div className="flex items-center gap-1.5 truncate">
+                <Building2 className="h-3.5 w-3.5 text-blue-600 flex-shrink-0" />
+                <span className="truncate">
+                  {selectedStationsFilter.length === 0
+                    ? 'Tất cả Trạm'
+                    : `Đã chọn ${selectedStationsFilter.length} trạm`}
+                </span>
+              </div>
+              <div className="flex items-center gap-1">
+                {selectedStationsFilter.length > 0 && (
+                  <span
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setSelectedStationsFilter([]);
+                    }}
+                    className="p-0.5 hover:bg-gray-200 rounded-full text-gray-400 hover:text-gray-600 cursor-pointer"
+                    title="Xóa lọc trạm"
+                  >
+                    <X className="h-3 w-3" />
+                  </span>
+                )}
+                <ChevronDown className={`h-3.5 w-3.5 text-gray-400 transition-transform ${isStationDropdownOpen ? 'rotate-180' : ''}`} />
+              </div>
+            </button>
+
+            {/* Tree Multi-Select Panel */}
+            {isStationDropdownOpen && (
+              <div className="absolute left-0 top-full mt-1.5 w-72 bg-white border border-gray-200 rounded-xl shadow-2xl z-50 p-3 text-xs space-y-2 max-h-80 overflow-y-auto">
+                <div className="flex items-center justify-between pb-2 border-b border-gray-100 font-bold text-gray-700">
+                  <span className="text-[11px] uppercase tracking-wider text-gray-400">Danh mục Trạm</span>
+                  <div className="flex items-center gap-2 text-[11px]">
+                    <button
+                      type="button"
+                      onClick={() => setSelectedStationsFilter([])}
+                      className="text-blue-600 hover:underline font-semibold cursor-pointer"
+                    >
+                      Tất cả
+                    </button>
+                    <span className="text-gray-300">|</span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const allTechs = stationTree.flatMap(g => g.stations);
+                        setSelectedStationsFilter(allTechs);
+                      }}
+                      className="text-gray-500 hover:underline cursor-pointer"
+                    >
+                      Chọn hết
+                    </button>
+                  </div>
+                </div>
+
+                <div className="space-y-3 pt-1">
+                  {stationTree.map((group) => {
+                    const isGroupAllSelected = group.stations.every(st => selectedStationsFilter.includes(st));
+                    const isGroupSomeSelected = group.stations.some(st => selectedStationsFilter.includes(st)) && !isGroupAllSelected;
+
+                    return (
+                      <div key={group.mainStationName} className="space-y-1">
+                        {/* Header: Trạm Chính (Parent Group) */}
+                        <div className="flex items-center gap-2 bg-blue-50/70 px-2 py-1.5 rounded-lg border border-blue-100 font-bold text-blue-950">
+                          <input
+                            type="checkbox"
+                            checked={isGroupAllSelected}
+                            ref={(el) => {
+                              if (el) el.indeterminate = isGroupSomeSelected;
+                            }}
+                            onChange={() => toggleMainStationGroup(group.stations)}
+                            className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer h-3.5 w-3.5"
+                          />
+                          <span className="truncate flex-1 text-[11px] font-extrabold text-[#1B3A6B]">
+                            🏢 {group.mainStationName}
+                          </span>
+                          <span className="text-[10px] bg-blue-200/60 text-blue-800 px-1.5 py-0.2 rounded-full font-bold">
+                            {group.stations.length}
+                          </span>
+                        </div>
+
+                        {/* Sub-items: Trạm Kỹ Thuật (Child Stations) */}
+                        <div className="pl-4 space-y-0.5">
+                          {group.stations.map((techStation) => {
+                            const isChecked = selectedStationsFilter.includes(techStation);
+
+                            return (
+                              <label
+                                key={techStation}
+                                className={`flex items-center gap-2 px-2 py-1 rounded-md text-xs transition cursor-pointer hover:bg-gray-50 ${
+                                  isChecked ? 'bg-cyan-50/80 font-bold text-cyan-900' : 'text-gray-700 font-medium'
+                                }`}
+                              >
+                                <input
+                                  type="checkbox"
+                                  checked={isChecked}
+                                  onChange={() => toggleStation(techStation)}
+                                  className="rounded border-gray-300 text-cyan-600 focus:ring-cyan-500 cursor-pointer h-3.5 w-3.5"
+                                />
+                                <span className="truncate text-[11px] flex-1">
+                                  📍 {techStation}
+                                </span>
+                              </label>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
           </div>
 
           {/* 3. Lọc theo Loại dịch vụ */}
