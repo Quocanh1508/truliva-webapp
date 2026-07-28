@@ -998,6 +998,8 @@ router.get('/rates', requireAuth, requireAdmin, async (req: Request, res: Respon
       rateMapByUser.get(r.userId)![r.workType] = r.rate;
     }
 
+    const stationRates = await loadStationRates();
+
     const defaultRates: Record<string, number> = {
       giaoHang: 20000,
       baoHanh: 60000,
@@ -1011,13 +1013,31 @@ router.get('/rates', requireAuth, requireAdmin, async (req: Request, res: Respon
 
     const matrix = ktvs.map(ktv => {
       const userRates = rateMapByUser.get(ktv.id) || {};
+      const ktvPhoneNorm = normalizePhone(ktv.phoneNumber);
+      const stationRate = ktvPhoneNorm ? stationRates.get(ktvPhoneNorm) : null;
+      const isOfficialTrulivaKtv = ktvPhoneNorm === '392110073';
+
       const ratesWithCustomFlag: Record<string, { rate: number; isCustom: boolean }> = {};
 
       for (const [workType, defRate] of Object.entries(defaultRates)) {
         if (userRates[workType] !== undefined && userRates[workType] !== null) {
           ratesWithCustomFlag[workType] = { rate: userRates[workType], isCustom: true };
-        } else {
+        } else if (isOfficialTrulivaKtv) {
+          // KTV Trạm Truliva (Nguyễn Minh Thuận): Mức đơn giá chuẩn Truliva
           ratesWithCustomFlag[workType] = { rate: defRate, isCustom: false };
+        } else if (workType === 'kmRate') {
+          const rateVal = stationRate?.kmRate || 3000;
+          ratesWithCustomFlag[workType] = { rate: rateVal, isCustom: false };
+        } else if (workType === 'freeKmThreshold') {
+          const rateVal = stationRate?.freeKmThreshold || 20;
+          ratesWithCustomFlag[workType] = { rate: rateVal, isCustom: false };
+        } else if (stationRate && stationRate.rates && stationRate.rates[workType] !== undefined && stationRate.rates[workType] > 0) {
+          // KTV Ngoại: Lấy đơn giá theo Trạm trong File Excel
+          ratesWithCustomFlag[workType] = { rate: stationRate.rates[workType], isCustom: false };
+        } else {
+          // KTV Ngoại không thuộc trạm Excel: Lấy Flat Rate KTV ngoài (120k công, 0đ giao hàng)
+          const flatRate = getKtvFlatRate(workType);
+          ratesWithCustomFlag[workType] = { rate: flatRate, isCustom: false };
         }
       }
 
@@ -1026,7 +1046,7 @@ router.get('/rates', requireAuth, requireAdmin, async (req: Request, res: Respon
         fullName: ktv.fullName,
         username: ktv.username,
         phoneNumber: ktv.phoneNumber,
-        stationName: ktv.techStation?.name || 'Trực thuộc Truliva',
+        stationName: ktv.techStation?.name || (stationRate ? stationRate.province : 'Trực thuộc Truliva'),
         mainStationName: ktv.techStation?.mainStation?.name || 'Truliva Official',
         rates: ratesWithCustomFlag
       };
