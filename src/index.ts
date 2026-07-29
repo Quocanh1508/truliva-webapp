@@ -186,6 +186,19 @@ There Is No Limit To What You Can Accomplish Using Zalo!
 </html>`);
 });
 
+app.get('/zalo_verifierUlIO8Ft_3I4MzQDvw8esJX2Bcsdy_KmqDZOv.html', (req, res) => {
+  res.setHeader('Content-Type', 'text/html; charset=utf-8');
+  res.send(`<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta property="zalo-platform-site-verification" content="UlIO8Ft_3I4MzQDvw8esJX2Bcsdy_KmqDZOv" />
+</head>
+<body>
+There Is No Limit To What You Can Accomplish Using Zalo!
+</body>
+</html>`);
+});
+
 // ── Serve webapp static files (production) ──
 const webappPath = path.join(__dirname, '..', 'webapp', 'dist');
 app.use(express.static(webappPath, {
