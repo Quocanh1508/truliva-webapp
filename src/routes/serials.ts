@@ -1883,7 +1883,7 @@ router.post('/:id/restore', requireCoordinatorOrAdmin, async (req: Request, res:
  * GET /api/serials/zalo/authorize
  * Chuyển hướng Admin tới trang OAuth của Zalo để bắt đầu cấp quyền liên kết OA
  */
-router.get('/zalo/authorize', requireCoordinatorOrAdmin, async (req: Request, res: Response): Promise<void> => {
+router.get('/zalo/authorize', async (req: Request, res: Response): Promise<void> => {
   try {
     const fnsAppId = process.env.FNS_APP_ID || '';
     const fnsSecretKey = process.env.FNS_SECRET_KEY || '';
