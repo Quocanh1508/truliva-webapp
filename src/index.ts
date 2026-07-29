@@ -215,7 +215,7 @@ app.use(express.static(webappPath, {
 // ── SPA fallback: mọi route không match API/webhook → index.html ──
 app.use((req, res, next) => {
   // Nếu request là API hoặc webhook thì bỏ qua (next)
-  if (req.path.startsWith('/api/') || req.path.startsWith('/webhooks/') || req.path === '/health' || req.path.startsWith('/uploads/')) {
+  if (req.path.startsWith('/api/') || req.path.startsWith('/webhooks/') || req.path === '/health' || req.path.startsWith('/uploads/') || req.path.startsWith('/zalo_verifier')) {
     return next();
   }
   res.sendFile(path.join(webappPath, 'index.html'));
