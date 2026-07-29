@@ -192,7 +192,7 @@ export default function InventoryManage() {
   });
 
   return (
-    <div className="container-fluid p-6">
+    <div className="container-fluid p-3 md:p-6">
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
         <div>
@@ -420,111 +420,207 @@ export default function InventoryManage() {
         </div>
       </div>
 
-      {/* Main Stock Matrix Grid */}
+      {/* Main Stock Matrix View */}
       <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
         {loading ? (
-          <div className="flex flex-col items-center justify-center p-16">
+          <div className="flex flex-col items-center justify-center p-12 md:p-16">
             <span className="spinner mb-3" style={{ borderColor: 'rgba(27, 58, 107, 0.2)', borderTopColor: '#1B3A6B' }}></span>
             <span className="text-slate-500 text-sm font-semibold">Đang tải bảng tồn kho...</span>
           </div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse table-auto">
-              <thead>
-                <tr className="bg-slate-50 border-b border-slate-200 text-slate-600 text-xs font-bold uppercase tracking-wider">
-                  <th className="px-6 py-4 sticky left-0 bg-slate-50 z-10 border-r border-slate-200 shadow-[2px_0_5px_rgba(0,0,0,0.03)]" style={{ minWidth: '240px' }}>
-                    Sản phẩm
-                  </th>
-                  <th className="px-4 py-4 text-center border-r border-slate-200" style={{ width: '120px' }}>SKU / Danh mục</th>
-                  
-                  {/* Cột hiển thị của từng kho hàng được chọn */}
-                  {warehouses.filter(w => selectedWarehouses.includes(w.id)).map((w) => (
-                    <th key={w.id} className="px-4 py-4 text-center border-r border-slate-100" style={{ minWidth: '130px', maxWidth: '200px' }}>
-                      <div className="truncate font-semibold text-slate-700" title={w.name}>{w.name}</div>
-                      {w.phone && <div className="text-[10px] text-slate-400 normal-case font-normal mt-0.5">{w.phone}</div>}
-                    </th>
-                  ))}
-                  
-                  <th className="px-4 py-4 text-center bg-slate-100 font-bold text-slate-800 border-l border-slate-200" style={{ width: '120px' }}>
-                    Tổng có thể bán
-                  </th>
-                  <th className="px-4 py-4 text-center bg-slate-50 font-bold text-slate-700 border-l border-slate-200" style={{ width: '120px' }}>
-                    Tổng tồn thực tế
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100 text-sm text-slate-700">
-                {filteredProducts.map((p) => {
-                  const systemTotal = p.availableStock;
-                  return (
-                    <tr key={p.id} className="hover:bg-slate-50 transition-colors">
-                      {/* Tên sản phẩm - Cố định ở cột đầu để dễ track khi scroll ngang */}
-                      <td className="px-6 py-3.5 font-semibold text-slate-900 sticky left-0 bg-white group-hover:bg-slate-50 border-r border-slate-200 shadow-[2px_0_5px_rgba(0,0,0,0.03)] z-10">
-                        <div className="flex flex-col">
-                          <span className="line-clamp-2" title={p.name}>{p.name}</span>
-                          {!p.isActive && (
-                            <span className="inline-block self-start text-[10px] bg-slate-100 text-slate-500 rounded px-1.5 py-0.5 mt-1 font-bold">Ẩn trên POS</span>
-                          )}
-                        </div>
-                      </td>
- 
-                      {/* Mã SKU & Danh mục */}
-                      <td className="px-4 py-3.5 text-center border-r border-slate-200 whitespace-nowrap">
-                        <div className="font-bold text-xs text-slate-600">{p.sku || '-'}</div>
-                        <div className="text-[11px] text-slate-400 mt-0.5">{p.category || '-'}</div>
-                      </td>
- 
-                      {/* Các cột kho hàng hiển thị tồn kho tương ứng */}
-                      {warehouses.filter(w => selectedWarehouses.includes(w.id)).map((w) => {
-                        const stockQty = p.stocks ? (p.stocks[w.id] ?? 0) : 0;
-                        const actualStockQty = p.actualStocks ? (p.actualStocks[w.id] ?? stockQty) : stockQty;
-                        const isLowStock = stockQty <= lowStockThreshold;
-                        return (
-                          <td 
-                            key={w.id} 
-                            className={`px-4 py-2 text-center border-r border-slate-100 font-bold transition-all ${
-                              isLowStock 
-                                ? 'bg-red-50 text-red-600 border-red-200/50 shadow-inner' 
-                                : 'text-slate-800'
-                            }`}
-                          >
-                            <div className="flex flex-col items-center">
-                              <span className={isLowStock ? 'text-base font-extrabold' : ''}>
-                                {stockQty}
-                              </span>
-                              <span className="text-xs text-slate-400 font-normal mt-0.5 border-t border-slate-100 w-full pt-0.5">
-                                {actualStockQty}
-                              </span>
-                            </div>
-                            {isLowStock && (
-                              <div className="text-[9px] text-red-500 font-bold uppercase tracking-wide mt-0.5">Sắp hết</div>
-                            )}
-                          </td>
-                        );
-                      })}
- 
-                      {/* Cột Tổng có thể bán */}
-                      <td className={`px-4 py-3.5 text-center font-extrabold border-l border-slate-200 text-sm transition-all ${
-                        systemTotal <= lowStockThreshold
-                          ? 'bg-red-100 text-red-700 border-red-200/50 shadow-inner'
-                          : 'bg-slate-100 text-slate-800'
-                      }`}>
-                        <span>{systemTotal}</span>
-                        {systemTotal <= lowStockThreshold && (
-                          <div className="text-[9px] text-red-600 font-bold uppercase tracking-wide mt-0.5">Sắp hết</div>
-                        )}
-                      </td>
-
-                      {/* Cột Tổng tồn thực tế */}
-                      <td className="px-4 py-3.5 text-center font-bold text-slate-700 bg-slate-50 border-l border-slate-200 text-sm">
-                        <span>{p.totalStock ?? 0}</span>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+        ) : filteredProducts.length === 0 ? (
+          <div className="flex flex-col items-center justify-center p-12 text-center text-slate-400">
+            <Warehouse size={40} className="mb-2 opacity-50 text-slate-400" />
+            <span className="text-sm font-semibold">Không tìm thấy sản phẩm phù hợp</span>
           </div>
+        ) : (
+          <>
+            {/* 📱 MOBILE CARD VIEW (Hiển thị mượt mà trên điện thoại < 768px) */}
+            <div className="block md:hidden p-3 space-y-3 bg-slate-50">
+              {filteredProducts.map((p) => {
+                const systemTotal = p.availableStock;
+                const isLowTotal = systemTotal <= lowStockThreshold;
+                const activeWarehouses = warehouses.filter(w => selectedWarehouses.includes(w.id));
+
+                return (
+                  <div key={p.id} className="bg-white rounded-xl border border-slate-200 p-3.5 shadow-sm space-y-3">
+                    {/* Tên sản phẩm & Badges */}
+                    <div>
+                      <div className="font-bold text-slate-900 text-sm leading-snug">
+                        {p.name}
+                      </div>
+                      <div className="flex flex-wrap items-center gap-1.5 mt-1.5">
+                        {p.sku && (
+                          <span className="bg-slate-100 text-slate-700 font-mono text-[10px] font-bold px-2 py-0.5 rounded border border-slate-200">
+                            SKU: {p.sku}
+                          </span>
+                        )}
+                        {p.category && (
+                          <span className="bg-blue-50 text-blue-700 text-[10px] font-semibold px-2 py-0.5 rounded border border-blue-100">
+                            {p.category}
+                          </span>
+                        )}
+                        {!p.isActive && (
+                          <span className="bg-slate-100 text-slate-500 text-[10px] font-bold px-1.5 py-0.5 rounded">
+                            Ẩn POS
+                          </span>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Tóm tắt tồn kho tổng */}
+                    <div className="grid grid-cols-2 gap-2 pt-2 border-t border-slate-100">
+                      <div className={`p-2 rounded-lg border text-center ${
+                        isLowTotal ? 'bg-red-50 border-red-200 text-red-700' : 'bg-slate-50 border-slate-200 text-slate-800'
+                      }`}>
+                        <div className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Có thể bán</div>
+                        <div className="text-base font-extrabold">{systemTotal}</div>
+                        {isLowTotal && <div className="text-[9px] font-bold text-red-600">Sắp hết hàng</div>}
+                      </div>
+
+                      <div className="p-2 rounded-lg border border-slate-200 bg-slate-50 text-slate-800 text-center">
+                        <div className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Tồn thực tế</div>
+                        <div className="text-base font-bold">{p.totalStock ?? 0}</div>
+                      </div>
+                    </div>
+
+                    {/* Chi tiết tồn kho theo từng kho được chọn */}
+                    {activeWarehouses.length > 0 && (
+                      <div className="pt-2 border-t border-slate-100 space-y-1.5">
+                        <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                          Tồn theo kho hàng ({activeWarehouses.length} kho)
+                        </div>
+                        <div className="grid grid-cols-1 gap-1.5">
+                          {activeWarehouses.map((w) => {
+                            const stockQty = p.stocks ? (p.stocks[w.id] ?? 0) : 0;
+                            const actualStockQty = p.actualStocks ? (p.actualStocks[w.id] ?? stockQty) : stockQty;
+                            const isLowStock = stockQty <= lowStockThreshold;
+
+                            return (
+                              <div
+                                key={w.id}
+                                className={`flex items-center justify-between px-2.5 py-1.5 rounded-lg border text-xs ${
+                                  isLowStock ? 'bg-red-50/80 border-red-200 text-red-900 font-semibold' : 'bg-slate-50/80 border-slate-150 text-slate-700'
+                                }`}
+                              >
+                                <span className="font-semibold truncate max-w-[190px]" title={w.name}>{w.name}</span>
+                                <div className="flex items-center gap-2 shrink-0">
+                                  <span className={isLowStock ? 'text-red-700 font-extrabold' : 'text-slate-900 font-bold'}>
+                                    Bán: {stockQty}
+                                  </span>
+                                  <span className="text-[10px] text-slate-400 font-normal">
+                                    (Thực: {actualStockQty})
+                                  </span>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* 💻 DESKTOP MATRIX TABLE VIEW (Hiển thị màn hình máy tính >= 768px) */}
+            <div className="hidden md:block overflow-x-auto">
+              <table className="w-full text-left border-collapse table-auto">
+                <thead>
+                  <tr className="bg-slate-50 border-b border-slate-200 text-slate-600 text-xs font-bold uppercase tracking-wider">
+                    <th className="px-6 py-4 sticky left-0 bg-slate-50 z-10 border-r border-slate-200 shadow-[2px_0_5px_rgba(0,0,0,0.03)]" style={{ minWidth: '240px' }}>
+                      Sản phẩm
+                    </th>
+                    <th className="px-4 py-4 text-center border-r border-slate-200" style={{ width: '120px' }}>SKU / Danh mục</th>
+                    
+                    {/* Cột hiển thị của từng kho hàng được chọn */}
+                    {warehouses.filter(w => selectedWarehouses.includes(w.id)).map((w) => (
+                      <th key={w.id} className="px-4 py-4 text-center border-r border-slate-100" style={{ minWidth: '130px', maxWidth: '200px' }}>
+                        <div className="truncate font-semibold text-slate-700" title={w.name}>{w.name}</div>
+                        {w.phone && <div className="text-[10px] text-slate-400 normal-case font-normal mt-0.5">{w.phone}</div>}
+                      </th>
+                    ))}
+                    
+                    <th className="px-4 py-4 text-center bg-slate-100 font-bold text-slate-800 border-l border-slate-200" style={{ width: '120px' }}>
+                      Tổng có thể bán
+                    </th>
+                    <th className="px-4 py-4 text-center bg-slate-50 font-bold text-slate-700 border-l border-slate-200" style={{ width: '120px' }}>
+                      Tổng tồn thực tế
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 text-sm text-slate-700">
+                  {filteredProducts.map((p) => {
+                    const systemTotal = p.availableStock;
+                    return (
+                      <tr key={p.id} className="hover:bg-slate-50 transition-colors">
+                        {/* Tên sản phẩm - Cố định ở cột đầu để dễ track khi scroll ngang */}
+                        <td className="px-6 py-3.5 font-semibold text-slate-900 sticky left-0 bg-white group-hover:bg-slate-50 border-r border-slate-200 shadow-[2px_0_5px_rgba(0,0,0,0.03)] z-10">
+                          <div className="flex flex-col">
+                            <span className="line-clamp-2" title={p.name}>{p.name}</span>
+                            {!p.isActive && (
+                              <span className="inline-block self-start text-[10px] bg-slate-100 text-slate-500 rounded px-1.5 py-0.5 mt-1 font-bold">Ẩn trên POS</span>
+                            )}
+                          </div>
+                        </td>
+
+                        {/* Mã SKU & Danh mục */}
+                        <td className="px-4 py-3.5 text-center border-r border-slate-200 whitespace-nowrap">
+                          <div className="font-bold text-xs text-slate-600">{p.sku || '-'}</div>
+                          <div className="text-[11px] text-slate-400 mt-0.5">{p.category || '-'}</div>
+                        </td>
+
+                        {/* Các cột kho hàng hiển thị tồn kho tương ứng */}
+                        {warehouses.filter(w => selectedWarehouses.includes(w.id)).map((w) => {
+                          const stockQty = p.stocks ? (p.stocks[w.id] ?? 0) : 0;
+                          const actualStockQty = p.actualStocks ? (p.actualStocks[w.id] ?? stockQty) : stockQty;
+                          const isLowStock = stockQty <= lowStockThreshold;
+                          return (
+                            <td 
+                              key={w.id} 
+                              className={`px-4 py-2 text-center border-r border-slate-100 font-bold transition-all ${
+                                isLowStock 
+                                  ? 'bg-red-50 text-red-600 border-red-200/50 shadow-inner' 
+                                  : 'text-slate-800'
+                              }`}
+                            >
+                              <div className="flex flex-col items-center">
+                                <span className={isLowStock ? 'text-base font-extrabold' : ''}>
+                                  {stockQty}
+                                </span>
+                                <span className="text-xs text-slate-400 font-normal mt-0.5 border-t border-slate-100 w-full pt-0.5">
+                                  {actualStockQty}
+                                </span>
+                              </div>
+                              {isLowStock && (
+                                <div className="text-[9px] text-red-500 font-bold uppercase tracking-wide mt-0.5">Sắp hết</div>
+                              )}
+                            </td>
+                          );
+                        })}
+
+                        {/* Cột Tổng có thể bán */}
+                        <td className={`px-4 py-3.5 text-center font-extrabold border-l border-slate-200 text-sm transition-all ${
+                          systemTotal <= lowStockThreshold
+                            ? 'bg-red-100 text-red-700 border-red-200/50 shadow-inner'
+                            : 'bg-slate-100 text-slate-800'
+                        }`}>
+                          <span>{systemTotal}</span>
+                          {systemTotal <= lowStockThreshold && (
+                            <div className="text-[9px] text-red-600 font-bold uppercase tracking-wide mt-0.5">Sắp hết</div>
+                          )}
+                        </td>
+
+                        {/* Cột Tổng tồn thực tế */}
+                        <td className="px-4 py-3.5 text-center font-bold text-slate-700 bg-slate-50 border-l border-slate-200 text-sm">
+                          <span>{p.totalStock ?? 0}</span>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </>
         )}
       </div>
     </div>
