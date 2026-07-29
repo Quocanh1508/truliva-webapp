@@ -1922,7 +1922,7 @@ router.get('/zalo/authorize', requireCoordinatorOrAdmin, async (req: Request, re
     
     // Zalo yêu cầu redirect_uri phải khớp chính xác với những gì đã cấu hình trên Zalo Developer portal.
     const redirectUri = process.env.ZALO_REDIRECT_URI || `${req.protocol}://${req.get('host')}/api/serials/zalo/callback`;
-    const authorizeUrl = `https://oauth.zalo.me/pc/oauth/authorize?app_id=${config.appId}&redirect_uri=${encodeURIComponent(redirectUri)}&state=truliva`;
+    const authorizeUrl = `https://oauth.zalo.me/v4/oa/permission?app_id=${config.appId}&redirect_uri=${encodeURIComponent(redirectUri)}&state=truliva`;
     
     logger.info('Redirecting admin to Zalo OAuth page', { appId: config.appId, redirectUri });
     res.redirect(authorizeUrl);
