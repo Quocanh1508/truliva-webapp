@@ -362,6 +362,130 @@ router.post('/public/confirm', async (req: Request, res: Response): Promise<void
   }
 });
 
+// ══════════════════════════════════════
+//  ZALO OA OAUTH PUBLIC ROUTES
+// ══════════════════════════════════════
+
+/**
+ * GET /api/serials/zalo/authorize
+ * Chuyển hướng Admin tới trang OAuth của Zalo để bắt đầu cấp quyền liên kết OA
+ */
+router.get('/zalo/authorize', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const fnsAppId = process.env.FNS_APP_ID || '';
+    const fnsSecretKey = process.env.FNS_SECRET_KEY || '';
+    if (fnsAppId && fnsSecretKey) {
+      res.send(`
+        <html>
+          <head>
+            <title>Liên kết Zalo OA</title>
+            <meta charset="utf-8">
+            <style>
+              body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; background-color: #f3f4f6; }
+              .card { background: white; padding: 32px; border-radius: 12px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); text-align: center; max-width: 400px; }
+              h2 { color: #10b981; margin-top: 0; }
+              p { color: #4b5563; font-size: 14px; line-height: 1.5; }
+              .btn { background: #3b82f6; color: white; border: none; padding: 10px 20px; border-radius: 6px; font-weight: 600; cursor: pointer; margin-top: 16px; }
+            </style>
+          </head>
+          <body>
+            <div class="card">
+              <h2>Đã kết nối qua FPT FNS</h2>
+              <p>Hệ thống hiện tại đang sử dụng cấu hình gửi tin nhắn ZNS thông qua cổng <strong>FPT FNS Gateway (App ID: ${fnsAppId})</strong>.</p>
+              <p>Trạng thái kết nối là hoạt động và bạn không cần thực hiện liên kết OAuth trực tiếp.</p>
+              <button onclick="window.close()" class="btn">Đóng cửa sổ</button>
+            </div>
+          </body>
+        </html>
+      `);
+      return;
+    }
+
+    const config = await getZaloConfig();
+    if (!config.appId) {
+      res.status(400).send('Cấu hình Zalo OA chưa được thiết lập App ID trong DB hoặc file .env');
+      return;
+    }
+    
+    // Zalo yêu cầu redirect_uri phải khớp chính xác với những gì đã cấu hình trên Zalo Developer portal.
+    const redirectUri = process.env.ZALO_REDIRECT_URI || `${req.protocol}://${req.get('host')}/api/serials/zalo/callback`;
+    const authorizeUrl = `https://oauth.zalo.me/v4/oa/permission?app_id=${config.appId}&redirect_uri=${encodeURIComponent(redirectUri)}&state=truliva`;
+    
+    logger.info('Redirecting admin to Zalo OAuth page', { appId: config.appId, redirectUri });
+    res.redirect(authorizeUrl);
+  } catch (error: any) {
+    logger.error('Error initiating Zalo OAuth redirect', { error: error.message });
+    res.status(500).send(`Lỗi hệ thống khi bắt đầu liên kết Zalo OA: ${error.message}`);
+  }
+});
+
+/**
+ * GET /api/serials/zalo/callback
+ * Endpoint nhận callback từ Zalo OAuth, nhận authorization_code để đổi lấy tokens
+ */
+router.get('/zalo/callback', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const code = req.query.code as string;
+    if (!code) {
+      res.status(400).send('Thiếu mã authorization code từ Zalo OA');
+      return;
+    }
+
+    await exchangeAuthorizationCode(code);
+
+    res.send(`
+      <html>
+        <head>
+          <title>Liên kết Zalo OA thành công</title>
+          <meta charset="utf-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1">
+          <style>
+            body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh; background-color: #f0fdf4; margin: 0; }
+            .card { background: white; padding: 40px; border-radius: 16px; box-shadow: 0 10px 25px -5px rgba(0,0,0,0.05); text-align: center; max-width: 420px; border: 1px solid #bbf7d0; }
+            h1 { color: #166534; font-size: 22px; margin-top: 16px; margin-bottom: 8px; }
+            p { color: #374151; font-size: 14px; line-height: 1.6; margin-bottom: 24px; }
+            .success-icon { width: 64px; height: 64px; background: #dcfce7; color: #16a34a; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto; font-size: 32px; }
+            .btn { background: #16a34a; color: white; border: none; padding: 12px 24px; border-radius: 8px; font-weight: 600; cursor: pointer; font-size: 14px; transition: background 0.2s; }
+            .btn:hover { background: #15803d; }
+          </style>
+        </head>
+        <body>
+          <div class="card">
+            <div class="success-icon">✓</div>
+            <h1>Liên kết Zalo OA thành công!</h1>
+            <p>Hệ thống Truliva đã kết nối thành công với tài khoản Zalo OA của bạn. Access Token và Refresh Token đã được lưu an toàn.</p>
+            <button onclick="window.close()" class="btn">Đóng cửa sổ này</button>
+          </div>
+        </body>
+      </html>
+    `);
+  } catch (error: any) {
+    logger.error('Zalo OAuth callback error', { error: error.message });
+    res.status(500).send(`
+      <html>
+        <head>
+          <title>Liên kết Zalo OA thất bại</title>
+          <meta charset="utf-8">
+          <style>
+            body { font-family: sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh; background-color: #fff5f5; margin: 0; }
+            .card { background: white; padding: 40px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); text-align: center; max-width: 400px; border-top: 4px solid #e53e3e; }
+            h1 { color: #c53030; margin-bottom: 16px; }
+            p { color: #4a5568; margin-bottom: 24px; line-height: 1.5; }
+            .btn { background: #e53e3e; color: white; padding: 10px 20px; text-decoration: none; border-radius: 4px; border: none; cursor: pointer; }
+          </style>
+        </head>
+        <body>
+          <div class="card">
+            <h1>Liên kết thất bại</h1>
+            <p>Có lỗi xảy ra trong quá trình thiết lập liên kết với Zalo OA: ${error.message}</p>
+            <button onclick="window.close()" class="btn">Đóng cửa sổ</button>
+          </div>
+        </body>
+      </html>
+    `);
+  }
+});
+
 // Tất cả route phía dưới yêu cầu đăng nhập
 router.use(requireAuth);
 
@@ -1876,129 +2000,8 @@ router.post('/:id/restore', requireCoordinatorOrAdmin, async (req: Request, res:
 });
 
 // ══════════════════════════════════════
-//  ZALO OA OAUTH & ZNS ROUTES
+//  ZALO OA STATUS & MANAGEMENT ROUTES
 // ══════════════════════════════════════
-
-/**
- * GET /api/serials/zalo/authorize
- * Chuyển hướng Admin tới trang OAuth của Zalo để bắt đầu cấp quyền liên kết OA
- */
-router.get('/zalo/authorize', async (req: Request, res: Response): Promise<void> => {
-  try {
-    const fnsAppId = process.env.FNS_APP_ID || '';
-    const fnsSecretKey = process.env.FNS_SECRET_KEY || '';
-    if (fnsAppId && fnsSecretKey) {
-      res.send(`
-        <html>
-          <head>
-            <title>Liên kết Zalo OA</title>
-            <meta charset="utf-8">
-            <style>
-              body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; background-color: #f3f4f6; }
-              .card { background: white; padding: 32px; border-radius: 12px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); text-align: center; max-width: 400px; }
-              h2 { color: #10b981; margin-top: 0; }
-              p { color: #4b5563; font-size: 14px; line-height: 1.5; }
-              .btn { background: #3b82f6; color: white; border: none; padding: 10px 20px; border-radius: 6px; font-weight: 600; cursor: pointer; margin-top: 16px; }
-            </style>
-          </head>
-          <body>
-            <div class="card">
-              <h2>Đã kết nối qua FPT FNS</h2>
-              <p>Hệ thống hiện tại đang sử dụng cấu hình gửi tin nhắn ZNS thông qua cổng <strong>FPT FNS Gateway (App ID: ${fnsAppId})</strong>.</p>
-              <p>Trạng thái kết nối là hoạt động và bạn không cần thực hiện liên kết OAuth trực tiếp.</p>
-              <button onclick="window.close()" class="btn">Đóng cửa sổ</button>
-            </div>
-          </body>
-        </html>
-      `);
-      return;
-    }
-
-    const config = await getZaloConfig();
-    if (!config.appId) {
-      res.status(400).send('Cấu hình Zalo OA chưa được thiết lập App ID trong DB hoặc file .env');
-      return;
-    }
-    
-    // Zalo yêu cầu redirect_uri phải khớp chính xác với những gì đã cấu hình trên Zalo Developer portal.
-    const redirectUri = process.env.ZALO_REDIRECT_URI || `${req.protocol}://${req.get('host')}/api/serials/zalo/callback`;
-    const authorizeUrl = `https://oauth.zalo.me/v4/oa/permission?app_id=${config.appId}&redirect_uri=${encodeURIComponent(redirectUri)}&state=truliva`;
-    
-    logger.info('Redirecting admin to Zalo OAuth page', { appId: config.appId, redirectUri });
-    res.redirect(authorizeUrl);
-  } catch (error: any) {
-    logger.error('Error initiating Zalo OAuth redirect', { error: error.message });
-    res.status(500).send(`Lỗi hệ thống khi bắt đầu liên kết Zalo OA: ${error.message}`);
-  }
-});
-
-/**
- * GET /api/serials/zalo/callback
- * Endpoint nhận callback từ Zalo OAuth, nhận authorization_code để đổi lấy tokens
- */
-router.get('/zalo/callback', async (req: Request, res: Response): Promise<void> => {
-  try {
-    const code = req.query.code as string;
-    if (!code) {
-      res.status(400).send('Thiếu mã authorization code từ Zalo OA');
-      return;
-    }
-
-    await exchangeAuthorizationCode(code);
-
-    // Trả về trang thông báo liên kết thành công đẹp mắt
-    res.send(`
-      <html>
-        <head>
-          <title>Liên kết Zalo OA thành công</title>
-          <meta charset="utf-8">
-          <meta name="viewport" content="width=device-width, initial-scale=1">
-          <style>
-            body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh; background-color: #f0f4f8; margin: 0; padding: 20px; }
-            .card { background: white; padding: 40px 30px; border-radius: 12px; box-shadow: 0 10px 25px rgba(0,0,0,0.05); text-align: center; max-width: 450px; width: 100%; border-top: 4px solid #3182ce; }
-            .icon { font-size: 48px; color: #48bb78; margin-bottom: 20px; }
-            h1 { color: #2b6cb0; font-size: 22px; margin-bottom: 12px; font-weight: 700; }
-            p { color: #4a5568; font-size: 15px; line-height: 1.6; margin-bottom: 24px; }
-            .btn { background: #3182ce; color: white; padding: 12px 30px; text-decoration: none; border-radius: 6px; font-weight: bold; border: none; cursor: pointer; transition: all 0.2s; font-size: 15px; box-shadow: 0 4px 6px rgba(49,130,206,0.2); }
-            .btn:hover { background: #2b6cb0; box-shadow: 0 6px 12px rgba(49,130,206,0.3); transform: translateY(-1px); }
-          </style>
-        </head>
-        <body>
-          <div class="card">
-            <div class="icon">✓</div>
-            <h1>Liên kết thành công!</h1>
-            <p>Hệ thống Truliva đã kết nối thành công với Zalo Official Account. Bây giờ bạn có thể đóng cửa sổ này và quay trở về trang quản lý.</p>
-            <button onclick="window.close()" class="btn">Đóng cửa sổ</button>
-          </div>
-        </body>
-      </html>
-    `);
-  } catch (error: any) {
-    logger.error('Zalo OAuth callback route error', { error: error.message });
-    res.status(500).send(`
-      <html>
-        <head>
-          <title>Liên kết Zalo OA thất bại</title>
-          <meta charset="utf-8">
-          <style>
-            body { font-family: sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh; background-color: #fff5f5; margin: 0; }
-            .card { background: white; padding: 40px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); text-align: center; max-width: 400px; border-top: 4px solid #e53e3e; }
-            h1 { color: #c53030; margin-bottom: 16px; }
-            p { color: #4a5568; margin-bottom: 24px; line-height: 1.5; }
-            .btn { background: #e53e3e; color: white; padding: 10px 20px; text-decoration: none; border-radius: 4px; border: none; cursor: pointer; }
-          </style>
-        </head>
-        <body>
-          <div class="card">
-            <h1>Liên kết thất bại</h1>
-            <p>Có lỗi xảy ra trong quá trình thiết lập liên kết với Zalo OA: ${error.message}</p>
-            <button onclick="window.close()" class="btn">Đóng cửa sổ</button>
-          </div>
-        </body>
-      </html>
-    `);
-  }
-});
 
 /**
  * GET /api/serials/zalo/status
