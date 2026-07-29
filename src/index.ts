@@ -172,6 +172,20 @@ app.use('/uploads', express.static(path.join(process.cwd(), 'uploads'), {
   }
 }));
 
+// ── Serve Zalo Domain Verification file ──
+app.get('/zalo_verifierUS2Y29_U63HrryaLawT10bIDx0Mu-pPOD38t.html', (req, res) => {
+  res.setHeader('Content-Type', 'text/html; charset=utf-8');
+  res.send(`<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta property="zalo-platform-site-verification" content="US2Y29_U63HrryaLawT10bIDx0Mu-pPOD38t" />
+</head>
+<body>
+There Is No Limit To What You Can Accomplish Using Zalo!
+</body>
+</html>`);
+});
+
 // ── Serve webapp static files (production) ──
 const webappPath = path.join(__dirname, '..', 'webapp', 'dist');
 app.use(express.static(webappPath, {
