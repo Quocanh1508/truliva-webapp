@@ -1648,8 +1648,8 @@ export default function Dashboard() {
               {/* Charts Row 1: Product & Area Issues */}
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 {/* 1. Dòng máy thường gặp sự cố */}
-                <div className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm flex flex-col h-[350px]">
-                  <h3 className="font-bold text-sm text-gray-800 border-b pb-3 mb-4">Dòng máy thường gặp sự cố (Số ca Bảo hành/Sửa chữa)</h3>
+                <div className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm flex flex-col h-[420px]">
+                  <h3 className="font-bold text-sm text-gray-800 border-b pb-3 mb-4">Dòng máy / Sản phẩm thường gặp sự cố</h3>
                   <div className="flex-1 w-full">
                     {qualityData.productIssues.length === 0 ? (
                       <div className="h-full flex items-center justify-center text-gray-400 text-sm">Chưa có dữ liệu sự cố dòng máy</div>
@@ -1657,13 +1657,19 @@ export default function Dashboard() {
                       <ResponsiveContainer width="100%" height="100%">
                         <BarChart 
                           layout="vertical"
-                          data={qualityData.productIssues.slice(0, 10).map((item: any) => ({
-                            ...item,
-                            displayName: item.name
-                              .replace(/^(Máy lọc nước |Máy nóng lạnh treo tường |Máy lọc không khí |Bộ lọc nước tại vòi )/i, '')
-                              .trim()
-                          }))} 
-                          margin={{ top: 5, right: 15, left: -10, bottom: 5 }}
+                          data={qualityData.productIssues.slice(0, 10).map((item: any) => {
+                            let clean = item.name
+                              .replace(/^(Máy lọc nước |Máy nóng lạnh treo tường |Máy lọc không khí |Bộ lọc nước tại vòi |\([A-Z]\)\s*)/gi, '')
+                              .trim();
+                            if (clean.length > 25) {
+                              clean = clean.slice(0, 24) + '…';
+                            }
+                            return {
+                              ...item,
+                              displayName: clean
+                            };
+                          })} 
+                          margin={{ top: 5, right: 20, left: 10, bottom: 5 }}
                         >
                           <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#e5e7eb" />
                           <XAxis type="number" axisLine={false} tickLine={false} tick={{fill: '#6b7280', fontSize: 11}} />
@@ -1672,14 +1678,14 @@ export default function Dashboard() {
                             dataKey="displayName" 
                             axisLine={false} 
                             tickLine={false} 
-                            width={110}
-                            tick={{fill: '#6b7280', fontSize: 10}}
+                            width={160}
+                            tick={{fill: '#4b5563', fontSize: 11, fontWeight: 500}}
                           />
                           <RechartsTooltip 
                             contentStyle={{borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)'}}
                             formatter={(value, _name, props) => [`${value} ca lỗi`, props.payload.name]}
                           />
-                          <Bar dataKey="total" fill="#ef4444" radius={[0, 4, 4, 0]} barSize={16} />
+                          <Bar dataKey="total" fill="#ef4444" radius={[0, 4, 4, 0]} barSize={18} />
                         </BarChart>
                       </ResponsiveContainer>
                     )}
@@ -1687,7 +1693,7 @@ export default function Dashboard() {
                 </div>
 
                 {/* 2. Khu vực thường gặp sự cố */}
-                <div className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm flex flex-col h-[350px]">
+                <div className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm flex flex-col h-[420px]">
                   <h3 className="font-bold text-sm text-gray-800 border-b pb-3 mb-4">Khu vực thường gặp sự cố (Tỉnh / Thành phố)</h3>
                   <div className="flex-1 w-full">
                     {qualityData.provinceIssues.length === 0 ? (
