@@ -673,7 +673,10 @@ export default function Dashboard() {
                   >
                     <Geographies geography={geoUrl}>
                       {({ geographies }) => {
-                        const mapProvinceData = analysisData.provinceStats || [];
+                        // Bug fix: Use dashStats.mapDensity (total orders per province) instead of
+                        // analysisData.provinceStats (only orders with appointments)
+                        const densityMap = dashStats.mapDensity || {};
+                        const mapProvinceData = Object.entries(densityMap).map(([name, total]) => ({ name, total: total as number }));
                         const colorScale = scaleQuantile<string>()
                           .domain(mapProvinceData.map((d: any) => d.total).length > 0 ? mapProvinceData.map((d: any) => d.total) : [0, 1])
                           .range([
@@ -781,10 +784,11 @@ export default function Dashboard() {
                     {[...analysisData.provinceStats]
                       .sort((a, b) => b.total - a.total)
                       .slice(0, 5)
-                      .map((entry: any, index: number) => {
+                      .map((entry: any, index: number, arr: any[]) => {
                         const colorsPalette = ['#0ea5e9', '#3b82f6', '#10b981', '#f59e0b', '#8b5cf6'];
-                        const totalOrders = analysisData.summary.totalWithAppointments || 1;
-                        const percentage = Math.round((entry.total / totalOrders) * 100);
+                        // Bug fix: Use sum of displayed items as denominator instead of totalWithAppointments
+                        const displayedTotal = arr.reduce((sum: number, e: any) => sum + e.total, 0) || 1;
+                        const percentage = Math.round((entry.total / displayedTotal) * 100);
                         return (
                           <div key={index} className="flex justify-between items-center border-b border-gray-50 pb-1">
                             <div className="flex items-center space-x-2">
@@ -934,7 +938,7 @@ export default function Dashboard() {
                   <h3 className="font-bold text-sm text-gray-800 border-b pb-3 mb-4">Số ca đúng hẹn theo Kỹ thuật viên</h3>
                   <div className="flex-1 w-full">
                     <ResponsiveContainer width="100%" height="100%">
-                      <BarChart data={analysisData.ktvStats.slice(0, 10)} margin={{ top: 5, right: 10, left: -25, bottom: 20 }}>
+                      <BarChart data={[...analysisData.ktvStats].sort((a: any, b: any) => b.total - a.total).slice(0, 10)} margin={{ top: 5, right: 10, left: -25, bottom: 20 }}>
                         <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e7eb" />
                         <XAxis 
                           dataKey="name" 
@@ -1292,7 +1296,7 @@ export default function Dashboard() {
                     <ResponsiveContainer width="100%" height="100%">
                       <BarChart data={analysisData.workTypeMonthlyStats} margin={{ top: 5, right: 10, left: -25, bottom: 5 }}>
                         <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e7eb" />
-                        <XAxis dataKey="month" tickLine={false} tick={{fill: '#6b7280', fontSize: 11}} />
+                        <XAxis dataKey="month" tickLine={false} tick={{fill: '#6b7280', fontSize: 11}} tickFormatter={(val) => { const parts = val.split('-'); return parts.length === 2 ? `T${parts[1]}/${parts[0]}` : val; }} />
                         <YAxis axisLine={false} tickLine={false} tick={{fill: '#6b7280', fontSize: 11}} />
                         <RechartsTooltip contentStyle={{borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)'}} />
                         <Legend wrapperStyle={{fontSize: 11, paddingTop: 10}} />
@@ -1308,7 +1312,7 @@ export default function Dashboard() {
                     <ResponsiveContainer width="100%" height="100%">
                       <LineChart data={analysisData.workTypeMonthlyStats} margin={{ top: 5, right: 10, left: -25, bottom: 5 }}>
                         <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e7eb" />
-                        <XAxis dataKey="month" tickLine={false} tick={{fill: '#6b7280', fontSize: 11}} />
+                        <XAxis dataKey="month" tickLine={false} tick={{fill: '#6b7280', fontSize: 11}} tickFormatter={(val) => { const parts = val.split('-'); return parts.length === 2 ? `T${parts[1]}/${parts[0]}` : val; }} />
                         <YAxis axisLine={false} tickLine={false} tick={{fill: '#6b7280', fontSize: 11}} />
                         <RechartsTooltip contentStyle={{borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)'}} />
                         <Legend wrapperStyle={{fontSize: 11, paddingTop: 10}} />
