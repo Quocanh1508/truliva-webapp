@@ -625,6 +625,50 @@ router.get('/dispatch-analysis', async (req: Request, res: Response): Promise<vo
       };
     });
 
+    // 7. Thống kê tình trạng phân công trạm theo Tỉnh (Unassigned Station Ratio per Province)
+    const provinceAssignmentMap: Record<string, { province: string; assigned: number; unassigned: number; total: number }> = {};
+    filteredOrders.forEach(o => {
+      const prov = o.province || 'Khác';
+      if (!provinceAssignmentMap[prov]) {
+        provinceAssignmentMap[prov] = { province: prov, assigned: 0, unassigned: 0, total: 0 };
+      }
+      provinceAssignmentMap[prov].total++;
+      if (o.mainStationName === 'Chưa phân trạm') {
+        provinceAssignmentMap[prov].unassigned++;
+      } else {
+        provinceAssignmentMap[prov].assigned++;
+      }
+    });
+
+    const unassignedProvinceStats = Object.values(provinceAssignmentMap)
+      .map(item => ({
+        ...item,
+        unassignedRate: item.total > 0 ? Math.round((item.unassigned / item.total) * 100) : 0
+      }))
+      .sort((a, b) => b.unassigned - a.unassigned);
+
+    // 8. Hiệu suất & Tỷ lệ hoàn thành của các Trạm chính thực tế (loại bỏ Chưa phân trạm)
+    const stationPerfMap: Record<string, { name: string; total: number; completed: number; onTime: number; late: number }> = {};
+    filteredOrders.forEach(o => {
+      if (o.mainStationName === 'Chưa phân trạm') return; // Bỏ qua chưa phân trạm
+      const name = o.mainStationName;
+      if (!stationPerfMap[name]) {
+        stationPerfMap[name] = { name, total: 0, completed: 0, onTime: 0, late: 0 };
+      }
+      stationPerfMap[name].total++;
+      if (o.isCompleted) stationPerfMap[name].completed++;
+      if (o.isOnTime) stationPerfMap[name].onTime++;
+      if (o.isLate) stationPerfMap[name].late++;
+    });
+
+    const stationPerformanceStats = Object.values(stationPerfMap)
+      .map(item => ({
+        ...item,
+        onTimeRate: item.total > 0 ? Math.round((item.onTime / item.total) * 100) : 0,
+        completionRate: item.total > 0 ? Math.round((item.completed / item.total) * 100) : 0
+      }))
+      .sort((a, b) => b.total - a.total);
+
     res.json({
       summary: {
         totalWithAppointments,
@@ -640,7 +684,9 @@ router.get('/dispatch-analysis', async (req: Request, res: Response): Promise<vo
       lateOrders,
       workTypeMonthlyStats,
       mainStationWorkloadStats,
-      mainStationCoverage
+      mainStationCoverage,
+      unassignedProvinceStats,
+      stationPerformanceStats
     });
 
   } catch (error: any) {

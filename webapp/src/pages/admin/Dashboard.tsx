@@ -1404,12 +1404,12 @@ export default function Dashboard() {
         </div>
       )}
 
-      {/* TAB CONTENT 5: STATION COMPARISON */}
+      {/* TAB CONTENT 5: STATION COMPARISON & DISPATCH ANALYTICS */}
       {activeTab === 'stationComp' && (
         <div className="space-y-6 animate-fade-in">
           {loadingAnalysis ? (
             <div className="flex flex-col items-center justify-center py-20 gap-3">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600"></div>
               <p className="text-gray-500 text-xs">Đang truy vấn dữ liệu trạm đối tác...</p>
             </div>
           ) : !analysisData ? (
@@ -1417,229 +1417,166 @@ export default function Dashboard() {
           ) : (
             <>
               {/* Info Definition Alert */}
-              <div className="bg-purple-50 border border-purple-200 text-purple-800 p-4 rounded-xl flex items-start space-x-3">
-                <Info className="text-purple-600 mt-0.5 flex-shrink-0" size={18} />
+              <div className="bg-purple-50 border border-purple-200 text-purple-800 p-4 rounded-xl flex items-start space-x-3 shadow-sm">
+                <Building className="text-purple-600 mt-0.5 flex-shrink-0" size={18} />
                 <div className="text-xs space-y-1">
-                  <div className="font-bold text-[13px]">Phân tích & So sánh các Đối tác/Trạm chính</div>
-                  <p>Các chỉ số so sánh thị phần và mức độ phủ sóng địa lý giữa các Đối tác chính **không bao gồm** các ca có loại công việc là **Giao hàng** để phản ánh đúng năng lực triển khai dịch vụ kỹ thuật.</p>
+                  <div className="font-bold text-[13px]">Báo cáo Điều phối & Năng suất Trạm chính</div>
+                  <p className="text-gray-600 leading-relaxed font-medium">
+                    Theo dõi tỷ lệ <b>Đơn chưa phân công Trạm</b> theo từng Tỉnh/Thành phố để ưu tiên điều phối, đồng thời đánh giá <b>Năng suất & Tỷ lệ đúng hẹn</b> thực tế của từng Trạm đối tác (không tính các ca chưa phân trạm).
+                  </p>
                 </div>
               </div>
 
+              {/* PHẦN 1: BÁO CÁO ĐƠN CHƯA PHÂN TRẠM THEO TỈNH */}
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                {/* Cột trái: Bản đồ phủ sóng Việt Nam (chiếm 2/3) */}
-                <div className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm flex flex-col h-[520px] lg:col-span-2 relative">
+                {/* Biểu đồ cột chồng Tỉ lệ chưa phân trạm Top 10 tỉnh */}
+                <div className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm flex flex-col h-[440px] lg:col-span-2">
                   <div className="flex justify-between items-center border-b pb-3 mb-4">
                     <div>
-                      <h3 className="font-bold text-base text-gray-800">
-                        Bản đồ Phủ sóng Địa lý của các Đối tác chính
+                      <h3 className="font-bold text-base text-gray-800 flex items-center gap-2">
+                        <AlertTriangle size={17} className="text-rose-500" />
+                        Tình trạng Phân công Trạm theo Tỉnh / Thành phố
                       </h3>
-                      <p className="text-xs text-gray-500 mt-0.5">Tỉnh thành được tô màu theo Đối tác chính chiếm ưu thế nhất (nhiều ca nhất)</p>
+                      <p className="text-xs text-gray-500 mt-0.5">Top khu vực có số lượng đơn chờ phân trạm chính nhiều nhất</p>
                     </div>
-                    
-                    {/* Bảng chú giải màu sắc bản đồ */}
-                    <div className="flex flex-wrap items-center gap-2.5 text-[10px] font-semibold text-gray-600 bg-gray-50 p-2 rounded-lg border border-gray-100 max-w-lg justify-end">
-                      <div className="flex items-center space-x-1.5">
-                        <span className="w-3 h-3 rounded bg-[#dc2626]"></span>
-                        <span>Truliva</span>
-                      </div>
-                      <div className="flex items-center space-x-1.5">
-                        <span className="w-3 h-3 rounded bg-[#a855f7]"></span>
-                        <span>Vinadu</span>
-                      </div>
-                      <div className="flex items-center space-x-1.5">
-                        <span className="w-3 h-3 rounded bg-[#10b981]"></span>
-                        <span>Hưng Thịnh</span>
-                      </div>
-                      <div className="flex items-center space-x-1.5">
-                        <span className="w-3 h-3 rounded bg-[#f59e0b]"></span>
-                        <span>KSC</span>
-                      </div>
-                      <div className="flex items-center space-x-1.5">
-                        <span className="w-3 h-3 rounded bg-[#6366f1]"></span>
-                        <span>PNN Home</span>
-                      </div>
-                      <div className="flex items-center space-x-1.5">
-                        <span className="w-3 h-3 rounded bg-[#94a3b8]"></span>
-                        <span>Khác</span>
-                      </div>
-                      <div className="flex items-center space-x-1.5">
-                        <span className="w-3 h-3 rounded bg-[#e2e8f0]"></span>
-                        <span>Lack (Không có đơn)</span>
-                      </div>
-                    </div>
+                    <span className="bg-rose-100 text-rose-800 text-xs font-bold px-2.5 py-1 rounded-full">
+                      {(analysisData.unassignedProvinceStats || []).reduce((acc: number, curr: any) => acc + curr.unassigned, 0)} ca chưa gán
+                    </span>
                   </div>
 
-                  <div className="flex-1 w-full bg-blue-50/20 rounded-lg overflow-hidden flex items-center justify-center relative border border-blue-100/30">
-                    <ComposableMap
-                      projection="geoMercator"
-                      projectionConfig={{
-                        scale: 2200,
-                        center: [106.3, 16.2]
-                      }}
-                      style={{ width: "100%", height: "100%" }}
-                    >
-                      <Geographies geography={geoUrl}>
-                        {({ geographies }) => {
-                          const coverage = analysisData.mainStationCoverage || {};
-                          const getStationColor = (stationName: string) => {
-                            if (!stationName || stationName === 'Lack') return '#e2e8f0'; // Gray
-                            if (stationName.includes('Truliva')) return '#dc2626'; // Red
-                            if (stationName.includes('Vinadu')) return '#a855f7'; // Purple
-                            if (stationName.includes('Hưng Thịnh')) return '#10b981'; // Green
-                            if (stationName.includes('KSC')) return '#f59e0b'; // Amber
-                            if (stationName.includes('PNN Home')) return '#6366f1'; // Blue/Indigo
-                            return '#94a3b8'; // Slate for others
-                          };
-
-                          return geographies.map(geo => {
-                            const geoName = geo.properties.Name || geo.properties.name || geo.properties.ten_tinh;
-                            
-                            let dominantStation = 'Lack';
-                            let coverageDetail: any = null;
-                            if (geoName) {
-                              const cleanGeoName = removeVietnameseTones(geoName)
-                                .replace(/ Province| City/gi, '')
-                                .trim()
-                                .toLowerCase();
-                              
-                              const foundKey = Object.keys(coverage).find(k => {
-                                const cleanDbKey = removeVietnameseTones(k)
-                                  .replace(/^(Tỉnh |Thành phố |TP |TP\. )/i, '')
-                                  .trim()
-                                  .toLowerCase();
-                                return cleanGeoName === cleanDbKey || cleanGeoName.includes(cleanDbKey) || cleanDbKey.includes(cleanGeoName);
-                              });
-                              if (foundKey) {
-                                coverageDetail = coverage[foundKey];
-                                dominantStation = coverageDetail.mainStationName;
-                              }
-                            }
-
-                            return (
-                              <Geography
-                                key={geo.rsmKey}
-                                geography={geo}
-                                fill={getStationColor(dominantStation)}
-                                stroke="#ffffff"
-                                strokeWidth={0.5}
-                                onMouseEnter={() => {
-                                  if (!coverageDetail || dominantStation === 'Lack') {
-                                    setTooltipContent(`${geoName || 'Không rõ'}: Chưa có đơn`);
-                                  } else {
-                                    const sortedBreakdown = Object.entries(coverageDetail.breakdown || {})
-                                      .sort((a: any, b: any) => b[1] - a[1]);
-                                    setTooltipContent(
-                                      <div className="space-y-1.5 p-0.5 text-left font-medium min-w-[140px]">
-                                        <div className="font-bold text-[12px] border-b border-white/20 pb-1 mb-1 flex justify-between items-center gap-3">
-                                          <span>{geoName || 'Không rõ'}</span>
-                                          <span className="bg-white/20 px-1.5 py-0.5 rounded text-[10px] text-white">Tổng: {coverageDetail.total} ca</span>
-                                        </div>
-                                        <div className="space-y-1">
-                                          {sortedBreakdown.map(([station, count]) => (
-                                            <div key={station} className="flex justify-between items-center gap-4 text-[11px]">
-                                              <span className="flex items-center gap-1.5 text-gray-200">
-                                                <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: getStationColor(station) }}></span>
-                                                <span>{station}</span>
-                                              </span>
-                                              <span className="font-bold text-white">{(count as any)} ca</span>
-                                            </div>
-                                          ))}
-                                        </div>
-                                      </div>
-                                    );
-                                  }
-                                }}
-                                onMouseLeave={() => {
-                                  setTooltipContent("");
-                                }}
-                                style={{
-                                  default: { outline: "none" },
-                                  hover: { fill: "#f59e0b", outline: "none", cursor: "pointer", transition: "all 0.2s" },
-                                  pressed: { fill: "#d97706", outline: "none" }
-                                }}
-                              />
-                            );
-                          });
-                        }}
-                      </Geographies>
-                    </ComposableMap>
-
-                    {tooltipContent && (
-                      <div className="absolute top-4 right-4 bg-gray-900/80 text-white px-3 py-1.5 rounded text-xs font-semibold shadow-lg pointer-events-none z-10 backdrop-blur-sm">
-                        {tooltipContent}
-                      </div>
+                  <div className="flex-1 w-full h-[320px]">
+                    {(!analysisData.unassignedProvinceStats || analysisData.unassignedProvinceStats.length === 0) ? (
+                      <div className="h-full flex items-center justify-center text-gray-400 text-sm">Không có dữ liệu đơn hàng</div>
+                    ) : (
+                      <ResponsiveContainer width="100%" height="100%">
+                        <BarChart data={analysisData.unassignedProvinceStats.slice(0, 10)} margin={{ top: 5, right: 10, left: -20, bottom: 20 }}>
+                          <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e7eb" />
+                          <XAxis 
+                            dataKey="province" 
+                            axisLine={false} 
+                            tickLine={false} 
+                            interval={0}
+                            height={40}
+                            tick={{fill: '#6b7280', fontSize: 10, angle: -25, textAnchor: 'end'}} 
+                          />
+                          <YAxis axisLine={false} tickLine={false} tick={{fill: '#6b7280', fontSize: 11}} />
+                          <RechartsTooltip contentStyle={{borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)'}} />
+                          <Legend wrapperStyle={{fontSize: 11, paddingTop: 5}} />
+                          <Bar dataKey="unassigned" name="Chưa phân trạm (Tồn đọng)" stackId="a" fill="#f43f5e" />
+                          <Bar dataKey="assigned" name="Đã phân trạm" stackId="a" fill="#3b82f6" radius={[4, 4, 0, 0]} />
+                        </BarChart>
+                      </ResponsiveContainer>
                     )}
                   </div>
                 </div>
 
-                {/* Cột phải: Biểu đồ tròn đóng góp của các trạm chính (chiếm 1/3) */}
-                <div className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm flex flex-col h-[520px]">
+                {/* Bảng Top Tỉnh tồn đọng đơn chưa gán trạm */}
+                <div className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm flex flex-col h-[440px]">
                   <h3 className="font-bold text-base text-gray-800 border-b pb-3 mb-4">
-                    Thị phần Công việc của Đối tác
+                    Top Tỉnh Tồn Đọng Chưa Gán Trạm
                   </h3>
-                  <div className="flex-1 flex flex-col justify-center items-center relative">
-                    <div className="w-full h-[220px]">
-                      {(!analysisData.mainStationWorkloadStats || analysisData.mainStationWorkloadStats.length === 0) ? (
-                        <div className="h-full flex items-center justify-center text-gray-400 text-sm">Không có dữ liệu</div>
-                      ) : (
-                        <ResponsiveContainer width="100%" height="100%">
-                          <PieChart>
-                            <Pie
-                              data={analysisData.mainStationWorkloadStats}
-                              cx="50%"
-                              cy="50%"
-                              innerRadius={60}
-                              outerRadius={85}
-                              paddingAngle={3}
-                              dataKey="total"
-                              nameKey="name"
-                            >
-                              {analysisData.mainStationWorkloadStats.map((entry: any, index: number) => {
-                                const getStationColor = (stationName: string) => {
-                                  if (!stationName || stationName === 'Lack') return '#e2e8f0';
-                                  if (stationName.includes('Truliva')) return '#dc2626';
-                                  if (stationName.includes('Vinadu')) return '#a855f7';
-                                  if (stationName.includes('Hưng Thịnh')) return '#10b981';
-                                  if (stationName.includes('KSC')) return '#f59e0b';
-                                  if (stationName.includes('PNN Home')) return '#6366f1';
-                                  return '#94a3b8';
-                                };
-                                return <Cell key={`cell-${index}`} fill={getStationColor(entry.name)} />;
-                              })}
-                            </Pie>
-                            <RechartsTooltip formatter={(value, name) => [`${value} ca`, name]} />
-                          </PieChart>
-                        </ResponsiveContainer>
-                      )}
+                  <div className="flex-1 overflow-y-auto space-y-3 pr-1 custom-scrollbar">
+                    {(analysisData.unassignedProvinceStats || [])
+                      .slice(0, 8)
+                      .map((item: any, idx: number) => (
+                        <div key={idx} className="p-2.5 rounded-lg bg-gray-50 border border-gray-100 hover:bg-gray-100/60 transition-colors">
+                          <div className="flex justify-between items-center mb-1">
+                            <span className="font-bold text-xs text-gray-800">{item.province}</span>
+                            <span className="text-[11px] font-extrabold text-rose-600">
+                              {item.unassigned} / {item.total} ca ({item.unassignedRate}%)
+                            </span>
+                          </div>
+                          {/* Progress bar */}
+                          <div className="w-full bg-gray-200 h-2 rounded-full overflow-hidden flex">
+                            <div 
+                              className="bg-rose-500 h-full transition-all duration-300" 
+                              style={{ width: `${item.unassignedRate}%` }} 
+                            />
+                            <div 
+                              className="bg-blue-500 h-full transition-all duration-300" 
+                              style={{ width: `${100 - item.unassignedRate}%` }} 
+                            />
+                          </div>
+                        </div>
+                      ))}
+                  </div>
+                </div>
+              </div>
+
+              {/* PHẦN 2: BÁO CÁO NĂNG SUẤT & TỶ LỆ ĐÚNG HẸN CỦA TRẠM ĐỐI TÁC */}
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                {/* Biểu đồ nhóm Năng suất vs Đúng hẹn của Trạm đối tác */}
+                <div className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm flex flex-col h-[420px] lg:col-span-2">
+                  <div className="border-b pb-3 mb-4 flex justify-between items-center">
+                    <div>
+                      <h3 className="font-bold text-base text-gray-800 flex items-center gap-2">
+                        <Building size={17} className="text-purple-600" />
+                        Năng suất & Tỷ lệ Đúng hẹn của Trạm Đối tác
+                      </h3>
+                      <p className="text-xs text-gray-500 mt-0.5">So sánh tổng số ca tiếp nhận, số ca hoàn thành và ca trễ hẹn (đã loại bỏ chưa phân trạm)</p>
                     </div>
-                    
-                    {/* Bảng tóm tắt thị phần bên dưới */}
-                    <div className="w-full mt-4 max-h-[200px] overflow-y-auto space-y-2 text-xs text-gray-600 px-2">
-                      {analysisData.mainStationWorkloadStats.map((entry: any, index: number) => {
-                        const getStationColor = (stationName: string) => {
-                          if (!stationName || stationName === 'Lack') return '#e2e8f0';
-                          if (stationName.includes('Truliva')) return '#dc2626';
-                          if (stationName.includes('Vinadu')) return '#a855f7';
-                          if (stationName.includes('Hưng Thịnh')) return '#10b981';
-                          if (stationName.includes('KSC')) return '#f59e0b';
-                          if (stationName.includes('PNN Home')) return '#6366f1';
-                          return '#94a3b8';
-                        };
-                        const color = getStationColor(entry.name);
-                        return (
-                          <div key={index} className="flex justify-between items-center border-b border-gray-50 pb-1.5">
-                            <div className="flex items-center space-x-2">
-                              <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: color }}></span>
-                              <span className="font-semibold text-gray-700">{entry.name}</span>
-                            </div>
-                            <div className="text-right space-x-2">
-                              <span className="font-bold text-gray-800">{entry.total} ca</span>
-                              <span className="text-gray-400">({entry.percentage}%)</span>
+                  </div>
+
+                  <div className="flex-1 w-full h-[300px]">
+                    {(!analysisData.stationPerformanceStats || analysisData.stationPerformanceStats.length === 0) ? (
+                      <div className="h-full flex items-center justify-center text-gray-400 text-sm">Chưa ghi nhận dữ liệu phân công trạm</div>
+                    ) : (
+                      <ResponsiveContainer width="100%" height="100%">
+                        <BarChart data={analysisData.stationPerformanceStats} margin={{ top: 5, right: 10, left: -20, bottom: 20 }}>
+                          <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e7eb" />
+                          <XAxis 
+                            dataKey="name" 
+                            axisLine={false} 
+                            tickLine={false} 
+                            interval={0}
+                            height={40}
+                            tick={{fill: '#6b7280', fontSize: 10, angle: -15, textAnchor: 'end'}} 
+                          />
+                          <YAxis axisLine={false} tickLine={false} tick={{fill: '#6b7280', fontSize: 11}} />
+                          <RechartsTooltip contentStyle={{borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)'}} />
+                          <Legend wrapperStyle={{fontSize: 11, paddingTop: 5}} />
+                          <Bar dataKey="total" name="Tổng ca tiếp nhận" fill="#6366f1" radius={[4, 4, 0, 0]} />
+                          <Bar dataKey="completed" name="Đã hoàn thành" fill="#10b981" radius={[4, 4, 0, 0]} />
+                          <Bar dataKey="late" name="Bị trễ hẹn" fill="#ef4444" radius={[4, 4, 0, 0]} />
+                        </BarChart>
+                      </ResponsiveContainer>
+                    )}
+                  </div>
+                </div>
+
+                {/* Bảng xếp hạng KPI Trạm chính */}
+                <div className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm flex flex-col h-[420px]">
+                  <h3 className="font-bold text-base text-gray-800 border-b pb-3 mb-4">
+                    Bảng Xếp Hạng KPI Trạm
+                  </h3>
+                  <div className="flex-1 overflow-y-auto space-y-2 pr-1 custom-scrollbar">
+                    {(!analysisData.stationPerformanceStats || analysisData.stationPerformanceStats.length === 0) ? (
+                      <div className="text-center py-10 text-gray-400 text-sm">Chưa có dữ liệu</div>
+                    ) : (
+                      analysisData.stationPerformanceStats.map((st: any, idx: number) => (
+                        <div key={idx} className="p-3 rounded-lg border border-gray-100 bg-white hover:bg-purple-50/40 transition-colors flex justify-between items-center">
+                          <div className="space-y-0.5">
+                            <div className="font-bold text-xs text-gray-900">{st.name}</div>
+                            <div className="text-[11px] text-gray-500">
+                              Tổng: <b className="text-gray-800">{st.total} ca</b> | Xong: <b className="text-emerald-600">{st.completed} ca</b>
                             </div>
                           </div>
-                        );
-                      })}
-                    </div>
+                          <div className="text-right">
+                            <span className={`inline-block px-2 py-0.5 rounded text-[10px] font-bold ${
+                              st.onTimeRate >= 80 ? 'bg-emerald-100 text-emerald-800' :
+                              st.onTimeRate >= 50 ? 'bg-amber-100 text-amber-800' : 'bg-rose-100 text-rose-800'
+                            }`}>
+                              Đúng hẹn {st.onTimeRate}%
+                            </span>
+                            {st.late > 0 && (
+                              <div className="text-[10px] text-rose-500 font-semibold mt-0.5">
+                                Trễ: {st.late} ca
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      ))
+                    )}
                   </div>
                 </div>
               </div>
