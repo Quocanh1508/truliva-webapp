@@ -258,15 +258,15 @@ export async function sendZnsWarrantyActivation(serialNumber: string, recipientP
   // 3. Fallback: Lấy Access Token hợp lệ của Zalo trực tiếp nếu không dùng FNS
   const accessToken = await getValidAccessToken();
 
-  // 4. Chuẩn bị dữ liệu gửi (Zalo OpenAPI)
+  // 4. Chuẩn bị dữ liệu gửi (Zalo Direct OpenAPI - Dùng cho Template ZCA 615292)
   const payload = {
     phone: formattedPhone,
-    template_id: templateId,
+    template_id: templateId || process.env.ZALO_ZNS_TEMPLATE_ID || '615292',
     template_data: {
-      Ten_Khach_Hang: customerName,
-      Ten_San_Pham: productName,
-      So_Seri: cleanSerial,
-      Ngay_Het_Bao_Hanh: expiryDateStr
+      customer_name: customerName,
+      product_name: productName,
+      code: cleanSerial,
+      time: expiryDateStr
     },
     tracking_id: `${cleanSerial}-${Date.now()}`
   };
