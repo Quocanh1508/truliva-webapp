@@ -1536,7 +1536,7 @@ export default function Dashboard() {
                           <RechartsTooltip contentStyle={{borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)'}} />
                           <Legend wrapperStyle={{fontSize: 11, paddingTop: 5}} />
                           <Bar dataKey="total" name="Tổng ca tiếp nhận" fill="#6366f1" radius={[4, 4, 0, 0]} />
-                          <Bar dataKey="completed" name="Đã hoàn thành" fill="#10b981" radius={[4, 4, 0, 0]} />
+                          <Bar dataKey="onTime" name="Hoàn thành đúng hẹn" fill="#10b981" radius={[4, 4, 0, 0]} />
                           <Bar dataKey="late" name="Bị trễ hẹn" fill="#ef4444" radius={[4, 4, 0, 0]} />
                         </BarChart>
                       </ResponsiveContainer>
@@ -1558,7 +1558,7 @@ export default function Dashboard() {
                           <div className="space-y-0.5">
                             <div className="font-bold text-xs text-gray-900">{st.name}</div>
                             <div className="text-[11px] text-gray-500">
-                              Tổng: <b className="text-gray-800">{st.total} ca</b> | Xong: <b className="text-emerald-600">{st.completed} ca</b>
+                              Tổng: <b className="text-gray-800">{st.total} ca</b> | Đúng hẹn: <b className="text-emerald-600">{st.onTime} ca</b>
                             </div>
                           </div>
                           <div className="text-right">
