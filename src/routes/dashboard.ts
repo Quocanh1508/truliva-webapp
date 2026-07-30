@@ -848,15 +848,37 @@ router.get('/product-quality', async (req: Request, res: Response): Promise<void
       .map(([name, total]) => ({ name, total }))
       .sort((a, b) => b.total - a.total);
 
-    // 4. Theo tháng, tỉ lệ gặp mỗi sự cố (issueType distribution by month)
+    // Helper hàm chuẩn hóa loại sự cố
+    const categorizeIssue = (raw: string): string => {
+      if (!raw) return 'Khác';
+      const clean = removeAccents(raw);
+      if (clean.includes('nguon') || clean.includes('dien') || clean.includes('bien ap') || clean.includes('phich') || clean.includes('e11') || clean.includes('mach')) {
+        return 'Lỗi Nguồn / Điện';
+      }
+      if (clean.includes('ro ri') || clean.includes('ro water') || clean.includes('tac van') || clean.includes('khoa van') || clean.includes('van') || clean.includes('ho')) {
+        return 'Rò nước & Tắc van';
+      }
+      if (clean.includes('chat luong') || clean.includes('tds') || clean.includes('mui') || clean.includes('cold') || clean.includes('lanh') || clean.includes('nong') || clean.includes('voi')) {
+        return 'Chất lượng nước & Cảm biến';
+      }
+      if (clean.includes('lap nham') || clean.includes('thay doi vi tri') || clean.includes('vo mat kinh') || clean.includes('bong mieng dan') || clean.includes('giao')) {
+        return 'Lỗi Lắp đặt & Vỏ máy';
+      }
+      if (clean.includes('khao sat') || clean.includes('lay mau') || clean.includes('thay loc')) {
+        return 'Khảo sát & Thay lọc';
+      }
+      return 'Sự cố kỹ thuật khác';
+    };
+
+    // 4. Theo tháng, tỉ lệ gặp mỗi sự cố (issueType distribution by month - đã chuẩn hóa nhóm)
     const monthlyIssueMap: Record<string, Record<string, number>> = {};
     issueReports.forEach(r => {
       const monthStr = r.createdAt.toISOString().slice(0, 7); // "YYYY-MM"
       if (!monthlyIssueMap[monthStr]) {
         monthlyIssueMap[monthStr] = {};
       }
-      const issue = r.issueType || 'Khác';
-      monthlyIssueMap[monthStr][issue] = (monthlyIssueMap[monthStr][issue] || 0) + 1;
+      const issueGroup = categorizeIssue(r.issueType || '');
+      monthlyIssueMap[monthStr][issueGroup] = (monthlyIssueMap[monthStr][issueGroup] || 0) + 1;
     });
     
     const monthlyIssuesTrend = Object.entries(monthlyIssueMap)
@@ -870,49 +892,72 @@ router.get('/product-quality', async (req: Request, res: Response): Promise<void
       })
       .sort((a, b) => a.month.localeCompare(b.month));
 
-    // 5. Phân tích vòng đời máy qua Serial Number (Lắp đặt -> Bảo hành/Sửa chữa)
-    const serialsWithIssues = Array.from(new Set(
-      issueReports.map(r => r.serialNumber).filter(Boolean) as string[]
-    ));
-
+    // 5. Phân tích vòng đời máy (Lắp đặt -> Bảo hành/Sửa chữa)
     const lifecycleList: any[] = [];
     let totalLifecycleDays = 0;
-    let lifecycleCount = 0;
 
-    for (const serial of serialsWithIssues) {
-      // Tìm báo cáo lắp đặt gốc của số serial này
-      const installRep = await prisma.serviceReport.findFirst({
-        where: {
-          serialNumber: serial,
-          workType: { in: ['Lắp đặt', 'Giao hàng và Lắp đặt'] }
-        },
-        orderBy: { createdAt: 'asc' }
-      });
+    for (const r of issueReports) {
+      let installDate: Date | null = null;
 
-      // Tìm báo cáo bảo hành/sửa chữa đầu tiên
-      const firstIssueRep = issueReports.find(r => r.serialNumber === serial);
+      // 1. Tìm ca lắp đặt theo serialNumber
+      if (r.serialNumber && r.serialNumber !== 'Không rõ') {
+        const installRep = await prisma.serviceReport.findFirst({
+          where: {
+            serialNumber: r.serialNumber,
+            workType: { in: ['Lắp đặt', 'Giao hàng và Lắp đặt'] }
+          },
+          orderBy: { createdAt: 'asc' }
+        });
+        if (installRep) {
+          installDate = installRep.createdAt;
+        }
+      }
 
-      if (installRep && firstIssueRep) {
-        const installDate = installRep.createdAt;
-        const issueDate = firstIssueRep.createdAt;
-        const diffMs = issueDate.getTime() - installDate.getTime();
+      // 2. Tìm ca lắp đặt theo đơn hàng / khách hàng
+      if (!installDate && r.orderId) {
+        const order = await prisma.order.findUnique({
+          where: { id: r.orderId },
+          select: { pancakeCreatedAt: true, createdAt: true, customerId: true }
+        });
+
+        if (order) {
+          if (order.customerId) {
+            const customerInstall = await prisma.serviceReport.findFirst({
+              where: {
+                order: { customerId: order.customerId },
+                workType: { in: ['Lắp đặt', 'Giao hàng và Lắp đặt'] }
+              },
+              orderBy: { createdAt: 'asc' }
+            });
+            if (customerInstall) {
+              installDate = customerInstall.createdAt;
+            }
+          }
+          if (!installDate) {
+            installDate = order.pancakeCreatedAt || order.createdAt;
+          }
+        }
+      }
+
+      if (installDate) {
+        const diffMs = r.createdAt.getTime() - installDate.getTime();
         const diffDays = Math.max(0, Math.floor(diffMs / (24 * 60 * 60 * 1000)));
 
         totalLifecycleDays += diffDays;
-        lifecycleCount++;
 
         lifecycleList.push({
-          serialNumber: serial,
-          products: firstIssueRep.products,
+          serialNumber: r.serialNumber || 'Chưa gán',
+          products: r.products || [],
           installDate,
-          firstIssueDate: issueDate,
+          firstIssueDate: r.createdAt,
           daysToFailure: diffDays,
-          issueType: firstIssueRep.issueType || 'Khác',
-          ktvName: firstIssueRep.ktvUser?.fullName || 'Không rõ'
+          issueType: categorizeIssue(r.issueType || ''),
+          ktvName: r.ktvUser?.fullName || 'Không rõ'
         });
       }
     }
 
+    const lifecycleCount = lifecycleList.length;
     const avgDaysToFailure = lifecycleCount > 0 ? Math.round(totalLifecycleDays / lifecycleCount) : 0;
 
     // Phân chia khoảng thời gian hỏng hóc

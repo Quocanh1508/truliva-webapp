@@ -1732,7 +1732,7 @@ export default function Dashboard() {
                           margin={{ top: 5, right: 10, left: -25, bottom: 5 }}
                         >
                           <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e7eb" />
-                          <XAxis dataKey="month" tickLine={false} tick={{fill: '#6b7280', fontSize: 11}} />
+                          <XAxis dataKey="month" tickLine={false} tick={{fill: '#6b7280', fontSize: 11}} tickFormatter={(val) => { const parts = val.split('-'); return parts.length === 2 ? `T${parts[1]}/${parts[0]}` : val; }} />
                           <YAxis axisLine={false} tickLine={false} tick={{fill: '#6b7280', fontSize: 11}} />
                           <RechartsTooltip contentStyle={{borderRadius: '8px', border: 'none'}} />
                           <Legend wrapperStyle={{fontSize: 11, paddingTop: 10}} />
