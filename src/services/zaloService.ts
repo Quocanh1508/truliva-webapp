@@ -173,7 +173,11 @@ export function formatZaloPhone(phone: string): string {
 /**
  * Gửi tin nhắn ZNS xác nhận kích hoạt bảo hành
  */
-export async function sendZnsWarrantyActivation(serialNumber: string, recipientPhone: string): Promise<any> {
+export async function sendZnsWarrantyActivation(
+  serialNumber: string, 
+  recipientPhone: string,
+  warrantyMonths: number = 12
+): Promise<any> {
   const cleanSerial = serialNumber.trim().replace(/[^a-zA-Z0-9_]/g, '').toUpperCase();
   const formattedPhone = formatZaloPhone(recipientPhone.trim());
   const templateId = process.env.ZALO_ZNS_TEMPLATE_ID || '';
@@ -203,7 +207,9 @@ export async function sendZnsWarrantyActivation(serialNumber: string, recipientP
     const year = d.getFullYear();
     expiryDateStr = `${day}/${month}/${year}`;
   } else {
-    const d = new Date(Date.now() + 365 * 24 * 60 * 60 * 1000);
+    // Tự động cộng N tháng kể từ ngày hoàn thành / ngày kích hoạt
+    const d = new Date();
+    d.setMonth(d.getMonth() + warrantyMonths);
     const day = String(d.getDate()).padStart(2, '0');
     const month = String(d.getMonth() + 1).padStart(2, '0');
     const year = d.getFullYear();
