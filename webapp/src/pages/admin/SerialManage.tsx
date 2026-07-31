@@ -484,7 +484,14 @@ export default function SerialManage() {
   };
 
   const openDetail = async (serial: Serial, focusWarranty = false) => {
-    setSelectedSerial(serial);
+    const initialStatus = serial.status === 'Chưa kích hoạt' ? '' : (serial.status || '');
+    const initialActBy = serial.activatedBy || '';
+
+    setSelectedSerial({
+      ...serial,
+      status: initialStatus,
+      activatedBy: initialActBy
+    });
     setFocusWarrantyDateOnOpen(focusWarranty);
     setLoadingDetail(true);
     setHistory([]);
@@ -492,7 +499,14 @@ export default function SerialManage() {
     setSelectedPromoCode('');
     try {
       const data = await fetchApi(`/serials/${serial.id}`);
-      setSelectedSerial(data.serial);
+      const s = data.serial;
+      if (s) {
+        setSelectedSerial({
+          ...s,
+          status: s.status === 'Chưa kích hoạt' ? '' : (s.status || ''),
+          activatedBy: s.activatedBy || ''
+        });
+      }
       setHistory(data.history || []);
     } catch (err: any) {
       console.error('Lỗi tải chi tiết serial:', err);
