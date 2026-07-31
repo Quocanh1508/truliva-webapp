@@ -61,6 +61,7 @@ export default function Layout() {
         { name: 'Quản lý & Bắn ZNS', path: '/dev/zns-manage', icon: <Send size={20} /> },
         { name: 'Sơ đồ hệ thống', path: '/dev/system-map', icon: <Network size={20} /> },
         { name: 'Phản hồi người dùng', path: '/dev/feedbacks', icon: <MessageSquare size={20} /> },
+        { name: 'Quản lý Serial', path: '/admin/serials', icon: <Hash size={20} /> },
         { name: 'Gửi thông báo', path: '/admin/broadcast', icon: <Send size={20} /> },
         { name: 'Thông báo', path: '/notifications', icon: <Bell size={20} /> },
         { name: 'Thông tin cá nhân', path: '/profile', icon: <User size={20} /> },
@@ -96,10 +97,9 @@ export default function Layout() {
       items.push({ name: 'Quản lý kho', path: '/admin/inventory', icon: <Warehouse size={20} /> });
     }
 
-    // 2.1 Quản lý Serial: Admin, Dev, Coordinator, Hotline, Staff thuộc nhóm Hotline
+    // 2.1 Quản lý Serial: Admin, Coordinator, Hotline, Staff thuộc nhóm Hotline
     const canSeeSerials = 
       user.role === 'ADMIN' || 
-      user.role === 'DEV' || 
       user.role === 'COORDINATOR' || 
       user.role === 'HOTLINE' || 
       (user.role === 'STAFF' && user.group === 'Hotline');
