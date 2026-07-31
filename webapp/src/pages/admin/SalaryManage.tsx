@@ -37,18 +37,7 @@ interface KtvRateRow {
   phoneNumber: string;
   stationName: string;
   mainStationName: string;
-  rates: {
-    giaoHang: KtvRateItem;
-    baoHanh: KtvRateItem;
-    suaChua?: KtvRateItem;
-    thayLoc: KtvRateItem;
-    lapDat: KtvRateItem;
-    giaoHangLapDat: KtvRateItem;
-    thaoLapLai?: KtvRateItem;
-    kmRate?: KtvRateItem;
-    freeKmThreshold?: KtvRateItem;
-    freeKmThresholdTLSC?: KtvRateItem;
-  };
+  rates: Record<string, any>;
 }
 
 interface CaseDetail {
