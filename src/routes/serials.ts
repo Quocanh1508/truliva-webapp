@@ -1814,10 +1814,17 @@ router.patch('/:id', requireSerialAccess, async (req: Request, res: Response): P
       activationDate, 
       warrantyExpiryDate, 
       customerConfirmationDate,
-      activatedBy, 
+      activatedBy,
       promoCode, 
       importBatchId 
     } = req.body;
+
+    if (customerPhone !== undefined && customerPhone !== null && customerPhone.trim() !== '') {
+      if (!/^\d{10}$/.test(customerPhone.trim())) {
+        res.status(400).json({ error: 'Số điện thoại phải chứa đúng 10 ký tự số tự nhiên (ví dụ: 0912345678).' });
+        return;
+      }
+    }
 
     const serial = await prisma.serial.findUnique({
       where: { id: id as string }

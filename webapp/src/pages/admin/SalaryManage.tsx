@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { fetchApi } from '../../api/client';
+import { isValidPhone, PHONE_ERROR_MSG } from '../../utils/phone';
 import { 
   Calculator, 
   Save, 
@@ -382,6 +383,10 @@ export default function SalaryManage() {
     e.preventDefault();
     if (!addCaseForm.ktvUserId || !addCaseForm.customerName) {
       alert('Vui lòng chọn KTV và nhập Tên ca / mục phí bổ sung');
+      return;
+    }
+    if (addCaseForm.customerPhone && !isValidPhone(addCaseForm.customerPhone, true)) {
+      alert(PHONE_ERROR_MSG);
       return;
     }
     setAddingCase(true);

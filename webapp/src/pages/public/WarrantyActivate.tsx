@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { ShieldCheck, ArrowRight, UploadCloud, CheckCircle, AlertTriangle, Smartphone, User, MapPin, Loader2, Sparkles, ChevronLeft, Phone, Wrench } from 'lucide-react';
 import { API_URL } from '../../api/client';
+import { isValidPhone, PHONE_ERROR_MSG } from '../../utils/phone';
 
 // Định dạng hiển thị Số Serial dạng: XXXX XXX XXX XXXXX
 const formatSerialNumber = (value: string): string => {
@@ -153,8 +154,8 @@ export default function WarrantyActivate() {
       setSubmitError('Vui lòng điền họ và tên người sử dụng');
       return;
     }
-    if (!customerPhone.trim()) {
-      setSubmitError('Vui lòng điền số điện thoại di động');
+    if (!isValidPhone(customerPhone)) {
+      setSubmitError(PHONE_ERROR_MSG);
       return;
     }
     if (!province) {

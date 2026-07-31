@@ -3,6 +3,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { fetchApi, getOrders, getFiltersData, getOrderDetails } from '../../api/client';
 import LabeledImageUploader from '../../components/LabeledImageUploader';
 import { useAuth } from '../../context/AuthContext';
+import { isValidPhone, PHONE_ERROR_MSG } from '../../utils/phone';
 import { CheckCircle, ChevronLeft, Send, AlertCircle, Camera, Loader2, ChevronDown, X, ShieldCheck } from 'lucide-react';
 import { Html5Qrcode } from 'html5-qrcode';
 import { enqueueReport } from '../../utils/offlineStorage';
@@ -650,8 +651,8 @@ export default function ReportForm() {
   };
 
   const handleSendZns = async () => {
-    if (!znsPhone.trim()) {
-      alert('Vui lòng nhập Số điện thoại nhận tin nhắn Zalo');
+    if (!isValidPhone(znsPhone)) {
+      alert(PHONE_ERROR_MSG);
       return;
     }
     setZnsSending(true);
@@ -716,6 +717,10 @@ export default function ReportForm() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!isValidPhone(customerPhone)) {
+      alert(PHONE_ERROR_MSG);
+      return;
+    }
     setError('');
     setLoading(true);
 

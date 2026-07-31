@@ -8,6 +8,7 @@ import DateRangePicker from '../../components/DateRangePicker';
 import CategoryTreeSelect from '../../components/CategoryTreeSelect';
 import { formatOrderId } from '../../utils/text';
 import { useAuth } from '../../context/AuthContext';
+import { isValidPhone, PHONE_ERROR_MSG } from '../../utils/phone';
 
 
 const ALL_SERVICE_TYPES = Array.from(new Set(Object.values(WORK_TYPE_SERVICES).flat()));
@@ -499,8 +500,8 @@ export default function OrderList() {
       alert('Vui lòng nhập tên khách hàng.');
       return;
     }
-    if (!newOrderForm.customerPhone.trim()) {
-      alert('Vui lòng nhập số điện thoại khách hàng.');
+    if (!isValidPhone(newOrderForm.customerPhone)) {
+      alert(PHONE_ERROR_MSG);
       return;
     }
     if (!newOrderForm.address.trim()) {

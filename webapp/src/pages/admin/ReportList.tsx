@@ -5,6 +5,7 @@ import { Download, X, ExternalLink, Image as ImageIcon, Loader, Search, Edit3, S
 import CategoryTreeSelect from '../../components/CategoryTreeSelect';
 import { formatOrderId } from '../../utils/text';
 import { useAuth } from '../../context/AuthContext';
+import { isValidPhone, PHONE_ERROR_MSG } from '../../utils/phone';
 
 function copyToClipboard(text: string): boolean {
   if (navigator.clipboard && navigator.clipboard.writeText) {
@@ -616,8 +617,8 @@ export default function ReportList() {
       alert('Vui lòng nhập Số Serial thiết bị');
       return;
     }
-    if (!znsPhone.trim()) {
-      alert('Vui lòng nhập Số điện thoại nhận ZNS');
+    if (!isValidPhone(znsPhone)) {
+      alert(PHONE_ERROR_MSG);
       return;
     }
     setZnsSending(true);
@@ -1034,6 +1035,10 @@ export default function ReportList() {
 
   const handleSaveEdit = async () => {
     if (!selectedDetailReport) return;
+    if (editData.customerPhone && !isValidPhone(editData.customerPhone, true)) {
+      alert(PHONE_ERROR_MSG);
+      return;
+    }
     setEditSaving(true);
     try {
       let finalImageUrls = [...editData.imageUrls];

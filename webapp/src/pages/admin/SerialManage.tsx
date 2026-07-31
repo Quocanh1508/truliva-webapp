@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { fetchApi, API_URL } from '../../api/client';
 import { useAuth } from '../../context/AuthContext';
+import { isValidPhone, PHONE_ERROR_MSG } from '../../utils/phone';
 import { Hash, Upload, Download, Search, X, Clock, ChevronLeft, ChevronRight, AlertTriangle, CheckCircle, User, Phone, MapPin, Wrench, FileText, Filter, RotateCcw, Sparkles, FolderPlus, Database } from 'lucide-react';
 
 interface Serial {
@@ -275,6 +276,11 @@ export default function SerialManage() {
 
   const handleSaveSerialDetails = async () => {
     if (!selectedSerial) return;
+    
+    if (selectedSerial.customerPhone && !isValidPhone(selectedSerial.customerPhone, true)) {
+      alert(PHONE_ERROR_MSG);
+      return;
+    }
     
     setSubmittingApprove(true);
     try {

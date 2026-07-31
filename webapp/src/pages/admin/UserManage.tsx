@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { fetchApi, getStations } from '../../api/client';
+import { isValidPhone, PHONE_ERROR_MSG } from '../../utils/phone';
 import { UserPlus, Lock, Unlock, Search, Filter, X, Pencil, Download } from 'lucide-react';
 import { useConfirm } from '../../context/ConfirmContext';
 import { matchesSearchTerm } from '../../utils/text';
@@ -228,6 +229,10 @@ export default function UserManage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+    if (phone && !isValidPhone(phone, true)) {
+      setError(PHONE_ERROR_MSG);
+      return;
+    }
     try {
       if (modalMode === 'create') {
         await fetchApi('/users', {
