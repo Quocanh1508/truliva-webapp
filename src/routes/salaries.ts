@@ -320,11 +320,28 @@ router.get('/calculate', requireAuth, requireAdmin, async (req: Request, res: Re
     // 4. Calculate for each KTV
     const result = [];
     for (const ktv of ktvs) {
+      // Tính toán khoảng ngày bắt đầu - kết thúc của tháng (dựa trên thời gian hoàn thành báo cáo createdAt)
+      const [mStr, yStr] = month.split('/');
+      const mNum = Number(mStr);
+      const yNum = Number(yStr);
+
+      const monthVariants = [
+        month,
+        `${mNum}/${yNum}`,
+        `${String(mNum).padStart(2, '0')}/${yNum}`
+      ];
+
+      const startDate = new Date(Date.UTC(yNum, mNum - 1, 1, 0, 0, 0, 0));
+      const endDate = new Date(Date.UTC(yNum, mNum, 0, 23, 59, 59, 999));
+
       const reports = await prisma.serviceReport.findMany({
         where: {
           ktvUserId: ktv.id,
-          month: month.startsWith('0') ? `${Number(month.substring(0, 2))}/${month.substring(3)}` : month, // supports "7/2026" or "07/2026"
-          approvalStatus: 'APPROVED'
+          approvalStatus: 'APPROVED',
+          OR: [
+            { month: { in: monthVariants } },
+            { createdAt: { gte: startDate, lte: endDate } }
+          ]
         },
         include: { order: true }
       });
@@ -539,13 +556,14 @@ router.get('/export', requireAuth, requireAdmin, async (req: Request, res: Respo
     }
 
     const formattedMonth = month.startsWith('0') ? `${Number(month.substring(0, 2))}/${month.substring(3)}` : month;
+    const ktvIdsList = ktvId ? ktvId.split(',').map(s => s.trim()).filter(Boolean) : [];
 
     // 1. Load active KTVs
     const ktvs = await prisma.user.findMany({
       where: {
         role: 'KTV',
         isActive: true,
-        ...(ktvId ? { id: ktvId } : {}),
+        ...(ktvIdsList.length > 0 ? { id: { in: ktvIdsList } } : {}),
         ...(stationId ? { techStationId: stationId } : {})
       },
       select: {

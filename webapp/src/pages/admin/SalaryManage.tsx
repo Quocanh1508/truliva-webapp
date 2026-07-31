@@ -256,16 +256,23 @@ export default function SalaryManage() {
 
   // Search & Filter states
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedKtvFilter, setSelectedKtvFilter] = useState('');
+  const [selectedKtvsFilter, setSelectedKtvsFilter] = useState<string[]>([]);
   const [selectedStationsFilter, setSelectedStationsFilter] = useState<string[]>([]);
   const [selectedWorkTypeFilter, setSelectedWorkTypeFilter] = useState('');
 
-  // Dropdown State & Ref for Multi-Select Station Tree Filter
+  // Dropdown States & Refs for Multi-Select Filters (KTV & Station)
+  const [isKtvDropdownOpen, setIsKtvDropdownOpen] = useState(false);
+  const [ktvSearchQuery, setKtvSearchQuery] = useState('');
+  const ktvDropdownRef = useRef<HTMLDivElement>(null);
+
   const [isStationDropdownOpen, setIsStationDropdownOpen] = useState(false);
   const stationDropdownRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
+      if (ktvDropdownRef.current && !ktvDropdownRef.current.contains(event.target as Node)) {
+        setIsKtvDropdownOpen(false);
+      }
       if (stationDropdownRef.current && !stationDropdownRef.current.contains(event.target as Node)) {
         setIsStationDropdownOpen(false);
       }
@@ -329,7 +336,8 @@ export default function SalaryManage() {
   };
 
   useEffect(() => {
-    setSelectedKtvFilter('');
+    setSelectedKtvsFilter([]);
+    setKtvSearchQuery('');
     setSelectedStationsFilter([]);
     setSelectedWorkTypeFilter('');
     fetchSalaries();
@@ -433,7 +441,7 @@ export default function SalaryManage() {
     try {
       const token = localStorage.getItem('session_token');
       let url = `/api/salaries/export?month=${encodeURIComponent(selectedMonth)}`;
-      if (selectedKtvFilter) url += `&ktvId=${encodeURIComponent(selectedKtvFilter)}`;
+      if (selectedKtvsFilter.length > 0) url += `&ktvId=${encodeURIComponent(selectedKtvsFilter.join(','))}`;
       if (selectedStationsFilter.length > 0) url += `&stationId=${encodeURIComponent(selectedStationsFilter.join(','))}`;
       if (selectedWorkTypeFilter) url += `&workType=${encodeURIComponent(selectedWorkTypeFilter)}`;
 
@@ -461,10 +469,43 @@ export default function SalaryManage() {
     }
   };
 
-  // Danh sách KTV có ca hoàn thành hoặc có ghi chú điều chỉnh trong tháng được chọn
+  // Danh sách KTV có đóng ca trong tháng tương ứng, sắp xếp Họ tên theo alphabet (A-Z)
   const activeKtvsInMonth = useMemo(() => {
-    return salaries.filter(s => s.casesCount > 0 || (s.adjustedCost !== s.calculatedCost) || !!s.adjustmentNote);
+    return salaries
+      .filter(s => s.casesCount > 0)
+      .sort((a, b) => a.fullName.localeCompare(b.fullName, 'vi'));
   }, [salaries]);
+
+  // Tìm kiếm KTV trong Dropdown chọn nhiều KTV
+  const filteredKtvsInDropdown = useMemo(() => {
+    if (!ktvSearchQuery.trim()) return activeKtvsInMonth;
+    const q = ktvSearchQuery.toLowerCase();
+    return activeKtvsInMonth.filter(s => 
+      s.fullName.toLowerCase().includes(q) ||
+      s.phoneNumber.includes(q) ||
+      s.username.toLowerCase().includes(q)
+    );
+  }, [activeKtvsInMonth, ktvSearchQuery]);
+
+  // Toggle chọn 1 KTV trong bộ lọc
+  const toggleKtv = (userId: string) => {
+    setSelectedKtvsFilter(prev => {
+      if (prev.includes(userId)) {
+        return prev.filter(id => id !== userId);
+      } else {
+        return [...prev, userId];
+      }
+    });
+  };
+
+  // Toggle chọn tất cả / bỏ tất cả KTV trong bộ lọc
+  const toggleAllKtvs = () => {
+    if (selectedKtvsFilter.length === activeKtvsInMonth.length) {
+      setSelectedKtvsFilter([]);
+    } else {
+      setSelectedKtvsFilter(activeKtvsInMonth.map(s => s.userId));
+    }
+  };
 
   // Cấu trúc Cây Trạm: Trạm Chính (Parent Group) -> Trạm Kỹ Thuật (Child Sub-stations)
   const stationTree = useMemo(() => {
@@ -534,9 +575,8 @@ export default function SalaryManage() {
   // Filtered Summary View
   const filteredSalaries = useMemo(() => {
     return salaries.filter(s => {
-      // Khi chọn "Tất cả KTV", chỉ hiển thị những KTV có làm ca trong tháng
       const hasActivity = s.casesCount > 0 || (s.adjustedCost !== s.calculatedCost) || !!s.adjustmentNote;
-      const matchKtv = selectedKtvFilter ? s.userId === selectedKtvFilter : hasActivity;
+      const matchKtv = selectedKtvsFilter.length === 0 ? hasActivity : selectedKtvsFilter.includes(s.userId);
       const matchStation = selectedStationsFilter.length === 0 || selectedStationsFilter.includes(s.stationName);
       const matchQuery = !searchQuery || 
         s.fullName.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -544,12 +584,12 @@ export default function SalaryManage() {
         s.phoneNumber.includes(searchQuery);
       return matchKtv && matchStation && matchQuery;
     });
-  }, [salaries, selectedKtvFilter, selectedStationsFilter, searchQuery]);
+  }, [salaries, selectedKtvsFilter, selectedStationsFilter, searchQuery]);
 
   // Filtered Detailed Cases View
   const filteredCases = useMemo(() => {
     return allCases.filter(c => {
-      const matchKtv = !selectedKtvFilter || c.userId === selectedKtvFilter;
+      const matchKtv = selectedKtvsFilter.length === 0 || selectedKtvsFilter.includes(c.userId);
       const matchStation = selectedStationsFilter.length === 0 || selectedStationsFilter.includes(c.stationName);
       const matchWorkType = !selectedWorkTypeFilter || c.workType.toLowerCase().includes(selectedWorkTypeFilter.toLowerCase());
       const matchQuery = !searchQuery ||
@@ -562,7 +602,7 @@ export default function SalaryManage() {
 
       return matchKtv && matchStation && matchWorkType && matchQuery;
     });
-  }, [allCases, selectedKtvFilter, selectedStationsFilter, selectedWorkTypeFilter, searchQuery]);
+  }, [allCases, selectedKtvsFilter, selectedStationsFilter, selectedWorkTypeFilter, searchQuery]);
 
   const formatMoney = (val: number) => {
     return val.toLocaleString('vi-VN') + ' đ';
@@ -752,21 +792,130 @@ export default function SalaryManage() {
         {/* Multi-Filter Bar */}
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 text-xs">
           
-          {/* 1. Lọc theo KTV */}
-          <div>
-            <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-1">Kỹ thuật viên</label>
-            <select
-              value={selectedKtvFilter}
-              onChange={(e) => setSelectedKtvFilter(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+          {/* 1. Lọc theo KTV (Cho phép chọn nhiều, chọn tất cả / bỏ tất cả, sắp xếp A-Z) */}
+          <div className="relative" ref={ktvDropdownRef}>
+            <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-1">
+              Kỹ thuật viên {selectedKtvsFilter.length > 0 && selectedKtvsFilter.length !== activeKtvsInMonth.length && `(${selectedKtvsFilter.length}/${activeKtvsInMonth.length})`}
+            </label>
+            <button
+              type="button"
+              onClick={() => setIsKtvDropdownOpen(!isKtvDropdownOpen)}
+              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white flex items-center justify-between gap-2 shadow-sm text-gray-800 cursor-pointer hover:border-gray-300"
             >
-              <option value="">Tất cả KTV có ca ({activeKtvsInMonth.length})</option>
-              {activeKtvsInMonth.map(s => (
-                <option key={s.userId} value={s.userId}>
-                  {s.fullName} ({s.phoneNumber}) - {s.casesCount} ca
-                </option>
-              ))}
-            </select>
+              <div className="flex items-center gap-1.5 truncate">
+                <UserCheck className="h-3.5 w-3.5 text-blue-600 flex-shrink-0" />
+                <span className="truncate">
+                  {selectedKtvsFilter.length === 0 || selectedKtvsFilter.length === activeKtvsInMonth.length
+                    ? `Tất cả KTV có ca (${activeKtvsInMonth.length})`
+                    : `Đã chọn ${selectedKtvsFilter.length} KTV`}
+                </span>
+              </div>
+              <div className="flex items-center gap-1">
+                {selectedKtvsFilter.length > 0 && (
+                  <span
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setSelectedKtvsFilter([]);
+                    }}
+                    className="p-0.5 hover:bg-gray-200 rounded-full text-gray-400 hover:text-gray-600 cursor-pointer"
+                    title="Bỏ chọn tất cả"
+                  >
+                    <X className="h-3 w-3" />
+                  </span>
+                )}
+                <ChevronDown className={`h-3.5 w-3.5 text-gray-400 transition-transform ${isKtvDropdownOpen ? 'rotate-180' : ''}`} />
+              </div>
+            </button>
+
+            {/* KTV Multi-Select Dropdown Panel */}
+            {isKtvDropdownOpen && (
+              <div className="absolute left-0 top-full mt-1.5 w-80 bg-white border border-gray-200 rounded-xl shadow-2xl z-50 p-3 text-xs space-y-2 max-h-80 overflow-y-auto">
+                {/* Header Select All / Deselect All */}
+                <div className="flex items-center justify-between pb-2 border-b border-gray-100 font-bold text-gray-700">
+                  <label className="flex items-center gap-2 cursor-pointer font-bold text-blue-900">
+                    <input
+                      type="checkbox"
+                      checked={activeKtvsInMonth.length > 0 && selectedKtvsFilter.length === activeKtvsInMonth.length}
+                      ref={(el) => {
+                        if (el) {
+                          el.indeterminate = selectedKtvsFilter.length > 0 && selectedKtvsFilter.length < activeKtvsInMonth.length;
+                        }
+                      }}
+                      onChange={toggleAllKtvs}
+                      className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer h-3.5 w-3.5"
+                    />
+                    <span>Tất cả KTV có ca ({activeKtvsInMonth.length})</span>
+                  </label>
+                  <div className="flex items-center gap-1 text-[11px]">
+                    <button
+                      type="button"
+                      onClick={() => setSelectedKtvsFilter(activeKtvsInMonth.map(s => s.userId))}
+                      className="text-blue-600 hover:underline font-semibold cursor-pointer"
+                    >
+                      Chọn hết
+                    </button>
+                    <span className="text-gray-300">|</span>
+                    <button
+                      type="button"
+                      onClick={() => setSelectedKtvsFilter([])}
+                      className="text-gray-500 hover:underline cursor-pointer"
+                    >
+                      Bỏ chọn
+                    </button>
+                  </div>
+                </div>
+
+                {/* Quick Search inside KTV Dropdown */}
+                {activeKtvsInMonth.length > 6 && (
+                  <div className="relative my-1">
+                    <Search className="h-3 w-3 text-gray-400 absolute left-2.5 top-2" />
+                    <input
+                      type="text"
+                      placeholder="Tìm theo tên KTV, SĐT..."
+                      value={ktvSearchQuery}
+                      onChange={(e) => setKtvSearchQuery(e.target.value)}
+                      className="w-full pl-7 pr-2 py-1 bg-gray-50 border border-gray-200 rounded-md text-[11px] focus:outline-none focus:ring-1 focus:ring-blue-500"
+                    />
+                  </div>
+                )}
+
+                {/* KTV Items List (Alphabetical A-Z) */}
+                <div className="space-y-1 pt-1">
+                  {filteredKtvsInDropdown.length === 0 ? (
+                    <div className="text-center py-3 text-gray-400 italic text-[11px]">
+                      Không tìm thấy KTV phù hợp
+                    </div>
+                  ) : (
+                    filteredKtvsInDropdown.map((s) => {
+                      const isSelected = selectedKtvsFilter.includes(s.userId);
+                      return (
+                        <label
+                          key={s.userId}
+                          className={`flex items-center justify-between px-2 py-1.5 rounded-lg border transition cursor-pointer ${
+                            isSelected 
+                              ? 'bg-blue-50/70 border-blue-200 text-blue-950 font-medium' 
+                              : 'border-transparent hover:bg-gray-50 text-gray-700'
+                          }`}
+                        >
+                          <div className="flex items-center gap-2 truncate">
+                            <input
+                              type="checkbox"
+                              checked={isSelected}
+                              onChange={() => toggleKtv(s.userId)}
+                              className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer h-3.5 w-3.5 flex-shrink-0"
+                            />
+                            <span className="truncate">{s.fullName} ({s.phoneNumber})</span>
+                          </div>
+                          <span className="text-[11px] font-semibold text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded-full flex-shrink-0">
+                            {s.casesCount} ca
+                          </span>
+                        </label>
+                      );
+                    })
+                  )}
+                </div>
+              </div>
+            )}
           </div>
 
           {/* 2. Lọc theo Trạm (Cây Phân Cấp: Trạm Chính -> Trạm Kỹ Thuật, Cho Chọn Nhiều) */}
