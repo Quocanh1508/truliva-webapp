@@ -409,7 +409,17 @@ export default function SalaryManage() {
     }
   };
 
+  // Track initial mount để tránh reset filter khi khôi phục từ sessionStorage
+  const isInitialMount = useRef(true);
+
   useEffect(() => {
+    if (isInitialMount.current) {
+      // Lần mount đầu tiên: chỉ fetch data, KHÔNG reset filters (đã khôi phục từ sessionStorage)
+      isInitialMount.current = false;
+      fetchSalaries();
+      return;
+    }
+    // User chủ động đổi tháng → reset tất cả filters
     setSelectedKtvsFilter([]);
     setKtvSearchQuery('');
     setSelectedStationsFilter([]);
