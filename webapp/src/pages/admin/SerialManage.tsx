@@ -277,8 +277,40 @@ export default function SerialManage() {
   const handleSaveSerialDetails = async () => {
     if (!selectedSerial) return;
     
-    if (selectedSerial.customerPhone && !isValidPhone(selectedSerial.customerPhone, true)) {
+    if (!selectedSerial.status) {
+      alert('Vui lòng chọn Trạng thái (*).');
+      return;
+    }
+    if (!selectedSerial.activatedBy) {
+      alert('Vui lòng chọn Kích hoạt bởi / Chức danh (*).');
+      return;
+    }
+    if (!selectedSerial.customerName || !selectedSerial.customerName.trim()) {
+      alert('Vui lòng nhập Tên khách hàng (*).');
+      return;
+    }
+    if (!selectedSerial.customerPhone || !selectedSerial.customerPhone.trim()) {
+      alert('Vui lòng nhập Số điện thoại (*).');
+      return;
+    }
+    if (!isValidPhone(selectedSerial.customerPhone)) {
       alert(PHONE_ERROR_MSG);
+      return;
+    }
+    if (!selectedSerial.address || !selectedSerial.address.trim()) {
+      alert('Vui lòng nhập Địa chỉ cụ thể (*).');
+      return;
+    }
+    if (!selectedSerial.province || !selectedSerial.province.trim()) {
+      alert('Vui lòng nhập Tỉnh / Thành phố (*).');
+      return;
+    }
+    if (!selectedSerial.activationDate) {
+      alert('Vui lòng chọn Ngày kích hoạt bảo hành (*).');
+      return;
+    }
+    if (!selectedSerial.warrantyExpiryDate) {
+      alert('Vui lòng chọn Ngày hết hạn bảo hành (*).');
       return;
     }
     
@@ -1136,9 +1168,9 @@ export default function SerialManage() {
 
                 {/* 3. Trạng thái */}
                 <div>
-                  <label style={{ fontSize: 11, fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>Trạng thái</label>
+                  <label style={{ fontSize: 11, fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>Trạng thái (*)</label>
                   <select
-                    value={selectedSerial.status || 'Chưa kích hoạt'}
+                    value={selectedSerial.status || ''}
                     onChange={e => {
                       const newStatus = e.target.value;
                       setSelectedSerial(prev => {
@@ -1174,6 +1206,7 @@ export default function SerialManage() {
                     }}
                     style={{ width: '100%', padding: '8px 12px', borderRadius: 8, border: '1px solid #cbd5e1', fontSize: 13, marginTop: 4, background: 'white' }}
                   >
+                    <option value="">-- Chọn trạng thái --</option>
                     <option value="Chưa kích hoạt">Chưa kích hoạt</option>
                     <option value="Chờ duyệt">Chờ duyệt</option>
                     <option value="Đã kích hoạt">Đã kích hoạt</option>
@@ -1183,13 +1216,13 @@ export default function SerialManage() {
 
                 {/* 4. Người kích hoạt */}
                 <div>
-                  <label style={{ fontSize: 11, fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>Kích hoạt bởi / Chức danh</label>
+                  <label style={{ fontSize: 11, fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>Kích hoạt bởi / Chức danh (*)</label>
                   <select
                     value={selectedSerial.activatedBy || ''}
                     onChange={e => setSelectedSerial(prev => prev ? { ...prev, activatedBy: e.target.value || null } : null)}
                     style={{ width: '100%', padding: '8px 12px', borderRadius: 8, border: '1px solid #cbd5e1', fontSize: 13, marginTop: 4, background: 'white' }}
                   >
-                    <option value="">Không rõ</option>
+                    <option value="">-- Chọn người kích hoạt --</option>
                     <option value="CUSTOMER">CUSTOMER</option>
                     <option value="KTV">KTV</option>
                     <option value="ADMIN">ADMIN</option>
@@ -1198,7 +1231,7 @@ export default function SerialManage() {
 
                 {/* 5. Tên khách hàng */}
                 <div>
-                  <label style={{ fontSize: 11, fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>Tên khách hàng</label>
+                  <label style={{ fontSize: 11, fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>Tên khách hàng (*)</label>
                   <input
                     type="text"
                     value={selectedSerial.customerName || ''}
@@ -1209,7 +1242,7 @@ export default function SerialManage() {
 
                 {/* 6. Số điện thoại */}
                 <div>
-                  <label style={{ fontSize: 11, fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>Số điện thoại</label>
+                  <label style={{ fontSize: 11, fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>Số điện thoại (*)</label>
                   <input
                     type="text"
                     value={selectedSerial.customerPhone || ''}
@@ -1220,7 +1253,7 @@ export default function SerialManage() {
 
                 {/* 7. Địa chỉ cụ thể */}
                 <div style={{ gridColumn: 'span 2' }}>
-                  <label style={{ fontSize: 11, fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>Địa chỉ cụ thể</label>
+                  <label style={{ fontSize: 11, fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>Địa chỉ cụ thể (*)</label>
                   <input
                     type="text"
                     value={selectedSerial.address || ''}
@@ -1231,7 +1264,7 @@ export default function SerialManage() {
 
                 {/* 8. Tỉnh / Thành phố */}
                 <div>
-                  <label style={{ fontSize: 11, fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>Tỉnh / Thành phố</label>
+                  <label style={{ fontSize: 11, fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>Tỉnh / Thành phố (*)</label>
                   <input
                     type="text"
                     value={selectedSerial.province || ''}
@@ -1253,7 +1286,7 @@ export default function SerialManage() {
 
                 {/* 10. Ngày kích hoạt bảo hành */}
                 <div>
-                  <label style={{ fontSize: 11, fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>Ngày kích hoạt bảo hành</label>
+                  <label style={{ fontSize: 11, fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>Ngày kích hoạt bảo hành (*)</label>
                   <input
                     type="date"
                     autoFocus={focusWarrantyDateOnOpen}
@@ -1273,7 +1306,7 @@ export default function SerialManage() {
 
                 {/* 11. Ngày hết hạn bảo hành */}
                 <div>
-                  <label style={{ fontSize: 11, fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>Ngày hết hạn bảo hành</label>
+                  <label style={{ fontSize: 11, fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>Ngày hết hạn bảo hành (*)</label>
                   <input
                     type="date"
                     disabled={!canChangeWarrantyPeriod}
