@@ -30,14 +30,15 @@ jobs:
             echo "=== 1. Pulling latest code ==="
             git pull origin main
             
-            echo "=== 2. Installing Backend & Frontend Dependencies ==="
-            npm install
+            echo "=== 2. Installing Backend Dependencies ==="
+            npm install --legacy-peer-deps
             
             echo "=== 3. Updating Database Schema ==="
+            npx prisma generate
             npx prisma db push
             
-            echo "=== 4. Building Frontend and Backend ==="
-            npm run build
+            echo "=== 4. Building Backend Only (TypeScript) ==="
+            npx tsc
             
             echo "=== 5. Restarting Backend Server ==="
             pm2 restart truliva-backend
