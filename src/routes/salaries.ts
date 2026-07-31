@@ -357,9 +357,40 @@ router.get('/calculate', requireAuth, requireAdmin, async (req: Request, res: Re
 
       for (const report of reports) {
         const costResult = calculateReportCost(report, ktvPhoneNorm, stationRate, userCustomRates);
+        const customCostsObj = (report.customCosts as any) || {};
+
+        const baoHanhCost = customCostsObj.baoHanhCost !== undefined
+          ? Number(customCostsObj.baoHanhCost)
+          : (costResult.rateType === 'baoHanh' ? costResult.baseCost : 0);
+
+        const giaoHangCost = customCostsObj.giaoHangCost !== undefined
+          ? Number(customCostsObj.giaoHangCost)
+          : (costResult.rateType === 'giaoHang' ? costResult.baseCost : 0);
+
+        const lapDatCost = customCostsObj.lapDatCost !== undefined
+          ? Number(customCostsObj.lapDatCost)
+          : (costResult.rateType === 'lapDat' ? costResult.baseCost : 0);
+
+        const giaoLapCost = customCostsObj.giaoLapCost !== undefined
+          ? Number(customCostsObj.giaoLapCost)
+          : (costResult.rateType === 'giaoHangLapDat' ? costResult.baseCost : 0);
+
+        const thayLocCost = customCostsObj.thayLocCost !== undefined
+          ? Number(customCostsObj.thayLocCost)
+          : (costResult.rateType === 'thayLoc' ? costResult.baseCost : 0);
+
+        const distanceCost = customCostsObj.distanceCost !== undefined
+          ? Number(customCostsObj.distanceCost)
+          : costResult.distanceCost;
+
+        const otherCost = customCostsObj.otherCost !== undefined
+          ? Number(customCostsObj.otherCost)
+          : (report.additionalCost || 0);
+
+        const totalReportCost = baoHanhCost + giaoHangCost + lapDatCost + giaoLapCost + thayLocCost + distanceCost + otherCost;
         const isSunday = new Date(report.createdAt).getDay() === 0;
 
-        calculatedCost += costResult.totalCost;
+        calculatedCost += totalReportCost;
 
         reportsDetail.push({
           reportId: report.id,
@@ -369,19 +400,23 @@ router.get('/calculate', requireAuth, requireAdmin, async (req: Request, res: Re
           customerPhone: report.customerPhone || report.order?.billPhoneNumber || '',
           province: report.province || '',
           address: report.address || '',
+          orderNote: report.order?.note || '',
+          reportNote: report.notes || '',
           notes: report.notes || report.order?.note || '',
           workType: costResult.workType,
           isSunday,
           baseCost: costResult.baseCost,
           distance: costResult.distance,
-          distanceCost: costResult.distanceCost,
-          totalCost: costResult.totalCost,
+          distanceCost,
+          baoHanhCost,
+          giaoHangCost,
+          lapDatCost,
+          giaoLapCost,
+          thayLocCost,
+          otherCost,
+          totalCost: totalReportCost,
           rateType: costResult.rateType,
-          baoHanhCost: costResult.rateType === 'baoHanh' ? costResult.baseCost : 0,
-          giaoHangCost: costResult.rateType === 'giaoHang' ? costResult.baseCost : 0,
-          lapDatCost: costResult.rateType === 'lapDat' ? costResult.baseCost : 0,
-          giaoLapCost: costResult.rateType === 'giaoHangLapDat' ? costResult.baseCost : 0,
-          thayLocCost: costResult.rateType === 'thayLoc' ? costResult.baseCost : 0,
+          customCosts: report.customCosts || null,
           createdAt: report.createdAt,
           appointmentTime: report.order?.appointmentTime,
           ktvCalledAt: report.order?.ktvCalledAt,
@@ -515,27 +550,101 @@ router.post('/lock', requireAuth, requireAdmin, async (req: Request, res: Respon
 
 /**
  * POST /api/salaries/update-base-cost
- * Update custom base cost for a report
+ * Update custom base cost or specific cost breakdown (customCosts) for a report
  */
 router.post('/update-base-cost', requireAuth, requireAdmin, async (req: Request, res: Response): Promise<void> => {
   try {
-    const { reportId, baseCost } = req.body;
+    const { reportId, baseCost, customCosts, fieldName, fieldValue } = req.body;
     if (!reportId) {
       res.status(400).json({ error: 'Thiếu reportId' });
       return;
     }
-    
+
+    const currentReport = await prisma.serviceReport.findUnique({
+      where: { id: reportId },
+      select: { customCosts: true, customBaseCost: true }
+    });
+
+    let newCustomCosts = (currentReport?.customCosts as any) || {};
+
+    if (customCosts && typeof customCosts === 'object') {
+      newCustomCosts = { ...newCustomCosts, ...customCosts };
+    }
+
+    if (fieldName) {
+      const numVal = fieldValue === '' || fieldValue === null ? 0 : Number(fieldValue);
+      newCustomCosts[fieldName] = isNaN(numVal) ? 0 : numVal;
+    }
+
     await prisma.serviceReport.update({
       where: { id: reportId },
       data: {
-        customBaseCost: baseCost !== null && baseCost !== undefined ? Number(baseCost) : null
+        ...(baseCost !== undefined ? { customBaseCost: baseCost !== null ? Number(baseCost) : null } : {}),
+        customCosts: newCustomCosts
       }
     });
-    
-    res.json({ message: 'Cập nhật đơn giá ca thành công' });
+
+    res.json({ success: true, message: 'Cập nhật đơn giá ca thành công' });
   } catch (error: any) {
     logger.error('Update custom base cost error', { error: error.message });
     res.status(500).json({ error: 'Lỗi khi cập nhật đơn giá ca' });
+  }
+});
+
+/**
+ * POST /api/salaries/add-custom-case
+ * Admin tự thêm ca / mục phí dịch vụ bổ sung vào bảng lương chi tiết
+ */
+router.post('/add-custom-case', requireAuth, requireAdmin, async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { month, ktvUserId, customerName, customerPhone, province, address, workType, amount, otherCost, notes } = req.body;
+
+    if (!month || !ktvUserId || !customerName) {
+      res.status(400).json({ error: 'Vui lòng điền đầy đủ thông tin bắt buộc (Tháng, KTV, Tên ca/khách hàng)' });
+      return;
+    }
+
+    const costNum = amount === '' || amount === null ? 0 : Number(amount);
+    const otherCostNum = otherCost === '' || otherCost === null ? 0 : Number(otherCost);
+
+    const workTypeStr = workType || 'Phí khác';
+    const rateType = getRateType(workTypeStr);
+
+    const customCosts: Record<string, number> = {
+      baoHanhCost: rateType === 'baoHanh' ? costNum : 0,
+      giaoHangCost: rateType === 'giaoHang' ? costNum : 0,
+      lapDatCost: rateType === 'lapDat' ? costNum : 0,
+      giaoLapCost: rateType === 'giaoHangLapDat' ? costNum : 0,
+      thayLocCost: rateType === 'thayLoc' ? costNum : 0,
+      distanceCost: 0,
+      otherCost: otherCostNum
+    };
+
+    const newReport = await prisma.serviceReport.create({
+      data: {
+        month,
+        ktvUserId,
+        customerName,
+        customerPhone: customerPhone || '0900000000',
+        province: province || 'Khác',
+        address: address || '',
+        serviceType: workTypeStr,
+        workType: workTypeStr,
+        notes: notes || 'Thêm ca / chi phí dịch vụ bổ sung',
+        products: [],
+        imageUrls: [],
+        customBaseCost: costNum,
+        customCosts,
+        additionalCost: otherCostNum,
+        approvalStatus: 'APPROVED'
+      }
+    });
+
+    logger.info('Admin added custom salary case', { month, ktvUserId, customerName, amount: costNum });
+    res.json({ success: true, report: newReport, message: 'Thêm ca / chi phí bổ sung thành công!' });
+  } catch (error: any) {
+    logger.error('Add custom salary case error', { error: error.message });
+    res.status(500).json({ error: 'Lỗi khi thêm ca / chi phí bổ sung' });
   }
 });
 

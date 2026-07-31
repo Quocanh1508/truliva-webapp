@@ -57,12 +57,15 @@ interface CaseDetail {
   customerPhone?: string;
   province?: string;
   address?: string;
+  orderNote?: string;
+  reportNote?: string;
   notes?: string;
   workType: string;
   isSunday: boolean;
   baseCost: number;
   distance: number;
   distanceCost: number;
+  otherCost?: number;
   totalCost: number;
   rateType?: string;
   baoHanhCost?: number;
@@ -114,8 +117,18 @@ export default function SalaryManage() {
     return list;
   };
 
+  // Khôi phục bộ lọc từ sessionStorage khi điều hướng quay lại trang Quản lý lương (Item 8)
+  const getInitialFilters = () => {
+    try {
+      const saved = sessionStorage.getItem('salary_manage_filters');
+      if (saved) return JSON.parse(saved);
+    } catch (e) {}
+    return null;
+  };
+  const initial = getInitialFilters();
+
   const months = generateMonths();
-  const [selectedMonth, setSelectedMonth] = useState(months[0]);
+  const [selectedMonth, setSelectedMonth] = useState(initial?.selectedMonth || months[0]);
   const [salaries, setSalaries] = useState<SalaryData[]>([]);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -123,142 +136,36 @@ export default function SalaryManage() {
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
   // View Mode: 'summary' (Tổng hợp KTV), 'detail' (Chi tiết từng ca) or 'rates' (Ma trận đơn giá KTV)
-  const [viewMode, setViewMode] = useState<'summary' | 'detail' | 'rates'>('summary');
-
-  // Rates Matrix State
-  const [rateMatrix, setRateMatrix] = useState<KtvRateRow[]>([]);
-  const [defaultRates, setDefaultRates] = useState<Record<string, number>>({
-    giaoHang: 20000,
-    baoHanh: 60000,
-    thayLoc: 40000,
-    lapDat: 100000,
-    giaoHangLapDat: 120000,
-    thaoLapLai: 160000
-  });
-  const [ratesLoading, setRatesLoading] = useState(false);
-  const [ratesSaving, setRatesSaving] = useState(false);
-  const [rateSearchQuery, setRateSearchQuery] = useState('');
-  const [editedRates, setEditedRates] = useState<Record<string, Record<string, number>>>({});
-
-  const getRateVal = (item: any, fallback: number): number => {
-    if (item === null || item === undefined) return fallback;
-    if (typeof item === 'number') return item;
-    if (typeof item === 'object' && typeof item.rate === 'number') return item.rate;
-    if (typeof item === 'object' && item.rate !== undefined) {
-      const num = Number(item.rate);
-      return isNaN(num) ? fallback : num;
-    }
-    const num = Number(item);
-    return isNaN(num) ? fallback : num;
-  };
-
-  const fetchRateMatrix = async () => {
-    setRatesLoading(true);
-    try {
-      const data = await fetchApi('/salaries/rates');
-      if (data.success) {
-        setRateMatrix(data.matrix || []);
-        if (data.defaultRates) setDefaultRates(data.defaultRates);
-        const map: Record<string, Record<string, number>> = {};
-        (data.matrix || []).forEach((row: KtvRateRow) => {
-          const rates = row.rates || {};
-          const def = data.defaultRates || defaultRates;
-          map[row.userId] = {
-            giaoHang: getRateVal(rates.giaoHang, def.giaoHang ?? 20000),
-            baoHanh: getRateVal(rates.baoHanh, def.baoHanh ?? 60000),
-            thayLoc: getRateVal(rates.thayLoc, def.thayLoc ?? 40000),
-            lapDat: getRateVal(rates.lapDat, def.lapDat ?? 100000),
-            giaoHangLapDat: getRateVal(rates.giaoHangLapDat, def.giaoHangLapDat ?? 120000),
-            thaoLapLai: getRateVal(rates.thaoLapLai, def.thaoLapLai ?? 160000),
-            kmRate: getRateVal(rates.kmRate, def.kmRate ?? 3000),
-            freeKmThreshold: getRateVal(rates.freeKmThreshold, def.freeKmThreshold ?? 20),
-          };
-        });
-        setEditedRates(map);
-      }
-    } catch (err: any) {
-      console.error(err);
-      setMessage({ type: 'error', text: err.message || 'Lỗi khi tải ma trận đơn giá KTV' });
-    } finally {
-      setRatesLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    if (viewMode === 'rates') {
-      fetchRateMatrix();
-    }
-  }, [viewMode]);
-
-  const handleRateCellChange = (userId: string, workType: string, val: string) => {
-    const num = val === '' ? 0 : Number(val.replace(/\D/g, ''));
-    if (isNaN(num)) return;
-    setEditedRates(prev => ({
-      ...prev,
-      [userId]: {
-        ...(prev[userId] || {}),
-        [workType]: num
-      }
-    }));
-  };
-
-  const handleResetKtvRates = async (userId: string) => {
-    try {
-      await fetchApi(`/salaries/rates/${userId}`, { method: 'DELETE' });
-      setEditedRates(prev => {
-        const next = { ...prev };
-        delete next[userId];
-        return next;
-      });
-      fetchRateMatrix();
-    } catch (err: any) {
-      alert(err.message || 'Lỗi khi khôi phục đơn giá');
-    }
-  };
-
-  const handleSaveRateMatrix = async () => {
-    setRatesSaving(true);
-    setMessage(null);
-    try {
-      const ratesList: Array<{ userId: string; workType: string; rate: number }> = [];
-      Object.entries(editedRates).forEach(([userId, workTypes]) => {
-        Object.entries(workTypes).forEach(([workType, rate]) => {
-          ratesList.push({ userId, workType, rate });
-        });
-      });
-
-      const res = await fetchApi('/salaries/rates', {
-        method: 'POST',
-        body: JSON.stringify({ rates: ratesList })
-      });
-
-      if (res.success) {
-        setMessage({ type: 'success', text: res.message || 'Cập nhật ma trận đơn giá KTV thành công!' });
-        fetchRateMatrix();
-        fetchSalaries(true);
-      }
-    } catch (err: any) {
-      console.error(err);
-      setMessage({ type: 'error', text: err.message || 'Lỗi khi lưu đơn giá KTV' });
-    } finally {
-      setRatesSaving(false);
-    }
-  };
+  const [viewMode, setViewMode] = useState<'summary' | 'detail' | 'rates'>(initial?.viewMode || 'summary');
 
   // Detail Modal State (For Summary View)
   const [selectedKtv, setSelectedKtv] = useState<SalaryData | null>(null);
   const [showDetailModal, setShowDetailModal] = useState(false);
 
-  // States for inline unit price editing and row expansion
-  const [editingReportId, setEditingReportId] = useState<string | null>(null);
-  const [editingBaseCost, setEditingBaseCost] = useState<string>('');
+  // States cho phép Admin chỉnh sửa trực tiếp từng cột chi phí (Item 5)
+  const [editingCostCell, setEditingCostCell] = useState<{ reportId: string; fieldName: string } | null>(null);
+  const [editingCostValue, setEditingCostValue] = useState<string>('');
   const [expandedReportIds, setExpandedReportIds] = useState<Set<string>>(new Set());
 
-  // Search & Filter states
-  const [searchQuery, setSearchQuery] = useState('');
-  const [selectedKtvsFilter, setSelectedKtvsFilter] = useState<string[]>([]);
-  const [selectedStationsFilter, setSelectedStationsFilter] = useState<string[]>([]);
-  const [selectedWorkTypeFilter, setSelectedWorkTypeFilter] = useState('');
+  // Search & Filter states (Item 8: lưu duy trì trong sessionStorage)
+  const [searchQuery, setSearchQuery] = useState(initial?.searchQuery || '');
+  const [selectedKtvsFilter, setSelectedKtvsFilter] = useState<string[]>(initial?.selectedKtvsFilter || []);
+  const [selectedStationsFilter, setSelectedStationsFilter] = useState<string[]>(initial?.selectedStationsFilter || []);
+  const [selectedWorkTypeFilter, setSelectedWorkTypeFilter] = useState(initial?.selectedWorkTypeFilter || '');
+
+  // Modal State cho Admin tự thêm ca / mục phí bổ sung (Item 7)
+  const [showAddCaseModal, setShowAddCaseModal] = useState(false);
+  const [addCaseForm, setAddCaseForm] = useState({
+    ktvUserId: '',
+    customerName: '',
+    customerPhone: '',
+    province: '',
+    workType: 'Bảo hành/Sửa chữa',
+    amount: '',
+    otherCost: '',
+    notes: ''
+  });
+  const [addingCase, setAddingCase] = useState(false);
 
   // Dropdown States & Refs for Multi-Select Filters (KTV & Station)
   const [isKtvDropdownOpen, setIsKtvDropdownOpen] = useState(false);
@@ -267,6 +174,18 @@ export default function SalaryManage() {
 
   const [isStationDropdownOpen, setIsStationDropdownOpen] = useState(false);
   const stationDropdownRef = useRef<HTMLDivElement>(null);
+
+  // Tự động lưu bộ lọc vào sessionStorage mỗi khi có thay đổi (Item 8)
+  useEffect(() => {
+    sessionStorage.setItem('salary_manage_filters', JSON.stringify({
+      selectedMonth,
+      viewMode,
+      selectedKtvsFilter,
+      selectedStationsFilter,
+      selectedWorkTypeFilter,
+      searchQuery
+    }));
+  }, [selectedMonth, viewMode, selectedKtvsFilter, selectedStationsFilter, selectedWorkTypeFilter, searchQuery]);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -294,15 +213,15 @@ export default function SalaryManage() {
     });
   };
 
-  // Function to save base cost changes
-  const saveBaseCostChange = async (reportId: string, value: string) => {
-    const cost = value === '' ? null : Number(value.replace(/\D/g, ''));
-    if (cost !== null && isNaN(cost)) return;
+  // Function to save specific cost category cell changes (Item 5)
+  const saveCostCellChange = async (reportId: string, fieldName: string, value: string) => {
+    const cost = value === '' ? 0 : Number(value.replace(/\D/g, ''));
+    if (isNaN(cost)) return;
     
     try {
       await fetchApi('/salaries/update-base-cost', {
         method: 'POST',
-        body: JSON.stringify({ reportId, baseCost: cost })
+        body: JSON.stringify({ reportId, fieldName, fieldValue: cost })
       });
       // Fetch latest salaries to sync everything
       const data = await fetchApi(`/salaries/calculate?month=${selectedMonth}`);
@@ -315,9 +234,47 @@ export default function SalaryManage() {
           setSelectedKtv(updatedKtv);
         }
       }
-      setEditingReportId(null);
+      setEditingCostCell(null);
     } catch (err: any) {
-      alert(err.message || 'Lỗi khi cập nhật đơn giá ca');
+      alert(err.message || 'Lỗi khi cập nhật chi phí ca');
+    }
+  };
+
+  // Function cho Admin tự thêm ca / mục phí bổ sung vào bảng lương (Item 7)
+  const handleAddCustomCase = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!addCaseForm.ktvUserId || !addCaseForm.customerName) {
+      alert('Vui lòng chọn KTV và nhập Tên ca / mục phí bổ sung');
+      return;
+    }
+    setAddingCase(true);
+    try {
+      const res = await fetchApi('/salaries/add-custom-case', {
+        method: 'POST',
+        body: JSON.stringify({
+          month: selectedMonth,
+          ...addCaseForm
+        })
+      });
+      if (res.success) {
+        setMessage({ type: 'success', text: 'Đã thêm ca / mục phí dịch vụ bổ sung thành công!' });
+        setShowAddCaseModal(false);
+        setAddCaseForm({
+          ktvUserId: '',
+          customerName: '',
+          customerPhone: '',
+          province: '',
+          workType: 'Bảo hành/Sửa chữa',
+          amount: '',
+          otherCost: '',
+          notes: ''
+        });
+        fetchSalaries();
+      }
+    } catch (err: any) {
+      alert(err.message || 'Lỗi khi thêm ca bổ sung');
+    } finally {
+      setAddingCase(false);
     }
   };
 
@@ -634,6 +591,50 @@ export default function SalaryManage() {
   const totalAdjusted = salaries.reduce((acc, curr) => acc + curr.adjustedCost, 0);
   const totalCasesCount = salaries.reduce((acc, curr) => acc + curr.casesCount, 0);
   const isMonthLocked = salaries.some(s => s.status === 'FINAL');
+
+  // Helper render ô chi phí có thể chỉnh sửa trực tiếp (Item 5)
+  const renderCostCell = (c: CaseDetail, fieldName: string, currentVal: number, bgClass: string = 'bg-blue-50/20') => {
+    const isEditing = editingCostCell?.reportId === c.reportId && editingCostCell?.fieldName === fieldName;
+    const canEdit = !isMonthLocked && isAdmin;
+
+    if (isEditing) {
+      return (
+        <td className={`px-2 py-2 text-right ${bgClass}`}>
+          <input
+            type="text"
+            className="w-20 text-right px-1.5 py-0.5 border border-blue-500 rounded focus:ring-1 focus:ring-blue-500 text-xs font-bold bg-white"
+            value={editingCostValue}
+            onChange={(e) => setEditingCostValue(e.target.value)}
+            onBlur={() => saveCostCellChange(c.reportId, fieldName, editingCostValue)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') saveCostCellChange(c.reportId, fieldName, editingCostValue);
+              else if (e.key === 'Escape') setEditingCostCell(null);
+            }}
+            autoFocus
+          />
+        </td>
+      );
+    }
+
+    return (
+      <td className={`px-3 py-2.5 text-right font-semibold text-gray-700 ${bgClass}`}>
+        <div
+          onClick={() => {
+            if (canEdit) {
+              setEditingCostCell({ reportId: c.reportId, fieldName });
+              setEditingCostValue(currentVal ? currentVal.toLocaleString('vi-VN') : '0');
+            }
+          }}
+          className={`px-1 py-0.5 rounded transition ${
+            canEdit ? 'cursor-pointer hover:bg-blue-100 hover:text-blue-800 border border-dashed border-transparent hover:border-blue-300' : ''
+          }`}
+          title={canEdit ? `Nhấp để chỉnh sửa ${fieldName}` : ''}
+        >
+          {currentVal > 0 ? currentVal.toLocaleString('vi-VN') : '-'}
+        </div>
+      </td>
+    );
+  };
 
   return (
     <div className="p-4 lg:p-6 max-w-[1700px] mx-auto space-y-6">
@@ -1195,11 +1196,29 @@ export default function SalaryManage() {
         </div>
       )}
 
+
+
       {/* ========================================================================= */}
       {/* VIEW MODE 2: BẢNG CHI TIẾT TẤT CẢ CA DỊCH VỤ (DETAILED CASES VIEW)       */}
       {/* ========================================================================= */}
       {viewMode === 'detail' && (
         <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden space-y-4">
+          {/* Action Toolbar trên bảng chi tiết (Item 7) */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 bg-gray-50/80 border-b border-gray-100">
+            <div className="text-xs text-gray-600 font-medium">
+              Hiển thị <strong className="text-blue-900 font-bold">{filteredCases.length}</strong> ca dịch vụ chi tiết trong tháng {selectedMonth}
+            </div>
+            {isAdmin && !isMonthLocked && (
+              <button
+                onClick={() => setShowAddCaseModal(true)}
+                className="px-3.5 py-2 bg-[#1B3A6B] hover:bg-[#152e55] text-white font-bold rounded-xl text-xs flex items-center gap-1.5 transition shadow-sm cursor-pointer self-start sm:self-auto min-h-[38px]"
+              >
+                <Save className="h-4 w-4 text-blue-200" />
+                + Thêm ca / Chi phí bổ sung
+              </button>
+            )}
+          </div>
+
           {loading ? (
             <div className="flex flex-col items-center justify-center py-20 gap-3">
               <RefreshCw className="h-8 w-8 animate-spin text-blue-600" />
@@ -1211,7 +1230,7 @@ export default function SalaryManage() {
             </div>
           ) : (
             <div className="overflow-x-auto">
-              <table className="min-w-[1600px] w-full text-left border-collapse text-xs">
+              <table className="min-w-[1850px] w-full text-left border-collapse text-xs">
                 <thead>
                   <tr className="bg-[#1B3A6B] text-white font-bold">
                     <th className="px-3 py-3 w-10 text-center">STT</th>
@@ -1223,14 +1242,21 @@ export default function SalaryManage() {
                     <th className="px-3 py-3 w-28">Tỉnh/TP</th>
                     <th className="px-3 py-3 min-w-[160px]">Sản phẩm</th>
                     <th className="px-3 py-3 w-36">Loại dịch vụ</th>
-                    <th className="px-3 py-3 min-w-[160px]">Ghi chú</th>
-                    <th className="px-3 py-3 w-24 text-right">Bán kính (km)</th>
-                    <th className="px-3 py-3 w-28 text-right bg-blue-900/60">Bảo Hành</th>
-                    <th className="px-3 py-3 w-28 text-right bg-blue-900/60">Giao hàng</th>
-                    <th className="px-3 py-3 w-28 text-right bg-blue-900/60">Lắp đặt</th>
-                    <th className="px-3 py-3 w-28 text-right bg-blue-900/60">Giao lắp</th>
-                    <th className="px-3 py-3 w-28 text-right bg-blue-900/60">Thay lọc</th>
-                    <th className="px-3 py-3 w-24 text-right bg-amber-900/60">Phí KC</th>
+                    {/* Item 1: Tách 2 loại ghi chú */}
+                    <th className="px-3 py-3 min-w-[140px]" title="Ghi chú đơn hàng do Sale lên">Ghi chú (Sale)</th>
+                    <th className="px-3 py-3 min-w-[160px]" title="Ghi chú do KTV nhập khi làm báo cáo">Ghi chú KTV</th>
+                    {/* Item 2: Đổi Bán kính -> KC di chuyển (km) */}
+                    <th className="px-3 py-3 w-28 text-right">KC di chuyển (km)</th>
+                    {/* Item 3: Đổi Bảo Hành -> Bảo hành/Sửa chữa */}
+                    <th className="px-3 py-3 w-28 text-right bg-blue-900/60" title="Nhấp vào ô bên dưới để chỉnh sửa">Bảo hành/Sửa chữa</th>
+                    <th className="px-3 py-3 w-28 text-right bg-blue-900/60" title="Nhấp vào ô bên dưới để chỉnh sửa">Giao hàng</th>
+                    <th className="px-3 py-3 w-28 text-right bg-blue-900/60" title="Nhấp vào ô bên dưới để chỉnh sửa">Lắp đặt</th>
+                    <th className="px-3 py-3 w-28 text-right bg-blue-900/60" title="Nhấp vào ô bên dưới để chỉnh sửa">Giao lắp</th>
+                    <th className="px-3 py-3 w-28 text-right bg-blue-900/60" title="Nhấp vào ô bên dưới để chỉnh sửa">Thay lọc</th>
+                    <th className="px-3 py-3 w-24 text-right bg-amber-900/60" title="Nhấp vào ô bên dưới để chỉnh sửa">Phí KC</th>
+                    {/* Item 4: Thêm cột Phí khác */}
+                    <th className="px-3 py-3 w-28 text-right bg-purple-900/60" title="Nhấp vào ô bên dưới để chỉnh sửa">Phí khác</th>
+                    {/* Item 6: Bỏ đơn vị 'đ' ở cột tổng */}
                     <th className="px-3 py-3 w-28 text-right font-extrabold bg-blue-950">Tổng (VND)</th>
                   </tr>
                 </thead>
@@ -1238,12 +1264,6 @@ export default function SalaryManage() {
                   {filteredCases.map((c, index) => {
                     const d = new Date(c.createdAt);
                     const formattedDate = `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
-
-                    const isBaoHanh = c.baoHanhCost && c.baoHanhCost > 0;
-                    const isGiaoHang = c.giaoHangCost && c.giaoHangCost > 0;
-                    const isLapDat = c.lapDatCost && c.lapDatCost > 0;
-                    const isGiaoLap = c.giaoLapCost && c.giaoLapCost > 0;
-                    const isThayLoc = c.thayLocCost && c.thayLocCost > 0;
 
                     return (
                       <tr key={c.reportId} className="hover:bg-gray-50/70 transition">
@@ -1262,66 +1282,37 @@ export default function SalaryManage() {
                             {c.workType}
                           </span>
                         </td>
-                        <td className="px-3 py-2.5 text-gray-500 text-[11px] truncate max-w-[200px]" title={c.notes}>
-                          {c.notes || '-'}
+                        
+                        {/* Item 1: Ghi chú Sale (rê chuột thấy full) */}
+                        <td className="px-3 py-2.5 text-gray-500 text-[11px]">
+                          <span className="truncate max-w-[140px] block" title={c.orderNote || c.notes || ''}>
+                            {c.orderNote || '-'}
+                          </span>
                         </td>
+
+                        {/* Item 1: Ghi chú KTV (hiển thị full) */}
+                        <td className="px-3 py-2.5 text-gray-700 text-[11px] font-medium min-w-[160px]">
+                          {c.reportNote || c.notes || '-'}
+                        </td>
+
+                        {/* Item 2: KC di chuyển (km) */}
                         <td className="px-3 py-2.5 text-right font-medium text-gray-600">
                           {c.distance > 0 ? `${c.distance} km` : '-'}
                         </td>
 
-                        {/* Money Categories Columns */}
-                        <td className="px-3 py-2.5 text-right font-semibold text-gray-700 bg-blue-50/20">
-                          {isBaoHanh ? c.baseCost.toLocaleString('vi-VN') : '-'}
-                        </td>
-                        <td className="px-3 py-2.5 text-right font-semibold text-gray-700 bg-blue-50/20">
-                          {isGiaoHang ? c.baseCost.toLocaleString('vi-VN') : '-'}
-                        </td>
-                        <td className="px-3 py-2.5 text-right font-semibold text-gray-700 bg-blue-50/20">
-                          {isLapDat ? c.baseCost.toLocaleString('vi-VN') : '-'}
-                        </td>
-                        <td className="px-3 py-2.5 text-right font-semibold text-gray-700 bg-blue-50/20">
-                          {isGiaoLap ? c.baseCost.toLocaleString('vi-VN') : '-'}
-                        </td>
-                        <td className="px-3 py-2.5 text-right font-semibold text-gray-700 bg-blue-50/20">
-                          {isThayLoc ? c.baseCost.toLocaleString('vi-VN') : '-'}
-                        </td>
+                        {/* Item 5: Admin điều chỉnh trực tiếp tất cả các cột chi phí */}
+                        {renderCostCell(c, 'baoHanhCost', c.baoHanhCost || 0)}
+                        {renderCostCell(c, 'giaoHangCost', c.giaoHangCost || 0)}
+                        {renderCostCell(c, 'lapDatCost', c.lapDatCost || 0)}
+                        {renderCostCell(c, 'giaoLapCost', c.giaoLapCost || 0)}
+                        {renderCostCell(c, 'thayLocCost', c.thayLocCost || 0)}
+                        {renderCostCell(c, 'distanceCost', c.distanceCost || 0, 'bg-amber-50/20')}
+                        {/* Item 4: Cột Phí khác */}
+                        {renderCostCell(c, 'otherCost', c.otherCost || 0, 'bg-purple-50/20')}
 
-                        {/* Distance Cost */}
-                        <td className="px-3 py-2.5 text-right font-semibold text-amber-700 bg-amber-50/20">
-                          {c.distanceCost > 0 ? c.distanceCost.toLocaleString('vi-VN') : '-'}
-                        </td>
-
-                        {/* Total Cost Column (Editable) */}
+                        {/* Item 6: Cột Tổng (Bỏ chữ 'đ') */}
                         <td className="px-3 py-2.5 text-right font-extrabold text-blue-900 bg-blue-50/40">
-                          {editingReportId === c.reportId ? (
-                            <input
-                              type="text"
-                              className="w-24 text-right px-1.5 py-0.5 border border-blue-500 rounded focus:ring-1 focus:ring-blue-500 text-xs font-bold"
-                              value={editingBaseCost}
-                              onChange={(e) => setEditingBaseCost(e.target.value)}
-                              onBlur={() => saveBaseCostChange(c.reportId, editingBaseCost)}
-                              onKeyDown={(e) => {
-                                if (e.key === 'Enter') saveBaseCostChange(c.reportId, editingBaseCost);
-                                else if (e.key === 'Escape') setEditingReportId(null);
-                              }}
-                              autoFocus
-                            />
-                          ) : (
-                            <div 
-                              onClick={() => {
-                                if (!isMonthLocked && isAdmin) {
-                                  setEditingReportId(c.reportId);
-                                  setEditingBaseCost(c.baseCost.toLocaleString('vi-VN'));
-                                }
-                              }}
-                              className={`cursor-pointer px-1 py-0.5 rounded transition ${
-                                !isMonthLocked && isAdmin ? 'hover:bg-blue-100 hover:text-blue-700 border border-dashed border-transparent hover:border-blue-300' : ''
-                              }`}
-                              title={!isMonthLocked && isAdmin ? 'Nhấp để chỉnh sửa đơn giá ca' : ''}
-                            >
-                              {c.totalCost.toLocaleString('vi-VN')} đ
-                            </div>
-                          )}
+                          {c.totalCost.toLocaleString('vi-VN')}
                         </td>
                       </tr>
                     );
@@ -1329,35 +1320,177 @@ export default function SalaryManage() {
                 </tbody>
                 <tfoot className="bg-slate-100 font-extrabold border-t-2 border-slate-300 text-xs">
                   <tr>
-                    <td colSpan={11} className="px-3 py-3 text-center text-slate-800 uppercase tracking-wider font-extrabold">
+                    <td colSpan={12} className="px-3 py-3 text-center text-slate-800 uppercase tracking-wider font-extrabold">
                       TỔNG CỘNG ({filteredCases.length} CA DỊCH VỤ)
                     </td>
                     <td className="px-3 py-3 text-right text-blue-900 font-extrabold bg-blue-100/50">
-                      {formatMoney(filteredCases.reduce((acc, c) => acc + (c.baoHanhCost || 0), 0))}
+                      {filteredCases.reduce((acc, c) => acc + (c.baoHanhCost || 0), 0).toLocaleString('vi-VN')}
                     </td>
                     <td className="px-3 py-3 text-right text-blue-900 font-extrabold bg-blue-100/50">
-                      {formatMoney(filteredCases.reduce((acc, c) => acc + (c.giaoHangCost || 0), 0))}
+                      {filteredCases.reduce((acc, c) => acc + (c.giaoHangCost || 0), 0).toLocaleString('vi-VN')}
                     </td>
                     <td className="px-3 py-3 text-right text-blue-900 font-extrabold bg-blue-100/50">
-                      {formatMoney(filteredCases.reduce((acc, c) => acc + (c.lapDatCost || 0), 0))}
+                      {filteredCases.reduce((acc, c) => acc + (c.lapDatCost || 0), 0).toLocaleString('vi-VN')}
                     </td>
                     <td className="px-3 py-3 text-right text-blue-900 font-extrabold bg-blue-100/50">
-                      {formatMoney(filteredCases.reduce((acc, c) => acc + (c.giaoLapCost || 0), 0))}
+                      {filteredCases.reduce((acc, c) => acc + (c.giaoLapCost || 0), 0).toLocaleString('vi-VN')}
                     </td>
                     <td className="px-3 py-3 text-right text-blue-900 font-extrabold bg-blue-100/50">
-                      {formatMoney(filteredCases.reduce((acc, c) => acc + (c.thayLocCost || 0), 0))}
+                      {filteredCases.reduce((acc, c) => acc + (c.thayLocCost || 0), 0).toLocaleString('vi-VN')}
                     </td>
                     <td className="px-3 py-3 text-right text-amber-800 font-extrabold bg-amber-100/50">
-                      {formatMoney(filteredCases.reduce((acc, c) => acc + (c.distanceCost || 0), 0))}
+                      {filteredCases.reduce((acc, c) => acc + (c.distanceCost || 0), 0).toLocaleString('vi-VN')}
+                    </td>
+                    <td className="px-3 py-3 text-right text-purple-900 font-extrabold bg-purple-100/50">
+                      {filteredCases.reduce((acc, c) => acc + (c.otherCost || 0), 0).toLocaleString('vi-VN')}
                     </td>
                     <td className="px-3 py-3 text-right text-blue-950 font-black bg-blue-200 text-xs">
-                      {formatMoney(filteredCases.reduce((acc, c) => acc + c.totalCost, 0))}
+                      {filteredCases.reduce((acc, c) => acc + c.totalCost, 0).toLocaleString('vi-VN')}
                     </td>
                   </tr>
                 </tfoot>
               </table>
             </div>
           )}
+        </div>
+      )}
+
+      {/* Modal Thêm Ca / Phí Bổ Sung (Item 7) */}
+      {showAddCaseModal && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl space-y-4">
+            <div className="flex items-center justify-between pb-3 border-b border-gray-100">
+              <h3 className="font-bold text-gray-900 text-base flex items-center gap-2">
+                <Calculator className="h-5 w-5 text-blue-600" />
+                Thêm ca / Chi phí dịch vụ bổ sung
+              </h3>
+              <button
+                onClick={() => setShowAddCaseModal(false)}
+                className="p-1 hover:bg-gray-100 rounded-full text-gray-400 hover:text-gray-600 cursor-pointer"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleAddCustomCase} className="space-y-3 text-xs">
+              <div>
+                <label className="block font-bold text-gray-700 mb-1">Chọn Kỹ thuật viên <span className="text-red-500">*</span></label>
+                <select
+                  value={addCaseForm.ktvUserId}
+                  onChange={(e) => setAddCaseForm(prev => ({ ...prev, ktvUserId: e.target.value }))}
+                  required
+                  className="w-full px-3 py-2 border border-gray-200 rounded-xl font-medium focus:ring-2 focus:ring-blue-500 bg-white text-xs"
+                >
+                  <option value="">-- Chọn KTV nhận thù lao --</option>
+                  {salaries.map(s => (
+                    <option key={s.userId} value={s.userId}>
+                      {s.fullName} ({s.phoneNumber}) - {s.stationName}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block font-bold text-gray-700 mb-1">Tên ca / Khách hàng / Nội dung <span className="text-red-500">*</span></label>
+                <input
+                  type="text"
+                  placeholder="VD: Ca hỗ trợ ngoài / KH Nguyễn Văn A..."
+                  value={addCaseForm.customerName}
+                  onChange={(e) => setAddCaseForm(prev => ({ ...prev, customerName: e.target.value }))}
+                  required
+                  className="w-full px-3 py-2 border border-gray-200 rounded-xl font-medium focus:ring-2 focus:ring-blue-500 text-xs"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block font-bold text-gray-700 mb-1">Loại dịch vụ</label>
+                  <select
+                    value={addCaseForm.workType}
+                    onChange={(e) => setAddCaseForm(prev => ({ ...prev, workType: e.target.value }))}
+                    className="w-full px-3 py-2 border border-gray-200 rounded-xl font-medium focus:ring-2 focus:ring-blue-500 bg-white text-xs"
+                  >
+                    <option value="Bảo hành/Sửa chữa">Bảo hành/Sửa chữa</option>
+                    <option value="Giao hàng">Giao hàng</option>
+                    <option value="Lắp đặt">Lắp đặt</option>
+                    <option value="Giao hàng và lắp đặt">Giao hàng và lắp đặt</option>
+                    <option value="Thay lọc">Thay lọc</option>
+                    <option value="Phí khác">Phí khác</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block font-bold text-gray-700 mb-1">Đơn giá ca (VND)</label>
+                  <input
+                    type="text"
+                    placeholder="VD: 190.000"
+                    value={addCaseForm.amount}
+                    onChange={(e) => {
+                      const val = e.target.value.replace(/\D/g, '');
+                      setAddCaseForm(prev => ({ ...prev, amount: val ? Number(val).toLocaleString('vi-VN') : '' }));
+                    }}
+                    className="w-full px-3 py-2 border border-gray-200 rounded-xl font-bold focus:ring-2 focus:ring-blue-500 text-xs text-right"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block font-bold text-gray-700 mb-1">Phí khác bổ sung (VND)</label>
+                  <input
+                    type="text"
+                    placeholder="VD: 50.000"
+                    value={addCaseForm.otherCost}
+                    onChange={(e) => {
+                      const val = e.target.value.replace(/\D/g, '');
+                      setAddCaseForm(prev => ({ ...prev, otherCost: val ? Number(val).toLocaleString('vi-VN') : '' }));
+                    }}
+                    className="w-full px-3 py-2 border border-gray-200 rounded-xl font-bold focus:ring-2 focus:ring-purple-500 text-xs text-right"
+                  />
+                </div>
+
+                <div>
+                  <label className="block font-bold text-gray-700 mb-1">Tỉnh/TP</label>
+                  <input
+                    type="text"
+                    placeholder="VD: Hà Nội..."
+                    value={addCaseForm.province}
+                    onChange={(e) => setAddCaseForm(prev => ({ ...prev, province: e.target.value }))}
+                    className="w-full px-3 py-2 border border-gray-200 rounded-xl font-medium focus:ring-2 focus:ring-blue-500 text-xs"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block font-bold text-gray-700 mb-1">Ghi chú giải trình</label>
+                <textarea
+                  rows={2}
+                  placeholder="Nhập ghi chú lý do thêm ca/phí bổ sung..."
+                  value={addCaseForm.notes}
+                  onChange={(e) => setAddCaseForm(prev => ({ ...prev, notes: e.target.value }))}
+                  className="w-full px-3 py-2 border border-gray-200 rounded-xl font-medium focus:ring-2 focus:ring-blue-500 text-xs"
+                />
+              </div>
+
+              <div className="flex items-center justify-end gap-3 pt-3 border-t border-gray-100">
+                <button
+                  type="button"
+                  onClick={() => setShowAddCaseModal(false)}
+                  className="px-4 py-2 border border-gray-200 rounded-xl font-semibold text-gray-600 hover:bg-gray-50 cursor-pointer"
+                >
+                  Hủy
+                </button>
+                <button
+                  type="submit"
+                  disabled={addingCase}
+                  className="px-5 py-2 bg-[#1B3A6B] hover:bg-[#152e55] text-white font-bold rounded-xl flex items-center gap-1.5 disabled:opacity-50 shadow-md cursor-pointer"
+                >
+                  {addingCase ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+                  Lưu Ca Bổ Sung
+                </button>
+              </div>
+            </form>
+          </div>
         </div>
       )}
 
