@@ -40,12 +40,14 @@ interface KtvRateRow {
   rates: {
     giaoHang: KtvRateItem;
     baoHanh: KtvRateItem;
+    suaChua?: KtvRateItem;
     thayLoc: KtvRateItem;
     lapDat: KtvRateItem;
     giaoHangLapDat: KtvRateItem;
     thaoLapLai?: KtvRateItem;
     kmRate?: KtvRateItem;
     freeKmThreshold?: KtvRateItem;
+    freeKmThresholdTLSC?: KtvRateItem;
   };
 }
 
@@ -138,6 +140,131 @@ export default function SalaryManage() {
 
   // View Mode: 'summary' (Tổng hợp KTV), 'detail' (Chi tiết từng ca) or 'rates' (Ma trận đơn giá KTV)
   const [viewMode, setViewMode] = useState<'summary' | 'detail' | 'rates'>(initial?.viewMode || 'summary');
+
+  // Rates Matrix State
+  const [rateMatrix, setRateMatrix] = useState<KtvRateRow[]>([]);
+  const [defaultRates, setDefaultRates] = useState<Record<string, number>>({
+    giaoHang: 20000,
+    baoHanh: 60000,
+    suaChua: 60000,
+    thayLoc: 40000,
+    lapDat: 100000,
+    giaoHangLapDat: 120000,
+    thaoLapLai: 160000,
+    kmRate: 3000,
+    freeKmThreshold: 20,
+    freeKmThresholdTLSC: 50
+  });
+  const [ratesLoading, setRatesLoading] = useState(false);
+  const [ratesSaving, setRatesSaving] = useState(false);
+  const [editedRates, setEditedRates] = useState<Record<string, Record<string, number>>>({});
+
+  const getRateVal = (item: any, fallback: number): number => {
+    if (item === null || item === undefined) return fallback;
+    if (typeof item === 'number') return item;
+    if (typeof item === 'object' && typeof item.rate === 'number') return item.rate;
+    if (typeof item === 'object' && item.rate !== undefined) {
+      const num = Number(item.rate);
+      return isNaN(num) ? fallback : num;
+    }
+    const num = Number(item);
+    return isNaN(num) ? fallback : num;
+  };
+
+  const fetchRateMatrix = async () => {
+    setRatesLoading(true);
+    try {
+      const data = await fetchApi('/salaries/rates');
+      if (data.success) {
+        setRateMatrix(data.matrix || []);
+        if (data.defaultRates) setDefaultRates(data.defaultRates);
+        const map: Record<string, Record<string, number>> = {};
+        (data.matrix || []).forEach((row: KtvRateRow) => {
+          const rates = row.rates || {};
+          const def = data.defaultRates || defaultRates;
+          map[row.userId] = {
+            giaoHang: getRateVal(rates.giaoHang, def.giaoHang ?? 20000),
+            baoHanh: getRateVal(rates.baoHanh, def.baoHanh ?? 60000),
+            suaChua: getRateVal(rates.suaChua, def.suaChua ?? 60000),
+            thayLoc: getRateVal(rates.thayLoc, def.thayLoc ?? 40000),
+            lapDat: getRateVal(rates.lapDat, def.lapDat ?? 100000),
+            giaoHangLapDat: getRateVal(rates.giaoHangLapDat, def.giaoHangLapDat ?? 120000),
+            thaoLapLai: getRateVal(rates.thaoLapLai, def.thaoLapLai ?? 160000),
+            kmRate: getRateVal(rates.kmRate, def.kmRate ?? 3000),
+            freeKmThreshold: getRateVal(rates.freeKmThreshold, def.freeKmThreshold ?? 20),
+            freeKmThresholdTLSC: getRateVal(rates.freeKmThresholdTLSC, def.freeKmThresholdTLSC ?? 50),
+          };
+        });
+        setEditedRates(map);
+      }
+    } catch (err: any) {
+      console.error(err);
+      setMessage({ type: 'error', text: err.message || 'Lỗi khi tải ma trận đơn giá KTV' });
+    } finally {
+      setRatesLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (viewMode === 'rates') {
+      fetchRateMatrix();
+    }
+  }, [viewMode]);
+
+  const handleRateCellChange = (userId: string, workType: string, val: string) => {
+    const num = val === '' ? 0 : Number(val.replace(/\D/g, ''));
+    if (isNaN(num)) return;
+    setEditedRates(prev => ({
+      ...prev,
+      [userId]: {
+        ...(prev[userId] || {}),
+        [workType]: num
+      }
+    }));
+  };
+
+  const handleResetKtvRates = async (userId: string) => {
+    try {
+      await fetchApi(`/salaries/rates/${userId}`, { method: 'DELETE' });
+      setEditedRates(prev => {
+        const next = { ...prev };
+        delete next[userId];
+        return next;
+      });
+      fetchRateMatrix();
+    } catch (err: any) {
+      alert(err.message || 'Lỗi khi khôi phục đơn giá');
+    }
+  };
+
+  const handleSaveRateMatrix = async () => {
+    setRatesSaving(true);
+    setMessage(null);
+    try {
+      const ratesList: Array<{ userId: string; workType: string; rate: number }> = [];
+      Object.entries(editedRates).forEach(([userId, workTypes]) => {
+        Object.entries(workTypes).forEach(([workType, rate]) => {
+          ratesList.push({ userId, workType, rate });
+        });
+      });
+
+      const res = await fetchApi('/salaries/rates', {
+        method: 'POST',
+        body: JSON.stringify({ rates: ratesList })
+      });
+
+      if (res.success) {
+        setMessage({ type: 'success', text: res.message || 'Cập nhật ma trận đơn giá KTV thành công!' });
+        fetchRateMatrix();
+        fetchSalaries(true);
+      }
+    } catch (err: any) {
+      console.error(err);
+      setMessage({ type: 'error', text: err.message || 'Lỗi khi lưu đơn giá KTV' });
+    } finally {
+      setRatesSaving(false);
+    }
+  };
 
   // Detail Modal State (For Summary View)
   const [selectedKtv, setSelectedKtv] = useState<SalaryData | null>(null);
