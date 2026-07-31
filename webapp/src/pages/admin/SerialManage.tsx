@@ -1221,7 +1221,6 @@ export default function SerialManage() {
                     style={{ width: '100%', padding: '8px 12px', borderRadius: 8, border: '1px solid #cbd5e1', fontSize: 13, marginTop: 4, background: 'white' }}
                   >
                     <option value="">-- Chọn trạng thái --</option>
-                    <option value="Chưa kích hoạt">Chưa kích hoạt</option>
                     <option value="Chờ duyệt">Chờ duyệt</option>
                     <option value="Đã kích hoạt">Đã kích hoạt</option>
                     <option value="KH xác nhận">KH xác nhận</option>
