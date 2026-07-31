@@ -139,3 +139,22 @@ export function requireDev(req: Request, res: Response, next: NextFunction): voi
   next();
 }
 
+/**
+ * Middleware kiểm tra quyền Quản lý Serial (Admin, Dev, Coordinator, Hotline, Staff thuộc nhóm Hotline).
+ */
+export function requireSerialAccess(req: Request, res: Response, next: NextFunction): void {
+  const role = req.user?.role;
+  const group = req.user?.group;
+  if (
+    role === 'ADMIN' ||
+    role === 'DEV' ||
+    role === 'COORDINATOR' ||
+    role === 'HOTLINE' ||
+    (role === 'STAFF' && group === 'Hotline')
+  ) {
+    next();
+    return;
+  }
+  res.status(403).json({ error: 'Không có quyền truy cập Quản lý Serial' });
+}
+

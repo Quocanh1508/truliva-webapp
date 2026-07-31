@@ -94,6 +94,16 @@ export default function Layout() {
     const canSeeInventory = user.role === 'ADMIN' || user.role === 'COORDINATOR';
     if (canSeeInventory) {
       items.push({ name: 'Quản lý kho', path: '/admin/inventory', icon: <Warehouse size={20} /> });
+    }
+
+    // 2.1 Quản lý Serial: Admin, Dev, Coordinator, Hotline, Staff thuộc nhóm Hotline
+    const canSeeSerials = 
+      user.role === 'ADMIN' || 
+      user.role === 'DEV' || 
+      user.role === 'COORDINATOR' || 
+      user.role === 'HOTLINE' || 
+      (user.role === 'STAFF' && user.group === 'Hotline');
+    if (canSeeSerials) {
       items.push({ name: 'Quản lý Serial', path: '/admin/serials', icon: <Hash size={20} /> });
     }
 

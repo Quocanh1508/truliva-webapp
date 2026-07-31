@@ -70,7 +70,14 @@ interface ImportError {
 
 export default function SerialManage() {
   const { user: currentUser } = useAuth();
-  const canChangeWarrantyPeriod = currentUser?.role === 'ADMIN' || currentUser?.role === 'DEV' || currentUser?.role === 'COORDINATOR';
+  const canChangeWarrantyPeriod = 
+    currentUser?.role === 'ADMIN' || 
+    currentUser?.role === 'DEV' || 
+    currentUser?.role === 'COORDINATOR' || 
+    currentUser?.role === 'HOTLINE' || 
+    (currentUser?.role === 'STAFF' && currentUser?.group === 'Hotline');
+
+  const canExportExcel = currentUser?.role === 'ADMIN' || currentUser?.role === 'DEV';
 
   // Helper to load saved filters from sessionStorage
   const getSavedSerialFilter = (key: string, defaultValue: any) => {
@@ -661,19 +668,21 @@ export default function SerialManage() {
             <Upload size={16} /> Import Excel
           </button>
 
-          {/* Export button */}
-          <button
-            onClick={handleExport}
-            style={{
-              display: 'flex', alignItems: 'center', gap: 6,
-              padding: '8px 16px', borderRadius: 8,
-              background: 'white', color: '#374151',
-              border: '1px solid #d1d5db',
-              fontSize: 14, fontWeight: 600, cursor: 'pointer',
-            }}
-          >
-            <Download size={16} /> Xuất Excel
-          </button>
+          {/* Export button (Chỉ dành cho Admin/Dev) */}
+          {canExportExcel && (
+            <button
+              onClick={handleExport}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 6,
+                padding: '8px 16px', borderRadius: 8,
+                background: 'white', color: '#374151',
+                border: '1px solid #d1d5db',
+                fontSize: 14, fontWeight: 600, cursor: 'pointer',
+              }}
+            >
+              <Download size={16} /> Xuất Excel
+            </button>
+          )}
 
           {/* Zalo OA OAuth Button */}
           <button

@@ -333,6 +333,10 @@ export default function App() {
                 <Route path="/admin/stations" element={<StationManage />} />
                 <Route path="/admin/users" element={<UserManage />} />
                 <Route path="/admin/sample-images" element={<SampleImageManage />} />
+              </Route>
+
+              {/* Serial Management Route (Admin, Dev, Coordinator, Hotline, Staff) */}
+              <Route element={<ProtectedRoute allowedRoles={['ADMIN', 'DEV', 'COORDINATOR', 'HOTLINE', 'STAFF']} />}>
                 <Route path="/admin/serials" element={<SerialManage />} />
               </Route>
 

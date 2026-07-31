@@ -9,7 +9,7 @@ import axios from 'axios';
 import fs from 'fs';
 import prisma from '../config/database';
 import logger from '../utils/logger';
-import { requireAuth, requireCoordinatorOrAdmin, requireDev } from '../middleware/authSession';
+import { requireAuth, requireCoordinatorOrAdmin, requireSerialAccess, requireDev } from '../middleware/authSession';
 import { activateSerialWarranty, extractWarrantyMonths } from '../services/warrantyService';
 import { getZaloConfig, exchangeAuthorizationCode, sendZnsWarrantyActivation } from '../services/zaloService';
 
@@ -577,7 +577,7 @@ function getCellText(cell: any): string {
 //  GET /api/serials - Danh sách serial (phân trang, tìm kiếm, lọc)
 // ══════════════════════════════════════
 
-router.get('/', requireCoordinatorOrAdmin, async (req: Request, res: Response): Promise<void> => {
+router.get('/', requireSerialAccess, async (req: Request, res: Response): Promise<void> => {
   try {
     const page = Math.max(1, parseInt(req.query.page as string) || 1);
     const limit = Math.min(100, Math.max(1, parseInt(req.query.limit as string) || 20));
@@ -703,7 +703,7 @@ router.get('/', requireCoordinatorOrAdmin, async (req: Request, res: Response): 
 // ══════════════════════════════════════
 //  GET /api/serials/batches - Lấy danh sách các lô import
 // ══════════════════════════════════════
-router.get('/batches', requireCoordinatorOrAdmin, async (req: Request, res: Response): Promise<void> => {
+router.get('/batches', requireSerialAccess, async (req: Request, res: Response): Promise<void> => {
   try {
     const batches = await prisma.serial.groupBy({
       by: ['importBatchId'],
@@ -733,7 +733,7 @@ router.get('/batches', requireCoordinatorOrAdmin, async (req: Request, res: Resp
 // ══════════════════════════════════════
 //  POST /api/serials/rollback - Revert lô import (Ctrl+Z)
 // ══════════════════════════════════════
-router.post('/rollback', requireCoordinatorOrAdmin, async (req: Request, res: Response): Promise<void> => {
+router.post('/rollback', requireSerialAccess, async (req: Request, res: Response): Promise<void> => {
   try {
     const { batchId } = req.body;
     if (!batchId) {
@@ -810,7 +810,7 @@ router.post('/rollback', requireCoordinatorOrAdmin, async (req: Request, res: Re
 //  POST /api/serials/import - Import Excel
 // ══════════════════════════════════════
 
-router.post('/import', requireCoordinatorOrAdmin, (req, res, next) => {
+router.post('/import', requireSerialAccess, (req, res, next) => {
   excelUpload.single('file')(req, res, (err) => {
     if (err instanceof multer.MulterError) {
       if (err.code === 'LIMIT_FILE_SIZE') {
@@ -1375,7 +1375,7 @@ router.post('/import', requireCoordinatorOrAdmin, (req, res, next) => {
 // ══════════════════════════════════════
 //  GET /api/serials/import-template - Tải file Excel mẫu
 // ══════════════════════════════════════
-router.get('/import-template', requireCoordinatorOrAdmin, async (req: Request, res: Response): Promise<void> => {
+router.get('/import-template', requireSerialAccess, async (req: Request, res: Response): Promise<void> => {
   try {
     const workbook = new ExcelJS.Workbook();
     const worksheet = workbook.addWorksheet('Template Import');
@@ -1517,7 +1517,13 @@ router.get('/import-template', requireCoordinatorOrAdmin, async (req: Request, r
 //  GET /api/serials/export - Xuất Excel
 // ══════════════════════════════════════
 
-router.get('/export', requireCoordinatorOrAdmin, async (req: Request, res: Response): Promise<void> => {
+router.get('/export', requireAuth, (req: Request, res: Response, next) => {
+  if (req.user?.role !== 'ADMIN' && req.user?.role !== 'DEV') {
+    res.status(403).json({ error: 'Chỉ Admin và Dev mới có quyền xuất file Excel Serial' });
+    return;
+  }
+  next();
+}, async (req: Request, res: Response): Promise<void> => {
   try {
     const serials = await prisma.serial.findMany({
       orderBy: { createdAt: 'desc' },
@@ -1584,7 +1590,7 @@ router.get('/export', requireCoordinatorOrAdmin, async (req: Request, res: Respo
 // ══════════════════════════════════════
 //  GET /api/serials/policies - Danh sách chính sách bảo hành
 // ══════════════════════════════════════
-router.get('/policies', requireCoordinatorOrAdmin, async (req: Request, res: Response): Promise<void> => {
+router.get('/policies', requireSerialAccess, async (req: Request, res: Response): Promise<void> => {
   try {
     const policies = await prisma.warrantyPolicy.findMany();
     res.json(policies);
@@ -1598,7 +1604,7 @@ router.get('/policies', requireCoordinatorOrAdmin, async (req: Request, res: Res
 //  GET /api/serials/:id - Chi tiết serial + Lịch sử
 // ══════════════════════════════════════
 
-router.get('/:id', requireCoordinatorOrAdmin, async (req: Request, res: Response): Promise<void> => {
+router.get('/:id', requireSerialAccess, async (req: Request, res: Response): Promise<void> => {
   try {
     const serial = await prisma.serial.findUnique({
       where: { id: req.params.id as string },
@@ -1665,7 +1671,7 @@ router.get('/:id', requireCoordinatorOrAdmin, async (req: Request, res: Response
  * POST /api/serials/:id/activate
  * Admin/Sales/Coordinator kích hoạt trực tiếp bảo hành cho Serial (không cần duyệt)
  */
-router.post('/:id/activate', requireCoordinatorOrAdmin, async (req: Request, res: Response): Promise<void> => {
+router.post('/:id/activate', requireSerialAccess, async (req: Request, res: Response): Promise<void> => {
   try {
     const id = req.params.id as string;
     const { customerName, customerPhone, address, province, promoCode, manualStartDate } = req.body;
@@ -1729,7 +1735,7 @@ router.post('/:id/activate', requireCoordinatorOrAdmin, async (req: Request, res
  * POST /api/serials/:id/approve-warranty
  * Admin/Coordinator duyệt yêu cầu kích hoạt bảo hành từ Khách hàng
  */
-router.post('/:id/approve-warranty', requireCoordinatorOrAdmin, async (req: Request, res: Response): Promise<void> => {
+router.post('/:id/approve-warranty', requireSerialAccess, async (req: Request, res: Response): Promise<void> => {
   try {
     const id = req.params.id as string;
     const { manualStartDate, promoCode } = req.body;
@@ -1793,7 +1799,7 @@ router.post('/:id/approve-warranty', requireCoordinatorOrAdmin, async (req: Requ
  * PATCH /api/serials/:id
  * Admin/Coordinator chỉnh sửa thông tin Serial
  */
-router.patch('/:id', requireCoordinatorOrAdmin, async (req: Request, res: Response): Promise<void> => {
+router.patch('/:id', requireSerialAccess, async (req: Request, res: Response): Promise<void> => {
   try {
     const { id } = req.params;
     const { 
@@ -1939,7 +1945,7 @@ router.patch('/:id', requireCoordinatorOrAdmin, async (req: Request, res: Respon
  * POST /api/serials/:id/restore
  * Khôi phục serial về trạng thái chưa kích hoạt (xóa trắng các thông tin kích hoạt)
  */
-router.post('/:id/restore', requireCoordinatorOrAdmin, async (req: Request, res: Response): Promise<void> => {
+router.post('/:id/restore', requireSerialAccess, async (req: Request, res: Response): Promise<void> => {
   try {
     const { id } = req.params;
 
@@ -2007,7 +2013,7 @@ router.post('/:id/restore', requireCoordinatorOrAdmin, async (req: Request, res:
  * GET /api/serials/zalo/status
  * Kiểm tra trạng thái kết nối và tokens hiện tại của Zalo OA
  */
-router.get('/zalo/status', requireCoordinatorOrAdmin, async (req: Request, res: Response): Promise<void> => {
+router.get('/zalo/status', requireSerialAccess, async (req: Request, res: Response): Promise<void> => {
   try {
     const fnsAppId = process.env.FNS_APP_ID || '';
     const fnsSecretKey = process.env.FNS_SECRET_KEY || '';
@@ -2090,7 +2096,7 @@ router.post('/zns-activate', requireAuth, async (req: Request, res: Response): P
  * POST /api/serials/activate-manual
  * Admin / Coordinator kích hoạt bảo hành trực tiếp trên hệ thống (thủ công)
  */
-router.post('/activate-manual', requireCoordinatorOrAdmin, async (req: Request, res: Response): Promise<void> => {
+router.post('/activate-manual', requireSerialAccess, async (req: Request, res: Response): Promise<void> => {
   try {
     const { serialNumber, model, customerName, customerPhone, address, province } = req.body;
     if (!serialNumber) {
