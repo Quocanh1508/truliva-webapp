@@ -1733,14 +1733,26 @@ export default function SalaryManage() {
                 <tbody className="divide-y divide-gray-100 bg-white">
                   {rateMatrix
                     .filter(ktv => {
-                      if (!searchQuery.trim()) return true;
-                      const q = searchQuery.toLowerCase();
-                      return (
+                      const matchKtv = selectedKtvsFilter.length === 0 || selectedKtvsFilter.includes(ktv.userId);
+
+                      const kMain = ktv.mainStationName && ktv.mainStationName !== 'Không có' ? ktv.mainStationName : 'Trực thuộc Truliva';
+                      const kTech = ktv.stationName && ktv.stationName !== 'Không có' ? ktv.stationName : 'Khác';
+                      const kKey = `${kMain}::${kTech}`;
+
+                      const matchStation = selectedStationsFilter.length === 0 || 
+                        selectedStationsFilter.includes(kKey) || 
+                        selectedStationsFilter.includes(ktv.stationName);
+
+                      const q = searchQuery.trim().toLowerCase();
+                      const matchQuery = !q || (
                         ktv.fullName.toLowerCase().includes(q) ||
                         ktv.username.toLowerCase().includes(q) ||
                         ktv.phoneNumber.includes(q) ||
-                        ktv.stationName.toLowerCase().includes(q)
+                        (ktv.stationName && ktv.stationName.toLowerCase().includes(q)) ||
+                        (ktv.mainStationName && ktv.mainStationName.toLowerCase().includes(q))
                       );
+
+                      return matchKtv && matchStation && matchQuery;
                     })
                     .map((ktv) => {
                       const userEdited = editedRates[ktv.userId] || {};
