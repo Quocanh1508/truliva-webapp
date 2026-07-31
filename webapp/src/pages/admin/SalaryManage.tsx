@@ -508,48 +508,52 @@ export default function SalaryManage() {
   };
 
   // Cấu trúc Cây Trạm: Trạm Chính (Parent Group) -> Trạm Kỹ Thuật (Child Sub-stations)
+  // Mỗi trạm kỹ thuật được gán Unique Key = "MainStationName::TechStationName" để không bị trùng lặp khi các Trạm chính cùng có tên trạm "Hà Nội"
   const stationTree = useMemo(() => {
-    const map = new Map<string, Set<string>>();
+    const map = new Map<string, Map<string, { key: string; name: string }>>();
 
     activeKtvsInMonth.forEach(s => {
       const main = s.mainStationName && s.mainStationName !== 'Không có' ? s.mainStationName : 'Trực thuộc Truliva';
       const tech = s.stationName && s.stationName !== 'Không có' ? s.stationName : 'Khác';
+      const key = `${main}::${tech}`;
+
       if (!map.has(main)) {
-        map.set(main, new Set());
+        map.set(main, new Map());
       }
-      map.get(main)!.add(tech);
+      map.get(main)!.set(key, { key, name: tech });
     });
 
-    const list: Array<{ mainStationName: string; stations: string[] }> = [];
-    map.forEach((stationsSet, mainStationName) => {
+    const list: Array<{ mainStationName: string; stations: Array<{ key: string; name: string }> }> = [];
+    map.forEach((stationsMap, mainStationName) => {
+      const sortedStations = Array.from(stationsMap.values()).sort((a, b) => a.name.localeCompare(b.name, 'vi'));
       list.push({
         mainStationName,
-        stations: Array.from(stationsSet).sort()
+        stations: sortedStations
       });
     });
 
-    return list.sort((a, b) => a.mainStationName.localeCompare(b.mainStationName));
+    return list.sort((a, b) => a.mainStationName.localeCompare(b.mainStationName, 'vi'));
   }, [activeKtvsInMonth]);
 
-  // Toggle single technical station selection
-  const toggleStation = (techStation: string) => {
+  // Toggle single technical station selection using unique station key
+  const toggleStation = (stationKey: string) => {
     setSelectedStationsFilter(prev => {
-      if (prev.includes(techStation)) {
-        return prev.filter(s => s !== techStation);
+      if (prev.includes(stationKey)) {
+        return prev.filter(s => s !== stationKey);
       } else {
-        return [...prev, techStation];
+        return [...prev, stationKey];
       }
     });
   };
 
-  // Toggle all technical stations under a main station group
-  const toggleMainStationGroup = (groupStations: string[]) => {
-    const allSelected = groupStations.every(st => selectedStationsFilter.includes(st));
+  // Toggle all technical stations under a main station group using unique station keys
+  const toggleMainStationGroup = (groupKeys: string[]) => {
+    const allSelected = groupKeys.every(k => selectedStationsFilter.includes(k));
     setSelectedStationsFilter(prev => {
       if (allSelected) {
-        return prev.filter(st => !groupStations.includes(st));
+        return prev.filter(k => !groupKeys.includes(k));
       } else {
-        const next = new Set([...prev, ...groupStations]);
+        const next = new Set([...prev, ...groupKeys]);
         return Array.from(next);
       }
     });
@@ -557,7 +561,7 @@ export default function SalaryManage() {
 
   // Flattened Cases Array for Detailed View Mode
   const allCases = useMemo(() => {
-    const list: Array<CaseDetail & { ktvName: string; ktvPhone: string; stationName: string; userId: string }> = [];
+    const list: Array<CaseDetail & { ktvName: string; ktvPhone: string; stationName: string; mainStationName: string; userId: string }> = [];
     for (const s of salaries) {
       for (const c of s.cases) {
         list.push({
@@ -565,7 +569,8 @@ export default function SalaryManage() {
           userId: s.userId,
           ktvName: s.fullName,
           ktvPhone: s.phoneNumber,
-          stationName: s.stationName
+          stationName: s.stationName,
+          mainStationName: s.mainStationName
         });
       }
     }
@@ -577,7 +582,15 @@ export default function SalaryManage() {
     return salaries.filter(s => {
       const hasActivity = s.casesCount > 0 || (s.adjustedCost !== s.calculatedCost) || !!s.adjustmentNote;
       const matchKtv = selectedKtvsFilter.length === 0 ? hasActivity : selectedKtvsFilter.includes(s.userId);
-      const matchStation = selectedStationsFilter.length === 0 || selectedStationsFilter.includes(s.stationName);
+
+      const sMain = s.mainStationName && s.mainStationName !== 'Không có' ? s.mainStationName : 'Trực thuộc Truliva';
+      const sTech = s.stationName && s.stationName !== 'Không có' ? s.stationName : 'Khác';
+      const sKey = `${sMain}::${sTech}`;
+
+      const matchStation = selectedStationsFilter.length === 0 || 
+        selectedStationsFilter.includes(sKey) || 
+        selectedStationsFilter.includes(s.stationName);
+
       const matchQuery = !searchQuery || 
         s.fullName.toLowerCase().includes(searchQuery.toLowerCase()) ||
         s.username.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -590,7 +603,15 @@ export default function SalaryManage() {
   const filteredCases = useMemo(() => {
     return allCases.filter(c => {
       const matchKtv = selectedKtvsFilter.length === 0 || selectedKtvsFilter.includes(c.userId);
-      const matchStation = selectedStationsFilter.length === 0 || selectedStationsFilter.includes(c.stationName);
+
+      const cMain = c.mainStationName && c.mainStationName !== 'Không có' ? c.mainStationName : 'Trực thuộc Truliva';
+      const cTech = c.stationName && c.stationName !== 'Không có' ? c.stationName : 'Khác';
+      const cKey = `${cMain}::${cTech}`;
+
+      const matchStation = selectedStationsFilter.length === 0 || 
+        selectedStationsFilter.includes(cKey) || 
+        selectedStationsFilter.includes(c.stationName);
+
       const matchWorkType = !selectedWorkTypeFilter || c.workType.toLowerCase().includes(selectedWorkTypeFilter.toLowerCase());
       const matchQuery = !searchQuery ||
         c.ktvName.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -970,8 +991,8 @@ export default function SalaryManage() {
                     <button
                       type="button"
                       onClick={() => {
-                        const allTechs = stationTree.flatMap(g => g.stations);
-                        setSelectedStationsFilter(allTechs);
+                        const allTechKeys = stationTree.flatMap(g => g.stations.map(st => st.key));
+                        setSelectedStationsFilter(allTechKeys);
                       }}
                       className="text-gray-500 hover:underline cursor-pointer"
                     >
@@ -982,8 +1003,9 @@ export default function SalaryManage() {
 
                 <div className="space-y-3 pt-1">
                   {stationTree.map((group) => {
-                    const isGroupAllSelected = group.stations.every(st => selectedStationsFilter.includes(st));
-                    const isGroupSomeSelected = group.stations.some(st => selectedStationsFilter.includes(st)) && !isGroupAllSelected;
+                    const groupKeys = group.stations.map(st => st.key);
+                    const isGroupAllSelected = groupKeys.every(k => selectedStationsFilter.includes(k));
+                    const isGroupSomeSelected = groupKeys.some(k => selectedStationsFilter.includes(k)) && !isGroupAllSelected;
 
                     return (
                       <div key={group.mainStationName} className="space-y-1">
@@ -995,7 +1017,7 @@ export default function SalaryManage() {
                             ref={(el) => {
                               if (el) el.indeterminate = isGroupSomeSelected;
                             }}
-                            onChange={() => toggleMainStationGroup(group.stations)}
+                            onChange={() => toggleMainStationGroup(groupKeys)}
                             className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer h-3.5 w-3.5"
                           />
                           <span className="truncate flex-1 text-[11px] font-extrabold text-[#1B3A6B]">
@@ -1008,12 +1030,12 @@ export default function SalaryManage() {
 
                         {/* Sub-items: Trạm Kỹ Thuật (Child Stations) */}
                         <div className="pl-4 space-y-0.5">
-                          {group.stations.map((techStation) => {
-                            const isChecked = selectedStationsFilter.includes(techStation);
+                          {group.stations.map((st) => {
+                            const isChecked = selectedStationsFilter.includes(st.key);
 
                             return (
                               <label
-                                key={techStation}
+                                key={st.key}
                                 className={`flex items-center gap-2 px-2 py-1 rounded-md text-xs transition cursor-pointer hover:bg-gray-50 ${
                                   isChecked ? 'bg-cyan-50/80 font-bold text-cyan-900' : 'text-gray-700 font-medium'
                                 }`}
@@ -1021,11 +1043,11 @@ export default function SalaryManage() {
                                 <input
                                   type="checkbox"
                                   checked={isChecked}
-                                  onChange={() => toggleStation(techStation)}
+                                  onChange={() => toggleStation(st.key)}
                                   className="rounded border-gray-300 text-cyan-600 focus:ring-cyan-500 cursor-pointer h-3.5 w-3.5"
                                 />
                                 <span className="truncate text-[11px] flex-1">
-                                  📍 {techStation}
+                                  📍 {st.name}
                                 </span>
                               </label>
                             );
