@@ -1594,8 +1594,12 @@ export default function SalaryManage() {
                       <span className="text-[10px] font-normal opacity-80">(Chuẩn: {(defaultRates.giaoHangLapDat || 120000).toLocaleString('vi-VN')}đ)</span>
                     </th>
                     <th className="px-3 py-3 bg-[#1B3A6B] sticky top-0 z-20 border-b border-blue-900 text-center min-w-[160px]">
-                      Chi phí di chuyển<br/>
+                      Di chuyển (Thông thường)<br/>
                       <span className="text-[10px] font-normal opacity-80">(Chuẩn: 3.000đ/km &gt;20km)</span>
+                    </th>
+                    <th className="px-3 py-3 bg-indigo-950 sticky top-0 z-20 border-b border-indigo-900 text-center min-w-[170px]">
+                      Di chuyển (Thay lọc & Sửa chữa)<br/>
+                      <span className="text-[10px] font-normal opacity-80">(Chuẩn: 3.000đ/km &gt;50km)</span>
                     </th>
                     <th className="px-3 py-3 bg-[#1B3A6B] sticky top-0 z-20 border-b border-blue-900 text-center min-w-[100px]">Thao tác</th>
                   </tr>
@@ -1640,12 +1644,12 @@ export default function SalaryManage() {
                         );
                       };
 
-                      const renderTravelCell = () => {
+                      const renderTravelCell = (thresholdKey: 'freeKmThreshold' | 'freeKmThresholdTLSC' = 'freeKmThreshold', defaultThresh: number = 20) => {
                         const defaultKmRate = getRateVal(ktv.rates?.kmRate, defaultRates.kmRate || 3000);
-                        const defaultThreshold = getRateVal(ktv.rates?.freeKmThreshold, defaultRates.freeKmThreshold || 20);
+                        const defaultThreshold = getRateVal(ktv.rates?.[thresholdKey], defaultRates[thresholdKey] || defaultThresh);
 
                         const currentKmRate = userEdited['kmRate'] !== undefined ? userEdited['kmRate'] : defaultKmRate;
-                        const currentThreshold = userEdited['freeKmThreshold'] !== undefined ? userEdited['freeKmThreshold'] : defaultThreshold;
+                        const currentThreshold = userEdited[thresholdKey] !== undefined ? userEdited[thresholdKey] : defaultThreshold;
 
                         const isKmRateModified = currentKmRate !== defaultKmRate;
                         const isThresholdModified = currentThreshold !== defaultThreshold;
@@ -1674,8 +1678,8 @@ export default function SalaryManage() {
                               <input
                                 type="number"
                                 value={currentThreshold}
-                                onChange={(e) => handleRateCellChange(ktv.userId, 'freeKmThreshold', e.target.value)}
-                                placeholder="20"
+                                onChange={(e) => handleRateCellChange(ktv.userId, thresholdKey, e.target.value)}
+                                placeholder={String(defaultThresh)}
                                 className={`w-12 text-center px-1 py-0.5 rounded border text-xs font-bold transition focus:outline-none focus:ring-2 ${
                                   isThresholdModified
                                     ? 'bg-cyan-50 border-cyan-400 text-cyan-900 font-extrabold shadow-sm'
@@ -1726,7 +1730,10 @@ export default function SalaryManage() {
                             {renderCell('giaoHangLapDat', defaultRates.giaoHangLapDat || 120000)}
                           </td>
                           <td className="px-3 py-3 text-center">
-                            {renderTravelCell()}
+                            {renderTravelCell('freeKmThreshold', 20)}
+                          </td>
+                          <td className="px-3 py-3 text-center bg-indigo-50/20">
+                            {renderTravelCell('freeKmThresholdTLSC', 50)}
                           </td>
                           <td className="px-3 py-3 text-center">
                             <button

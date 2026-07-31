@@ -252,10 +252,25 @@ function calculateReportCost(report: any, ktvPhoneNorm: string, stationRate: any
     kmRate = stationRate.kmRate;
   }
 
-  if (customKtvRatesMap && customKtvRatesMap.has('freeKmThreshold') && customKtvRatesMap.get('freeKmThreshold') !== undefined) {
-    threshold = customKtvRatesMap.get('freeKmThreshold')!;
-  } else if (stationRate?.freeKmThreshold) {
-    threshold = stationRate.freeKmThreshold;
+  // Tách biệt ngưỡng di chuyển theo loại công việc:
+  // - Nếu là ca Thay Lọc ('thayLoc') hoặc Sửa Chữa ('suaChua'): ngưỡng mặc định 50km (hoặc tùy chỉnh)
+  // - Nếu là các ca khác (Lắp đặt, Giao hàng, Giao lắp, Bảo hành): ngưỡng mặc định 20km (hoặc tùy chỉnh)
+  const isTLSC = rateType === 'thayLoc' || rateType === 'suaChua';
+
+  if (isTLSC) {
+    threshold = 50;
+    if (customKtvRatesMap && customKtvRatesMap.has('freeKmThresholdTLSC') && customKtvRatesMap.get('freeKmThresholdTLSC') !== undefined) {
+      threshold = customKtvRatesMap.get('freeKmThresholdTLSC')!;
+    } else if (stationRate?.freeKmThresholdTLSC) {
+      threshold = stationRate.freeKmThresholdTLSC;
+    }
+  } else {
+    threshold = 20;
+    if (customKtvRatesMap && customKtvRatesMap.has('freeKmThreshold') && customKtvRatesMap.get('freeKmThreshold') !== undefined) {
+      threshold = customKtvRatesMap.get('freeKmThreshold')!;
+    } else if (stationRate?.freeKmThreshold) {
+      threshold = stationRate.freeKmThreshold;
+    }
   }
 
   if (!stationRate?.noDistanceCost) {
@@ -1143,7 +1158,8 @@ router.get('/rates', requireAuth, requireAdmin, async (req: Request, res: Respon
       giaoHangLapDat: 120000,
       thaoLapLai: 160000,
       kmRate: 3000,
-      freeKmThreshold: 20
+      freeKmThreshold: 20,
+      freeKmThresholdTLSC: 50
     };
 
     const matrix = ktvs.map(ktv => {
@@ -1165,6 +1181,9 @@ router.get('/rates', requireAuth, requireAdmin, async (req: Request, res: Respon
           ratesWithCustomFlag[workType] = { rate: rateVal, isCustom: false };
         } else if (workType === 'freeKmThreshold') {
           const rateVal = stationRate?.freeKmThreshold || 20;
+          ratesWithCustomFlag[workType] = { rate: rateVal, isCustom: false };
+        } else if (workType === 'freeKmThresholdTLSC') {
+          const rateVal = stationRate?.freeKmThresholdTLSC || 50;
           ratesWithCustomFlag[workType] = { rate: rateVal, isCustom: false };
         } else if (stationRate && stationRate.rates && stationRate.rates[workType] !== undefined && stationRate.rates[workType] > 0) {
           // KTV Ngoại: Lấy đơn giá theo Trạm trong File Excel
