@@ -269,6 +269,7 @@ export default function SalaryManage() {
   const [selectedKtvsFilter, setSelectedKtvsFilter] = useState<string[]>(initial?.selectedKtvsFilter || []);
   const [selectedStationsFilter, setSelectedStationsFilter] = useState<string[]>(initial?.selectedStationsFilter || []);
   const [selectedWorkTypeFilter, setSelectedWorkTypeFilter] = useState(initial?.selectedWorkTypeFilter || '');
+  const [selectedCompletedDateFilter, setSelectedCompletedDateFilter] = useState(initial?.selectedCompletedDateFilter || '');
 
   // Modal State cho Admin tự thêm ca / mục phí bổ sung (Item 7)
   const [showAddCaseModal, setShowAddCaseModal] = useState(false);
@@ -300,9 +301,10 @@ export default function SalaryManage() {
       selectedKtvsFilter,
       selectedStationsFilter,
       selectedWorkTypeFilter,
+      selectedCompletedDateFilter,
       searchQuery
     }));
-  }, [selectedMonth, viewMode, selectedKtvsFilter, selectedStationsFilter, selectedWorkTypeFilter, searchQuery]);
+  }, [selectedMonth, viewMode, selectedKtvsFilter, selectedStationsFilter, selectedWorkTypeFilter, selectedCompletedDateFilter, searchQuery]);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -424,6 +426,7 @@ export default function SalaryManage() {
     setKtvSearchQuery('');
     setSelectedStationsFilter([]);
     setSelectedWorkTypeFilter('');
+    setSelectedCompletedDateFilter('');
     fetchSalaries();
   }, [selectedMonth]);
 
@@ -675,13 +678,19 @@ export default function SalaryManage() {
         selectedStationsFilter.includes(sKey) || 
         selectedStationsFilter.includes(s.stationName);
 
+      const matchCompletedDate = !selectedCompletedDateFilter || (s.cases && s.cases.some(c => {
+        if (!c.createdAt) return false;
+        const cDate = new Date(c.createdAt).toLocaleDateString('sv-SE');
+        return cDate === selectedCompletedDateFilter;
+      }));
+
       const matchQuery = !searchQuery || 
         s.fullName.toLowerCase().includes(searchQuery.toLowerCase()) ||
         s.username.toLowerCase().includes(searchQuery.toLowerCase()) ||
         s.phoneNumber.includes(searchQuery);
-      return matchKtv && matchStation && matchQuery;
+      return matchKtv && matchStation && matchCompletedDate && matchQuery;
     });
-  }, [salaries, selectedKtvsFilter, selectedStationsFilter, searchQuery]);
+  }, [salaries, selectedKtvsFilter, selectedStationsFilter, selectedCompletedDateFilter, searchQuery]);
 
   // Filtered Detailed Cases View
   const filteredCases = useMemo(() => {
@@ -697,6 +706,10 @@ export default function SalaryManage() {
         selectedStationsFilter.includes(c.stationName);
 
       const matchWorkType = !selectedWorkTypeFilter || c.workType.toLowerCase().includes(selectedWorkTypeFilter.toLowerCase());
+
+      const cDate = c.createdAt ? new Date(c.createdAt).toLocaleDateString('sv-SE') : '';
+      const matchCompletedDate = !selectedCompletedDateFilter || cDate === selectedCompletedDateFilter;
+
       const matchQuery = !searchQuery ||
         c.ktvName.toLowerCase().includes(searchQuery.toLowerCase()) ||
         c.customerName.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -705,9 +718,9 @@ export default function SalaryManage() {
         (c.notes && c.notes.toLowerCase().includes(searchQuery.toLowerCase())) ||
         (c.products && c.products.some(p => p.toLowerCase().includes(searchQuery.toLowerCase())));
 
-      return matchKtv && matchStation && matchWorkType && matchQuery;
+      return matchKtv && matchStation && matchWorkType && matchCompletedDate && matchQuery;
     });
-  }, [allCases, selectedKtvsFilter, selectedStationsFilter, selectedWorkTypeFilter, searchQuery]);
+  }, [allCases, selectedKtvsFilter, selectedStationsFilter, selectedWorkTypeFilter, selectedCompletedDateFilter, searchQuery]);
 
   const formatMoney = (val: number) => {
     return val.toLocaleString('vi-VN') + ' đ';
@@ -939,7 +952,7 @@ export default function SalaryManage() {
         </div>
 
         {/* Multi-Filter Bar */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 text-xs">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3 text-xs">
           
           {/* 1. Lọc theo KTV (Cho phép chọn nhiều, chọn tất cả / bỏ tất cả, sắp xếp A-Z) */}
           <div className="relative" ref={ktvDropdownRef}>
@@ -1189,16 +1202,17 @@ export default function SalaryManage() {
             )}
           </div>
 
-          {/* 3. Lọc theo Loại dịch vụ */}
+          {/* 3. Lọc theo Loại công việc */}
           <div>
-            <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-1">Loại dịch vụ</label>
+            <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-1">Loại công việc</label>
             <select
               value={selectedWorkTypeFilter}
               onChange={(e) => setSelectedWorkTypeFilter(e.target.value)}
               className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
             >
-              <option value="">Tất cả loại dịch vụ</option>
+              <option value="">Tất cả loại công việc</option>
               <option value="Bảo hành">Bảo hành</option>
+              <option value="Sửa chữa">Sửa chữa</option>
               <option value="Giao hàng và lắp đặt">Giao hàng & Lắp đặt</option>
               <option value="Lắp đặt">Lắp đặt</option>
               <option value="Thay lọc">Thay lọc</option>
@@ -1206,7 +1220,32 @@ export default function SalaryManage() {
             </select>
           </div>
 
-          {/* 4. Tìm kiếm từ khóa */}
+          {/* 4. Lọc theo Ngày hoàn thành */}
+          <div>
+            <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-1">
+              Ngày hoàn thành {selectedCompletedDateFilter && '(Đang lọc)'}
+            </label>
+            <div className="relative">
+              <input
+                type="date"
+                value={selectedCompletedDateFilter}
+                onChange={(e) => setSelectedCompletedDateFilter(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+              />
+              {selectedCompletedDateFilter && (
+                <button
+                  type="button"
+                  onClick={() => setSelectedCompletedDateFilter('')}
+                  className="absolute right-2 top-2 p-0.5 hover:bg-gray-100 rounded-full text-gray-400 hover:text-gray-600 cursor-pointer"
+                  title="Xóa lọc ngày"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* 5. Tìm kiếm từ khóa */}
           <div>
             <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-1">Tìm kiếm từ khóa</label>
             <input
@@ -1368,7 +1407,7 @@ export default function SalaryManage() {
                     <th className="px-3 py-3 w-28 text-center bg-[#1B3A6B] sticky top-0 z-20">SĐT KH</th>
                     <th className="px-3 py-3 w-28 bg-[#1B3A6B] sticky top-0 z-20">Tỉnh/TP</th>
                     <th className="px-3 py-3 min-w-[160px] bg-[#1B3A6B] sticky top-0 z-20">Sản phẩm</th>
-                    <th className="px-3 py-3 w-36 bg-[#1B3A6B] sticky top-0 z-20">Loại dịch vụ</th>
+                    <th className="px-3 py-3 w-36 bg-[#1B3A6B] sticky top-0 z-20">Loại công việc</th>
                     {/* Item 1: Tách 2 loại ghi chú */}
                     <th className="px-3 py-3 min-w-[140px] bg-[#1B3A6B] sticky top-0 z-20" title="Ghi chú đơn hàng do Sale lên">Ghi chú (Sale)</th>
                     <th className="px-3 py-3 min-w-[160px] bg-[#1B3A6B] sticky top-0 z-20" title="Ghi chú do KTV nhập khi làm báo cáo">Ghi chú KTV</th>
@@ -1536,7 +1575,7 @@ export default function SalaryManage() {
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block font-bold text-gray-700 mb-1">Loại dịch vụ</label>
+                  <label className="block font-bold text-gray-700 mb-1">Loại công việc</label>
                   <select
                     value={addCaseForm.workType}
                     onChange={(e) => setAddCaseForm(prev => ({ ...prev, workType: e.target.value }))}
