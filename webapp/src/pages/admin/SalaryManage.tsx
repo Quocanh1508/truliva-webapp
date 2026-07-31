@@ -979,24 +979,24 @@ export default function SalaryManage() {
               <div className="absolute left-0 top-full mt-1.5 w-72 bg-white border border-gray-200 rounded-xl shadow-2xl z-50 p-3 text-xs space-y-2 max-h-80 overflow-y-auto">
                 <div className="flex items-center justify-between pb-2 border-b border-gray-100 font-bold text-gray-700">
                   <span className="text-[11px] uppercase tracking-wider text-gray-400">Danh mục Trạm</span>
-                  <div className="flex items-center gap-2 text-[11px]">
-                    <button
-                      type="button"
-                      onClick={() => setSelectedStationsFilter([])}
-                      className="text-blue-600 hover:underline font-semibold cursor-pointer"
-                    >
-                      Tất cả
-                    </button>
-                    <span className="text-gray-300">|</span>
+                  <div className="flex items-center gap-1 text-[11px]">
                     <button
                       type="button"
                       onClick={() => {
                         const allTechKeys = stationTree.flatMap(g => g.stations.map(st => st.key));
                         setSelectedStationsFilter(allTechKeys);
                       }}
-                      className="text-gray-500 hover:underline cursor-pointer"
+                      className="text-blue-600 hover:underline font-semibold cursor-pointer"
                     >
                       Chọn hết
+                    </button>
+                    <span className="text-gray-300">|</span>
+                    <button
+                      type="button"
+                      onClick={() => setSelectedStationsFilter([])}
+                      className="text-gray-500 hover:underline cursor-pointer"
+                    >
+                      Bỏ chọn
                     </button>
                   </div>
                 </div>
