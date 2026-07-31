@@ -69,6 +69,7 @@ interface CaseDetail {
   totalCost: number;
   rateType?: string;
   baoHanhCost?: number;
+  suaChuaCost?: number;
   giaoHangCost?: number;
   lapDatCost?: number;
   giaoLapCost?: number;
@@ -1110,19 +1111,19 @@ export default function SalaryManage() {
               Không tìm thấy thông tin KTV nào phù hợp với bộ lọc hiện tại.
             </div>
           ) : (
-            <div className="overflow-x-auto">
+            <div className="overflow-x-auto max-h-[calc(100vh-230px)] overflow-y-auto relative rounded-xl border border-gray-100 shadow-sm">
               <table className="min-w-[1100px] w-full text-left border-collapse text-xs">
-                <thead>
+                <thead className="sticky top-0 z-20 shadow-sm">
                   <tr className="bg-[#1B3A6B] text-white font-bold">
-                    <th className="px-5 py-3.5 w-12 text-center">STT</th>
-                    <th className="px-5 py-3.5">Họ tên KTV</th>
-                    <th className="px-5 py-3.5 w-36">Số điện thoại</th>
-                    <th className="px-5 py-3.5 w-44">Trạm quản lý</th>
-                    <th className="px-5 py-3.5 w-28 text-center">Số ca hoàn thành</th>
-                    <th className="px-5 py-3.5 w-44 text-right">Thù lao tự động (VND)</th>
-                    <th className="px-5 py-3.5 w-48 text-right">Thực nhận (VND)</th>
-                    <th className="px-5 py-3.5 min-w-[200px]">Ghi chú điều chỉnh</th>
-                    <th className="px-5 py-3.5 w-28 text-center">Thao tác</th>
+                    <th className="px-5 py-3.5 w-12 text-center bg-[#1B3A6B] sticky top-0 z-20">STT</th>
+                    <th className="px-5 py-3.5 bg-[#1B3A6B] sticky top-0 z-20">Họ tên KTV</th>
+                    <th className="px-5 py-3.5 w-36 bg-[#1B3A6B] sticky top-0 z-20">Số điện thoại</th>
+                    <th className="px-5 py-3.5 w-44 bg-[#1B3A6B] sticky top-0 z-20">Trạm quản lý</th>
+                    <th className="px-5 py-3.5 w-28 text-center bg-[#1B3A6B] sticky top-0 z-20">Số ca hoàn thành</th>
+                    <th className="px-5 py-3.5 w-44 text-right bg-[#1B3A6B] sticky top-0 z-20">Thù lao tự động (VND)</th>
+                    <th className="px-5 py-3.5 w-48 text-right bg-[#1B3A6B] sticky top-0 z-20">Thực nhận (VND)</th>
+                    <th className="px-5 py-3.5 min-w-[200px] bg-[#1B3A6B] sticky top-0 z-20">Ghi chú điều chỉnh</th>
+                    <th className="px-5 py-3.5 w-28 text-center bg-[#1B3A6B] sticky top-0 z-20">Thao tác</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
@@ -1229,35 +1230,36 @@ export default function SalaryManage() {
               Không tìm thấy ca dịch vụ nào phù hợp với bộ lọc hiện tại.
             </div>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="min-w-[1850px] w-full text-left border-collapse text-xs">
-                <thead>
+            <div className="overflow-x-auto max-h-[calc(100vh-230px)] overflow-y-auto relative rounded-xl border border-gray-100 shadow-sm">
+              <table className="min-w-[1950px] w-full text-left border-collapse text-xs">
+                <thead className="sticky top-0 z-20 shadow-sm">
                   <tr className="bg-[#1B3A6B] text-white font-bold">
-                    <th className="px-3 py-3 w-10 text-center">STT</th>
-                    <th className="px-3 py-3 w-32 text-center">Ngày hoàn thành</th>
-                    <th className="px-3 py-3 w-36">KTV</th>
-                    <th className="px-3 py-3 w-32">Trạm</th>
-                    <th className="px-3 py-3 w-36">Tên KH</th>
-                    <th className="px-3 py-3 w-28 text-center">SĐT KH</th>
-                    <th className="px-3 py-3 w-28">Tỉnh/TP</th>
-                    <th className="px-3 py-3 min-w-[160px]">Sản phẩm</th>
-                    <th className="px-3 py-3 w-36">Loại dịch vụ</th>
+                    <th className="px-3 py-3 w-10 text-center bg-[#1B3A6B] sticky top-0 z-20">STT</th>
+                    <th className="px-3 py-3 w-32 text-center bg-[#1B3A6B] sticky top-0 z-20">Ngày hoàn thành</th>
+                    <th className="px-3 py-3 w-36 bg-[#1B3A6B] sticky top-0 z-20">KTV</th>
+                    <th className="px-3 py-3 w-32 bg-[#1B3A6B] sticky top-0 z-20">Trạm</th>
+                    <th className="px-3 py-3 w-36 bg-[#1B3A6B] sticky top-0 z-20">Tên KH</th>
+                    <th className="px-3 py-3 w-28 text-center bg-[#1B3A6B] sticky top-0 z-20">SĐT KH</th>
+                    <th className="px-3 py-3 w-28 bg-[#1B3A6B] sticky top-0 z-20">Tỉnh/TP</th>
+                    <th className="px-3 py-3 min-w-[160px] bg-[#1B3A6B] sticky top-0 z-20">Sản phẩm</th>
+                    <th className="px-3 py-3 w-36 bg-[#1B3A6B] sticky top-0 z-20">Loại dịch vụ</th>
                     {/* Item 1: Tách 2 loại ghi chú */}
-                    <th className="px-3 py-3 min-w-[140px]" title="Ghi chú đơn hàng do Sale lên">Ghi chú (Sale)</th>
-                    <th className="px-3 py-3 min-w-[160px]" title="Ghi chú do KTV nhập khi làm báo cáo">Ghi chú KTV</th>
+                    <th className="px-3 py-3 min-w-[140px] bg-[#1B3A6B] sticky top-0 z-20" title="Ghi chú đơn hàng do Sale lên">Ghi chú (Sale)</th>
+                    <th className="px-3 py-3 min-w-[160px] bg-[#1B3A6B] sticky top-0 z-20" title="Ghi chú do KTV nhập khi làm báo cáo">Ghi chú KTV</th>
                     {/* Item 2: Đổi Bán kính -> KC di chuyển (km) */}
-                    <th className="px-3 py-3 w-28 text-right">KC di chuyển (km)</th>
-                    {/* Item 3: Đổi Bảo Hành -> Bảo hành/Sửa chữa */}
-                    <th className="px-3 py-3 w-28 text-right bg-blue-900/60" title="Nhấp vào ô bên dưới để chỉnh sửa">Bảo hành/Sửa chữa</th>
-                    <th className="px-3 py-3 w-28 text-right bg-blue-900/60" title="Nhấp vào ô bên dưới để chỉnh sửa">Giao hàng</th>
-                    <th className="px-3 py-3 w-28 text-right bg-blue-900/60" title="Nhấp vào ô bên dưới để chỉnh sửa">Lắp đặt</th>
-                    <th className="px-3 py-3 w-28 text-right bg-blue-900/60" title="Nhấp vào ô bên dưới để chỉnh sửa">Giao lắp</th>
-                    <th className="px-3 py-3 w-28 text-right bg-blue-900/60" title="Nhấp vào ô bên dưới để chỉnh sửa">Thay lọc</th>
-                    <th className="px-3 py-3 w-24 text-right bg-amber-900/60" title="Nhấp vào ô bên dưới để chỉnh sửa">Phí KC</th>
+                    <th className="px-3 py-3 w-28 text-right bg-[#1B3A6B] sticky top-0 z-20">KC di chuyển (km)</th>
+                    {/* Tách riêng 2 cột Bảo hành & Sửa chữa */}
+                    <th className="px-3 py-3 w-28 text-right bg-blue-950/90 sticky top-0 z-20 border-l border-blue-800" title="Nhấp vào ô bên dưới để chỉnh sửa">Bảo hành</th>
+                    <th className="px-3 py-3 w-28 text-right bg-indigo-950/90 sticky top-0 z-20 border-l border-indigo-800" title="Nhấp vào ô bên dưới để chỉnh sửa">Sửa chữa</th>
+                    <th className="px-3 py-3 w-28 text-right bg-blue-900/90 sticky top-0 z-20" title="Nhấp vào ô bên dưới để chỉnh sửa">Giao hàng</th>
+                    <th className="px-3 py-3 w-28 text-right bg-blue-900/90 sticky top-0 z-20" title="Nhấp vào ô bên dưới để chỉnh sửa">Lắp đặt</th>
+                    <th className="px-3 py-3 w-28 text-right bg-blue-900/90 sticky top-0 z-20" title="Nhấp vào ô bên dưới để chỉnh sửa">Giao lắp</th>
+                    <th className="px-3 py-3 w-28 text-right bg-blue-900/90 sticky top-0 z-20" title="Nhấp vào ô bên dưới để chỉnh sửa">Thay lọc</th>
+                    <th className="px-3 py-3 w-24 text-right bg-amber-900/90 sticky top-0 z-20" title="Nhấp vào ô bên dưới để chỉnh sửa">Phí KC</th>
                     {/* Item 4: Thêm cột Phí khác */}
-                    <th className="px-3 py-3 w-28 text-right bg-purple-900/60" title="Nhấp vào ô bên dưới để chỉnh sửa">Phí khác</th>
+                    <th className="px-3 py-3 w-28 text-right bg-purple-900/90 sticky top-0 z-20" title="Nhấp vào ô bên dưới để chỉnh sửa">Phí khác</th>
                     {/* Item 6: Bỏ đơn vị 'đ' ở cột tổng */}
-                    <th className="px-3 py-3 w-28 text-right font-extrabold bg-blue-950">Tổng (VND)</th>
+                    <th className="px-3 py-3 w-28 text-right font-extrabold bg-blue-950 sticky top-0 z-20">Tổng (VND)</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
@@ -1302,6 +1304,7 @@ export default function SalaryManage() {
 
                         {/* Item 5: Admin điều chỉnh trực tiếp tất cả các cột chi phí */}
                         {renderCostCell(c, 'baoHanhCost', c.baoHanhCost || 0)}
+                        {renderCostCell(c, 'suaChuaCost', c.suaChuaCost || 0, 'bg-indigo-50/30')}
                         {renderCostCell(c, 'giaoHangCost', c.giaoHangCost || 0)}
                         {renderCostCell(c, 'lapDatCost', c.lapDatCost || 0)}
                         {renderCostCell(c, 'giaoLapCost', c.giaoLapCost || 0)}
@@ -1325,6 +1328,9 @@ export default function SalaryManage() {
                     </td>
                     <td className="px-3 py-3 text-right text-blue-900 font-extrabold bg-blue-100/50">
                       {filteredCases.reduce((acc, c) => acc + (c.baoHanhCost || 0), 0).toLocaleString('vi-VN')}
+                    </td>
+                    <td className="px-3 py-3 text-right text-indigo-900 font-extrabold bg-indigo-100/50">
+                      {filteredCases.reduce((acc, c) => acc + (c.suaChuaCost || 0), 0).toLocaleString('vi-VN')}
                     </td>
                     <td className="px-3 py-3 text-right text-blue-900 font-extrabold bg-blue-100/50">
                       {filteredCases.reduce((acc, c) => acc + (c.giaoHangCost || 0), 0).toLocaleString('vi-VN')}
@@ -1557,37 +1563,41 @@ export default function SalaryManage() {
               <span className="text-gray-400 text-xs font-semibold">Đang tải danh sách đơn giá KTV...</span>
             </div>
           ) : (
-            <div className="overflow-x-auto rounded-xl border border-gray-200">
+            <div className="overflow-x-auto max-h-[calc(100vh-250px)] overflow-y-auto relative rounded-xl border border-gray-200 shadow-sm">
               <table className="w-full text-left text-xs border-collapse">
-                <thead>
+                <thead className="sticky top-0 z-20 shadow-sm">
                   <tr className="bg-[#1B3A6B] text-white text-xs uppercase font-bold tracking-wider">
-                    <th className="px-4 py-3 border-b border-blue-900 min-w-[180px]">Kỹ thuật viên</th>
-                    <th className="px-4 py-3 border-b border-blue-900 min-w-[140px]">Trạm quản lý</th>
-                    <th className="px-3 py-3 border-b border-blue-900 text-center min-w-[120px]">
+                    <th className="px-4 py-3 bg-[#1B3A6B] sticky top-0 z-20 border-b border-blue-900 min-w-[180px]">Kỹ thuật viên</th>
+                    <th className="px-4 py-3 bg-[#1B3A6B] sticky top-0 z-20 border-b border-blue-900 min-w-[140px]">Trạm quản lý</th>
+                    <th className="px-3 py-3 bg-[#1B3A6B] sticky top-0 z-20 border-b border-blue-900 text-center min-w-[120px]">
                       Giao hàng<br/>
                       <span className="text-[10px] font-normal opacity-80">(Chuẩn: {(defaultRates.giaoHang || 20000).toLocaleString('vi-VN')}đ)</span>
                     </th>
-                    <th className="px-3 py-3 border-b border-blue-900 text-center min-w-[130px]">
-                      Bảo hành & Sửa chữa<br/>
+                    <th className="px-3 py-3 bg-[#1B3A6B] sticky top-0 z-20 border-b border-blue-900 text-center min-w-[130px]">
+                      Bảo hành<br/>
                       <span className="text-[10px] font-normal opacity-80">(Chuẩn: {(defaultRates.baoHanh || 60000).toLocaleString('vi-VN')}đ)</span>
                     </th>
-                    <th className="px-3 py-3 border-b border-blue-900 text-center min-w-[120px]">
+                    <th className="px-3 py-3 bg-[#1B3A6B] sticky top-0 z-20 border-b border-blue-900 text-center min-w-[130px]">
+                      Sửa chữa<br/>
+                      <span className="text-[10px] font-normal opacity-80">(Chuẩn: {(defaultRates.suaChua || 60000).toLocaleString('vi-VN')}đ)</span>
+                    </th>
+                    <th className="px-3 py-3 bg-[#1B3A6B] sticky top-0 z-20 border-b border-blue-900 text-center min-w-[120px]">
                       Thay lọc<br/>
                       <span className="text-[10px] font-normal opacity-80">(Chuẩn: {(defaultRates.thayLoc || 40000).toLocaleString('vi-VN')}đ)</span>
                     </th>
-                    <th className="px-3 py-3 border-b border-blue-900 text-center min-w-[120px]">
+                    <th className="px-3 py-3 bg-[#1B3A6B] sticky top-0 z-20 border-b border-blue-900 text-center min-w-[120px]">
                       Lắp đặt<br/>
                       <span className="text-[10px] font-normal opacity-80">(Chuẩn: {(defaultRates.lapDat || 100000).toLocaleString('vi-VN')}đ)</span>
                     </th>
-                    <th className="px-3 py-3 border-b border-blue-900 text-center min-w-[130px]">
+                    <th className="px-3 py-3 bg-[#1B3A6B] sticky top-0 z-20 border-b border-blue-900 text-center min-w-[130px]">
                       Giao + Lắp<br/>
                       <span className="text-[10px] font-normal opacity-80">(Chuẩn: {(defaultRates.giaoHangLapDat || 120000).toLocaleString('vi-VN')}đ)</span>
                     </th>
-                    <th className="px-3 py-3 border-b border-blue-900 text-center min-w-[160px]">
+                    <th className="px-3 py-3 bg-[#1B3A6B] sticky top-0 z-20 border-b border-blue-900 text-center min-w-[160px]">
                       Chi phí di chuyển<br/>
                       <span className="text-[10px] font-normal opacity-80">(Chuẩn: 3.000đ/km &gt;20km)</span>
                     </th>
-                    <th className="px-3 py-3 border-b border-blue-900 text-center min-w-[100px]">Thao tác</th>
+                    <th className="px-3 py-3 bg-[#1B3A6B] sticky top-0 z-20 border-b border-blue-900 text-center min-w-[100px]">Thao tác</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100 bg-white">
@@ -1704,6 +1714,9 @@ export default function SalaryManage() {
                             {renderCell('baoHanh', defaultRates.baoHanh || 60000)}
                           </td>
                           <td className="px-3 py-3 text-center">
+                            {renderCell('suaChua', defaultRates.suaChua || 60000)}
+                          </td>
+                          <td className="px-3 py-3 text-center">
                             {renderCell('thayLoc', defaultRates.thayLoc || 40000)}
                           </td>
                           <td className="px-3 py-3 text-center">
@@ -1769,22 +1782,22 @@ export default function SalaryManage() {
                   Không tìm thấy ca dịch vụ nào của KTV này trong tháng.
                 </div>
               ) : (
-                <div className="overflow-x-auto border border-gray-100 rounded-xl">
+                <div className="overflow-x-auto max-h-[55vh] overflow-y-auto relative border border-gray-100 rounded-xl">
                   <table className="w-full text-left text-xs border-collapse">
-                    <thead>
-                      <tr className="bg-gray-50 border-b border-gray-100 text-gray-500 font-semibold">
-                        <th className="px-4 py-3 text-center w-12">STT</th>
-                        <th className="px-4 py-3 w-28">Mã ca</th>
-                        <th className="px-4 py-3">Khách hàng</th>
-                        <th className="px-4 py-3 w-32">Loại công việc</th>
-                        <th className="px-4 py-3 min-w-[130px]">Ghi chú (Sale)</th>
-                        <th className="px-4 py-3 min-w-[150px]">Ghi chú KTV</th>
-                        <th className="px-4 py-3 text-center w-24">Ngày cuối tuần</th>
-                        <th className="px-4 py-3 text-right w-32">Đơn giá ca (VND)</th>
-                        <th className="px-4 py-3 w-28 text-center">Quãng đường</th>
-                        <th className="px-4 py-3 text-right w-32">Phụ cấp km (VND)</th>
-                        <th className="px-4 py-3 text-right w-28">Phí khác (VND)</th>
-                        <th className="px-4 py-3 text-right w-32 font-bold text-gray-700">Tổng cộng (VND)</th>
+                    <thead className="sticky top-0 z-20 shadow-sm">
+                      <tr className="bg-gray-50 border-b border-gray-100 text-gray-700 font-bold">
+                        <th className="px-4 py-3 text-center w-12 bg-gray-50 sticky top-0 z-20">STT</th>
+                        <th className="px-4 py-3 w-28 bg-gray-50 sticky top-0 z-20">Mã ca</th>
+                        <th className="px-4 py-3 bg-gray-50 sticky top-0 z-20">Khách hàng</th>
+                        <th className="px-4 py-3 w-32 bg-gray-50 sticky top-0 z-20">Loại công việc</th>
+                        <th className="px-4 py-3 min-w-[130px] bg-gray-50 sticky top-0 z-20">Ghi chú (Sale)</th>
+                        <th className="px-4 py-3 min-w-[150px] bg-gray-50 sticky top-0 z-20">Ghi chú KTV</th>
+                        <th className="px-4 py-3 text-center w-24 bg-gray-50 sticky top-0 z-20">Ngày cuối tuần</th>
+                        <th className="px-4 py-3 text-right w-32 bg-gray-50 sticky top-0 z-20">Đơn giá ca (VND)</th>
+                        <th className="px-4 py-3 w-28 text-center bg-gray-50 sticky top-0 z-20">Quãng đường</th>
+                        <th className="px-4 py-3 text-right w-32 bg-gray-50 sticky top-0 z-20">Phụ cấp km (VND)</th>
+                        <th className="px-4 py-3 text-right w-28 bg-gray-50 sticky top-0 z-20">Phí khác (VND)</th>
+                        <th className="px-4 py-3 text-right w-32 font-bold text-gray-800 bg-gray-50 sticky top-0 z-20">Tổng cộng (VND)</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-100">

@@ -21,7 +21,7 @@ function normalizePhone(phone: any): string {
 }
 
 // Map workType to the Station rate fields
-function getRateType(workType: string | null | undefined): 'giaoHang' | 'baoHanh' | 'thayLoc' | 'lapDat' | 'giaoHangLapDat' | 'thaoLapLai' {
+function getRateType(workType: string | null | undefined): 'giaoHang' | 'baoHanh' | 'suaChua' | 'thayLoc' | 'lapDat' | 'giaoHangLapDat' | 'thaoLapLai' {
   if (!workType) return 'baoHanh';
   const normalized = workType.toLowerCase().trim();
   if (normalized.includes('tháo máy & lắp đặt lại') || normalized.includes('tháo máy và lắp đặt lại') || normalized.includes('tháo lắp') || normalized.includes('thao_lap_lai')) {
@@ -38,6 +38,9 @@ function getRateType(workType: string | null | undefined): 'giaoHang' | 'baoHanh
   }
   if (normalized.includes('lắp đặt') || normalized.includes('lap_dat') || normalized.includes('lắp mới') || normalized.includes('lắp lại')) {
     return 'lapDat';
+  }
+  if (normalized.includes('sửa chữa') || normalized.includes('sua_chua') || normalized.includes('sửa máy')) {
+    return 'suaChua';
   }
   return 'baoHanh';
 }
@@ -363,6 +366,10 @@ router.get('/calculate', requireAuth, requireAdmin, async (req: Request, res: Re
           ? Number(customCostsObj.baoHanhCost)
           : (costResult.rateType === 'baoHanh' ? costResult.baseCost : 0);
 
+        const suaChuaCost = customCostsObj.suaChuaCost !== undefined
+          ? Number(customCostsObj.suaChuaCost)
+          : (costResult.rateType === 'suaChua' ? costResult.baseCost : 0);
+
         const giaoHangCost = customCostsObj.giaoHangCost !== undefined
           ? Number(customCostsObj.giaoHangCost)
           : (costResult.rateType === 'giaoHang' ? costResult.baseCost : 0);
@@ -387,7 +394,7 @@ router.get('/calculate', requireAuth, requireAdmin, async (req: Request, res: Re
           ? Number(customCostsObj.otherCost)
           : (report.additionalCost || 0);
 
-        const totalReportCost = baoHanhCost + giaoHangCost + lapDatCost + giaoLapCost + thayLocCost + distanceCost + otherCost;
+        const totalReportCost = baoHanhCost + suaChuaCost + giaoHangCost + lapDatCost + giaoLapCost + thayLocCost + distanceCost + otherCost;
         const isSunday = new Date(report.createdAt).getDay() === 0;
 
         calculatedCost += totalReportCost;
@@ -408,6 +415,7 @@ router.get('/calculate', requireAuth, requireAdmin, async (req: Request, res: Re
           distance: costResult.distance,
           distanceCost,
           baoHanhCost,
+          suaChuaCost,
           giaoHangCost,
           lapDatCost,
           giaoLapCost,
@@ -1129,6 +1137,7 @@ router.get('/rates', requireAuth, requireAdmin, async (req: Request, res: Respon
     const defaultRates: Record<string, number> = {
       giaoHang: 20000,
       baoHanh: 60000,
+      suaChua: 60000,
       thayLoc: 40000,
       lapDat: 100000,
       giaoHangLapDat: 120000,
