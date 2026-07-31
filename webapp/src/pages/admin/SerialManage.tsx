@@ -72,18 +72,40 @@ export default function SerialManage() {
   const { user: currentUser } = useAuth();
   const canChangeWarrantyPeriod = currentUser?.role === 'ADMIN' || currentUser?.role === 'DEV' || currentUser?.role === 'COORDINATOR';
 
+  // Helper to load saved filters from sessionStorage
+  const getSavedSerialFilter = (key: string, defaultValue: any) => {
+    try {
+      const saved = sessionStorage.getItem('truliva_serial_filters');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed[key] !== undefined) return parsed[key];
+      }
+    } catch (e) {}
+    return defaultValue;
+  };
+
   const [serials, setSerials] = useState<Serial[]>([]);
   const [stats, setStats] = useState<SerialStats>({ total: 0, activated: 0, unactivated: 0, confirmed: 0, expired: 0, valid: 0 });
   const [loading, setLoading] = useState(true);
-  const [page, setPage] = useState(1);
+  const [page, setPage] = useState(() => getSavedSerialFilter('page', 1));
   const [totalPages, setTotalPages] = useState(1);
-  const [search, setSearch] = useState('');
-  const [statusFilter, setStatusFilter] = useState('');
-  const [searchInput, setSearchInput] = useState('');
+  const [search, setSearch] = useState(() => getSavedSerialFilter('search', ''));
+  const [statusFilter, setStatusFilter] = useState(() => getSavedSerialFilter('statusFilter', ''));
+  const [searchInput, setSearchInput] = useState(() => getSavedSerialFilter('search', ''));
 
   // Batch states
   const [batches, setBatches] = useState<{ batchId: string; count: number }[]>([]);
-  const [batchFilter, setBatchFilter] = useState('');
+  const [batchFilter, setBatchFilter] = useState(() => getSavedSerialFilter('batchFilter', ''));
+
+  // Save filters to sessionStorage on change
+  useEffect(() => {
+    sessionStorage.setItem('truliva_serial_filters', JSON.stringify({
+      search,
+      statusFilter,
+      batchFilter,
+      page
+    }));
+  }, [search, statusFilter, batchFilter, page]);
   const [showBatchModal, setShowBatchModal] = useState(false);
   const [rollingBack, setRollingBack] = useState<string | null>(null);
 

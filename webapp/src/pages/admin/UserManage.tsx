@@ -43,11 +43,30 @@ export default function UserManage() {
   const [group, setGroup] = useState('');
   const [pancakeAccountName, setPancakeAccountName] = useState('');
   
-  // Filter state
-  const [searchText, setSearchText] = useState('');
-  const [filterMainStation, setFilterMainStation] = useState('');
-  const [filterTechStation, setFilterTechStation] = useState('');
-  const [filterStatus, setFilterStatus] = useState<'all' | 'active' | 'inactive'>('all');
+  // Helper to load saved filters from sessionStorage
+  const getSavedUserFilter = (key: string, defaultValue: any) => {
+    try {
+      const saved = sessionStorage.getItem('truliva_user_filters');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed[key] !== undefined) return parsed[key];
+      }
+    } catch (e) {}
+    return defaultValue;
+  };
+
+  // Filter state (restored from sessionStorage)
+  const [searchText, setSearchText] = useState(() => getSavedUserFilter('searchText', ''));
+  const [filterMainStation, setFilterMainStation] = useState(() => getSavedUserFilter('filterMainStation', ''));
+  const [filterTechStation, setFilterTechStation] = useState(() => getSavedUserFilter('filterTechStation', ''));
+  const [filterStatus, setFilterStatus] = useState<'all' | 'active' | 'inactive'>(() => getSavedUserFilter('filterStatus', 'all'));
+
+  // Save filters to sessionStorage on change
+  useEffect(() => {
+    sessionStorage.setItem('truliva_user_filters', JSON.stringify({
+      searchText, filterMainStation, filterTechStation, filterStatus
+    }));
+  }, [searchText, filterMainStation, filterTechStation, filterStatus]);
 
   // Form Modal state
   const [modalOpen, setModalOpen] = useState(false);

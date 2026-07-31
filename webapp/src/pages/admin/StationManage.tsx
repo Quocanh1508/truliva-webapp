@@ -29,7 +29,20 @@ export default function StationManage() {
   const [stations, setStations] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [statusFilter, setStatusFilter] = useState<'active' | 'locked'>('active');
+  const [statusFilter, setStatusFilter] = useState<'active' | 'locked'>(() => {
+    try {
+      const saved = sessionStorage.getItem('truliva_station_filters');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed.statusFilter) return parsed.statusFilter;
+      }
+    } catch (e) {}
+    return 'active';
+  });
+
+  useEffect(() => {
+    sessionStorage.setItem('truliva_station_filters', JSON.stringify({ statusFilter }));
+  }, [statusFilter]);
 
   const [expandedMain, setExpandedMain] = useState<string[]>([]);
   

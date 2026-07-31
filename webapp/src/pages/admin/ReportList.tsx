@@ -468,12 +468,24 @@ export default function ReportList() {
       setModalActionLoading(false);
     }
   };
-  const [filterMonth, setFilterMonth] = useState('');
+  // Helper to load saved filters from sessionStorage
+  const getSavedReportFilter = (key: string, defaultValue: any) => {
+    try {
+      const saved = sessionStorage.getItem('truliva_report_filters');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed[key] !== undefined) return parsed[key];
+      }
+    } catch (e) {}
+    return defaultValue;
+  };
+
+  const [filterMonth, setFilterMonth] = useState(() => getSavedReportFilter('filterMonth', ''));
   const [openPopupId, setOpenPopupId] = useState<string | null>(null);
-  const [search, setSearch] = useState(searchParam);
-  const [datePreset, setDatePreset] = useState('');
-  const [customStartDate, setCustomStartDate] = useState('');
-  const [customEndDate, setCustomEndDate] = useState('');
+  const [search, setSearch] = useState(() => searchParam || getSavedReportFilter('search', ''));
+  const [datePreset, setDatePreset] = useState(() => getSavedReportFilter('datePreset', ''));
+  const [customStartDate, setCustomStartDate] = useState(() => getSavedReportFilter('customStartDate', ''));
+  const [customEndDate, setCustomEndDate] = useState(() => getSavedReportFilter('customEndDate', ''));
   const [deleteModal, setDeleteModal] = useState<{ isOpen: boolean; reportId: string } | null>(null);
   const [deleteReason, setDeleteReason] = useState('');
   const [deleting, setDeleting] = useState(false);
@@ -498,7 +510,7 @@ export default function ReportList() {
   const [tempUpdatedEnd, setTempUpdatedEnd] = useState('');
 
   // Applied filter parameters sent to API
-  const [appliedFilters, setAppliedFilters] = useState({
+  const [appliedFilters, setAppliedFilters] = useState(() => getSavedReportFilter('appliedFilters', {
     workTypes: [] as string[],
     serviceTypes: [] as string[],
     categories: [] as string[],
@@ -513,7 +525,19 @@ export default function ReportList() {
     createdEnd: '',
     updatedStart: '',
     updatedEnd: ''
-  });
+  }));
+
+  // Save filters to sessionStorage on change
+  useEffect(() => {
+    sessionStorage.setItem('truliva_report_filters', JSON.stringify({
+      filterMonth,
+      search,
+      datePreset,
+      customStartDate,
+      customEndDate,
+      appliedFilters
+    }));
+  }, [filterMonth, search, datePreset, customStartDate, customEndDate, appliedFilters]);
 
   // ── Edit mode state ──
   const [isEditing, setIsEditing] = useState(false);

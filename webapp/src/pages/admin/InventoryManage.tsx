@@ -36,13 +36,36 @@ export default function InventoryManage() {
   const [error, setError] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
 
-  // Filters & Settings
-  const [searchTerm, setSearchTerm] = useState('');
-  const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
-  const [selectedWarehouses, setSelectedWarehouses] = useState<string[]>([]);
+  // Helper to load saved filters from sessionStorage
+  const getSavedInventoryFilter = (key: string, defaultValue: any) => {
+    try {
+      const saved = sessionStorage.getItem('truliva_inventory_filters');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed[key] !== undefined) return parsed[key];
+      }
+    } catch (e) {}
+    return defaultValue;
+  };
+
+  // Filters & Settings (restored from sessionStorage)
+  const [searchTerm, setSearchTerm] = useState(() => getSavedInventoryFilter('searchTerm', ''));
+  const [selectedCategories, setSelectedCategories] = useState<string[]>(() => getSavedInventoryFilter('selectedCategories', []));
+  const [selectedWarehouses, setSelectedWarehouses] = useState<string[]>(() => getSavedInventoryFilter('selectedWarehouses', []));
   const [lowStockThreshold, setLowStockThreshold] = useState<number>(2); // Ngưỡng mặc định bằng 2 theo yêu cầu
-  const [showOnlyLowStock, setShowOnlyLowStock] = useState(false);
-  const [showOnlyInStock, setShowOnlyInStock] = useState(false);
+  const [showOnlyLowStock, setShowOnlyLowStock] = useState(() => getSavedInventoryFilter('showOnlyLowStock', false));
+  const [showOnlyInStock, setShowOnlyInStock] = useState(() => getSavedInventoryFilter('showOnlyInStock', false));
+
+  // Save filters to sessionStorage on change
+  useEffect(() => {
+    sessionStorage.setItem('truliva_inventory_filters', JSON.stringify({
+      searchTerm,
+      selectedCategories,
+      selectedWarehouses,
+      showOnlyLowStock,
+      showOnlyInStock
+    }));
+  }, [searchTerm, selectedCategories, selectedWarehouses, showOnlyLowStock, showOnlyInStock]);
 
   // UI Dropdowns
   const [showWarehouseFilterDropdown, setShowWarehouseFilterDropdown] = useState(false);
