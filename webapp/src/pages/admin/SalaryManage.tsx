@@ -278,7 +278,7 @@ export default function SalaryManage() {
     customerName: '',
     customerPhone: '',
     province: '',
-    workType: 'Bảo hành/Sửa chữa',
+    workType: 'Bảo hành',
     amount: '',
     otherCost: '',
     notes: ''
@@ -292,6 +292,11 @@ export default function SalaryManage() {
 
   const [isStationDropdownOpen, setIsStationDropdownOpen] = useState(false);
   const stationDropdownRef = useRef<HTMLDivElement>(null);
+
+  // Dropdown cho Modal Chọn KTV (Sắp xếp A-Z + Tìm kiếm gợi ý)
+  const [isModalKtvDropdownOpen, setIsModalKtvDropdownOpen] = useState(false);
+  const [modalKtvSearchQuery, setModalKtvSearchQuery] = useState('');
+  const modalKtvDropdownRef = useRef<HTMLDivElement>(null);
 
   // Tự động lưu bộ lọc vào sessionStorage mỗi khi có thay đổi (Item 8)
   useEffect(() => {
@@ -314,10 +319,33 @@ export default function SalaryManage() {
       if (stationDropdownRef.current && !stationDropdownRef.current.contains(event.target as Node)) {
         setIsStationDropdownOpen(false);
       }
+      if (modalKtvDropdownRef.current && !modalKtvDropdownRef.current.contains(event.target as Node)) {
+        setIsModalKtvDropdownOpen(false);
+      }
     };
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
+
+  // Danh sách KTV trong Modal Thêm Ca Bổ Sung (sắp xếp Alphabet A-Z theo Họ tên)
+  const modalSortedKtvs = useMemo(() => {
+    return [...salaries].sort((a, b) => a.fullName.localeCompare(b.fullName, 'vi'));
+  }, [salaries]);
+
+  const filteredModalKtvs = useMemo(() => {
+    if (!modalKtvSearchQuery.trim()) return modalSortedKtvs;
+    const q = modalKtvSearchQuery.toLowerCase();
+    return modalSortedKtvs.filter(s =>
+      s.fullName.toLowerCase().includes(q) ||
+      s.phoneNumber.includes(q) ||
+      s.username.toLowerCase().includes(q) ||
+      (s.stationName && s.stationName.toLowerCase().includes(q))
+    );
+  }, [modalSortedKtvs, modalKtvSearchQuery]);
+
+  const selectedModalKtvObj = useMemo(() => {
+    return salaries.find(s => s.userId === addCaseForm.ktvUserId);
+  }, [salaries, addCaseForm.ktvUserId]);
 
   // Function to toggle row expansion
   const toggleRowExpand = (reportId: string) => {
@@ -383,11 +411,12 @@ export default function SalaryManage() {
           customerName: '',
           customerPhone: '',
           province: '',
-          workType: 'Bảo hành/Sửa chữa',
+          workType: 'Bảo hành',
           amount: '',
           otherCost: '',
           notes: ''
         });
+        setModalKtvSearchQuery('');
         fetchSalaries();
       }
     } catch (err: any) {
@@ -1544,21 +1573,74 @@ export default function SalaryManage() {
             </div>
 
             <form onSubmit={handleAddCustomCase} className="space-y-3 text-xs">
+              {/* Chọn KTV với Tìm kiếm gợi ý & Sắp xếp Alphabet A-Z */}
               <div>
-                <label className="block font-bold text-gray-700 mb-1">Chọn Kỹ thuật viên <span className="text-red-500">*</span></label>
-                <select
-                  value={addCaseForm.ktvUserId}
-                  onChange={(e) => setAddCaseForm(prev => ({ ...prev, ktvUserId: e.target.value }))}
-                  required
-                  className="w-full px-3 py-2 border border-gray-200 rounded-xl font-medium focus:ring-2 focus:ring-blue-500 bg-white text-xs"
-                >
-                  <option value="">-- Chọn KTV nhận thù lao --</option>
-                  {salaries.map(s => (
-                    <option key={s.userId} value={s.userId}>
-                      {s.fullName} ({s.phoneNumber}) - {s.stationName}
-                    </option>
-                  ))}
-                </select>
+                <label className="block font-bold text-gray-700 mb-1">
+                  Chọn Kỹ thuật viên <span className="text-red-500">*</span>
+                </label>
+                <div className="relative" ref={modalKtvDropdownRef}>
+                  <button
+                    type="button"
+                    onClick={() => setIsModalKtvDropdownOpen(!isModalKtvDropdownOpen)}
+                    className="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs font-medium focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white flex items-center justify-between gap-2 text-left cursor-pointer hover:border-gray-300 shadow-sm"
+                  >
+                    <span className={selectedModalKtvObj ? 'font-bold text-gray-900 truncate' : 'text-gray-400 truncate'}>
+                      {selectedModalKtvObj
+                        ? `${selectedModalKtvObj.fullName} (${selectedModalKtvObj.phoneNumber}) - ${selectedModalKtvObj.stationName}`
+                        : '-- Chọn KTV nhận thù lao --'}
+                    </span>
+                    <ChevronDown className={`h-4 w-4 text-gray-400 flex-shrink-0 transition-transform ${isModalKtvDropdownOpen ? 'rotate-180' : ''}`} />
+                  </button>
+
+                  {isModalKtvDropdownOpen && (
+                    <div className="absolute left-0 top-full mt-1.5 w-full bg-white border border-gray-200 rounded-xl shadow-2xl z-50 p-2 text-xs space-y-2 max-h-64 overflow-y-auto">
+                      <div className="relative sticky top-0 bg-white pb-1 border-b border-gray-100 z-10">
+                        <Search className="h-3.5 w-3.5 absolute left-2.5 top-2.5 text-gray-400" />
+                        <input
+                          type="text"
+                          placeholder="Gõ tên, SĐT để tìm nhanh KTV..."
+                          value={modalKtvSearchQuery}
+                          onChange={(e) => setModalKtvSearchQuery(e.target.value)}
+                          autoFocus
+                          className="w-full pl-8 pr-3 py-1.5 border border-gray-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        />
+                      </div>
+
+                      <div className="space-y-0.5 max-h-48 overflow-y-auto">
+                        {filteredModalKtvs.length === 0 ? (
+                          <div className="p-3 text-center text-gray-400 font-medium text-[11px]">
+                            Không tìm thấy KTV nào phù hợp
+                          </div>
+                        ) : (
+                          filteredModalKtvs.map((s) => {
+                            const isSelected = s.userId === addCaseForm.ktvUserId;
+
+                            return (
+                              <div
+                                key={s.userId}
+                                onClick={() => {
+                                  setAddCaseForm(prev => ({ ...prev, ktvUserId: s.userId }));
+                                  setIsModalKtvDropdownOpen(false);
+                                }}
+                                className={`px-3 py-2 rounded-lg cursor-pointer transition flex items-center justify-between text-xs ${
+                                  isSelected
+                                    ? 'bg-blue-50 text-blue-900 font-bold border border-blue-200'
+                                    : 'hover:bg-gray-50 text-gray-700 font-medium'
+                                }`}
+                              >
+                                <div>
+                                  <div className="font-bold text-gray-900">{s.fullName} <span className="text-gray-500 font-normal text-[11px]">({s.phoneNumber})</span></div>
+                                  <div className="text-[10px] text-gray-500">📍 {s.stationName}</div>
+                                </div>
+                                {isSelected && <UserCheck className="h-4 w-4 text-blue-600 flex-shrink-0" />}
+                              </div>
+                            );
+                          })
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
               </div>
 
               <div>
@@ -1581,7 +1663,8 @@ export default function SalaryManage() {
                     onChange={(e) => setAddCaseForm(prev => ({ ...prev, workType: e.target.value }))}
                     className="w-full px-3 py-2 border border-gray-200 rounded-xl font-medium focus:ring-2 focus:ring-blue-500 bg-white text-xs"
                   >
-                    <option value="Bảo hành/Sửa chữa">Bảo hành/Sửa chữa</option>
+                    <option value="Bảo hành">Bảo hành</option>
+                    <option value="Sửa chữa">Sửa chữa</option>
                     <option value="Giao hàng">Giao hàng</option>
                     <option value="Lắp đặt">Lắp đặt</option>
                     <option value="Giao hàng và lắp đặt">Giao hàng và lắp đặt</option>
