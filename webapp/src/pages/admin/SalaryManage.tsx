@@ -1285,14 +1285,14 @@ export default function SalaryManage() {
                         
                         {/* Item 1: Ghi chú Sale (rê chuột thấy full) */}
                         <td className="px-3 py-2.5 text-gray-500 text-[11px]">
-                          <span className="truncate max-w-[140px] block" title={c.orderNote || c.notes || ''}>
+                          <span className="truncate max-w-[140px] block" title={c.orderNote || ''}>
                             {c.orderNote || '-'}
                           </span>
                         </td>
 
                         {/* Item 1: Ghi chú KTV (hiển thị full) */}
                         <td className="px-3 py-2.5 text-gray-700 text-[11px] font-medium min-w-[160px]">
-                          {c.reportNote || c.notes || '-'}
+                          {c.reportNote || '-'}
                         </td>
 
                         {/* Item 2: KC di chuyển (km) */}
@@ -1819,14 +1819,14 @@ export default function SalaryManage() {
                               
                               {/* Ghi chú Sale */}
                               <td className="px-4 py-3 text-gray-500 text-[11px]">
-                                <span className="truncate max-w-[130px] block" title={c.orderNote || c.notes || ''}>
+                                <span className="truncate max-w-[130px] block" title={c.orderNote || ''}>
                                   {c.orderNote || '-'}
                                 </span>
                               </td>
 
                               {/* Ghi chú KTV báo cáo */}
                               <td className="px-4 py-3 text-gray-800 text-[11px] font-medium min-w-[150px]">
-                                {c.reportNote || c.notes || '-'}
+                                {c.reportNote || '-'}
                               </td>
 
                               <td className="px-4 py-3 text-center">
