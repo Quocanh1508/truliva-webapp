@@ -1523,8 +1523,8 @@ export default function SalaryManage() {
                 <input
                   type="text"
                   placeholder="Tìm KTV, trạm..."
-                  value={rateSearchQuery}
-                  onChange={(e) => setRateSearchQuery(e.target.value)}
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
                   className="pl-9 pr-3 py-2 border border-gray-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 w-48 md:w-64"
                 />
               </div>
