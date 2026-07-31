@@ -1607,8 +1607,8 @@ export default function SalaryManage() {
                 <tbody className="divide-y divide-gray-100 bg-white">
                   {rateMatrix
                     .filter(ktv => {
-                      if (!rateSearchQuery.trim()) return true;
-                      const q = rateSearchQuery.toLowerCase();
+                      if (!searchQuery.trim()) return true;
+                      const q = searchQuery.toLowerCase();
                       return (
                         ktv.fullName.toLowerCase().includes(q) ||
                         ktv.username.toLowerCase().includes(q) ||

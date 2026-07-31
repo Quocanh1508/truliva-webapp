@@ -113,21 +113,21 @@ async function getCoordinates(stationName?: string): Promise<Coordinates> {
     }
   }
 
-  // 3. Fallback sang IP Geolocation (Sử dụng ipapi.co miễn phí hỗ trợ HTTPS)
+  // 3. Fallback sang IP Geolocation (Sử dụng API get.geojs.io miễn phí hỗ trợ CORS & HTTPS)
   try {
-    const response = await fetch('https://ipapi.co/json/');
+    const response = await fetch('https://get.geojs.io/v1/ip/geo.json');
     if (response.ok) {
       const data = await response.json();
       if (data.latitude && data.longitude) {
         return {
-          latitude: data.latitude,
-          longitude: data.longitude,
+          latitude: parseFloat(data.latitude),
+          longitude: parseFloat(data.longitude),
           city: data.city || DEFAULT_CITY
         };
       }
     }
   } catch (ipError) {
-    console.error('IP Geolocation failed. Using default coordinates (Hà Nội)...', ipError);
+    // Silent fallback to default city
   }
 
   // 4. Mặc định
