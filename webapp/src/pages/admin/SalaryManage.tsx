@@ -4,26 +4,16 @@ import {
   Calculator, 
   Save, 
   Lock, 
-  MapPin, 
-  CheckCircle, 
   RefreshCw, 
-  Eye, 
-  AlertCircle, 
   FileSpreadsheet,
   X,
-  TrendingUp,
   UserCheck,
   ChevronDown,
-  Layers,
-  ListFilter,
-  RotateCcw,
   Sliders,
   Loader2,
   Search,
   Building2
 } from 'lucide-react';
-import { useConfirm } from '../../context/ConfirmContext';
-import { useAuth } from '../../context/AuthContext';
 
 interface KtvRateItem {
   rate: number;
