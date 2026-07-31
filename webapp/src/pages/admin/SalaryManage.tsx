@@ -1776,11 +1776,14 @@ export default function SalaryManage() {
                         <th className="px-4 py-3 text-center w-12">STT</th>
                         <th className="px-4 py-3 w-28">Mã ca</th>
                         <th className="px-4 py-3">Khách hàng</th>
-                        <th className="px-4 py-3 w-40">Loại công việc</th>
+                        <th className="px-4 py-3 w-32">Loại công việc</th>
+                        <th className="px-4 py-3 min-w-[130px]">Ghi chú (Sale)</th>
+                        <th className="px-4 py-3 min-w-[150px]">Ghi chú KTV</th>
                         <th className="px-4 py-3 text-center w-24">Ngày cuối tuần</th>
                         <th className="px-4 py-3 text-right w-32">Đơn giá ca (VND)</th>
                         <th className="px-4 py-3 w-28 text-center">Quãng đường</th>
                         <th className="px-4 py-3 text-right w-32">Phụ cấp km (VND)</th>
+                        <th className="px-4 py-3 text-right w-28">Phí khác (VND)</th>
                         <th className="px-4 py-3 text-right w-32 font-bold text-gray-700">Tổng cộng (VND)</th>
                       </tr>
                     </thead>
@@ -1813,6 +1816,19 @@ export default function SalaryManage() {
                               <td className="px-4 py-3 font-semibold text-blue-600">{formattedId}</td>
                               <td className="px-4 py-3 font-medium text-gray-800">{c.customerName}</td>
                               <td className="px-4 py-3 text-gray-600">{c.workType}</td>
+                              
+                              {/* Ghi chú Sale */}
+                              <td className="px-4 py-3 text-gray-500 text-[11px]">
+                                <span className="truncate max-w-[130px] block" title={c.orderNote || c.notes || ''}>
+                                  {c.orderNote || '-'}
+                                </span>
+                              </td>
+
+                              {/* Ghi chú KTV báo cáo */}
+                              <td className="px-4 py-3 text-gray-800 text-[11px] font-medium min-w-[150px]">
+                                {c.reportNote || c.notes || '-'}
+                              </td>
+
                               <td className="px-4 py-3 text-center">
                                 {c.isSunday ? (
                                   <span className="px-2 py-0.5 text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-100 rounded-md">
@@ -1861,6 +1877,9 @@ export default function SalaryManage() {
                               </td>
                               <td className="px-4 py-3 text-right text-gray-600">
                                 {c.distanceCost > 0 ? c.distanceCost.toLocaleString('vi-VN') : '-'}
+                              </td>
+                              <td className="px-4 py-3 text-right text-purple-800 font-semibold">
+                                {c.otherCost && c.otherCost > 0 ? c.otherCost.toLocaleString('vi-VN') : '-'}
                               </td>
                               <td className="px-4 py-3 text-right font-bold text-gray-900">
                                 {c.totalCost.toLocaleString('vi-VN')}
