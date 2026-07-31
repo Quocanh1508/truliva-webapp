@@ -135,8 +135,8 @@ export default function OrderList() {
     setPage(1);
   }, [debouncedSearch]);
 
-  const [sortBy, setSortBy] = useState('createdAt');
-  const [sortOrder, setSortOrder] = useState('desc');
+  const [sortBy, setSortBy] = useState<string>(() => getSavedFilter('sortBy', 'createdAt'));
+  const [sortOrder, setSortOrder] = useState<string>(() => getSavedFilter('sortOrder', 'desc'));
 
   // Date Filters
   const [customStartDate, setCustomStartDate] = useState<string>(() => getSavedFilter('customStartDate', ''));
@@ -185,6 +185,8 @@ export default function OrderList() {
       customStartDate,
       customEndDate,
       dateType,
+      sortBy,
+      sortOrder,
       filterPancakeOrderId,
       filterAdminStatuses,
       filterKtvIds,
@@ -206,6 +208,8 @@ export default function OrderList() {
     customStartDate,
     customEndDate,
     dateType,
+    sortBy,
+    sortOrder,
     filterPancakeOrderId,
     filterAdminStatuses,
     filterKtvIds,
