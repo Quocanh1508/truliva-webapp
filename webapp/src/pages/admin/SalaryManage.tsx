@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { fetchApi } from '../../api/client';
 import { isValidPhone, PHONE_ERROR_MSG } from '../../utils/phone';
+import { useConfirm } from '../../context/ConfirmContext';
+import { useAuth } from '../../context/AuthContext';
 import { 
   Calculator, 
   Save, 
@@ -261,6 +263,8 @@ export default function SalaryManage() {
   // States cho phép Admin chỉnh sửa trực tiếp từng cột chi phí (Item 5)
   const [editingCostCell, setEditingCostCell] = useState<{ reportId: string; fieldName: string } | null>(null);
   const [editingCostValue, setEditingCostValue] = useState<string>('');
+  const [editingReportId, setEditingReportId] = useState<string | null>(null);
+  const [editingBaseCost, setEditingBaseCost] = useState<string>('');
   const [expandedReportIds, setExpandedReportIds] = useState<Set<string>>(new Set());
 
   // Search & Filter states (Item 8: lưu duy trì trong sessionStorage)
@@ -384,6 +388,11 @@ export default function SalaryManage() {
     } catch (err: any) {
       alert(err.message || 'Lỗi khi cập nhật chi phí ca');
     }
+  };
+
+  const saveBaseCostChange = async (reportId: string, value: string) => {
+    await saveCostCellChange(reportId, 'baseCost', value);
+    setEditingReportId(null);
   };
 
   // Function cho Admin tự thêm ca / mục phí bổ sung vào bảng lương (Item 7)
