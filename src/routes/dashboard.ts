@@ -1192,9 +1192,19 @@ router.get('/revenue', async (req: Request, res: Response): Promise<void> => {
     currOrders = await filterMemory(currOrders);
     prevOrders = await filterMemory(prevOrders);
 
-    // Helper tính chỉ số tài chính cho 1 đơn hàng (Thuần Thực Thu moneyToCollect hoặc Thuần Doanh Số totalPrice)
+    // Helper tính chỉ số tài chính thông minh cho 1 đơn hàng:
+    // - Nếu activeMetric === 'totalPrice': Doanh số niêm yết (Gross Sales) -> Lấy totalPrice
+    // - Nếu activeMetric === 'moneyToCollect': Doanh thu thực thu thông minh (Smart Net Revenue):
+    //   + Đơn POS (pancakeOrderId > 0): Lấy moneyToCollect nếu > 0 (đơn COD), fallback totalPrice nếu == 0 (đơn chuyển khoản trước/eCom)
+    //   + Ca thủ công: Lấy tiền thu hộ COD thực tế tại nhà khách (moneyToCollect)
     const getRevenue = (o: any) => {
       if (activeMetric === 'totalPrice') {
+        return Number(o.totalPrice) || 0;
+      }
+      if (o.pancakeOrderId) {
+        if (o.moneyToCollect !== null && o.moneyToCollect !== undefined && Number(o.moneyToCollect) > 0) {
+          return Number(o.moneyToCollect);
+        }
         return Number(o.totalPrice) || 0;
       }
       return Number(o.moneyToCollect) || 0;

@@ -2218,9 +2218,9 @@ export default function Dashboard() {
                   <span className="font-bold text-blue-950">Nguồn dữ liệu & Quy tắc tính toán:</span>
                   <p className="text-blue-800 leading-relaxed">
                     {revenueMetricType === 'moneyToCollect' ? (
-                      <>💵 <b>Đang tính theo Doanh Thu Thực Thu (`moneyToCollect`)</b>: Chỉ tính số tiền COD/Thực thu nhận về từ khách hàng. Dữ liệu này dùng để <b>đối chiếu trùng khớp với ô Doanh Thu trên Pancake POS</b> (Khoảng ~2.49 tỷ cho tháng 07/2026).</>
+                      <>💵 <b>Đang tính theo Doanh Thu Thực Thu Thông Minh (Smart Net Revenue)</b>: Bao gồm tiền COD POS thực nhận + các đơn POS chuyển khoản trước (`totalPrice`) + tiền thu hộ từ các Ca thủ công/kỹ thuật. Dữ liệu này <b>cao hơn POS (~2.980 tỷ) đúng bằng phần doanh thu gia tăng từ ca thủ công (đạt ~3.017 tỷ cho tháng 07/2026)</b>.</>
                     ) : (
-                      <>📊 <b>Đang tính theo Tổng Doanh Số Niêm Yết (`totalPrice`)</b>: Tính tổng tiền giá trị đơn hàng niêm yết. Dữ liệu này dùng để <b>đối chiếu với ô Tổng Hàng Chốt trên Pancake POS</b> (Khoảng ~6.21 tỷ cho tháng 07/2026).</>
+                      <>📊 <b>Đang tính theo Tổng Doanh Số Niêm Yết (`totalPrice`)</b>: Tính tổng tiền giá trị đơn hàng niêm yết của tất cả đơn POS và ca dịch vụ. Dữ liệu này dùng để <b>đối chiếu với Tổng Hàng Chốt trên Pancake POS</b> (Khoảng ~6.21 tỷ cho tháng 07/2026).</>
                     )}
                   </p>
                 </div>
