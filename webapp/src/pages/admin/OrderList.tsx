@@ -1587,7 +1587,7 @@ export default function OrderList() {
 
           <div className="flex flex-wrap items-center gap-2 md:gap-3">
             {/* Tạo mới ca dịch vụ */}
-            {!isViewOnlyStaff && (
+            {hasPermission('ORDER_CREATE') && (
               <button
                 onClick={openCreateModal}
                 className="flex items-center space-x-1.5 px-3 py-2 text-[13px] border border-transparent rounded-md bg-blue-600 text-white hover:bg-blue-700 focus:outline-none font-semibold shadow-sm transition-colors"
@@ -1598,10 +1598,8 @@ export default function OrderList() {
               </button>
             )}
  
-
-
             {/* Đồng bộ từ Pancake button */}
-            {!isViewOnlyStaff && (
+            {hasPermission('ORDER_SYNC_PANCAKE') && (
               <button
                 onClick={handleSync}
                 disabled={syncing}

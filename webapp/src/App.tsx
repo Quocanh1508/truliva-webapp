@@ -330,33 +330,43 @@ export default function App() {
                 </Route>
 
                 {/* Admin & Coordinator Settings Routes */}
-                <Route element={<ProtectedRoute allowedRoles={['ADMIN', 'COORDINATOR']} />}>
+                <Route element={<ProtectedRoute allowedRoles={['ADMIN', 'COORDINATOR']} featureKey="INVENTORY_VIEW" />}>
                   <Route path="/admin/inventory" element={<InventoryManage />} />
+                </Route>
+                <Route element={<ProtectedRoute allowedRoles={['ADMIN', 'COORDINATOR']} featureKey="STATION_MANAGE" />}>
                   <Route path="/admin/stations" element={<StationManage />} />
-                  <Route path="/admin/users" element={<UserManage />} />
                   <Route path="/admin/sample-images" element={<SampleImageManage />} />
                 </Route>
+                <Route element={<ProtectedRoute allowedRoles={['ADMIN', 'COORDINATOR']} featureKey="USER_MANAGE" />}>
+                  <Route path="/admin/users" element={<UserManage />} />
+                </Route>
 
-                {/* Serial Management Route (Admin, Dev, Coordinator, Hotline, Staff) */}
-                <Route element={<ProtectedRoute allowedRoles={['ADMIN', 'DEV', 'COORDINATOR', 'HOTLINE', 'STAFF']} />}>
+                {/* Serial Management Route */}
+                <Route element={<ProtectedRoute allowedRoles={['ADMIN', 'DEV', 'COORDINATOR', 'HOTLINE', 'STAFF']} featureKey="SERIAL_VIEW" />}>
                   <Route path="/admin/serials" element={<SerialManage />} />
                 </Route>
 
                 {/* Admin & Dev Broadcast Routes */}
-                <Route element={<ProtectedRoute allowedRoles={['ADMIN', 'DEV']} />}>
+                <Route element={<ProtectedRoute allowedRoles={['ADMIN', 'DEV']} featureKey="USER_MANAGE" />}>
                   <Route path="/admin/broadcast" element={<BroadcastNotification />} />
                 </Route>
 
-                {/* Admin Only Salary & IoT Routes */}
-                <Route element={<ProtectedRoute allowedRoles={['ADMIN']} />}>
+                {/* Salary Route */}
+                <Route element={<ProtectedRoute allowedRoles={['ADMIN']} featureKey="SALARY_VIEW" />}>
                   <Route path="/admin/salaries" element={<SalaryManage />} />
+                </Route>
+                <Route element={<ProtectedRoute allowedRoles={['ADMIN']} />}>
                   <Route path="/admin/iot" element={<IotMonitor />} />
                 </Route>
 
                 {/* All Office/Administrative Routes */}
-                <Route element={<ProtectedRoute allowedRoles={['ADMIN', 'COORDINATOR', 'SALE_SUPERVISOR', 'SALER', 'HOTLINE', 'STAFF']} />}>
+                <Route element={<ProtectedRoute allowedRoles={['ADMIN', 'COORDINATOR', 'SALE_SUPERVISOR', 'SALER', 'HOTLINE', 'STAFF']} featureKey="ORDER_VIEW" />}>
                   <Route path="/admin/orders" element={<OrderList />} />
+                </Route>
+                <Route element={<ProtectedRoute allowedRoles={['ADMIN', 'COORDINATOR', 'SALE_SUPERVISOR', 'SALER', 'HOTLINE', 'STAFF']} featureKey="REPORT_VIEW" />}>
                   <Route path="/admin/reports" element={<ReportList />} />
+                </Route>
+                <Route element={<ProtectedRoute allowedRoles={['ADMIN', 'COORDINATOR', 'SALE_SUPERVISOR', 'SALER', 'HOTLINE', 'STAFF']} featureKey="PROMO_MANAGE" />}>
                   <Route path="/admin/promos" element={<PromoManage />} />
                 </Route>
 

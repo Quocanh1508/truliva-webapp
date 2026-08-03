@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Outlet, useNavigate, useLocation, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { usePermission } from '../context/PermissionContext';
 import { LogOut, Menu, X, FileText, List, Users, BarChart, Building, Image as ImageIcon, MessageSquare, Bell, Wrench, User, Warehouse, Network, Send, Hash, Tag, Calculator, Cpu } from 'lucide-react';
 import { fetchApi } from '../api/client';
 import SyncManager from './SyncManager';
@@ -8,6 +9,7 @@ import { fetchCurrentWeather, type WeatherInfo } from '../utils/weather';
 
 export default function Layout() {
   const { user, logout } = useAuth();
+  const { hasPermission } = usePermission();
   const navigate = useNavigate();
   const location = useLocation();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -91,49 +93,56 @@ export default function Layout() {
       items.push({ name: 'Dashboard', path: '/admin', icon: <BarChart size={20} /> });
     }
     
-    // 2. Quản lý kho: Admin, Coordinator
-    const canSeeInventory = user.role === 'ADMIN' || user.role === 'COORDINATOR';
-    if (canSeeInventory) {
+    // 2. Quản lý kho: kiểm tra quyền INVENTORY_VIEW
+    if (hasPermission('INVENTORY_VIEW')) {
       items.push({ name: 'Quản lý kho', path: '/admin/inventory', icon: <Warehouse size={20} /> });
     }
 
-    // 2.1 Quản lý Serial: Admin, Coordinator, Hotline, Staff thuộc nhóm Hotline
-    const canSeeSerials = 
-      user.role === 'ADMIN' || 
-      user.role === 'COORDINATOR' || 
-      user.role === 'HOTLINE' || 
-      (user.role === 'STAFF' && user.group === 'Hotline');
-    if (canSeeSerials) {
+    // 3. Quản lý Serial: kiểm tra quyền SERIAL_VIEW
+    if (hasPermission('SERIAL_VIEW')) {
       items.push({ name: 'Quản lý Serial', path: '/admin/serials', icon: <Hash size={20} /> });
     }
 
-    const canSeePromos = ['ADMIN', 'COORDINATOR', 'SALE_SUPERVISOR', 'SALER', 'HOTLINE'].includes(user.role);
-    if (canSeePromos) {
+    // 4. Quản lý Khuyến mãi: kiểm tra quyền PROMO_MANAGE
+    if (hasPermission('PROMO_MANAGE')) {
       items.push({ name: 'Quản lý Khuyến mãi', path: '/admin/promos', icon: <Tag size={20} /> });
     }
     
-    // 3. Quản lý dịch vụ: All office roles
-    items.push({ name: 'Quản lý dịch vụ', path: '/admin/orders', icon: <Wrench size={20} /> });
+    // 5. Quản lý dịch vụ: kiểm tra quyền ORDER_VIEW
+    if (hasPermission('ORDER_VIEW')) {
+      items.push({ name: 'Quản lý dịch vụ', path: '/admin/orders', icon: <Wrench size={20} /> });
+    }
     
-    // 4. Danh sách báo cáo: All office roles
-    items.push({ name: 'Danh sách báo cáo', path: '/admin/reports', icon: <List size={20} /> });
+    // 6. Danh sách báo cáo: kiểm tra quyền REPORT_VIEW
+    if (hasPermission('REPORT_VIEW')) {
+      items.push({ name: 'Danh sách báo cáo', path: '/admin/reports', icon: <List size={20} /> });
+    }
     
-    // 5. Quản lý Trạm, KTV, Ảnh mẫu: Admin, Coordinator
-    const canSeeSettings = user.role === 'ADMIN' || user.role === 'COORDINATOR';
-    if (canSeeSettings) {
-      items.push(
-        { name: 'Quản lý Trạm', path: '/admin/stations', icon: <Building size={20} /> },
-        { name: 'Quản lí nhân viên', path: '/admin/users', icon: <Users size={20} /> },
-        { name: 'Ảnh mẫu báo cáo', path: '/admin/sample-images', icon: <ImageIcon size={20} /> }
-      );
+    // 7. Quản lý Trạm: kiểm tra quyền STATION_MANAGE
+    if (hasPermission('STATION_MANAGE')) {
+      items.push({ name: 'Quản lý Trạm', path: '/admin/stations', icon: <Building size={20} /> });
+    }
+
+    // 8. Quản lý nhân sự & Phân quyền: kiểm tra quyền USER_MANAGE hoặc USER_PERMISSIONS_MATRIX
+    if (hasPermission('USER_MANAGE') || hasPermission('USER_PERMISSIONS_MATRIX')) {
+      items.push({ name: 'Quản lí nhân viên', path: '/admin/users', icon: <Users size={20} /> });
+    }
+
+    // 9. Ảnh mẫu báo cáo
+    if (user.role === 'ADMIN' || user.role === 'COORDINATOR') {
+      items.push({ name: 'Ảnh mẫu báo cáo', path: '/admin/sample-images', icon: <ImageIcon size={20} /> });
+    }
+
+    // 10. Quản lý lương: kiểm tra quyền SALARY_VIEW
+    if (hasPermission('SALARY_VIEW')) {
+      items.push({ name: 'Quản lý lương', path: '/admin/salaries', icon: <Calculator size={20} /> });
     }
     
     // Gửi thông báo hệ thống & IoT: Admin
     if (user.role === 'ADMIN') {
       items.push(
         { name: 'Giám sát IoT (ESP32)', path: '/admin/iot', icon: <Cpu size={20} /> },
-        { name: 'Gửi thông báo', path: '/admin/broadcast', icon: <Send size={20} /> },
-        { name: 'Quản lý lương', path: '/admin/salaries', icon: <Calculator size={20} /> }
+        { name: 'Gửi thông báo', path: '/admin/broadcast', icon: <Send size={20} /> }
       );
     }
     

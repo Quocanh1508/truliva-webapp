@@ -1,14 +1,17 @@
 import { Navigate, Outlet } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { usePermission } from '../context/PermissionContext';
 import type { UserRole } from '../context/AuthContext';
 
 interface ProtectedRouteProps {
   allowedRoles?: UserRole[];
+  featureKey?: string;
   requireDashboard?: boolean;
 }
 
-export default function ProtectedRoute({ allowedRoles, requireDashboard }: ProtectedRouteProps) {
+export default function ProtectedRoute({ allowedRoles, featureKey, requireDashboard }: ProtectedRouteProps) {
   const { user, loading } = useAuth();
+  const { hasPermission } = usePermission();
 
   if (loading) {
     return (
@@ -22,7 +25,16 @@ export default function ProtectedRoute({ allowedRoles, requireDashboard }: Prote
     return <Navigate to="/login" replace />;
   }
 
-  if (allowedRoles && !allowedRoles.includes(user.role)) {
+  // Nếu có featureKey, ưu tiên kiểm tra qua PermissionContext
+  let isAllowedByPermission = false;
+  if (featureKey) {
+    isAllowedByPermission = hasPermission(featureKey);
+  }
+
+  // Nếu vai trò nằm trong allowedRoles HOẶC được cấp quyền động qua featureKey thì được truy cập
+  const isAllowedByRole = allowedRoles ? allowedRoles.includes(user.role as UserRole) : true;
+
+  if (!isAllowedByRole && !isAllowedByPermission) {
     if (user.role === 'KTV') return <Navigate to="/ktv/my-orders" replace />;
     if (user.role === 'DEV') return <Navigate to="/dev/feedbacks" replace />;
     return <Navigate to="/admin/orders" replace />;

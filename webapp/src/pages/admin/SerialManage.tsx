@@ -706,17 +706,19 @@ export default function SerialManage() {
           </button>
 
           {/* Import button */}
-          <button
-            onClick={() => setShowImportModal(true)}
-            style={{
-              display: 'flex', alignItems: 'center', gap: 6,
-              padding: '8px 16px', borderRadius: 8,
-              background: '#4472C4', color: 'white', border: 'none',
-              fontSize: 14, fontWeight: 600, cursor: 'pointer',
-            }}
-          >
-            <Upload size={16} /> Import Excel
-          </button>
+          {hasPermission('SERIAL_IMPORT_EXCEL') && (
+            <button
+              onClick={() => setShowImportModal(true)}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 6,
+                padding: '8px 16px', borderRadius: 8,
+                background: '#4472C4', color: 'white', border: 'none',
+                fontSize: 14, fontWeight: 600, cursor: 'pointer',
+              }}
+            >
+              <Upload size={16} /> Import Excel
+            </button>
+          )}
 
           {/* Export button (Chỉ dành cho Admin/Dev) */}
           {canExportExcel && (
