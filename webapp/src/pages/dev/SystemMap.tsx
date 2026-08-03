@@ -57,17 +57,18 @@ interface UserProfile {
 
 // --- DATA FOR UNDERSTAND ANYTHING ANALYTICS ---
 const UA_NODES = [
-  { id: 'index.ts', label: 'src/index.ts', x: 260, y: 120, category: 'entry', size: 28, desc: 'Entry point của Express Server, khởi chạy máy chủ, các cron job và đăng ký các routes.' },
-  { id: 'schema.prisma', label: 'prisma/schema.prisma', x: 120, y: 280, category: 'db', size: 26, desc: 'Định nghĩa 13 Models dữ liệu PostgreSQL kết nối qua Prisma ORM.' },
-  { id: 'webhooks.ts', label: 'src/routes/webhooks.ts', x: 440, y: 80, category: 'route', size: 24, desc: 'Tiếp nhận các sự kiện Pancake Webhooks, thực hiện kiểm tra trùng lặp và chuyển dữ liệu.' },
-  { id: 'orders.ts', label: 'src/routes/orders.ts', x: 440, y: 220, category: 'route', size: 24, desc: 'Cung cấp các API quản lý đơn hàng, phân công KTV, đồng bộ trạng thái ngược lên Pancake POS.' },
-  { id: 'users.ts', label: 'src/routes/users.ts', x: 440, y: 340, category: 'route', size: 20, desc: 'API quản lý danh sách kỹ thuật viên, cấu hình trạm kỹ thuật, thông tin cá nhân và xuất Excel.' },
-  { id: 'eventRouter.ts', label: 'src/services/eventRouter.ts', x: 620, y: 100, category: 'service', size: 22, desc: 'Điều phối sự kiện webhook, tự động phân loại đơn hàng (Order) hay khách hàng (Customer).' },
-  { id: 'orderProcessor.ts', label: 'src/services/orderProcessor.ts', x: 800, y: 140, category: 'service', size: 24, desc: 'Xử lý logic nghiệp vụ đơn hàng, tạo/cập nhật thông tin khách và sản phẩm vào CSDL.' },
-  { id: 'customerProcessor.ts', label: 'src/services/customerProcessor.ts', x: 800, y: 260, category: 'service', size: 20, desc: 'Xử lý đồng bộ thông tin khách hàng từ Pancake POS về hệ thống nội bộ.' },
-  { id: 'notificationService.ts', label: 'src/services/notificationService.ts', x: 620, y: 400, category: 'service', size: 22, desc: 'Tự động gửi push notification qua Firebase FCM và Web Push khi KTV được phân công đơn mới.' },
-  { id: 'logger.ts', label: 'src/utils/logger.ts', x: 120, y: 100, category: 'util', size: 18, desc: 'Hỗ trợ ghi nhận log của ứng dụng qua Winston logger.' },
-  { id: 'emailService.ts', label: 'src/utils/emailService.ts', x: 260, y: 440, category: 'util', size: 18, desc: 'Gửi email khôi phục mật khẩu cho nhân sự.' }
+  { id: 'index.ts', label: 'src/index.ts', x: 220, y: 150, category: 'entry', size: 28, desc: 'Entry point của Express Server, khởi chạy máy chủ, các cron job và đăng ký các routes.' },
+  { id: 'schema.prisma', label: 'prisma/schema.prisma', x: 70, y: 280, category: 'db', size: 26, desc: 'Định nghĩa các Models dữ liệu PostgreSQL kết nối qua Prisma ORM.' },
+  { id: 'webhooks.ts', label: 'src/routes/webhooks.ts', x: 390, y: 70, category: 'route', size: 24, desc: 'Tiếp nhận các sự kiện Pancake Webhooks, thực hiện kiểm tra trùng lặp và chuyển dữ liệu.' },
+  { id: 'orders.ts', label: 'src/routes/orders.ts', x: 390, y: 200, category: 'route', size: 24, desc: 'Cung cấp các API quản lý đơn hàng, phân công KTV, đồng bộ trạng thái ngược lên Pancake POS.' },
+  { id: 'users.ts', label: 'src/routes/users.ts', x: 390, y: 320, category: 'route', size: 20, desc: 'API quản lý danh sách kỹ thuật viên, cấu hình trạm kỹ thuật, thông tin cá nhân và xuất Excel.' },
+  { id: 'permissions.ts', label: 'src/routes/permissions.ts', x: 390, y: 440, category: 'route', size: 20, desc: 'API Ma trận Phân quyền Động cho phép Admin quản lý bật/tắt tính năng.' },
+  { id: 'eventRouter.ts', label: 'src/services/eventRouter.ts', x: 560, y: 90, category: 'service', size: 22, desc: 'Điều phối sự kiện webhook, tự động phân loại đơn hàng (Order) hay khách hàng (Customer).' },
+  { id: 'orderProcessor.ts', label: 'src/services/orderProcessor.ts', x: 730, y: 130, category: 'service', size: 24, desc: 'Xử lý logic nghiệp vụ đơn hàng, tạo/cập nhật thông tin khách và sản phẩm vào CSDL.' },
+  { id: 'customerProcessor.ts', label: 'src/services/customerProcessor.ts', x: 730, y: 260, category: 'service', size: 20, desc: 'Xử lý đồng bộ thông tin khách hàng từ Pancake POS về hệ thống nội bộ.' },
+  { id: 'notificationService.ts', label: 'src/services/notificationService.ts', x: 560, y: 390, category: 'service', size: 22, desc: 'Tự động gửi push notification qua Firebase FCM và Web Push khi KTV được phân công đơn mới.' },
+  { id: 'logger.ts', label: 'src/utils/logger.ts', x: 70, y: 100, category: 'util', size: 18, desc: 'Hỗ trợ ghi nhận log của ứng dụng qua Winston logger.' },
+  { id: 'emailService.ts', label: 'src/utils/emailService.ts', x: 220, y: 440, category: 'util', size: 18, desc: 'Gửi email khôi phục mật khẩu cho nhân sự.' }
 ];
 
 const UA_EDGES = [
@@ -1842,7 +1843,7 @@ export default function SystemMap() {
                     </div>
 
                     {/* SVG Canvas */}
-                    <svg className="w-full h-full min-h-[500px] z-0">
+                    <svg className="w-full h-full min-h-[500px] z-0" viewBox="0 0 840 500" preserveAspectRatio="xMidYMid meet">
                       {/* Definitions for arrow markers */}
                       <defs>
                         <marker id="arrow" viewBox="0 0 10 10" refX="20" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
