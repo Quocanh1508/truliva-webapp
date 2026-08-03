@@ -21,12 +21,17 @@ Dưới đây là các đúc kết thực tế để tối ưu hóa việc deplo
   - Script test phải load biến môi trường bằng đường dẫn tuyệt đối: `require('c:/StudyZone/Project/Truliva/node_modules/dotenv').config()`.
   - Sử dụng module database đã biên dịch của dự án để đảm bảo tích hợp đúng pg-pool adapter: `require('c:/StudyZone/Project/Truliva/dist/config/database.js')`.
 
-## 4. Rebuild & Restart Dịch Vụ Trên VPS
-- Khi có thay đổi Backend:
-  - Chạy gộp: `cd /var/www/truliva && npx tsc && pm2 restart truliva-backend`.
-- Khi có thay đổi Frontend:
-  - Chạy gộp: `cd /var/www/truliva/webapp && npm run build`.
-- Luôn kiểm tra PM2 status (`pm2 status`) để xác nhận server backend online sau khi restart.
+## 4. Rebuild & Restart Dịch Vụ Trên VPS & Quy Trình Testing Bắt Buộc
+- **Quy chuẩn deploy Backend**:
+  1. Upload file nguồn `.ts` trong `src/` lên VPS `/var/www/truliva/src/`.
+  2. BẮT BUỘC biên dịch TypeScript trực tiếp trên VPS: `cd /var/www/truliva && npx tsc`. (Cấm chỉ upload file `.js` từ local).
+  3. Restart dịch vụ PM2: `cd /var/www/truliva && pm2 restart truliva-backend --update-env`.
+  4. **Nghiệm thu API thực tế (Mandatory HTTP Verification)**: BẮT BUỘC chạy script test gọi trực tiếp HTTP API endpoint (`http://127.0.0.1:3000/api/...`) trên VPS để kiểm tra Header/JSON/Excel thực tế trả về từ PM2 process trước khi báo thành công với User.
+- **Quy chuẩn deploy Frontend**:
+  1. Upload file nguồn React (`.tsx`/`.ts`) lên `/var/www/truliva/webapp/src/`.
+  2. Build trực tiếp trên VPS: `cd /var/www/truliva/webapp && npm run build`.
+- Luôn kiểm tra PM2 status (`pm2 status`) và log HTTP response để xác nhận server online và chạy đúng bản code mới nhất.
+- Chi tiết quy tắc deploy & testing xem tại document [DEPLOY_AND_TESTING_RULES.md](file:///c:/StudyZone/Project/Truliva/DEPLOY_AND_TESTING_RULES.md).
 
 ## 5. Quy Chuẩn Giao Diện (UI Design System)
 - Tất cả các chỉnh sửa hoặc tạo mới Component trên Frontend (Web App Admin, KTV, Zalo Mini App) **BẮT BUỘC** tuân thủ quy chuẩn thiết kế tại file [UI_DESIGN_SYSTEM.md](file:///c:/StudyZone/Project/Truliva/UI_DESIGN_SYSTEM.md).
