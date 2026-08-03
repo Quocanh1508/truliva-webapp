@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { fetchApi, API_URL } from '../../api/client';
 import { useAuth } from '../../context/AuthContext';
+import { usePermission } from '../../context/PermissionContext';
 import { isValidPhone, PHONE_ERROR_MSG } from '../../utils/phone';
 import ProvinceSelect from '../../components/ProvinceSelect';
 import { isValidProvince } from '../../utils/provinces';
@@ -73,14 +74,9 @@ interface ImportError {
 
 export default function SerialManage() {
   const { user: currentUser } = useAuth();
-  const canChangeWarrantyPeriod = 
-    currentUser?.role === 'ADMIN' || 
-    currentUser?.role === 'DEV' || 
-    currentUser?.role === 'COORDINATOR' || 
-    currentUser?.role === 'HOTLINE' || 
-    (currentUser?.role === 'STAFF' && currentUser?.group === 'Hotline');
-
-  const canExportExcel = currentUser?.role === 'ADMIN' || currentUser?.role === 'DEV';
+  const { hasPermission } = usePermission();
+  const canChangeWarrantyPeriod = hasPermission('SERIAL_EDIT');
+  const canExportExcel = hasPermission('SERIAL_EXPORT_EXCEL');
 
   // Helper to load saved filters from sessionStorage
   const getSavedSerialFilter = (key: string, defaultValue: any) => {

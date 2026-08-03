@@ -5,6 +5,7 @@ import { Download, X, ExternalLink, Image as ImageIcon, Loader, Search, Edit3, S
 import CategoryTreeSelect from '../../components/CategoryTreeSelect';
 import { formatOrderId } from '../../utils/text';
 import { useAuth } from '../../context/AuthContext';
+import { usePermission } from '../../context/PermissionContext';
 import { isValidPhone, PHONE_ERROR_MSG } from '../../utils/phone';
 import ProvinceSelect from '../../components/ProvinceSelect';
 
@@ -291,9 +292,10 @@ function MultiSelectObjectDropdown({
 
 export default function ReportList() {
   const { user: currentUser } = useAuth();
-  const canExportExcel = currentUser?.role === 'ADMIN' || currentUser?.role === 'DEV' || currentUser?.role === 'COORDINATOR' || (currentUser?.role === 'STAFF' && currentUser?.group === 'Service');
-  const canEditOrDelete = currentUser?.role === 'ADMIN' || currentUser?.role === 'DEV' || currentUser?.role === 'COORDINATOR';
-  const canApproveOrReject = currentUser?.role === 'ADMIN' || currentUser?.role === 'DEV' || currentUser?.role === 'COORDINATOR' || currentUser?.role === 'STAFF';
+  const { hasPermission } = usePermission();
+  const canExportExcel = hasPermission('REPORT_EXPORT_EXCEL');
+  const canEditOrDelete = hasPermission('REPORT_EDIT_DELETE');
+  const canApproveOrReject = hasPermission('REPORT_APPROVE_REJECT');
 
   const [searchParams, setSearchParams] = useSearchParams();
   const searchParam = searchParams.get('search') || '';

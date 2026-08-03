@@ -201,6 +201,19 @@ enum UserRole {
   STAFF
 }
 
+// ── Ma trận phân quyền động theo Role ──
+model RolePermission {
+  id          String   @id @default(uuid())
+  role        UserRole
+  featureKey  String   @map("feature_key")
+  isAllowed   Boolean  @default(true) @map("is_allowed")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@unique([role, featureKey])
+  @@map("role_permissions")
+}
+
 // ── Tài khoản người dùng (KTV + Admin) ──
 model User {
   id              String       @id @default(uuid())

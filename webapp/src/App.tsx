@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Navigate, useNavigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
+import { PermissionProvider } from './context/PermissionContext';
 import { ConfirmProvider } from './context/ConfirmContext';
 import { Capacitor } from '@capacitor/core';
 import { PushNotifications } from '@capacitor/push-notifications';
@@ -299,87 +300,89 @@ function PushNotificationManager({ children }: { children: React.ReactNode }) {
 export default function App() {
   return (
     <AuthProvider>
-      <BrowserRouter>
-        <PushNotificationManager>
-          <ConfirmProvider>
-            <OfflineScreen />
-            <Routes>
-              <Route path="/login" element={<LoginPage />} />
-              <Route path="/forgot-password" element={<ForgotPasswordPage />} />
-              <Route path="/reset-password" element={<ResetPasswordPage />} />
-              <Route path="/warranty-activate" element={<WarrantyActivate />} />
-              <Route path="/warranty-confirm" element={<WarrantyConfirm />} />
-              
-              <Route element={<Layout />}>
-              {/* KTV Routes */}
-              <Route element={<ProtectedRoute allowedRoles={['KTV', 'ADMIN', 'COORDINATOR', 'SALE_SUPERVISOR', 'SALER', 'HOTLINE', 'STAFF']} />}>
-                <Route path="/ktv/report" element={<ReportForm />} />
+      <PermissionProvider>
+        <BrowserRouter>
+          <PushNotificationManager>
+            <ConfirmProvider>
+              <OfflineScreen />
+              <Routes>
+                <Route path="/login" element={<LoginPage />} />
+                <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+                <Route path="/reset-password" element={<ResetPasswordPage />} />
+                <Route path="/warranty-activate" element={<WarrantyActivate />} />
+                <Route path="/warranty-confirm" element={<WarrantyConfirm />} />
+                
+                <Route element={<Layout />}>
+                {/* KTV Routes */}
+                <Route element={<ProtectedRoute allowedRoles={['KTV', 'ADMIN', 'COORDINATOR', 'SALE_SUPERVISOR', 'SALER', 'HOTLINE', 'STAFF']} />}>
+                  <Route path="/ktv/report" element={<ReportForm />} />
+                </Route>
+
+                <Route element={<ProtectedRoute allowedRoles={['KTV']} />}>
+                  <Route path="/ktv/my-reports" element={<MyReports />} />
+                  <Route path="/ktv/my-orders" element={<MyOrders />} />
+                  <Route path="/ktv/inventory" element={<KtvInventory />} />
+                </Route>
+
+                {/* Dashboard Route */}
+                <Route element={<ProtectedRoute allowedRoles={['ADMIN', 'STAFF']} requireDashboard={true} />}>
+                  <Route path="/admin" element={<Dashboard />} />
+                </Route>
+
+                {/* Admin & Coordinator Settings Routes */}
+                <Route element={<ProtectedRoute allowedRoles={['ADMIN', 'COORDINATOR']} />}>
+                  <Route path="/admin/inventory" element={<InventoryManage />} />
+                  <Route path="/admin/stations" element={<StationManage />} />
+                  <Route path="/admin/users" element={<UserManage />} />
+                  <Route path="/admin/sample-images" element={<SampleImageManage />} />
+                </Route>
+
+                {/* Serial Management Route (Admin, Dev, Coordinator, Hotline, Staff) */}
+                <Route element={<ProtectedRoute allowedRoles={['ADMIN', 'DEV', 'COORDINATOR', 'HOTLINE', 'STAFF']} />}>
+                  <Route path="/admin/serials" element={<SerialManage />} />
+                </Route>
+
+                {/* Admin & Dev Broadcast Routes */}
+                <Route element={<ProtectedRoute allowedRoles={['ADMIN', 'DEV']} />}>
+                  <Route path="/admin/broadcast" element={<BroadcastNotification />} />
+                </Route>
+
+                {/* Admin Only Salary & IoT Routes */}
+                <Route element={<ProtectedRoute allowedRoles={['ADMIN']} />}>
+                  <Route path="/admin/salaries" element={<SalaryManage />} />
+                  <Route path="/admin/iot" element={<IotMonitor />} />
+                </Route>
+
+                {/* All Office/Administrative Routes */}
+                <Route element={<ProtectedRoute allowedRoles={['ADMIN', 'COORDINATOR', 'SALE_SUPERVISOR', 'SALER', 'HOTLINE', 'STAFF']} />}>
+                  <Route path="/admin/orders" element={<OrderList />} />
+                  <Route path="/admin/reports" element={<ReportList />} />
+                  <Route path="/admin/promos" element={<PromoManage />} />
+                </Route>
+
+                {/* Dev Routes */}
+                <Route element={<ProtectedRoute allowedRoles={['DEV']} />}>
+                  <Route path="/dev/feedbacks" element={<FeedbackList />} />
+                  <Route path="/dev/system-map" element={<SystemMap />} />
+                  <Route path="/dev/zns-manage" element={<ZnsManage />} />
+                </Route>
+
+                {/* Shared Routes */}
+                <Route element={<ProtectedRoute allowedRoles={['KTV', 'ADMIN', 'DEV', 'COORDINATOR', 'SALE_SUPERVISOR', 'SALER', 'HOTLINE', 'STAFF']} />}>
+                  <Route path="/profile" element={<ProfilePage />} />
+                  <Route path="/change-password" element={<ChangePasswordPage />} />
+                  <Route path="/feedback" element={<FeedbackPage />} />
+                  <Route path="/notifications" element={<Notifications />} />
+                </Route>
               </Route>
 
-              <Route element={<ProtectedRoute allowedRoles={['KTV']} />}>
-                <Route path="/ktv/my-reports" element={<MyReports />} />
-                <Route path="/ktv/my-orders" element={<MyOrders />} />
-                <Route path="/ktv/inventory" element={<KtvInventory />} />
-              </Route>
-
-              {/* Dashboard Route */}
-              <Route element={<ProtectedRoute allowedRoles={['ADMIN', 'STAFF']} requireDashboard={true} />}>
-                <Route path="/admin" element={<Dashboard />} />
-              </Route>
-
-              {/* Admin & Coordinator Settings Routes */}
-              <Route element={<ProtectedRoute allowedRoles={['ADMIN', 'COORDINATOR']} />}>
-                <Route path="/admin/inventory" element={<InventoryManage />} />
-                <Route path="/admin/stations" element={<StationManage />} />
-                <Route path="/admin/users" element={<UserManage />} />
-                <Route path="/admin/sample-images" element={<SampleImageManage />} />
-              </Route>
-
-              {/* Serial Management Route (Admin, Dev, Coordinator, Hotline, Staff) */}
-              <Route element={<ProtectedRoute allowedRoles={['ADMIN', 'DEV', 'COORDINATOR', 'HOTLINE', 'STAFF']} />}>
-                <Route path="/admin/serials" element={<SerialManage />} />
-              </Route>
-
-              {/* Admin & Dev Broadcast Routes */}
-              <Route element={<ProtectedRoute allowedRoles={['ADMIN', 'DEV']} />}>
-                <Route path="/admin/broadcast" element={<BroadcastNotification />} />
-              </Route>
-
-              {/* Admin Only Salary & IoT Routes */}
-              <Route element={<ProtectedRoute allowedRoles={['ADMIN']} />}>
-                <Route path="/admin/salaries" element={<SalaryManage />} />
-                <Route path="/admin/iot" element={<IotMonitor />} />
-              </Route>
-
-              {/* All Office/Administrative Routes */}
-              <Route element={<ProtectedRoute allowedRoles={['ADMIN', 'COORDINATOR', 'SALE_SUPERVISOR', 'SALER', 'HOTLINE', 'STAFF']} />}>
-                <Route path="/admin/orders" element={<OrderList />} />
-                <Route path="/admin/reports" element={<ReportList />} />
-                <Route path="/admin/promos" element={<PromoManage />} />
-              </Route>
-
-              {/* Dev Routes */}
-              <Route element={<ProtectedRoute allowedRoles={['DEV']} />}>
-                <Route path="/dev/feedbacks" element={<FeedbackList />} />
-                <Route path="/dev/system-map" element={<SystemMap />} />
-                <Route path="/dev/zns-manage" element={<ZnsManage />} />
-              </Route>
-
-              {/* Shared Routes */}
-              <Route element={<ProtectedRoute allowedRoles={['KTV', 'ADMIN', 'DEV', 'COORDINATOR', 'SALE_SUPERVISOR', 'SALER', 'HOTLINE', 'STAFF']} />}>
-                <Route path="/profile" element={<ProfilePage />} />
-                <Route path="/change-password" element={<ChangePasswordPage />} />
-                <Route path="/feedback" element={<FeedbackPage />} />
-                <Route path="/notifications" element={<Notifications />} />
-              </Route>
-            </Route>
-
-            <Route path="/" element={<Navigate to="/login" replace />} />
-            <Route path="*" element={<Navigate to="/login" replace />} />
-          </Routes>
-          </ConfirmProvider>
-        </PushNotificationManager>
-      </BrowserRouter>
+              <Route path="/" element={<Navigate to="/login" replace />} />
+              <Route path="*" element={<Navigate to="/login" replace />} />
+            </Routes>
+            </ConfirmProvider>
+          </PushNotificationManager>
+        </BrowserRouter>
+      </PermissionProvider>
     </AuthProvider>
   );
 }

@@ -2,10 +2,11 @@ import React, { useEffect, useState, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { fetchApi, getStations } from '../../api/client';
 import { isValidPhone, PHONE_ERROR_MSG } from '../../utils/phone';
-import { UserPlus, Lock, Unlock, Search, Filter, X, Pencil, Download } from 'lucide-react';
+import { UserPlus, Lock, Unlock, Search, Filter, X, Pencil, Download, Shield, Users } from 'lucide-react';
 import { useConfirm } from '../../context/ConfirmContext';
 import { matchesSearchTerm } from '../../utils/text';
 import { useAuth, type UserRole } from '../../context/AuthContext';
+import PermissionMatrix from '../../components/PermissionMatrix';
 
 // Helper to sort tech stations: TP.Hồ Chí Minh, Hà Nội, Đà Nẵng first, then A-Z
 function getSortedTechStations(main: any) {
@@ -55,6 +56,9 @@ export default function UserManage() {
     } catch (e) {}
     return defaultValue;
   };
+
+  // Main tab state (users list vs permissions matrix)
+  const [mainTab, setMainTab] = useState<'users' | 'permissions'>('users');
 
   // Filter state (restored from sessionStorage)
   const [searchText, setSearchText] = useState(() => getSavedUserFilter('searchText', ''));
@@ -315,18 +319,53 @@ export default function UserManage() {
   };
 
   return (
-    <div className="animate-fade-in">
-      <div className="flex justify-between items-center mb-6">
-        <h2 className="font-bold text-2xl text-[#1B3A6B]">Quản Lí Nhân Viên</h2>
-        <div className="flex items-center gap-2">
-          <button className="btn btn-outline flex items-center gap-2" onClick={handleExportExcel} title="Xuất file Excel theo bộ lọc">
-            <Download size={18} /> Xuất Excel
+    <div className="animate-fade-in space-y-6">
+      <div className="flex justify-between items-center">
+        <h2 className="font-bold text-2xl text-[#1B3A6B]">Quản Lý Nhân Viên & Phân Quyền</h2>
+        {mainTab === 'users' && (
+          <div className="flex items-center gap-2">
+            <button className="btn btn-outline flex items-center gap-2" onClick={handleExportExcel} title="Xuất file Excel theo bộ lọc">
+              <Download size={18} /> Xuất Excel
+            </button>
+            <button className="btn btn-primary flex items-center gap-2" onClick={openCreateModal}>
+              <UserPlus size={18} /> Thêm KTV
+            </button>
+          </div>
+        )}
+      </div>
+
+      {/* ── Main Tab Navigation Bar ── */}
+      {currentUser?.role === 'ADMIN' && (
+        <div className="flex border border-gray-200/80 mb-2 gap-1.5 bg-slate-100/70 p-1.5 rounded-2xl w-fit shadow-inner">
+          <button
+            onClick={() => setMainTab('users')}
+            className={`px-5 py-2 rounded-xl font-bold text-xs flex items-center gap-2 transition-all cursor-pointer ${
+              mainTab === 'users'
+                ? 'bg-white text-[#1B3A6B] shadow-sm'
+                : 'text-gray-500 hover:text-gray-800 hover:bg-white/50'
+            }`}
+          >
+            <Users size={16} />
+            <span>Danh Sách Nhân Viên</span>
           </button>
-          <button className="btn btn-primary flex items-center gap-2" onClick={openCreateModal}>
-            <UserPlus size={18} /> Thêm KTV
+          <button
+            onClick={() => setMainTab('permissions')}
+            className={`px-5 py-2 rounded-xl font-bold text-xs flex items-center gap-2 transition-all cursor-pointer ${
+              mainTab === 'permissions'
+                ? 'bg-white text-purple-700 shadow-sm'
+                : 'text-gray-500 hover:text-gray-800 hover:bg-white/50'
+            }`}
+          >
+            <Shield size={16} />
+            <span>Phân Bổ Quyền (Matrix)</span>
           </button>
         </div>
-      </div>
+      )}
+
+      {mainTab === 'permissions' && currentUser?.role === 'ADMIN' ? (
+        <PermissionMatrix />
+      ) : (
+        <>
 
       {/* ── Filter Bar ── */}
       <div className="card mb-6" style={{ padding: '16px' }}>
@@ -800,6 +839,8 @@ export default function UserManage() {
             ))
           )}
         </div>
+      )}
+        </>
       )}
     </div>
   );

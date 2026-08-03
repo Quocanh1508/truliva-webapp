@@ -8,6 +8,7 @@ import DateRangePicker from '../../components/DateRangePicker';
 import CategoryTreeSelect from '../../components/CategoryTreeSelect';
 import { formatOrderId } from '../../utils/text';
 import { useAuth } from '../../context/AuthContext';
+import { usePermission } from '../../context/PermissionContext';
 import { isValidPhone, PHONE_ERROR_MSG } from '../../utils/phone';
 import ProvinceSelect from '../../components/ProvinceSelect';
 import { isValidProvince } from '../../utils/provinces';
@@ -85,9 +86,10 @@ export default function OrderList() {
   };
 
   const { user: currentUser } = useAuth();
+  const { hasPermission } = usePermission();
   const isViewOnlyStaff = currentUser?.role === 'STAFF' && currentUser?.group === 'Service';
-  const canExportExcel = currentUser?.role === 'ADMIN' || currentUser?.role === 'DEV' || currentUser?.role === 'COORDINATOR' || (currentUser?.role === 'STAFF' && currentUser?.group === 'Service');
-  const canUseAutoRefresh = currentUser?.role === 'ADMIN' || currentUser?.role === 'DEV' || currentUser?.role === 'COORDINATOR';
+  const canExportExcel = hasPermission('ORDER_EXPORT_EXCEL');
+  const canUseAutoRefresh = hasPermission('ORDER_AUTO_REFRESH');
   const navigate = useNavigate();
   const [orders, setOrders] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);

@@ -3,6 +3,7 @@ import { fetchApi } from '../../api/client';
 import { isValidPhone, PHONE_ERROR_MSG } from '../../utils/phone';
 import { useConfirm } from '../../context/ConfirmContext';
 import { useAuth } from '../../context/AuthContext';
+import { usePermission } from '../../context/PermissionContext';
 import ProvinceSelect from '../../components/ProvinceSelect';
 import { 
   Calculator, 
@@ -96,7 +97,8 @@ interface SalaryData {
 export default function SalaryManage() {
   const { confirm } = useConfirm();
   const { user } = useAuth();
-  const isAdmin = user?.role === 'ADMIN';
+  const { hasPermission } = usePermission();
+  const isAdmin = user?.role === 'ADMIN' || hasPermission('SALARY_UPDATE_COST');
 
   // Generate last 12 months for selector
   const generateMonths = () => {
