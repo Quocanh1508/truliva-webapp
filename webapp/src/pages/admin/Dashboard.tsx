@@ -303,6 +303,7 @@ export default function Dashboard() {
   const [prevStartDate, setPrevStartDate] = useState<string>('');
   const [prevEndDate, setPrevEndDate] = useState<string>('');
   const [revenueScope, setRevenueScope] = useState<'all' | 'service'>('all');
+  const [revenueMetricType, setRevenueMetricType] = useState<'moneyToCollect' | 'totalPrice'>('moneyToCollect');
 
   // Fetch static data (stations, overview stats) once on mount
   useEffect(() => {
@@ -421,14 +422,15 @@ export default function Dashboard() {
       compareMode,
       prevStartDate: compareMode === 'custom' ? prevStartDate : undefined,
       prevEndDate: compareMode === 'custom' ? prevEndDate : undefined,
-      revenueScope
+      revenueScope,
+      metricType: revenueMetricType
     })
       .then(data => {
         setRevenueData(data);
       })
       .catch(console.error)
       .finally(() => setLoadingRevenue(false));
-  }, [activeTab, startDate, endDate, selectedProvinces, selectedMainStations, selectedTechStations, selectedWorkTypes, selectedKtvIds, compareMode, prevStartDate, prevEndDate, revenueScope]);
+  }, [activeTab, startDate, endDate, selectedProvinces, selectedMainStations, selectedTechStations, selectedWorkTypes, selectedKtvIds, compareMode, prevStartDate, prevEndDate, revenueScope, revenueMetricType]);
 
   useEffect(() => {
     setSelectedLateProvince('');
@@ -2066,48 +2068,77 @@ export default function Dashboard() {
             </div>
           ) : (
             <>
-              {/* SOURCE TOGGLE CONTROL TOOLBAR */}
-              <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
-                <div>
+              {/* SOURCE & METRIC CONTROL TOOLBAR */}
+              <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm flex flex-col xl:flex-row xl:items-center justify-between gap-4">
+                <div className="space-y-1">
                   <h3 className="font-bold text-sm text-[#1B3A6B] flex items-center gap-2">
                     <Filter size={16} className="text-blue-600" />
-                    Phạm vi tính toán Doanh thu
+                    Cấu hình Phạm vi & Chỉ số Báo cáo
                   </h3>
-                  <p className="text-xs text-gray-500 mt-0.5">Chọn góc nhìn báo cáo: Toàn bộ công ty (Bao gồm eCom) hoặc Chuyên biệt KTV/Dịch vụ</p>
+                  <p className="text-xs text-gray-500">Chuyển đổi góc nhìn giữa Doanh thu thực thu COD (đối chiếu POS) và Tổng doanh số niêm yết</p>
                 </div>
 
-                {/* Segmented Button Control */}
-                <div className="inline-flex bg-gray-100 p-1 rounded-xl border border-gray-200 self-start md:self-auto">
-                  <button
-                    onClick={() => setRevenueScope('all')}
-                    className={`px-4 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-2 ${
-                      revenueScope === 'all'
-                        ? 'bg-[#1B3A6B] text-white shadow-sm'
-                        : 'text-gray-600 hover:text-gray-900 hover:bg-white/60'
-                    }`}
-                  >
-                    <span>🌐 Tất cả đơn hàng (Toàn công ty)</span>
-                  </button>
-                  <button
-                    onClick={() => setRevenueScope('service')}
-                    className={`px-4 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-2 ${
-                      revenueScope === 'service'
-                        ? 'bg-blue-600 text-white shadow-sm'
-                        : 'text-gray-600 hover:text-gray-900 hover:bg-white/60'
-                    }`}
-                  >
-                    <span>🛠️ Chỉ đơn Dịch vụ / KTV</span>
-                  </button>
+                <div className="flex flex-wrap items-center gap-3">
+                  {/* Metric Switcher */}
+                  <div className="inline-flex bg-emerald-50/80 p-1 rounded-xl border border-emerald-200/80">
+                    <button
+                      onClick={() => setRevenueMetricType('moneyToCollect')}
+                      className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${
+                        revenueMetricType === 'moneyToCollect'
+                          ? 'bg-emerald-700 text-white shadow-sm'
+                          : 'text-emerald-800 hover:bg-white/60'
+                      }`}
+                    >
+                      <DollarSign size={14} />
+                      <span>Thực thu (COD / Thực nhận)</span>
+                    </button>
+                    <button
+                      onClick={() => setRevenueMetricType('totalPrice')}
+                      className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${
+                        revenueMetricType === 'totalPrice'
+                          ? 'bg-emerald-700 text-white shadow-sm'
+                          : 'text-emerald-800 hover:bg-white/60'
+                      }`}
+                    >
+                      <TrendingUp size={14} />
+                      <span>Doanh số (Giá niêm yết)</span>
+                    </button>
+                  </div>
+
+                  {/* Scope Switcher */}
+                  <div className="inline-flex bg-gray-100 p-1 rounded-xl border border-gray-200">
+                    <button
+                      onClick={() => setRevenueScope('all')}
+                      className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                        revenueScope === 'all'
+                          ? 'bg-[#1B3A6B] text-white shadow-sm'
+                          : 'text-gray-600 hover:text-gray-900 hover:bg-white/60'
+                      }`}
+                    >
+                      <span>🌐 Toàn công ty (Gồm eCom)</span>
+                    </button>
+                    <button
+                      onClick={() => setRevenueScope('service')}
+                      className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                        revenueScope === 'service'
+                          ? 'bg-blue-600 text-white shadow-sm'
+                          : 'text-gray-600 hover:text-gray-900 hover:bg-white/60'
+                      }`}
+                    >
+                      <span>🛠️ Chỉ Dịch vụ / KTV</span>
+                    </button>
+                  </div>
                 </div>
               </div>
 
               {/* KPI Summary Cards */}
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                {/* Tổng Doanh Thu */}
+                {/* Tổng Doanh Thu / Doanh Số */}
                 <div className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm border-l-4 border-emerald-500 flex flex-col justify-between hover:shadow-md transition-shadow">
                   <div className="flex justify-between items-center">
                     <span className="text-emerald-700 font-bold text-xs flex items-center gap-1.5 uppercase">
-                      <DollarSign size={16} /> Tổng doanh thu thực tế
+                      <DollarSign size={16} />
+                      {revenueMetricType === 'moneyToCollect' ? 'Doanh thu thực thu COD' : 'Tổng doanh số niêm yết'}
                     </span>
                     <span className={`px-2 py-0.5 rounded-full text-[11px] font-bold flex items-center gap-0.5 ${
                       revenueData.summary.percentChange >= 0
@@ -2123,7 +2154,9 @@ export default function Dashboard() {
                       {revenueData.summary.totalRevenue.toLocaleString('vi-VN')} <span className="text-sm font-semibold text-gray-500">VNĐ</span>
                     </div>
                     <p className="text-[11px] text-gray-500 mt-1 font-medium">
-                      So với kỳ trước ({revenueData.summary.prevRevenue.toLocaleString('vi-VN')} VNĐ)
+                      {revenueMetricType === 'moneyToCollect'
+                        ? 'Số tiền COD thực nhận về (Khớp với Doanh Thu POS)'
+                        : 'Tổng giá trị đơn hàng chốt (Khớp với Doanh Số POS)'}
                     </p>
                   </div>
                 </div>
@@ -2182,12 +2215,12 @@ export default function Dashboard() {
               <div className="bg-blue-50/70 border border-blue-200/80 p-3.5 rounded-xl text-xs text-blue-900 flex items-start gap-2.5 shadow-2xs">
                 <Info size={16} className="text-blue-600 flex-shrink-0 mt-0.5" />
                 <div className="space-y-0.5">
-                  <span className="font-bold text-blue-950">Nguồn dữ liệu & Quy tắc tính toán Doanh thu:</span>
+                  <span className="font-bold text-blue-950">Nguồn dữ liệu & Quy tắc tính toán:</span>
                   <p className="text-blue-800 leading-relaxed">
-                    {revenueScope === 'all' ? (
-                      <>🌐 <b>Đang xem Bức tranh Toàn cảnh Toàn Công ty</b>: Bao gồm TẤT CẢ các đơn hàng <b>Hoàn thành</b> từ mọi nguồn: Sàn TMĐT (<i>Shopee, Lazada, TikTok Shop, Tiki</i>), Pancake, Zalo Mini App, Hotline, và Ca tạo thủ công.</>
+                    {revenueMetricType === 'moneyToCollect' ? (
+                      <>💵 <b>Đang tính theo Doanh Thu Thực Thu (`moneyToCollect`)</b>: Chỉ tính số tiền COD/Thực thu nhận về từ khách hàng. Dữ liệu này dùng để <b>đối chiếu trùng khớp với ô Doanh Thu trên Pancake POS</b> (Khoảng ~2.49 tỷ cho tháng 07/2026).</>
                     ) : (
-                      <>🛠️ <b>Đang xem Chuyên biệt Dịch vụ / KTV</b>: Bao gồm các ca dịch vụ <b>Hoàn thành</b> (Pancake, Zalo Mini App, Hotline, <b>Ca tạo thủ công</b>...). Ưu tiên lấy <b>Số tiền thu hộ thực tế (COD)</b>. <b>Không tính</b> các đơn hàng bán lẻ sản phẩm qua sàn TMĐT (<i>Shopee, Lazada, TikTok Shop, Tiki</i>).</>
+                      <>📊 <b>Đang tính theo Tổng Doanh Số Niêm Yết (`totalPrice`)</b>: Tính tổng tiền giá trị đơn hàng niêm yết. Dữ liệu này dùng để <b>đối chiếu với ô Tổng Hàng Chốt trên Pancake POS</b> (Khoảng ~6.21 tỷ cho tháng 07/2026).</>
                     )}
                   </p>
                 </div>

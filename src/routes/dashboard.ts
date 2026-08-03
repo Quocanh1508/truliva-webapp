@@ -1027,10 +1027,13 @@ router.get('/revenue', async (req: Request, res: Response): Promise<void> => {
       prevStartDate,
       prevEndDate,
       includeEcom,
-      revenueScope
+      revenueScope,
+      metricType,
+      metric
     } = req.query;
 
     const isIncludeEcom = includeEcom === 'true' || revenueScope === 'all';
+    const activeMetric = (metricType as string) || (metric as string) || 'moneyToCollect';
 
     const parseMulti = (val: any): string[] => {
       if (!val) return [];
@@ -1189,12 +1192,12 @@ router.get('/revenue', async (req: Request, res: Response): Promise<void> => {
     currOrders = await filterMemory(currOrders);
     prevOrders = await filterMemory(prevOrders);
 
-    // Helper tính doanh thu 1 đơn hàng (ưu tiên moneyToCollect COD, fallback sang totalPrice)
+    // Helper tính chỉ số tài chính cho 1 đơn hàng (Thuần Thực Thu moneyToCollect hoặc Thuần Doanh Số totalPrice)
     const getRevenue = (o: any) => {
-      if (o.moneyToCollect !== null && o.moneyToCollect !== undefined && o.moneyToCollect > 0) {
-        return Number(o.moneyToCollect);
+      if (activeMetric === 'totalPrice') {
+        return Number(o.totalPrice) || 0;
       }
-      return Number(o.totalPrice) || 0;
+      return Number(o.moneyToCollect) || 0;
     };
 
     // 5. Tổng doanh thu kỳ hiện tại vs kỳ trước
@@ -1392,6 +1395,7 @@ router.get('/revenue', async (req: Request, res: Response): Promise<void> => {
         previous: { start: prevStartStr, end: prevEndStr }
       },
       summary: {
+        metricType: activeMetric,
         totalRevenue: totalCurrRevenue,
         prevRevenue: totalPrevRevenue,
         revenueDiff: revDiff,
