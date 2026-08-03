@@ -1,6 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
 import { fetchApi, API_URL } from '../../api/client';
-import { useAuth } from '../../context/AuthContext';
 import { usePermission } from '../../context/PermissionContext';
 import { isValidPhone, PHONE_ERROR_MSG } from '../../utils/phone';
 import ProvinceSelect from '../../components/ProvinceSelect';
@@ -73,7 +72,6 @@ interface ImportError {
 }
 
 export default function SerialManage() {
-  const { user: currentUser } = useAuth();
   const { hasPermission } = usePermission();
   const canChangeWarrantyPeriod = hasPermission('SERIAL_EDIT');
   const canExportExcel = hasPermission('SERIAL_EXPORT_EXCEL');
@@ -918,7 +916,7 @@ export default function SerialManage() {
           }}>
             <button
               disabled={page <= 1}
-              onClick={() => setPage(p => Math.max(1, p - 1))}
+              onClick={() => setPage((p: number) => Math.max(1, p - 1))}
               style={{
                 padding: '6px 12px', borderRadius: 6, border: '1px solid #d1d5db',
                 background: page <= 1 ? '#f3f4f6' : 'white', cursor: page <= 1 ? 'default' : 'pointer',
@@ -958,7 +956,7 @@ export default function SerialManage() {
             </span>
             <button
               disabled={page >= totalPages}
-              onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+              onClick={() => setPage((p: number) => Math.min(totalPages, p + 1))}
               style={{
                 padding: '6px 12px', borderRadius: 6, border: '1px solid #d1d5db',
                 background: page >= totalPages ? '#f3f4f6' : 'white', cursor: page >= totalPages ? 'default' : 'pointer',

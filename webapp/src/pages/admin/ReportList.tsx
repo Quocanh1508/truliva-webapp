@@ -4,7 +4,6 @@ import { fetchApi, deleteReportWithReason, updateReport, uploadImages, approveRe
 import { Download, X, ExternalLink, Image as ImageIcon, Loader, Search, Edit3, Save, Plus, Trash2, SlidersHorizontal, RotateCcw, Calendar, ChevronLeft, ChevronRight, ShieldCheck, CheckCircle, Loader2 } from 'lucide-react';
 import CategoryTreeSelect from '../../components/CategoryTreeSelect';
 import { formatOrderId } from '../../utils/text';
-import { useAuth } from '../../context/AuthContext';
 import { usePermission } from '../../context/PermissionContext';
 import { isValidPhone, PHONE_ERROR_MSG } from '../../utils/phone';
 import ProvinceSelect from '../../components/ProvinceSelect';
@@ -291,7 +290,6 @@ function MultiSelectObjectDropdown({
 }
 
 export default function ReportList() {
-  const { user: currentUser } = useAuth();
   const { hasPermission } = usePermission();
   const canExportExcel = hasPermission('REPORT_EXPORT_EXCEL');
   const canEditOrDelete = hasPermission('REPORT_EDIT_DELETE');

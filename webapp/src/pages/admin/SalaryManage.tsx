@@ -28,10 +28,7 @@ import {
   RotateCcw
 } from 'lucide-react';
 
-interface KtvRateItem {
-  rate: number;
-  isCustom: boolean;
-}
+
 
 interface KtvRateRow {
   userId: string;
@@ -565,7 +562,7 @@ export default function SalaryManage() {
     }
   };
 
-  // Export to Excel (With filters support)
+  // Export to Excel (With full filters support)
   const handleExportExcel = async () => {
     setExporting(true);
     setMessage(null);
@@ -575,6 +572,8 @@ export default function SalaryManage() {
       if (selectedKtvsFilter.length > 0) url += `&ktvId=${encodeURIComponent(selectedKtvsFilter.join(','))}`;
       if (selectedStationsFilter.length > 0) url += `&stationId=${encodeURIComponent(selectedStationsFilter.join(','))}`;
       if (selectedWorkTypeFilter) url += `&workType=${encodeURIComponent(selectedWorkTypeFilter)}`;
+      if (selectedCompletedDateFilter) url += `&completedDate=${encodeURIComponent(selectedCompletedDateFilter)}`;
+      if (searchQuery) url += `&search=${encodeURIComponent(searchQuery)}`;
 
       const response = await fetch(url, {
         headers: {

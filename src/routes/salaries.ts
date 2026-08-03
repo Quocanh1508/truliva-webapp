@@ -1,4 +1,5 @@
 import { Router, Request, Response } from 'express';
+import { Prisma } from '@prisma/client';
 import prisma from '../config/database';
 import logger from '../utils/logger';
 import { requireAuth, requireAdmin } from '../middleware/authSession';
@@ -685,24 +686,52 @@ router.get('/export', requireAuth, requireAdmin, async (req: Request, res: Respo
     const month = req.query.month as string;
     const ktvId = req.query.ktvId as string | undefined;
     const stationId = req.query.stationId as string | undefined;
+    const mainStationId = req.query.mainStationId as string | undefined;
     const workTypeFilter = req.query.workType as string | undefined;
+    const completedDate = req.query.completedDate as string | undefined;
+    const searchQuery = (req.query.search as string || req.query.q as string || '').trim().toLowerCase();
 
     if (!month || !/^\d{2}\/\d{4}$/.test(month)) {
       res.status(400).json({ error: 'Định dạng tháng không hợp lệ (MM/YYYY)' });
       return;
     }
 
-    const formattedMonth = month.startsWith('0') ? `${Number(month.substring(0, 2))}/${month.substring(3)}` : month;
-    const ktvIdsList = ktvId ? ktvId.split(',').map(s => s.trim()).filter(Boolean) : [];
+    const [mStr, yStr] = month.split('/');
+    const mNum = Number(mStr);
+    const yNum = Number(yStr);
 
-    // 1. Load active KTVs
-    const ktvs = await prisma.user.findMany({
-      where: {
-        role: 'KTV',
-        isActive: true,
-        ...(ktvIdsList.length > 0 ? { id: { in: ktvIdsList } } : {}),
-        ...(stationId ? { techStationId: stationId } : {})
-      },
+    const monthVariants = [
+      month,
+      `${mNum}/${yNum}`,
+      `${String(mNum).padStart(2, '0')}/${yNum}`
+    ];
+
+    const startDate = new Date(Date.UTC(yNum, mNum - 1, 1, 0, 0, 0, 0));
+    const endDate = new Date(Date.UTC(yNum, mNum, 0, 23, 59, 59, 999));
+
+    const ktvIdsList = ktvId ? ktvId.split(',').map(s => s.trim()).filter(Boolean) : [];
+    const stationIdsList = stationId ? stationId.split(',').map(s => s.trim()).filter(Boolean) : [];
+    const mainStationIdsList = mainStationId ? mainStationId.split(',').map(s => s.trim()).filter(Boolean) : [];
+    const workTypesList = workTypeFilter ? workTypeFilter.split(',').map(s => s.trim()).filter(Boolean) : [];
+
+    // 1. Load KTVs according to filter
+    const ktvWhere: Prisma.UserWhereInput = {
+      role: 'KTV',
+      isActive: true
+    };
+
+    if (ktvIdsList.length > 0) {
+      ktvWhere.id = { in: ktvIdsList };
+    }
+    if (stationIdsList.length > 0) {
+      ktvWhere.techStationId = { in: stationIdsList };
+    }
+    if (mainStationIdsList.length > 0) {
+      ktvWhere.techStation = { mainStationId: { in: mainStationIdsList } };
+    }
+
+    let ktvs = await prisma.user.findMany({
+      where: ktvWhere,
       select: {
         id: true,
         fullName: true,
@@ -710,6 +739,13 @@ router.get('/export', requireAuth, requireAdmin, async (req: Request, res: Respo
         techStation: { select: { name: true } }
       }
     });
+
+    if (searchQuery) {
+      ktvs = ktvs.filter(k => 
+        k.fullName.toLowerCase().includes(searchQuery) || 
+        (k.phoneNumber && k.phoneNumber.toLowerCase().includes(searchQuery))
+      );
+    }
 
     // 2. Load Excel rates
     const stationRates = await loadStationRates();
@@ -719,6 +755,81 @@ router.get('/export', requireAuth, requireAdmin, async (req: Request, res: Respo
       where: { month }
     });
     const savedMap = new Map(savedRecords.map(r => [r.userId, r]));
+
+    // Build common ServiceReport filter helper
+    const buildReportWhere = (targetKtvId?: string): Prisma.ServiceReportWhereInput => {
+      const reportWhere: Prisma.ServiceReportWhereInput = {
+        approvalStatus: 'APPROVED',
+        OR: [
+          { month: { in: monthVariants } },
+          { createdAt: { gte: startDate, lte: endDate } }
+        ]
+      };
+
+      if (targetKtvId) {
+        reportWhere.ktvUserId = targetKtvId;
+      } else if (ktvIdsList.length > 0) {
+        reportWhere.ktvUserId = { in: ktvIdsList };
+      }
+
+      if (stationIdsList.length > 0) {
+        reportWhere.ktvUser = {
+          ...((reportWhere.ktvUser as any) || {}),
+          techStationId: { in: stationIdsList }
+        };
+      }
+
+      if (mainStationIdsList.length > 0) {
+        reportWhere.ktvUser = {
+          ...((reportWhere.ktvUser as any) || {}),
+          techStation: { mainStationId: { in: mainStationIdsList } }
+        };
+      }
+
+      if (workTypesList.length > 0) {
+        const orConds = workTypesList.map(w => ({
+          OR: [
+            { workType: { contains: w, mode: 'insensitive' as const } },
+            { serviceType: { contains: w, mode: 'insensitive' as const } }
+          ]
+        }));
+        reportWhere.AND = [
+          ...((reportWhere.AND as any[]) || []),
+          { OR: orConds }
+        ];
+      }
+
+      if (completedDate) {
+        let compStart: Date;
+        let compEnd: Date;
+        if (completedDate.includes('/')) {
+          const [d, m, y] = completedDate.split('/');
+          compStart = new Date(Date.UTC(Number(y), Number(m) - 1, Number(d), 0, 0, 0, 0));
+          compEnd = new Date(Date.UTC(Number(y), Number(m) - 1, Number(d), 23, 59, 59, 999));
+        } else {
+          compStart = new Date(`${completedDate}T00:00:00.000Z`);
+          compEnd = new Date(`${completedDate}T23:59:59.999Z`);
+        }
+        reportWhere.createdAt = { gte: compStart, lte: compEnd };
+      }
+
+      return reportWhere;
+    };
+
+    const matchSearch = (r: any, ktvName?: string, ktvPhone?: string) => {
+      if (!searchQuery) return true;
+      const target = [
+        ktvName || r.ktvUser?.fullName || '',
+        ktvPhone || r.ktvUser?.phoneNumber || '',
+        r.customerName || '',
+        r.customerPhone || '',
+        r.province || '',
+        r.notes || '',
+        r.order?.orderSourceId || '',
+        String(r.order?.pancakeOrderId || '')
+      ].join(' ').toLowerCase();
+      return target.includes(searchQuery);
+    };
 
     const workbook = new ExcelJS.Workbook();
 
@@ -736,59 +847,33 @@ router.get('/export', requireAuth, requireAdmin, async (req: Request, res: Respo
     wsSummary.getRow(2).font = { size: 10, italic: true, color: { argb: 'FF4B5563' } };
     wsSummary.getRow(3).font = { size: 14, bold: true, color: { argb: 'FF1B3A6B' } };
 
-    const lastSummaryDataRow = 5 + ktvs.length;
-
-    // Top Summary Row Sheet 1 (Row 4 - Always visible above filter)
-    const topSummaryRow1 = wsSummary.addRow([
-      'TỔNG CỘNG THEO BỘ LỌC:',
-      '', '', '',
-      { formula: `SUBTOTAL(109, E6:E${lastSummaryDataRow})`, result: 0 },
-      { formula: `SUBTOTAL(109, F6:F${lastSummaryDataRow})`, result: 0 },
-      { formula: `SUBTOTAL(109, G6:G${lastSummaryDataRow})`, result: 0 },
-      '', ''
-    ]);
-    wsSummary.mergeCells(`A4:D4`);
-    topSummaryRow1.font = { bold: true, color: { argb: 'FF1B3A6B' } };
-    topSummaryRow1.fill = {
-      type: 'pattern',
-      pattern: 'solid',
-      fgColor: { argb: 'FFE2E8F0' }
-    };
-    topSummaryRow1.getCell(1).alignment = { horizontal: 'center' };
-    topSummaryRow1.getCell(5).alignment = { horizontal: 'center' };
-    topSummaryRow1.getCell(6).numFmt = '#,##0';
-    topSummaryRow1.getCell(7).numFmt = '#,##0';
-
     // Columns config for Sheet 1 (Row 5 Header)
     const summaryHeaders = ['STT', 'Tên KTV', 'Số điện thoại', 'Trạm quản lý', 'Số ca hoàn thành', 'Thù lao tự động (VND)', 'Thực nhận (VND)', 'Ghi chú điều chỉnh', 'Trạng thái'];
-    const summaryHeaderRow = wsSummary.addRow(summaryHeaders);
-    summaryHeaderRow.font = { bold: true, color: { argb: 'FFFFFFFF' } };
-    summaryHeaderRow.fill = {
-      type: 'pattern',
-      pattern: 'solid',
-      fgColor: { argb: 'FF1B3A6B' } // Truliva Navy
-    };
-    summaryHeaderRow.alignment = { vertical: 'middle', horizontal: 'center' };
-
+    
+    // Rows list for Summary Sheet
+    const summaryRowsData: any[] = [];
     let summaryIdx = 1;
     let sumTotalCases = 0;
     let sumCalculated = 0;
     let sumAdjusted = 0;
 
     for (const ktv of ktvs) {
-      const reports = await prisma.serviceReport.findMany({
-        where: {
-          ktvUserId: ktv.id,
-          month: formattedMonth,
-          approvalStatus: 'APPROVED'
-        },
+      let reports = await prisma.serviceReport.findMany({
+        where: buildReportWhere(ktv.id),
         include: { order: true }
       });
 
+      if (searchQuery) {
+        reports = reports.filter(r => matchSearch(r, ktv.fullName, ktv.phoneNumber || ''));
+      }
+
+      // Skip KTVs with 0 reports if workType or completedDate filter is active
+      if (reports.length === 0 && (workTypesList.length > 0 || completedDate)) {
+        continue;
+      }
+
       const ktvPhoneNorm = normalizePhone(ktv.phoneNumber);
       const stationRate = ktvPhoneNorm ? stationRates.get(ktvPhoneNorm) : null;
-      const isStationPaid = !!stationRate;
-
       let calculatedCost = 0;
 
       for (const report of reports) {
@@ -806,7 +891,7 @@ router.get('/export', requireAuth, requireAdmin, async (req: Request, res: Respo
       sumCalculated += calculated;
       sumAdjusted += adjusted;
 
-      const row = wsSummary.addRow([
+      summaryRowsData.push([
         summaryIdx++,
         ktv.fullName,
         ktv.phoneNumber || '',
@@ -817,18 +902,48 @@ router.get('/export', requireAuth, requireAdmin, async (req: Request, res: Respo
         note,
         status
       ]);
+    }
 
+    const lastSummaryDataRow = 5 + summaryRowsData.length;
+
+    // Top Summary Row Sheet 1 (Row 4 - Always visible above filter)
+    const topSummaryRow1 = wsSummary.addRow([
+      'TỔNG CỘNG THEO BỘ LỌC:',
+      '', '', '',
+      { formula: `SUBTOTAL(109, E6:E${lastSummaryDataRow})`, result: sumTotalCases },
+      { formula: `SUBTOTAL(109, F6:F${lastSummaryDataRow})`, result: sumCalculated },
+      { formula: `SUBTOTAL(109, G6:G${lastSummaryDataRow})`, result: sumAdjusted },
+      '', ''
+    ]);
+    wsSummary.mergeCells(`A4:D4`);
+    topSummaryRow1.font = { bold: true, color: { argb: 'FF1B3A6B' } };
+    topSummaryRow1.fill = {
+      type: 'pattern',
+      pattern: 'solid',
+      fgColor: { argb: 'FFE2E8F0' }
+    };
+    topSummaryRow1.getCell(1).alignment = { horizontal: 'center' };
+    topSummaryRow1.getCell(5).alignment = { horizontal: 'center' };
+    topSummaryRow1.getCell(6).numFmt = '#,##0';
+    topSummaryRow1.getCell(7).numFmt = '#,##0';
+
+    const summaryHeaderRow = wsSummary.addRow(summaryHeaders);
+    summaryHeaderRow.font = { bold: true, color: { argb: 'FFFFFFFF' } };
+    summaryHeaderRow.fill = {
+      type: 'pattern',
+      pattern: 'solid',
+      fgColor: { argb: 'FF1B3A6B' } // Truliva Navy
+    };
+    summaryHeaderRow.alignment = { vertical: 'middle', horizontal: 'center' };
+
+    summaryRowsData.forEach(rowData => {
+      const row = wsSummary.addRow(rowData);
       row.getCell(1).alignment = { horizontal: 'center' };
       row.getCell(5).alignment = { horizontal: 'center' };
       row.getCell(6).numFmt = '#,##0';
       row.getCell(7).numFmt = '#,##0';
       row.getCell(9).alignment = { horizontal: 'center' };
-    }
-
-    // Update Top Summary Row Sheet 1 Results
-    topSummaryRow1.getCell(5).value = { formula: `SUBTOTAL(109, E6:E${lastSummaryDataRow})`, result: sumTotalCases };
-    topSummaryRow1.getCell(6).value = { formula: `SUBTOTAL(109, F6:F${lastSummaryDataRow})`, result: sumCalculated };
-    topSummaryRow1.getCell(7).value = { formula: `SUBTOTAL(109, G6:G${lastSummaryDataRow})`, result: sumAdjusted };
+    });
 
     // Bottom Total Row Sheet 1
     const totalRowSheet1 = wsSummary.addRow([
@@ -885,20 +1000,9 @@ router.get('/export', requireAuth, requireAdmin, async (req: Request, res: Respo
     wsDetail.getRow(2).font = { size: 10, italic: true, color: { argb: 'FF4B5563' } };
     wsDetail.getRow(3).font = { size: 14, bold: true, color: { argb: 'FF1B3A6B' } };
 
-    // Fetch all approved reports for the month
-    const reports = await prisma.serviceReport.findMany({
-      where: {
-        month: formattedMonth,
-        approvalStatus: 'APPROVED',
-        ...(ktvId ? { ktvUserId: ktvId } : {}),
-        ...(stationId ? { ktvUser: { techStationId: stationId } } : {}),
-        ...(workTypeFilter ? {
-          OR: [
-            { workType: { contains: workTypeFilter, mode: 'insensitive' } },
-            { serviceType: { contains: workTypeFilter, mode: 'insensitive' } }
-          ]
-        } : {})
-      },
+    // Fetch all approved reports matching filters
+    let reports = await prisma.serviceReport.findMany({
+      where: buildReportWhere(),
       include: {
         ktvUser: {
           select: {
@@ -911,6 +1015,10 @@ router.get('/export', requireAuth, requireAdmin, async (req: Request, res: Respo
       },
       orderBy: { createdAt: 'asc' }
     });
+
+    if (searchQuery) {
+      reports = reports.filter(r => matchSearch(r));
+    }
 
     const startDataRow = 6;
     const lastDataRow = reports.length > 0 ? startDataRow + reports.length - 1 : startDataRow;
