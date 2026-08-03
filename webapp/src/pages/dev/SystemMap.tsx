@@ -598,6 +598,33 @@ export default function SystemMap() {
         ]
       },
       {
+        id: 'RolePermission',
+        name: 'RolePermission (Ma trận phân quyền)',
+        x: 50, y: 450,
+        desc: 'Lưu trữ thiết lập phân quyền tùy chỉnh động cho từng Vai trò (Role) đối với các tính năng toàn hệ thống.',
+        prismaCode: `model RolePermission {\n  id          String   @id @default(uuid())\n  role        UserRole\n  featureKey  String   @map("feature_key")\n  isAllowed   Boolean  @default(true) @map("is_allowed")\n  createdAt   DateTime @default(now()) @map("created_at")\n  updatedAt   DateTime @updatedAt @map("updated_at")\n  @@unique([role, featureKey])\n  @@map("role_permissions")\n}`,
+        fields: [
+          { name: 'id', type: 'String (UUID)', key: true, desc: 'Khóa chính' },
+          { name: 'role', type: 'UserRole (Enum)', desc: 'Vai trò áp dụng (ADMIN, KTV, COORDINATOR...)' },
+          { name: 'featureKey', type: 'String', desc: 'Mã tính năng hệ thống (ORDER_EXPORT_EXCEL...)' },
+          { name: 'isAllowed', type: 'Boolean', desc: 'Trạng thái được phép hay bị chặn' }
+        ]
+      },
+      {
+        id: 'Serial',
+        name: 'Serial (Quản lý Serial & BH)',
+        x: 520, y: 30,
+        desc: 'Quản lý mã Serial sản phẩm, ngày kích hoạt bảo hành, thời hạn và thông tin khách hàng sở hữu.',
+        prismaCode: `model Serial {\n  id                  String    @id @default(uuid())\n  serialNumber        String    @unique @map("serial_number")\n  model               String\n  status              String    @default("chưa kích hoạt")\n  activationDate      DateTime? @map("activation_date")\n  warrantyExpiryDate  DateTime? @map("warranty_expiry_date")\n  customerName        String?   @map("customer_name")\n  customerPhone       String?   @map("customer_phone")\n  province            String?\n  @@map("serials")\n}`,
+        fields: [
+          { name: 'id', type: 'String (UUID)', key: true, desc: 'Khóa chính' },
+          { name: 'serialNumber', type: 'String', desc: 'Mã Serial duy nhất' },
+          { name: 'model', type: 'String', desc: 'Model sản phẩm (UR5840...)' },
+          { name: 'status', type: 'String', desc: 'Trạng thái bảo hành (Đã kích hoạt...)' },
+          { name: 'customerPhone', type: 'String', desc: 'Số điện thoại bảo hành (10 chữ số)' }
+        ]
+      },
+      {
         id: 'AuditLog',
         name: 'AuditLog (Lịch sử thay đổi)',
         x: 520, y: 450,
@@ -651,7 +678,8 @@ export default function SystemMap() {
               type: 'folder',
               key: 'backend_config',
               children: [
-                { name: 'database.ts', type: 'file', key: 'db_ts', desc: 'Thiết lập kết nối PostgreSQL và khởi tạo đối tượng prisma dùng chung toàn server.' }
+                { name: 'database.ts', type: 'file', key: 'db_ts', desc: 'Thiết lập kết nối PostgreSQL và khởi tạo đối tượng prisma dùng chung toàn server.' },
+                { name: 'permissions.ts', type: 'file', key: 'perm_config', desc: 'Central Feature Registry định nghĩa tất cả 23 tính năng hệ thống, 8 Roles và ma trận phân quyền mặc định.' }
               ]
             },
             {
@@ -667,8 +695,12 @@ export default function SystemMap() {
               type: 'folder',
               key: 'backend_routes',
               children: [
+                { name: 'permissions.ts', type: 'file', key: 'routes_permissions', desc: 'API Ma trận Phân quyền Động (/api/permissions). Cung cấp ma trận phân quyền và cho phép Admin cập nhật nút bật/tắt.' },
                 { name: 'orders.ts', type: 'file', key: 'routes_orders', desc: 'Chứa các API nghiệp vụ đơn hàng. Xử lý logic gán KTV, cập nhật trạng thái đơn hàng, và đồng bộ thủ công từ Pancake POS.' },
+                { name: 'serials.ts', type: 'file', key: 'routes_serials', desc: 'API quản lý mã Serial sản phẩm, tra cứu hạn bảo hành, kích hoạt và xuất/nhập Excel.' },
+                { name: 'salaries.ts', type: 'file', key: 'routes_salaries', desc: 'API tính toán bảng lương KTV, điều chỉnh đơn giá công ca, chi phí linh kiện và chốt sổ lương tháng.' },
                 { name: 'reports.ts', type: 'file', key: 'routes_reports', desc: 'Xử lý các API nộp báo cáo ca hoàn thành từ KTV, phê duyệt và hủy duyệt báo cáo.' },
+                { name: 'inventory.ts', type: 'file', key: 'routes_inventory', desc: 'API quản lý tồn kho các trạm, điều chuyển linh kiện vật tư giữa các kho hàng.' },
                 { name: 'users.ts', type: 'file', key: 'routes_users', desc: 'Quản lý tài khoản nhân viên văn phòng, trạm và kỹ thuật viên.' },
                 { name: 'dev.ts', type: 'file', key: 'routes_dev', desc: 'API dành riêng cho DEV thực hiện ping live kiểm tra Database, Pancake POS, Firebase Admin.' }
               ]
@@ -700,6 +732,24 @@ export default function SystemMap() {
               ]
             },
             {
+              name: 'components',
+              type: 'folder',
+              key: 'frontend_components',
+              children: [
+                { name: 'PermissionMatrix.tsx', type: 'file', key: 'comp_perm_matrix', desc: 'Giao diện Ma trận Phân quyền Động cho Admin bật/tắt quyền sử dụng tính năng của các Role.' },
+                { name: 'ProvinceSelect.tsx', type: 'file', key: 'comp_province_select', desc: 'Combobox tìm kiếm 63 tỉnh thành chuẩn Pancake POS, ưu tiên HCM, Hà Nội, Đà Nẵng lên đầu.' }
+              ]
+            },
+            {
+              name: 'context',
+              type: 'folder',
+              key: 'frontend_context',
+              children: [
+                { name: 'AuthContext.tsx', type: 'file', key: 'ctx_auth', desc: 'Lưu trữ thông tin người dùng đang đăng nhập và phiên làm việc (Session Token).' },
+                { name: 'PermissionContext.tsx', type: 'file', key: 'ctx_permission', desc: 'Cung cấp hook usePermission() kiểm tra quyền động hasPermission(featureKey) toàn ứng dụng.' }
+              ]
+            },
+            {
               name: 'pages',
               type: 'folder',
               key: 'frontend_pages',
@@ -710,6 +760,9 @@ export default function SystemMap() {
                   key: 'pages_admin',
                   children: [
                     { name: 'OrderList.tsx', type: 'file', key: 'pages_orders', desc: 'Quản lý danh sách ca dịch vụ dành cho Admin và Điều phối viên. Hỗ trợ lọc nâng cao, gán ca cho KTV, xuất Excel.' },
+                    { name: 'SerialManage.tsx', type: 'file', key: 'pages_serials', desc: 'Quản lý Serial & Bảo hành sản phẩm, tra cứu hạn bảo hành, nhập/xuất Excel.' },
+                    { name: 'UserManage.tsx', type: 'file', key: 'pages_users', desc: 'Quản lý nhân viên KTV & Tab Phân bổ quyền (Permission Matrix) cho Admin.' },
+                    { name: 'SalaryManage.tsx', type: 'file', key: 'pages_salaries', desc: 'Quản lý bảng tính lương KTV, đơn giá công ca và phụ phí bổ sung.' },
                     { name: 'Dashboard.tsx', type: 'file', desc: 'Báo cáo thống kê hiệu suất, đơn hàng, lượng báo cáo, biểu đồ doanh thu.' }
                   ]
                 },
@@ -765,6 +818,45 @@ export default function SystemMap() {
           { method: 'GET', path: '/', desc: 'Lấy danh sách các báo cáo hoàn thành ca của KTV để chờ phê duyệt.', roles: 'ADMIN, COORDINATOR, KTV (chỉ xem báo cáo của mình)' },
           { method: 'POST', path: '/', desc: 'KTV nộp báo cáo hoàn thành ca lên hệ thống, kèm danh sách ảnh hiện trường và chữ ký KH.', roles: 'KTV' },
           { method: 'PATCH', path: '/:id', desc: 'Admin/Điều phối duyệt hoặc từ chối báo cáo KTV. Nếu phê duyệt, hệ thống tự động đổi trạng thái đơn hàng tương ứng sang "Hoàn thành".', roles: 'ADMIN, COORDINATOR' }
+        ]
+      },
+      {
+        name: 'Permissions Router (/api/permissions)',
+        endpoints: [
+          { method: 'GET', path: '/', desc: 'Lấy ma trận phân quyền động toàn hệ thống (kết hợp CSDL overrides và default fallbacks cho 8 Roles và 23 tính năng).', roles: 'Tài khoản đã đăng nhập' },
+          { method: 'POST', path: '/update', desc: 'Bật hoặc tắt quyền sử dụng tính năng của một Role trong Ma trận Phân quyền.', roles: 'ADMIN' }
+        ]
+      },
+      {
+        name: 'Serials Router (/api/serials)',
+        endpoints: [
+          { method: 'GET', path: '/', desc: 'Tra cứu danh sách & thông tin bảo hành của mã Serial sản phẩm kèm bộ lọc tỉnh thành, trạng thái.', roles: 'ADMIN, DEV, COORDINATOR, HOTLINE, STAFF' },
+          { method: 'PATCH', path: '/:id', desc: 'Cập nhật trạng thái bảo hành, thời hạn bảo hành và thông tin khách hàng sở hữu Serial.', roles: 'ADMIN, DEV, COORDINATOR, HOTLINE, STAFF' },
+          { method: 'POST', path: '/import', desc: 'Tải lên lô mã Serial sản phẩm mới từ file Excel.', roles: 'ADMIN, DEV' },
+          { method: 'GET', path: '/export', desc: 'Tải xuống file Excel danh sách Serial theo bộ lọc.', roles: 'ADMIN, DEV' }
+        ]
+      },
+      {
+        name: 'Salaries Router (/api/salaries)',
+        endpoints: [
+          { method: 'GET', path: '/calculate', desc: 'Tính toán bảng lương KTV theo tháng, chi tiết đơn giá công ca và thưởng phạt.', roles: 'ADMIN, DEV, COORDINATOR' },
+          { method: 'POST', path: '/update-cost', desc: 'Cập nhật đơn giá cơ bản và phí linh kiện ca dịch vụ.', roles: 'ADMIN' },
+          { method: 'POST', path: '/add-custom-case', desc: 'Thêm ca thủ công hoặc phụ phí điều chỉnh vào sổ lương KTV.', roles: 'ADMIN' },
+          { method: 'POST', path: '/lock', desc: 'Khóa hoặc mở khóa bảng lương tháng ngăn chỉnh sửa.', roles: 'ADMIN' }
+        ]
+      },
+      {
+        name: 'Inventory Router (/api/inventory)',
+        endpoints: [
+          { method: 'GET', path: '/', desc: 'Lấy danh sách các kho hàng và số lượng tồn kho thực tế của từng linh kiện vật tư.', roles: 'ADMIN, DEV, COORDINATOR' },
+          { method: 'POST', path: '/transfer', desc: 'Thực hiện thao tác điều chuyển linh kiện giữa các kho hoặc xuất/nhập kho.', roles: 'ADMIN, COORDINATOR' }
+        ]
+      },
+      {
+        name: 'Promos Router (/api/promos)',
+        endpoints: [
+          { method: 'GET', path: '/', desc: 'Xem danh sách các mã giảm giá / voucher khuyến mãi dịch vụ.', roles: 'ADMIN, DEV, COORDINATOR, STAFF' },
+          { method: 'POST', path: '/', desc: 'Tạo mới hoặc chỉnh sửa cấu hình mã giảm giá.', roles: 'ADMIN, DEV' }
         ]
       },
       {
