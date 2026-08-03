@@ -36,8 +36,13 @@ router.get('/stats', async (req: Request, res: Response): Promise<void> => {
       mainStationId,
       techStationId,
       workType,
-      assignedKtvId
+      assignedKtvId,
+      includeEcom,
+      revenueScope
     } = req.query;
+
+    const isIncludeEcom = includeEcom === 'true' || revenueScope === 'all' || !revenueScope;
+    const activeEcomFilter = isIncludeEcom ? {} : nonEcomFilter;
 
     // 1. Thống kê số lượng đơn hàng theo Trạm (Main Station)
     const stations = await prisma.mainStation.findMany({
@@ -47,7 +52,7 @@ router.get('/stats', async (req: Request, res: Response): Promise<void> => {
         _count: {
           select: {
             orders: {
-              where: nonEcomFilter
+              where: activeEcomFilter
             }
           }
         },
@@ -58,7 +63,7 @@ router.get('/stats', async (req: Request, res: Response): Promise<void> => {
             _count: {
               select: {
                 orders: {
-                  where: nonEcomFilter
+                  where: activeEcomFilter
                 }
               }
             }
@@ -84,7 +89,7 @@ router.get('/stats', async (req: Request, res: Response): Promise<void> => {
         _count: {
           select: {
             orders: {
-              where: nonEcomFilter
+              where: activeEcomFilter
             }
           }
         }
@@ -102,7 +107,7 @@ router.get('/stats', async (req: Request, res: Response): Promise<void> => {
     // 3. Tổng quan đơn hàng theo trạng thái
     const statusCounts = await prisma.order.groupBy({
       by: ['adminStatus'],
-      where: nonEcomFilter,
+      where: activeEcomFilter,
       _count: { id: true }
     });
 
@@ -115,10 +120,13 @@ router.get('/stats', async (req: Request, res: Response): Promise<void> => {
             { statusCode: null },
             { pancakeOrderId: { lt: 0 } } // Đơn thủ công (luôn hiện, bất kể statusCode)
           ]
-        },
-        nonEcomFilter
+        }
       ]
     };
+
+    if (!isIncludeEcom) {
+      where.AND.push(nonEcomFilter);
+    }
 
     if (startDate || endDate) {
       where.pancakeCreatedAt = {
@@ -1195,13 +1203,14 @@ router.get('/revenue', async (req: Request, res: Response): Promise<void> => {
     // Helper tính chỉ số tài chính thông minh cho 1 đơn hàng:
     // - Nếu activeMetric === 'totalPrice': Doanh số niêm yết (Gross Sales) -> Lấy totalPrice
     // - Nếu activeMetric === 'moneyToCollect': Doanh thu thực thu thông minh (Smart Net Revenue):
-    //   + Đơn POS (pancakeOrderId > 0): Lấy moneyToCollect nếu > 0 (đơn COD), fallback totalPrice nếu == 0 (đơn chuyển khoản trước/eCom)
+    //   + Đơn POS (pancakeOrderId > 100 & orderSource != 'unknown'): Lấy moneyToCollect nếu > 0 (đơn COD), fallback totalPrice nếu == 0 (chuyển khoản trước)
     //   + Ca thủ công: Lấy tiền thu hộ COD thực tế tại nhà khách (moneyToCollect)
     const getRevenue = (o: any) => {
       if (activeMetric === 'totalPrice') {
         return Number(o.totalPrice) || 0;
       }
-      if (o.pancakeOrderId) {
+      const isPosOrder = o.pancakeOrderId > 100 && o.orderSource !== 'unknown';
+      if (isPosOrder) {
         if (o.moneyToCollect !== null && o.moneyToCollect !== undefined && Number(o.moneyToCollect) > 0) {
           return Number(o.moneyToCollect);
         }
