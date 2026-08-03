@@ -2637,9 +2637,16 @@ export default function OrderList() {
                     <td className="px-4 py-2 whitespace-normal align-top">
                       {/* Trạng thái & Hẹn khách inline */}
                       <div className="flex items-center flex-wrap gap-1.5 mb-1">
-                        <span className={`inline-block text-[10px] font-bold px-1.5 py-0.5 rounded text-white capitalize ${getStatusStyle(order.adminStatus || 'chờ xử lý')}`}>
-                          {order.adminStatus === 'đang thực hiện' ? 'đã phân công' : (order.adminStatus || 'chờ xử lý')}
-                        </span>
+                        {(() => {
+                          const hasKtv = !!(order.assignedKtvId || order.assignedKtv);
+                          const isPendingStatus = !order.adminStatus || order.adminStatus === 'chờ xử lý';
+                          const displayStatus = (hasKtv && isPendingStatus) ? 'đang thực hiện' : (order.adminStatus || 'chờ xử lý');
+                          return (
+                            <span className={`inline-block text-[10px] font-bold px-1.5 py-0.5 rounded text-white capitalize ${getStatusStyle(displayStatus)}`}>
+                              {displayStatus === 'đang thực hiện' ? 'đã phân công' : displayStatus}
+                            </span>
+                          );
+                        })()}
                         {order.appointmentTime ? (() => {
                           const isOverdue = new Date(order.appointmentTime) < new Date() && order.adminStatus !== 'hoàn thành' && order.adminStatus !== 'hủy đơn';
                           return (

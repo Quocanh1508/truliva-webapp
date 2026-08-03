@@ -1913,9 +1913,16 @@ router.patch('/:id', requireAuth, async (req: Request, res: Response): Promise<v
       }
     }
 
-    if (adminStatus !== undefined && adminStatus !== oldOrder.adminStatus) {
+    // Auto update adminStatus if KTV is assigned and status is currently 'chờ xử lý'
+    const finalKtv = assignedKtvId !== undefined ? (assignedKtvId || null) : oldOrder.assignedKtvId;
+    let targetAdminStatus = adminStatus;
+    if (finalKtv && (!targetAdminStatus || targetAdminStatus === 'chờ xử lý') && (!oldOrder.adminStatus || oldOrder.adminStatus === 'chờ xử lý')) {
+      targetAdminStatus = 'đang thực hiện';
+    }
+
+    if (targetAdminStatus !== undefined && targetAdminStatus !== oldOrder.adminStatus) {
       try {
-        await syncOrderStatusToPancake(oldOrder.pancakeOrderId, adminStatus);
+        await syncOrderStatusToPancake(oldOrder.pancakeOrderId, targetAdminStatus);
         updateData.pancakeSyncStatus = 'SUCCESS';
       } catch (err: any) {
         logger.warn('Failed to sync status update to Pancake POS API (non-blocking)', { 
@@ -1946,7 +1953,7 @@ router.patch('/:id', requireAuth, async (req: Request, res: Response): Promise<v
       }
     };
 
-    track('adminStatus', adminStatus);
+    track('adminStatus', targetAdminStatus);
     track('workType', workType);
     track('serviceType', serviceType);
     track('mainStationId', mainStationId || null);
@@ -2392,12 +2399,13 @@ router.patch('/bulk/assign', requireAuth, async (req: Request, res: Response): P
       if (assignedKtvId !== undefined && assignedKtvId !== oldOrder.assignedKtvId) {
         updateData.assignedKtvId = assignedKtvId || null;
         changes.push({ field: 'assignedKtvId', from: oldOrder.assignedKtvId, to: assignedKtvId || null });
-        
-        // Auto update adminStatus if KTV is assigned
-        if (assignedKtvId && (!oldOrder.adminStatus || oldOrder.adminStatus === 'chờ xử lý')) {
-          updateData.adminStatus = 'đang thực hiện';
-          changes.push({ field: 'adminStatus', from: oldOrder.adminStatus, to: 'đang thực hiện' });
-        }
+      }
+
+      // Auto update adminStatus if KTV is assigned (newly or previously) and status is currently 'chờ xử lý'
+      const effectiveKtv = assignedKtvId !== undefined ? (assignedKtvId || null) : oldOrder.assignedKtvId;
+      if (effectiveKtv && (!oldOrder.adminStatus || oldOrder.adminStatus === 'chờ xử lý') && !updateData.adminStatus) {
+        updateData.adminStatus = 'đang thực hiện';
+        changes.push({ field: 'adminStatus', from: oldOrder.adminStatus, to: 'đang thực hiện' });
       }
 
       // Appointment Time
