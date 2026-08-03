@@ -3,6 +3,7 @@ import { fetchApi } from '../../api/client';
 import { isValidPhone, PHONE_ERROR_MSG } from '../../utils/phone';
 import { useConfirm } from '../../context/ConfirmContext';
 import { useAuth } from '../../context/AuthContext';
+import ProvinceSelect from '../../components/ProvinceSelect';
 import { 
   Calculator, 
   Save, 
@@ -1717,12 +1718,10 @@ export default function SalaryManage() {
 
                 <div>
                   <label className="block font-bold text-gray-700 mb-1">Tỉnh/TP</label>
-                  <input
-                    type="text"
-                    placeholder="VD: Hà Nội..."
+                  <ProvinceSelect
                     value={addCaseForm.province}
-                    onChange={(e) => setAddCaseForm(prev => ({ ...prev, province: e.target.value }))}
-                    className="w-full px-3 py-2 border border-gray-200 rounded-xl font-medium focus:ring-2 focus:ring-blue-500 text-xs"
+                    onChange={(prov) => setAddCaseForm(prev => ({ ...prev, province: prov }))}
+                    placeholder="Chọn hoặc gõ tỉnh thành..."
                   />
                 </div>
               </div>

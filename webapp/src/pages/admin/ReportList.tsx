@@ -6,6 +6,7 @@ import CategoryTreeSelect from '../../components/CategoryTreeSelect';
 import { formatOrderId } from '../../utils/text';
 import { useAuth } from '../../context/AuthContext';
 import { isValidPhone, PHONE_ERROR_MSG } from '../../utils/phone';
+import ProvinceSelect from '../../components/ProvinceSelect';
 
 function copyToClipboard(text: string): boolean {
   if (navigator.clipboard && navigator.clipboard.writeText) {
@@ -2036,8 +2037,11 @@ export default function ReportList() {
                       </div>
                       <div>
                         <label className="text-gray-600 block text-xs font-semibold mb-1">Tỉnh / Thành phố</label>
-                        <input type="text" className="w-full border border-gray-300 rounded-md px-3 py-1.5 text-sm focus:ring-1 focus:ring-blue-500 focus:border-blue-500 outline-none"
-                          value={editData.province} onChange={e => handleEditField('province', e.target.value)} />
+                        <ProvinceSelect
+                          value={editData.province}
+                          onChange={prov => handleEditField('province', prov)}
+                          placeholder="Chọn hoặc gõ tỉnh thành..."
+                        />
                       </div>
                       <div>
                         <label className="text-gray-600 block text-xs font-semibold mb-1">Loại công việc</label>

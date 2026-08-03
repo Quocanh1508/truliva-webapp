@@ -2,6 +2,8 @@ import { useState, useEffect, useRef } from 'react';
 import { fetchApi, API_URL } from '../../api/client';
 import { useAuth } from '../../context/AuthContext';
 import { isValidPhone, PHONE_ERROR_MSG } from '../../utils/phone';
+import ProvinceSelect from '../../components/ProvinceSelect';
+import { isValidProvince } from '../../utils/provinces';
 import { Hash, Upload, Download, Search, X, Clock, ChevronLeft, ChevronRight, AlertTriangle, CheckCircle, User, Phone, MapPin, Wrench, FileText, Filter, RotateCcw, Sparkles, FolderPlus, Database } from 'lucide-react';
 
 interface Serial {
@@ -301,8 +303,8 @@ export default function SerialManage() {
       alert('Vui lòng nhập Địa chỉ cụ thể (*).');
       return;
     }
-    if (!selectedSerial.province || !selectedSerial.province.trim()) {
-      alert('Vui lòng nhập Tỉnh / Thành phố (*).');
+    if (!selectedSerial.province || !selectedSerial.province.trim() || !isValidProvince(selectedSerial.province)) {
+      alert('Vui lòng chọn Tỉnh / Thành phố (*) hợp lệ từ danh sách Pancake POS.');
       return;
     }
     if (!selectedSerial.activationDate) {
@@ -1278,12 +1280,14 @@ export default function SerialManage() {
                 {/* 8. Tỉnh / Thành phố */}
                 <div>
                   <label style={{ fontSize: 11, fontWeight: 700, color: '#64748b', textTransform: 'uppercase' }}>Tỉnh / Thành phố (*)</label>
-                  <input
-                    type="text"
-                    value={selectedSerial.province || ''}
-                    onChange={e => setSelectedSerial(prev => prev ? { ...prev, province: e.target.value || null } : null)}
-                    style={{ width: '100%', padding: '8px 12px', borderRadius: 8, border: '1px solid #cbd5e1', fontSize: 13, marginTop: 4, background: 'white' }}
-                  />
+                  <div className="mt-1">
+                    <ProvinceSelect
+                      value={selectedSerial.province || ''}
+                      onChange={prov => setSelectedSerial(prev => prev ? { ...prev, province: prov || null } : null)}
+                      placeholder="Chọn hoặc gõ tỉnh thành..."
+                      required
+                    />
+                  </div>
                 </div>
 
                 {/* 9. Mã lô nhập */}

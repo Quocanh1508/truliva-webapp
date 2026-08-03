@@ -9,6 +9,8 @@ import CategoryTreeSelect from '../../components/CategoryTreeSelect';
 import { formatOrderId } from '../../utils/text';
 import { useAuth } from '../../context/AuthContext';
 import { isValidPhone, PHONE_ERROR_MSG } from '../../utils/phone';
+import ProvinceSelect from '../../components/ProvinceSelect';
+import { isValidProvince } from '../../utils/provinces';
 
 
 const ALL_SERVICE_TYPES = Array.from(new Set(Object.values(WORK_TYPE_SERVICES).flat()));
@@ -508,8 +510,8 @@ export default function OrderList() {
       alert('Vui lòng nhập địa chỉ chi tiết.');
       return;
     }
-    if (!newOrderForm.province.trim()) {
-      alert('Vui lòng chọn hoặc nhập tỉnh / thành phố.');
+    if (!newOrderForm.province.trim() || !isValidProvince(newOrderForm.province)) {
+      alert('Vui lòng chọn Tỉnh / Thành phố hợp lệ từ danh sách Pancake POS.');
       return;
     }
     if (!newOrderForm.note.trim()) {
@@ -3897,19 +3899,12 @@ export default function OrderList() {
 
                 <div>
                   <label className="block text-sm text-gray-600 mb-1">Tỉnh / Thành phố *</label>
-                  <input
-                    type="text"
-                    list="new-order-provinces-list"
-                    className="w-full border rounded p-2 text-sm outline-none focus:border-blue-500 text-gray-800 bg-white"
-                    placeholder="Chọn hoặc gõ tỉnh thành..."
+                  <ProvinceSelect
                     value={newOrderForm.province}
-                    onChange={e => setNewOrderForm({ ...newOrderForm, province: e.target.value })}
+                    onChange={prov => setNewOrderForm({ ...newOrderForm, province: prov })}
+                    placeholder="Chọn hoặc gõ tỉnh thành..."
+                    required
                   />
-                  <datalist id="new-order-provinces-list">
-                    {dbFilterOptions.provinces.map(prov => (
-                      <option key={prov} value={prov} />
-                    ))}
-                  </datalist>
                 </div>
 
                 <div>
