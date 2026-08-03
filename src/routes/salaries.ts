@@ -80,18 +80,18 @@ function getKtvFlatRate(workType: string | null | undefined): number {
     return 120000;
   }
   if (normalized.includes('lắp đặt') || normalized.includes('lap_dat')) {
-    return 120000;
+    return 100000;
   }
   if (normalized.includes('bảo hành') || normalized.includes('sửa chữa')) {
-    return 120000;
+    return 60000;
   }
   if (normalized.includes('thay lọc') || normalized.includes('thay_loc') || normalized.includes('thay lõi')) {
-    return 120000;
+    return 40000;
   }
   if (normalized.includes('giao hàng') || normalized.includes('giao_hang')) {
     return 0;
   }
-  return 120000;
+  return 60000;
 }
 
 // Load Station rates from Excel spreadsheet ("cơ cấu tính lương.xlsx")
@@ -223,13 +223,16 @@ function calculateReportCost(report: any, ktvPhoneNorm: string, stationRate: any
     // 3.1. Ưu tiên 1: Giá tùy chỉnh trong Ma trận đơn giá (nếu có)
     if (customKtvRatesMap && customKtvRatesMap.has(rateType) && (customKtvRatesMap.get(rateType) ?? 0) > 0) {
       baseCost = customKtvRatesMap.get(rateType)!;
-    } 
+    } else if (rateType === 'suaChua' && customKtvRatesMap && customKtvRatesMap.has('baoHanh') && (customKtvRatesMap.get('baoHanh') ?? 0) > 0) {
+      // Phí Sửa chữa bằng Phí Bảo hành nếu không được cài riêng
+      baseCost = customKtvRatesMap.get('baoHanh')!;
+    }
     // 3.2. Ưu tiên 2: Đơn giá theo File Excel Trạm Kỹ Thuật
     else if (stationRate) {
       if (stationRate.province === 'TP.HCM' && rateType === 'giaoHangLapDat' && notes.includes('giao lắp')) {
         baseCost = 250000;
       } else {
-        const specificRate = stationRate.rates[rateType];
+        const specificRate = stationRate.rates[rateType] || (rateType === 'suaChua' ? stationRate.rates['baoHanh'] : null);
         baseCost = (specificRate !== undefined && specificRate !== null && specificRate > 0) 
           ? specificRate 
           : getKtvFlatRate(workType);
@@ -287,6 +290,63 @@ function calculateReportCost(report: any, ktvPhoneNorm: string, stationRate: any
     distance,
     distanceCost,
     totalCost: baseCost + distanceCost
+  };
+}
+
+// Single source of truth breakdown calculation for a single service report
+function getReportCostBreakdown(report: any, ktvPhoneNorm: string, stationRate: any, userCustomRates?: Map<string, number>) {
+  const costResult = calculateReportCost(report, ktvPhoneNorm, stationRate, userCustomRates);
+  const customCostsObj = (report.customCosts as any) || {};
+  const hasManualOverride = report.customBaseCost !== null && report.customBaseCost !== undefined;
+
+  const baoHanhCost = (hasManualOverride && customCostsObj.baoHanhCost !== undefined)
+    ? Number(customCostsObj.baoHanhCost)
+    : (costResult.rateType === 'baoHanh' ? costResult.baseCost : 0);
+
+  const suaChuaCost = (hasManualOverride && customCostsObj.suaChuaCost !== undefined)
+    ? Number(customCostsObj.suaChuaCost)
+    : (costResult.rateType === 'suaChua' ? costResult.baseCost : 0);
+
+  const giaoHangCost = (hasManualOverride && customCostsObj.giaoHangCost !== undefined)
+    ? Number(customCostsObj.giaoHangCost)
+    : (costResult.rateType === 'giaoHang' ? costResult.baseCost : 0);
+
+  const lapDatCost = (hasManualOverride && customCostsObj.lapDatCost !== undefined)
+    ? Number(customCostsObj.lapDatCost)
+    : (costResult.rateType === 'lapDat' ? costResult.baseCost : 0);
+
+  const giaoLapCost = (hasManualOverride && customCostsObj.giaoLapCost !== undefined)
+    ? Number(customCostsObj.giaoLapCost)
+    : (costResult.rateType === 'giaoHangLapDat' ? costResult.baseCost : 0);
+
+  const thayLocCost = (hasManualOverride && customCostsObj.thayLocCost !== undefined)
+    ? Number(customCostsObj.thayLocCost)
+    : (costResult.rateType === 'thayLoc' ? costResult.baseCost : 0);
+
+  const distanceCost = customCostsObj.distanceCost !== undefined
+    ? Number(customCostsObj.distanceCost)
+    : costResult.distanceCost;
+
+  const otherCost = customCostsObj.otherCost !== undefined
+    ? Number(customCostsObj.otherCost)
+    : (report.additionalCost || 0);
+
+  const totalReportCost = baoHanhCost + suaChuaCost + giaoHangCost + lapDatCost + giaoLapCost + thayLocCost + distanceCost + otherCost;
+
+  return {
+    workType: costResult.workType,
+    rateType: costResult.rateType,
+    baseCost: costResult.baseCost,
+    distance: costResult.distance,
+    distanceCost,
+    baoHanhCost,
+    suaChuaCost,
+    giaoHangCost,
+    lapDatCost,
+    giaoLapCost,
+    thayLocCost,
+    otherCost,
+    totalCost: totalReportCost
   };
 }
 
@@ -375,46 +435,10 @@ router.get('/calculate', requireAuth, requireAdmin, async (req: Request, res: Re
       const reportsDetail = [];
 
       for (const report of reports) {
-        const costResult = calculateReportCost(report, ktvPhoneNorm, stationRate, userCustomRates);
-        const customCostsObj = (report.customCosts as any) || {};
-        const hasManualOverride = report.customBaseCost !== null && report.customBaseCost !== undefined;
-
-        const baoHanhCost = (hasManualOverride && customCostsObj.baoHanhCost !== undefined)
-          ? Number(customCostsObj.baoHanhCost)
-          : (costResult.rateType === 'baoHanh' ? costResult.baseCost : 0);
-
-        const suaChuaCost = (hasManualOverride && customCostsObj.suaChuaCost !== undefined)
-          ? Number(customCostsObj.suaChuaCost)
-          : (costResult.rateType === 'suaChua' ? costResult.baseCost : 0);
-
-        const giaoHangCost = (hasManualOverride && customCostsObj.giaoHangCost !== undefined)
-          ? Number(customCostsObj.giaoHangCost)
-          : (costResult.rateType === 'giaoHang' ? costResult.baseCost : 0);
-
-        const lapDatCost = (hasManualOverride && customCostsObj.lapDatCost !== undefined)
-          ? Number(customCostsObj.lapDatCost)
-          : (costResult.rateType === 'lapDat' ? costResult.baseCost : 0);
-
-        const giaoLapCost = (hasManualOverride && customCostsObj.giaoLapCost !== undefined)
-          ? Number(customCostsObj.giaoLapCost)
-          : (costResult.rateType === 'giaoHangLapDat' ? costResult.baseCost : 0);
-
-        const thayLocCost = (hasManualOverride && customCostsObj.thayLocCost !== undefined)
-          ? Number(customCostsObj.thayLocCost)
-          : (costResult.rateType === 'thayLoc' ? costResult.baseCost : 0);
-
-        const distanceCost = customCostsObj.distanceCost !== undefined
-          ? Number(customCostsObj.distanceCost)
-          : costResult.distanceCost;
-
-        const otherCost = customCostsObj.otherCost !== undefined
-          ? Number(customCostsObj.otherCost)
-          : (report.additionalCost || 0);
-
-        const totalReportCost = baoHanhCost + suaChuaCost + giaoHangCost + lapDatCost + giaoLapCost + thayLocCost + distanceCost + otherCost;
+        const breakdown = getReportCostBreakdown(report, ktvPhoneNorm, stationRate, userCustomRates);
         const isSunday = new Date(report.createdAt).getDay() === 0;
 
-        calculatedCost += totalReportCost;
+        calculatedCost += breakdown.totalCost;
 
         reportsDetail.push({
           reportId: report.id,
@@ -426,20 +450,20 @@ router.get('/calculate', requireAuth, requireAdmin, async (req: Request, res: Re
           address: report.address || '',
           orderNote: report.order?.note || null,
           reportNote: report.notes || null,
-          workType: costResult.workType,
+          workType: breakdown.workType,
           isSunday,
-          baseCost: costResult.baseCost,
-          distance: costResult.distance,
-          distanceCost,
-          baoHanhCost,
-          suaChuaCost,
-          giaoHangCost,
-          lapDatCost,
-          giaoLapCost,
-          thayLocCost,
-          otherCost,
-          totalCost: totalReportCost,
-          rateType: costResult.rateType,
+          baseCost: breakdown.baseCost,
+          distance: breakdown.distance,
+          distanceCost: breakdown.distanceCost,
+          baoHanhCost: breakdown.baoHanhCost,
+          suaChuaCost: breakdown.suaChuaCost,
+          giaoHangCost: breakdown.giaoHangCost,
+          lapDatCost: breakdown.lapDatCost,
+          giaoLapCost: breakdown.giaoLapCost,
+          thayLocCost: breakdown.thayLocCost,
+          otherCost: breakdown.otherCost,
+          totalCost: breakdown.totalCost,
+          rateType: breakdown.rateType,
           customCosts: report.customCosts || null,
           createdAt: report.createdAt,
           appointmentTime: report.order?.appointmentTime,
@@ -1049,6 +1073,16 @@ router.get('/export', requireAuth, requireAdmin, async (req: Request, res: Respo
       reports = reports.filter(r => matchSearch(r));
     }
 
+    // Load DB custom KTV rates for export
+    const dbCustomRates = await prisma.ktvServiceRate.findMany();
+    const customKtvRatesByUser = new Map<string, Map<string, number>>();
+    for (const r of dbCustomRates) {
+      if (!customKtvRatesByUser.has(r.userId)) {
+        customKtvRatesByUser.set(r.userId, new Map());
+      }
+      customKtvRatesByUser.get(r.userId)!.set(r.workType, r.rate);
+    }
+
     const hasDetailReports = reports.length > 0;
     const startDataRow = 6;
     const lastDataRow = hasDetailReports ? startDataRow + reports.length - 1 : startDataRow;
@@ -1064,7 +1098,8 @@ router.get('/export', requireAuth, requireAdmin, async (req: Request, res: Respo
       hasDetailReports ? { formula: `SUBTOTAL(109, P${startDataRow}:P${lastDataRow})`, result: 0 } : 0,
       hasDetailReports ? { formula: `SUBTOTAL(109, Q${startDataRow}:Q${lastDataRow})`, result: 0 } : 0,
       hasDetailReports ? { formula: `SUBTOTAL(109, R${startDataRow}:R${lastDataRow})`, result: 0 } : 0,
-      hasDetailReports ? { formula: `SUBTOTAL(109, S${startDataRow}:S${lastDataRow})`, result: 0 } : 0
+      hasDetailReports ? { formula: `SUBTOTAL(109, S${startDataRow}:S${lastDataRow})`, result: 0 } : 0,
+      hasDetailReports ? { formula: `SUBTOTAL(109, T${startDataRow}:T${lastDataRow})`, result: 0 } : 0
     ]);
     wsDetail.mergeCells(`A4:K4`);
     topSummaryRow2.font = { bold: true, color: { argb: 'FF1B3A6B' } };
@@ -1074,11 +1109,11 @@ router.get('/export', requireAuth, requireAdmin, async (req: Request, res: Respo
       fgColor: { argb: 'FFE2E8F0' }
     };
     topSummaryRow2.getCell(1).alignment = { horizontal: 'center' };
-    for (let c = 12; c <= 19; c++) {
+    for (let c = 12; c <= 20; c++) {
       topSummaryRow2.getCell(c).numFmt = '#,##0';
     }
 
-    // Row 5 Header
+    // Row 5 Header (20 columns)
     const detailHeaders = [
       'STT',
       'Ngày hoàn thành',
@@ -1092,6 +1127,7 @@ router.get('/export', requireAuth, requireAdmin, async (req: Request, res: Respo
       'Ghi chú',
       'Khoảng cách (km)',
       'Bảo Hành',
+      'Sửa chữa',
       'Giao hàng',
       'Lắp đặt',
       'Giao lắp',
@@ -1112,33 +1148,32 @@ router.get('/export', requireAuth, requireAdmin, async (req: Request, res: Respo
 
     let detailIdx = 1;
     let sumBaoHanh = 0;
+    let sumSuaChua = 0;
     let sumGiaoHang = 0;
     let sumLapDat = 0;
     let sumGiaoLap = 0;
     let sumThayLoc = 0;
     let sumDistanceCost = 0;
+    let sumOtherCost = 0;
     let sumTotalCost = 0;
 
     for (const r of reports) {
       const ktvPhoneNorm = normalizePhone(r.ktvUser?.phoneNumber);
       const stationRate = ktvPhoneNorm ? stationRates.get(ktvPhoneNorm) : null;
-      const costResult = calculateReportCost(r, ktvPhoneNorm, stationRate);
+      const userCustomRates = customKtvRatesByUser.get(r.ktvUserId);
 
-      const workType = costResult.workType;
-      const baseCost = costResult.baseCost;
-      const distance = costResult.distance;
-      const distanceCost = costResult.distanceCost;
-      const totalCost = costResult.totalCost;
-      const rateType = costResult.rateType;
+      const breakdown = getReportCostBreakdown(r, ktvPhoneNorm, stationRate, userCustomRates);
 
       // Accumulate totals
-      if (rateType === 'baoHanh') sumBaoHanh += baseCost;
-      if (rateType === 'giaoHang') sumGiaoHang += baseCost;
-      if (rateType === 'lapDat') sumLapDat += baseCost;
-      if (rateType === 'giaoHangLapDat') sumGiaoLap += baseCost;
-      if (rateType === 'thayLoc') sumThayLoc += baseCost;
-      sumDistanceCost += distanceCost;
-      sumTotalCost += totalCost;
+      sumBaoHanh += breakdown.baoHanhCost;
+      sumSuaChua += breakdown.suaChuaCost;
+      sumGiaoHang += breakdown.giaoHangCost;
+      sumLapDat += breakdown.lapDatCost;
+      sumGiaoLap += breakdown.giaoLapCost;
+      sumThayLoc += breakdown.thayLocCost;
+      sumDistanceCost += breakdown.distanceCost;
+      sumOtherCost += breakdown.otherCost;
+      sumTotalCost += breakdown.totalCost;
 
       // Format date: DD/MM/YYYY HH:mm
       const d = new Date(r.createdAt);
@@ -1153,17 +1188,18 @@ router.get('/export', requireAuth, requireAdmin, async (req: Request, res: Respo
         r.customerPhone || '',
         r.province || '',
         (r.products || []).join(', '),
-        workType,
+        breakdown.workType,
         r.notes || '',
-        distance > 0 ? distance : '-',
-        rateType === 'baoHanh' ? baseCost : '-',
-        rateType === 'giaoHang' ? baseCost : '-',
-        rateType === 'lapDat' ? baseCost : '-',
-        rateType === 'giaoHangLapDat' ? baseCost : '-',
-        rateType === 'thayLoc' ? baseCost : '-',
-        distanceCost > 0 ? distanceCost : '-',
-        '-',
-        totalCost
+        breakdown.distance > 0 ? breakdown.distance : '-',
+        breakdown.baoHanhCost > 0 ? breakdown.baoHanhCost : '-',
+        breakdown.suaChuaCost > 0 ? breakdown.suaChuaCost : '-',
+        breakdown.giaoHangCost > 0 ? breakdown.giaoHangCost : '-',
+        breakdown.lapDatCost > 0 ? breakdown.lapDatCost : '-',
+        breakdown.giaoLapCost > 0 ? breakdown.giaoLapCost : '-',
+        breakdown.thayLocCost > 0 ? breakdown.thayLocCost : '-',
+        breakdown.distanceCost > 0 ? breakdown.distanceCost : '-',
+        breakdown.otherCost > 0 ? breakdown.otherCost : '-',
+        breakdown.totalCost
       ]);
 
       // Alignments & Number formats
@@ -1172,8 +1208,8 @@ router.get('/export', requireAuth, requireAdmin, async (req: Request, res: Respo
       row.getCell(6).alignment = { horizontal: 'center' };
       row.getCell(11).alignment = { horizontal: 'right' };
 
-      // Currency columns L to S (index 12 to 19)
-      for (let c = 12; c <= 19; c++) {
+      // Currency columns L to T (index 12 to 20)
+      for (let c = 12; c <= 20; c++) {
         const cell = row.getCell(c);
         if (typeof cell.value === 'number') {
           cell.numFmt = '#,##0';
@@ -1185,13 +1221,14 @@ router.get('/export', requireAuth, requireAdmin, async (req: Request, res: Respo
 
     // Update Top Summary Row Sheet 2 Results
     topSummaryRow2.getCell(12).value = { formula: `SUBTOTAL(109, L${startDataRow}:L${lastDataRow})`, result: sumBaoHanh };
-    topSummaryRow2.getCell(13).value = { formula: `SUBTOTAL(109, M${startDataRow}:M${lastDataRow})`, result: sumGiaoHang };
-    topSummaryRow2.getCell(14).value = { formula: `SUBTOTAL(109, N${startDataRow}:N${lastDataRow})`, result: sumLapDat };
-    topSummaryRow2.getCell(15).value = { formula: `SUBTOTAL(109, O${startDataRow}:O${lastDataRow})`, result: sumGiaoLap };
-    topSummaryRow2.getCell(16).value = { formula: `SUBTOTAL(109, P${startDataRow}:P${lastDataRow})`, result: sumThayLoc };
-    topSummaryRow2.getCell(17).value = { formula: `SUBTOTAL(109, Q${startDataRow}:Q${lastDataRow})`, result: sumDistanceCost };
-    topSummaryRow2.getCell(18).value = { formula: `SUBTOTAL(109, R${startDataRow}:R${lastDataRow})`, result: 0 };
-    topSummaryRow2.getCell(19).value = { formula: `SUBTOTAL(109, S${startDataRow}:S${lastDataRow})`, result: sumTotalCost };
+    topSummaryRow2.getCell(13).value = { formula: `SUBTOTAL(109, M${startDataRow}:M${lastDataRow})`, result: sumSuaChua };
+    topSummaryRow2.getCell(14).value = { formula: `SUBTOTAL(109, N${startDataRow}:N${lastDataRow})`, result: sumGiaoHang };
+    topSummaryRow2.getCell(15).value = { formula: `SUBTOTAL(109, O${startDataRow}:O${lastDataRow})`, result: sumLapDat };
+    topSummaryRow2.getCell(16).value = { formula: `SUBTOTAL(109, P${startDataRow}:P${lastDataRow})`, result: sumGiaoLap };
+    topSummaryRow2.getCell(17).value = { formula: `SUBTOTAL(109, Q${startDataRow}:Q${lastDataRow})`, result: sumThayLoc };
+    topSummaryRow2.getCell(18).value = { formula: `SUBTOTAL(109, R${startDataRow}:R${lastDataRow})`, result: sumDistanceCost };
+    topSummaryRow2.getCell(19).value = { formula: `SUBTOTAL(109, S${startDataRow}:S${lastDataRow})`, result: sumOtherCost };
+    topSummaryRow2.getCell(20).value = { formula: `SUBTOTAL(109, T${startDataRow}:T${lastDataRow})`, result: sumTotalCost };
 
     // Bottom Total Row Sheet 2
     if (reports.length > 0) {
@@ -1199,20 +1236,21 @@ router.get('/export', requireAuth, requireAdmin, async (req: Request, res: Respo
         'TỔNG CỘNG',
         '', '', '', '', '', '', '', '', '', '',
         { formula: `SUBTOTAL(109, L${startDataRow}:L${lastDataRow})`, result: sumBaoHanh },
-        { formula: `SUBTOTAL(109, M${startDataRow}:M${lastDataRow})`, result: sumGiaoHang },
-        { formula: `SUBTOTAL(109, N${startDataRow}:N${lastDataRow})`, result: sumLapDat },
-        { formula: `SUBTOTAL(109, O${startDataRow}:O${lastDataRow})`, result: sumGiaoLap },
-        { formula: `SUBTOTAL(109, P${startDataRow}:P${lastDataRow})`, result: sumThayLoc },
-        { formula: `SUBTOTAL(109, Q${startDataRow}:Q${lastDataRow})`, result: sumDistanceCost },
-        { formula: `SUBTOTAL(109, R${startDataRow}:R${lastDataRow})`, result: 0 },
-        { formula: `SUBTOTAL(109, S${startDataRow}:S${lastDataRow})`, result: sumTotalCost }
+        { formula: `SUBTOTAL(109, M${startDataRow}:M${lastDataRow})`, result: sumSuaChua },
+        { formula: `SUBTOTAL(109, N${startDataRow}:N${lastDataRow})`, result: sumGiaoHang },
+        { formula: `SUBTOTAL(109, O${startDataRow}:O${lastDataRow})`, result: sumLapDat },
+        { formula: `SUBTOTAL(109, P${startDataRow}:P${lastDataRow})`, result: sumGiaoLap },
+        { formula: `SUBTOTAL(109, Q${startDataRow}:Q${lastDataRow})`, result: sumThayLoc },
+        { formula: `SUBTOTAL(109, R${startDataRow}:R${lastDataRow})`, result: sumDistanceCost },
+        { formula: `SUBTOTAL(109, S${startDataRow}:S${lastDataRow})`, result: sumOtherCost },
+        { formula: `SUBTOTAL(109, T${startDataRow}:T${lastDataRow})`, result: sumTotalCost }
       ]);
 
       wsDetail.mergeCells(`A${totalRowSheet2.number}:K${totalRowSheet2.number}`);
       totalRowSheet2.font = { bold: true };
       totalRowSheet2.getCell(1).alignment = { horizontal: 'center' };
 
-      for (let c = 12; c <= 19; c++) {
+      for (let c = 12; c <= 20; c++) {
         totalRowSheet2.getCell(c).numFmt = '#,##0';
       }
 
@@ -1224,8 +1262,8 @@ router.get('/export', requireAuth, requireAdmin, async (req: Request, res: Respo
     }
 
     // Set AutoFilter and Column Widths Sheet 2 (Header at Row 5)
-    wsDetail.autoFilter = `A5:S${lastDataRow}`;
-    [6, 18, 22, 20, 22, 15, 18, 30, 22, 30, 14, 15, 15, 15, 15, 15, 15, 15, 18].forEach((w, i) => {
+    wsDetail.autoFilter = `A5:T${lastDataRow}`;
+    [6, 18, 22, 20, 22, 15, 18, 30, 22, 30, 14, 15, 15, 15, 15, 15, 15, 15, 15, 18].forEach((w, i) => {
       wsDetail.getColumn(i + 1).width = w;
     });
 
@@ -1317,6 +1355,21 @@ router.get('/rates', requireAuth, requireAdmin, async (req: Request, res: Respon
       for (const [workType, defRate] of Object.entries(defaultRates)) {
         if (userRates[workType] !== undefined && userRates[workType] !== null) {
           ratesWithCustomFlag[workType] = { rate: userRates[workType], isCustom: true };
+        } else if (workType === 'suaChua') {
+          // Phí Sửa chữa mặc định bằng Phí Bảo hành của KTV đó
+          let suaChuaVal = 60000;
+          let isCustom = false;
+          if (userRates['baoHanh'] !== undefined && userRates['baoHanh'] !== null) {
+            suaChuaVal = userRates['baoHanh'];
+            isCustom = true;
+          } else if (isOfficialTrulivaKtv) {
+            suaChuaVal = 60000;
+          } else if (stationRate && stationRate.rates && (stationRate.rates['suaChua'] || stationRate.rates['baoHanh'])) {
+            suaChuaVal = stationRate.rates['suaChua'] || stationRate.rates['baoHanh'];
+          } else {
+            suaChuaVal = 60000;
+          }
+          ratesWithCustomFlag[workType] = { rate: suaChuaVal, isCustom };
         } else if (isOfficialTrulivaKtv) {
           // KTV Trạm Truliva (Nguyễn Minh Thuận): Mức đơn giá chuẩn Truliva
           ratesWithCustomFlag[workType] = { rate: defRate, isCustom: false };
@@ -1333,7 +1386,7 @@ router.get('/rates', requireAuth, requireAdmin, async (req: Request, res: Respon
           // KTV Ngoại: Lấy đơn giá theo Trạm trong File Excel
           ratesWithCustomFlag[workType] = { rate: stationRate.rates[workType], isCustom: false };
         } else {
-          // KTV Ngoại không thuộc trạm Excel: Lấy Flat Rate KTV ngoài (120k công, 0đ giao hàng)
+          // KTV Ngoại không thuộc trạm Excel: Lấy Flat Rate KTV ngoài (0đ giao hàng, 60k/100k/120k công)
           const flatRate = getKtvFlatRate(workType);
           ratesWithCustomFlag[workType] = { rate: flatRate, isCustom: false };
         }

@@ -172,10 +172,11 @@ export default function SalaryManage() {
         (data.matrix || []).forEach((row: KtvRateRow) => {
           const rates = row.rates || {};
           const def = data.defaultRates || defaultRates;
+          const baoHanhVal = getRateVal(rates.baoHanh, def.baoHanh ?? 60000);
           map[row.userId] = {
-            giaoHang: getRateVal(rates.giaoHang, def.giaoHang ?? 20000),
-            baoHanh: getRateVal(rates.baoHanh, def.baoHanh ?? 60000),
-            suaChua: getRateVal(rates.suaChua, def.suaChua ?? 60000),
+            giaoHang: getRateVal(rates.giaoHang, 0),
+            baoHanh: baoHanhVal,
+            suaChua: getRateVal(rates.suaChua, baoHanhVal),
             thayLoc: getRateVal(rates.thayLoc, def.thayLoc ?? 40000),
             lapDat: getRateVal(rates.lapDat, def.lapDat ?? 100000),
             giaoHangLapDat: getRateVal(rates.giaoHangLapDat, def.giaoHangLapDat ?? 120000),
