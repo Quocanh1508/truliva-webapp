@@ -9,7 +9,7 @@ const SHOP_ID = '1635300067';
  * Đồng bộ các đơn hàng gần đây từ Pancake POS API về Database.
  * Trả về số lượng đơn hàng được xử lý.
  */
-export async function syncRecentOrders(pageSize: number = 50): Promise<number> {
+export async function syncRecentOrders(pageSize: number = 200): Promise<number> {
   const apiKey = process.env.PANCAKE_API_KEY;
   if (!apiKey) {
     logger.error('PANCAKE_API_KEY is not defined in env, order sync aborted');
@@ -18,40 +18,38 @@ export async function syncRecentOrders(pageSize: number = 50): Promise<number> {
 
   try {
     logger.info('Fetching recent orders from Pancake POS API...', { pageSize });
-    const response = await axios.get(`https://pos.pages.fm/api/v1/shops/${SHOP_ID}/orders`, {
-      params: { 
-        api_key: apiKey, 
-        page_size: pageSize, 
-        page_number: 1 
-      },
-      timeout: 15000 // 15s timeout
-    });
-
-    if (!response.data || !response.data.success || !Array.isArray(response.data.data)) {
-      logger.warn('Pancake POS API returned unsuccessful orders response', { data: response.data });
-      throw new Error('API Pancake trả về kết quả không thành công');
-    }
-
-    const orders = response.data.data;
-    logger.info(`Received ${orders.length} recent orders from API. Processing sync...`);
-
+    // Fetch top 2 pages (200 orders)
     let syncCount = 0;
-    for (const orderPayload of orders) {
-      if (!orderPayload.system_id) continue;
-      
-      try {
-        // Tái sử dụng hàm processOrderEvent với rawEventId = null
-        await processOrderEvent(null, orderPayload);
-        syncCount++;
-      } catch (err: any) {
-        logger.error('Error syncing individual order from API', {
-          orderId: orderPayload.system_id,
-          error: err.message
-        });
+    for (let page = 1; page <= 2; page++) {
+      const response = await axios.get(`https://pos.pages.fm/api/v1/shops/${SHOP_ID}/orders`, {
+        params: { 
+          api_key: apiKey, 
+          page_size: 100, 
+          page_number: page 
+        },
+        timeout: 15000
+      });
+
+      if (!response.data || !response.data.success || !Array.isArray(response.data.data)) {
+        continue;
+      }
+
+      const orders = response.data.data;
+      for (const orderPayload of orders) {
+        if (!orderPayload.system_id) continue;
+        try {
+          await processOrderEvent(null, orderPayload);
+          syncCount++;
+        } catch (err: any) {
+          logger.error('Error syncing individual order from API', {
+            orderId: orderPayload.system_id,
+            error: err.message
+          });
+        }
       }
     }
 
-    logger.info(`Completed sync of ${syncCount}/${orders.length} recent orders.`);
+    logger.info(`Completed sync of ${syncCount} recent orders.`);
     return syncCount;
   } catch (error: any) {
     logger.error('syncRecentOrders failed', { error: error.message });

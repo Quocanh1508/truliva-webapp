@@ -13,14 +13,29 @@ export async function fetchApi(endpoint: string, options: RequestInit = {}) {
     headers['Authorization'] = `Bearer ${token}`;
   }
 
-  const response = await fetch(`${API_URL}${endpoint}`, {
+  const cleanEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
+  const response = await fetch(`${API_URL}${cleanEndpoint}`, {
     ...options,
     headers,
   });
 
+  const contentType = response.headers.get('content-type') || '';
+  if (!contentType.includes('application/json')) {
+    if (response.status === 401) {
+      localStorage.removeItem('session_token');
+      window.location.href = '/login';
+      throw new Error('Phiên làm việc đã hết hạn. Vui lòng đăng nhập lại.');
+    }
+    throw new Error(`Lỗi kết nối máy chủ (${response.status})`);
+  }
+
   const data = await response.json();
 
   if (!response.ok) {
+    if (response.status === 401) {
+      localStorage.removeItem('session_token');
+      window.location.href = '/login';
+    }
     const error = new Error(data.error || 'Có lỗi xảy ra') as any;
     error.status = response.status;
     throw error;
