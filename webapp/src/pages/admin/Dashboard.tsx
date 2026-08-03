@@ -302,6 +302,7 @@ export default function Dashboard() {
   const [compareMode, setCompareMode] = useState<'auto' | 'yoy' | 'custom'>('auto');
   const [prevStartDate, setPrevStartDate] = useState<string>('');
   const [prevEndDate, setPrevEndDate] = useState<string>('');
+  const [revenueScope, setRevenueScope] = useState<'all' | 'service'>('all');
 
   // Fetch static data (stations, overview stats) once on mount
   useEffect(() => {
@@ -419,14 +420,15 @@ export default function Dashboard() {
       assignedKtvId: selectedKtvIds,
       compareMode,
       prevStartDate: compareMode === 'custom' ? prevStartDate : undefined,
-      prevEndDate: compareMode === 'custom' ? prevEndDate : undefined
+      prevEndDate: compareMode === 'custom' ? prevEndDate : undefined,
+      revenueScope
     })
       .then(data => {
         setRevenueData(data);
       })
       .catch(console.error)
       .finally(() => setLoadingRevenue(false));
-  }, [activeTab, startDate, endDate, selectedProvinces, selectedMainStations, selectedTechStations, selectedWorkTypes, selectedKtvIds, compareMode, prevStartDate, prevEndDate]);
+  }, [activeTab, startDate, endDate, selectedProvinces, selectedMainStations, selectedTechStations, selectedWorkTypes, selectedKtvIds, compareMode, prevStartDate, prevEndDate, revenueScope]);
 
   useEffect(() => {
     setSelectedLateProvince('');
@@ -2064,6 +2066,41 @@ export default function Dashboard() {
             </div>
           ) : (
             <>
+              {/* SOURCE TOGGLE CONTROL TOOLBAR */}
+              <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div>
+                  <h3 className="font-bold text-sm text-[#1B3A6B] flex items-center gap-2">
+                    <Filter size={16} className="text-blue-600" />
+                    Phạm vi tính toán Doanh thu
+                  </h3>
+                  <p className="text-xs text-gray-500 mt-0.5">Chọn góc nhìn báo cáo: Toàn bộ công ty (Bao gồm eCom) hoặc Chuyên biệt KTV/Dịch vụ</p>
+                </div>
+
+                {/* Segmented Button Control */}
+                <div className="inline-flex bg-gray-100 p-1 rounded-xl border border-gray-200 self-start md:self-auto">
+                  <button
+                    onClick={() => setRevenueScope('all')}
+                    className={`px-4 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-2 ${
+                      revenueScope === 'all'
+                        ? 'bg-[#1B3A6B] text-white shadow-sm'
+                        : 'text-gray-600 hover:text-gray-900 hover:bg-white/60'
+                    }`}
+                  >
+                    <span>🌐 Tất cả đơn hàng (Toàn công ty)</span>
+                  </button>
+                  <button
+                    onClick={() => setRevenueScope('service')}
+                    className={`px-4 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-2 ${
+                      revenueScope === 'service'
+                        ? 'bg-blue-600 text-white shadow-sm'
+                        : 'text-gray-600 hover:text-gray-900 hover:bg-white/60'
+                    }`}
+                  >
+                    <span>🛠️ Chỉ đơn Dịch vụ / KTV</span>
+                  </button>
+                </div>
+              </div>
+
               {/* KPI Summary Cards */}
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                 {/* Tổng Doanh Thu */}
@@ -2101,7 +2138,9 @@ export default function Dashboard() {
                       {revenueData.summary.ordersCount} <span className="text-sm font-semibold text-gray-500">đơn</span>
                     </div>
                     <p className="text-[11px] text-gray-500 mt-1 font-medium">
-                      Bao gồm ca tạo thủ công, không tính đơn eCom sàn
+                      {revenueScope === 'all'
+                        ? 'Bao gồm tất cả đơn POS eCom + Ca thủ công & dịch vụ'
+                        : 'Bao gồm ca tạo thủ công, không tính đơn eCom sàn'}
                     </p>
                   </div>
                 </div>
@@ -2145,7 +2184,11 @@ export default function Dashboard() {
                 <div className="space-y-0.5">
                   <span className="font-bold text-blue-950">Nguồn dữ liệu & Quy tắc tính toán Doanh thu:</span>
                   <p className="text-blue-800 leading-relaxed">
-                    Bao gồm các ca dịch vụ <b>Hoàn thành</b> (Pancake, Zalo Mini App, Hotline, <b>Ca tạo thủ công</b>...). Ưu tiên lấy <b>Số tiền thu hộ thực tế (COD)</b>. <b>Không tính</b> các đơn hàng bán lẻ sản phẩm qua sàn TMĐT (<i>Shopee, Lazada, TikTok Shop, Tiki</i>).
+                    {revenueScope === 'all' ? (
+                      <>🌐 <b>Đang xem Bức tranh Toàn cảnh Toàn Công ty</b>: Bao gồm TẤT CẢ các đơn hàng <b>Hoàn thành</b> từ mọi nguồn: Sàn TMĐT (<i>Shopee, Lazada, TikTok Shop, Tiki</i>), Pancake, Zalo Mini App, Hotline, và Ca tạo thủ công.</>
+                    ) : (
+                      <>🛠️ <b>Đang xem Chuyên biệt Dịch vụ / KTV</b>: Bao gồm các ca dịch vụ <b>Hoàn thành</b> (Pancake, Zalo Mini App, Hotline, <b>Ca tạo thủ công</b>...). Ưu tiên lấy <b>Số tiền thu hộ thực tế (COD)</b>. <b>Không tính</b> các đơn hàng bán lẻ sản phẩm qua sàn TMĐT (<i>Shopee, Lazada, TikTok Shop, Tiki</i>).</>
+                    )}
                   </p>
                 </div>
               </div>

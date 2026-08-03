@@ -1025,8 +1025,12 @@ router.get('/revenue', async (req: Request, res: Response): Promise<void> => {
       assignedKtvId,
       compareMode,
       prevStartDate,
-      prevEndDate
+      prevEndDate,
+      includeEcom,
+      revenueScope
     } = req.query;
+
+    const isIncludeEcom = includeEcom === 'true' || revenueScope === 'all';
 
     const parseMulti = (val: any): string[] => {
       if (!val) return [];
@@ -1079,10 +1083,13 @@ router.get('/revenue', async (req: Request, res: Response): Promise<void> => {
       const whereInput: any = {
         AND: [
           { adminStatus: 'hoàn thành' },
-          nonEcomFilter,
           { pancakeCreatedAt: { gte: sDate, lte: eDate } }
         ]
       };
+
+      if (!isIncludeEcom) {
+        whereInput.AND.push(nonEcomFilter);
+      }
 
       const workTypes = parseMulti(workType);
       if (workTypes.length > 0) {
