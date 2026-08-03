@@ -54,7 +54,7 @@ router.get('/', requireAuth, async (req: Request, res: Response): Promise<void> 
  * POST /api/permissions/update
  * Cập nhật bật/tắt 1 quyền (hoặc nhiều quyền) cho một Role (Chỉ Admin)
  */
-router.post('/update', requireAdmin, async (req: Request, res: Response): Promise<void> => {
+router.post('/update', requireAuth, requireAdmin, async (req: Request, res: Response): Promise<void> => {
   try {
     const { role, featureKey, isAllowed, updates } = req.body;
 
