@@ -714,6 +714,9 @@ router.get('/export', requireAuth, requireAdmin, async (req: Request, res: Respo
     const mainStationIdsList = mainStationId ? mainStationId.split(',').map(s => s.trim()).filter(Boolean) : [];
     const workTypesList = workTypeFilter ? workTypeFilter.split(',').map(s => s.trim()).filter(Boolean) : [];
 
+    const parsedTechNames = stationIdsList.map(s => s.includes('::') ? s.split('::')[1] : s).filter(Boolean);
+    const parsedMainNames = mainStationIdsList.map(s => s.includes('::') ? s.split('::')[0] : s).filter(Boolean);
+
     // 1. Load KTVs according to filter
     const ktvWhere: Prisma.UserWhereInput = {
       role: 'KTV',
@@ -724,10 +727,22 @@ router.get('/export', requireAuth, requireAdmin, async (req: Request, res: Respo
       ktvWhere.id = { in: ktvIdsList };
     }
     if (stationIdsList.length > 0) {
-      ktvWhere.techStationId = { in: stationIdsList };
+      ktvWhere.OR = [
+        { techStationId: { in: stationIdsList } },
+        { techStation: { name: { in: parsedTechNames } } },
+        { techStation: { id: { in: stationIdsList } } }
+      ];
     }
     if (mainStationIdsList.length > 0) {
-      ktvWhere.techStation = { mainStationId: { in: mainStationIdsList } };
+      ktvWhere.techStation = {
+        mainStation: {
+          OR: [
+            { id: { in: mainStationIdsList } },
+            { name: { in: parsedMainNames } },
+            { name: { in: mainStationIdsList } }
+          ]
+        }
+      };
     }
 
     let ktvs = await prisma.user.findMany({
@@ -775,14 +790,26 @@ router.get('/export', requireAuth, requireAdmin, async (req: Request, res: Respo
       if (stationIdsList.length > 0) {
         reportWhere.ktvUser = {
           ...((reportWhere.ktvUser as any) || {}),
-          techStationId: { in: stationIdsList }
+          OR: [
+            { techStationId: { in: stationIdsList } },
+            { techStation: { name: { in: parsedTechNames } } },
+            { techStation: { id: { in: stationIdsList } } }
+          ]
         };
       }
 
       if (mainStationIdsList.length > 0) {
         reportWhere.ktvUser = {
           ...((reportWhere.ktvUser as any) || {}),
-          techStation: { mainStationId: { in: mainStationIdsList } }
+          techStation: {
+            mainStation: {
+              OR: [
+                { id: { in: mainStationIdsList } },
+                { name: { in: parsedMainNames } },
+                { name: { in: mainStationIdsList } }
+              ]
+            }
+          }
         };
       }
 
@@ -904,15 +931,16 @@ router.get('/export', requireAuth, requireAdmin, async (req: Request, res: Respo
       ]);
     }
 
-    const lastSummaryDataRow = 5 + summaryRowsData.length;
+    const hasSummaryRows = summaryRowsData.length > 0;
+    const lastSummaryDataRow = hasSummaryRows ? 5 + summaryRowsData.length : 5;
 
     // Top Summary Row Sheet 1 (Row 4 - Always visible above filter)
     const topSummaryRow1 = wsSummary.addRow([
       'TỔNG CỘNG THEO BỘ LỌC:',
       '', '', '',
-      { formula: `SUBTOTAL(109, E6:E${lastSummaryDataRow})`, result: sumTotalCases },
-      { formula: `SUBTOTAL(109, F6:F${lastSummaryDataRow})`, result: sumCalculated },
-      { formula: `SUBTOTAL(109, G6:G${lastSummaryDataRow})`, result: sumAdjusted },
+      hasSummaryRows ? { formula: `SUBTOTAL(109, E6:E${lastSummaryDataRow})`, result: sumTotalCases } : 0,
+      hasSummaryRows ? { formula: `SUBTOTAL(109, F6:F${lastSummaryDataRow})`, result: sumCalculated } : 0,
+      hasSummaryRows ? { formula: `SUBTOTAL(109, G6:G${lastSummaryDataRow})`, result: sumAdjusted } : 0,
       '', ''
     ]);
     wsSummary.mergeCells(`A4:D4`);
@@ -949,9 +977,9 @@ router.get('/export', requireAuth, requireAdmin, async (req: Request, res: Respo
     const totalRowSheet1 = wsSummary.addRow([
       'TỔNG CỘNG',
       '', '', '',
-      { formula: `SUBTOTAL(109, E6:E${lastSummaryDataRow})`, result: sumTotalCases },
-      { formula: `SUBTOTAL(109, F6:F${lastSummaryDataRow})`, result: sumCalculated },
-      { formula: `SUBTOTAL(109, G6:G${lastSummaryDataRow})`, result: sumAdjusted },
+      hasSummaryRows ? { formula: `SUBTOTAL(109, E6:E${lastSummaryDataRow})`, result: sumTotalCases } : 0,
+      hasSummaryRows ? { formula: `SUBTOTAL(109, F6:F${lastSummaryDataRow})`, result: sumCalculated } : 0,
+      hasSummaryRows ? { formula: `SUBTOTAL(109, G6:G${lastSummaryDataRow})`, result: sumAdjusted } : 0,
       '', ''
     ]);
     wsSummary.mergeCells(`A${totalRowSheet1.number}:D${totalRowSheet1.number}`);
@@ -967,7 +995,8 @@ router.get('/export', requireAuth, requireAdmin, async (req: Request, res: Respo
     };
 
     // Set AutoFilter and column widths Sheet 1
-    wsSummary.autoFilter = `A5:I${lastSummaryDataRow}`;
+    const autoFilterEndRow = hasSummaryRows ? lastSummaryDataRow : 5;
+    wsSummary.autoFilter = `A5:I${autoFilterEndRow}`;
     [8, 25, 16, 22, 16, 22, 22, 35, 15].forEach((w, i) => {
       wsSummary.getColumn(i + 1).width = w;
     });
@@ -1020,21 +1049,22 @@ router.get('/export', requireAuth, requireAdmin, async (req: Request, res: Respo
       reports = reports.filter(r => matchSearch(r));
     }
 
+    const hasDetailReports = reports.length > 0;
     const startDataRow = 6;
-    const lastDataRow = reports.length > 0 ? startDataRow + reports.length - 1 : startDataRow;
+    const lastDataRow = hasDetailReports ? startDataRow + reports.length - 1 : startDataRow;
 
     // Top Summary Row Sheet 2 (Row 4 - Always visible above AutoFilter)
     const topSummaryRow2 = wsDetail.addRow([
       'TỔNG CỘNG THEO BỘ LỌC:',
       '', '', '', '', '', '', '', '', '', '',
-      { formula: `SUBTOTAL(109, L${startDataRow}:L${lastDataRow})`, result: 0 },
-      { formula: `SUBTOTAL(109, M${startDataRow}:M${lastDataRow})`, result: 0 },
-      { formula: `SUBTOTAL(109, N${startDataRow}:N${lastDataRow})`, result: 0 },
-      { formula: `SUBTOTAL(109, O${startDataRow}:O${lastDataRow})`, result: 0 },
-      { formula: `SUBTOTAL(109, P${startDataRow}:P${lastDataRow})`, result: 0 },
-      { formula: `SUBTOTAL(109, Q${startDataRow}:Q${lastDataRow})`, result: 0 },
-      { formula: `SUBTOTAL(109, R${startDataRow}:R${lastDataRow})`, result: 0 },
-      { formula: `SUBTOTAL(109, S${startDataRow}:S${lastDataRow})`, result: 0 }
+      hasDetailReports ? { formula: `SUBTOTAL(109, L${startDataRow}:L${lastDataRow})`, result: 0 } : 0,
+      hasDetailReports ? { formula: `SUBTOTAL(109, M${startDataRow}:M${lastDataRow})`, result: 0 } : 0,
+      hasDetailReports ? { formula: `SUBTOTAL(109, N${startDataRow}:N${lastDataRow})`, result: 0 } : 0,
+      hasDetailReports ? { formula: `SUBTOTAL(109, O${startDataRow}:O${lastDataRow})`, result: 0 } : 0,
+      hasDetailReports ? { formula: `SUBTOTAL(109, P${startDataRow}:P${lastDataRow})`, result: 0 } : 0,
+      hasDetailReports ? { formula: `SUBTOTAL(109, Q${startDataRow}:Q${lastDataRow})`, result: 0 } : 0,
+      hasDetailReports ? { formula: `SUBTOTAL(109, R${startDataRow}:R${lastDataRow})`, result: 0 } : 0,
+      hasDetailReports ? { formula: `SUBTOTAL(109, S${startDataRow}:S${lastDataRow})`, result: 0 } : 0
     ]);
     wsDetail.mergeCells(`A4:K4`);
     topSummaryRow2.font = { bold: true, color: { argb: 'FF1B3A6B' } };
