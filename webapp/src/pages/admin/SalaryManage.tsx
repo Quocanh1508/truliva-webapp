@@ -205,13 +205,22 @@ export default function SalaryManage() {
   const handleRateCellChange = (userId: string, workType: string, val: string) => {
     const num = val === '' ? 0 : Number(val.replace(/\D/g, ''));
     if (isNaN(num)) return;
-    setEditedRates(prev => ({
-      ...prev,
-      [userId]: {
-        ...(prev[userId] || {}),
-        [workType]: num
+    setEditedRates(prev => {
+      const ktvRates = { ...(prev[userId] || {}) };
+      ktvRates[workType] = num;
+      // Nếu thay đổi Phí Bảo Hành và Phí Sửa Chữa chưa được gán tùy chỉnh riêng, tự động cập nhật Sửa Chữa = Bảo Hành
+      if (workType === 'baoHanh') {
+        const currentSuaChua = ktvRates.suaChua;
+        const currentBaoHanh = ktvRates.baoHanh;
+        if (currentSuaChua === undefined || currentSuaChua === currentBaoHanh || currentSuaChua === 120000 || currentSuaChua === 60000) {
+          ktvRates.suaChua = num;
+        }
       }
-    }));
+      return {
+        ...prev,
+        [userId]: ktvRates
+      };
+    });
   };
 
   const handleResetKtvRates = async (userId: string) => {
@@ -235,7 +244,11 @@ export default function SalaryManage() {
       const ratesList: Array<{ userId: string; workType: string; rate: number }> = [];
       Object.entries(editedRates).forEach(([userId, workTypes]) => {
         Object.entries(workTypes).forEach(([workType, rate]) => {
-          ratesList.push({ userId, workType, rate });
+          let finalRate = rate;
+          if (workType === 'giaoHang' && finalRate === 120000) {
+            finalRate = 0; // Sanitize legacy default 120k for delivery to 0
+          }
+          ratesList.push({ userId, workType, rate: finalRate });
         });
       });
 

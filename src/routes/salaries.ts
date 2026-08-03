@@ -1427,6 +1427,10 @@ router.post('/rates', requireAuth, requireAdmin, async (req: Request, res: Respo
     }
 
     const upsertPromises = rates.map(item => {
+      let finalRate = Number(item.rate) || 0;
+      if (item.workType === 'giaoHang' && finalRate === 120000) {
+        finalRate = 0;
+      }
       return prisma.ktvServiceRate.upsert({
         where: {
           userId_workType: {
@@ -1435,12 +1439,12 @@ router.post('/rates', requireAuth, requireAdmin, async (req: Request, res: Respo
           }
         },
         update: {
-          rate: Number(item.rate) || 0
+          rate: finalRate
         },
         create: {
           userId: item.userId,
           workType: item.workType,
-          rate: Number(item.rate) || 0
+          rate: finalRate
         }
       });
     });
