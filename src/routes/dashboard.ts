@@ -1003,4 +1003,409 @@ router.get('/product-quality', async (req: Request, res: Response): Promise<void
   }
 });
 
+
+/**
+ * GET /api/dashboard/revenue
+ * Trả về dữ liệu phân tích doanh thu theo các góc nhìn:
+ * - Doanh thu theo thời gian + so sánh kỳ trước
+ * - Doanh thu theo trạm chính
+ * - Doanh thu theo loại công việc & loại dịch vụ
+ * - Doanh thu theo kỹ thuật viên (Top KTVs)
+ * - Doanh thu theo tỉnh thành (Top Tỉnh)
+ */
+router.get('/revenue', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const {
+      startDate,
+      endDate,
+      province,
+      mainStationId,
+      techStationId,
+      workType,
+      assignedKtvId,
+      compareMode,
+      prevStartDate,
+      prevEndDate
+    } = req.query;
+
+    const parseMulti = (val: any): string[] => {
+      if (!val) return [];
+      if (Array.isArray(val)) return val.map(String).filter(Boolean);
+      return String(val).split(',').map(s => s.trim()).filter(Boolean);
+    };
+
+    const removeAcc = (str: string): string => {
+      if (!str) return '';
+      return str
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .replace(/đ/g, 'd')
+        .replace(/Đ/g, 'D')
+        .toLowerCase();
+    };
+
+    // 1. Xác định khoảng thời gian hiện tại (Kỳ này) và Kỳ đối chiếu (Kỳ trước)
+    const now = new Date();
+    const currStartStr = (startDate as string) || new Date(now.getFullYear(), 0, 1).toISOString().slice(0, 10);
+    const currEndStr = (endDate as string) || new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().slice(0, 10);
+
+    const currStart = new Date(`${currStartStr}T00:00:00.000Z`);
+    const currEnd = new Date(`${currEndStr}T23:59:59.999Z`);
+
+    const mode = (compareMode as string) || 'auto';
+    let prevStart: Date;
+    let prevEnd: Date;
+
+    if (mode === 'custom' && prevStartDate && prevEndDate) {
+      prevStart = new Date(`${prevStartDate}T00:00:00.000Z`);
+      prevEnd = new Date(`${prevEndDate}T23:59:59.999Z`);
+    } else if (mode === 'yoy') {
+      prevStart = new Date(currStart);
+      prevStart.setFullYear(prevStart.getFullYear() - 1);
+      prevEnd = new Date(currEnd);
+      prevEnd.setFullYear(prevEnd.getFullYear() - 1);
+    } else {
+      // mode === 'auto' (Kỳ liền trước tự động)
+      const durationMs = Math.max(1, currEnd.getTime() - currStart.getTime());
+      prevEnd = new Date(currStart.getTime() - 1);
+      prevStart = new Date(prevEnd.getTime() - durationMs);
+    }
+
+    const prevStartStr = prevStart.toISOString().slice(0, 10);
+    const prevEndStr = prevEnd.toISOString().slice(0, 10);
+
+    // 2. Xây dựng điều kiện lọc cơ bản cho Đơn hoàn thành
+    const buildWhere = (sDate: Date, eDate: Date) => {
+      const whereInput: any = {
+        AND: [
+          { adminStatus: 'hoàn thành' },
+          nonEcomFilter,
+          { pancakeCreatedAt: { gte: sDate, lte: eDate } }
+        ]
+      };
+
+      const workTypes = parseMulti(workType);
+      if (workTypes.length > 0) {
+        whereInput.AND.push({ workType: workTypes.length === 1 ? workTypes[0] : { in: workTypes } });
+      }
+
+      const ktvIds = parseMulti(assignedKtvId);
+      if (ktvIds.length > 0) {
+        whereInput.AND.push({ assignedKtvId: ktvIds.length === 1 ? ktvIds[0] : { in: ktvIds } });
+      }
+
+      return whereInput;
+    };
+
+    // 3. Query đơn hàng kỳ hiện tại và kỳ trước
+    const selectFields = {
+      id: true,
+      moneyToCollect: true,
+      totalPrice: true,
+      pancakeCreatedAt: true,
+      workType: true,
+      serviceType: true,
+      mainStationId: true,
+      techStationId: true,
+      customer: { select: { provinceName: true } },
+      shippingAddress: true,
+      assignedKtv: { select: { id: true, fullName: true } },
+      mainStation: { select: { id: true, name: true, isActive: true } },
+      techStation: {
+        select: {
+          id: true,
+          name: true,
+          mainStation: { select: { id: true, name: true, isActive: true } }
+        }
+      }
+    };
+
+    let currOrders = await prisma.order.findMany({
+      where: buildWhere(currStart, currEnd),
+      select: selectFields
+    });
+
+    let prevOrders = await prisma.order.findMany({
+      where: buildWhere(prevStart, prevEnd),
+      select: selectFields
+    });
+
+    // 4. Lọc bộ nhớ theo tỉnh thành, trạm chính, trạm kỹ thuật
+    const filterMemory = async (orderList: typeof currOrders) => {
+      let filtered = orderList;
+
+      const provinces = parseMulti(province);
+      if (provinces.length > 0) {
+        const searchProvinces = provinces.map(p => removeAcc(p));
+        filtered = filtered.filter(order => {
+          const provName = removeAcc(order.customer?.provinceName || (order.shippingAddress as any)?.province_name || '');
+          return searchProvinces.some(sp => provName.includes(sp));
+        });
+      }
+
+      const mainStationIds = parseMulti(mainStationId);
+      if (mainStationIds.length > 0) {
+        const targetMainStations = await prisma.mainStation.findMany({
+          where: { id: { in: mainStationIds } }
+        });
+        const targetNames = targetMainStations.map(s => s.name);
+        if (targetNames.length > 0) {
+          filtered = filtered.filter(o => {
+            let msName = 'Chưa phân trạm';
+            if (o.mainStation) {
+              if (o.mainStation.isActive) {
+                msName = o.mainStation.name;
+              } else if (['Trạm Hồ Chí Minh', 'Trạm Đồng Nai', 'Trạm Vũng Tàu'].includes(o.mainStation.name)) {
+                msName = 'Truliva';
+              }
+            }
+            if (msName === 'Chưa phân trạm' && o.techStation?.mainStation) {
+              if (o.techStation.mainStation.isActive) {
+                msName = o.techStation.mainStation.name;
+              } else if (['Trạm Hồ Chí Minh', 'Trạm Đồng Nai', 'Trạm Vũng Tàu'].includes(o.techStation.mainStation.name)) {
+                msName = 'Truliva';
+              }
+            }
+            return targetNames.includes(msName);
+          });
+        }
+      }
+
+      const techStationIds = parseMulti(techStationId);
+      if (techStationIds.length > 0) {
+        filtered = filtered.filter(o => o.techStationId != null && techStationIds.includes(o.techStationId));
+      }
+
+      return filtered;
+    };
+
+    currOrders = await filterMemory(currOrders);
+    prevOrders = await filterMemory(prevOrders);
+
+    // Helper tính doanh thu 1 đơn hàng (ưu tiên moneyToCollect COD, fallback sang totalPrice)
+    const getRevenue = (o: any) => {
+      if (o.moneyToCollect !== null && o.moneyToCollect !== undefined && o.moneyToCollect > 0) {
+        return Number(o.moneyToCollect);
+      }
+      return Number(o.totalPrice) || 0;
+    };
+
+    // 5. Tổng doanh thu kỳ hiện tại vs kỳ trước
+    const totalCurrRevenue = currOrders.reduce((sum, o) => sum + getRevenue(o), 0);
+    const totalPrevRevenue = prevOrders.reduce((sum, o) => sum + getRevenue(o), 0);
+    const revDiff = totalCurrRevenue - totalPrevRevenue;
+    const revPercentChange = totalPrevRevenue > 0
+      ? Math.round((revDiff / totalPrevRevenue) * 100)
+      : (totalCurrRevenue > 0 ? 100 : 0);
+
+    // Helper format local date YYYY-MM-DD
+    const formatKeyDate = (d: Date) => {
+      const year = d.getFullYear();
+      const month = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      return `${year}-${month}-${day}`;
+    };
+
+    // 6. Doanh thu theo thời gian (Daily breakdown)
+    const currDates: string[] = [];
+    let cIter = new Date(currStart);
+    while (cIter <= currEnd) {
+      currDates.push(formatKeyDate(cIter));
+      cIter.setDate(cIter.getDate() + 1);
+    }
+
+    const prevDates: string[] = [];
+    let pIter = new Date(prevStart);
+    while (pIter <= prevEnd) {
+      prevDates.push(formatKeyDate(pIter));
+      pIter.setDate(pIter.getDate() + 1);
+    }
+
+    const currDailyMap: Record<string, { revenue: number; ordersCount: number }> = {};
+    currOrders.forEach(o => {
+      if (o.pancakeCreatedAt) {
+        const dKey = formatKeyDate(new Date(o.pancakeCreatedAt));
+        if (!currDailyMap[dKey]) currDailyMap[dKey] = { revenue: 0, ordersCount: 0 };
+        currDailyMap[dKey].revenue += getRevenue(o);
+        currDailyMap[dKey].ordersCount += 1;
+      }
+    });
+
+    const prevDailyMap: Record<string, { revenue: number; ordersCount: number }> = {};
+    prevOrders.forEach(o => {
+      if (o.pancakeCreatedAt) {
+        const dKey = formatKeyDate(new Date(o.pancakeCreatedAt));
+        if (!prevDailyMap[dKey]) prevDailyMap[dKey] = { revenue: 0, ordersCount: 0 };
+        prevDailyMap[dKey].revenue += getRevenue(o);
+        prevDailyMap[dKey].ordersCount += 1;
+      }
+    });
+
+    const timeTrend = currDates.map((cDate, idx) => {
+      const pDate = prevDates[idx] || '';
+      const cData = currDailyMap[cDate] || { revenue: 0, ordersCount: 0 };
+      const pData = pDate ? (prevDailyMap[pDate] || { revenue: 0, ordersCount: 0 }) : { revenue: 0, ordersCount: 0 };
+      return {
+        date: cDate,
+        revenue: cData.revenue,
+        ordersCount: cData.ordersCount,
+        prevDate: pDate,
+        prevRevenue: pData.revenue,
+        prevOrdersCount: pData.ordersCount
+      };
+    });
+
+    // 7. Doanh thu theo Trạm chính
+    const stationMap: Record<string, { name: string; revenue: number; ordersCount: number; prevRevenue: number; prevOrdersCount: number }> = {};
+    currOrders.forEach(o => {
+      let stName = 'Chưa phân trạm';
+      if (o.mainStation) stName = o.mainStation.name;
+      else if (o.techStation?.mainStation) stName = o.techStation.mainStation.name;
+
+      if (!stationMap[stName]) {
+        stationMap[stName] = { name: stName, revenue: 0, ordersCount: 0, prevRevenue: 0, prevOrdersCount: 0 };
+      }
+      stationMap[stName].revenue += getRevenue(o);
+      stationMap[stName].ordersCount += 1;
+    });
+
+    prevOrders.forEach(o => {
+      let stName = 'Chưa phân trạm';
+      if (o.mainStation) stName = o.mainStation.name;
+      else if (o.techStation?.mainStation) stName = o.techStation.mainStation.name;
+
+      if (!stationMap[stName]) {
+        stationMap[stName] = { name: stName, revenue: 0, ordersCount: 0, prevRevenue: 0, prevOrdersCount: 0 };
+      }
+      stationMap[stName].prevRevenue += getRevenue(o);
+      stationMap[stName].prevOrdersCount += 1;
+    });
+
+    const byStation = Object.values(stationMap).sort((a, b) => b.revenue - a.revenue);
+
+    // 8. Doanh thu theo Loại công việc
+    const workTypeMap: Record<string, { name: string; revenue: number; ordersCount: number; prevRevenue: number; prevOrdersCount: number }> = {};
+    currOrders.forEach(o => {
+      const wt = o.workType || 'Chưa xác định';
+      if (!workTypeMap[wt]) {
+        workTypeMap[wt] = { name: wt, revenue: 0, ordersCount: 0, prevRevenue: 0, prevOrdersCount: 0 };
+      }
+      workTypeMap[wt].revenue += getRevenue(o);
+      workTypeMap[wt].ordersCount += 1;
+    });
+
+    prevOrders.forEach(o => {
+      const wt = o.workType || 'Chưa xác định';
+      if (!workTypeMap[wt]) {
+        workTypeMap[wt] = { name: wt, revenue: 0, ordersCount: 0, prevRevenue: 0, prevOrdersCount: 0 };
+      }
+      workTypeMap[wt].prevRevenue += getRevenue(o);
+      workTypeMap[wt].prevOrdersCount += 1;
+    });
+
+    const byWorkType = Object.values(workTypeMap).sort((a, b) => b.revenue - a.revenue);
+
+    // 9. Doanh thu theo Loại dịch vụ (serviceType)
+    const serviceTypeMap: Record<string, { name: string; revenue: number; ordersCount: number; prevRevenue: number; prevOrdersCount: number }> = {};
+    currOrders.forEach(o => {
+      const st = o.serviceType || 'Chưa xác định';
+      if (!serviceTypeMap[st]) {
+        serviceTypeMap[st] = { name: st, revenue: 0, ordersCount: 0, prevRevenue: 0, prevOrdersCount: 0 };
+      }
+      serviceTypeMap[st].revenue += getRevenue(o);
+      serviceTypeMap[st].ordersCount += 1;
+    });
+
+    prevOrders.forEach(o => {
+      const st = o.serviceType || 'Chưa xác định';
+      if (!serviceTypeMap[st]) {
+        serviceTypeMap[st] = { name: st, revenue: 0, ordersCount: 0, prevRevenue: 0, prevOrdersCount: 0 };
+      }
+      serviceTypeMap[st].prevRevenue += getRevenue(o);
+      serviceTypeMap[st].prevOrdersCount += 1;
+    });
+
+    const byServiceType = Object.values(serviceTypeMap).sort((a, b) => b.revenue - a.revenue);
+
+    // 10. Doanh thu theo Kỹ thuật viên (Top KTVs)
+    const ktvMap: Record<string, { id: string; name: string; revenue: number; ordersCount: number; prevRevenue: number; prevOrdersCount: number }> = {};
+    currOrders.forEach(o => {
+      const kId = o.assignedKtv?.id || 'unassigned';
+      const kName = o.assignedKtv?.fullName || 'Chưa phân công';
+      if (!ktvMap[kId]) {
+        ktvMap[kId] = { id: kId, name: kName, revenue: 0, ordersCount: 0, prevRevenue: 0, prevOrdersCount: 0 };
+      }
+      ktvMap[kId].revenue += getRevenue(o);
+      ktvMap[kId].ordersCount += 1;
+    });
+
+    prevOrders.forEach(o => {
+      const kId = o.assignedKtv?.id || 'unassigned';
+      const kName = o.assignedKtv?.fullName || 'Chưa phân công';
+      if (!ktvMap[kId]) {
+        ktvMap[kId] = { id: kId, name: kName, revenue: 0, ordersCount: 0, prevRevenue: 0, prevOrdersCount: 0 };
+      }
+      ktvMap[kId].prevRevenue += getRevenue(o);
+      ktvMap[kId].prevOrdersCount += 1;
+    });
+
+    const byKtv = Object.values(ktvMap).sort((a, b) => b.revenue - a.revenue);
+
+    // 11. Doanh thu theo Tỉnh/Thành phố
+    const provinceMap: Record<string, { name: string; revenue: number; ordersCount: number; prevRevenue: number; prevOrdersCount: number }> = {};
+    currOrders.forEach(o => {
+      let pName = o.customer?.provinceName || (o.shippingAddress as any)?.province_name || 'Khác';
+      pName = pName.replace(/^(Tỉnh |Thành phố |TP\.?\s*)/i, '').trim();
+      if (!pName) pName = 'Khác';
+
+      if (!provinceMap[pName]) {
+        provinceMap[pName] = { name: pName, revenue: 0, ordersCount: 0, prevRevenue: 0, prevOrdersCount: 0 };
+      }
+      provinceMap[pName].revenue += getRevenue(o);
+      provinceMap[pName].ordersCount += 1;
+    });
+
+    prevOrders.forEach(o => {
+      let pName = o.customer?.provinceName || (o.shippingAddress as any)?.province_name || 'Khác';
+      pName = pName.replace(/^(Tỉnh |Thành phố |TP\.?\s*)/i, '').trim();
+      if (!pName) pName = 'Khác';
+
+      if (!provinceMap[pName]) {
+        provinceMap[pName] = { name: pName, revenue: 0, ordersCount: 0, prevRevenue: 0, prevOrdersCount: 0 };
+      }
+      provinceMap[pName].prevRevenue += getRevenue(o);
+      provinceMap[pName].prevOrdersCount += 1;
+    });
+
+    const byProvince = Object.values(provinceMap).sort((a, b) => b.revenue - a.revenue);
+
+    res.json({
+      periodInfo: {
+        current: { start: currStartStr, end: currEndStr },
+        previous: { start: prevStartStr, end: prevEndStr }
+      },
+      summary: {
+        totalRevenue: totalCurrRevenue,
+        prevRevenue: totalPrevRevenue,
+        revenueDiff: revDiff,
+        percentChange: revPercentChange,
+        ordersCount: currOrders.length,
+        prevOrdersCount: prevOrders.length,
+        avgOrderValue: currOrders.length > 0 ? Math.round(totalCurrRevenue / currOrders.length) : 0
+      },
+      timeTrend,
+      byStation,
+      byWorkType,
+      byServiceType,
+      byKtv,
+      byProvince
+    });
+
+  } catch (error: any) {
+    logger.error('Get revenue analysis error', { error: error.message });
+    res.status(500).json({ error: 'Lỗi lấy dữ liệu phân tích doanh thu' });
+  }
+});
+
 export default router;
+

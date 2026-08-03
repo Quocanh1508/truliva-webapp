@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react';
-import { fetchApi, getDashboardStats, getStations, getDispatchAnalysis, getKtvUsers, getProductQualityAnalysis } from '../../api/client';
+import { useNavigate } from 'react-router-dom';
+import { fetchApi, getDashboardStats, getStations, getDispatchAnalysis, getKtvUsers, getProductQualityAnalysis, getRevenueAnalysis } from '../../api/client';
 import { 
   FileText, CheckCircle, Clock, Building, MapPin, 
   AlertTriangle, Info, Filter, AlertCircle, RefreshCw, TrendingUp,
-  ClipboardList, UserCheck, XCircle
+  ClipboardList, UserCheck, XCircle, DollarSign, ArrowUpRight, ArrowDownRight, Award
 } from 'lucide-react';
 import { 
   BarChart, Bar, XAxis, YAxis, Tooltip as RechartsTooltip, Legend, 
@@ -12,6 +13,7 @@ import {
 } from 'recharts';
 import { ComposableMap, Geographies, Geography } from 'react-simple-maps';
 import { scaleQuantile } from 'd3-scale';
+import DateRangePicker from '../../components/DateRangePicker';
 
 function removeVietnameseTones(str: string) {
     if (!str) return '';
@@ -30,6 +32,20 @@ function removeVietnameseTones(str: string) {
     str = str.replace(/Ỳ|Ý|Ỵ|Ỷ|Ỹ/g, "Y");
     str = str.replace(/Đ/g, "D");
     return str;
+}
+
+function formatLocalDate(d: Date): string {
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+function formatDateVN(dateStr: string): string {
+  if (!dateStr) return '';
+  const [y, m, d] = dateStr.split('-');
+  if (!y || !m || !d) return dateStr;
+  return `${d}/${m}/${y}`;
 }
 
 const getGroupedStats = (dailyStats: any[], mode: 'day' | 'week' | 'month') => {
@@ -229,7 +245,21 @@ function MultiSelect({
 }
 
 export default function Dashboard() {
-  const [activeTab, setActiveTab] = useState<'summary' | 'ontime' | 'late' | 'workload' | 'stationComp' | 'productQuality'>('summary');
+  const navigate = useNavigate();
+  const [activeTab, setActiveTab] = useState<'summary' | 'ontime' | 'late' | 'workload' | 'stationComp' | 'productQuality' | 'revenue'>('summary');
+
+  const navigateToOrdersWithStatus = (statuses?: string[]) => {
+    try {
+      const existing = sessionStorage.getItem('truliva_order_filters');
+      const parsed = existing ? JSON.parse(existing) : {};
+      parsed.filterAdminStatuses = statuses || [];
+      parsed.page = 1;
+      sessionStorage.setItem('truliva_order_filters', JSON.stringify(parsed));
+    } catch (e) {
+      console.error(e);
+    }
+    navigate('/admin/orders');
+  };
   
   // Data States
   const [stats, setStats] = useState<any>(null);
@@ -237,7 +267,9 @@ export default function Dashboard() {
   const [stationsList, setStationsList] = useState<any[]>([]);
   const [analysisData, setAnalysisData] = useState<any>(null);
   const [qualityData, setQualityData] = useState<any>(null);
+  const [revenueData, setRevenueData] = useState<any>(null);
   const [loadingQuality, setLoadingQuality] = useState(false);
+  const [loadingRevenue, setLoadingRevenue] = useState(false);
   
   // Loading & Tooltip States
   const [loadingOverview, setLoadingOverview] = useState(true);
@@ -250,13 +282,11 @@ export default function Dashboard() {
   // Filter States
   const [startDate, setStartDate] = useState(() => {
     const d = new Date();
-    // Default to January 1st of current year to load rich multi-month data by default
-    return new Date(d.getFullYear(), 0, 1).toISOString().slice(0, 10);
+    return formatLocalDate(new Date(d.getFullYear(), 0, 1));
   });
   const [endDate, setEndDate] = useState(() => {
     const d = new Date();
-    // Default to last day of current month
-    return new Date(d.getFullYear(), d.getMonth() + 1, 0).toISOString().slice(0, 10);
+    return formatLocalDate(new Date(d.getFullYear(), d.getMonth() + 1, 0));
   });
   const [selectedProvinces, setSelectedProvinces] = useState<string[]>([]);
   const [selectedMainStations, setSelectedMainStations] = useState<string[]>([]);
@@ -267,6 +297,11 @@ export default function Dashboard() {
   const [selectedProducts, setSelectedProducts] = useState<string[]>([]);
   const [openDropdown, setOpenDropdown] = useState<string | null>(null);
   const [ktvList, setKtvList] = useState<any[]>([]);
+
+  // Revenue comparison filter states
+  const [compareMode, setCompareMode] = useState<'auto' | 'yoy' | 'custom'>('auto');
+  const [prevStartDate, setPrevStartDate] = useState<string>('');
+  const [prevEndDate, setPrevEndDate] = useState<string>('');
 
   // Fetch static data (stations, overview stats) once on mount
   useEffect(() => {
@@ -370,6 +405,29 @@ export default function Dashboard() {
       .finally(() => setLoadingQuality(false));
   }, [activeTab, startDate, endDate, selectedProvinces, selectedMainStations, selectedTechStations, selectedProducts]);
 
+  // Fetch revenue analysis data
+  useEffect(() => {
+    if (activeTab !== 'revenue') return;
+    setLoadingRevenue(true);
+    getRevenueAnalysis({
+      startDate,
+      endDate,
+      province: selectedProvinces,
+      mainStationId: selectedMainStations,
+      techStationId: selectedTechStations,
+      workType: selectedWorkTypes,
+      assignedKtvId: selectedKtvIds,
+      compareMode,
+      prevStartDate: compareMode === 'custom' ? prevStartDate : undefined,
+      prevEndDate: compareMode === 'custom' ? prevEndDate : undefined
+    })
+      .then(data => {
+        setRevenueData(data);
+      })
+      .catch(console.error)
+      .finally(() => setLoadingRevenue(false));
+  }, [activeTab, startDate, endDate, selectedProvinces, selectedMainStations, selectedTechStations, selectedWorkTypes, selectedKtvIds, compareMode, prevStartDate, prevEndDate]);
+
   useEffect(() => {
     setSelectedLateProvince('');
   }, [analysisData]);
@@ -412,8 +470,8 @@ export default function Dashboard() {
 
   const resetFilters = () => {
     const d = new Date();
-    setStartDate(new Date(d.getFullYear(), d.getMonth(), 1).toISOString().slice(0, 10));
-    setEndDate(new Date(d.getFullYear(), d.getMonth() + 1, 0).toISOString().slice(0, 10));
+    setStartDate(formatLocalDate(new Date(d.getFullYear(), 0, 1)));
+    setEndDate(formatLocalDate(new Date(d.getFullYear(), d.getMonth() + 1, 0)));
     setSelectedProvinces([]);
     setSelectedMainStations([]);
     setSelectedTechStations([]);
@@ -421,6 +479,9 @@ export default function Dashboard() {
     setSelectedAdminStatuses([]);
     setSelectedKtvIds([]);
     setSelectedProducts([]);
+    setCompareMode('auto');
+    setPrevStartDate('');
+    setPrevEndDate('');
   };
 
   return (
@@ -465,28 +526,83 @@ export default function Dashboard() {
           <span>Bộ lọc dữ liệu phân tích</span>
         </div>
         
-        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-9 gap-3">
-          {/* Start Date */}
-          <div className="flex flex-col">
-            <label className="text-[11px] font-semibold text-gray-500 mb-1 uppercase">Tạo từ ngày</label>
-            <input 
-              type="date" 
-              className="border rounded px-2.5 py-1.5 text-xs outline-none focus:border-blue-500 text-gray-700 bg-white" 
-              value={startDate} 
-              onChange={e => setStartDate(e.target.value)} 
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-3">
+          {/* Khoảng ngày phân tích */}
+          <div className="flex flex-col sm:col-span-2">
+            <label className="text-[11px] font-semibold text-gray-500 mb-1 uppercase">Khoảng ngày phân tích</label>
+            <DateRangePicker
+              startDate={startDate}
+              endDate={endDate}
+              onChange={(start, end) => {
+                setStartDate(start);
+                setEndDate(end);
+              }}
+              placeholder="Bắt đầu - kết thúc"
             />
           </div>
 
-          {/* End Date */}
-          <div className="flex flex-col">
-            <label className="text-[11px] font-semibold text-gray-500 mb-1 uppercase">Tạo đến ngày</label>
-            <input 
-              type="date" 
-              className="border rounded px-2.5 py-1.5 text-xs outline-none focus:border-blue-500 text-gray-700 bg-white" 
-              value={endDate} 
-              onChange={e => setEndDate(e.target.value)} 
-            />
-          </div>
+          {/* Khi ở tab Doanh thu: Khoảng ngày đối chiếu */}
+          {activeTab === 'revenue' && (
+            <div className="flex flex-col sm:col-span-2">
+              <div className="flex justify-between items-center mb-1">
+                <label className="text-[11px] font-semibold text-emerald-700 uppercase">Khoảng ngày đối chiếu</label>
+                <div className="flex space-x-1 text-[10px]">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setCompareMode('auto');
+                      setPrevStartDate('');
+                      setPrevEndDate('');
+                    }}
+                    className={`px-1.5 py-0.5 rounded font-medium transition-colors ${
+                      compareMode === 'auto' && !prevStartDate
+                        ? 'bg-emerald-100 text-emerald-800 font-bold'
+                        : 'text-gray-500 hover:bg-gray-100'
+                    }`}
+                    title="Tự động lùi cùng số ngày liền trước"
+                  >
+                    Tự động
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setCompareMode('yoy');
+                      setPrevStartDate('');
+                      setPrevEndDate('');
+                    }}
+                    className={`px-1.5 py-0.5 rounded font-medium transition-colors ${
+                      compareMode === 'yoy'
+                        ? 'bg-emerald-100 text-emerald-800 font-bold'
+                        : 'text-gray-500 hover:bg-gray-100'
+                    }`}
+                    title="So sánh với cùng kỳ năm trước"
+                  >
+                    YoY
+                  </button>
+                </div>
+              </div>
+              <DateRangePicker
+                startDate={
+                  prevStartDate || (compareMode !== 'custom' ? (revenueData?.periodInfo?.previous?.start || '') : '')
+                }
+                endDate={
+                  prevEndDate || (compareMode !== 'custom' ? (revenueData?.periodInfo?.previous?.end || '') : '')
+                }
+                onChange={(start, end) => {
+                  if (start || end) {
+                    setCompareMode('custom');
+                    setPrevStartDate(start);
+                    setPrevEndDate(end);
+                  } else {
+                    setCompareMode('auto');
+                    setPrevStartDate('');
+                    setPrevEndDate('');
+                  }
+                }}
+                placeholder="Chọn khoảng ngày đối chiếu"
+              />
+            </div>
+          )}
 
           {/* Province */}
           <MultiSelect
@@ -618,6 +734,13 @@ export default function Dashboard() {
           <AlertCircle size={15} />
           <span>Chất lượng sản phẩm</span>
         </button>
+        <button 
+          onClick={() => setActiveTab('revenue')}
+          className={`flex-1 md:flex-initial px-6 py-2.5 rounded-md text-sm font-semibold transition-all flex items-center justify-center space-x-1.5 ${activeTab === 'revenue' ? 'bg-white text-emerald-600 shadow-sm border border-gray-200' : 'text-gray-600 hover:text-gray-900 hover:bg-white/50'}`}
+        >
+          <DollarSign size={15} />
+          <span>Doanh Thu</span>
+        </button>
       </div>
 
       {/* TAB CONTENT 1: SUMMARY & MAP */}
@@ -625,28 +748,63 @@ export default function Dashboard() {
         <div className="space-y-6 animate-fade-in">
           {/* KPI Overview Cards */}
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
-            <div className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm border-l-4 border-blue-500 flex flex-col justify-between animate-fade-in hover:shadow-md transition-shadow">
-              <div className="text-blue-600 font-semibold text-xs flex items-center gap-1.5 uppercase"><ClipboardList size={15}/> Tổng số đơn</div>
+            <div 
+              onClick={() => navigateToOrdersWithStatus([])}
+              className="bg-white p-5 rounded-xl border border-gray-200 border-l-4 border-l-blue-500 shadow-sm flex flex-col justify-between cursor-pointer hover:shadow-md hover:-translate-y-0.5 transition-all group"
+              title="Nhấp để xem danh sách tất cả đơn hàng"
+            >
+              <div className="text-blue-600 font-semibold text-xs flex items-center justify-between uppercase">
+                <span className="flex items-center gap-1.5"><ClipboardList size={15}/> Tổng số đơn</span>
+                <span className="text-[10px] text-gray-400 group-hover:text-blue-600 transition-colors">Xem ngay →</span>
+              </div>
               <div className="text-3xl font-bold text-gray-900 mt-2">{dashStats.orderStats?.total ?? 0}</div>
             </div>
             
-            <div className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm border-l-4 border-amber-500 flex flex-col justify-between animate-fade-in hover:shadow-md transition-shadow">
-              <div className="text-amber-600 font-semibold text-xs flex items-center gap-1.5 uppercase"><Clock size={15}/> Đơn chờ xử lý</div>
+            <div 
+              onClick={() => navigateToOrdersWithStatus(['chờ xử lý'])}
+              className="bg-white p-5 rounded-xl border border-gray-200 border-l-4 border-l-amber-500 shadow-sm flex flex-col justify-between cursor-pointer hover:shadow-md hover:-translate-y-0.5 transition-all group"
+              title="Nhấp để xem danh sách đơn chờ xử lý"
+            >
+              <div className="text-amber-600 font-semibold text-xs flex items-center justify-between uppercase">
+                <span className="flex items-center gap-1.5"><Clock size={15}/> Đơn chờ xử lý</span>
+                <span className="text-[10px] text-gray-400 group-hover:text-amber-600 transition-colors">Xem ngay →</span>
+              </div>
               <div className="text-3xl font-bold text-gray-900 mt-2">{dashStats.orderStats?.pending ?? 0}</div>
             </div>
 
-            <div className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm border-l-4 border-indigo-500 flex flex-col justify-between animate-fade-in hover:shadow-md transition-shadow">
-              <div className="text-indigo-600 font-semibold text-xs flex items-center gap-1.5 uppercase"><UserCheck size={15}/> Đơn đã phân công</div>
+            <div 
+              onClick={() => navigateToOrdersWithStatus(['đang thực hiện'])}
+              className="bg-white p-5 rounded-xl border border-gray-200 border-l-4 border-l-indigo-500 shadow-sm flex flex-col justify-between cursor-pointer hover:shadow-md hover:-translate-y-0.5 transition-all group"
+              title="Nhấp để xem danh sách đơn đã phân công (đang thực hiện)"
+            >
+              <div className="text-indigo-600 font-semibold text-xs flex items-center justify-between uppercase">
+                <span className="flex items-center gap-1.5"><UserCheck size={15}/> Đơn đã phân công</span>
+                <span className="text-[10px] text-gray-400 group-hover:text-indigo-600 transition-colors">Xem ngay →</span>
+              </div>
               <div className="text-3xl font-bold text-gray-900 mt-2">{dashStats.orderStats?.assigned ?? 0}</div>
             </div>
 
-            <div className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm border-l-4 border-emerald-500 flex flex-col justify-between animate-fade-in hover:shadow-md transition-shadow">
-              <div className="text-emerald-600 font-semibold text-xs flex items-center gap-1.5 uppercase"><CheckCircle size={15}/> Đơn hoàn thành</div>
+            <div 
+              onClick={() => navigateToOrdersWithStatus(['hoàn thành'])}
+              className="bg-white p-5 rounded-xl border border-gray-200 border-l-4 border-l-emerald-500 shadow-sm flex flex-col justify-between cursor-pointer hover:shadow-md hover:-translate-y-0.5 transition-all group"
+              title="Nhấp để xem danh sách đơn đã hoàn thành"
+            >
+              <div className="text-emerald-600 font-semibold text-xs flex items-center justify-between uppercase">
+                <span className="flex items-center gap-1.5"><CheckCircle size={15}/> Đơn hoàn thành</span>
+                <span className="text-[10px] text-gray-400 group-hover:text-emerald-600 transition-colors">Xem ngay →</span>
+              </div>
               <div className="text-3xl font-bold text-gray-900 mt-2">{dashStats.orderStats?.completed ?? 0}</div>
             </div>
 
-            <div className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm border-l-4 border-rose-500 flex flex-col justify-between animate-fade-in hover:shadow-md transition-shadow">
-              <div className="text-rose-600 font-semibold text-xs flex items-center gap-1.5 uppercase"><XCircle size={15}/> Đơn bị hủy</div>
+            <div 
+              onClick={() => navigateToOrdersWithStatus(['hủy đơn'])}
+              className="bg-white p-5 rounded-xl border border-gray-200 border-l-4 border-l-rose-500 shadow-sm flex flex-col justify-between cursor-pointer hover:shadow-md hover:-translate-y-0.5 transition-all group"
+              title="Nhấp để xem danh sách đơn bị hủy"
+            >
+              <div className="text-rose-600 font-semibold text-xs flex items-center justify-between uppercase">
+                <span className="flex items-center gap-1.5"><XCircle size={15}/> Đơn bị hủy</span>
+                <span className="text-[10px] text-gray-400 group-hover:text-rose-600 transition-colors">Xem ngay →</span>
+              </div>
               <div className="text-3xl font-bold text-gray-900 mt-2">{dashStats.orderStats?.cancelled ?? 0}</div>
             </div>
           </div>
@@ -1885,6 +2043,358 @@ export default function Dashboard() {
                       </tbody>
                     </table>
                   )}
+                </div>
+              </div>
+            </>
+          )}
+        </div>
+      )}
+
+      {/* TAB CONTENT 7: REVENUE ANALYSIS */}
+      {activeTab === 'revenue' && (
+        <div className="space-y-6 animate-fade-in">
+          {loadingRevenue ? (
+            <div className="bg-white p-12 rounded-xl border border-gray-200 shadow-sm flex flex-col items-center justify-center space-y-3">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-600"></div>
+              <p className="text-gray-500 text-sm font-medium">Đang tải và phân tích dữ liệu doanh thu...</p>
+            </div>
+          ) : !revenueData ? (
+            <div className="bg-white p-8 rounded-xl border border-gray-200 text-center text-gray-500">
+              Không có dữ liệu doanh thu cho khoảng thời gian và bộ lọc được chọn.
+            </div>
+          ) : (
+            <>
+              {/* KPI Summary Cards */}
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                {/* Tổng Doanh Thu */}
+                <div className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm border-l-4 border-emerald-500 flex flex-col justify-between hover:shadow-md transition-shadow">
+                  <div className="flex justify-between items-center">
+                    <span className="text-emerald-700 font-bold text-xs flex items-center gap-1.5 uppercase">
+                      <DollarSign size={16} /> Tổng doanh thu thực tế
+                    </span>
+                    <span className={`px-2 py-0.5 rounded-full text-[11px] font-bold flex items-center gap-0.5 ${
+                      revenueData.summary.percentChange >= 0
+                        ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                        : 'bg-rose-50 text-rose-700 border border-rose-200'
+                    }`}>
+                      {revenueData.summary.percentChange >= 0 ? <ArrowUpRight size={14} /> : <ArrowDownRight size={14} />}
+                      {revenueData.summary.percentChange >= 0 ? `+${revenueData.summary.percentChange}%` : `${revenueData.summary.percentChange}%`}
+                    </span>
+                  </div>
+                  <div className="mt-3">
+                    <div className="text-3xl font-bold text-gray-900 tracking-tight">
+                      {revenueData.summary.totalRevenue.toLocaleString('vi-VN')} <span className="text-sm font-semibold text-gray-500">VNĐ</span>
+                    </div>
+                    <p className="text-[11px] text-gray-500 mt-1 font-medium">
+                      So với kỳ trước ({revenueData.summary.prevRevenue.toLocaleString('vi-VN')} VNĐ)
+                    </p>
+                  </div>
+                </div>
+
+                {/* Tổng Số Đơn Hoàn Thành */}
+                <div className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm border-l-4 border-blue-500 flex flex-col justify-between hover:shadow-md transition-shadow">
+                  <div className="text-blue-700 font-bold text-xs flex items-center gap-1.5 uppercase">
+                    <CheckCircle size={16} /> Số đơn đã hoàn thành
+                  </div>
+                  <div className="mt-3">
+                    <div className="text-3xl font-bold text-gray-900 tracking-tight">
+                      {revenueData.summary.ordersCount} <span className="text-sm font-semibold text-gray-500">đơn</span>
+                    </div>
+                    <p className="text-[11px] text-gray-500 mt-1 font-medium">
+                      Bao gồm ca tạo thủ công, không tính đơn eCom sàn
+                    </p>
+                  </div>
+                </div>
+
+                {/* Giá Trị Trung Bình / Đơn */}
+                <div className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm border-l-4 border-indigo-500 flex flex-col justify-between hover:shadow-md transition-shadow">
+                  <div className="text-indigo-700 font-bold text-xs flex items-center gap-1.5 uppercase">
+                    <TrendingUp size={16} /> Doanh thu TB / Đơn
+                  </div>
+                  <div className="mt-3">
+                    <div className="text-3xl font-bold text-gray-900 tracking-tight">
+                      {revenueData.summary.avgOrderValue.toLocaleString('vi-VN')} <span className="text-sm font-semibold text-gray-500">VNĐ</span>
+                    </div>
+                    <p className="text-[11px] text-gray-500 mt-1 font-medium">
+                      Giá trị trung bình thu được trên mỗi đơn
+                    </p>
+                  </div>
+                </div>
+
+                {/* Kỳ Đối Chiếu */}
+                <div className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm border-l-4 border-purple-500 flex flex-col justify-between hover:shadow-md transition-shadow">
+                  <div className="text-purple-700 font-bold text-xs flex items-center gap-1.5 uppercase">
+                    <Clock size={16} /> Khoảng thời gian đối chiếu
+                  </div>
+                  <div className="mt-3 space-y-1 text-xs">
+                    <div className="flex justify-between text-gray-700">
+                      <span className="text-gray-500 font-medium">Kỳ này:</span>
+                      <strong className="font-semibold text-gray-900">{formatDateVN(revenueData.periodInfo.current.start)} → {formatDateVN(revenueData.periodInfo.current.end)}</strong>
+                    </div>
+                    <div className="flex justify-between text-gray-700 border-t pt-1">
+                      <span className="text-gray-500 font-medium">Kỳ trước:</span>
+                      <strong className="font-semibold text-purple-700">{formatDateVN(revenueData.periodInfo.previous.start)} → {formatDateVN(revenueData.periodInfo.previous.end)}</strong>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* DATA SOURCE NOTE BANNER */}
+              <div className="bg-blue-50/70 border border-blue-200/80 p-3.5 rounded-xl text-xs text-blue-900 flex items-start gap-2.5 shadow-2xs">
+                <Info size={16} className="text-blue-600 flex-shrink-0 mt-0.5" />
+                <div className="space-y-0.5">
+                  <span className="font-bold text-blue-950">Nguồn dữ liệu & Quy tắc tính toán Doanh thu:</span>
+                  <p className="text-blue-800 leading-relaxed">
+                    Bao gồm các ca dịch vụ <b>Hoàn thành</b> (Pancake, Zalo Mini App, Hotline, <b>Ca tạo thủ công</b>...). Ưu tiên lấy <b>Số tiền thu hộ thực tế (COD)</b>. <b>Không tính</b> các đơn hàng bán lẻ sản phẩm qua sàn TMĐT (<i>Shopee, Lazada, TikTok Shop, Tiki</i>).
+                  </p>
+                </div>
+              </div>
+
+              {/* 1. Biểu đồ Doanh thu theo Thời gian */}
+              <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm space-y-4">
+                <div className="flex justify-between items-center border-b pb-3">
+                  <div>
+                    <h3 className="font-bold text-base text-[#1B3A6B]">1. Xu hướng Doanh thu theo Ngày</h3>
+                    <p className="text-xs text-gray-500">Tổng tiền thu được theo ngày trong khoảng thời gian đã chọn</p>
+                  </div>
+                </div>
+                <div className="h-80 w-full">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <AreaChart data={revenueData.timeTrend} margin={{ top: 10, right: 30, left: 20, bottom: 0 }}>
+                      <defs>
+                        <linearGradient id="colorRevenue" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%" stopColor="#10B981" stopOpacity={0.8}/>
+                          <stop offset="95%" stopColor="#10B981" stopOpacity={0.05}/>
+                        </linearGradient>
+                        <linearGradient id="colorPrevRevenue" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%" stopColor="#8B5CF6" stopOpacity={0.4}/>
+                          <stop offset="95%" stopColor="#8B5CF6" stopOpacity={0.05}/>
+                        </linearGradient>
+                      </defs>
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#F3F4F6" />
+                      <XAxis dataKey="date" tick={{ fontSize: 11, fill: '#6B7280' }} tickFormatter={(val) => formatDateVN(val)} />
+                      <YAxis tick={{ fontSize: 11, fill: '#6B7280' }} tickFormatter={(val) => `${(val / 1000000).toFixed(1)}M`} />
+                      <Legend verticalAlign="top" height={36} wrapperStyle={{ fontSize: '12px', fontWeight: 600 }} />
+                      <RechartsTooltip 
+                        formatter={(val: any, name: any) => [`${Number(val).toLocaleString('vi-VN')} VNĐ`, name]}
+                        labelFormatter={(lbl, items) => {
+                          const item = items && items[0] ? items[0].payload : null;
+                          if (item && item.prevDate) {
+                            return `Kỳ này: ${formatDateVN(lbl)} | Kỳ trước: ${formatDateVN(item.prevDate)}`;
+                          }
+                          return `Ngày: ${formatDateVN(lbl)}`;
+                        }}
+                        contentStyle={{ backgroundColor: '#fff', borderRadius: '8px', border: '1px solid #E5E7EB', fontSize: '12px' }}
+                      />
+                      <Area 
+                        type="monotone" 
+                        dataKey="revenue" 
+                        stroke="#10B981" 
+                        strokeWidth={3} 
+                        fillOpacity={1} 
+                        fill="url(#colorRevenue)" 
+                        name={`Kỳ này (${formatDateVN(revenueData.periodInfo.current.start)} - ${formatDateVN(revenueData.periodInfo.current.end)})`} 
+                      />
+                      <Area 
+                        type="monotone" 
+                        dataKey="prevRevenue" 
+                        stroke="#8B5CF6" 
+                        strokeWidth={2.5} 
+                        strokeDasharray="5 5" 
+                        fillOpacity={1} 
+                        fill="url(#colorPrevRevenue)" 
+                        name={`Kỳ trước (${formatDateVN(revenueData.periodInfo.previous.start)} - ${formatDateVN(revenueData.periodInfo.previous.end)})`} 
+                      />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+
+              {/* 2 & 3. Grid: Doanh Thu Theo Trạm & Theo Loại Công Việc */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                {/* 2. Doanh thu theo Trạm Chính */}
+                <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm space-y-4 flex flex-col justify-between">
+                  <div>
+                    <h3 className="font-bold text-base text-[#1B3A6B]">2. Doanh thu theo Trạm Quản lý</h3>
+                    <p className="text-xs text-gray-500 mb-4">Tổng thu nhập tạo ra bởi từng Trạm chính</p>
+                    <div className="h-72 w-full">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <BarChart data={revenueData.byStation} layout="vertical" margin={{ top: 5, right: 30, left: 40, bottom: 5 }}>
+                          <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#F3F4F6" />
+                          <XAxis type="number" tickFormatter={(val) => `${(val / 1000000).toFixed(1)}M`} tick={{ fontSize: 11 }} />
+                          <YAxis dataKey="name" type="category" tick={{ fontSize: 11, fill: '#374151' }} width={110} />
+                          <Legend verticalAlign="top" height={30} wrapperStyle={{ fontSize: '11px' }} />
+                          <RechartsTooltip formatter={(val: any, name: any) => [`${Number(val).toLocaleString('vi-VN')} VNĐ`, name]} />
+                          <Bar dataKey="revenue" fill="#10B981" radius={[0, 4, 4, 0]} name="Kỳ này" />
+                          <Bar dataKey="prevRevenue" fill="#8B5CF6" radius={[0, 4, 4, 0]} name="Kỳ trước" />
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </div>
+                  </div>
+
+                  {/* Bảng chi tiết Trạm */}
+                  <div className="border-t pt-3">
+                    <div className="max-h-40 overflow-y-auto text-xs">
+                      <table className="w-full text-left">
+                        <thead>
+                          <tr className="text-gray-500 font-semibold border-b text-[11px] uppercase">
+                            <th className="pb-1.5">Trạm</th>
+                            <th className="pb-1.5 text-right">Kỳ này</th>
+                            <th className="pb-1.5 text-right">Kỳ trước</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-100">
+                          {revenueData.byStation.map((st: any, idx: number) => (
+                            <tr key={idx} className="hover:bg-gray-50">
+                              <td className="py-1.5 font-medium text-gray-800">{st.name}</td>
+                              <td className="py-1.5 text-right font-bold text-emerald-700">{st.revenue.toLocaleString('vi-VN')} đ</td>
+                              <td className="py-1.5 text-right font-medium text-purple-700">{(st.prevRevenue || 0).toLocaleString('vi-VN')} đ</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </div>
+
+                {/* 3. Doanh thu theo Loại Công Việc */}
+                <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm space-y-4 flex flex-col justify-between">
+                  <div>
+                    <h3 className="font-bold text-base text-[#1B3A6B]">3. Doanh thu theo Loại Công việc</h3>
+                    <p className="text-xs text-gray-500 mb-4">Cơ cấu doanh thu theo từng dịch vụ thi công</p>
+                    <div className="h-72 w-full">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <BarChart data={revenueData.byWorkType} margin={{ top: 10, right: 30, left: 10, bottom: 20 }}>
+                          <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#F3F4F6" />
+                          <XAxis dataKey="name" tick={{ fontSize: 10, fill: '#374151' }} interval={0} angle={-15} textAnchor="end" />
+                          <YAxis tickFormatter={(val) => `${(val / 1000000).toFixed(1)}M`} tick={{ fontSize: 11 }} />
+                          <Legend verticalAlign="top" height={30} wrapperStyle={{ fontSize: '11px' }} />
+                          <RechartsTooltip formatter={(val: any, name: any) => [`${Number(val).toLocaleString('vi-VN')} VNĐ`, name]} />
+                          <Bar dataKey="revenue" fill="#00A3FF" radius={[4, 4, 0, 0]} name="Kỳ này" />
+                          <Bar dataKey="prevRevenue" fill="#8B5CF6" radius={[4, 4, 0, 0]} name="Kỳ trước" />
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </div>
+                  </div>
+
+                  {/* Bảng chi tiết Loại công việc */}
+                  <div className="border-t pt-3">
+                    <div className="max-h-40 overflow-y-auto text-xs">
+                      <table className="w-full text-left">
+                        <thead>
+                          <tr className="text-gray-500 font-semibold border-b text-[11px] uppercase">
+                            <th className="pb-1.5">Loại công việc</th>
+                            <th className="pb-1.5 text-right">Số đơn</th>
+                            <th className="pb-1.5 text-right">Doanh thu</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-100">
+                          {revenueData.byWorkType.map((wt: any, idx: number) => (
+                            <tr key={idx} className="hover:bg-gray-50">
+                              <td className="py-1.5 font-medium text-gray-800">{wt.name}</td>
+                              <td className="py-1.5 text-right text-gray-600">{wt.ordersCount} đơn</td>
+                              <td className="py-1.5 text-right font-bold text-blue-700">{wt.revenue.toLocaleString('vi-VN')} đ</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* 4. Top Kỹ Thuật Viên Doanh Thu Cao Nhất */}
+              <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm space-y-4">
+                <div className="flex justify-between items-center border-b pb-3">
+                  <div>
+                    <h3 className="font-bold text-base text-[#1B3A6B] flex items-center gap-2">
+                      <Award className="text-amber-500" size={18} />
+                      4. Top Kỹ thuật viên Đóng góp Doanh thu Cao nhất
+                    </h3>
+                    <p className="text-xs text-gray-500">Bảng xếp hạng KTV hoàn thành ca đạt tổng giá trị thu hộ cao nhất</p>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
+                  <div className="lg:col-span-2 h-72 w-full">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart data={revenueData.byKtv.slice(0, 10)} margin={{ top: 10, right: 30, left: 10, bottom: 25 }}>
+                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#F3F4F6" />
+                        <XAxis dataKey="name" tick={{ fontSize: 11, fill: '#374151' }} interval={0} angle={-20} textAnchor="end" />
+                        <YAxis tickFormatter={(val) => `${(val / 1000000).toFixed(1)}M`} tick={{ fontSize: 11 }} />
+                        <RechartsTooltip formatter={(val: any) => [`${Number(val).toLocaleString('vi-VN')} VNĐ`, 'Doanh thu']} />
+                        <Bar dataKey="revenue" fill="#8B5CF6" radius={[4, 4, 0, 0]} name="Doanh thu" />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+
+                  {/* Top 5 Highlight List */}
+                  <div className="bg-purple-50/50 border border-purple-100 p-4 rounded-xl space-y-3">
+                    <h4 className="font-bold text-xs text-purple-900 uppercase tracking-wider">Xếp hạng Top 5 KTV</h4>
+                    <div className="space-y-2 text-xs">
+                      {revenueData.byKtv.slice(0, 5).map((ktv: any, idx: number) => (
+                        <div key={ktv.id} className="flex justify-between items-center bg-white p-2.5 rounded-lg border border-purple-100 shadow-2xs">
+                          <div className="flex items-center space-x-2.5">
+                            <span className={`w-5 h-5 rounded-full text-[11px] font-bold flex items-center justify-center ${
+                              idx === 0 ? 'bg-amber-400 text-white' : idx === 1 ? 'bg-slate-300 text-gray-800' : idx === 2 ? 'bg-amber-600 text-white' : 'bg-gray-100 text-gray-600'
+                            }`}>
+                              {idx + 1}
+                            </span>
+                            <div>
+                              <strong className="block text-gray-800 font-semibold">{ktv.name}</strong>
+                              <span className="text-[10px] text-gray-500">{ktv.ordersCount} ca hoàn thành</span>
+                            </div>
+                          </div>
+                          <strong className="text-purple-700 font-bold">{ktv.revenue.toLocaleString('vi-VN')} đ</strong>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* 5. Doanh thu theo Tỉnh/Thành phố */}
+              <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm space-y-4">
+                <div className="flex justify-between items-center border-b pb-3">
+                  <div>
+                    <h3 className="font-bold text-base text-[#1B3A6B] flex items-center gap-2">
+                      <MapPin className="text-rose-500" size={18} />
+                      5. Doanh thu theo Tỉnh / Thành phố
+                    </h3>
+                    <p className="text-xs text-gray-500">Phân bổ doanh thu thị trường theo vị trí địa lý</p>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-center">
+                  <div className="lg:col-span-2 h-72 w-full">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart data={revenueData.byProvince.slice(0, 10)} layout="vertical" margin={{ top: 5, right: 30, left: 30, bottom: 5 }}>
+                        <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#F3F4F6" />
+                        <XAxis type="number" tickFormatter={(val) => `${(val / 1000000).toFixed(1)}M`} tick={{ fontSize: 11 }} />
+                        <YAxis dataKey="name" type="category" tick={{ fontSize: 11, fill: '#374151' }} width={100} />
+                        <RechartsTooltip formatter={(val: any) => [`${Number(val).toLocaleString('vi-VN')} VNĐ`, 'Doanh thu']} />
+                        <Bar dataKey="revenue" fill="#F43F5E" radius={[0, 4, 4, 0]} name="Doanh thu" />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+
+                  <div className="border border-gray-200 rounded-xl overflow-hidden text-xs">
+                    <div className="bg-gray-50 p-3 font-bold text-gray-700 border-b flex justify-between">
+                      <span>Tỉnh thành</span>
+                      <span>Doanh thu</span>
+                    </div>
+                    <div className="max-h-60 overflow-y-auto divide-y divide-gray-100">
+                      {revenueData.byProvince.map((prov: any, idx: number) => (
+                        <div key={idx} className="p-2.5 flex justify-between items-center hover:bg-gray-50">
+                          <span className="font-medium text-gray-800">{prov.name}</span>
+                          <div className="text-right">
+                            <strong className="block text-rose-600 font-bold">{prov.revenue.toLocaleString('vi-VN')} đ</strong>
+                            <span className="text-[10px] text-gray-400">{prov.ordersCount} đơn</span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
                 </div>
               </div>
             </>

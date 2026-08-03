@@ -267,7 +267,7 @@ export async function sendZnsWarrantyActivation(
   // 4. Chuẩn bị dữ liệu gửi (Zalo Direct OpenAPI - Dùng cho Template ZCA 615292)
   const payload = {
     phone: formattedPhone,
-    template_id: templateId || process.env.ZALO_ZNS_TEMPLATE_ID || '615292',
+    template_id: templateId || process.env.ZALO_ZNS_TEMPLATE_ID || '10232',
     template_data: {
       customer_name: customerName,
       product_name: productName,

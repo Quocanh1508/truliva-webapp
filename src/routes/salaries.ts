@@ -376,28 +376,29 @@ router.get('/calculate', requireAuth, requireAdmin, async (req: Request, res: Re
       for (const report of reports) {
         const costResult = calculateReportCost(report, ktvPhoneNorm, stationRate, userCustomRates);
         const customCostsObj = (report.customCosts as any) || {};
+        const hasManualOverride = report.customBaseCost !== null && report.customBaseCost !== undefined;
 
-        const baoHanhCost = customCostsObj.baoHanhCost !== undefined
+        const baoHanhCost = (hasManualOverride && customCostsObj.baoHanhCost !== undefined)
           ? Number(customCostsObj.baoHanhCost)
           : (costResult.rateType === 'baoHanh' ? costResult.baseCost : 0);
 
-        const suaChuaCost = customCostsObj.suaChuaCost !== undefined
+        const suaChuaCost = (hasManualOverride && customCostsObj.suaChuaCost !== undefined)
           ? Number(customCostsObj.suaChuaCost)
           : (costResult.rateType === 'suaChua' ? costResult.baseCost : 0);
 
-        const giaoHangCost = customCostsObj.giaoHangCost !== undefined
+        const giaoHangCost = (hasManualOverride && customCostsObj.giaoHangCost !== undefined)
           ? Number(customCostsObj.giaoHangCost)
           : (costResult.rateType === 'giaoHang' ? costResult.baseCost : 0);
 
-        const lapDatCost = customCostsObj.lapDatCost !== undefined
+        const lapDatCost = (hasManualOverride && customCostsObj.lapDatCost !== undefined)
           ? Number(customCostsObj.lapDatCost)
           : (costResult.rateType === 'lapDat' ? costResult.baseCost : 0);
 
-        const giaoLapCost = customCostsObj.giaoLapCost !== undefined
+        const giaoLapCost = (hasManualOverride && customCostsObj.giaoLapCost !== undefined)
           ? Number(customCostsObj.giaoLapCost)
           : (costResult.rateType === 'giaoHangLapDat' ? costResult.baseCost : 0);
 
-        const thayLocCost = customCostsObj.thayLocCost !== undefined
+        const thayLocCost = (hasManualOverride && customCostsObj.thayLocCost !== undefined)
           ? Number(customCostsObj.thayLocCost)
           : (costResult.rateType === 'thayLoc' ? costResult.baseCost : 0);
 
@@ -593,15 +594,20 @@ router.post('/update-base-cost', requireAuth, requireAdmin, async (req: Request,
       newCustomCosts = { ...newCustomCosts, ...customCosts };
     }
 
+    let updatedCustomBaseCost = baseCost !== undefined ? (baseCost !== null ? Number(baseCost) : null) : currentReport?.customBaseCost;
+
     if (fieldName) {
       const numVal = fieldValue === '' || fieldValue === null ? 0 : Number(fieldValue);
       newCustomCosts[fieldName] = isNaN(numVal) ? 0 : numVal;
+      if (fieldName !== 'otherCost' && fieldName !== 'distanceCost') {
+        updatedCustomBaseCost = isNaN(numVal) ? null : numVal;
+      }
     }
 
     await prisma.serviceReport.update({
       where: { id: reportId },
       data: {
-        ...(baseCost !== undefined ? { customBaseCost: baseCost !== null ? Number(baseCost) : null } : {}),
+        customBaseCost: updatedCustomBaseCost,
         customCosts: newCustomCosts
       }
     });
@@ -1250,9 +1256,13 @@ router.post('/rates', requireAuth, requireAdmin, async (req: Request, res: Respo
 
     await Promise.all(upsertPromises);
 
-    // Tự động đồng bộ lại calculatedCost cho các tháng đang ở trạng thái DRAFT (Nháp/Chưa khóa)
-    // Các tháng ĐÃ CHỐT (FINAL) sẽ giữ nguyên con số lịch sử và KHÔNG bị ảnh hưởng!
+    // Tự động đồng bộ lại chi phí chi tiết ca + calculatedCost cho các tháng DRAFT
+    // Khi Ma trận đơn giá thay đổi, cần RESET customCosts trên ServiceReport
+    // để chi tiết ca phản ánh đúng đơn giá mới (trừ report đã bị Admin ghi đè customBaseCost).
     try {
+      // Lấy danh sách userId bị thay đổi đơn giá
+      const affectedUserIds = [...new Set(rates.map(r => r.userId))];
+
       const draftRecords = await prisma.salaryRecord.findMany({
         where: { status: 'DRAFT' },
         select: { month: true }
@@ -1271,18 +1281,34 @@ router.post('/rates', requireAuth, requireAdmin, async (req: Request, res: Respo
         }
 
         for (const draftMonth of draftMonths) {
-          const formattedMonth = draftMonth.startsWith('0') ? `${Number(draftMonth.substring(0, 2))}/${draftMonth.substring(3)}` : draftMonth;
+          const [mStr, yStr] = draftMonth.split('/');
+          const mNum = Number(mStr);
+          const yNum = Number(yStr);
+          const monthVariants = [
+            draftMonth,
+            `${mNum}/${yNum}`,
+            `${String(mNum).padStart(2, '0')}/${yNum}`
+          ];
+          const startDate = new Date(Date.UTC(yNum, mNum - 1, 1, 0, 0, 0, 0));
+          const endDate = new Date(Date.UTC(yNum, mNum, 0, 23, 59, 59, 999));
+
           const recordsToUpdate = await prisma.salaryRecord.findMany({
             where: { month: draftMonth, status: 'DRAFT' },
             include: { user: true }
           });
 
           for (const rec of recordsToUpdate) {
+            // Chỉ xử lý KTV bị ảnh hưởng bởi thay đổi đơn giá
+            if (!affectedUserIds.includes(rec.userId)) continue;
+
             const reports = await prisma.serviceReport.findMany({
               where: {
                 ktvUserId: rec.userId,
-                month: formattedMonth,
-                approvalStatus: 'APPROVED'
+                approvalStatus: 'APPROVED',
+                OR: [
+                  { month: { in: monthVariants } },
+                  { createdAt: { gte: startDate, lte: endDate } }
+                ]
               },
               include: { order: true }
             });
@@ -1293,8 +1319,47 @@ router.post('/rates', requireAuth, requireAdmin, async (req: Request, res: Respo
 
             let newCalculated = 0;
             for (const rep of reports) {
-              const cost = calculateReportCost(rep, ktvPhoneNorm, stationRate, userCustomRates);
-              newCalculated += cost.totalCost;
+              const costResult = calculateReportCost(rep, ktvPhoneNorm, stationRate, userCustomRates);
+
+              // Reset customCosts trên report để phản ánh đơn giá mới từ Ma trận
+              // CHỈ reset nếu report KHÔNG có customBaseCost (ghi đè thủ công riêng cho ca)
+              if (rep.customBaseCost === null || rep.customBaseCost === undefined) {
+                const existingCustom = (rep.customCosts as any) || {};
+                // Giữ nguyên otherCost (phụ phí) vì đây là chi phí phát sinh do Admin nhập thủ công
+                const preservedOtherCost = existingCustom.otherCost !== undefined ? existingCustom.otherCost : 0;
+
+                // Rebuild customCosts dựa trên đơn giá mới từ calculateReportCost
+                const newCustomCosts: Record<string, number> = {
+                  baoHanhCost: costResult.rateType === 'baoHanh' ? costResult.baseCost : 0,
+                  suaChuaCost: costResult.rateType === 'suaChua' ? costResult.baseCost : 0,
+                  giaoHangCost: costResult.rateType === 'giaoHang' ? costResult.baseCost : 0,
+                  lapDatCost: costResult.rateType === 'lapDat' ? costResult.baseCost : 0,
+                  giaoLapCost: costResult.rateType === 'giaoHangLapDat' ? costResult.baseCost : 0,
+                  thayLocCost: costResult.rateType === 'thayLoc' ? costResult.baseCost : 0,
+                  distanceCost: costResult.distanceCost,
+                  otherCost: preservedOtherCost
+                };
+
+                await prisma.serviceReport.update({
+                  where: { id: rep.id },
+                  data: { customCosts: newCustomCosts }
+                });
+
+                const totalReportCost = Object.values(newCustomCosts).reduce((a, b) => a + b, 0);
+                newCalculated += totalReportCost;
+              } else {
+                // Report đã bị ghi đè thủ công: giữ nguyên customCosts hiện tại
+                const customCostsObj = (rep.customCosts as any) || {};
+                const baoHanhCost = customCostsObj.baoHanhCost !== undefined ? Number(customCostsObj.baoHanhCost) : (costResult.rateType === 'baoHanh' ? costResult.baseCost : 0);
+                const suaChuaCost = customCostsObj.suaChuaCost !== undefined ? Number(customCostsObj.suaChuaCost) : (costResult.rateType === 'suaChua' ? costResult.baseCost : 0);
+                const giaoHangCost = customCostsObj.giaoHangCost !== undefined ? Number(customCostsObj.giaoHangCost) : (costResult.rateType === 'giaoHang' ? costResult.baseCost : 0);
+                const lapDatCost = customCostsObj.lapDatCost !== undefined ? Number(customCostsObj.lapDatCost) : (costResult.rateType === 'lapDat' ? costResult.baseCost : 0);
+                const giaoLapCost = customCostsObj.giaoLapCost !== undefined ? Number(customCostsObj.giaoLapCost) : (costResult.rateType === 'giaoHangLapDat' ? costResult.baseCost : 0);
+                const thayLocCost = customCostsObj.thayLocCost !== undefined ? Number(customCostsObj.thayLocCost) : (costResult.rateType === 'thayLoc' ? costResult.baseCost : 0);
+                const distanceCost = customCostsObj.distanceCost !== undefined ? Number(customCostsObj.distanceCost) : costResult.distanceCost;
+                const otherCost = customCostsObj.otherCost !== undefined ? Number(customCostsObj.otherCost) : (rep.additionalCost || 0);
+                newCalculated += baoHanhCost + suaChuaCost + giaoHangCost + lapDatCost + giaoLapCost + thayLocCost + distanceCost + otherCost;
+              }
             }
 
             const newAdjusted = rec.adjustmentNote ? rec.adjustedCost : newCalculated;

@@ -13,13 +13,15 @@ interface DateRangePickerProps {
   endDate: string; // YYYY-MM-DD
   onChange: (start: string, end: string) => void;
   placeholder?: string;
+  align?: 'left' | 'right';
 }
 
 export default function DateRangePicker({
   startDate,
   endDate,
   onChange,
-  placeholder = 'Bắt đầu - kết thúc'
+  placeholder = 'Bắt đầu - kết thúc',
+  align = 'left'
 }: DateRangePickerProps) {
   const [isOpen, setIsOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -338,7 +340,7 @@ export default function DateRangePicker({
 
       {/* Date Picker Dropdown Popover */}
       {isOpen && (
-        <div className="absolute right-0 mt-2 bg-white border border-gray-200 rounded-xl shadow-xl z-50 flex flex-col md:flex-row overflow-hidden divide-y md:divide-y-0 md:divide-x divide-gray-150 animate-in fade-in slide-in-from-top-1 duration-150">
+        <div className={`absolute ${align === 'right' ? 'right-0' : 'left-0'} mt-2 bg-white border border-gray-200 rounded-xl shadow-2xl z-50 flex flex-col md:flex-row overflow-hidden divide-y md:divide-y-0 md:divide-x divide-gray-150 animate-in fade-in slide-in-from-top-1 duration-150 max-w-[95vw]`}>
           
           {/* Quick presets sidebar */}
           <div className="w-full md:w-36 flex md:flex-col p-3 bg-gray-50/50 justify-between md:justify-start gap-1">

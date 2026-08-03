@@ -291,6 +291,23 @@ export const getProductQualityAnalysis = async (params: Record<string, any> = {}
   return fetchApi(q ? `/dashboard/product-quality?${q}` : '/dashboard/product-quality');
 };
 
+export const getRevenueAnalysis = async (params: Record<string, any> = {}) => {
+  const query = new URLSearchParams();
+  for (const [key, value] of Object.entries(params)) {
+    if (value !== undefined && value !== null && value !== '') {
+      if (Array.isArray(value)) {
+        if (value.length > 0) {
+          query.append(key, value.join(','));
+        }
+      } else {
+        query.append(key, String(value));
+      }
+    }
+  }
+  const q = query.toString();
+  return fetchApi(q ? `/dashboard/revenue?${q}` : '/dashboard/revenue');
+};
+
 export const rescheduleOrder = async (orderId: string, appointmentTime: string, rescheduleReason: string) => {
   return fetchApi(`/orders/${orderId}/reschedule`, {
     method: 'POST',

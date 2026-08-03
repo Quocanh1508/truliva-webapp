@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { ChevronDown, Search, X, Check } from 'lucide-react';
+import { ChevronDown, X, Check } from 'lucide-react';
 import { PANCAKE_PROVINCES, PRIORITY_PROVINCES, normalizeProvince } from '../utils/provinces';
 import { removeVietnameseTones } from '../utils/text';
 
