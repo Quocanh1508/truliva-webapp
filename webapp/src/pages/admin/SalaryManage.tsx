@@ -751,6 +751,11 @@ export default function SalaryManage() {
 
   // Filtered Summary View
   const filteredSalaries = useMemo(() => {
+    const normStr = (str: string | null | undefined): string => {
+      if (!str) return '';
+      return String(str).toLowerCase().replace(/trạm\s+/g, '').trim();
+    };
+
     return salaries.filter(s => {
       const hasActivity = s.casesCount > 0 || (s.adjustedCost !== s.calculatedCost) || !!s.adjustmentNote;
       const matchKtv = selectedKtvsFilter.length === 0 ? hasActivity : selectedKtvsFilter.includes(s.userId);
@@ -759,9 +764,24 @@ export default function SalaryManage() {
       const sTech = s.stationName && s.stationName !== 'Không có' ? s.stationName : 'Khác';
       const sKey = `${sMain}::${sTech}`;
 
-      const matchStation = selectedStationsFilter.length === 0 || 
-        selectedStationsFilter.includes(sKey) || 
-        selectedStationsFilter.includes(s.stationName);
+      const normKey = normStr(sKey);
+      const normMain = normStr(sMain);
+      const normTech = normStr(sTech);
+
+      const matchStation = selectedStationsFilter.length === 0 || selectedStationsFilter.some(item => {
+        const filter = item.trim();
+        if (!filter) return false;
+        const normF = normStr(filter);
+
+        if (filter === sKey || normF === normKey) return true;
+
+        if (filter.includes('::')) {
+          const [f1, f2] = filter.split('::').map(x => normStr(x));
+          return (f1 === normMain && f2 === normTech) || (f1 === normTech && f2 === normMain);
+        }
+
+        return normMain === normF || normTech === normF;
+      });
 
       const matchCompletedDate = !selectedCompletedDateFilter || (s.cases && s.cases.some(c => {
         if (!c.createdAt) return false;
@@ -779,6 +799,11 @@ export default function SalaryManage() {
 
   // Filtered Detailed Cases View
   const filteredCases = useMemo(() => {
+    const normStr = (str: string | null | undefined): string => {
+      if (!str) return '';
+      return String(str).toLowerCase().replace(/trạm\s+/g, '').trim();
+    };
+
     return allCases.filter(c => {
       const matchKtv = selectedKtvsFilter.length === 0 || selectedKtvsFilter.includes(c.userId);
 
@@ -786,9 +811,24 @@ export default function SalaryManage() {
       const cTech = c.stationName && c.stationName !== 'Không có' ? c.stationName : 'Khác';
       const cKey = `${cMain}::${cTech}`;
 
-      const matchStation = selectedStationsFilter.length === 0 || 
-        selectedStationsFilter.includes(cKey) || 
-        selectedStationsFilter.includes(c.stationName);
+      const normKey = normStr(cKey);
+      const normMain = normStr(cMain);
+      const normTech = normStr(cTech);
+
+      const matchStation = selectedStationsFilter.length === 0 || selectedStationsFilter.some(item => {
+        const filter = item.trim();
+        if (!filter) return false;
+        const normF = normStr(filter);
+
+        if (filter === cKey || normF === normKey) return true;
+
+        if (filter.includes('::')) {
+          const [f1, f2] = filter.split('::').map(x => normStr(x));
+          return (f1 === normMain && f2 === normTech) || (f1 === normTech && f2 === normMain);
+        }
+
+        return normMain === normF || normTech === normF;
+      });
 
       const matchWorkType = !selectedWorkTypeFilter || c.workType.toLowerCase().includes(selectedWorkTypeFilter.toLowerCase());
 

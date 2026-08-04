@@ -731,8 +731,11 @@ router.get('/export', requireAuth, requireAdmin, async (req: Request, res: Respo
     const mainStationIdsList = mainStationId ? mainStationId.split(',').map(s => s.trim()).filter(Boolean) : [];
     const workTypesList = workTypeFilter ? workTypeFilter.split(',').map(s => s.trim()).filter(Boolean) : [];
 
-    const parsedTechNames = stationIdsList.map(s => s.includes('::') ? s.split('::')[1] : s).filter(Boolean);
-    const parsedMainNames = mainStationIdsList.map(s => s.includes('::') ? s.split('::')[0] : s).filter(Boolean);
+    // Helper to normalize strings for comparison (remove 'Trạm', lowercase, trim)
+    const normStr = (str: string | null | undefined): string => {
+      if (!str) return '';
+      return String(str).toLowerCase().replace(/trạm\s+/g, '').trim();
+    };
 
     // 1. Filter KTV Summary list (Sheet 1) using EXACT SAME logic as Frontend
     const filteredSalaries = allSalaries.filter(s => {
@@ -740,20 +743,44 @@ router.get('/export', requireAuth, requireAdmin, async (req: Request, res: Respo
       const matchKtv = ktvIdsList.length === 0 ? hasActivity : ktvIdsList.includes(s.userId);
       if (!matchKtv) return false;
 
-      const sMain = s.mainStationName && s.mainStationName !== 'Không có' ? s.mainStationName : 'Trực thuộc Truliva';
-      const sTech = s.stationName && s.stationName !== 'Không có' ? s.stationName : 'Khác';
-      const sKey = `${sMain}::${sTech}`;
+      if (stationIdsList.length > 0) {
+        const sMain = s.mainStationName && s.mainStationName !== 'Không có' ? s.mainStationName : 'Trực thuộc Truliva';
+        const sTech = s.stationName && s.stationName !== 'Không có' ? s.stationName : 'Khác';
+        const sKey = `${sMain}::${sTech}`;
 
-      const matchStation = stationIdsList.length === 0 ||
-        stationIdsList.includes(sKey) ||
-        stationIdsList.includes(s.stationName) ||
-        parsedTechNames.includes(s.stationName);
-      if (!matchStation) return false;
+        const normKey = normStr(sKey);
+        const normMain = normStr(sMain);
+        const normTech = normStr(sTech);
 
-      const matchMainStation = mainStationIdsList.length === 0 ||
-        mainStationIdsList.includes(s.mainStationName) ||
-        parsedMainNames.includes(s.mainStationName);
-      if (!matchMainStation) return false;
+        const matchStation = stationIdsList.some(item => {
+          const filter = item.trim();
+          if (!filter) return false;
+          const normF = normStr(filter);
+
+          // Exact stationKey match ("Hưng Thịnh::Hà Nội" or "Trạm Hà Nội::Trạm Hưng Thịnh")
+          if (filter === sKey || normF === normKey) return true;
+
+          // If filter contains '::', main and tech must both match
+          if (filter.includes('::')) {
+            const [f1, f2] = filter.split('::').map(x => normStr(x));
+            return (f1 === normMain && f2 === normTech) || (f1 === normTech && f2 === normMain);
+          }
+
+          // If single filter without '::', match mainStationName OR stationName
+          return normMain === normF || normTech === normF;
+        });
+
+        if (!matchStation) return false;
+      }
+
+      if (mainStationIdsList.length > 0) {
+        const normMain = normStr(s.mainStationName);
+        const matchMain = mainStationIdsList.some(m => {
+          const normM = normStr(m);
+          return normMain === normM;
+        });
+        if (!matchMain) return false;
+      }
 
       const matchCompletedDate = !completedDate || (s.cases && s.cases.some((c: any) => {
         if (!c.createdAt) return false;
