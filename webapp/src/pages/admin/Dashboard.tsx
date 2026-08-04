@@ -1,13 +1,13 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { fetchApi, getDashboardStats, getStations, getDispatchAnalysis, getKtvUsers, getProductQualityAnalysis, getRevenueAnalysis } from '../../api/client';
-import { 
-  FileText, CheckCircle, Clock, Building, MapPin, 
+import {
+  FileText, CheckCircle, Clock, Building, MapPin,
   AlertTriangle, Info, Filter, AlertCircle, RefreshCw, TrendingUp,
   ClipboardList, UserCheck, XCircle, DollarSign, ArrowUpRight, ArrowDownRight, Award
 } from 'lucide-react';
-import { 
-  BarChart, Bar, XAxis, YAxis, Tooltip as RechartsTooltip, Legend, 
+import {
+  BarChart, Bar, XAxis, YAxis, Tooltip as RechartsTooltip, Legend,
   ResponsiveContainer, CartesianGrid, AreaChart, Area,
   LineChart, Line, PieChart, Pie, Cell
 } from 'recharts';
@@ -16,22 +16,22 @@ import { scaleQuantile } from 'd3-scale';
 import DateRangePicker from '../../components/DateRangePicker';
 
 function removeVietnameseTones(str: string) {
-    if (!str) return '';
-    str = str.replace(/à|á|ạ|ả|ã|â|ầ|ấ|ậ|ẩ|ẫ|ă|ằ|ắ|ặ|ẳ|ẵ/g,"a"); 
-    str = str.replace(/è|é|ẹ|ẻ|ẽ|ê|ề|ế|ệ|ể|ễ/g,"e"); 
-    str = str.replace(/ì|í|ị|ỉ|ĩ/g,"i"); 
-    str = str.replace(/ò|ó|ọ|ỏ|õ|ô|ồ|ố|ộ|ổ|ỗ|ơ|ờ|ớ|ợ|ở|ỡ/g,"o"); 
-    str = str.replace(/ù|ú|ụ|ủ|ũ|ư|ừ|ứ|ự|ử|ữ/g,"u"); 
-    str = str.replace(/ỳ|ý|ỵ|ỷ|ỹ/g,"y"); 
-    str = str.replace(/đ/g,"d");
-    str = str.replace(/À|Á|Ạ|Ả|Ã|Â|Ầ|Ấ|Ậ|Ẩ|Ẫ|Ă|Ằ|Ắ|Ặ|Ẳ|Ẵ/g, "A");
-    str = str.replace(/È|É|Ẹ|Ẻ|Ẽ|Ê|Ề|Ế|Ệ|Ể|Ễ/g, "E");
-    str = str.replace(/Ì|Í|Ị|Ỉ|Ĩ/g, "I");
-    str = str.replace(/Ò|Ó|Ọ|Ỏ|Õ|Ô|Ồ|Ố|Ộ|Ổ|Ỗ|Ơ|Ờ|Ớ|Ợ|Ở|Ỡ/g, "O");
-    str = str.replace(/Ù|Ú|Ụ|Ủ|Ũ|Ư|Ừ|Ứ|Ự|Ử|Ữ/g, "U");
-    str = str.replace(/Ỳ|Ý|Ỵ|Ỷ|Ỹ/g, "Y");
-    str = str.replace(/Đ/g, "D");
-    return str;
+  if (!str) return '';
+  str = str.replace(/à|á|ạ|ả|ã|â|ầ|ấ|ậ|ẩ|ẫ|ă|ằ|ắ|ặ|ẳ|ẵ/g, "a");
+  str = str.replace(/è|é|ẹ|ẻ|ẽ|ê|ề|ế|ệ|ể|ễ/g, "e");
+  str = str.replace(/ì|í|ị|ỉ|ĩ/g, "i");
+  str = str.replace(/ò|ó|ọ|ỏ|õ|ô|ồ|ố|ộ|ổ|ỗ|ơ|ờ|ớ|ợ|ở|ỡ/g, "o");
+  str = str.replace(/ù|ú|ụ|ủ|ũ|ư|ừ|ứ|ự|ử|ữ/g, "u");
+  str = str.replace(/ỳ|ý|ỵ|ỷ|ỹ/g, "y");
+  str = str.replace(/đ/g, "d");
+  str = str.replace(/À|Á|Ạ|Ả|Ã|Â|Ầ|Ấ|Ậ|Ẩ|Ẫ|Ă|Ằ|Ắ|Ặ|Ẳ|Ẵ/g, "A");
+  str = str.replace(/È|É|Ẹ|Ẻ|Ẽ|Ê|Ề|Ế|Ệ|Ể|Ễ/g, "E");
+  str = str.replace(/Ì|Í|Ị|Ỉ|Ĩ/g, "I");
+  str = str.replace(/Ò|Ó|Ọ|Ỏ|Õ|Ô|Ồ|Ố|Ộ|Ổ|Ỗ|Ơ|Ờ|Ớ|Ợ|Ở|Ỡ/g, "O");
+  str = str.replace(/Ù|Ú|Ụ|Ủ|Ũ|Ư|Ừ|Ứ|Ự|Ử|Ữ/g, "U");
+  str = str.replace(/Ỳ|Ý|Ỵ|Ỷ|Ỹ/g, "Y");
+  str = str.replace(/Đ/g, "D");
+  return str;
 }
 
 function formatLocalDate(d: Date): string {
@@ -50,7 +50,7 @@ function formatDateVN(dateStr: string): string {
 
 const getGroupedStats = (dailyStats: any[], mode: 'day' | 'week' | 'month') => {
   if (!dailyStats || dailyStats.length === 0) return [];
-  
+
   if (mode === 'day') {
     return dailyStats.map(item => {
       const total = (item.onTime || 0) + (item.late || 0);
@@ -182,9 +182,8 @@ function MultiSelect({
           e.stopPropagation();
           onToggle();
         }}
-        className={`border rounded px-2.5 py-1.5 text-xs outline-none focus:border-blue-500 text-gray-700 bg-white flex justify-between items-center cursor-pointer min-h-[32px] text-left select-none transition-all ${
-          disabled ? 'opacity-50 cursor-not-allowed bg-gray-50 font-medium' : 'hover:border-gray-400 font-medium'
-        }`}
+        className={`border rounded px-2.5 py-1.5 text-xs outline-none focus:border-blue-500 text-gray-700 bg-white flex justify-between items-center cursor-pointer min-h-[32px] text-left select-none transition-all ${disabled ? 'opacity-50 cursor-not-allowed bg-gray-50 font-medium' : 'hover:border-gray-400 font-medium'
+          }`}
       >
         <span className="truncate pr-1">{getDisplayText()}</span>
         <svg
@@ -248,11 +247,13 @@ export default function Dashboard() {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<'summary' | 'ontime' | 'late' | 'workload' | 'stationComp' | 'productQuality' | 'revenue'>('summary');
 
-  const navigateToOrdersWithStatus = (statuses?: string[]) => {
+  const navigateToOrdersWithStatus = (statuses?: string[], customStart?: string, customEnd?: string) => {
     try {
       const existing = sessionStorage.getItem('truliva_order_filters');
       const parsed = existing ? JSON.parse(existing) : {};
       parsed.filterAdminStatuses = statuses || [];
+      parsed.customStartDate = customStart !== undefined ? customStart : startDate;
+      parsed.customEndDate = customEnd !== undefined ? customEnd : endDate;
       parsed.page = 1;
       sessionStorage.setItem('truliva_order_filters', JSON.stringify(parsed));
     } catch (e) {
@@ -260,7 +261,7 @@ export default function Dashboard() {
     }
     navigate('/admin/orders');
   };
-  
+
   // Data States
   const [stats, setStats] = useState<any>(null);
   const [dashStats, setDashStats] = useState<any>(null);
@@ -270,7 +271,7 @@ export default function Dashboard() {
   const [revenueData, setRevenueData] = useState<any>(null);
   const [loadingQuality, setLoadingQuality] = useState(false);
   const [loadingRevenue, setLoadingRevenue] = useState(false);
-  
+
   // Loading & Tooltip States
   const [loadingOverview, setLoadingOverview] = useState(true);
   const [loadingAnalysis, setLoadingAnalysis] = useState(true);
@@ -356,7 +357,7 @@ export default function Dashboard() {
   // Fetch dynamic analysis data whenever filters change
   useEffect(() => {
     setLoadingAnalysis(true);
-    
+
     getDashboardStats({
       startDate,
       endDate,
@@ -425,7 +426,7 @@ export default function Dashboard() {
       revenueScope,
       metricType: revenueMetricType
     })
-      .then(data => {
+      .then((data: any) => {
         setRevenueData(data);
       })
       .catch(console.error)
@@ -456,16 +457,16 @@ export default function Dashboard() {
 
   const availableTechStations = selectedMainStations.length > 0
     ? stationsList
-        .filter(s => selectedMainStations.includes(s.id))
-        .flatMap(s => s.techStations || [])
+      .filter(s => selectedMainStations.includes(s.id))
+      .flatMap(s => s.techStations || [])
     : [];
 
   // Expose unique provinces currently present in the late orders list
   const lateProvinces = analysisData?.lateOrders
     ? Array.from(new Set(analysisData.lateOrders.map((o: any) => o.province).filter(Boolean) as string[]))
-        .map(p => p.trim())
-        .filter(p => p.length > 0)
-        .sort((a, b) => a.localeCompare(b, 'vi'))
+      .map(p => p.trim())
+      .filter(p => p.length > 0)
+      .sort((a, b) => a.localeCompare(b, 'vi'))
     : [];
 
   const filteredLateOrders = selectedLateProvince && analysisData?.lateOrders
@@ -490,7 +491,7 @@ export default function Dashboard() {
 
   return (
     <div className="animate-fade-in relative font-sans space-y-6">
-      
+
       {/* Header */}
       <div className="flex justify-between items-center border-b pb-4">
         <div>
@@ -529,7 +530,7 @@ export default function Dashboard() {
           <Filter size={16} />
           <span>Bộ lọc dữ liệu phân tích</span>
         </div>
-        
+
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-3">
           {/* Khoảng ngày phân tích */}
           <div className="flex flex-col sm:col-span-2">
@@ -558,11 +559,10 @@ export default function Dashboard() {
                       setPrevStartDate('');
                       setPrevEndDate('');
                     }}
-                    className={`px-1.5 py-0.5 rounded font-medium transition-colors ${
-                      compareMode === 'auto' && !prevStartDate
+                    className={`px-1.5 py-0.5 rounded font-medium transition-colors ${compareMode === 'auto' && !prevStartDate
                         ? 'bg-emerald-100 text-emerald-800 font-bold'
                         : 'text-gray-500 hover:bg-gray-100'
-                    }`}
+                      }`}
                     title="Tự động lùi cùng số ngày liền trước"
                   >
                     Tự động
@@ -574,11 +574,10 @@ export default function Dashboard() {
                       setPrevStartDate('');
                       setPrevEndDate('');
                     }}
-                    className={`px-1.5 py-0.5 rounded font-medium transition-colors ${
-                      compareMode === 'yoy'
+                    className={`px-1.5 py-0.5 rounded font-medium transition-colors ${compareMode === 'yoy'
                         ? 'bg-emerald-100 text-emerald-800 font-bold'
                         : 'text-gray-500 hover:bg-gray-100'
-                    }`}
+                      }`}
                     title="So sánh với cùng kỳ năm trước"
                   >
                     YoY
@@ -672,8 +671,8 @@ export default function Dashboard() {
 
           {/* Buttons */}
           <div className="flex items-end">
-            <button 
-              onClick={resetFilters} 
+            <button
+              onClick={resetFilters}
               className="w-full border border-gray-300 hover:bg-gray-50 text-gray-600 text-xs py-2 px-3 rounded font-medium flex items-center justify-center space-x-1.5"
             >
               <RefreshCw size={13} />
@@ -689,7 +688,7 @@ export default function Dashboard() {
         <div className="text-xs space-y-1">
           <p className="font-bold text-[13px] text-[#1B3A6B]">Thông tin nguồn dữ liệu & bộ lọc:</p>
           <p className="text-gray-600 leading-relaxed font-medium">
-            Bộ lọc thời gian trên Dashboard được áp dụng theo <b>Ngày tạo đơn hàng trên Pancake</b>. 
+            Bộ lọc thời gian trên Dashboard được áp dụng theo <b>Ngày tạo đơn hàng trên Pancake</b>.
             Các chỉ số hiệu suất, tỷ lệ Đúng/Trễ hẹn và các biểu đồ phân tích liên quan được tính toán dựa trên <b>Ngày hẹn khách hàng</b> (hệ thống tự động thiết lập hoặc điều phối viên gán).
           </p>
         </div>
@@ -697,48 +696,48 @@ export default function Dashboard() {
 
       {/* TAB NAVIGATION */}
       <div className="flex border-b border-gray-200 bg-gray-50/50 p-1 rounded-lg space-x-1">
-        <button 
+        <button
           onClick={() => setActiveTab('summary')}
           className={`flex-1 md:flex-initial px-6 py-2.5 rounded-md text-sm font-semibold transition-all ${activeTab === 'summary' ? 'bg-white text-blue-600 shadow-sm border border-gray-200' : 'text-gray-600 hover:text-gray-900 hover:bg-white/50'}`}
         >
           Tổng quan & Mật độ
         </button>
-        <button 
+        <button
           onClick={() => setActiveTab('ontime')}
           className={`flex-1 md:flex-initial px-6 py-2.5 rounded-md text-sm font-semibold transition-all flex items-center justify-center space-x-1.5 ${activeTab === 'ontime' ? 'bg-white text-emerald-600 shadow-sm border border-gray-200' : 'text-gray-600 hover:text-gray-900 hover:bg-white/50'}`}
         >
           <CheckCircle size={15} />
           <span>Báo cáo Đúng Hẹn</span>
         </button>
-        <button 
+        <button
           onClick={() => setActiveTab('late')}
           className={`flex-1 md:flex-initial px-6 py-2.5 rounded-md text-sm font-semibold transition-all flex items-center justify-center space-x-1.5 ${activeTab === 'late' ? 'bg-white text-rose-600 shadow-sm border border-gray-200' : 'text-gray-600 hover:text-gray-900 hover:bg-white/50'}`}
         >
           <AlertTriangle size={15} />
           <span>Báo cáo Trễ Hẹn</span>
         </button>
-        <button 
+        <button
           onClick={() => setActiveTab('workload')}
           className={`flex-1 md:flex-initial px-6 py-2.5 rounded-md text-sm font-semibold transition-all flex items-center justify-center space-x-1.5 ${activeTab === 'workload' ? 'bg-white text-blue-800 shadow-sm border border-gray-200' : 'text-gray-600 hover:text-gray-900 hover:bg-white/50'}`}
         >
           <TrendingUp size={15} />
           <span>Phân tích Công việc</span>
         </button>
-        <button 
+        <button
           onClick={() => setActiveTab('stationComp')}
           className={`flex-1 md:flex-initial px-6 py-2.5 rounded-md text-sm font-semibold transition-all flex items-center justify-center space-x-1.5 ${activeTab === 'stationComp' ? 'bg-white text-purple-600 shadow-sm border border-gray-200' : 'text-gray-600 hover:text-gray-900 hover:bg-white/50'}`}
         >
           <Building size={15} />
           <span>Đối tác & Trạm chính</span>
         </button>
-        <button 
+        <button
           onClick={() => setActiveTab('productQuality')}
           className={`flex-1 md:flex-initial px-6 py-2.5 rounded-md text-sm font-semibold transition-all flex items-center justify-center space-x-1.5 ${activeTab === 'productQuality' ? 'bg-white text-orange-600 shadow-sm border border-gray-200' : 'text-gray-600 hover:text-gray-900 hover:bg-white/50'}`}
         >
           <AlertCircle size={15} />
           <span>Chất lượng sản phẩm</span>
         </button>
-        <button 
+        <button
           onClick={() => setActiveTab('revenue')}
           className={`flex-1 md:flex-initial px-6 py-2.5 rounded-md text-sm font-semibold transition-all flex items-center justify-center space-x-1.5 ${activeTab === 'revenue' ? 'bg-white text-emerald-600 shadow-sm border border-gray-200' : 'text-gray-600 hover:text-gray-900 hover:bg-white/50'}`}
         >
@@ -752,61 +751,61 @@ export default function Dashboard() {
         <div className="space-y-6 animate-fade-in">
           {/* KPI Overview Cards */}
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
-            <div 
-              onClick={() => navigateToOrdersWithStatus([])}
+            <div
+              onClick={() => navigateToOrdersWithStatus([], startDate, endDate)}
               className="bg-white p-5 rounded-xl border border-gray-200 border-l-4 border-l-blue-500 shadow-sm flex flex-col justify-between cursor-pointer hover:shadow-md hover:-translate-y-0.5 transition-all group"
-              title="Nhấp để xem danh sách tất cả đơn hàng"
+              title="Nhấp để xem danh sách tất cả đơn hàng theo khoảng ngày đang chọn"
             >
               <div className="text-blue-600 font-semibold text-xs flex items-center justify-between uppercase">
-                <span className="flex items-center gap-1.5"><ClipboardList size={15}/> Tổng số đơn</span>
+                <span className="flex items-center gap-1.5"><ClipboardList size={15} /> Tổng số đơn</span>
                 <span className="text-[10px] text-gray-400 group-hover:text-blue-600 transition-colors">Xem ngay →</span>
               </div>
               <div className="text-3xl font-bold text-gray-900 mt-2">{dashStats.orderStats?.total ?? 0}</div>
             </div>
-            
-            <div 
-              onClick={() => navigateToOrdersWithStatus(['chờ xử lý'])}
+
+            <div
+              onClick={() => navigateToOrdersWithStatus(['chờ xử lý'], startDate, endDate)}
               className="bg-white p-5 rounded-xl border border-gray-200 border-l-4 border-l-amber-500 shadow-sm flex flex-col justify-between cursor-pointer hover:shadow-md hover:-translate-y-0.5 transition-all group"
-              title="Nhấp để xem danh sách đơn chờ xử lý"
+              title="Nhấp để xem danh sách đơn chờ xử lý theo khoảng ngày đang chọn"
             >
               <div className="text-amber-600 font-semibold text-xs flex items-center justify-between uppercase">
-                <span className="flex items-center gap-1.5"><Clock size={15}/> Đơn chờ xử lý</span>
+                <span className="flex items-center gap-1.5"><Clock size={15} /> Đơn chờ xử lý</span>
                 <span className="text-[10px] text-gray-400 group-hover:text-amber-600 transition-colors">Xem ngay →</span>
               </div>
               <div className="text-3xl font-bold text-gray-900 mt-2">{dashStats.orderStats?.pending ?? 0}</div>
             </div>
 
-            <div 
-              onClick={() => navigateToOrdersWithStatus(['đang thực hiện'])}
+            <div
+              onClick={() => navigateToOrdersWithStatus(['đang thực hiện'], startDate, endDate)}
               className="bg-white p-5 rounded-xl border border-gray-200 border-l-4 border-l-indigo-500 shadow-sm flex flex-col justify-between cursor-pointer hover:shadow-md hover:-translate-y-0.5 transition-all group"
-              title="Nhấp để xem danh sách đơn đã phân công (đang thực hiện)"
+              title="Nhấp để xem danh sách đơn đã phân công theo khoảng ngày đang chọn"
             >
               <div className="text-indigo-600 font-semibold text-xs flex items-center justify-between uppercase">
-                <span className="flex items-center gap-1.5"><UserCheck size={15}/> Đơn đã phân công</span>
+                <span className="flex items-center gap-1.5"><UserCheck size={15} /> Đơn đã phân công</span>
                 <span className="text-[10px] text-gray-400 group-hover:text-indigo-600 transition-colors">Xem ngay →</span>
               </div>
               <div className="text-3xl font-bold text-gray-900 mt-2">{dashStats.orderStats?.assigned ?? 0}</div>
             </div>
 
-            <div 
-              onClick={() => navigateToOrdersWithStatus(['hoàn thành'])}
+            <div
+              onClick={() => navigateToOrdersWithStatus(['hoàn thành'], startDate, endDate)}
               className="bg-white p-5 rounded-xl border border-gray-200 border-l-4 border-l-emerald-500 shadow-sm flex flex-col justify-between cursor-pointer hover:shadow-md hover:-translate-y-0.5 transition-all group"
-              title="Nhấp để xem danh sách đơn đã hoàn thành"
+              title="Nhấp để xem danh sách đơn đã hoàn thành theo khoảng ngày đang chọn"
             >
               <div className="text-emerald-600 font-semibold text-xs flex items-center justify-between uppercase">
-                <span className="flex items-center gap-1.5"><CheckCircle size={15}/> Đơn hoàn thành</span>
+                <span className="flex items-center gap-1.5"><CheckCircle size={15} /> Đơn hoàn thành</span>
                 <span className="text-[10px] text-gray-400 group-hover:text-emerald-600 transition-colors">Xem ngay →</span>
               </div>
               <div className="text-3xl font-bold text-gray-900 mt-2">{dashStats.orderStats?.completed ?? 0}</div>
             </div>
 
-            <div 
-              onClick={() => navigateToOrdersWithStatus(['hủy đơn'])}
+            <div
+              onClick={() => navigateToOrdersWithStatus(['hủy đơn'], startDate, endDate)}
               className="bg-white p-5 rounded-xl border border-gray-200 border-l-4 border-l-rose-500 shadow-sm flex flex-col justify-between cursor-pointer hover:shadow-md hover:-translate-y-0.5 transition-all group"
-              title="Nhấp để xem danh sách đơn bị hủy"
+              title="Nhấp để xem danh sách đơn bị hủy theo khoảng ngày đang chọn"
             >
               <div className="text-rose-600 font-semibold text-xs flex items-center justify-between uppercase">
-                <span className="flex items-center gap-1.5"><XCircle size={15}/> Đơn bị hủy</span>
+                <span className="flex items-center gap-1.5"><XCircle size={15} /> Đơn bị hủy</span>
                 <span className="text-[10px] text-gray-400 group-hover:text-rose-600 transition-colors">Xem ngay →</span>
               </div>
               <div className="text-3xl font-bold text-gray-900 mt-2">{dashStats.orderStats?.cancelled ?? 0}</div>
@@ -842,19 +841,19 @@ export default function Dashboard() {
                         const colorScale = scaleQuantile<string>()
                           .domain(mapProvinceData.map((d: any) => d.total).length > 0 ? mapProvinceData.map((d: any) => d.total) : [0, 1])
                           .range([
-                            "#e0f2fe", 
+                            "#e0f2fe",
                             "#bae6fd",
                             "#7dd3fc",
                             "#38bdf8",
                             "#0ea5e9",
                             "#0284c7",
-                            "#0369a1", 
+                            "#0369a1",
                             "#075985"
                           ]);
 
                         return geographies.map(geo => {
                           const geoName = geo.properties.Name || geo.properties.name || geo.properties.ten_tinh;
-                          
+
                           let matchedValue = 0;
                           if (geoName) {
                             const cleanGeoName = removeVietnameseTones(geoName)
@@ -902,7 +901,7 @@ export default function Dashboard() {
                       {tooltipContent}
                     </div>
                   )}
-                  
+
                   <div className="absolute bottom-3 left-3 text-[10px] text-gray-400 bg-white/80 px-2 py-0.5 rounded border border-gray-100">
                     * Phân tích dựa trên thông tin địa chỉ đơn hàng
                   </div>
@@ -940,7 +939,7 @@ export default function Dashboard() {
                       </ResponsiveContainer>
                     )}
                   </div>
-                  
+
                   {/* Bảng chú thích Top 5 tỉnh/thành nhiều nhất */}
                   <div className="w-full mt-4 max-h-[140px] overflow-y-auto space-y-1.5 text-xs text-gray-600 px-2">
                     {[...analysisData.provinceStats]
@@ -992,7 +991,7 @@ export default function Dashboard() {
                     </tbody>
                   </table>
                 </div>
-                
+
                 {/* Tổng số ở cuối bảng */}
                 <div className="mt-4 pt-3 border-t border-gray-200 flex justify-between items-center text-sm">
                   <span className="font-bold text-gray-800">Tổng cộng</span>
@@ -1054,14 +1053,14 @@ export default function Dashboard() {
                       <AreaChart data={analysisData.dailyStats} margin={{ top: 5, right: 10, left: -25, bottom: 5 }}>
                         <defs>
                           <linearGradient id="colorOnTime" x1="0" y1="0" x2="0" y2="1">
-                            <stop offset="5%" stopColor="#10b981" stopOpacity={0.2}/>
-                            <stop offset="95%" stopColor="#10b981" stopOpacity={0}/>
+                            <stop offset="5%" stopColor="#10b981" stopOpacity={0.2} />
+                            <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
                           </linearGradient>
                         </defs>
                         <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e7eb" />
-                        <XAxis dataKey="date" axisLine={false} tickLine={false} tick={{fill: '#6b7280', fontSize: 11}} />
-                        <YAxis axisLine={false} tickLine={false} tick={{fill: '#6b7280', fontSize: 11}} />
-                        <RechartsTooltip contentStyle={{borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)'}} />
+                        <XAxis dataKey="date" axisLine={false} tickLine={false} tick={{ fill: '#6b7280', fontSize: 11 }} />
+                        <YAxis axisLine={false} tickLine={false} tick={{ fill: '#6b7280', fontSize: 11 }} />
+                        <RechartsTooltip contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
                         <Area type="monotone" dataKey="onTime" name="Ca Đúng Hẹn" stroke="#10b981" strokeWidth={2} fillOpacity={1} fill="url(#colorOnTime)" />
                       </AreaChart>
                     </ResponsiveContainer>
@@ -1071,7 +1070,7 @@ export default function Dashboard() {
 
               {/* Charts grid */}
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                
+
                 {/* 1. Đúng hẹn theo loại công việc */}
                 <div className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm flex flex-col h-[350px]">
                   <h3 className="font-bold text-sm text-gray-800 border-b pb-3 mb-4">Số ca đúng hẹn theo Loại công việc</h3>
@@ -1079,16 +1078,16 @@ export default function Dashboard() {
                     <ResponsiveContainer width="100%" height="100%">
                       <BarChart data={analysisData.workTypeStats} margin={{ top: 5, right: 10, left: -25, bottom: 5 }}>
                         <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e7eb" />
-                        <XAxis 
-                          dataKey="name" 
-                          axisLine={false} 
-                          tickLine={false} 
+                        <XAxis
+                          dataKey="name"
+                          axisLine={false}
+                          tickLine={false}
                           interval={0}
-                          tick={{fill: '#6b7280', fontSize: 10}}
+                          tick={{ fill: '#6b7280', fontSize: 10 }}
                           tickFormatter={(value) => value === 'Giao hàng và Lắp đặt' ? 'Giao hàng & Lắp đặt' : value}
                         />
-                        <YAxis axisLine={false} tickLine={false} tick={{fill: '#6b7280', fontSize: 11}} />
-                        <RechartsTooltip contentStyle={{borderRadius: '8px', border: 'none'}} />
+                        <YAxis axisLine={false} tickLine={false} tick={{ fill: '#6b7280', fontSize: 11 }} />
+                        <RechartsTooltip contentStyle={{ borderRadius: '8px', border: 'none' }} />
                         <Bar dataKey="onTime" name="Đúng hẹn" fill="#10b981" radius={[4, 4, 0, 0]} />
                       </BarChart>
                     </ResponsiveContainer>
@@ -1102,16 +1101,16 @@ export default function Dashboard() {
                     <ResponsiveContainer width="100%" height="100%">
                       <BarChart data={[...analysisData.ktvStats].sort((a: any, b: any) => b.total - a.total).slice(0, 10)} margin={{ top: 5, right: 10, left: -25, bottom: 20 }}>
                         <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e7eb" />
-                        <XAxis 
-                          dataKey="name" 
-                          axisLine={false} 
-                          tickLine={false} 
+                        <XAxis
+                          dataKey="name"
+                          axisLine={false}
+                          tickLine={false}
                           interval={0}
                           height={45}
-                          tick={{fill: '#6b7280', fontSize: 9, angle: -25, textAnchor: 'end'}} 
+                          tick={{ fill: '#6b7280', fontSize: 9, angle: -25, textAnchor: 'end' }}
                         />
-                        <YAxis axisLine={false} tickLine={false} tick={{fill: '#6b7280', fontSize: 11}} />
-                        <RechartsTooltip contentStyle={{borderRadius: '8px', border: 'none'}} />
+                        <YAxis axisLine={false} tickLine={false} tick={{ fill: '#6b7280', fontSize: 11 }} />
+                        <RechartsTooltip contentStyle={{ borderRadius: '8px', border: 'none' }} />
                         <Bar dataKey="onTime" name="Đúng hẹn" fill="#0ea5e9" radius={[4, 4, 0, 0]} />
                       </BarChart>
                     </ResponsiveContainer>
@@ -1125,16 +1124,16 @@ export default function Dashboard() {
                     <ResponsiveContainer width="100%" height="100%">
                       <BarChart data={analysisData.provinceStats.slice(0, 8)} margin={{ top: 5, right: 10, left: -25, bottom: 20 }}>
                         <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e7eb" />
-                        <XAxis 
-                          dataKey="name" 
-                          axisLine={false} 
-                          tickLine={false} 
+                        <XAxis
+                          dataKey="name"
+                          axisLine={false}
+                          tickLine={false}
                           interval={0}
                           height={45}
-                          tick={{fill: '#6b7280', fontSize: 9, angle: -25, textAnchor: 'end'}} 
+                          tick={{ fill: '#6b7280', fontSize: 9, angle: -25, textAnchor: 'end' }}
                         />
-                        <YAxis axisLine={false} tickLine={false} tick={{fill: '#6b7280', fontSize: 11}} />
-                        <RechartsTooltip contentStyle={{borderRadius: '8px', border: 'none'}} />
+                        <YAxis axisLine={false} tickLine={false} tick={{ fill: '#6b7280', fontSize: 11 }} />
+                        <RechartsTooltip contentStyle={{ borderRadius: '8px', border: 'none' }} />
                         <Bar dataKey="onTime" name="Đúng hẹn" fill="#6366f1" radius={[4, 4, 0, 0]} />
                       </BarChart>
                     </ResponsiveContainer>
@@ -1149,16 +1148,16 @@ export default function Dashboard() {
                     <ResponsiveContainer width="100%" height="100%">
                       <BarChart data={analysisData.workTypeStats} margin={{ top: 5, right: 10, left: -25, bottom: 5 }}>
                         <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e7eb" />
-                        <XAxis 
-                          dataKey="name" 
-                          axisLine={false} 
-                          tickLine={false} 
+                        <XAxis
+                          dataKey="name"
+                          axisLine={false}
+                          tickLine={false}
                           interval={0}
-                          tick={{fill: '#6b7280', fontSize: 10}}
+                          tick={{ fill: '#6b7280', fontSize: 10 }}
                           tickFormatter={(value) => value === 'Giao hàng và Lắp đặt' ? 'Giao hàng & Lắp đặt' : value}
                         />
-                        <YAxis axisLine={false} tickLine={false} tick={{fill: '#6b7280', fontSize: 11}} />
-                        <RechartsTooltip contentStyle={{borderRadius: '8px', border: 'none'}} />
+                        <YAxis axisLine={false} tickLine={false} tick={{ fill: '#6b7280', fontSize: 11 }} />
+                        <RechartsTooltip contentStyle={{ borderRadius: '8px', border: 'none' }} />
                         <Bar dataKey="avgLeadTimeDays" name="Chênh lệch ngày trung bình" fill="#14b8a6" radius={[4, 4, 0, 0]} />
                       </BarChart>
                     </ResponsiveContainer>
@@ -1217,22 +1216,22 @@ export default function Dashboard() {
                     <h3 className="font-bold text-base text-gray-800">Xu hướng Tỷ lệ Trễ hẹn</h3>
                     <p className="text-xs text-gray-500 mt-0.5">Tỷ lệ % số ca bị trễ hẹn trên tổng số ca có lịch hẹn theo thời gian</p>
                   </div>
-                  
+
                   {/* Selector for scale */}
                   <div className="flex bg-gray-100 p-1 rounded-lg space-x-1 border border-gray-200">
-                    <button 
+                    <button
                       onClick={() => setLateChartScale('day')}
                       className={`px-3 py-1 rounded text-xs font-semibold transition-all ${lateChartScale === 'day' ? 'bg-white text-rose-600 shadow-sm' : 'text-gray-500 hover:text-gray-800'}`}
                     >
                       Ngày
                     </button>
-                    <button 
+                    <button
                       onClick={() => setLateChartScale('week')}
                       className={`px-3 py-1 rounded text-xs font-semibold transition-all ${lateChartScale === 'week' ? 'bg-white text-rose-600 shadow-sm' : 'text-gray-500 hover:text-gray-800'}`}
                     >
                       Tuần
                     </button>
-                    <button 
+                    <button
                       onClick={() => setLateChartScale('month')}
                       className={`px-3 py-1 rounded text-xs font-semibold transition-all ${lateChartScale === 'month' ? 'bg-white text-rose-600 shadow-sm' : 'text-gray-500 hover:text-gray-800'}`}
                     >
@@ -1254,16 +1253,16 @@ export default function Dashboard() {
                         <ResponsiveContainer width="100%" height="100%">
                           <LineChart data={chartData} margin={{ top: 10, right: 15, left: -20, bottom: 5 }}>
                             <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e7eb" />
-                            <XAxis dataKey="label" axisLine={false} tickLine={false} tick={{fill: '#6b7280', fontSize: 11}} />
-                            <YAxis axisLine={false} tickLine={false} domain={[0, 100]} tickFormatter={(val) => `${val}%`} tick={{fill: '#6b7280', fontSize: 11}} />
-                            <RechartsTooltip 
-                              contentStyle={{borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)'}} 
+                            <XAxis dataKey="label" axisLine={false} tickLine={false} tick={{ fill: '#6b7280', fontSize: 11 }} />
+                            <YAxis axisLine={false} tickLine={false} domain={[0, 100]} tickFormatter={(val) => `${val}%`} tick={{ fill: '#6b7280', fontSize: 11 }} />
+                            <RechartsTooltip
+                              contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
                               formatter={(value: any, _name: any, entry: any) => [
-                                `${value}% (Trễ ${entry.payload.late}/${entry.payload.total} ca)`, 
+                                `${value}% (Trễ ${entry.payload.late}/${entry.payload.total} ca)`,
                                 'Tỷ lệ trễ hẹn'
                               ]}
                             />
-                            <Legend wrapperStyle={{fontSize: 11}} />
+                            <Legend wrapperStyle={{ fontSize: 11 }} />
                             <Line type="monotone" dataKey="latePercent" name="Tỷ lệ trễ hẹn" stroke="#f43f5e" strokeWidth={3} dot={{ r: 4, stroke: '#f43f5e', strokeWidth: 2, fill: '#fff' }} activeDot={{ r: 6, fill: '#f43f5e' }} />
                           </LineChart>
                         </ResponsiveContainer>
@@ -1282,17 +1281,17 @@ export default function Dashboard() {
                     <ResponsiveContainer width="100%" height="100%">
                       <BarChart data={analysisData.workTypeStats} margin={{ top: 5, right: 10, left: -25, bottom: 5 }}>
                         <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e7eb" />
-                        <XAxis 
-                          dataKey="name" 
-                          axisLine={false} 
-                          tickLine={false} 
+                        <XAxis
+                          dataKey="name"
+                          axisLine={false}
+                          tickLine={false}
                           interval={0}
-                          tick={{fill: '#6b7280', fontSize: 10}}
+                          tick={{ fill: '#6b7280', fontSize: 10 }}
                           tickFormatter={(value) => value === 'Giao hàng và Lắp đặt' ? 'Giao hàng & Lắp đặt' : value}
                         />
-                        <YAxis axisLine={false} tickLine={false} tick={{fill: '#6b7280', fontSize: 11}} />
-                        <RechartsTooltip contentStyle={{borderRadius: '8px', border: 'none'}} />
-                        <Legend wrapperStyle={{fontSize: 11}} />
+                        <YAxis axisLine={false} tickLine={false} tick={{ fill: '#6b7280', fontSize: 11 }} />
+                        <RechartsTooltip contentStyle={{ borderRadius: '8px', border: 'none' }} />
+                        <Legend wrapperStyle={{ fontSize: 11 }} />
                         <Bar dataKey="late" name="Số ca trễ" fill="#f43f5e" />
                         <Bar dataKey="total" name="Tổng ca có hẹn" fill="#cbd5e1" />
                       </BarChart>
@@ -1307,17 +1306,17 @@ export default function Dashboard() {
                     <ResponsiveContainer width="100%" height="100%">
                       <BarChart data={analysisData.techStationStats.slice(0, 8)} margin={{ top: 5, right: 10, left: -25, bottom: 20 }}>
                         <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e7eb" />
-                        <XAxis 
-                          dataKey="name" 
-                          axisLine={false} 
-                          tickLine={false} 
+                        <XAxis
+                          dataKey="name"
+                          axisLine={false}
+                          tickLine={false}
                           interval={0}
                           height={45}
-                          tick={{fill: '#6b7280', fontSize: 9, angle: -25, textAnchor: 'end'}} 
+                          tick={{ fill: '#6b7280', fontSize: 9, angle: -25, textAnchor: 'end' }}
                         />
-                        <YAxis axisLine={false} tickLine={false} tick={{fill: '#6b7280', fontSize: 11}} />
-                        <RechartsTooltip contentStyle={{borderRadius: '8px', border: 'none'}} />
-                        <Legend wrapperStyle={{fontSize: 11}} />
+                        <YAxis axisLine={false} tickLine={false} tick={{ fill: '#6b7280', fontSize: 11 }} />
+                        <RechartsTooltip contentStyle={{ borderRadius: '8px', border: 'none' }} />
+                        <Legend wrapperStyle={{ fontSize: 11 }} />
                         <Bar dataKey="late" name="Số ca trễ" fill="#f43f5e" />
                         <Bar dataKey="total" name="Tổng ca có hẹn" fill="#cbd5e1" />
                       </BarChart>
@@ -1333,13 +1332,13 @@ export default function Dashboard() {
                     <AlertTriangle size={17} />
                     Danh sách các ca đang trễ hẹn
                   </h3>
-                  
+
                   <div className="flex items-center gap-3">
                     {/* Province Filter Dropdown for Late Orders */}
                     {lateProvinces.length > 0 && (
                       <div className="flex items-center gap-1.5">
                         <label className="text-[11px] font-semibold text-gray-500 uppercase">Lọc theo Tỉnh/TP:</label>
-                        <select 
+                        <select
                           className="border border-gray-200 rounded px-2.5 py-1 text-xs outline-none focus:border-rose-500 text-gray-700 bg-white shadow-sm font-semibold"
                           value={selectedLateProvince}
                           onChange={e => setSelectedLateProvince(e.target.value)}
@@ -1359,7 +1358,7 @@ export default function Dashboard() {
                     </span>
                   </div>
                 </div>
-                
+
                 <div className="overflow-x-auto">
                   {filteredLateOrders.length === 0 ? (
                     <div className="text-center py-10 text-gray-500 text-sm">Tuyệt vời! Không có ca nào bị trễ hẹn trong khoảng lọc này.</div>
@@ -1395,10 +1394,9 @@ export default function Dashboard() {
                               </span>
                             </td>
                             <td className="px-5 py-3.5 text-center">
-                              <span className={`inline-block px-2.5 py-0.5 rounded-full text-[10px] font-bold ${
-                                o.adminStatus === 'hoàn thành' ? 'bg-emerald-100 text-emerald-800' :
-                                o.adminStatus === 'đang thực hiện' ? 'bg-blue-100 text-blue-800' : 'bg-amber-100 text-amber-800'
-                              }`}>
+                              <span className={`inline-block px-2.5 py-0.5 rounded-full text-[10px] font-bold ${o.adminStatus === 'hoàn thành' ? 'bg-emerald-100 text-emerald-800' :
+                                  o.adminStatus === 'đang thực hiện' ? 'bg-blue-100 text-blue-800' : 'bg-amber-100 text-amber-800'
+                                }`}>
                                 {o.adminStatus === 'đang thực hiện' ? 'đã phân công' : o.adminStatus}
                               </span>
                             </td>
@@ -1433,16 +1431,16 @@ export default function Dashboard() {
                     <TrendingUp size={17} className="text-blue-600" />
                     Thống kê & Xu hướng công việc theo Tháng
                   </h3>
-                  
+
                   {/* Nút Toggle loại biểu đồ */}
                   <div className="flex bg-gray-100 p-1 rounded-lg space-x-1 border border-gray-200">
-                    <button 
+                    <button
                       onClick={() => setChartType('stackedBar')}
                       className={`px-3 py-1 rounded text-xs font-semibold transition-all ${chartType === 'stackedBar' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500 hover:text-gray-800'}`}
                     >
                       Cột chồng
                     </button>
-                    <button 
+                    <button
                       onClick={() => setChartType('line')}
                       className={`px-3 py-1 rounded text-xs font-semibold transition-all ${chartType === 'line' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-500 hover:text-gray-800'}`}
                     >
@@ -1458,10 +1456,10 @@ export default function Dashboard() {
                     <ResponsiveContainer width="100%" height="100%">
                       <BarChart data={analysisData.workTypeMonthlyStats} margin={{ top: 5, right: 10, left: -25, bottom: 5 }}>
                         <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e7eb" />
-                        <XAxis dataKey="month" tickLine={false} tick={{fill: '#6b7280', fontSize: 11}} tickFormatter={(val) => { const parts = val.split('-'); return parts.length === 2 ? `T${parts[1]}/${parts[0]}` : val; }} />
-                        <YAxis axisLine={false} tickLine={false} tick={{fill: '#6b7280', fontSize: 11}} />
-                        <RechartsTooltip contentStyle={{borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)'}} />
-                        <Legend wrapperStyle={{fontSize: 11, paddingTop: 10}} />
+                        <XAxis dataKey="month" tickLine={false} tick={{ fill: '#6b7280', fontSize: 11 }} tickFormatter={(val) => { const parts = val.split('-'); return parts.length === 2 ? `T${parts[1]}/${parts[0]}` : val; }} />
+                        <YAxis axisLine={false} tickLine={false} tick={{ fill: '#6b7280', fontSize: 11 }} />
+                        <RechartsTooltip contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
+                        <Legend wrapperStyle={{ fontSize: 11, paddingTop: 10 }} />
                         <Bar dataKey="Giao hàng và Lắp đặt" name="Giao hàng & Lắp đặt" stackId="a" fill="#3b82f6" />
                         <Bar dataKey="Lắp đặt" name="Lắp đặt" stackId="a" fill="#0ea5e9" />
                         <Bar dataKey="Giao hàng" name="Giao hàng" stackId="a" fill="#10b981" />
@@ -1474,10 +1472,10 @@ export default function Dashboard() {
                     <ResponsiveContainer width="100%" height="100%">
                       <LineChart data={analysisData.workTypeMonthlyStats} margin={{ top: 5, right: 10, left: -25, bottom: 5 }}>
                         <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e7eb" />
-                        <XAxis dataKey="month" tickLine={false} tick={{fill: '#6b7280', fontSize: 11}} tickFormatter={(val) => { const parts = val.split('-'); return parts.length === 2 ? `T${parts[1]}/${parts[0]}` : val; }} />
-                        <YAxis axisLine={false} tickLine={false} tick={{fill: '#6b7280', fontSize: 11}} />
-                        <RechartsTooltip contentStyle={{borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)'}} />
-                        <Legend wrapperStyle={{fontSize: 11, paddingTop: 10}} />
+                        <XAxis dataKey="month" tickLine={false} tick={{ fill: '#6b7280', fontSize: 11 }} tickFormatter={(val) => { const parts = val.split('-'); return parts.length === 2 ? `T${parts[1]}/${parts[0]}` : val; }} />
+                        <YAxis axisLine={false} tickLine={false} tick={{ fill: '#6b7280', fontSize: 11 }} />
+                        <RechartsTooltip contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
+                        <Legend wrapperStyle={{ fontSize: 11, paddingTop: 10 }} />
                         <Line type="monotone" dataKey="Giao hàng và Lắp đặt" name="Giao hàng & Lắp đặt" stroke="#3b82f6" strokeWidth={2.5} dot={{ r: 4 }} activeDot={{ r: 6 }} />
                         <Line type="monotone" dataKey="Lắp đặt" name="Lắp đặt" stroke="#0ea5e9" strokeWidth={2.5} dot={{ r: 4 }} activeDot={{ r: 6 }} />
                         <Line type="monotone" dataKey="Giao hàng" name="Giao hàng" stroke="#10b981" strokeWidth={2.5} dot={{ r: 4 }} activeDot={{ r: 6 }} />
@@ -1530,7 +1528,7 @@ export default function Dashboard() {
                       </ResponsiveContainer>
                     )}
                   </div>
-                  
+
                   {/* Bảng tóm tắt phần trăm ở dưới Donut */}
                   <div className="w-full mt-4 max-h-[160px] overflow-y-auto space-y-1.5 text-xs text-gray-600 px-2">
                     {analysisData.workTypeStats.map((entry: any, index: number) => {
@@ -1613,17 +1611,17 @@ export default function Dashboard() {
                       <ResponsiveContainer width="100%" height="100%">
                         <BarChart data={analysisData.unassignedProvinceStats.slice(0, 10)} margin={{ top: 5, right: 10, left: -20, bottom: 20 }}>
                           <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e7eb" />
-                          <XAxis 
-                            dataKey="province" 
-                            axisLine={false} 
-                            tickLine={false} 
+                          <XAxis
+                            dataKey="province"
+                            axisLine={false}
+                            tickLine={false}
                             interval={0}
                             height={40}
-                            tick={{fill: '#6b7280', fontSize: 10, angle: -25, textAnchor: 'end'}} 
+                            tick={{ fill: '#6b7280', fontSize: 10, angle: -25, textAnchor: 'end' }}
                           />
-                          <YAxis axisLine={false} tickLine={false} tick={{fill: '#6b7280', fontSize: 11}} />
-                          <RechartsTooltip contentStyle={{borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)'}} />
-                          <Legend wrapperStyle={{fontSize: 11, paddingTop: 5}} />
+                          <YAxis axisLine={false} tickLine={false} tick={{ fill: '#6b7280', fontSize: 11 }} />
+                          <RechartsTooltip contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
+                          <Legend wrapperStyle={{ fontSize: 11, paddingTop: 5 }} />
                           <Bar dataKey="unassigned" name="Chưa phân trạm (Tồn đọng)" stackId="a" fill="#f43f5e" />
                           <Bar dataKey="assigned" name="Đã phân trạm" stackId="a" fill="#3b82f6" radius={[4, 4, 0, 0]} />
                         </BarChart>
@@ -1650,13 +1648,13 @@ export default function Dashboard() {
                           </div>
                           {/* Progress bar */}
                           <div className="w-full bg-gray-200 h-2 rounded-full overflow-hidden flex">
-                            <div 
-                              className="bg-rose-500 h-full transition-all duration-300" 
-                              style={{ width: `${item.unassignedRate}%` }} 
+                            <div
+                              className="bg-rose-500 h-full transition-all duration-300"
+                              style={{ width: `${item.unassignedRate}%` }}
                             />
-                            <div 
-                              className="bg-blue-500 h-full transition-all duration-300" 
-                              style={{ width: `${100 - item.unassignedRate}%` }} 
+                            <div
+                              className="bg-blue-500 h-full transition-all duration-300"
+                              style={{ width: `${100 - item.unassignedRate}%` }}
                             />
                           </div>
                         </div>
@@ -1686,17 +1684,17 @@ export default function Dashboard() {
                       <ResponsiveContainer width="100%" height="100%">
                         <BarChart data={analysisData.stationPerformanceStats} margin={{ top: 5, right: 10, left: -20, bottom: 20 }}>
                           <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e7eb" />
-                          <XAxis 
-                            dataKey="name" 
-                            axisLine={false} 
-                            tickLine={false} 
+                          <XAxis
+                            dataKey="name"
+                            axisLine={false}
+                            tickLine={false}
                             interval={0}
                             height={40}
-                            tick={{fill: '#6b7280', fontSize: 10, angle: -15, textAnchor: 'end'}} 
+                            tick={{ fill: '#6b7280', fontSize: 10, angle: -15, textAnchor: 'end' }}
                           />
-                          <YAxis axisLine={false} tickLine={false} tick={{fill: '#6b7280', fontSize: 11}} />
-                          <RechartsTooltip contentStyle={{borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)'}} />
-                          <Legend wrapperStyle={{fontSize: 11, paddingTop: 5}} />
+                          <YAxis axisLine={false} tickLine={false} tick={{ fill: '#6b7280', fontSize: 11 }} />
+                          <RechartsTooltip contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
+                          <Legend wrapperStyle={{ fontSize: 11, paddingTop: 5 }} />
                           <Bar dataKey="total" name="Tổng ca tiếp nhận" fill="#6366f1" radius={[4, 4, 0, 0]} />
                           <Bar dataKey="onTime" name="Hoàn thành đúng hẹn" fill="#10b981" radius={[4, 4, 0, 0]} />
                           <Bar dataKey="late" name="Bị trễ hẹn" fill="#ef4444" radius={[4, 4, 0, 0]} />
@@ -1724,10 +1722,9 @@ export default function Dashboard() {
                             </div>
                           </div>
                           <div className="text-right">
-                            <span className={`inline-block px-2 py-0.5 rounded text-[10px] font-bold ${
-                              st.onTimeRate >= 80 ? 'bg-emerald-100 text-emerald-800' :
-                              st.onTimeRate >= 50 ? 'bg-amber-100 text-amber-800' : 'bg-rose-100 text-rose-800'
-                            }`}>
+                            <span className={`inline-block px-2 py-0.5 rounded text-[10px] font-bold ${st.onTimeRate >= 80 ? 'bg-emerald-100 text-emerald-800' :
+                                st.onTimeRate >= 50 ? 'bg-amber-100 text-amber-800' : 'bg-rose-100 text-rose-800'
+                              }`}>
                               Đúng hẹn {st.onTimeRate}%
                             </span>
                             {st.late > 0 && (
@@ -1787,7 +1784,7 @@ export default function Dashboard() {
                   <div className="text-gray-500 font-semibold text-xs flex items-center gap-1.5"><FileText size={14} /> TỔNG CA LẮP ĐẶT</div>
                   <div className="text-3xl font-bold text-gray-900 mt-2">{qualityData.summary.totalInstalls}</div>
                 </div>
-                
+
                 <div className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm border-l-4 border-red-500 flex flex-col justify-between">
                   <div className="text-red-600 font-semibold text-xs flex items-center gap-1.5"><AlertCircle size={14} /> TỔNG CA SỰ CỐ / LỖI</div>
                   <div className="text-3xl font-bold text-gray-900 mt-2">{qualityData.summary.totalIssues}</div>
@@ -1817,7 +1814,7 @@ export default function Dashboard() {
                       <div className="h-full flex items-center justify-center text-gray-400 text-sm">Chưa có dữ liệu sự cố dòng máy</div>
                     ) : (
                       <ResponsiveContainer width="100%" height="100%">
-                        <BarChart 
+                        <BarChart
                           layout="vertical"
                           data={qualityData.productIssues.slice(0, 10).map((item: any) => {
                             let clean = item.name
@@ -1830,21 +1827,21 @@ export default function Dashboard() {
                               ...item,
                               displayName: clean
                             };
-                          })} 
+                          })}
                           margin={{ top: 5, right: 20, left: 10, bottom: 5 }}
                         >
                           <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#e5e7eb" />
-                          <XAxis type="number" axisLine={false} tickLine={false} tick={{fill: '#6b7280', fontSize: 11}} />
-                          <YAxis 
-                            type="category" 
-                            dataKey="displayName" 
-                            axisLine={false} 
-                            tickLine={false} 
+                          <XAxis type="number" axisLine={false} tickLine={false} tick={{ fill: '#6b7280', fontSize: 11 }} />
+                          <YAxis
+                            type="category"
+                            dataKey="displayName"
+                            axisLine={false}
+                            tickLine={false}
                             width={160}
-                            tick={{fill: '#4b5563', fontSize: 11, fontWeight: 500}}
+                            tick={{ fill: '#4b5563', fontSize: 11, fontWeight: 500 }}
                           />
-                          <RechartsTooltip 
-                            contentStyle={{borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)'}}
+                          <RechartsTooltip
+                            contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
                             formatter={(value, _name, props) => [`${value} ca lỗi`, props.payload.name]}
                           />
                           <Bar dataKey="total" fill="#ef4444" radius={[0, 4, 4, 0]} barSize={18} />
@@ -1864,16 +1861,16 @@ export default function Dashboard() {
                       <ResponsiveContainer width="100%" height="100%">
                         <BarChart data={qualityData.provinceIssues.slice(0, 10)} margin={{ top: 5, right: 10, left: -25, bottom: 20 }}>
                           <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e7eb" />
-                          <XAxis 
-                            dataKey="name" 
-                            axisLine={false} 
-                            tickLine={false} 
+                          <XAxis
+                            dataKey="name"
+                            axisLine={false}
+                            tickLine={false}
                             interval={0}
                             height={40}
-                            tick={{fill: '#6b7280', fontSize: 9, angle: -35, textAnchor: 'end'}}
+                            tick={{ fill: '#6b7280', fontSize: 9, angle: -35, textAnchor: 'end' }}
                           />
-                          <YAxis axisLine={false} tickLine={false} tick={{fill: '#6b7280', fontSize: 11}} />
-                          <RechartsTooltip contentStyle={{borderRadius: '8px', border: 'none'}} />
+                          <YAxis axisLine={false} tickLine={false} tick={{ fill: '#6b7280', fontSize: 11 }} />
+                          <RechartsTooltip contentStyle={{ borderRadius: '8px', border: 'none' }} />
                           <Bar dataKey="total" name="Số ca lỗi" fill="#6366f1" radius={[4, 4, 0, 0]} />
                         </BarChart>
                       </ResponsiveContainer>
@@ -1892,18 +1889,18 @@ export default function Dashboard() {
                       <div className="h-full flex items-center justify-center text-gray-400 text-sm">Chưa có dữ liệu sự cố hàng tháng</div>
                     ) : (
                       <ResponsiveContainer width="100%" height="100%">
-                        <BarChart 
+                        <BarChart
                           data={qualityData.monthlyIssuesTrend.map((item: any) => ({
                             month: item.month,
                             ...item.issues
-                          }))} 
+                          }))}
                           margin={{ top: 5, right: 10, left: -25, bottom: 5 }}
                         >
                           <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e7eb" />
-                          <XAxis dataKey="month" tickLine={false} tick={{fill: '#6b7280', fontSize: 11}} tickFormatter={(val) => { const parts = val.split('-'); return parts.length === 2 ? `T${parts[1]}/${parts[0]}` : val; }} />
-                          <YAxis axisLine={false} tickLine={false} tick={{fill: '#6b7280', fontSize: 11}} />
-                          <RechartsTooltip contentStyle={{borderRadius: '8px', border: 'none'}} />
-                          <Legend wrapperStyle={{fontSize: 11, paddingTop: 10}} />
+                          <XAxis dataKey="month" tickLine={false} tick={{ fill: '#6b7280', fontSize: 11 }} tickFormatter={(val) => { const parts = val.split('-'); return parts.length === 2 ? `T${parts[1]}/${parts[0]}` : val; }} />
+                          <YAxis axisLine={false} tickLine={false} tick={{ fill: '#6b7280', fontSize: 11 }} />
+                          <RechartsTooltip contentStyle={{ borderRadius: '8px', border: 'none' }} />
+                          <Legend wrapperStyle={{ fontSize: 11, paddingTop: 10 }} />
                           {(() => {
                             const issueKeys = Array.from(new Set(
                               qualityData.monthlyIssuesTrend.flatMap((item: any) => Object.keys(item.issues))
@@ -1949,7 +1946,7 @@ export default function Dashboard() {
                         </ResponsiveContainer>
                       )}
                     </div>
-                    
+
                     {/* Bảng chú thích */}
                     <div className="w-full mt-4 space-y-1.5 text-xs text-gray-600 px-2">
                       {qualityData.durationDist.map((entry: any, index: number) => {
@@ -1985,7 +1982,7 @@ export default function Dashboard() {
                     {qualityData.cases.length} case ghi nhận
                   </span>
                 </div>
-                
+
                 <div className="overflow-x-auto max-h-[450px]">
                   {qualityData.cases.length === 0 ? (
                     <div className="text-center py-10 text-gray-500 text-sm">Chưa ghi nhận ca thay thế linh kiện hoặc báo cáo sự cố nào.</div>
@@ -2083,22 +2080,20 @@ export default function Dashboard() {
                   <div className="inline-flex bg-emerald-50/80 p-1 rounded-xl border border-emerald-200/80">
                     <button
                       onClick={() => setRevenueMetricType('moneyToCollect')}
-                      className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${
-                        revenueMetricType === 'moneyToCollect'
+                      className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${revenueMetricType === 'moneyToCollect'
                           ? 'bg-emerald-700 text-white shadow-sm'
                           : 'text-emerald-800 hover:bg-white/60'
-                      }`}
+                        }`}
                     >
                       <DollarSign size={14} />
                       <span>Thực thu (COD / Thực nhận)</span>
                     </button>
                     <button
                       onClick={() => setRevenueMetricType('totalPrice')}
-                      className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${
-                        revenueMetricType === 'totalPrice'
+                      className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${revenueMetricType === 'totalPrice'
                           ? 'bg-emerald-700 text-white shadow-sm'
                           : 'text-emerald-800 hover:bg-white/60'
-                      }`}
+                        }`}
                     >
                       <TrendingUp size={14} />
                       <span>Doanh số (Giá niêm yết)</span>
@@ -2109,21 +2104,19 @@ export default function Dashboard() {
                   <div className="inline-flex bg-gray-100 p-1 rounded-xl border border-gray-200">
                     <button
                       onClick={() => setRevenueScope('all')}
-                      className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all ${
-                        revenueScope === 'all'
+                      className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all ${revenueScope === 'all'
                           ? 'bg-[#1B3A6B] text-white shadow-sm'
                           : 'text-gray-600 hover:text-gray-900 hover:bg-white/60'
-                      }`}
+                        }`}
                     >
                       <span>🌐 Toàn công ty (Gồm eCom)</span>
                     </button>
                     <button
                       onClick={() => setRevenueScope('service')}
-                      className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all ${
-                        revenueScope === 'service'
+                      className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all ${revenueScope === 'service'
                           ? 'bg-blue-600 text-white shadow-sm'
                           : 'text-gray-600 hover:text-gray-900 hover:bg-white/60'
-                      }`}
+                        }`}
                     >
                       <span>🛠️ Chỉ Dịch vụ / KTV</span>
                     </button>
@@ -2140,11 +2133,10 @@ export default function Dashboard() {
                       <DollarSign size={16} />
                       {revenueMetricType === 'moneyToCollect' ? 'Doanh thu thực thu COD' : 'Tổng doanh số niêm yết'}
                     </span>
-                    <span className={`px-2 py-0.5 rounded-full text-[11px] font-bold flex items-center gap-0.5 ${
-                      revenueData.summary.percentChange >= 0
+                    <span className={`px-2 py-0.5 rounded-full text-[11px] font-bold flex items-center gap-0.5 ${revenueData.summary.percentChange >= 0
                         ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
                         : 'bg-rose-50 text-rose-700 border border-rose-200'
-                    }`}>
+                      }`}>
                       {revenueData.summary.percentChange >= 0 ? <ArrowUpRight size={14} /> : <ArrowDownRight size={14} />}
                       {revenueData.summary.percentChange >= 0 ? `+${revenueData.summary.percentChange}%` : `${revenueData.summary.percentChange}%`}
                     </span>
@@ -2239,19 +2231,19 @@ export default function Dashboard() {
                     <AreaChart data={revenueData.timeTrend} margin={{ top: 10, right: 30, left: 20, bottom: 0 }}>
                       <defs>
                         <linearGradient id="colorRevenue" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="5%" stopColor="#10B981" stopOpacity={0.8}/>
-                          <stop offset="95%" stopColor="#10B981" stopOpacity={0.05}/>
+                          <stop offset="5%" stopColor="#10B981" stopOpacity={0.8} />
+                          <stop offset="95%" stopColor="#10B981" stopOpacity={0.05} />
                         </linearGradient>
                         <linearGradient id="colorPrevRevenue" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="5%" stopColor="#8B5CF6" stopOpacity={0.4}/>
-                          <stop offset="95%" stopColor="#8B5CF6" stopOpacity={0.05}/>
+                          <stop offset="5%" stopColor="#8B5CF6" stopOpacity={0.4} />
+                          <stop offset="95%" stopColor="#8B5CF6" stopOpacity={0.05} />
                         </linearGradient>
                       </defs>
                       <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#F3F4F6" />
                       <XAxis dataKey="date" tick={{ fontSize: 11, fill: '#6B7280' }} tickFormatter={(val) => formatDateVN(val)} />
                       <YAxis tick={{ fontSize: 11, fill: '#6B7280' }} tickFormatter={(val) => `${(val / 1000000).toFixed(1)}M`} />
                       <Legend verticalAlign="top" height={36} wrapperStyle={{ fontSize: '12px', fontWeight: 600 }} />
-                      <RechartsTooltip 
+                      <RechartsTooltip
                         formatter={(val: any, name: any) => [`${Number(val).toLocaleString('vi-VN')} VNĐ`, name]}
                         labelFormatter={(lbl, items) => {
                           const item = items && items[0] ? items[0].payload : null;
@@ -2262,24 +2254,24 @@ export default function Dashboard() {
                         }}
                         contentStyle={{ backgroundColor: '#fff', borderRadius: '8px', border: '1px solid #E5E7EB', fontSize: '12px' }}
                       />
-                      <Area 
-                        type="monotone" 
-                        dataKey="revenue" 
-                        stroke="#10B981" 
-                        strokeWidth={3} 
-                        fillOpacity={1} 
-                        fill="url(#colorRevenue)" 
-                        name={`Kỳ này (${formatDateVN(revenueData.periodInfo.current.start)} - ${formatDateVN(revenueData.periodInfo.current.end)})`} 
+                      <Area
+                        type="monotone"
+                        dataKey="revenue"
+                        stroke="#10B981"
+                        strokeWidth={3}
+                        fillOpacity={1}
+                        fill="url(#colorRevenue)"
+                        name={`Kỳ này (${formatDateVN(revenueData.periodInfo.current.start)} - ${formatDateVN(revenueData.periodInfo.current.end)})`}
                       />
-                      <Area 
-                        type="monotone" 
-                        dataKey="prevRevenue" 
-                        stroke="#8B5CF6" 
-                        strokeWidth={2.5} 
-                        strokeDasharray="5 5" 
-                        fillOpacity={1} 
-                        fill="url(#colorPrevRevenue)" 
-                        name={`Kỳ trước (${formatDateVN(revenueData.periodInfo.previous.start)} - ${formatDateVN(revenueData.periodInfo.previous.end)})`} 
+                      <Area
+                        type="monotone"
+                        dataKey="prevRevenue"
+                        stroke="#8B5CF6"
+                        strokeWidth={2.5}
+                        strokeDasharray="5 5"
+                        fillOpacity={1}
+                        fill="url(#colorPrevRevenue)"
+                        name={`Kỳ trước (${formatDateVN(revenueData.periodInfo.previous.start)} - ${formatDateVN(revenueData.periodInfo.previous.end)})`}
                       />
                     </AreaChart>
                   </ResponsiveContainer>
@@ -2411,9 +2403,8 @@ export default function Dashboard() {
                       {revenueData.byKtv.slice(0, 5).map((ktv: any, idx: number) => (
                         <div key={ktv.id} className="flex justify-between items-center bg-white p-2.5 rounded-lg border border-purple-100 shadow-2xs">
                           <div className="flex items-center space-x-2.5">
-                            <span className={`w-5 h-5 rounded-full text-[11px] font-bold flex items-center justify-center ${
-                              idx === 0 ? 'bg-amber-400 text-white' : idx === 1 ? 'bg-slate-300 text-gray-800' : idx === 2 ? 'bg-amber-600 text-white' : 'bg-gray-100 text-gray-600'
-                            }`}>
+                            <span className={`w-5 h-5 rounded-full text-[11px] font-bold flex items-center justify-center ${idx === 0 ? 'bg-amber-400 text-white' : idx === 1 ? 'bg-slate-300 text-gray-800' : idx === 2 ? 'bg-amber-600 text-white' : 'bg-gray-100 text-gray-600'
+                              }`}>
                               {idx + 1}
                             </span>
                             <div>

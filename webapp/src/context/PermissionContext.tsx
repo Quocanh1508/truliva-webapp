@@ -14,7 +14,18 @@ interface PermissionContextType {
   updatePermission: (role: string, featureKey: string, isAllowed: boolean) => Promise<boolean>;
 }
 
-const PermissionContext = createContext<PermissionContextType | undefined>(undefined);
+const defaultPermissionContext: PermissionContextType = {
+  matrix: {},
+  modules: SYSTEM_MODULES,
+  features: SYSTEM_FEATURES,
+  roles: SYSTEM_ROLES,
+  loading: false,
+  refetchPermissions: async () => {},
+  hasPermission: () => true,
+  updatePermission: async () => false
+};
+
+const PermissionContext = createContext<PermissionContextType>(defaultPermissionContext);
 
 export const PermissionProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { user } = useAuth();
@@ -92,9 +103,5 @@ export const PermissionProvider: React.FC<{ children: React.ReactNode }> = ({ ch
 };
 
 export const usePermission = (): PermissionContextType => {
-  const context = useContext(PermissionContext);
-  if (!context) {
-    throw new Error('usePermission must be used within a PermissionProvider');
-  }
-  return context;
+  return useContext(PermissionContext) || defaultPermissionContext;
 };

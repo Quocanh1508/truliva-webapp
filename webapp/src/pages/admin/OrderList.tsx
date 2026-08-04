@@ -3853,7 +3853,7 @@ export default function OrderList() {
                     className="w-full border rounded p-2 text-sm outline-none focus:border-blue-500 text-gray-800 bg-white"
                     placeholder="Nhập tên khách hàng..."
                     value={newOrderForm.customerName}
-                    onChange={e => setNewOrderForm({ ...newOrderForm, customerName: e.target.value })}
+                    onChange={e => setNewOrderForm(prev => ({ ...prev, customerName: e.target.value }))}
                   />
                 </div>
 
@@ -3865,7 +3865,7 @@ export default function OrderList() {
                     className="w-full border rounded p-2 text-sm outline-none focus:border-blue-500 text-gray-800 bg-white"
                     placeholder="Nhập số điện thoại..."
                     value={newOrderForm.customerPhone}
-                    onChange={e => setNewOrderForm({ ...newOrderForm, customerPhone: e.target.value })}
+                    onChange={e => setNewOrderForm(prev => ({ ...prev, customerPhone: e.target.value }))}
                     onBlur={() => setTimeout(() => setCustomerSuggestions([]), 200)}
                   />
                   {customerSuggestions.length > 0 && (
@@ -3874,17 +3874,24 @@ export default function OrderList() {
                         <button
                           key={cust.id}
                           type="button"
-                          className="w-full text-left px-3 py-2 text-sm hover:bg-blue-50 hover:text-blue-700 transition-colors border-b border-gray-100 last:border-0"
-                          onClick={() => handleSelectCustomer(cust)}
+                          className="w-full text-left px-3 py-2 text-sm hover:bg-blue-50 hover:text-blue-700 transition-colors border-b border-gray-100 last:border-0 cursor-pointer"
+                          onMouseDown={(e) => {
+                            e.preventDefault();
+                            handleSelectCustomer(cust);
+                          }}
+                          onClick={(e) => {
+                            e.preventDefault();
+                            handleSelectCustomer(cust);
+                          }}
                         >
                           <div className="font-semibold text-gray-800">{cust.fullName}</div>
                           <div className="text-xs text-gray-500 flex justify-between">
                             <span>SĐT: {cust.phoneNumber}</span>
                             {cust.provinceName && <span>Tỉnh: {cust.provinceName}</span>}
                           </div>
-                          {cust.fullAddress && (
+                          {(cust.fullAddress || cust.address) && (
                             <div className="text-[11px] text-gray-400 truncate mt-0.5">
-                              ĐC: {cust.fullAddress}
+                              ĐC: {cust.fullAddress || cust.address}
                             </div>
                           )}
                         </button>
@@ -3900,7 +3907,7 @@ export default function OrderList() {
                     className="w-full border rounded p-2 text-sm outline-none focus:border-blue-500 text-gray-800 bg-white"
                     placeholder="Số nhà, tên đường, phường/xã, quận/huyện..."
                     value={newOrderForm.address}
-                    onChange={e => setNewOrderForm({ ...newOrderForm, address: e.target.value })}
+                    onChange={e => setNewOrderForm(prev => ({ ...prev, address: e.target.value }))}
                   />
                 </div>
 
@@ -3908,7 +3915,7 @@ export default function OrderList() {
                   <label className="block text-sm text-gray-600 mb-1">Tỉnh / Thành phố *</label>
                   <ProvinceSelect
                     value={newOrderForm.province}
-                    onChange={prov => setNewOrderForm({ ...newOrderForm, province: prov })}
+                    onChange={prov => setNewOrderForm(prev => ({ ...prev, province: prov }))}
                     placeholder="Chọn hoặc gõ tỉnh thành..."
                     required
                   />
@@ -3921,7 +3928,7 @@ export default function OrderList() {
                     className="w-full border rounded p-2 text-sm outline-none focus:border-blue-500"
                     placeholder="Ghi chú về ca dịch vụ..."
                     value={newOrderForm.note}
-                    onChange={e => setNewOrderForm({ ...newOrderForm, note: e.target.value })}
+                    onChange={e => setNewOrderForm(prev => ({ ...prev, note: e.target.value }))}
                   ></textarea>
                 </div>
               </div>
@@ -3972,7 +3979,7 @@ export default function OrderList() {
                         className="w-full border rounded p-2 text-sm outline-none focus:border-blue-500 text-gray-800 bg-white"
                         placeholder="Gõ để tìm kiếm & chọn dịch vụ..."
                         value={newOrderForm.serviceType}
-                        onChange={e => setNewOrderForm({ ...newOrderForm, serviceType: e.target.value })}
+                        onChange={e => setNewOrderForm(prev => ({ ...prev, serviceType: e.target.value }))}
                         onFocus={() => setShowCreateServiceDropdown(true)}
                         onBlur={() => setTimeout(() => setShowCreateServiceDropdown(false), 200)}
                       />
@@ -4043,7 +4050,7 @@ export default function OrderList() {
                         type="date"
                         className="w-full border rounded p-2 text-sm outline-none focus:border-blue-500 text-gray-800 bg-white"
                         value={newOrderForm.appointmentDate}
-                        onChange={e => setNewOrderForm({ ...newOrderForm, appointmentDate: e.target.value })}
+                        onChange={e => setNewOrderForm(prev => ({ ...prev, appointmentDate: e.target.value }))}
                       />
                     </div>
                     <div>
@@ -4051,7 +4058,7 @@ export default function OrderList() {
                         type="time"
                         className="w-full border rounded p-2 text-sm outline-none focus:border-blue-500 text-gray-800 bg-white"
                         value={newOrderForm.appointmentTime}
-                        onChange={e => setNewOrderForm({ ...newOrderForm, appointmentTime: e.target.value })}
+                        onChange={e => setNewOrderForm(prev => ({ ...prev, appointmentTime: e.target.value }))}
                       />
                     </div>
                   </div>
@@ -4064,7 +4071,7 @@ export default function OrderList() {
                     className="w-full border rounded p-2 text-sm outline-none focus:border-blue-500 text-gray-800 bg-white font-medium"
                     placeholder="Ví dụ: 50000"
                     value={newOrderForm.moneyToCollect === 0 ? '' : newOrderForm.moneyToCollect}
-                    onChange={e => setNewOrderForm({ ...newOrderForm, moneyToCollect: parseInt(e.target.value, 10) || 0 })}
+                    onChange={e => setNewOrderForm(prev => ({ ...prev, moneyToCollect: parseInt(e.target.value, 10) || 0 }))}
                   />
                 </div>
 
@@ -4073,7 +4080,7 @@ export default function OrderList() {
                   <select
                     className="w-full border rounded p-2 text-sm outline-none focus:border-blue-500 text-gray-800 bg-white font-medium cursor-pointer"
                     value={newOrderForm.promoCode}
-                    onChange={e => setNewOrderForm({ ...newOrderForm, promoCode: e.target.value })}
+                    onChange={e => setNewOrderForm(prev => ({ ...prev, promoCode: e.target.value }))}
                   >
                     <option value="">Không áp dụng</option>
                     {promosList.filter(p => !p.isLocked).map(p => (
@@ -4103,19 +4110,21 @@ export default function OrderList() {
                               value={item.quantity}
                               onChange={(e) => {
                                 const val = parseInt(e.target.value, 10) || 1;
-                                const newItems = [...newOrderForm.items];
-                                newItems[idx].quantity = val;
-                                setNewOrderForm({ ...newOrderForm, items: newItems });
+                                setNewOrderForm(prev => {
+                                  const newItems = [...prev.items];
+                                  newItems[idx].quantity = val;
+                                  return { ...prev, items: newItems };
+                                });
                               }}
                             />
                             <button
                               type="button"
                               className="text-red-500 hover:text-red-700 font-bold px-1"
                               onClick={() => {
-                                setNewOrderForm({
-                                  ...newOrderForm,
-                                  items: newOrderForm.items.filter((_, i) => i !== idx)
-                                });
+                                setNewOrderForm(prev => ({
+                                  ...prev,
+                                  items: prev.items.filter((_, i) => i !== idx)
+                                }));
                               }}
                             >
                               Xóa
@@ -4141,24 +4150,26 @@ export default function OrderList() {
                           .filter(id => id.startsWith('PROD:'))
                           .map(id => id.substring(5));
 
-                        let updatedItems = newOrderForm.items.filter(item =>
-                          nextProductNames.includes(item.productName)
-                        );
+                        setNewOrderForm(prev => {
+                          let updatedItems = prev.items.filter(item =>
+                            nextProductNames.includes(item.productName)
+                          );
 
-                        nextProductNames.forEach(name => {
-                          const alreadyAdded = updatedItems.some(item => item.productName === name);
-                          if (!alreadyAdded) {
-                            const prodData = productsStock.find(p => p.name === name);
-                            updatedItems.push({
-                              productName: name,
-                              sku: prodData?.sku || '',
-                              quantity: 1,
-                              price: prodData?.sellingPrice || 0
-                            });
-                          }
+                          nextProductNames.forEach(name => {
+                            const alreadyAdded = updatedItems.some(item => item.productName === name);
+                            if (!alreadyAdded) {
+                              const prodData = productsStock.find(p => p.name === name);
+                              updatedItems.push({
+                                productName: name,
+                                sku: prodData?.sku || '',
+                                quantity: 1,
+                                price: prodData?.sellingPrice || 0
+                              });
+                            }
+                          });
+
+                          return { ...prev, items: updatedItems };
                         });
-
-                        setNewOrderForm({ ...newOrderForm, items: updatedItems });
                       }}
                     />
                   </div>
