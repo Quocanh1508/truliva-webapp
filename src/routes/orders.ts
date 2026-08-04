@@ -5,6 +5,7 @@ import {
   createManualOrder,
   syncOrders,
   getFilterOptions,
+  searchCustomers,
   getOrderById,
 } from '../controllers/orderController';
 
@@ -16,6 +17,7 @@ router.get('/', getOrders);
 router.post('/', createManualOrder);
 router.post('/sync', syncOrders);
 router.get('/filter-options', getFilterOptions);
+router.get('/customers/search', searchCustomers);
 router.get('/:id', getOrderById);
 
 export default router;

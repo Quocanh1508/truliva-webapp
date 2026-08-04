@@ -12,6 +12,46 @@ import { buildOrderFilter } from '../services/orderService';
 import ExcelJS from 'exceljs';
 import axios from 'axios';
 
+export async function searchCustomers(req: Request, res: Response): Promise<void> {
+  try {
+    const { phone } = req.query;
+    if (!phone || typeof phone !== 'string') {
+      res.json([]);
+      return;
+    }
+    const cleanPhone = phone.trim();
+    if (cleanPhone.length < 3) {
+      res.json([]);
+      return;
+    }
+    const customers = await prisma.customer.findMany({
+      where: {
+        phoneNumber: {
+          contains: cleanPhone,
+        }
+      },
+      take: 10,
+      select: {
+        id: true,
+        fullName: true,
+        phoneNumber: true,
+        address: true,
+        fullAddress: true,
+        provinceName: true,
+        districtName: true,
+        communeName: true,
+        provinceId: true,
+        districtId: true,
+        communeId: true,
+      }
+    });
+    res.json(customers);
+  } catch (error: any) {
+    logger.error('Search customers error', { error: error.message });
+    res.status(500).json({ error: 'Lỗi tìm kiếm thông tin khách hàng' });
+  }
+}
+
 export async function getOrders(req: Request, res: Response): Promise<void> {
   try {
     const { 
