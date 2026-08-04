@@ -21,10 +21,12 @@ function normalizePhone(phone: any): string {
   return str;
 }
 
-// Map workType to the Station rate fields
-function getRateType(workType: string | null | undefined): 'giaoHang' | 'baoHanh' | 'suaChua' | 'thayLoc' | 'lapDat' | 'giaoHangLapDat' | 'thaoLapLai' {
+function getRateType(workType: string | null | undefined): 'giaoHang' | 'baoHanh' | 'suaChua' | 'thayLoc' | 'lapDat' | 'giaoHangLapDat' | 'thaoLapLai' | 'other' {
   if (!workType) return 'baoHanh';
   const normalized = workType.toLowerCase().trim();
+  if (normalized.includes('phí khác') || normalized.includes('phi_khac') || normalized.includes('phí bổ sung')) {
+    return 'other';
+  }
   if (normalized.includes('tháo máy & lắp đặt lại') || normalized.includes('tháo máy và lắp đặt lại') || normalized.includes('tháo lắp') || normalized.includes('thao_lap_lai')) {
     return 'thaoLapLai';
   }
@@ -657,18 +659,18 @@ router.post('/add-custom-case', requireAuth, requireAdmin, async (req: Request, 
       return;
     }
 
-    const costNum = amount === '' || amount === null ? 0 : Number(amount);
-    const otherCostNum = otherCost === '' || otherCost === null ? 0 : Number(otherCost);
+    const costNum = (amount !== '' && amount !== null && amount !== undefined) ? Number(String(amount).replace(/\D/g, '')) : null;
+    const otherCostNum = (otherCost !== '' && otherCost !== null && otherCost !== undefined) ? Number(String(otherCost).replace(/\D/g, '')) : 0;
 
     const workTypeStr = workType || 'Phí khác';
     const rateType = getRateType(workTypeStr);
 
     const customCosts: Record<string, number> = {
-      baoHanhCost: rateType === 'baoHanh' ? costNum : 0,
-      giaoHangCost: rateType === 'giaoHang' ? costNum : 0,
-      lapDatCost: rateType === 'lapDat' ? costNum : 0,
-      giaoLapCost: rateType === 'giaoHangLapDat' ? costNum : 0,
-      thayLocCost: rateType === 'thayLoc' ? costNum : 0,
+      baoHanhCost: (rateType === 'baoHanh' && costNum !== null) ? costNum : 0,
+      giaoHangCost: (rateType === 'giaoHang' && costNum !== null) ? costNum : 0,
+      lapDatCost: (rateType === 'lapDat' && costNum !== null) ? costNum : 0,
+      giaoLapCost: (rateType === 'giaoHangLapDat' && costNum !== null) ? costNum : 0,
+      thayLocCost: (rateType === 'thayLoc' && costNum !== null) ? costNum : 0,
       distanceCost: 0,
       otherCost: otherCostNum
     };
