@@ -40,3 +40,6 @@ Dưới đây là các đúc kết thực tế để tối ưu hóa việc deplo
   - Cặp màu Badges cho 5 loại trạng thái (Chờ xử lý, Đang thực hiện, Hoàn thành, Hủy đơn, Đổi hoàn).
   - Bo góc `rounded-2xl` / `rounded-xl`, chiều cao nút tối thiểu 44px trên mobile, loading state với spinner icon `<Loader2 className="animate-spin" />`.
 
+## 6. Bảo Tồn API Contract & Kiểm Thử Payload Sâu (Mandatory JSON Schema Verification)
+- **Kiểm tra Frontend trước khi sửa Backend Route/Controller**: Trước khi tái cấu trúc tệp Controller/Route, BẮT BUỘC dùng `grep_search` quét file React trong `webapp/src` để đọc chính xác tên thuộc tính JSON mà UI đang chờ (`res.data.salaries`, `res.data.reports`, ...). CẤM đổi tên thuộc tính JSON trả về.
+- **Nghiệm thu HTTP Payload thực tế**: Lệnh test verification HTTP không chỉ kiểm tra server trả về mã HTTP status 200/401, mà BẮT BUỘC phải parse JSON và verify tên thuộc tính của đối tượng mảng trả về khớp 100% với Frontend.

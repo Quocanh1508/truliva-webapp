@@ -27,9 +27,12 @@ Khi có thay đổi bất kỳ file code Backend nào (`src/routes/*`, `src/serv
      cd /var/www/truliva && pm2 restart truliva-backend --update-env
      ```
    - Kiểm tra `pm2 status` để đảm bảo process status là `online` và PID mới đã được cấp.
-4. **Xác Nhận API Thực Tế (Mandatory HTTP Verification)**:
+4. **Xác Nhận API Thực Tế (Mandatory HTTP Payload Verification)**:
    - Chạy script test (node JS) thực hiện request HTTP (GET/POST) trực tiếp đến API local trên VPS (`http://127.0.0.1:3000/api/...`).
-   - Phân tích JSON hoặc Buffer trả về (Header, Data Rows, Column Count) để đảm bảo Backend thật sự đang chạy bản code mới và trả về dữ liệu chuẩn.
+   - **Bắt buộc kiểm tra sâu cấu trúc JSON Payload**: Không chỉ kiểm tra status HTTP 200/401, mà BẮT BUỘC phải parse đối tượng JSON trả về và xác minh tên thuộc tính (property keys như `salaries`, `reports`, `matrix`, `orders`) khớp 100% với tên thuộc tính mà Frontend đang sử dụng.
+
+5. **Bảo Tồn 100% API Contract Khi Refactor**:
+   - Trước khi refactor bất kỳ Route/Controller nào, BẮT BUỘC dùng tool tìm kiếm (`grep_search`) trên Frontend (`webapp/src`) để kiểm tra chính xác cấu trúc dữ liệu JSON (`res.data.salaries`, `res.data.matrix`, ...) mà UI đang tiêu thụ. CẤM tự ý đổi tên thuộc tính JSON trả về.
 
 ---
 
