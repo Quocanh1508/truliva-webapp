@@ -620,16 +620,42 @@ export default function SalaryManage() {
       .sort((a, b) => a.fullName.localeCompare(b.fullName, 'vi'));
   }, [salaries]);
 
+  // KTVs constrained by selected station(s)
+  const stationFilteredKtvsInMonth = useMemo(() => {
+    return activeKtvsInMonth.filter(s => {
+      if (selectedStationsFilter.length === 0) return true;
+
+      const sMain = s.mainStationName && s.mainStationName !== 'Không có' ? s.mainStationName : 'Trực thuộc Truliva';
+      const sTech = s.stationName && s.stationName !== 'Không có' ? s.stationName : 'Khác';
+      const sKey = `${sMain}::${sTech}`;
+
+      return selectedStationsFilter.includes(sKey) || 
+             selectedStationsFilter.includes(s.stationName) ||
+             selectedStationsFilter.includes(s.mainStationName);
+    });
+  }, [activeKtvsInMonth, selectedStationsFilter]);
+
+  // Auto-prune selected KTV filter when station filter changes
+  useEffect(() => {
+    if (selectedStationsFilter.length > 0) {
+      const validKtvIds = new Set(stationFilteredKtvsInMonth.map(s => s.userId));
+      setSelectedKtvsFilter(prev => {
+        const next = prev.filter(id => validKtvIds.has(id));
+        return next.length === prev.length ? prev : next;
+      });
+    }
+  }, [selectedStationsFilter, stationFilteredKtvsInMonth]);
+
   // Tìm kiếm KTV trong Dropdown chọn nhiều KTV
   const filteredKtvsInDropdown = useMemo(() => {
-    if (!ktvSearchQuery.trim()) return activeKtvsInMonth;
+    if (!ktvSearchQuery.trim()) return stationFilteredKtvsInMonth;
     const q = ktvSearchQuery.toLowerCase();
-    return activeKtvsInMonth.filter(s => 
+    return stationFilteredKtvsInMonth.filter(s => 
       s.fullName.toLowerCase().includes(q) ||
       s.phoneNumber.includes(q) ||
       s.username.toLowerCase().includes(q)
     );
-  }, [activeKtvsInMonth, ktvSearchQuery]);
+  }, [stationFilteredKtvsInMonth, ktvSearchQuery]);
 
   // Toggle chọn 1 KTV trong bộ lọc
   const toggleKtv = (userId: string) => {
@@ -642,12 +668,15 @@ export default function SalaryManage() {
     });
   };
 
-  // Toggle chọn tất cả / bỏ tất cả KTV trong bộ lọc
+  // Toggle chọn tất cả / bỏ tất cả KTV trong bộ lọc (chỉ tác động đến KTV thuộc trạm đang chọn)
   const toggleAllKtvs = () => {
-    if (selectedKtvsFilter.length === activeKtvsInMonth.length) {
-      setSelectedKtvsFilter([]);
+    const currentAvailableIds = stationFilteredKtvsInMonth.map(s => s.userId);
+    const allSelected = currentAvailableIds.length > 0 && currentAvailableIds.every(id => selectedKtvsFilter.includes(id));
+
+    if (allSelected) {
+      setSelectedKtvsFilter(prev => prev.filter(id => !currentAvailableIds.includes(id)));
     } else {
-      setSelectedKtvsFilter(activeKtvsInMonth.map(s => s.userId));
+      setSelectedKtvsFilter(prev => Array.from(new Set([...prev, ...currentAvailableIds])));
     }
   };
 
@@ -1018,7 +1047,7 @@ export default function SalaryManage() {
           {/* 1. Lọc theo KTV (Cho phép chọn nhiều, chọn tất cả / bỏ tất cả, sắp xếp A-Z) */}
           <div className="relative" ref={ktvDropdownRef}>
             <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-1">
-              Kỹ thuật viên {selectedKtvsFilter.length > 0 && selectedKtvsFilter.length !== activeKtvsInMonth.length && `(${selectedKtvsFilter.length}/${activeKtvsInMonth.length})`}
+              Kỹ thuật viên {selectedKtvsFilter.length > 0 && selectedKtvsFilter.length !== stationFilteredKtvsInMonth.length && `(${selectedKtvsFilter.length}/${stationFilteredKtvsInMonth.length})`}
             </label>
             <button
               type="button"
@@ -1028,8 +1057,8 @@ export default function SalaryManage() {
               <div className="flex items-center gap-1.5 truncate">
                 <UserCheck className="h-3.5 w-3.5 text-blue-600 flex-shrink-0" />
                 <span className="truncate">
-                  {selectedKtvsFilter.length === 0 || selectedKtvsFilter.length === activeKtvsInMonth.length
-                    ? `Tất cả KTV có ca (${activeKtvsInMonth.length})`
+                  {selectedKtvsFilter.length === 0 || selectedKtvsFilter.length === stationFilteredKtvsInMonth.length
+                    ? (selectedStationsFilter.length > 0 ? `Tất cả KTV thuộc trạm (${stationFilteredKtvsInMonth.length})` : `Tất cả KTV có ca (${stationFilteredKtvsInMonth.length})`)
                     : `Đã chọn ${selectedKtvsFilter.length} KTV`}
                 </span>
               </div>
@@ -1058,21 +1087,22 @@ export default function SalaryManage() {
                   <label className="flex items-center gap-2 cursor-pointer font-bold text-blue-900">
                     <input
                       type="checkbox"
-                      checked={activeKtvsInMonth.length > 0 && selectedKtvsFilter.length === activeKtvsInMonth.length}
+                      checked={stationFilteredKtvsInMonth.length > 0 && stationFilteredKtvsInMonth.every(s => selectedKtvsFilter.includes(s.userId))}
                       ref={(el) => {
                         if (el) {
-                          el.indeterminate = selectedKtvsFilter.length > 0 && selectedKtvsFilter.length < activeKtvsInMonth.length;
+                          const count = stationFilteredKtvsInMonth.filter(s => selectedKtvsFilter.includes(s.userId)).length;
+                          el.indeterminate = count > 0 && count < stationFilteredKtvsInMonth.length;
                         }
                       }}
                       onChange={toggleAllKtvs}
                       className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer h-3.5 w-3.5"
                     />
-                    <span>Tất cả KTV có ca ({activeKtvsInMonth.length})</span>
+                    <span>{selectedStationsFilter.length > 0 ? 'Tất cả KTV thuộc trạm' : 'Tất cả KTV có ca'} ({stationFilteredKtvsInMonth.length})</span>
                   </label>
                   <div className="flex items-center gap-1 text-[11px]">
                     <button
                       type="button"
-                      onClick={() => setSelectedKtvsFilter(activeKtvsInMonth.map(s => s.userId))}
+                      onClick={() => setSelectedKtvsFilter(stationFilteredKtvsInMonth.map(s => s.userId))}
                       className="text-blue-600 hover:underline font-semibold cursor-pointer"
                     >
                       Chọn hết
