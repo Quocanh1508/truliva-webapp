@@ -1179,6 +1179,8 @@ router.get('/export', requireAuth, requireAdmin, async (req: Request, res: Respo
       const d = new Date(r.createdAt);
       const formattedDate = `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
 
+      const customCostsObj = (r.customCosts as any) || {};
+
       const row = wsDetail.addRow([
         detailIdx++,
         formattedDate,
@@ -1191,14 +1193,14 @@ router.get('/export', requireAuth, requireAdmin, async (req: Request, res: Respo
         breakdown.workType,
         r.notes || '',
         breakdown.distance > 0 ? breakdown.distance : '-',
-        breakdown.baoHanhCost > 0 ? breakdown.baoHanhCost : '-',
-        breakdown.suaChuaCost > 0 ? breakdown.suaChuaCost : '-',
-        breakdown.giaoHangCost > 0 ? breakdown.giaoHangCost : '-',
-        breakdown.lapDatCost > 0 ? breakdown.lapDatCost : '-',
-        breakdown.giaoLapCost > 0 ? breakdown.giaoLapCost : '-',
-        breakdown.thayLocCost > 0 ? breakdown.thayLocCost : '-',
-        breakdown.distanceCost > 0 ? breakdown.distanceCost : '-',
-        breakdown.otherCost > 0 ? breakdown.otherCost : '-',
+        (breakdown.baoHanhCost > 0 || customCostsObj.baoHanhCost !== undefined) ? breakdown.baoHanhCost : '-',
+        (breakdown.suaChuaCost > 0 || customCostsObj.suaChuaCost !== undefined) ? breakdown.suaChuaCost : '-',
+        (breakdown.giaoHangCost > 0 || customCostsObj.giaoHangCost !== undefined) ? breakdown.giaoHangCost : '-',
+        (breakdown.lapDatCost > 0 || customCostsObj.lapDatCost !== undefined) ? breakdown.lapDatCost : '-',
+        (breakdown.giaoLapCost > 0 || customCostsObj.giaoLapCost !== undefined) ? breakdown.giaoLapCost : '-',
+        (breakdown.thayLocCost > 0 || customCostsObj.thayLocCost !== undefined || breakdown.workType === 'Thay lọc') ? breakdown.thayLocCost : '-',
+        (breakdown.distanceCost > 0 || customCostsObj.distanceCost !== undefined) ? breakdown.distanceCost : '-',
+        (breakdown.otherCost > 0 || customCostsObj.otherCost !== undefined) ? breakdown.otherCost : '-',
         breakdown.totalCost
       ]);
 

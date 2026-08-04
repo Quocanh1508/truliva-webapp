@@ -789,10 +789,10 @@ export default function SalaryManage() {
   const totalCasesCount = salaries.reduce((acc, curr) => acc + curr.casesCount, 0);
   const isMonthLocked = salaries.some(s => s.status === 'FINAL');
 
-  // Helper render ô chi phí có thể chỉnh sửa trực tiếp (Item 5)
   const renderCostCell = (c: CaseDetail, fieldName: string, currentVal: number, bgClass: string = 'bg-blue-50/20') => {
     const isEditing = editingCostCell?.reportId === c.reportId && editingCostCell?.fieldName === fieldName;
     const canEdit = !isMonthLocked && isAdmin;
+    const hasExplicitOverride = (c as any).customCosts && (c as any).customCosts[fieldName] !== undefined;
 
     if (isEditing) {
       return (
@@ -813,6 +813,10 @@ export default function SalaryManage() {
       );
     }
 
+    const displayVal = currentVal > 0 
+      ? currentVal.toLocaleString('vi-VN') 
+      : (hasExplicitOverride || (currentVal === 0 && fieldName.toLowerCase().includes(c.workType?.toLowerCase()?.replace(/\s+/g, '') || '')) ? '0' : '-');
+
     return (
       <td className={`px-3 py-2.5 text-right font-semibold text-gray-700 ${bgClass}`}>
         <div
@@ -827,7 +831,7 @@ export default function SalaryManage() {
           }`}
           title={canEdit ? `Nhấp để chỉnh sửa ${fieldName}` : ''}
         >
-          {currentVal > 0 ? currentVal.toLocaleString('vi-VN') : '-'}
+          {displayVal}
         </div>
       </td>
     );
