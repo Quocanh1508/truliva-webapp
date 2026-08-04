@@ -821,3 +821,87 @@ export async function resetKtvRates(req: Request, res: Response): Promise<void> 
   }
 }
 
+/**
+ * POST /api/salaries/save
+ * Save draft salary records
+ */
+export async function saveSalaryDraft(req: Request, res: Response): Promise<void> {
+  try {
+    const { month, salaries } = req.body;
+    if (!month || !/^\d{2}\/\d{4}$/.test(month)) {
+      res.status(400).json({ error: 'Định dạng tháng không hợp lệ (MM/YYYY)' });
+      return;
+    }
+    if (!Array.isArray(salaries)) {
+      res.status(400).json({ error: 'Dữ liệu thù lao không hợp lệ' });
+      return;
+    }
+
+    const savedRecords = [];
+    for (const item of salaries) {
+      const { userId, calculatedCost, adjustedCost, adjustmentNote } = item;
+      if (!userId) continue;
+
+      const existing = await prisma.salaryRecord.findUnique({
+        where: { month_userId: { month, userId } }
+      });
+
+      if (existing && existing.status === 'FINAL') {
+        continue;
+      }
+
+      const record = await prisma.salaryRecord.upsert({
+        where: {
+          month_userId: { month, userId }
+        },
+        create: {
+          month,
+          userId,
+          calculatedCost: Number(calculatedCost) || 0,
+          adjustedCost: Number(adjustedCost) ?? Number(calculatedCost) ?? 0,
+          adjustmentNote: adjustmentNote || '',
+          status: 'DRAFT'
+        },
+        update: {
+          calculatedCost: Number(calculatedCost) || 0,
+          adjustedCost: Number(adjustedCost) ?? Number(calculatedCost) ?? 0,
+          adjustmentNote: adjustmentNote || '',
+        }
+      });
+      savedRecords.push(record);
+    }
+
+    logger.info('Draft salary records saved', { month, count: savedRecords.length });
+    res.json({ message: 'Lưu nháp thành công', count: savedRecords.length });
+  } catch (error: any) {
+    logger.error('Save salary records error', { error: error.message });
+    res.status(500).json({ error: 'Lỗi khi lưu nháp bảng thù lao' });
+  }
+}
+
+/**
+ * POST /api/salaries/lock
+ * Lock salary records for a month (Lock changes)
+ */
+export async function lockSalaryMonth(req: Request, res: Response): Promise<void> {
+  try {
+    const { month } = req.body;
+    if (!month || !/^\d{2}\/\d{4}$/.test(month)) {
+      res.status(400).json({ error: 'Định dạng tháng không hợp lệ (MM/YYYY)' });
+      return;
+    }
+
+    const updated = await prisma.salaryRecord.updateMany({
+      where: { month },
+      data: { status: 'FINAL' }
+    });
+
+    logger.info('Salary records locked', { month, count: updated.count });
+    res.json({ message: 'Chốt và khóa bảng thù lao thành công', count: updated.count });
+  } catch (error: any) {
+    logger.error('Lock salary records error', { error: error.message });
+    res.status(500).json({ error: 'Lỗi khi chốt bảng thù lao' });
+  }
+}
+
+

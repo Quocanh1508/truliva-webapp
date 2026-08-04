@@ -2,6 +2,8 @@ import { Router } from 'express';
 import { requireAuth, requireAdmin } from '../middleware/authSession';
 import {
   getCalculatedSalaries,
+  saveSalaryDraft,
+  lockSalaryMonth,
   adjustSalary,
   exportSalaries,
   getKtvRates,
@@ -17,6 +19,8 @@ const router = Router();
 router.use(requireAuth);
 
 router.get('/calculate', requireAdmin, getCalculatedSalaries);
+router.post('/save', requireAdmin, saveSalaryDraft);
+router.post('/lock', requireAdmin, lockSalaryMonth);
 router.post('/adjust', requireAdmin, adjustSalary);
 router.get('/export', requireAdmin, exportSalaries);
 router.get('/rates', requireAdmin, getKtvRates);
