@@ -42,7 +42,21 @@ router.get('/stats', async (req: Request, res: Response): Promise<void> => {
     } = req.query;
 
     const isIncludeEcom = includeEcom === 'true' || revenueScope === 'all' || !revenueScope;
-    const activeEcomFilter = isIncludeEcom ? {} : nonEcomFilter;
+
+    const validOrderFilter: Prisma.OrderWhereInput = {
+      OR: [
+        { statusCode: { not: 0 } },
+        { statusCode: null },
+        { pancakeOrderId: { lt: 0 } }
+      ]
+    };
+
+    const activeBaseFilter: Prisma.OrderWhereInput = {
+      AND: [
+        validOrderFilter,
+        ...(isIncludeEcom ? [] : [nonEcomFilter])
+      ]
+    };
 
     // 1. Thống kê số lượng đơn hàng theo Trạm (Main Station)
     const stations = await prisma.mainStation.findMany({
@@ -52,7 +66,7 @@ router.get('/stats', async (req: Request, res: Response): Promise<void> => {
         _count: {
           select: {
             orders: {
-              where: activeEcomFilter
+              where: activeBaseFilter
             }
           }
         },
@@ -63,7 +77,7 @@ router.get('/stats', async (req: Request, res: Response): Promise<void> => {
             _count: {
               select: {
                 orders: {
-                  where: activeEcomFilter
+                  where: activeBaseFilter
                 }
               }
             }
@@ -89,7 +103,7 @@ router.get('/stats', async (req: Request, res: Response): Promise<void> => {
         _count: {
           select: {
             orders: {
-              where: activeEcomFilter
+              where: activeBaseFilter
             }
           }
         }
@@ -107,20 +121,14 @@ router.get('/stats', async (req: Request, res: Response): Promise<void> => {
     // 3. Tổng quan đơn hàng theo trạng thái
     const statusCounts = await prisma.order.groupBy({
       by: ['adminStatus'],
-      where: activeEcomFilter,
+      where: activeBaseFilter,
       _count: { id: true }
     });
 
     // 4. Thống kê theo yêu cầu của user có áp dụng bộ lọc (Lọc theo Ngày tạo đơn hàng trên Pancake)
     const where: any = {
       AND: [
-        {
-          OR: [
-            { statusCode: { not: 0 } },
-            { statusCode: null },
-            { pancakeOrderId: { lt: 0 } } // Đơn thủ công (luôn hiện, bất kể statusCode)
-          ]
-        }
+        validOrderFilter
       ]
     };
 
