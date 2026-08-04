@@ -235,9 +235,9 @@ export default function DateRangePicker({
 
     return (
       <div className="w-72 p-2">
-        {/* Month Header format: "2026 Năm Tháng 6" */}
+        {/* Month Header format: "Tháng 7 năm 2026" */}
         <div className="text-center font-bold text-gray-700 text-sm mb-3">
-          {monthDate.getFullYear()} Năm Tháng {monthDate.getMonth() + 1}
+          Tháng {monthDate.getMonth() + 1} năm {monthDate.getFullYear()}
         </div>
         
         {/* Weekdays */}
