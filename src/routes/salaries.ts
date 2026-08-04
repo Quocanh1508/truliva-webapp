@@ -747,9 +747,7 @@ router.get('/export', requireAuth, requireAdmin, async (req: Request, res: Respo
       const matchStation = stationIdsList.length === 0 ||
         stationIdsList.includes(sKey) ||
         stationIdsList.includes(s.stationName) ||
-        stationIdsList.includes(s.mainStationName) ||
-        parsedTechNames.includes(s.stationName) ||
-        parsedMainNames.includes(s.mainStationName);
+        parsedTechNames.includes(s.stationName);
       if (!matchStation) return false;
 
       const matchMainStation = mainStationIdsList.length === 0 ||

@@ -630,8 +630,7 @@ export default function SalaryManage() {
       const sKey = `${sMain}::${sTech}`;
 
       return selectedStationsFilter.includes(sKey) || 
-             selectedStationsFilter.includes(s.stationName) ||
-             selectedStationsFilter.includes(s.mainStationName);
+             selectedStationsFilter.includes(s.stationName);
     });
   }, [activeKtvsInMonth, selectedStationsFilter]);
 
