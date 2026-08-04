@@ -749,3 +749,75 @@ export async function deleteCustomCase(req: Request, res: Response): Promise<voi
     res.status(500).json({ error: 'Lỗi khi xóa ca dịch vụ bổ sung' });
   }
 }
+
+/**
+ * POST /api/salaries/update-base-cost
+ * Update base cost or specific custom cost field for a report
+ */
+export async function updateBaseCost(req: Request, res: Response): Promise<void> {
+  try {
+    const { reportId, fieldName, fieldValue } = req.body;
+    if (!reportId || fieldName === undefined || fieldValue === undefined) {
+      res.status(400).json({ error: 'Thiếu tham số reportId, fieldName hoặc fieldValue' });
+      return;
+    }
+
+    const report = await prisma.serviceReport.findUnique({
+      where: { id: reportId }
+    });
+
+    if (!report) {
+      res.status(404).json({ error: 'Không tìm thấy báo cáo' });
+      return;
+    }
+
+    const val = Number(fieldValue);
+    const existingCustomCosts = (report.customCosts as any) || {};
+
+    if (fieldName === 'baseCost') {
+      await prisma.serviceReport.update({
+        where: { id: reportId },
+        data: { customBaseCost: val }
+      });
+    } else {
+      const updatedCustomCosts = {
+        ...existingCustomCosts,
+        [fieldName]: val
+      };
+      await prisma.serviceReport.update({
+        where: { id: reportId },
+        data: {
+          customBaseCost: val,
+          customCosts: updatedCustomCosts
+        }
+      });
+    }
+
+    res.json({ success: true });
+  } catch (error: any) {
+    logger.error('Update base cost error', { error: error.message });
+    res.status(500).json({ error: 'Lỗi cập nhật chi phí ca' });
+  }
+}
+
+/**
+ * DELETE /api/salaries/rates/:userId
+ * Reset custom service rates for a KTV back to defaults
+ */
+export async function resetKtvRates(req: Request, res: Response): Promise<void> {
+  try {
+    const { userId } = req.params;
+    await prisma.ktvServiceRate.deleteMany({
+      where: { userId: String(userId) }
+    });
+
+    res.json({
+      success: true,
+      message: 'Đã khôi phục đơn giá chuẩn cho KTV thành công'
+    });
+  } catch (error: any) {
+    logger.error('Reset KTV service rates error', { error: error.message });
+    res.status(500).json({ error: 'Lỗi khi khôi phục đơn giá KTV' });
+  }
+}
+
