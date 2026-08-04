@@ -16,7 +16,7 @@ export async function getCalculatedSalaries(req: Request, res: Response): Promis
   try {
     const month = (req.query.month as string) || `${new Date().getMonth() + 1}/${new Date().getFullYear()}`;
     const result = await computeFullSalariesForMonth(month);
-    res.json({ month, data: result });
+    res.json({ month, salaries: result, data: result });
   } catch (error: any) {
     logger.error('Error calculating salaries', { error: error.message, stack: error.stack });
     res.status(500).json({ error: 'Lỗi khi tính thù lao KTV' });
@@ -582,7 +582,7 @@ export async function getKtvRates(req: Request, res: Response): Promise<void> {
       };
     });
 
-    res.json({ data: result });
+    res.json({ success: true, matrix: result, data: result });
   } catch (error: any) {
     logger.error('Error fetching KTV rates matrix', { error: error.message });
     res.status(500).json({ error: 'Lỗi khi tải bảng ma trận đơn giá KTV' });
