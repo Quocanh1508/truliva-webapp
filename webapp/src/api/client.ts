@@ -23,7 +23,11 @@ export async function fetchApi(endpoint: string, options: RequestInit = {}) {
   if (!contentType.includes('application/json')) {
     if (response.status === 401) {
       localStorage.removeItem('session_token');
-      window.location.href = '/login';
+      localStorage.removeItem('session_user');
+      // Only hard-redirect if NOT already on /login to avoid infinite reload loop
+      if (!window.location.pathname.startsWith('/login')) {
+        window.location.href = '/login';
+      }
       throw new Error('Phiên làm việc đã hết hạn. Vui lòng đăng nhập lại.');
     }
     throw new Error(`Lỗi kết nối máy chủ (${response.status})`);
@@ -34,7 +38,11 @@ export async function fetchApi(endpoint: string, options: RequestInit = {}) {
   if (!response.ok) {
     if (response.status === 401) {
       localStorage.removeItem('session_token');
-      window.location.href = '/login';
+      localStorage.removeItem('session_user');
+      // Only hard-redirect if NOT already on /login to avoid infinite reload loop
+      if (!window.location.pathname.startsWith('/login')) {
+        window.location.href = '/login';
+      }
     }
     const error = new Error(data.error || 'Có lỗi xảy ra') as any;
     error.status = response.status;
