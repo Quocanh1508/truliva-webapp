@@ -1,10 +1,16 @@
+// Cache-busting version - change this value to force iOS PWA to reload all assets
+const SW_VERSION = '2026-08-05-v3';
+
 self.addEventListener('install', (event) => {
+  console.log(`[SW ${SW_VERSION}] Installing...`);
   self.skipWaiting();
 });
 
 self.addEventListener('activate', (event) => {
+  console.log(`[SW ${SW_VERSION}] Activating - purging all caches...`);
   event.waitUntil(
-    caches.keys().then((keys) => Promise.all(keys.map((k) => caches.delete(k))))
+    caches.keys()
+      .then((keys) => Promise.all(keys.map((k) => caches.delete(k))))
       .then(() => self.clients.claim())
   );
 });
