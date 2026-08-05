@@ -14,6 +14,19 @@ export interface ActivationCustomerInfo {
  * Nhận diện các mẫu: "bảo hành 24 tháng", "bh 12 thang", "BH 24T", "bh 2 năm", "bao hanh 1 nam", "bh 3n"
  */
 export function extractWarrantyMonths(note: string | null | undefined): number | null {
+  if (!note) return null;
+  const str = note.toLowerCase();
+  
+  const monthMatch = str.match(/(?:bảo hành|bh|bao hanh)\s*(\d{1,2})\s*(?:tháng|thang|t|m)\b/i);
+  if (monthMatch) {
+    return parseInt(monthMatch[1], 10);
+  }
+
+  const yearMatch = str.match(/(?:bảo hành|bh|bao hanh)\s*(\d{1,2})\s*(?:năm|nam|n)\b/i);
+  if (yearMatch) {
+    return parseInt(yearMatch[1], 10) * 12;
+  }
+
   return null;
 }
 
