@@ -26,8 +26,21 @@ export default function LoginPage() {
   const [showIosModal, setShowIosModal] = useState(false);
   const [showGeneralModal, setShowGeneralModal] = useState(false);
   
-  const { login } = useAuth();
+  const { user, loading: authLoading, login } = useAuth();
   const navigate = useNavigate();
+
+  // Redirect if user is already logged in
+  useEffect(() => {
+    if (!authLoading && user) {
+      if (user.role === 'DEV') {
+        navigate('/dev/feedbacks', { replace: true });
+      } else if (user.role === 'KTV') {
+        navigate('/ktv/my-orders', { replace: true });
+      } else {
+        navigate('/admin/orders', { replace: true });
+      }
+    }
+  }, [user, authLoading, navigate]);
 
   // Detect if running inside the Capacitor mobile app shell
   const isApp = Capacitor.isNativePlatform();
@@ -44,11 +57,21 @@ export default function LoginPage() {
 
     let animationFrameId: number;
     let particles: Particle[] = [];
-    const maxParticles = window.innerWidth < 768 ? 30 : 65; // Density optimized for performance
-    const connectionDist = 110;
-    const mouseConnectionDist = 150;
+    const isMobile = window.innerWidth < 768;
+    const maxParticles = isMobile ? 18 : 50; // Optimized particle count for smooth mobile rendering
+    const connectionDist = isMobile ? 80 : 110;
+    const mouseConnectionDist = 130;
+
+    let lastWidth = window.innerWidth;
+    let lastHeight = window.innerHeight;
 
     const resizeCanvas = () => {
+      // Avoid canvas reset on mobile keyboard popups where width doesn't change
+      if (Math.abs(window.innerWidth - lastWidth) < 10 && Math.abs(window.innerHeight - lastHeight) < 80 && isMobile) {
+        return;
+      }
+      lastWidth = window.innerWidth;
+      lastHeight = window.innerHeight;
       canvas.width = window.innerWidth;
       canvas.height = window.innerHeight;
     };
@@ -61,11 +84,11 @@ export default function LoginPage() {
       particles.push({
         x: Math.random() * canvas.width,
         y: Math.random() * canvas.height,
-        vx: (Math.random() - 0.5) * 0.35, // Slow elegant movement
-        vy: (Math.random() - 0.5) * 0.35,
-        radius: Math.random() * 2 + 1.2,
-        alpha: Math.random() * 0.35 + 0.15,
-        baseAlpha: Math.random() * 0.25 + 0.1,
+        vx: (Math.random() - 0.5) * 0.3,
+        vy: (Math.random() - 0.5) * 0.3,
+        radius: Math.random() * 1.8 + 1,
+        alpha: Math.random() * 0.3 + 0.15,
+        baseAlpha: Math.random() * 0.2 + 0.1,
       });
     }
 
@@ -97,18 +120,16 @@ export default function LoginPage() {
         if (mouse.x !== null && mouse.y !== null) {
           const distToMouse = Math.hypot(p1.x - mouse.x, p1.y - mouse.y);
           if (distToMouse < mouseConnectionDist) {
-            const alpha = (1 - distToMouse / mouseConnectionDist) * 0.45;
+            const alpha = (1 - distToMouse / mouseConnectionDist) * 0.4;
             
-            // Draw connector line with cyan/emerald glow
             ctx.beginPath();
             ctx.strokeStyle = `rgba(6, 182, 212, ${alpha})`;
-            ctx.lineWidth = 1.1;
+            ctx.lineWidth = 1;
             ctx.moveTo(p1.x, p1.y);
             ctx.lineTo(mouse.x, mouse.y);
             ctx.stroke();
 
-            // Glow effect on particles near mouse
-            p1.alpha = p1.baseAlpha + (1 - distToMouse / mouseConnectionDist) * 0.65;
+            p1.alpha = p1.baseAlpha + (1 - distToMouse / mouseConnectionDist) * 0.5;
           } else {
             p1.alpha = p1.baseAlpha;
           }
@@ -131,14 +152,6 @@ export default function LoginPage() {
         ctx.arc(p1.x, p1.y, p1.radius, 0, Math.PI * 2);
         ctx.fillStyle = `rgba(14, 165, 233, ${p1.alpha})`;
         ctx.fill();
-        
-        // Small radial glow around particle if near cursor
-        if (p1.alpha > 0.35) {
-          ctx.beginPath();
-          ctx.arc(p1.x, p1.y, p1.radius * 3.5, 0, Math.PI * 2);
-          ctx.fillStyle = `rgba(6, 182, 212, ${(p1.alpha - 0.35) * 0.25})`;
-          ctx.fill();
-        }
       }
 
       animationFrameId = requestAnimationFrame(draw);
@@ -248,7 +261,8 @@ export default function LoginPage() {
       onTouchStart={handleTouchStart}
       onTouchMove={handleTouchMove}
       onTouchEnd={handleTouchEnd}
-      className="relative flex items-center justify-center h-screen overflow-hidden cyber-bg"
+      className="relative flex items-center justify-center min-h-screen h-[100dvh] w-full overflow-hidden cyber-bg"
+      style={{ WebkitTapHighlightColor: 'transparent' }}
     >
       {/* Subtle grid pattern overlay */}
       <div className="absolute inset-0 pointer-events-none z-0 cyber-grid" />
@@ -257,6 +271,7 @@ export default function LoginPage() {
       <canvas 
         ref={canvasRef} 
         className="absolute inset-0 pointer-events-none z-10" 
+        style={{ transform: 'translateZ(0)', willChange: 'transform' }}
       />
 
       {/* Ambient Glowing Orbs */}
@@ -280,9 +295,11 @@ export default function LoginPage() {
           position: absolute;
           border-radius: 50%;
           filter: blur(120px);
+          -webkit-filter: blur(120px);
           pointer-events: none;
           opacity: 0.3;
           mix-blend-mode: screen;
+          transform: translateZ(0);
         }
 
         .orb-blue {
@@ -308,35 +325,24 @@ export default function LoginPage() {
           100% { transform: translate(30px, 20px) scale(1.05); }
         }
 
-        /* 3D Glassmorphism Card Style (Stationary layout as requested) */
+        /* 3D Glassmorphism Card Style - Fixed WebKit Composite Glitch */
         .glow-card {
           position: relative;
-          background: rgba(10, 18, 36, 0.85);
+          background: rgba(10, 18, 36, 0.88);
+          -webkit-backdrop-filter: blur(20px);
           backdrop-filter: blur(20px);
           border-radius: 1.25rem;
           padding: 2.5rem 2.25rem;
           width: 100%;
           max-width: 410px;
           margin: 1.5rem;
+          border: 1px solid rgba(59, 130, 246, 0.3);
           box-shadow: 
             0 20px 45px -10px rgba(0, 0, 0, 0.6), 
             0 10px 20px -10px rgba(0, 0, 0, 0.4),
-            0 0 35px rgba(59, 130, 246, 0.04);
-        }
-
-        .glow-card::before {
-          content: '';
-          position: absolute;
-          inset: 0;
-          border-radius: 1.25rem;
-          padding: 1.5px;
-          background: linear-gradient(135deg, rgba(59, 130, 246, 0.45), rgba(6, 182, 212, 0.1), rgba(59, 130, 246, 0.1), rgba(6, 182, 212, 0.35));
-          -webkit-mask: 
-             linear-gradient(#fff 0 0) content-box, 
-             linear-gradient(#fff 0 0);
-          -webkit-mask-composite: xor;
-                  mask-composite: exclude;
-          pointer-events: none;
+            0 0 35px rgba(59, 130, 246, 0.08);
+          transform: translateZ(0);
+          will-change: transform;
         }
 
         .cyber-label {
