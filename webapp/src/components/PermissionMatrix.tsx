@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { usePermission } from '../context/PermissionContext';
 import { Search, Shield, Check, X, RefreshCw, ChevronDown, ChevronRight, Info } from 'lucide-react';
+import { getDefaultPermission } from '../config/permissions';
 import { removeVietnameseTones } from '../utils/text';
 
 export const PermissionMatrix: React.FC = () => {
@@ -142,7 +143,9 @@ export const PermissionMatrix: React.FC = () => {
                       </td>
 
                       {roles.map(r => {
-                        const isAllowed = matrix[r.key] ? matrix[r.key][feat.key] ?? false : false;
+                        const isAllowed = (matrix[r.key] && matrix[r.key][feat.key] !== undefined)
+                          ? matrix[r.key][feat.key]
+                          : getDefaultPermission(r.key, feat.key);
                         const isUpdating = updatingKey === `${r.key}:${feat.key}`;
                         const isAdminRole = r.key === 'ADMIN';
 
