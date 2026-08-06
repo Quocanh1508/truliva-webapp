@@ -64,7 +64,9 @@ export async function syncProducts() {
         const totalImported = vwList.reduce((sum: number, vw: any) => sum + (Number(vw.total_quantity) || 0), 0);
         const totalStock = vwList.reduce((sum: number, vw: any) => sum + (Number(vw.actual_remain_quantity) || Number(vw.remain_quantity) || 0), 0);
 
-        const isActive = !(item.is_hidden || item.is_removed || item.is_locked);
+        const isItemHidden = Boolean(item.is_hidden || item.is_removed || item.is_locked);
+        const isProductHidden = Boolean(productInfo.is_hidden || productInfo.is_removed || productInfo.is_locked);
+        const isActive = !(isItemHidden || isProductHidden);
 
         await prisma.product.upsert({
           where: { pancakeProductId: pancakeProductId },

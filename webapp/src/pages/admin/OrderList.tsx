@@ -416,6 +416,25 @@ export default function OrderList() {
     setCustomerSuggestions([]);
   };
 
+  const [syncingPosProducts, setSyncingPosProducts] = useState(false);
+
+  const handleSyncPosProducts = async () => {
+    try {
+      setSyncingPosProducts(true);
+      await fetchApi('/inventory/sync', { method: 'POST' });
+      const invData = await fetchApi('/inventory/stock');
+      const whs = invData.warehouses || [];
+      const prods = invData.products || [];
+      setWarehouses(whs);
+      setProductsStock(prods);
+      alert('🎉 Đã đồng bộ danh mục sản phẩm active từ Pancake POS thành công!');
+    } catch (err: any) {
+      alert(err.message || 'Lỗi đồng bộ sản phẩm từ POS');
+    } finally {
+      setSyncingPosProducts(false);
+    }
+  };
+
   const openCreateModal = () => {
     setEditingOrderId(null);
     setCustomerSuggestions([]);
@@ -435,16 +454,14 @@ export default function OrderList() {
       promoCode: ''
     });
 
-    if (productsStock.length === 0) {
-      fetchApi('/inventory/stock')
-        .then(invData => {
-          const whs = invData.warehouses || [];
-          const prods = invData.products || [];
-          setWarehouses(whs);
-          setProductsStock(prods);
-        })
-        .catch(console.error);
-    }
+    fetchApi('/inventory/stock')
+      .then(invData => {
+        const whs = invData.warehouses || [];
+        const prods = invData.products || [];
+        setWarehouses(whs);
+        setProductsStock(prods);
+      })
+      .catch(console.error);
 
     setShowCreateModal(true);
   };
@@ -484,16 +501,14 @@ export default function OrderList() {
       promoCode: order.promoCode || ''
     });
 
-    if (productsStock.length === 0) {
-      fetchApi('/inventory/stock')
-        .then(invData => {
-          const whs = invData.warehouses || [];
-          const prods = invData.products || [];
-          setWarehouses(whs);
-          setProductsStock(prods);
-        })
-        .catch(console.error);
-    }
+    fetchApi('/inventory/stock')
+      .then(invData => {
+        const whs = invData.warehouses || [];
+        const prods = invData.products || [];
+        setWarehouses(whs);
+        setProductsStock(prods);
+      })
+      .catch(console.error);
 
     setEditingOrderId(order.id);
     setShowCreateModal(true);
@@ -4091,9 +4106,20 @@ export default function OrderList() {
                   </select>
                 </div>
 
-                {/* Chọn sản phẩm */}
                 <div className="border-t pt-4 space-y-2">
-                  <label className="block text-sm font-semibold text-gray-800">Sản phẩm đi kèm *</label>
+                  <div className="flex justify-between items-center">
+                    <label className="block text-sm font-semibold text-gray-800">Sản phẩm đi kèm *</label>
+                    <button
+                      type="button"
+                      onClick={handleSyncPosProducts}
+                      disabled={syncingPosProducts}
+                      className="text-xs font-semibold text-blue-600 hover:text-blue-800 flex items-center gap-1 bg-blue-50 hover:bg-blue-100 px-2.5 py-1 rounded-md transition-all border border-blue-200 shadow-2xs cursor-pointer"
+                      title="Bấm để đồng bộ ngay lập tức các sản phẩm vừa mở trên POS"
+                    >
+                      <RefreshCw size={13} className={syncingPosProducts ? "animate-spin" : ""} />
+                      <span>{syncingPosProducts ? "Đang đồng bộ..." : "Đồng bộ từ POS"}</span>
+                    </button>
+                  </div>
 
                   {newOrderForm.items.length > 0 ? (
                     <div className="border border-gray-200 rounded divide-y max-h-40 overflow-y-auto bg-gray-50">

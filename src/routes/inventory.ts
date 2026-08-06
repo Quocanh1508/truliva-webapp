@@ -129,8 +129,8 @@ router.get('/stock', async (req: Request, res: Response): Promise<void> => {
  */
 router.post('/sync', requireCoordinatorOrAdmin, async (req: Request, res: Response): Promise<void> => {
   try {
-    syncProducts().catch((err) => logger.error('Sync products in background failed', { error: err.message }));
-    res.status(200).json({ message: 'Sync process started in the background.' });
+    await syncProducts();
+    res.status(200).json({ success: true, message: 'Đã đồng bộ danh mục sản phẩm từ Pancake POS thành công!' });
   } catch (error: any) {
     logger.error('Sync products route error', { error: error.message });
     res.status(500).json({ error: error.message });

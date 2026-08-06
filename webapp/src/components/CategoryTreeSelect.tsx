@@ -117,11 +117,15 @@ export default function CategoryTreeSelect({
 
     // Populate products as Level 3 nodes if provided
     if (products && products.length > 0) {
+      const placedProductNames = new Set<string>();
+
       const populateProducts = (nodes: TreeNode[]) => {
         nodes.forEach(node => {
           if (node.isParent) {
             // Find products belonging to this category
             const matchedProducts = products.filter(p => p.category === node.id);
+            matchedProducts.forEach(p => placedProductNames.add(p.name));
+
             node.children = [
               ...node.children.map(c => {
                 // Recursively populate products for subcategories
@@ -146,6 +150,22 @@ export default function CategoryTreeSelect({
         });
       };
       populateProducts(roots);
+
+      // Any products whose category is null/unmatched are placed under "Khác / Chưa phân loại"
+      const unplaced = products.filter(p => !placedProductNames.has(p.name));
+      if (unplaced.length > 0) {
+        roots.push({
+          id: 'Uncategorized',
+          label: 'Khác / Chưa phân loại',
+          isParent: true,
+          children: unplaced.map(p => ({
+            id: `PROD:${p.name}`,
+            label: p.sku ? `${p.name} (${p.sku})` : p.name,
+            isParent: false,
+            children: []
+          }))
+        });
+      }
     }
 
     // Sắp xếp roots theo thứ tự abc
