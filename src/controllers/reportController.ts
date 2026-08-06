@@ -55,7 +55,30 @@ export async function createReport(req: Request, res: Response): Promise<void> {
     const userRole = req.user!.role;
     const isKtv = userRole === 'KTV';
 
-    if (!isKtv && !mainStationId) {
+    let resolvedMainStationId = mainStationId || null;
+
+    if (!resolvedMainStationId) {
+      if (orderId) {
+        const targetOrder = await prisma.order.findUnique({
+          where: { id: orderId },
+          select: { mainStationId: true }
+        });
+        if (targetOrder?.mainStationId) {
+          resolvedMainStationId = targetOrder.mainStationId;
+        }
+      }
+      if (!resolvedMainStationId && (req.user as any).mainStationId) {
+        resolvedMainStationId = (req.user as any).mainStationId;
+      }
+      if (!resolvedMainStationId) {
+        const firstStation = await prisma.mainStation.findFirst({ select: { id: true } });
+        if (firstStation) {
+          resolvedMainStationId = firstStation.id;
+        }
+      }
+    }
+
+    if (!isKtv && !resolvedMainStationId) {
       res.status(400).json({ error: 'Tài khoản văn phòng bắt buộc phải chọn Trạm chính khi báo cáo' });
       return;
     }
@@ -218,7 +241,7 @@ export async function createReport(req: Request, res: Response): Promise<void> {
         serviceCost: (serviceCost !== undefined && serviceCost !== null && serviceCost !== '') ? parseFloat(serviceCost) : null,
         additionalCost: (additionalCost !== undefined && additionalCost !== null && additionalCost !== '') ? parseFloat(additionalCost) : null,
         orderId: orderId || null,
-        mainStationId: mainStationId || null,
+        mainStationId: resolvedMainStationId || null,
         workType: workType || null,
         address: address || null,
         actualAmount: (actualAmount !== undefined && actualAmount !== null && actualAmount !== '') ? parseFloat(actualAmount) : null,

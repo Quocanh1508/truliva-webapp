@@ -717,63 +717,69 @@ export default function ReportForm() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!isValidPhone(customerPhone)) {
-      alert(PHONE_ERROR_MSG);
-      return;
-    }
-    setError('');
-    setLoading(true);
-
-    const finalIssueType = ['Bảo hành', 'Sửa chữa'].includes(workType)
-      ? (issueType === 'Khác (Nhập chi tiết phía dưới)' ? customIssueType : issueType)
-      : null;
-
-    const finalHandlingMethod = ['Bảo hành', 'Sửa chữa'].includes(workType)
-      ? handlingMethod.trim()
-      : null;
-
-    const legacyProducts: string[] = [];
-    const legacySpareParts: string[] = [];
-    selectedItems.forEach(item => {
-      const prodInfo = stockProducts.find(p => p.name.toLowerCase() === item.productName.toLowerCase());
-      const isSparePart = prodInfo?.category?.toLowerCase() === 'spare part';
-      const formatted = item.quantity > 1 ? `${item.productName} x${item.quantity}` : item.productName;
-      if (isSparePart) {
-        legacySpareParts.push(formatted);
-      } else {
-        legacyProducts.push(formatted);
-      }
-    });
-
-    const payload = {
-      customerName,
-      customerPhone,
-      province,
-      address,
-      products: legacyProducts,
-      serviceType: selectedServices.join(', '),
-      workType,
-      serialNumber,
-      distanceKm,
-      actualAmount,
-      waterSource: needsTechnicalFields(workType) ? waterSource : null,
-      tdsIn: needsTechnicalFields(workType) ? tdsIn : null,
-      tdsOut: needsTechnicalFields(workType) ? tdsOut : null,
-      waterPressure: needsTechnicalFields(workType) ? waterPressure : null,
-      spareParts: legacySpareParts,
-      issueType: finalIssueType,
-      handlingMethod: finalHandlingMethod,
-      notes,
-      imageUrls: navigator.onLine ? imageUrls : [], // Dùng url rỗng khi offline để SyncManager điền sau
-      orderId: selectedOrderId,
-      items: selectedItems.map(item => ({ productName: item.productName, quantity: item.quantity })),
-      mainStationId: selectedMainStationId || undefined,
-      techStationId: (mainStations.find(s => s.id === selectedMainStationId)?.name?.trim().toLowerCase() === 'đơn vị vận chuyển') ? null : (selectedTechStationId || undefined),
-      assignedKtvId: (mainStations.find(s => s.id === selectedMainStationId)?.name?.trim().toLowerCase() === 'đơn vị vận chuyển') ? null : (selectedKtvId || undefined),
-    };
-
     try {
+      if (!isValidPhone(customerPhone)) {
+        alert(PHONE_ERROR_MSG);
+        return;
+      }
+      setError('');
+      setLoading(true);
+
+      const finalIssueType = ['Bảo hành', 'Sửa chữa'].includes(workType)
+        ? (issueType === 'Khác (Nhập chi tiết phía dưới)' ? customIssueType : issueType)
+        : null;
+
+      const finalHandlingMethod = ['Bảo hành', 'Sửa chữa'].includes(workType)
+        ? handlingMethod.trim()
+        : null;
+
+      const legacyProducts: string[] = [];
+      const legacySpareParts: string[] = [];
+      (selectedItems || []).forEach(item => {
+        if (!item || !item.productName) return;
+        const prodInfo = stockProducts.find(p => p?.name && item.productName && p.name.toLowerCase() === item.productName.toLowerCase());
+        const isSparePart = prodInfo?.category?.toLowerCase() === 'spare part';
+        const formatted = item.quantity > 1 ? `${item.productName} x${item.quantity}` : item.productName;
+        if (isSparePart) {
+          legacySpareParts.push(formatted);
+        } else {
+          legacyProducts.push(formatted);
+        }
+      });
+
       const isKtvUser = user?.role === 'KTV';
+      const defaultWaterSource = waterSource || (!isKtvUser ? 'Nước máy trực tiếp' : null);
+      const defaultTdsIn = tdsIn || (!isKtvUser ? '0' : null);
+      const defaultTdsOut = tdsOut || (!isKtvUser ? '0' : null);
+      const defaultWaterPressure = waterPressure || (!isKtvUser ? '0' : null);
+
+      const payload = {
+        customerName,
+        customerPhone,
+        province,
+        address,
+        products: legacyProducts,
+        serviceType: selectedServices.join(', '),
+        workType,
+        serialNumber: serialNumber || 'XXXXX',
+        distanceKm,
+        actualAmount,
+        waterSource: needsTechnicalFields(workType) ? defaultWaterSource : null,
+        tdsIn: needsTechnicalFields(workType) ? defaultTdsIn : null,
+        tdsOut: needsTechnicalFields(workType) ? defaultTdsOut : null,
+        waterPressure: needsTechnicalFields(workType) ? defaultWaterPressure : null,
+        spareParts: legacySpareParts,
+        issueType: finalIssueType,
+        handlingMethod: finalHandlingMethod,
+        notes,
+        imageUrls: navigator.onLine ? imageUrls : [], // Dùng url rỗng khi offline để SyncManager điền sau
+        orderId: selectedOrderId,
+        items: (selectedItems || []).filter(item => item && item.productName).map(item => ({ productName: item.productName, quantity: item.quantity })),
+        mainStationId: selectedMainStationId || (mainStations.length > 0 ? mainStations[0].id : undefined),
+        techStationId: (mainStations.find(s => s.id === selectedMainStationId)?.name?.trim().toLowerCase() === 'đơn vị vận chuyển') ? null : (selectedTechStationId || undefined),
+        assignedKtvId: (mainStations.find(s => s.id === selectedMainStationId)?.name?.trim().toLowerCase() === 'đơn vị vận chuyển') ? null : (selectedKtvId || undefined),
+      };
+
       if (isKtvUser) {
         if (navigator.onLine && imageUrls.length === 0) {
           setError('Báo cáo bắt buộc phải có hình ảnh xác nhận. Vui lòng quay lại bước 2 để tải ảnh.');
@@ -799,7 +805,7 @@ export default function ReportForm() {
           method: 'PUT',
           body: JSON.stringify(payload)
         });
-        const isInstallJob = ['lắp đặt', 'giao hàng và lắp đặt'].includes(payload.workType?.trim().toLowerCase());
+        const isInstallJob = ['lắp đặt', 'giao hàng và lắp đặt'].includes(payload.workType?.trim().toLowerCase() || '');
         if (isInstallJob) {
           triggerActivationModal(payload);
         } else {
