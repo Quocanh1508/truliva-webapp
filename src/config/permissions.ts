@@ -78,9 +78,33 @@ export const SYSTEM_FEATURES: SystemFeature[] = [
     key: 'ORDER_SYNC_PANCAKE',
     module: 'orders',
     moduleName: '📋 Quản lý Đơn hàng',
-    name: 'Đồng bộ đơn từ Pancake POS',
-    description: 'Nút đồng bộ dữ liệu đơn hàng trực tiếp từ Pancake',
-    defaultRoles: ['ADMIN']
+    name: 'Đồng bộ đơn hàng loạt từ Pancake POS (50 đơn)',
+    description: 'Nút đồng bộ 50 đơn hàng mới nhất trực tiếp từ Pancake POS',
+    defaultRoles: ['ADMIN', 'DEV', 'COORDINATOR', 'HOTLINE', 'SALE_SUPERVISOR', 'SALER', 'STAFF']
+  },
+  {
+    key: 'ORDER_SYNC_SINGLE',
+    module: 'orders',
+    moduleName: '📋 Quản lý Đơn hàng',
+    name: 'Đồng bộ ca đơn lẻ từ Pancake POS',
+    description: 'Nút đồng bộ dữ liệu riêng từng ca dịch vụ từ Pancake POS',
+    defaultRoles: ['ADMIN', 'DEV', 'COORDINATOR', 'HOTLINE', 'SALE_SUPERVISOR', 'SALER']
+  },
+  {
+    key: 'ORDER_REOPEN',
+    module: 'orders',
+    moduleName: '📋 Quản lý Đơn hàng',
+    name: 'Mở lại đơn hàng (Khôi phục ca)',
+    description: 'Khôi phục đơn đã hủy hoặc hoàn thành về Chờ xử lý và xóa phân bổ trạm/KTV',
+    defaultRoles: ['ADMIN', 'DEV', 'COORDINATOR']
+  },
+  {
+    key: 'ORDER_AUDIT_LOG',
+    module: 'orders',
+    moduleName: '📋 Quản lý Đơn hàng',
+    name: 'Xem nhật ký lịch sử thay đổi ca',
+    description: 'Xem chi tiết lịch sử cập nhật, phân công, đổi trạng thái của ca dịch vụ',
+    defaultRoles: ['ADMIN', 'DEV', 'COORDINATOR', 'HOTLINE', 'SALE_SUPERVISOR', 'SALER', 'STAFF']
   },
   {
     key: 'ORDER_COMPLETE_MANUAL',
@@ -151,6 +175,14 @@ export const SYSTEM_FEATURES: SystemFeature[] = [
     defaultRoles: ['ADMIN', 'DEV', 'COORDINATOR', 'HOTLINE', 'STAFF']
   },
   {
+    key: 'REPORT_CREATE',
+    module: 'reports',
+    moduleName: '📝 Quản lý Báo cáo',
+    name: 'Tạo & Nộp Báo cáo nghiệm thu ca',
+    description: 'Gửi báo cáo hoàn thành ca, upload ảnh nghiệm thu & linh kiện đã thay',
+    defaultRoles: ['ADMIN', 'DEV', 'COORDINATOR', 'SALER', 'KTV']
+  },
+  {
     key: 'REPORT_APPROVE_REJECT',
     module: 'reports',
     moduleName: '📝 Quản lý Báo cáo',
@@ -208,6 +240,14 @@ export const SYSTEM_FEATURES: SystemFeature[] = [
     description: 'Chốt bảng lương tháng ngăn chỉnh sửa',
     defaultRoles: ['ADMIN']
   },
+  {
+    key: 'SALARY_EXPORT_EXCEL',
+    module: 'salaries',
+    moduleName: '💰 Quản lý Lương & Chi phí',
+    name: 'Xuất Excel Bảng tính lương KTV',
+    description: 'Tải file Excel chi tiết bảng tính lương, phụ cấp & công ca KTV',
+    defaultRoles: ['ADMIN', 'DEV', 'COORDINATOR']
+  },
 
   // 5. Quản lý Kho & Vật tư
   {
@@ -234,6 +274,14 @@ export const SYSTEM_FEATURES: SystemFeature[] = [
     description: 'Thao tác điều chuyển vật tư linh kiện giữa các kho',
     defaultRoles: ['ADMIN', 'COORDINATOR']
   },
+  {
+    key: 'INVENTORY_SYNC_POS',
+    module: 'inventory',
+    moduleName: '📦 Quản lý Kho & Vật tư',
+    name: 'Đồng bộ sản phẩm active từ POS',
+    description: 'Đồng bộ danh mục sản phẩm active và thông tin tồn kho từ Pancake POS',
+    defaultRoles: ['ADMIN', 'DEV', 'COORDINATOR']
+  },
 
   // 6. Quản lý Hệ thống & Nhân sự
   {
@@ -251,6 +299,14 @@ export const SYSTEM_FEATURES: SystemFeature[] = [
     name: 'Quản lý Ma trận Phân quyền',
     description: 'Xem và bật/tắt ma trận phân quyền động cho các Role',
     defaultRoles: ['ADMIN']
+  },
+  {
+    key: 'USER_EXPORT_EXCEL',
+    module: 'system',
+    moduleName: '⚙️ Quản lý Hệ thống',
+    name: 'Xuất Excel Danh sách Nhân sự / KTV',
+    description: 'Tải file Excel thông tin chi tiết danh sách tài khoản nhân viên & KTV',
+    defaultRoles: ['ADMIN', 'DEV']
   },
   {
     key: 'STATION_MANAGE',
