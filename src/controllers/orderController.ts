@@ -1265,11 +1265,26 @@ export async function exportOrdersExcel(req: Request, res: Response): Promise<vo
         techStation: {
           select: {
             name: true,
+            mainStation: {
+              select: {
+                name: true,
+              }
+            }
           }
         },
         assignedKtv: {
           select: {
             fullName: true,
+            techStation: {
+              select: {
+                name: true,
+                mainStation: {
+                  select: {
+                    name: true,
+                  }
+                }
+              }
+            }
           }
         }
       }
@@ -1310,6 +1325,17 @@ export async function exportOrdersExcel(req: Request, res: Response): Promise<vo
       const address = o.shippingAddress?.full_address || o.customer?.fullAddress || '';
       const productsList = o.items.map((i: any) => i.productName).join(', ');
 
+      const mainStationName = 
+        o.mainStation?.name || 
+        o.techStation?.mainStation?.name || 
+        o.assignedKtv?.techStation?.mainStation?.name || 
+        '';
+
+      const techStationName = 
+        o.techStation?.name || 
+        o.assignedKtv?.techStation?.name || 
+        '';
+
       sheet.addRow({
         pancakeOrderId: o.pancakeOrderId < 0 ? `M${Math.abs(o.pancakeOrderId)}` : o.pancakeOrderId,
         customerName,
@@ -1320,8 +1346,8 @@ export async function exportOrdersExcel(req: Request, res: Response): Promise<vo
         serviceType: o.serviceType || '',
         products: productsList,
         moneyToCollect: o.moneyToCollect ?? 0,
-        mainStation: o.mainStation?.name || '',
-        techStation: o.techStation?.name || '',
+        mainStation: mainStationName,
+        techStation: techStationName,
         ktv: o.assignedKtv?.fullName || '',
         appointmentTime: o.appointmentTime ? new Date(o.appointmentTime).toLocaleString('vi-VN') : '',
         createdAt: o.pancakeCreatedAt ? new Date(o.pancakeCreatedAt).toLocaleString('vi-VN') : new Date(o.createdAt).toLocaleString('vi-VN'),
