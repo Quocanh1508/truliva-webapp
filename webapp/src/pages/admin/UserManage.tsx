@@ -29,6 +29,8 @@ function getSortedTechStations(main: any) {
   });
 }
 
+const PREDEFINED_GROUPS: string[] = ['DTC', 'eCom', 'Service', 'DT South', 'DT North', 'Marketing', 'Admin'];
+
 export default function UserManage() {
   const { confirm } = useConfirm();
   const { user: currentUser } = useAuth();
@@ -43,6 +45,8 @@ export default function UserManage() {
   // New role, group and pancake account fields
   const [role, setRole] = useState<UserRole>('KTV');
   const [group, setGroup] = useState('');
+  const [selectedGroupOption, setSelectedGroupOption] = useState('');
+  const [customGroup, setCustomGroup] = useState('');
   const [pancakeAccountName, setPancakeAccountName] = useState('');
   
   // Helper to load saved filters from sessionStorage
@@ -116,6 +120,8 @@ export default function UserManage() {
     setWarehouseName('');
     setRole('KTV');
     setGroup('');
+    setSelectedGroupOption('');
+    setCustomGroup('');
     setPancakeAccountName('');
     setIsActive(true);
     setActiveTab('basic');
@@ -141,7 +147,22 @@ export default function UserManage() {
     setWarehouseId(user.warehouseId || '');
     setWarehouseName(user.warehouseName || '');
     setRole(user.role || 'KTV');
-    setGroup(user.group || '');
+
+    const userGroup = user.group || '';
+    if (PREDEFINED_GROUPS.includes(userGroup)) {
+      setSelectedGroupOption(userGroup);
+      setCustomGroup('');
+      setGroup(userGroup);
+    } else if (userGroup) {
+      setSelectedGroupOption('OTHER');
+      setCustomGroup(userGroup);
+      setGroup(userGroup);
+    } else {
+      setSelectedGroupOption('');
+      setCustomGroup('');
+      setGroup('');
+    }
+
     setPancakeAccountName(user.pancakeAccountName || '');
     setIsActive(user.isActive !== false);
     setActiveTab('basic');
@@ -583,13 +604,38 @@ export default function UserManage() {
                   </div>
                   <div className="form-group mb-0">
                     <label className="form-label text-xs font-semibold text-gray-700">Nhóm công việc (Group)</label>
-                    <input
-                      type="text"
-                      className="form-input"
-                      value={group}
-                      onChange={e => setGroup(e.target.value)}
-                      placeholder="Ví dụ: DTC, eCom, Service, Marketing"
-                    />
+                    <select
+                      className="form-input bg-white cursor-pointer"
+                      value={selectedGroupOption}
+                      onChange={e => {
+                        const val = e.target.value;
+                        setSelectedGroupOption(val);
+                        if (val === 'OTHER') {
+                          setGroup(customGroup);
+                        } else {
+                          setGroup(val);
+                        }
+                      }}
+                    >
+                      <option value="">-- Chưa chọn nhóm --</option>
+                      {PREDEFINED_GROUPS.map((g: string) => (
+                        <option key={g} value={g}>{g}</option>
+                      ))}
+                      <option value="OTHER">-- Khác (Gõ nhóm mới...) --</option>
+                    </select>
+                    {selectedGroupOption === 'OTHER' && (
+                      <input
+                        type="text"
+                        className="form-input mt-2"
+                        value={customGroup}
+                        onChange={e => {
+                          setCustomGroup(e.target.value);
+                          setGroup(e.target.value);
+                        }}
+                        placeholder="Nhập tên nhóm công việc khác..."
+                        autoFocus
+                      />
+                    )}
                   </div>
                   <div className="form-group mb-0">
                     <label className="form-label text-xs font-semibold text-gray-700">Tên account Pancake</label>
