@@ -2082,10 +2082,11 @@ export async function syncSingleOrder(req: Request, res: Response): Promise<void
   try {
     const id = req.params.id as string;
     
-    // Check permissions (Only ADMIN can sync single order)
+    // Check permissions
     const role = req.user?.role;
-    if (role !== 'ADMIN') {
-      res.status(403).json({ error: 'Chỉ Admin mới có quyền đồng bộ đơn hàng từ Pancake.' });
+    const group = req.user?.group;
+    if (role === 'KTV' || (role === 'STAFF' && group === 'Service')) {
+      res.status(403).json({ error: 'Bạn không có quyền đồng bộ đơn hàng từ Pancake.' });
       return;
     }
 
