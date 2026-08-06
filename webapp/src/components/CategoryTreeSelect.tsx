@@ -2,6 +2,30 @@ import { useState, useEffect, useRef } from 'react';
 import { ChevronRight, ChevronDown, Folder, FolderOpen, FileText, Search, X, Check, Minus } from 'lucide-react';
 import { matchesSearchTerm } from '../utils/text';
 
+/** Bảng ánh xạ tĩnh tên danh mục POS (tiếng Anh) → tiếng Việt */
+const CATEGORY_VI_MAP: Record<string, string> = {
+  'Device': 'Thiết bị',
+  'Filter': 'Lõi lọc',
+  'Prefilter': 'Lõi lọc thô',
+  'Spare part': 'Linh kiện phụ',
+  'Service': 'Dịch vụ',
+  'Uncategorized': 'Khác / Chưa phân loại',
+  // Sub-categories
+  'Water CT Device': 'Máy lọc CT',
+  'Water UTS Device': 'Máy lọc UTS',
+  'Water WM Device': 'Máy lọc WM',
+};
+
+/** Dịch tên label sang tiếng Việt (nếu có trong bảng). Giữ nguyên tên gốc nếu không tìm thấy. */
+function translateLabel(label: string): string {
+  if (CATEGORY_VI_MAP[label]) return CATEGORY_VI_MAP[label];
+  // Thử match theo phần cuối (VD: "Water CT Device" → "Máy lọc CT")
+  for (const [en, vi] of Object.entries(CATEGORY_VI_MAP)) {
+    if (label.toLowerCase() === en.toLowerCase()) return vi;
+  }
+  return label;
+}
+
 interface TreeNode {
   id: string;
   label: string;
@@ -156,7 +180,7 @@ export default function CategoryTreeSelect({
       if (unplaced.length > 0) {
         roots.push({
           id: 'Uncategorized',
-          label: 'Khác / Chưa phân loại',
+          label: translateLabel('Uncategorized'),
           isParent: true,
           children: unplaced.map(p => ({
             id: `PROD:${p.name}`,
@@ -237,17 +261,22 @@ export default function CategoryTreeSelect({
     e.preventDefault();
     e.stopPropagation();
     
+    // Nếu là parent node có products: CHỈ toggle expand/collapse, KHÔNG chọn
+    if (node.isParent && products && products.length > 0) {
+      setExpandedIds(prev => ({ ...prev, [node.id]: !prev[node.id] }));
+      return;
+    }
+    
     let nextSelected = [...selected];
     
     if (node.isParent) {
+      // Mode danh mục (không có products) — giữ nguyên logic cũ
       const currentlyChecked = isChecked(node);
       const allNodeIds = [node.id, ...node.children.map(c => c.id)];
       
       if (currentlyChecked) {
-        // Uncheck parent and all children
         nextSelected = nextSelected.filter(id => !allNodeIds.includes(id));
       } else {
-        // Check parent and all children
         allNodeIds.forEach(id => {
           if (!nextSelected.includes(id)) {
             nextSelected.push(id);
@@ -255,7 +284,7 @@ export default function CategoryTreeSelect({
         });
       }
     } else {
-      // Leaf node or standalone node
+      // Leaf node (sản phẩm cụ thể)
       if (nextSelected.includes(node.id)) {
         nextSelected = nextSelected.filter(id => id !== node.id);
         
@@ -316,19 +345,33 @@ export default function CategoryTreeSelect({
 
   const visibleTree = filterTree(tree);
 
+  // Kiểm tra xem component đang chạy ở chế độ chọn sản phẩm (có products) hay chế độ lọc danh mục
+  const isProductMode = products && products.length > 0;
+
   // Render a node and recursively render children
   const renderNode = (node: TreeNode, depth = 0) => {
     const hasChildren = node.children && node.children.length > 0;
     const isNodeExpanded = expandedIds[node.id] ?? false;
     const checked = isChecked(node);
     const indeterminate = isIndeterminate(node);
+    const isParentInProductMode = node.isParent && isProductMode;
+    const displayLabel = isProductMode ? translateLabel(node.label) : node.label;
+
+    // Đếm số sản phẩm con đã chọn trong thư mục này
+    const selectedChildCount = isParentInProductMode
+      ? node.children.filter(c => selected.includes(c.id)).length
+      : 0;
 
     return (
       <div key={node.id} className="flex flex-col">
         <div 
           onClick={(e) => toggleNode(node, e)}
-          className={`flex items-center gap-2 px-2.5 py-1.5 hover:bg-slate-50 rounded-lg cursor-pointer transition-colors select-none text-[13px] ${
+          className={`flex items-center gap-2 px-2.5 py-1.5 rounded-lg cursor-pointer transition-colors select-none text-[13px] ${
             depth > 0 ? 'ml-6' : ''
+          } ${
+            isParentInProductMode
+              ? 'hover:bg-amber-50/60'
+              : 'hover:bg-slate-50'
           }`}
         >
           {/* Collapse/Expand chevron for parent */}
@@ -343,31 +386,56 @@ export default function CategoryTreeSelect({
             <div className="w-6" /> // spacer
           )}
 
-          {/* Checkbox */}
-          <div className={`w-4 h-4 rounded border flex items-center justify-center transition-all shrink-0 ${
-            checked 
-              ? 'bg-blue-600 border-blue-600 text-white' 
-              : indeterminate 
-                ? 'bg-blue-100 border-blue-500 text-blue-600' 
-                : 'border-slate-300 bg-white'
-          }`}>
-            {checked && <Check size={11} strokeWidth={3} />}
-            {indeterminate && <Minus size={11} strokeWidth={3} />}
-          </div>
+          {/* Checkbox — ẨN đối với thư mục (parent) khi đang ở chế độ chọn sản phẩm */}
+          {isParentInProductMode ? (
+            // Thư mục: KHÔNG có checkbox, chỉ có icon thư mục
+            <span className="text-amber-500 shrink-0">
+              {isNodeExpanded ? <FolderOpen size={15} /> : <Folder size={15} />}
+            </span>
+          ) : (
+            // Sản phẩm lá hoặc chế độ lọc danh mục: có checkbox
+            <>
+              <div className={`w-4 h-4 rounded border flex items-center justify-center transition-all shrink-0 ${
+                checked 
+                  ? 'bg-blue-600 border-blue-600 text-white' 
+                  : indeterminate 
+                    ? 'bg-blue-100 border-blue-500 text-blue-600' 
+                    : 'border-slate-300 bg-white'
+              }`}>
+                {checked && <Check size={11} strokeWidth={3} />}
+                {indeterminate && <Minus size={11} strokeWidth={3} />}
+              </div>
 
-          {/* Node Icon */}
-          <span className="text-slate-400">
-            {node.isParent ? (
-              isNodeExpanded ? <FolderOpen size={14} className="text-amber-500" /> : <Folder size={14} className="text-amber-500" />
-            ) : (
-              <FileText size={14} className="text-blue-400" />
-            )}
-          </span>
+              {/* Node Icon */}
+              <span className="text-slate-400">
+                {node.isParent ? (
+                  isNodeExpanded ? <FolderOpen size={14} className="text-amber-500" /> : <Folder size={14} className="text-amber-500" />
+                ) : (
+                  <FileText size={14} className="text-blue-400" />
+                )}
+              </span>
+            </>
+          )}
 
           {/* Label */}
-          <span className={`text-slate-700 font-medium ${node.isParent ? 'font-semibold' : ''}`}>
-            {node.label}
+          <span className={`text-slate-700 font-medium flex-1 ${
+            isParentInProductMode ? 'font-semibold text-slate-800' : node.isParent ? 'font-semibold' : ''
+          }`}>
+            {displayLabel}
           </span>
+
+          {/* Badge đếm số sản phẩm đã chọn trong thư mục */}
+          {isParentInProductMode && selectedChildCount > 0 && (
+            <span className="px-1.5 py-0.5 bg-blue-100 text-blue-700 text-[10px] font-bold rounded-full shrink-0">
+              {selectedChildCount}
+            </span>
+          )}
+          {/* Badge tổng số sản phẩm trong thư mục */}
+          {isParentInProductMode && node.children.length > 0 && (
+            <span className="text-[10px] text-slate-400 shrink-0">
+              ({node.children.length})
+            </span>
+          )}
         </div>
 
         {/* Children nodes container */}
@@ -413,15 +481,19 @@ export default function CategoryTreeSelect({
           )}
         </div>
 
-        {/* Quick Actions (Select All / Clear All) */}
+        {/* Quick Actions — Ẩn "Chọn tất cả" khi ở chế độ sản phẩm để tránh chọn nhầm */}
         <div className="flex justify-between items-center border-b border-slate-100 pb-2 text-xs font-semibold">
-          <button 
-            type="button"
-            onClick={handleSelectAll} 
-            className="text-[#1B3A6B] hover:underline"
-          >
-            Chọn tất cả
-          </button>
+          {!isProductMode ? (
+            <button 
+              type="button"
+              onClick={handleSelectAll} 
+              className="text-[#1B3A6B] hover:underline"
+            >
+              Chọn tất cả
+            </button>
+          ) : (
+            <span className="text-slate-400 italic">Chọn từng sản phẩm bên dưới</span>
+          )}
           <button 
             type="button"
             onClick={handleClearAll} 
@@ -499,14 +571,18 @@ export default function CategoryTreeSelect({
             )}
           </div>
 
-          {/* Quick Actions (Select All / Clear All) */}
+          {/* Quick Actions — Ẩn "Chọn tất cả" khi ở chế độ sản phẩm */}
           <div className="flex justify-between items-center border-b border-slate-100 pb-2 text-xs font-semibold">
-            <button 
-              onClick={handleSelectAll} 
-              className="text-[#1B3A6B] hover:underline"
-            >
-              Chọn tất cả
-            </button>
+            {!isProductMode ? (
+              <button 
+                onClick={handleSelectAll} 
+                className="text-[#1B3A6B] hover:underline"
+              >
+                Chọn tất cả
+              </button>
+            ) : (
+              <span className="text-slate-400 italic">Chọn từng sản phẩm bên dưới</span>
+            )}
             <button 
               onClick={handleClearAll} 
               className="text-slate-500 hover:underline"
