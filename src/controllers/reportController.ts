@@ -1158,32 +1158,76 @@ export async function checkReportSerial(req: Request, res: Response): Promise<vo
 
 export async function getReportById(req: Request, res: Response): Promise<void> {
   try {
+    const targetId = req.params.id as string;
     const reportFilter = await buildReportFilter({}, req.user);
-    const report = await prisma.serviceReport.findFirst({
+
+    const reportInclude = {
+      ktvUser: { select: { fullName: true, username: true, role: true } },
+      reportedByUser: { select: { fullName: true, username: true, role: true } },
+      order: {
+        select: {
+          id: true,
+          pancakeOrderId: true,
+          billFullName: true,
+          billPhoneNumber: true,
+          shippingAddress: true,
+          customer: true,
+          workType: true,
+          serviceType: true,
+          items: true,
+          moneyToCollect: true,
+          totalPrice: true
+        }
+      }
+    };
+
+    // 1. Tìm theo ID chính xác của Báo cáo (ServiceReport.id)
+    let report = await prisma.serviceReport.findFirst({
       where: {
-        id: req.params.id as string,
+        id: targetId,
         ...reportFilter
       },
-      include: {
-        ktvUser: { select: { fullName: true, username: true, role: true } },
-        reportedByUser: { select: { fullName: true, username: true, role: true } },
-        order: {
-          select: {
-            id: true,
-            pancakeOrderId: true,
-            billFullName: true,
-            billPhoneNumber: true,
-            shippingAddress: true,
-            customer: true,
-            workType: true,
-            serviceType: true,
-            items: true,
-            moneyToCollect: true,
-            totalPrice: true
-          }
-        }
-      },
+      include: reportInclude,
     });
+
+    // 2. Nếu không tìm thấy (do ID cũ bị thay thế/xóa hoặc truyền orderId/pancakeOrderId), tìm báo cáo mới nhất theo orderId hoặc pancakeOrderId
+    if (!report) {
+      const parsedPancakeId = parseInt(targetId, 10);
+      const isNumeric = !isNaN(parsedPancakeId) && String(parsedPancakeId) === targetId.trim();
+
+      report = await prisma.serviceReport.findFirst({
+        where: {
+          OR: [
+            { orderId: targetId },
+            ...(isNumeric ? [{ order: { pancakeOrderId: parsedPancakeId } }] : [])
+          ],
+          ...reportFilter
+        },
+        orderBy: { createdAt: 'desc' },
+        include: reportInclude,
+      });
+    }
+
+    // 3. Nếu vẫn chưa tìm thấy (ID báo cáo cũ nằm trong Notification rawData), tra cứu orderId từ Notification
+    if (!report) {
+      const relatedNotif = await prisma.notification.findFirst({
+        where: {
+          rawData: { path: ['reportId'], equals: targetId }
+        },
+        select: { rawData: true }
+      });
+      const orderIdFromNotif = (relatedNotif?.rawData as any)?.orderId;
+      if (orderIdFromNotif) {
+        report = await prisma.serviceReport.findFirst({
+          where: {
+            orderId: orderIdFromNotif,
+            ...reportFilter
+          },
+          orderBy: { createdAt: 'desc' },
+          include: reportInclude,
+        });
+      }
+    }
 
     if (!report) {
       res.status(404).json({ error: 'Không tìm thấy báo cáo hoặc bạn không có quyền xem' });

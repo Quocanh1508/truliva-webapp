@@ -288,7 +288,7 @@ export default function Notifications() {
 
                       <div className="flex flex-wrap gap-2 shrink-0">
                         <button
-                          onClick={(e) => handleViewReport(e, n.rawData.reportId)}
+                          onClick={(e) => handleViewReport(e, n.rawData?.orderId || n.rawData?.reportId)}
                           disabled={viewLoading}
                           className="px-2.5 py-1 bg-[#1B3A6B] hover:bg-[#2A518E] disabled:bg-gray-400 text-white rounded text-xs font-bold transition-colors cursor-pointer flex items-center gap-1 shadow-sm"
                         >
