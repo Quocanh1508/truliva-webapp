@@ -4,16 +4,24 @@ import { matchesSearchTerm } from '../utils/text';
 
 /** Bảng ánh xạ tĩnh tên danh mục POS (tiếng Anh) → tiếng Việt */
 const CATEGORY_VI_MAP: Record<string, string> = {
+  // Danh mục gốc (Level 1)
   'Device': 'Thiết bị',
   'Filter': 'Lõi lọc',
   'Prefilter': 'Lõi lọc thô',
   'Spare part': 'Linh kiện phụ',
   'Service': 'Dịch vụ',
   'Uncategorized': 'Khác / Chưa phân loại',
-  // Sub-categories
-  'Water CT Device': 'Máy lọc CT',
-  'Water UTS Device': 'Máy lọc UTS',
-  'Water WM Device': 'Máy lọc WM',
+  // Danh mục con Thiết bị (Level 2)
+  'Air CT Device': 'Máy lọc không khí CT',
+  'Water CT Device': 'Máy lọc nước CT',
+  'Water UTS Device': 'Máy lọc nước UTS',
+  'Water WM Device': 'Máy lọc nước WM',
+  // Danh mục con Lõi lọc (Level 2)
+  'Water CT Filter': 'Lõi lọc nước CT',
+  'Water UTS Filter': 'Lõi lọc nước UTS',
+  // Danh mục con Linh kiện phụ (Level 2)
+  'Water UTS Spare part': 'Linh kiện UTS',
+  'Water WM Spare part': 'Linh kiện WM',
 };
 
 /** Dịch tên label sang tiếng Việt (nếu có trong bảng). Giữ nguyên tên gốc nếu không tìm thấy. */
