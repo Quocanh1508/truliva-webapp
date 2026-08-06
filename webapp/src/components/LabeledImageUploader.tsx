@@ -28,16 +28,29 @@ export default function LabeledImageUploader({ imageSlots, workType, onUploadSuc
   const [samples, setSamples] = useState<any[]>([]);
   const [saveModalUrl, setSaveModalUrl] = useState<string | null>(null);
 
+  const slotsKey = imageSlots.map(s => s.label).join('|');
+  const initialUrlsKey = (initialImageUrls || []).join('|');
+
   useEffect(() => {
-    // Reset file/previews khi số lượng slots thay đổi
-    setSlotFiles(imageSlots.map(() => null));
     if (initialImageUrls && initialImageUrls.length > 0) {
       const prefilled = imageSlots.map((_, i) => initialImageUrls[i] || null);
       setSlotPreviews(prefilled);
     } else {
-      setSlotPreviews(imageSlots.map(() => null));
+      setSlotPreviews(prev => {
+        if (prev.length === imageSlots.length && prev.some(p => p !== null)) {
+          return prev;
+        }
+        return imageSlots.map(() => null);
+      });
     }
-  }, [imageSlots, initialImageUrls]);
+
+    setSlotFiles(prev => {
+      if (prev.length === imageSlots.length && prev.some(f => f !== null)) {
+        return prev;
+      }
+      return imageSlots.map(() => null);
+    });
+  }, [slotsKey, initialUrlsKey]);
 
   useEffect(() => {
     if (!workType) return;
