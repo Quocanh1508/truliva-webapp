@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { fetchApi } from '../../api/client';
-import { Search, X, Loader2, Clock, Send } from 'lucide-react';
+import { Search, X, Loader2, Clock, Send, User, Check, ShoppingBag } from 'lucide-react';
 import ProvinceSelect from '../ProvinceSelect';
 
 // ═══════════════════════════════════════════════════
@@ -44,6 +44,45 @@ export default function HotlineTicketModal({ ticket, isOpen, onClose, onSaved, u
   const [searchSerial, setSearchSerial] = useState('');
   const [searchResults, setSearchResults] = useState<any>(null);
   const [searching, setSearching] = useState(false);
+  const [activeResultTab, setActiveResultTab] = useState<'customers' | 'orders' | 'serials'>('customers');
+  const [selectedResultId, setSelectedResultId] = useState<string>('');
+
+  const selectCustomer = (c: any) => {
+    setSelectedResultId(`cust-${c.id}`);
+    setFormData(prev => ({
+      ...prev,
+      customerName: c.fullName || prev.customerName,
+      customerPhone: c.phoneNumber || prev.customerPhone,
+      email: c.email || prev.email,
+      provinceName: c.provinceName || prev.provinceName,
+      address: c.fullAddress || c.address || prev.address
+    }));
+  };
+
+  const selectOrder = (o: any) => {
+    setSelectedResultId(`ord-${o.id}`);
+    setFormData(prev => ({
+      ...prev,
+      customerName: o.billFullName || prev.customerName,
+      customerPhone: o.billPhoneNumber || prev.customerPhone,
+      productName: o.items?.[0]?.productName || prev.productName,
+      address: (o.shippingAddress as any)?.full_address || prev.address,
+      provinceName: (o.shippingAddress as any)?.province || prev.provinceName
+    }));
+  };
+
+  const selectSerialItem = (s: any) => {
+    setSelectedResultId(`ser-${s.id}`);
+    setFormData(prev => ({
+      ...prev,
+      customerName: s.customerName || prev.customerName,
+      customerPhone: s.customerPhone || prev.customerPhone,
+      serialNumber: s.serialNumber || prev.serialNumber,
+      productName: `${s.productLine || ''} ${s.model || ''}`.trim() || prev.productName,
+      provinceName: s.province || prev.provinceName,
+      address: s.address || prev.address
+    }));
+  };
 
   // Phase 2: Form data
   const [formData, setFormData] = useState({
@@ -125,47 +164,14 @@ export default function HotlineTicketModal({ ticket, isOpen, onClose, onSaved, u
 
       // Auto-fill from first result
       if (data.customers?.[0]) {
-        const c = data.customers[0];
-        setFormData(prev => ({
-          ...prev,
-          customerName: c.fullName || prev.customerName,
-          customerPhone: c.phoneNumber || prev.customerPhone,
-          email: c.email || prev.email,
-          provinceName: c.provinceName || prev.provinceName,
-          address: c.fullAddress || c.address || prev.address
-        }));
-      }
-      if (data.serials?.[0]) {
-        const s = data.serials[0];
-        setFormData(prev => ({
-          ...prev,
-          customerName: s.customerName || prev.customerName,
-          customerPhone: s.customerPhone || prev.customerPhone,
-          serialNumber: s.serialNumber || prev.serialNumber,
-          productName: `${s.productLine || ''} ${s.model || ''}`.trim() || prev.productName,
-          provinceName: s.province || prev.provinceName,
-          address: s.address || prev.address
-        }));
-      }
-      if (data.reports?.[0]) {
-        const r = data.reports[0];
-        setFormData(prev => ({
-          ...prev,
-          customerName: prev.customerName || r.customerName || r.order?.billFullName || '',
-          customerPhone: prev.customerPhone || r.customerPhone || r.order?.billPhoneNumber || '',
-          serialNumber: prev.serialNumber || r.serialNumber || '',
-          provinceName: prev.provinceName || r.province || (r.order?.shippingAddress as any)?.province || '',
-          address: prev.address || r.address || (r.order?.shippingAddress as any)?.full_address || ''
-        }));
-      }
-      if (data.orders?.[0]) {
-        const o = data.orders[0];
-        setFormData(prev => ({
-          ...prev,
-          customerName: prev.customerName || o.billFullName || '',
-          customerPhone: prev.customerPhone || o.billPhoneNumber || '',
-          productName: prev.productName || o.items?.[0]?.productName || ''
-        }));
+        setActiveResultTab('customers');
+        selectCustomer(data.customers[0]);
+      } else if (data.orders?.[0]) {
+        setActiveResultTab('orders');
+        selectOrder(data.orders[0]);
+      } else if (data.serials?.[0]) {
+        setActiveResultTab('serials');
+        selectSerialItem(data.serials[0]);
       }
     } catch (err) {
       console.error('Search error:', err);
@@ -283,15 +289,181 @@ export default function HotlineTicketModal({ ticket, isOpen, onClose, onSaved, u
                   </button>
                 </div>
               </div>
-              {/* Search Results Summary */}
+              {/* Search Results Selector */}
               {searchResults && (
-                <div className="text-xs text-gray-500 pt-1">
-                  Tìm thấy: {searchResults.customers?.length || 0} KH,{' '}
-                  {searchResults.orders?.length || 0} đơn hàng,{' '}
-                  {searchResults.serials?.length || 0} serial.
-                  {(searchResults.customers?.length > 0 || searchResults.serials?.length > 0) && (
-                    <span className="text-emerald-600 font-medium ml-1">✓ Đã tự động điền thông tin</span>
-                  )}
+                <div className="space-y-2 pt-2 border-t border-gray-200 mt-2">
+                  <div className="flex items-center justify-between text-xs text-gray-600">
+                    <span>
+                      Tìm thấy: <b>{searchResults.customers?.length || 0}</b> KH,{' '}
+                      <b>{searchResults.orders?.length || 0}</b> đơn hàng,{' '}
+                      <b>{searchResults.serials?.length || 0}</b> serial.
+                    </span>
+                    {selectedResultId && (
+                      <span className="text-emerald-600 font-semibold flex items-center gap-1">
+                        <Check size={13} /> Đã chọn kết quả
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Result Category Tabs */}
+                  <div className="flex gap-1.5 border-b border-gray-200 pb-1">
+                    {(searchResults.customers?.length > 0) && (
+                      <button
+                        type="button"
+                        onClick={() => setActiveResultTab('customers')}
+                        className={`px-2.5 py-1 text-xs font-semibold rounded-t-md transition-all ${
+                          activeResultTab === 'customers'
+                            ? 'bg-[#1B3A6B] text-white shadow-sm'
+                            : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                        }`}
+                      >
+                        Khách hàng ({searchResults.customers.length})
+                      </button>
+                    )}
+                    {(searchResults.orders?.length > 0) && (
+                      <button
+                        type="button"
+                        onClick={() => setActiveResultTab('orders')}
+                        className={`px-2.5 py-1 text-xs font-semibold rounded-t-md transition-all ${
+                          activeResultTab === 'orders'
+                            ? 'bg-[#1B3A6B] text-white shadow-sm'
+                            : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                        }`}
+                      >
+                        Đơn hàng ({searchResults.orders.length})
+                      </button>
+                    )}
+                    {(searchResults.serials?.length > 0) && (
+                      <button
+                        type="button"
+                        onClick={() => setActiveResultTab('serials')}
+                        className={`px-2.5 py-1 text-xs font-semibold rounded-t-md transition-all ${
+                          activeResultTab === 'serials'
+                            ? 'bg-[#1B3A6B] text-white shadow-sm'
+                            : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                        }`}
+                      >
+                        Serial ({searchResults.serials.length})
+                      </button>
+                    )}
+                  </div>
+
+                  {/* List of matched items */}
+                  <div className="max-h-52 overflow-y-auto space-y-1.5 pr-1">
+                    {activeResultTab === 'customers' && searchResults.customers?.map((c: any) => {
+                      const isSelected = selectedResultId === `cust-${c.id}`;
+                      return (
+                        <div
+                          key={c.id}
+                          onClick={() => selectCustomer(c)}
+                          className={`p-2.5 rounded-lg border text-xs cursor-pointer transition-all flex items-center justify-between gap-2 ${
+                            isSelected
+                              ? 'border-blue-500 bg-blue-50/80 ring-1 ring-blue-400'
+                              : 'border-gray-200 bg-white hover:bg-blue-50/40'
+                          }`}
+                        >
+                          <div className="space-y-0.5 min-w-0">
+                            <div className="font-semibold text-gray-800 flex items-center gap-1.5">
+                              <User size={13} className="text-blue-600 shrink-0" />
+                              <span className="truncate">{c.fullName || 'Chưa tên'}</span>
+                              <span className="text-gray-500 font-normal shrink-0">({c.phoneNumber})</span>
+                            </div>
+                            {(c.fullAddress || c.address) && (
+                              <div className="text-gray-500 text-[11px] truncate">
+                                {c.fullAddress || c.address}
+                              </div>
+                            )}
+                          </div>
+                          <button
+                            type="button"
+                            onClick={(e) => { e.stopPropagation(); selectCustomer(c); }}
+                            className={`px-3 py-1 text-[11px] font-semibold rounded-md shrink-0 transition-all ${
+                              isSelected
+                                ? 'bg-blue-600 text-white'
+                                : 'bg-blue-100 text-blue-700 hover:bg-blue-200'
+                            }`}
+                          >
+                            {isSelected ? '✓ Đã chọn' : 'Chọn KH này'}
+                          </button>
+                        </div>
+                      );
+                    })}
+
+                    {activeResultTab === 'orders' && searchResults.orders?.map((o: any) => {
+                      const isSelected = selectedResultId === `ord-${o.id}`;
+                      return (
+                        <div
+                          key={o.id}
+                          onClick={() => selectOrder(o)}
+                          className={`p-2.5 rounded-lg border text-xs cursor-pointer transition-all flex items-center justify-between gap-2 ${
+                            isSelected
+                              ? 'border-blue-500 bg-blue-50/80 ring-1 ring-blue-400'
+                              : 'border-gray-200 bg-white hover:bg-blue-50/40'
+                          }`}
+                        >
+                          <div className="space-y-0.5 min-w-0">
+                            <div className="font-semibold text-gray-800 flex items-center gap-1.5">
+                              <ShoppingBag size={13} className="text-purple-600 shrink-0" />
+                              <span className="text-blue-600 font-mono font-medium">ORD{Math.abs(o.pancakeOrderId).toString().padStart(8, '0')}</span>
+                              <span className="truncate">{o.billFullName}</span>
+                              <span className="text-gray-500 font-normal shrink-0">({o.billPhoneNumber})</span>
+                            </div>
+                            <div className="text-gray-500 text-[11px] truncate">
+                              SP: {o.items?.[0]?.productName || 'Dịch vụ'} | Trạng thái: {o.adminStatus || 'Mới'}
+                            </div>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={(e) => { e.stopPropagation(); selectOrder(o); }}
+                            className={`px-3 py-1 text-[11px] font-semibold rounded-md shrink-0 transition-all ${
+                              isSelected
+                                ? 'bg-blue-600 text-white'
+                                : 'bg-blue-100 text-blue-700 hover:bg-blue-200'
+                            }`}
+                          >
+                            {isSelected ? '✓ Đã chọn' : 'Chọn Đơn này'}
+                          </button>
+                        </div>
+                      );
+                    })}
+
+                    {activeResultTab === 'serials' && searchResults.serials?.map((s: any) => {
+                      const isSelected = selectedResultId === `ser-${s.id}`;
+                      return (
+                        <div
+                          key={s.id}
+                          onClick={() => selectSerialItem(s)}
+                          className={`p-2.5 rounded-lg border text-xs cursor-pointer transition-all flex items-center justify-between gap-2 ${
+                            isSelected
+                              ? 'border-blue-500 bg-blue-50/80 ring-1 ring-blue-400'
+                              : 'border-gray-200 bg-white hover:bg-blue-50/40'
+                          }`}
+                        >
+                          <div className="space-y-0.5 min-w-0">
+                            <div className="font-semibold text-gray-800 flex items-center gap-1.5">
+                              <span className="font-mono text-blue-600">{s.serialNumber}</span>
+                              {s.customerName && <span className="truncate">- {s.customerName}</span>}
+                              {s.customerPhone && <span className="text-gray-500 font-normal shrink-0">({s.customerPhone})</span>}
+                            </div>
+                            <div className="text-gray-500 text-[11px] truncate">
+                              {s.productLine || s.model} | {s.status || 'Chưa kích hoạt'}
+                            </div>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={(e) => { e.stopPropagation(); selectSerialItem(s); }}
+                            className={`px-3 py-1 text-[11px] font-semibold rounded-md shrink-0 transition-all ${
+                              isSelected
+                                ? 'bg-blue-600 text-white'
+                                : 'bg-blue-100 text-blue-700 hover:bg-blue-200'
+                            }`}
+                          >
+                            {isSelected ? '✓ Đã chọn' : 'Chọn Serial này'}
+                          </button>
+                        </div>
+                      );
+                    })}
+                  </div>
                 </div>
               )}
             </div>
