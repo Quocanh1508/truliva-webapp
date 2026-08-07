@@ -147,13 +147,24 @@ export default function HotlineTicketModal({ ticket, isOpen, onClose, onSaved, u
           address: s.address || prev.address
         }));
       }
+      if (data.reports?.[0]) {
+        const r = data.reports[0];
+        setFormData(prev => ({
+          ...prev,
+          customerName: prev.customerName || r.customerName || r.order?.billFullName || '',
+          customerPhone: prev.customerPhone || r.customerPhone || r.order?.billPhoneNumber || '',
+          serialNumber: prev.serialNumber || r.serialNumber || '',
+          provinceName: prev.provinceName || r.province || (r.order?.shippingAddress as any)?.province || '',
+          address: prev.address || r.address || (r.order?.shippingAddress as any)?.full_address || ''
+        }));
+      }
       if (data.orders?.[0]) {
         const o = data.orders[0];
         setFormData(prev => ({
           ...prev,
-          customerName: o.billFullName || prev.customerName,
-          customerPhone: o.billPhoneNumber || prev.customerPhone,
-          productName: o.items?.[0]?.productName || prev.productName
+          customerName: prev.customerName || o.billFullName || '',
+          customerPhone: prev.customerPhone || o.billPhoneNumber || '',
+          productName: prev.productName || o.items?.[0]?.productName || ''
         }));
       }
     } catch (err) {

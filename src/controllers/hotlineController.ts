@@ -66,11 +66,14 @@ export async function searchCustomerHistory(req: Request, res: Response) {
 
     if (serial && String(serial).trim().length >= 3) {
       const serialStr = String(serial).trim();
+
+      // 1. Tìm trong bảng Serial
       const serials = await prisma.serial.findMany({
         where: {
           OR: [
             { serialNumber: { contains: serialStr, mode: 'insensitive' } },
-            { model: { contains: serialStr, mode: 'insensitive' } }
+            { model: { contains: serialStr, mode: 'insensitive' } },
+            { productLine: { contains: serialStr, mode: 'insensitive' } }
           ]
         },
         select: {
@@ -83,12 +86,100 @@ export async function searchCustomerHistory(req: Request, res: Response) {
           address: true,
           province: true,
           status: true,
-          warrantyExpiryDate: true
+          warrantyExpiryDate: true,
+          order: {
+            select: {
+              billFullName: true,
+              billPhoneNumber: true,
+              shippingAddress: true,
+              customer: {
+                select: {
+                  fullName: true,
+                  phoneNumber: true,
+                  fullAddress: true,
+                  provinceName: true
+                }
+              }
+            }
+          }
         },
         take: 10,
         orderBy: { createdAt: 'desc' }
       });
-      results.serials = serials;
+
+      // 2. Tìm trong bảng ServiceReport theo serialNumber
+      const reports = await prisma.serviceReport.findMany({
+        where: {
+          serialNumber: { contains: serialStr, mode: 'insensitive' }
+        },
+        select: {
+          id: true,
+          customerName: true,
+          customerPhone: true,
+          address: true,
+          province: true,
+          serviceType: true,
+          serialNumber: true,
+          createdAt: true,
+          order: {
+            select: {
+              billFullName: true,
+              billPhoneNumber: true,
+              shippingAddress: true
+            }
+          }
+        },
+        take: 10,
+        orderBy: { createdAt: 'desc' }
+      });
+      results.reports = reports;
+
+      // 3. Enrich customer info if Serial customerName/customerPhone is null
+      results.serials = serials.map((s: any) => {
+        let name = s.customerName || s.order?.billFullName || s.order?.customer?.fullName;
+        let phone = s.customerPhone || s.order?.billPhoneNumber || s.order?.customer?.phoneNumber;
+        let addr = s.address || (s.order?.shippingAddress as any)?.full_address || s.order?.customer?.fullAddress;
+        let prov = s.province || (s.order?.shippingAddress as any)?.province || s.order?.customer?.provinceName;
+
+        if (!name || !phone) {
+          const matchedReport = reports.find((r: any) => r.serialNumber === s.serialNumber) || reports[0];
+          if (matchedReport) {
+            name = name || matchedReport.customerName || matchedReport.order?.billFullName;
+            phone = phone || matchedReport.customerPhone || matchedReport.order?.billPhoneNumber;
+            addr = addr || matchedReport.address;
+            prov = prov || matchedReport.province;
+          }
+        }
+
+        return {
+          id: s.id,
+          serialNumber: s.serialNumber,
+          model: s.model,
+          productLine: s.productLine,
+          customerName: name || null,
+          customerPhone: phone || null,
+          address: addr || null,
+          province: prov || null,
+          status: s.status,
+          warrantyExpiryDate: s.warrantyExpiryDate
+        };
+      });
+
+      // Nếu không có trong bảng Serial nhưng có trong ServiceReport
+      if (results.serials.length === 0 && reports.length > 0) {
+        results.serials = reports.map((r: any) => ({
+          id: r.id,
+          serialNumber: r.serialNumber,
+          model: r.serviceType || 'Máy lọc nước',
+          productLine: r.serviceType || 'Truliva',
+          customerName: r.customerName || r.order?.billFullName || null,
+          customerPhone: r.customerPhone || r.order?.billPhoneNumber || null,
+          address: r.address || null,
+          province: r.province || null,
+          status: 'Đã nghiệm thu',
+          warrantyExpiryDate: null
+        }));
+      }
     }
 
     return res.json(results);
