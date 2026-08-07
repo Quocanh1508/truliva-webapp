@@ -110,6 +110,7 @@ model Order {
   techStation         TechStation?  @relation(fields: [techStationId], references: [id])
   serviceReports      ServiceReport[]
   serials             Serial[]
+  hotlineTickets      HotlineTicket[]
 
   @@map("orders")
 }
@@ -249,6 +250,8 @@ model User {
   importedSerials Serial[]
   salaryRecords   SalaryRecord[]
   ktvServiceRates KtvServiceRate[]
+  hotlineTicketsCreated  HotlineTicket[] @relation("HotlineCreatedBy")
+  hotlineTicketsHandled  HotlineTicket[] @relation("HotlineHandlerUser")
 
   @@map("users")
 }
@@ -530,4 +533,91 @@ model IotAlert {
 
   @@index([deviceId, createdAt])
   @@map("iot_alerts")
+}
+
+// ══════════════════════════════════════
+//  Quản Lý Yêu Cầu Hotline
+// ══════════════════════════════════════
+
+// ── Phiếu yêu cầu Hotline ──
+model HotlineTicket {
+  id                    String        @id @default(uuid())
+  ticketCode            String        @unique @map("ticket_code") // HL202608070001
+
+  // Phase 2: Thông tin yêu cầu
+  customerName          String        @map("customer_name")
+  customerPhone         String        @map("customer_phone")
+  secondaryPhones       String?       @map("secondary_phones") @db.Text // "chị Vân - 0913624678"
+  email                 String?
+  dateOfBirth           String?       @map("date_of_birth")
+  provinceName          String        @map("province_name")
+  address               String?
+  source                String        // Nguồn tiếp nhận
+  channel               String?       // Kênh
+  productName           String        @map("product_name")       // Sản phẩm (VD: "Ultima Black")
+  serialNumber          String?       @map("serial_number")
+  serviceRequestType    String        @map("service_request_type") // Yêu cầu dịch vụ
+  customerSupportDetail String        @map("customer_support_detail") @db.Text
+  attachmentUrls        String[]      @default([]) @map("attachment_urls")
+  requestTime           DateTime      @default(now()) @map("request_time")
+
+  createdById           String        @map("created_by_id")
+  createdBy             User          @relation("HotlineCreatedBy", fields: [createdById], references: [id])
+  targetTeam            String        @map("target_team") // Hotline, Coordinator, Admin
+  handlerUserId         String?       @map("handler_user_id")
+  handlerUser           User?         @relation("HotlineHandlerUser", fields: [handlerUserId], references: [id], onDelete: SetNull)
+
+  // Phase 3: Verify & Xử lý (Role: HOTLINE, ADMIN, COORDINATOR)
+  contactTime           DateTime?     @map("contact_time")
+  phase3RequestType     String?       @map("phase3_request_type")
+  phase3ServiceType     String?       @map("phase3_service_type")
+  sparePartName         String?       @map("spare_part_name")
+  convertedOrderId      String?       @map("converted_order_id")
+  convertedOrder        Order?        @relation(fields: [convertedOrderId], references: [id], onDelete: SetNull)
+  consultationNote      String?       @map("consultation_note") @db.Text
+
+  status                String        @default("CHỜ XÁC THỰC")
+  slaDeadline           DateTime?     @map("sla_deadline")
+  phase3Action          String?       @map("phase3_action")
+  phase3Feedback        String?       @map("phase3_feedback") @db.Text
+
+  notesHistory          HotlineTicketNoteHistory[]
+  feedbackHistory       HotlineTicketFeedbackHistory[]
+
+  createdAt             DateTime      @default(now()) @map("created_at")
+  updatedAt             DateTime      @updatedAt @map("updated_at")
+
+  @@index([customerPhone])
+  @@index([status])
+  @@index([createdAt])
+  @@map("hotline_tickets")
+}
+
+// ── Lịch sử ghi chú tư vấn ──
+model HotlineTicketNoteHistory {
+  id              String        @id @default(uuid())
+  ticketId        String        @map("ticket_id")
+  ticket          HotlineTicket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  userId          String        @map("user_id")
+  userName        String        @map("user_name")
+  note            String        @db.Text
+  createdAt       DateTime      @default(now()) @map("created_at")
+
+  @@index([ticketId])
+  @@map("hotline_ticket_note_history")
+}
+
+// ── Lịch sử phản hồi Phase 3 ──
+model HotlineTicketFeedbackHistory {
+  id              String        @id @default(uuid())
+  ticketId        String        @map("ticket_id")
+  ticket          HotlineTicket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  userId          String        @map("user_id")
+  userName        String        @map("user_name")
+  action          String        // VERIFY_APPROVE, REJECT_TO_PHASE2, CONVERT_ORDER, CANCEL, ASSIGN, STATUS_CHANGE
+  feedback        String        @db.Text
+  createdAt       DateTime      @default(now()) @map("created_at")
+
+  @@index([ticketId])
+  @@map("hotline_ticket_feedback_history")
 }

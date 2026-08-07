@@ -1,0 +1,40 @@
+import { Router } from 'express';
+import { requireAuth } from '../middleware/authSession';
+import {
+  searchCustomerHistory,
+  getHotlineTickets,
+  createHotlineTicket,
+  getHotlineTicketById,
+  updateHotlineTicket,
+  assignHotlineTicket,
+  convertToServiceOrder,
+  verifyHotlineTicketPhase3,
+  deleteHotlineTicket,
+  getHotlineHandlers
+} from '../controllers/hotlineController';
+
+const router = Router();
+
+router.use(requireAuth);
+
+// Phase 1: Tra cứu lịch sử KH
+router.get('/search-customer', searchCustomerHistory);
+
+// Dropdown danh sách người xử lý (HOTLINE/ADMIN/COORDINATOR)
+router.get('/handlers', getHotlineHandlers);
+
+// CRUD
+router.get('/', getHotlineTickets);
+router.post('/', createHotlineTicket);
+
+// Parametric routes
+router.get('/:id', getHotlineTicketById);
+router.put('/:id', updateHotlineTicket);
+router.delete('/:id', deleteHotlineTicket);
+
+// Thao tác nhanh
+router.post('/:id/assign', assignHotlineTicket);
+router.post('/:id/convert-to-order', convertToServiceOrder);
+router.post('/:id/verify', verifyHotlineTicketPhase3);
+
+export default router;

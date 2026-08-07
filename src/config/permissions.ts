@@ -11,6 +11,7 @@ export interface SystemFeature {
 
 export const SYSTEM_MODULES = [
   { id: 'orders', name: '📋 Quản lý Đơn hàng & Ca Dịch vụ' },
+  { id: 'hotline', name: '📞 Quản lý Yêu Cầu Hotline' },
   { id: 'serials', name: '🏷️ Quản lý Serial & Bảo hành' },
   { id: 'reports', name: '📝 Quản lý Báo cáo Kỹ thuật' },
   { id: 'salaries', name: '💰 Quản lý Lương & Chi phí KTV' },
@@ -129,6 +130,32 @@ export const SYSTEM_FEATURES: SystemFeature[] = [
     name: 'Tự động tải lại trang (Auto Refresh)',
     description: 'Bật chế độ tự động làm mới danh sách đơn',
     defaultRoles: ['ADMIN', 'DEV', 'COORDINATOR']
+  },
+
+  // 1.5 Quản lý Yêu Cầu Hotline
+  {
+    key: 'HOTLINE_TICKET_VIEW',
+    module: 'hotline',
+    moduleName: '📞 Quản lý Yêu Cầu Hotline',
+    name: 'Xem danh sách Yêu cầu Hotline',
+    description: 'Quyền xem danh sách phiếu yêu cầu hotline từ khách hàng',
+    defaultRoles: ['ADMIN', 'COORDINATOR', 'HOTLINE', 'SALE_SUPERVISOR', 'SALER', 'STAFF']
+  },
+  {
+    key: 'HOTLINE_TICKET_CREATE',
+    module: 'hotline',
+    moduleName: '📞 Quản lý Yêu Cầu Hotline',
+    name: 'Tạo phiếu Yêu cầu Hotline (Phase 2)',
+    description: 'Tạo mới phiếu yêu cầu hỗ trợ/tư vấn từ khách hàng',
+    defaultRoles: ['ADMIN', 'COORDINATOR', 'HOTLINE', 'SALE_SUPERVISOR', 'SALER', 'STAFF']
+  },
+  {
+    key: 'HOTLINE_TICKET_VERIFY',
+    module: 'hotline',
+    moduleName: '📞 Quản lý Yêu Cầu Hotline',
+    name: 'Phê duyệt & Xử lý yêu cầu (Phase 3)',
+    description: 'Phân bổ, xác thực, chuyển ca dịch vụ hoặc trả về Phase 2',
+    defaultRoles: ['ADMIN', 'COORDINATOR', 'HOTLINE']
   },
 
   // 2. Quản lý Serial & Bảo hành

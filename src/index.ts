@@ -28,6 +28,7 @@ import salaryRoutes from './routes/salaries';
 import zaloMiniAppRoutes from './routes/zaloMiniApp';
 import iotRoutes from './routes/iot';
 import permissionRoutes from './routes/permissions';
+import hotlineRoutes from './routes/hotlines';
 import { startOrderSyncScheduler } from './services/orderSyncScheduler';
 import { startReportCleanupScheduler } from './services/reportCleanupScheduler';
 import { startPancakeRetryScheduler } from './services/pancakeRetryScheduler';
@@ -165,6 +166,7 @@ app.use('/api/salaries', salaryRoutes);
 app.use('/api/zalo-miniapp', zaloMiniAppRoutes);
 app.use('/api/iot', iotRoutes);
 app.use('/api/permissions', permissionRoutes);
+app.use('/api/hotlines', hotlineRoutes);
 
 // ── Serve uploaded images ──
 app.use('/uploads', express.static(path.join(process.cwd(), 'uploads'), {
