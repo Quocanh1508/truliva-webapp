@@ -78,12 +78,12 @@ export async function searchCustomerHistory(req: Request, res: Response) {
           serialNumber: true,
           model: true,
           productLine: true,
-          ownerName: true,
-          ownerPhone: true,
-          ownerAddress: true,
-          ownerProvince: true,
-          warrantyStatus: true,
-          warrantyExpiry: true
+          customerName: true,
+          customerPhone: true,
+          address: true,
+          province: true,
+          status: true,
+          warrantyExpiryDate: true
         },
         take: 10,
         orderBy: { createdAt: 'desc' }

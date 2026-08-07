@@ -139,12 +139,12 @@ export default function HotlineTicketModal({ ticket, isOpen, onClose, onSaved, u
         const s = data.serials[0];
         setFormData(prev => ({
           ...prev,
-          customerName: s.ownerName || prev.customerName,
-          customerPhone: s.ownerPhone || prev.customerPhone,
+          customerName: s.customerName || prev.customerName,
+          customerPhone: s.customerPhone || prev.customerPhone,
           serialNumber: s.serialNumber || prev.serialNumber,
           productName: `${s.productLine || ''} ${s.model || ''}`.trim() || prev.productName,
-          provinceName: s.ownerProvince || prev.provinceName,
-          address: s.ownerAddress || prev.address
+          provinceName: s.province || prev.provinceName,
+          address: s.address || prev.address
         }));
       }
       if (data.orders?.[0]) {
