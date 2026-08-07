@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
-import { fetchApi } from '../../api/client';
+import { fetchApi, getFiltersData } from '../../api/client';
 import { Search, X, Loader2, Clock, Send, User, Check, ShoppingBag } from 'lucide-react';
 import ProvinceSelect from '../ProvinceSelect';
+import CategoryTreeSelect from '../CategoryTreeSelect';
 
 // ═══════════════════════════════════════════════════
 //  Types
@@ -38,6 +39,18 @@ const STATUS_OPTIONS = [
 export default function HotlineTicketModal({ ticket, isOpen, onClose, onSaved, userRole }: Props) {
   const isEditMode = !!ticket;
   const canPhase3 = ['ADMIN', 'COORDINATOR', 'HOTLINE'].includes(userRole);
+  // Product tree options
+  const [categories, setCategories] = useState<string[]>([]);
+  const [products, setProducts] = useState<any[]>([]);
+
+  useEffect(() => {
+    getFiltersData().then(data => {
+      if (data) {
+        setCategories(data.categories || []);
+        setProducts(data.products || []);
+      }
+    }).catch(console.error);
+  }, []);
 
   // Phase 1: Search
   const [searchPhone, setSearchPhone] = useState('');
@@ -549,8 +562,16 @@ export default function HotlineTicketModal({ ticket, isOpen, onClose, onSaved, u
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 mb-1">Sản phẩm *</label>
-                  <input type="text" placeholder="VD: Ultima Black" value={formData.productName} onChange={(e) => updateForm('productName', e.target.value)}
-                    className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-200" />
+                  <CategoryTreeSelect
+                    categories={categories}
+                    products={products}
+                    selected={formData.productName ? [formData.productName] : []}
+                    onChange={(nextSelected) => {
+                      const val = nextSelected[nextSelected.length - 1] || nextSelected[0] || '';
+                      updateForm('productName', val);
+                    }}
+                    placeholder="-- Chọn sản phẩm --"
+                  />
                 </div>
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 mb-1">Serial</label>
