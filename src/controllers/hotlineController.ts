@@ -715,3 +715,80 @@ export async function getHotlineHandlers(req: Request, res: Response) {
     return res.status(500).json({ error: 'Lỗi lấy danh sách người xử lý', details: error.message });
   }
 }
+
+// ═══════════════════════════════════════════════════
+//  POST /api/hotlines/public/create-support - Tạo ticket Hỗ trợ kỹ thuật Public từ Webapp
+// ═══════════════════════════════════════════════════
+
+export async function createPublicTechSupportTicket(req: Request, res: Response) {
+  try {
+    const {
+      customerName, customerPhone, secondaryPhones, email,
+      provinceName, address, productName, serialNumber,
+      serviceRequestType, customerSupportDetail, attachmentUrls
+    } = req.body;
+
+    if (!customerName || !customerPhone || !provinceName || !address || !productName || !serviceRequestType || !customerSupportDetail) {
+      return res.status(400).json({ error: 'Vui lòng điền đầy đủ các trường bắt buộc (*)' });
+    }
+
+    // Tìm admin user làm người tạo mặc định cho ticket public từ Webapp
+    const systemUser = await prisma.user.findFirst({
+      where: { role: 'ADMIN' },
+      select: { id: true }
+    });
+
+    if (!systemUser) {
+      return res.status(500).json({ error: 'Hệ thống chưa thiết lập tài khoản Admin' });
+    }
+
+    // Sinh mã ticket HL YYYYMMDD XXXX
+    const todayStr = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+    const prefix = `HL${todayStr}`;
+    
+    const lastTicket = await prisma.hotlineTicket.findFirst({
+      where: { ticketCode: { startsWith: prefix } },
+      orderBy: { ticketCode: 'desc' },
+      select: { ticketCode: true }
+    });
+
+    let seq = 1;
+    if (lastTicket && lastTicket.ticketCode) {
+      const lastSeq = parseInt(lastTicket.ticketCode.slice(-4));
+      if (!isNaN(lastSeq)) seq = lastSeq + 1;
+    }
+    const ticketCode = `${prefix}${seq.toString().padStart(4, '0')}`;
+
+    const ticket = await prisma.hotlineTicket.create({
+      data: {
+        ticketCode,
+        customerName: customerName.trim(),
+        customerPhone: customerPhone.trim(),
+        secondaryPhones: secondaryPhones ? secondaryPhones.trim() : null,
+        email: email ? email.trim() : null,
+        provinceName,
+        address: address.trim(),
+        source: 'Webapp (Hỗ trợ kỹ thuật)',
+        channel: 'Webapp',
+        productName: productName.trim(),
+        serialNumber: serialNumber ? serialNumber.trim() : null,
+        serviceRequestType,
+        customerSupportDetail: customerSupportDetail.trim(),
+        attachmentUrls: attachmentUrls || [],
+        status: 'CHỜ XÁC THỰC',
+        createdById: systemUser.id,
+        targetTeam: 'Hotline'
+      }
+    });
+
+    return res.status(201).json({
+      success: true,
+      message: 'Gửi yêu cầu hỗ trợ kỹ thuật thành công. Bộ phận Hotline/Kỹ thuật sẽ liên hệ lại với bạn trong thời gian sớm nhất!',
+      ticketCode: ticket.ticketCode
+    });
+  } catch (error: any) {
+    console.error('[createPublicTechSupportTicket] Error:', error);
+    return res.status(500).json({ error: 'Lỗi tạo yêu cầu hỗ trợ kỹ thuật', details: error.message });
+  }
+}
+

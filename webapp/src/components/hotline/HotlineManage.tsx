@@ -19,6 +19,8 @@ interface HotlineTicket {
   productName: string;
   serialNumber?: string;
   status: string;
+  source?: string;
+  channel?: string;
   requestTime: string;
   createdAt: string;
   targetTeam: string;
@@ -260,7 +262,14 @@ export default function HotlineManage() {
                 >
                   {/* Mã yêu cầu */}
                   <td className="px-4 py-3 whitespace-nowrap">
-                    <span className="font-mono text-blue-600 font-medium text-[13px]">{ticket.ticketCode}</span>
+                    <div className="flex flex-col gap-0.5">
+                      <span className="font-mono text-blue-600 font-medium text-[13px]">{ticket.ticketCode}</span>
+                      {ticket.source?.includes('Hỗ trợ kỹ thuật') && (
+                        <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-extrabold bg-cyan-100 text-cyan-800 border border-cyan-300 w-fit">
+                          🛠️ HỖ TRỢ KỸ THUẬT
+                        </span>
+                      )}
+                    </div>
                   </td>
 
                   {/* Khách hàng */}
@@ -337,11 +346,17 @@ export default function HotlineManage() {
                         <Clock size={12} className="text-gray-400" />
                         <span>{formatDateTime(ticket.requestTime)}</span>
                       </div>
-                      {ticket.createdBy && (
-                        <div className="text-gray-500">{ticket.createdBy.fullName}</div>
-                      )}
-                      {ticket.createdBy?.email && (
-                        <div className="text-gray-400 text-[11px]">({ticket.createdBy.email})</div>
+                      {ticket.source?.includes('Hỗ trợ kỹ thuật') ? (
+                        <div className="text-cyan-700 font-semibold text-[11px]">🌐 Từ Webapp Hỗ trợ kỹ thuật</div>
+                      ) : ticket.createdBy ? (
+                        <>
+                          <div className="text-gray-500">{ticket.createdBy.fullName}</div>
+                          {ticket.createdBy.email && (
+                            <div className="text-gray-400 text-[11px]">({ticket.createdBy.email})</div>
+                          )}
+                        </>
+                      ) : (
+                        <div className="text-gray-400 italic">Tự động</div>
                       )}
                     </div>
                   </td>

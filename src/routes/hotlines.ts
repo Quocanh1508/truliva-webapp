@@ -10,10 +10,14 @@ import {
   convertToServiceOrder,
   verifyHotlineTicketPhase3,
   deleteHotlineTicket,
-  getHotlineHandlers
+  getHotlineHandlers,
+  createPublicTechSupportTicket
 } from '../controllers/hotlineController';
 
 const router = Router();
+
+// Public Route (Không cần đăng nhập)
+router.post('/public/create-support', createPublicTechSupportTicket);
 
 router.use(requireAuth);
 

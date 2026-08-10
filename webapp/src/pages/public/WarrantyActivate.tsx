@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { ShieldCheck, ArrowRight, UploadCloud, CheckCircle, AlertTriangle, Smartphone, User, MapPin, Loader2, Sparkles, ChevronLeft, Phone, Wrench } from 'lucide-react';
+import { ShieldCheck, ArrowRight, UploadCloud, CheckCircle, AlertTriangle, Smartphone, User, MapPin, Loader2, Sparkles, ChevronLeft, Phone, Wrench, Send } from 'lucide-react';
 import { API_URL } from '../../api/client';
 import { isValidPhone, PHONE_ERROR_MSG } from '../../utils/phone';
 
@@ -71,6 +71,67 @@ export default function WarrantyActivate() {
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
+
+  // Tech Support Form states (step 10 & 11)
+  const [supportName, setSupportName] = useState('');
+  const [supportPhone, setSupportPhone] = useState('');
+  const [supportSecondaryPhones, setSupportSecondaryPhones] = useState('');
+  const [supportEmail, setSupportEmail] = useState('');
+  const [supportProvince, setSupportProvince] = useState('');
+  const [supportAddress, setSupportAddress] = useState('');
+  const [supportProduct, setSupportProduct] = useState('');
+  const [supportSerial, setSupportSerial] = useState('');
+  const [supportServiceType, setSupportServiceType] = useState('Sửa chữa');
+  const [supportDetail, setSupportDetail] = useState('');
+  const [supportError, setSupportError] = useState('');
+  const [submittingSupport, setSubmittingSupport] = useState(false);
+  const [supportSuccessTicket, setSupportSuccessTicket] = useState('');
+
+  const handleSubmitSupport = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!supportName.trim()) { setSupportError('Vui lòng nhập Họ và tên'); return; }
+    if (!isValidPhone(supportPhone)) { setSupportError(PHONE_ERROR_MSG); return; }
+    if (!supportProvince) { setSupportError('Vui lòng chọn Tỉnh/Thành phố'); return; }
+    if (!supportAddress.trim()) { setSupportError('Vui lòng nhập địa chỉ cụ thể'); return; }
+    if (!supportProduct.trim()) { setSupportError('Vui lòng nhập tên sản phẩm hoặc thiết bị'); return; }
+    if (!supportServiceType) { setSupportError('Vui lòng chọn loại yêu cầu dịch vụ'); return; }
+    if (!supportDetail.trim()) { setSupportError('Vui lòng nhập nội dung cần hỗ trợ'); return; }
+
+    setSubmittingSupport(true);
+    setSupportError('');
+
+    try {
+      const response = await fetch(`${API_URL}/hotlines/public/create-support`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          customerName: supportName.trim(),
+          customerPhone: supportPhone.trim(),
+          secondaryPhones: supportSecondaryPhones.trim(),
+          email: supportEmail.trim(),
+          provinceName: supportProvince,
+          address: supportAddress.trim(),
+          productName: supportProduct.trim(),
+          serialNumber: supportSerial.trim(),
+          serviceRequestType: supportServiceType,
+          customerSupportDetail: supportDetail.trim()
+        })
+      });
+
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.error || 'Lỗi gửi yêu cầu hỗ trợ kỹ thuật');
+      }
+
+      setSupportSuccessTicket(data.ticketCode || 'HL-WEBAPP');
+      setStep(11);
+    } catch (err: any) {
+      console.error(err);
+      setSupportError(err.message || 'Có lỗi xảy ra khi gửi yêu cầu. Vui lòng liên hệ Hotline 1900 6364');
+    } finally {
+      setSubmittingSupport(false);
+    }
+  };
 
   // Auto-fill serial if provided in URL
   useEffect(() => {
@@ -264,9 +325,9 @@ export default function WarrantyActivate() {
 
         {/* Main Content */}
         <div className="flex-1 flex flex-col items-center justify-center px-5 pb-8">
-          <div className="w-full max-w-sm space-y-4">
+          <div className="w-full max-w-sm space-y-3.5">
 
-            {/* Kích hoạt bảo hành sản phẩm */}
+            {/* 1. Kích hoạt bảo hành sản phẩm (Nút Đỏ) */}
             <button
               onClick={() => setStep(1)}
               className="w-full bg-[#E53935] hover:bg-[#D32F2F] active:scale-[0.98] text-white font-bold py-4 px-5 rounded-xl text-base transition-all shadow-lg shadow-red-900/30 flex items-center gap-4 border border-red-400/20"
@@ -280,11 +341,9 @@ export default function WarrantyActivate() {
               </div>
             </button>
 
-            {/* Hỗ trợ kỹ thuật */}
-            <a
-              href="https://zalo.me/3870382725035413507"
-              target="_blank"
-              rel="noopener noreferrer"
+            {/* 2. Hỗ trợ kỹ thuật (Nút Xanh Lá - Mở Form điền) */}
+            <button
+              onClick={() => setStep(10)}
               className="w-full bg-[#2E7D32] hover:bg-[#1B5E20] active:scale-[0.98] text-white font-bold py-4 px-5 rounded-xl text-base transition-all shadow-lg shadow-green-900/30 flex items-center gap-4 border border-green-400/20"
             >
               <div className="w-12 h-12 bg-white/15 rounded-xl flex items-center justify-center shrink-0">
@@ -292,6 +351,24 @@ export default function WarrantyActivate() {
               </div>
               <div className="text-left">
                 <span className="block text-[15px] font-extrabold leading-tight">Hỗ trợ kỹ thuật</span>
+              </div>
+            </button>
+
+            {/* 3. Zalo CSKH (Nút Xanh Dương - Tách riêng trỏ Zalo OA) */}
+            <a
+              href="https://zalo.me/3870382725035413507"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="w-full bg-[#0068FF] hover:bg-[#0052CC] active:scale-[0.98] text-white font-bold py-4 px-5 rounded-xl text-base transition-all shadow-lg shadow-blue-900/30 flex items-center gap-4 border border-blue-400/20"
+            >
+              <div className="w-12 h-12 bg-white/15 rounded-xl flex items-center justify-center shrink-0">
+                <svg className="w-7 h-7 fill-current text-white" viewBox="0 0 24 24">
+                  <path d="M12.003 2C6.478 2 2 6.136 2 11.238c0 3.125 1.688 5.88 4.298 7.48-.12.443-.655 2.417-.655 2.417-.06.223.167.387.352.268 0 0 2.278-1.52 3.162-2.09.91.246 1.875.38 2.846.38 5.525 0 10.003-4.137 10.003-9.24C22.006 6.137 17.528 2 12.003 2z"/>
+                </svg>
+              </div>
+              <div className="text-left">
+                <span className="block text-[15px] font-extrabold leading-tight">Zalo CSKH</span>
+                <span className="block text-[11px] opacity-80 font-normal">Trỏ trực tiếp Zalo OA Truliva</span>
               </div>
             </a>
 
@@ -752,4 +829,232 @@ export default function WarrantyActivate() {
 
     </div>
   );
+
+  // ==================== STEP 10: PUBLIC TECH SUPPORT FORM ====================
+  if (step === 10) {
+    return (
+      <div className="min-h-screen bg-[#1B2A4A] flex flex-col font-sans antialiased">
+        <header className="flex items-center justify-between px-5 py-4 border-b border-white/10 bg-[#15233E]">
+          <button onClick={() => setStep(0)} className="flex items-center gap-1 text-white/80 hover:text-white text-sm font-semibold transition">
+            <ChevronLeft size={18} />
+            <span>Trang chủ</span>
+          </button>
+          <img src="/logo.png" alt="Truliva" className="h-8 object-contain brightness-0 invert" />
+        </header>
+
+        <div className="flex-1 flex flex-col items-center justify-center p-4 py-8">
+          <div className="w-full max-w-lg bg-white rounded-2xl shadow-2xl overflow-hidden">
+            <div className="bg-gradient-to-r from-[#1B3A6B] to-[#2563EB] p-6 text-white text-center">
+              <div className="inline-flex p-3 bg-white/10 rounded-xl mb-2">
+                <Wrench size={28} className="text-white" />
+              </div>
+              <h2 className="text-xl font-extrabold">Yêu Cầu Hỗ Trợ Kỹ Thuật</h2>
+              <p className="text-xs text-blue-100 mt-1">Gửi thông tin sự cố, bộ phận Hotline / Kỹ thuật sẽ liên hệ hỗ trợ bạn ngay</p>
+            </div>
+
+            <form onSubmit={handleSubmitSupport} className="p-6 space-y-4 text-left">
+              {supportError && (
+                <div className="bg-red-50 border border-red-200 text-red-700 text-xs p-3 rounded-xl flex items-center gap-2">
+                  <AlertTriangle size={16} className="shrink-0" />
+                  <span>{supportError}</span>
+                </div>
+              )}
+
+              {/* Họ tên + SĐT */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">Họ và tên *</label>
+                  <input
+                    type="text"
+                    placeholder="VD: Nguyễn Văn An"
+                    value={supportName}
+                    onChange={e => setSupportName(e.target.value)}
+                    className="w-full px-3.5 py-2.5 border border-gray-300 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-200"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">Số điện thoại *</label>
+                  <input
+                    type="tel"
+                    placeholder="VD: 0912345678"
+                    value={supportPhone}
+                    onChange={e => setSupportPhone(e.target.value)}
+                    className="w-full px-3.5 py-2.5 border border-gray-300 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-200"
+                    required
+                  />
+                </div>
+              </div>
+
+              {/* SĐT phụ + Email */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">Số điện thoại phụ</label>
+                  <input
+                    type="tel"
+                    placeholder="VD: 0914567123"
+                    value={supportSecondaryPhones}
+                    onChange={e => setSupportSecondaryPhones(e.target.value)}
+                    className="w-full px-3.5 py-2.5 border border-gray-300 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-200"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">Email</label>
+                  <input
+                    type="email"
+                    placeholder="Email của bạn"
+                    value={supportEmail}
+                    onChange={e => setSupportEmail(e.target.value)}
+                    className="w-full px-3.5 py-2.5 border border-gray-300 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-200"
+                  />
+                </div>
+              </div>
+
+              {/* Tỉnh/thành phố + Địa chỉ */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">Tỉnh / Thành phố *</label>
+                  <select
+                    value={supportProvince}
+                    onChange={e => setSupportProvince(e.target.value)}
+                    className="w-full px-3.5 py-2.5 border border-gray-300 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-200 bg-white"
+                    required
+                  >
+                    <option value="">-- Chọn Tỉnh / Thành phố --</option>
+                    {VIETNAM_PROVINCES.map(p => (
+                      <option key={p} value={p}>{p}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">Địa chỉ cụ thể *</label>
+                  <input
+                    type="text"
+                    placeholder="VD: 123 Nguyễn Văn Cừ, Phường 4"
+                    value={supportAddress}
+                    onChange={e => setSupportAddress(e.target.value)}
+                    className="w-full px-3.5 py-2.5 border border-gray-300 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-200"
+                    required
+                  />
+                </div>
+              </div>
+
+              {/* Sản phẩm + Serial */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">Sản phẩm / Thiết bị *</label>
+                  <input
+                    type="text"
+                    placeholder="VD: Máy lọc nước Ultima Black"
+                    value={supportProduct}
+                    onChange={e => setSupportProduct(e.target.value)}
+                    className="w-full px-3.5 py-2.5 border border-gray-300 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-200"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">Số Serial (nếu có)</label>
+                  <input
+                    type="text"
+                    placeholder="VD: 185826042700121"
+                    value={supportSerial}
+                    onChange={e => setSupportSerial(e.target.value)}
+                    className="w-full px-3.5 py-2.5 border border-gray-300 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-200 font-mono"
+                  />
+                </div>
+              </div>
+
+              {/* Yêu cầu dịch vụ */}
+              <div>
+                <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">Loại Yêu Cầu *</label>
+                <select
+                  value={supportServiceType}
+                  onChange={e => setSupportServiceType(e.target.value)}
+                  className="w-full px-3.5 py-2.5 border border-gray-300 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-200 bg-white"
+                  required
+                >
+                  <option value="Sửa chữa">Sửa chữa sự cố</option>
+                  <option value="Lắp đặt">Lắp đặt mới</option>
+                  <option value="Thay lọc">Thay lõi lọc định kỳ</option>
+                  <option value="Bảo hành">Kiểm tra bảo hành</option>
+                  <option value="Tư vấn">Tư vấn sử dụng</option>
+                  <option value="Khiếu nại">Khiếu nại / Góp ý</option>
+                  <option value="Khác">Khác</option>
+                </select>
+              </div>
+
+              {/* Nội dung cần hỗ trợ */}
+              <div>
+                <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">Nội dung chi tiết sự cố / Yêu cầu *</label>
+                <textarea
+                  rows={3}
+                  placeholder="Vui lòng mô tả chi tiết hiện trạng máy hoặc sự cố đang gặp phải..."
+                  value={supportDetail}
+                  onChange={e => setSupportDetail(e.target.value)}
+                  className="w-full px-3.5 py-2.5 border border-gray-300 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-200"
+                  required
+                />
+              </div>
+
+              {/* Submit Buttons */}
+              <div className="pt-2 flex gap-3">
+                <button
+                  type="button"
+                  onClick={() => setStep(0)}
+                  className="flex-1 py-3 border border-gray-300 text-gray-700 rounded-xl font-bold text-sm hover:bg-gray-50 transition"
+                >
+                  Hủy
+                </button>
+                <button
+                  type="submit"
+                  disabled={submittingSupport}
+                  className="flex-[2] py-3 bg-[#2E7D32] hover:bg-[#1B5E20] text-white rounded-xl font-extrabold text-sm transition shadow-md flex items-center justify-center gap-2 disabled:opacity-50"
+                >
+                  {submittingSupport ? <Loader2 size={18} className="animate-spin" /> : <Send size={18} />}
+                  <span>Gửi Yêu Cầu Hỗ Trợ</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // ==================== STEP 11: TECH SUPPORT SUCCESS ====================
+  if (step === 11) {
+    return (
+      <div className="min-h-screen bg-[#1B2A4A] flex flex-col font-sans antialiased justify-center items-center p-4">
+        <div className="bg-white rounded-2xl shadow-2xl p-8 max-w-md w-full text-center space-y-5 animate-fade-in">
+          <div className="w-16 h-16 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mx-auto">
+            <CheckCircle size={36} />
+          </div>
+
+          <div className="space-y-2">
+            <h2 className="text-xl font-extrabold text-gray-800">Yêu Cầu Hỗ Trợ Đã Gửi Thành Công!</h2>
+            <div className="inline-block px-3 py-1 bg-blue-50 border border-blue-200 text-blue-700 font-mono font-bold text-sm rounded-lg">
+              Mã Yêu Cầu: {supportSuccessTicket}
+            </div>
+            <p className="text-xs text-gray-500 leading-relaxed pt-2">
+              Bộ phận Hotline và Kỹ thuật viên Truliva đã tiếp nhận thông tin sự cố của bạn. Chúng tôi sẽ chủ động liên hệ qua số điện thoại <b>{supportPhone}</b> trong thời gian sớm nhất.
+            </p>
+          </div>
+
+          <div className="pt-2">
+            <button
+              onClick={() => {
+                setSupportName(''); setSupportPhone(''); setSupportSecondaryPhones('');
+                setSupportEmail(''); setSupportProvince(''); setSupportAddress('');
+                setSupportProduct(''); setSupportSerial(''); setSupportDetail('');
+                setStep(0);
+              }}
+              className="w-full py-3 bg-[#1B3A6B] hover:bg-[#122749] text-white rounded-xl font-bold text-sm transition shadow-md"
+            >
+              Về Trang Chủ
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 }
