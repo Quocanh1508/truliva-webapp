@@ -793,51 +793,65 @@ export async function createPublicTechSupportTicket(req: Request, res: Response)
 }
 
 // ═══════════════════════════════════════════════════
-//  GET /api/hotlines/public/devices - Danh sách sản phẩm/thiết bị Public (Không gồm lõi lọc)
+//  GET /api/hotlines/public/devices - Cây danh mục Sản phẩm/Thiết bị Public (Không gồm lõi lọc/linh kiện)
 // ═══════════════════════════════════════════════════
 
 export async function getPublicSupportDevices(req: Request, res: Response) {
   try {
     const allProducts = await prisma.product.findMany({
-      select: { name: true, category: true },
+      select: { name: true, category: true, sku: true },
       orderBy: { name: 'asc' }
     });
 
-    const filtered = allProducts.filter(p => {
-      const nameLower = (p.name || '').toLowerCase();
+    const EXCLUDE_PREFIXES = [
+      '(N)', 'Biến áp', 'Bơm', 'Bộ GKK', 'Bộ dụng cụ', 'Bộ gia nhiệt', 'Bộ vòi',
+      'Bộ lọc Casa', 'Bộ lọc Classic', 'Bộ lọc Excella', 'Bộ lọc nước',
+      'Chảo', 'Cảm biến', 'Cụm van', 'Gói dịch vụ', 'Khay', 'Mạch', 'Nắp',
+      'Nồi', 'Túi', 'Vali', 'Van', 'Vỏ', 'Đầu vòi', 'Ống', 'Bình', 'Combo', 'Giải pháp',
+      'Vòi sen', 'Máy xay', 'Bếp điện', 'Truliva Trial'
+    ];
+
+    const filteredProducts = allProducts.filter(p => {
+      const nameStr = (p.name || '').trim();
+      const nameLower = nameStr.toLowerCase();
       const catLower = (p.category || '').toLowerCase();
-      if (catLower.includes('lõi') || catLower.includes('loi') || catLower.includes('phụ kiện') || catLower.includes('phu kien')) return false;
+
+      if (catLower.includes('lõi') || catLower.includes('loi') || catLower.includes('spare') || catLower.includes('phụ kiện') || catLower.includes('phu kien')) return false;
       if (nameLower.includes('lõi lọc') || nameLower.includes('loi loc') || nameLower.includes('thay lõi') || nameLower.includes('cto') || nameLower.includes('pp 5m')) return false;
+
+      for (const prefix of EXCLUDE_PREFIXES) {
+        if (nameStr.startsWith(prefix)) return false;
+      }
       return true;
     });
 
-    let deviceNames = Array.from(new Set(filtered.map(p => p.name.trim()))).filter(Boolean);
-
-    const DEFAULT_DEVICES = [
-      'Máy lọc nước Truliva UR61096H',
-      'Máy lọc nước Truliva UR5840',
-      'Máy lọc nước Delica UR5440',
-      'Máy lọc nước Delica UR5640',
-      'Máy lọc nước Lavita CR5240',
-      'Máy lọc nước Tanka UR3140',
-      'Máy lọc nước Truliva UR5676',
-      'Máy lọc nước Truliva UR3626',
-      'Máy rửa rau Truliva QY/F-I20',
-      'Máy lọc không khí Airplus KJ260',
-      'Bộ lọc sơ cấp Truliva P1011',
-      'Máy nóng lạnh treo tường Truliva W6412',
+    const DEVICE_CATEGORIES = [
+      'Device',
+      'Water CT Device',
+      'Water UTS Device',
+      'Water WM Device',
+      'Air CT Device',
+      'Prefilter',
       'Thiết bị khác'
     ];
 
-    if (deviceNames.length === 0) {
-      deviceNames = DEFAULT_DEVICES;
-    } else {
-      for (const d of DEFAULT_DEVICES) {
-        if (!deviceNames.includes(d)) deviceNames.push(d);
-      }
-    }
+    const productsList = filteredProducts.map(p => ({
+      name: p.name.trim(),
+      category: p.category || 'Device',
+      sku: p.sku || ''
+    }));
 
-    return res.json(deviceNames);
+    // Thêm tùy chọn "Thiết bị khác"
+    productsList.push({
+      name: 'Thiết bị khác',
+      category: 'Thiết bị khác',
+      sku: 'OTHER'
+    });
+
+    return res.json({
+      categories: DEVICE_CATEGORIES,
+      products: productsList
+    });
   } catch (error: any) {
     console.error('[getPublicSupportDevices] Error:', error);
     return res.status(500).json({ error: 'Lỗi lấy danh sách thiết bị', details: error.message });

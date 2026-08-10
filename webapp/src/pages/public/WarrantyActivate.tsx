@@ -3,6 +3,7 @@ import { useSearchParams } from 'react-router-dom';
 import { ShieldCheck, ArrowRight, UploadCloud, CheckCircle, AlertTriangle, Smartphone, User, MapPin, Loader2, Sparkles, ChevronLeft, Phone, Wrench, Send } from 'lucide-react';
 import { API_URL } from '../../api/client';
 import { isValidPhone, PHONE_ERROR_MSG } from '../../utils/phone';
+import CategoryTreeSelect from '../../components/CategoryTreeSelect';
 
 // Định dạng hiển thị Số Serial dạng: XXXX XXX XXX XXXXX
 const formatSerialNumber = (value: string): string => {
@@ -26,7 +27,7 @@ const formatSerialNumber = (value: string): string => {
 const VIETNAM_PROVINCES = [
   'An Giang', 'Bà Rịa - Vũng Tàu', 'Bắc Giang', 'Bắc Kạn', 'Bạc Liêu', 'Bắc Ninh',
   'Bến Tre', 'Bình Định', 'Bình Dương', 'Bình Phước', 'Bình Thuận', 'Cà Mau',
-  'Cần Thơ', 'Cao Bằng', 'Đà Nẵng', 'Đắk Lắk', 'Đắk Nông', 'Điện Biên', 'Đồng Nai',
+  'Cần Thơ', 'Cao Bằng', 'Đà Nẵng', 'Đắc Lắk', 'Đắc Nông', 'Điện Biên', 'Đồng Nai',
   'Đồng Tháp', 'Gia Lai', 'Hà Giang', 'Hà Nam', 'Hà Nội', 'Hà Tĩnh', 'Hải Dương',
   'Hải Phòng', 'Hậu Giang', 'Hòa Bình', 'Hưng Yên', 'Khánh Hòa', 'Kiên Giang',
   'Kon Tum', 'Lai Châu', 'Lâm Đồng', 'Lạng Sơn', 'Lào Cai', 'Long An', 'Nam Định',
@@ -81,7 +82,10 @@ export default function WarrantyActivate() {
   const [supportAddress, setSupportAddress] = useState('');
   const [supportProduct, setSupportProduct] = useState('');
   const [customSupportProduct, setCustomSupportProduct] = useState('');
-  const [devicesList, setDevicesList] = useState<string[]>([]);
+  const [deviceTreeData, setDeviceTreeData] = useState<{ categories: string[]; products: any[] }>({
+    categories: [],
+    products: []
+  });
   const [supportSerial, setSupportSerial] = useState('');
   const [supportServiceType, setSupportServiceType] = useState('Sửa chữa');
   const [supportDetail, setSupportDetail] = useState('');
@@ -91,17 +95,17 @@ export default function WarrantyActivate() {
 
   // Fetch public device categories/models when entering Tech Support Form
   useEffect(() => {
-    if (step === 10 && devicesList.length === 0) {
+    if (step === 10 && deviceTreeData.categories.length === 0) {
       fetch(`${API_URL}/hotlines/public/devices`)
         .then(res => res.json())
         .then(data => {
-          if (Array.isArray(data) && data.length > 0) {
-            setDevicesList(data);
+          if (data && Array.isArray(data.categories) && Array.isArray(data.products)) {
+            setDeviceTreeData(data);
           }
         })
         .catch(console.error);
     }
-  }, [step, devicesList.length]);
+  }, [step, deviceTreeData.categories.length]);
 
   const handleSubmitSupport = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -538,38 +542,44 @@ export default function WarrantyActivate() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">Sản phẩm / Thiết bị *</label>
-                  <select
-                    value={supportProduct}
-                    onChange={e => setSupportProduct(e.target.value)}
-                    className="w-full px-3.5 py-2.5 border border-gray-300 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-200 bg-white"
-                    required
-                  >
-                    <option value="">-- Chọn Sản phẩm / Thiết bị --</option>
-                    {(devicesList.length > 0 ? devicesList : [
-                      'Máy lọc nước Truliva UR61096H',
-                      'Máy lọc nước Truliva UR5840',
-                      'Máy lọc nước Delica UR5440',
-                      'Máy lọc nước Delica UR5640',
-                      'Máy lọc nước Lavita CR5240',
-                      'Máy lọc nước Tanka UR3140',
-                      'Máy lọc nước Truliva UR5676',
-                      'Máy lọc nước Truliva UR3626',
-                      'Máy rửa rau Truliva QY/F-I20',
-                      'Máy lọc không khí Airplus KJ260',
-                      'Bộ lọc sơ cấp Truliva P1011',
-                      'Máy nóng lạnh treo tường Truliva W6412',
-                      'Thiết bị khác'
-                    ]).map(device => (
-                      <option key={device} value={device}>{device}</option>
-                    ))}
-                  </select>
+                  <CategoryTreeSelect
+                    categories={deviceTreeData.categories.length > 0 ? deviceTreeData.categories : [
+                      'Device', 'Water CT Device', 'Water UTS Device', 'Water WM Device', 'Air CT Device', 'Thiết bị khác'
+                    ]}
+                    products={deviceTreeData.products.length > 0 ? deviceTreeData.products : [
+                      { name: 'Máy lọc nước Truliva UR61096H', category: 'Water UTS Device' },
+                      { name: 'Máy lọc nước Truliva UR5840', category: 'Water UTS Device' },
+                      { name: 'Máy lọc nước Delica UR5440', category: 'Water UTS Device' },
+                      { name: 'Máy lọc nước Delica UR5640', category: 'Water UTS Device' },
+                      { name: 'Máy lọc nước Delica UR5840', category: 'Water UTS Device' },
+                      { name: 'Máy lọc nước Lavita CR5240', category: 'Water CT Device' },
+                      { name: 'Máy lọc nước Tanka UR3140', category: 'Water CT Device' },
+                      { name: 'Máy lọc nước Truliva Lavita CR-ZX5170', category: 'Water CT Device' },
+                      { name: 'Máy lọc nước Truliva UR3626', category: 'Water UTS Device' },
+                      { name: 'Máy lọc nước Truliva UR5676', category: 'Water UTS Device' },
+                      { name: 'Máy lọc nước Ultima Black', category: 'Water CT Device' },
+                      { name: 'Máy nóng lạnh Truliva Lavita YDZ-5301D', category: 'Water CT Device' },
+                      { name: 'Máy nóng lạnh treo tường Truliva W6412', category: 'Water WM Device' },
+                      { name: 'Máy rửa rau Truliva QY/F-I20', category: 'Water CT Device' },
+                      { name: 'Máy lọc không khí Airplus KJ260', category: 'Air CT Device' },
+                      { name: 'Máy lọc không khí Xiaomi Smart Air Purifier 4 Compact', category: 'Air CT Device' },
+                      { name: 'Bộ lọc sơ cấp Truliva P1011', category: 'Device' },
+                      { name: 'Thiết bị khác', category: 'Thiết bị khác' }
+                    ]}
+                    selected={supportProduct ? [supportProduct] : []}
+                    onChange={(nextSelected) => {
+                      const val = nextSelected[nextSelected.length - 1] || nextSelected[0] || '';
+                      setSupportProduct(val);
+                    }}
+                    placeholder="-- Chọn Sản phẩm / Thiết bị --"
+                  />
                   {supportProduct === 'Thiết bị khác' && (
                     <input
                       type="text"
                       placeholder="Nhập tên sản phẩm / thiết bị cụ thể..."
                       value={customSupportProduct}
                       onChange={e => setCustomSupportProduct(e.target.value)}
-                      className="w-full mt-2 px-3.5 py-2 border border-gray-300 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-200"
+                      className="w-full mt-2 px-3.5 py-2.5 border border-gray-300 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-200"
                       required
                     />
                   )}
