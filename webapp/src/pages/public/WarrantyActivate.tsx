@@ -80,6 +80,8 @@ export default function WarrantyActivate() {
   const [supportProvince, setSupportProvince] = useState('');
   const [supportAddress, setSupportAddress] = useState('');
   const [supportProduct, setSupportProduct] = useState('');
+  const [customSupportProduct, setCustomSupportProduct] = useState('');
+  const [devicesList, setDevicesList] = useState<string[]>([]);
   const [supportSerial, setSupportSerial] = useState('');
   const [supportServiceType, setSupportServiceType] = useState('Sửa chữa');
   const [supportDetail, setSupportDetail] = useState('');
@@ -87,18 +89,37 @@ export default function WarrantyActivate() {
   const [submittingSupport, setSubmittingSupport] = useState(false);
   const [supportSuccessTicket, setSupportSuccessTicket] = useState('');
 
+  // Fetch public device categories/models when entering Tech Support Form
+  useEffect(() => {
+    if (step === 10 && devicesList.length === 0) {
+      fetch(`${API_URL}/hotlines/public/devices`)
+        .then(res => res.json())
+        .then(data => {
+          if (Array.isArray(data) && data.length > 0) {
+            setDevicesList(data);
+          }
+        })
+        .catch(console.error);
+    }
+  }, [step, devicesList.length]);
+
   const handleSubmitSupport = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!supportName.trim()) { setSupportError('Vui lòng nhập Họ và tên'); return; }
     if (!isValidPhone(supportPhone)) { setSupportError(PHONE_ERROR_MSG); return; }
     if (!supportProvince) { setSupportError('Vui lòng chọn Tỉnh/Thành phố'); return; }
     if (!supportAddress.trim()) { setSupportError('Vui lòng nhập địa chỉ cụ thể'); return; }
-    if (!supportProduct.trim()) { setSupportError('Vui lòng nhập tên sản phẩm hoặc thiết bị'); return; }
+    if (!supportProduct) { setSupportError('Vui lòng chọn Sản phẩm / Thiết bị'); return; }
+    if (supportProduct === 'Thiết bị khác' && !customSupportProduct.trim()) { setSupportError('Vui lòng nhập tên thiết bị cụ thể'); return; }
     if (!supportServiceType) { setSupportError('Vui lòng chọn loại yêu cầu dịch vụ'); return; }
     if (!supportDetail.trim()) { setSupportError('Vui lòng nhập nội dung cần hỗ trợ'); return; }
 
     setSubmittingSupport(true);
     setSupportError('');
+
+    const finalProduct = supportProduct === 'Thiết bị khác'
+      ? (customSupportProduct.trim() || 'Thiết bị khác')
+      : supportProduct;
 
     try {
       const response = await fetch(`${API_URL}/hotlines/public/create-support`, {
@@ -111,7 +132,7 @@ export default function WarrantyActivate() {
           email: supportEmail.trim(),
           provinceName: supportProvince,
           address: supportAddress.trim(),
-          productName: supportProduct.trim(),
+          productName: finalProduct,
           serialNumber: supportSerial.trim(),
           serviceRequestType: supportServiceType,
           customerSupportDetail: supportDetail.trim()
@@ -517,14 +538,41 @@ export default function WarrantyActivate() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">Sản phẩm / Thiết bị *</label>
-                  <input
-                    type="text"
-                    placeholder="VD: Máy lọc nước Ultima Black"
+                  <select
                     value={supportProduct}
                     onChange={e => setSupportProduct(e.target.value)}
-                    className="w-full px-3.5 py-2.5 border border-gray-300 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-200"
+                    className="w-full px-3.5 py-2.5 border border-gray-300 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-200 bg-white"
                     required
-                  />
+                  >
+                    <option value="">-- Chọn Sản phẩm / Thiết bị --</option>
+                    {(devicesList.length > 0 ? devicesList : [
+                      'Máy lọc nước Truliva UR61096H',
+                      'Máy lọc nước Truliva UR5840',
+                      'Máy lọc nước Delica UR5440',
+                      'Máy lọc nước Delica UR5640',
+                      'Máy lọc nước Lavita CR5240',
+                      'Máy lọc nước Tanka UR3140',
+                      'Máy lọc nước Truliva UR5676',
+                      'Máy lọc nước Truliva UR3626',
+                      'Máy rửa rau Truliva QY/F-I20',
+                      'Máy lọc không khí Airplus KJ260',
+                      'Bộ lọc sơ cấp Truliva P1011',
+                      'Máy nóng lạnh treo tường Truliva W6412',
+                      'Thiết bị khác'
+                    ]).map(device => (
+                      <option key={device} value={device}>{device}</option>
+                    ))}
+                  </select>
+                  {supportProduct === 'Thiết bị khác' && (
+                    <input
+                      type="text"
+                      placeholder="Nhập tên sản phẩm / thiết bị cụ thể..."
+                      value={customSupportProduct}
+                      onChange={e => setCustomSupportProduct(e.target.value)}
+                      className="w-full mt-2 px-3.5 py-2 border border-gray-300 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-200"
+                      required
+                    />
+                  )}
                 </div>
                 <div>
                   <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">Số Serial (nếu có)</label>

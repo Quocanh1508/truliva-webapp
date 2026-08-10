@@ -792,3 +792,56 @@ export async function createPublicTechSupportTicket(req: Request, res: Response)
   }
 }
 
+// ═══════════════════════════════════════════════════
+//  GET /api/hotlines/public/devices - Danh sách sản phẩm/thiết bị Public (Không gồm lõi lọc)
+// ═══════════════════════════════════════════════════
+
+export async function getPublicSupportDevices(req: Request, res: Response) {
+  try {
+    const allProducts = await prisma.product.findMany({
+      select: { name: true, category: true },
+      orderBy: { name: 'asc' }
+    });
+
+    const filtered = allProducts.filter(p => {
+      const nameLower = (p.name || '').toLowerCase();
+      const catLower = (p.category || '').toLowerCase();
+      if (catLower.includes('lõi') || catLower.includes('loi') || catLower.includes('phụ kiện') || catLower.includes('phu kien')) return false;
+      if (nameLower.includes('lõi lọc') || nameLower.includes('loi loc') || nameLower.includes('thay lõi') || nameLower.includes('cto') || nameLower.includes('pp 5m')) return false;
+      return true;
+    });
+
+    let deviceNames = Array.from(new Set(filtered.map(p => p.name.trim()))).filter(Boolean);
+
+    const DEFAULT_DEVICES = [
+      'Máy lọc nước Truliva UR61096H',
+      'Máy lọc nước Truliva UR5840',
+      'Máy lọc nước Delica UR5440',
+      'Máy lọc nước Delica UR5640',
+      'Máy lọc nước Lavita CR5240',
+      'Máy lọc nước Tanka UR3140',
+      'Máy lọc nước Truliva UR5676',
+      'Máy lọc nước Truliva UR3626',
+      'Máy rửa rau Truliva QY/F-I20',
+      'Máy lọc không khí Airplus KJ260',
+      'Bộ lọc sơ cấp Truliva P1011',
+      'Máy nóng lạnh treo tường Truliva W6412',
+      'Thiết bị khác'
+    ];
+
+    if (deviceNames.length === 0) {
+      deviceNames = DEFAULT_DEVICES;
+    } else {
+      for (const d of DEFAULT_DEVICES) {
+        if (!deviceNames.includes(d)) deviceNames.push(d);
+      }
+    }
+
+    return res.json(deviceNames);
+  } catch (error: any) {
+    console.error('[getPublicSupportDevices] Error:', error);
+    return res.status(500).json({ error: 'Lỗi lấy danh sách thiết bị', details: error.message });
+  }
+}
+
+

@@ -11,13 +11,15 @@ import {
   verifyHotlineTicketPhase3,
   deleteHotlineTicket,
   getHotlineHandlers,
-  createPublicTechSupportTicket
+  createPublicTechSupportTicket,
+  getPublicSupportDevices
 } from '../controllers/hotlineController';
 
 const router = Router();
 
-// Public Route (Không cần đăng nhập)
+// Public Routes (Không cần đăng nhập)
 router.post('/public/create-support', createPublicTechSupportTicket);
+router.get('/public/devices', getPublicSupportDevices);
 
 router.use(requireAuth);
 
