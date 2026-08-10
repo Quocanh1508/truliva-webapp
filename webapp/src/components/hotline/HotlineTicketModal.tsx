@@ -17,7 +17,6 @@ interface Props {
 }
 
 const SOURCE_OPTIONS = ['Hotline (Cuộc gọi)', 'Zalo OA', 'Fanpage / Messenger', 'Webapp', 'Khác'];
-const CHANNEL_OPTIONS = ['Inbound', 'Outbound', 'Chat', 'Email', 'Khác'];
 const SERVICE_REQUEST_OPTIONS = ['Sửa chữa', 'Lắp đặt', 'Thay lọc', 'Bảo hành', 'Tư vấn', 'Khiếu nại', 'Khác'];
 const PHASE3_REQUEST_TYPE_OPTIONS = ['Sửa chữa', 'Lắp đặt', 'Thay lọc', 'Bảo hành', 'Tư vấn', 'Khác'];
 const PHASE3_SERVICE_TYPE_OPTIONS = ['Áp lực nước yếu', 'Rò rỉ', 'Máy không hoạt động', 'TDS cao', 'Không ra nước', 'Tiếng ồn', 'Thay linh kiện', 'Khác'];
@@ -538,24 +537,14 @@ export default function HotlineTicketModal({ ticket, isOpen, onClose, onSaved, u
                   className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-200" />
               </div>
 
-              {/* Nguồn + Kênh */}
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-1">Nguồn *</label>
-                  <select value={formData.source} onChange={(e) => updateForm('source', e.target.value)}
-                    className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-200">
-                    <option value="">Chọn</option>
-                    {SOURCE_OPTIONS.map(s => <option key={s} value={s}>{s}</option>)}
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-1">Kênh</label>
-                  <select value={formData.channel} onChange={(e) => updateForm('channel', e.target.value)}
-                    className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-200">
-                    <option value="">Chọn</option>
-                    {CHANNEL_OPTIONS.map(c => <option key={c} value={c}>{c}</option>)}
-                  </select>
-                </div>
+              {/* Nguồn */}
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-1">Nguồn *</label>
+                <select value={formData.source} onChange={(e) => updateForm('source', e.target.value)}
+                  className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-200">
+                  <option value="">Chọn</option>
+                  {SOURCE_OPTIONS.map(s => <option key={s} value={s}>{s}</option>)}
+                </select>
               </div>
 
               {/* Sản phẩm + Serial */}
