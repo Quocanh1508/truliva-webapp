@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { fetchApi } from '../../api/client';
 import { useAuth } from '../../context/AuthContext';
-import { Search, Plus, UserPlus, ArrowRightCircle, ShoppingCart, Phone, MapPin, User, Clock, Loader2, ChevronLeft, ChevronRight, X, Wrench, Package, ShieldCheck, PhoneCall } from 'lucide-react';
+import { Search, Plus, UserPlus, ArrowRightCircle, ShoppingCart, Phone, MapPin, User, Clock, Loader2, ChevronLeft, ChevronRight, X, Wrench, Package, ShieldCheck, PhoneCall, Copy, CheckCircle2 } from 'lucide-react';
 import HotlineTicketModal from './HotlineTicketModal';
 
 // ═══════════════════════════════════════════════════
@@ -120,6 +120,31 @@ export default function HotlineManage() {
   const [showAssignModal, setShowAssignModal] = useState(false);
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [selectedTicket, setSelectedTicket] = useState<HotlineTicket | null>(null);
+  const [copiedPhone, setCopiedPhone] = useState<string | null>(null);
+
+  const handleCopyPhone = (phoneStr: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!phoneStr) return;
+    const cleanPhone = phoneStr.trim();
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(cleanPhone).catch(() => {
+        fallbackCopyText(cleanPhone);
+      });
+    } else {
+      fallbackCopyText(cleanPhone);
+    }
+    setCopiedPhone(cleanPhone);
+    setTimeout(() => setCopiedPhone(null), 2000);
+  };
+
+  const fallbackCopyText = (text: string) => {
+    const el = document.createElement('textarea');
+    el.value = text;
+    document.body.appendChild(el);
+    el.select();
+    document.execCommand('copy');
+    document.body.removeChild(el);
+  };
 
   // Assign modal states
   const [assignTeam, setAssignTeam] = useState('');
@@ -630,13 +655,18 @@ export default function HotlineManage() {
                   return (
                     <tr
                       key={ticket.id}
-                      className="border-b border-gray-100 hover:bg-blue-50/40 transition-colors cursor-pointer"
-                      onClick={() => { setSelectedTicket(ticket); setShowDetailModal(true); }}
+                      className="border-b border-gray-100 hover:bg-gray-50/70 transition-colors"
                     >
-                      {/* 1. Mã yêu cầu hotline */}
-                      <td className="px-4 py-3 whitespace-nowrap">
+                      {/* 1. Mã yêu cầu hotline (Click vào đây để mở Edit Ticket Modal) */}
+                      <td
+                        className="px-4 py-3 whitespace-nowrap cursor-pointer hover:bg-blue-50/80 transition-colors group"
+                        onClick={() => { setSelectedTicket(ticket); setShowDetailModal(true); }}
+                        title="Bấm vào mã đơn để mở chi tiết & chỉnh sửa phiếu"
+                      >
                         <div className="flex flex-col gap-0.5">
-                          <span className="font-mono text-blue-600 font-medium text-[13px]">{ticket.ticketCode}</span>
+                          <span className="font-mono text-blue-600 font-bold text-[13px] group-hover:underline group-hover:text-blue-800">
+                            {ticket.ticketCode}
+                          </span>
                           {ticket.source?.includes('Hỗ trợ kỹ thuật') && (
                             <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-extrabold bg-cyan-100 text-cyan-800 border border-cyan-300 w-fit">
                               🛠️ HỖ TRỢ KỸ THUẬT
@@ -645,21 +675,37 @@ export default function HotlineManage() {
                         </div>
                       </td>
 
-                      {/* 2. Khách hàng */}
+                      {/* 2. Khách hàng (Click vào SĐT để sao chép) */}
                       <td className="px-4 py-3 min-w-[220px]">
                         <div className="space-y-0.5">
                           <div className="flex items-center gap-1.5">
                             <User size={13} className="text-gray-400" />
                             <span className="font-medium text-gray-800">{ticket.customerName}</span>
                           </div>
-                          <div className="flex items-center gap-1.5">
-                            <Phone size={13} className="text-gray-400" />
-                            <span className="text-gray-600">{ticket.customerPhone}</span>
+                          {/* SĐT chính */}
+                          <div
+                            onClick={(e) => handleCopyPhone(ticket.customerPhone, e)}
+                            className="flex items-center gap-1.5 cursor-pointer hover:text-blue-600 group/phone w-fit py-0.5 px-1 -ml-1 rounded hover:bg-blue-50 transition-colors"
+                            title="Bấm để sao chép số điện thoại"
+                          >
+                            <Phone size={13} className="text-gray-400 group-hover/phone:text-blue-500" />
+                            <span className="text-gray-700 font-medium group-hover/phone:text-blue-600">
+                              {ticket.customerPhone}
+                            </span>
+                            <Copy size={11} className="text-gray-400 opacity-0 group-hover/phone:opacity-100 transition-opacity" />
                           </div>
+                          {/* SĐT phụ (nếu có) */}
                           {ticket.secondaryPhones && (
-                            <div className="flex items-center gap-1.5">
-                              <Phone size={13} className="text-emerald-400" />
-                              <span className="text-gray-500 text-xs">{ticket.secondaryPhones}</span>
+                            <div
+                              onClick={(e) => handleCopyPhone(ticket.secondaryPhones!, e)}
+                              className="flex items-center gap-1.5 cursor-pointer hover:text-emerald-600 group/secphone w-fit py-0.5 px-1 -ml-1 rounded hover:bg-emerald-50 transition-colors"
+                              title="Bấm để sao chép SĐT phụ"
+                            >
+                              <Phone size={13} className="text-emerald-400 group-hover/secphone:text-emerald-600" />
+                              <span className="text-gray-500 text-xs group-hover/secphone:text-emerald-700">
+                                {ticket.secondaryPhones}
+                              </span>
+                              <Copy size={11} className="text-emerald-400 opacity-0 group-hover/secphone:opacity-100 transition-opacity" />
                             </div>
                           )}
                           {ticket.address && (
@@ -912,6 +958,16 @@ export default function HotlineManage() {
           onSaved={() => { setShowCreateModal(false); setShowDetailModal(false); setSelectedTicket(null); fetchTickets(); }}
           userRole={user?.role || ''}
         />
+      )}
+
+      {/* ══════════════════════════════════════════════════
+           COPIED PHONE TOAST
+         ══════════════════════════════════════════════════ */}
+      {copiedPhone && (
+        <div className="fixed bottom-6 right-6 z-50 bg-gray-900/90 text-white px-4 py-2.5 rounded-xl shadow-2xl flex items-center gap-2.5 text-xs font-medium backdrop-blur-sm border border-gray-700 animate-in fade-in slide-in-from-bottom-2">
+          <CheckCircle2 size={16} className="text-emerald-400 shrink-0" />
+          <span>Đã sao chép SĐT: <strong className="text-emerald-300 font-mono text-xs">{copiedPhone}</strong></span>
+        </div>
       )}
     </div>
   );
