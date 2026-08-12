@@ -29,6 +29,11 @@ interface HotlineTicket {
   convertedOrder?: { id: string; pancakeOrderId: number; billFullName?: string; adminStatus?: string } | null;
   customerSupportDetail?: string;
   serviceRequestType?: string;
+  phase3RequestType?: string;
+  phase3ServiceType?: string;
+  sparePartName?: string;
+  consultationNote?: string;
+  phase3Feedback?: string;
 }
 
 interface BadgeCounts {
@@ -610,13 +615,16 @@ export default function HotlineManage() {
                   <th className="px-4 py-3 text-left font-semibold text-gray-600 whitespace-nowrap">Thông tin gửi yêu cầu</th>
                   <th className="px-4 py-3 text-left font-semibold text-gray-600 whitespace-nowrap">Thông tin xử lý yêu cầu</th>
                   <th className="px-4 py-3 text-left font-semibold text-gray-600 whitespace-nowrap">Sản phẩm</th>
+                  <th className="px-4 py-3 text-left font-semibold text-gray-600 whitespace-nowrap">Thông tin nội dung yêu cầu</th>
+                  <th className="px-4 py-3 text-left font-semibold text-gray-600 whitespace-nowrap">Thông tin nội dung xử lý</th>
+                  <th className="px-4 py-3 text-left font-semibold text-gray-600 whitespace-nowrap">Ghi chú nội dung tư vấn</th>
                 </tr>
               </thead>
               <tbody>
                 {loading ? (
-                  <tr><td colSpan={7} className="text-center py-12"><Loader2 className="mx-auto animate-spin text-blue-500" size={28} /></td></tr>
+                  <tr><td colSpan={10} className="text-center py-12"><Loader2 className="mx-auto animate-spin text-blue-500" size={28} /></td></tr>
                 ) : tickets.length === 0 ? (
-                  <tr><td colSpan={7} className="text-center py-12 text-gray-400">Không có yêu cầu hotline nào</td></tr>
+                  <tr><td colSpan={10} className="text-center py-12 text-gray-400">Không có yêu cầu hotline nào</td></tr>
                 ) : tickets.map(ticket => {
                   const statusBadge = STATUS_BADGE_MAP[ticket.status] || { bg: 'bg-gray-100', text: 'text-gray-700' };
                   return (
@@ -625,7 +633,7 @@ export default function HotlineManage() {
                       className="border-b border-gray-100 hover:bg-blue-50/40 transition-colors cursor-pointer"
                       onClick={() => { setSelectedTicket(ticket); setShowDetailModal(true); }}
                     >
-                      {/* Mã yêu cầu */}
+                      {/* 1. Mã yêu cầu hotline */}
                       <td className="px-4 py-3 whitespace-nowrap">
                         <div className="flex flex-col gap-0.5">
                           <span className="font-mono text-blue-600 font-medium text-[13px]">{ticket.ticketCode}</span>
@@ -637,7 +645,7 @@ export default function HotlineManage() {
                         </div>
                       </td>
 
-                      {/* Khách hàng */}
+                      {/* 2. Khách hàng */}
                       <td className="px-4 py-3 min-w-[220px]">
                         <div className="space-y-0.5">
                           <div className="flex items-center gap-1.5">
@@ -667,10 +675,9 @@ export default function HotlineManage() {
                         </div>
                       </td>
 
-                      {/* Thao tác */}
+                      {/* 3. Thao tác */}
                       <td className="px-4 py-3 text-center" onClick={(e) => e.stopPropagation()}>
                         <div className="flex items-center justify-center gap-2">
-                          {/* Icon 1: Phân bổ */}
                           <button
                             title="Phân bổ"
                             onClick={(e) => { e.stopPropagation(); setSelectedTicket(ticket); setAssignTeam(ticket.targetTeam || ''); setShowAssignModal(true); }}
@@ -678,7 +685,6 @@ export default function HotlineManage() {
                           >
                             <UserPlus size={18} />
                           </button>
-                          {/* Icon 2: Thêm mới yêu cầu KH (Chuyển sang Ca DV) */}
                           <button
                             title="Thêm mới yêu cầu KH (Chuyển sang Ca dịch vụ)"
                             onClick={(e) => { e.stopPropagation(); handleConvertToOrder(ticket); }}
@@ -686,7 +692,6 @@ export default function HotlineManage() {
                           >
                             <ArrowRightCircle size={18} />
                           </button>
-                          {/* Icon 3: Thêm mới đơn hàng (POS) */}
                           <button
                             title="Thêm mới đơn hàng (POS)"
                             onClick={(e) => { e.stopPropagation(); handlePOSNotice(); }}
@@ -697,14 +702,14 @@ export default function HotlineManage() {
                         </div>
                       </td>
 
-                      {/* Trạng thái */}
+                      {/* 4. Trạng thái */}
                       <td className="px-4 py-3 whitespace-nowrap">
                         <span className={`inline-flex px-2.5 py-1 rounded-md text-xs font-bold ${statusBadge.bg} ${statusBadge.text}`}>
                           {ticket.status}
                         </span>
                       </td>
 
-                      {/* Thông tin gửi yêu cầu */}
+                      {/* 5. Thông tin gửi yêu cầu */}
                       <td className="px-4 py-3 min-w-[180px]">
                         <div className="space-y-0.5 text-xs text-gray-600">
                           <div className="flex items-center gap-1">
@@ -726,10 +731,10 @@ export default function HotlineManage() {
                         </div>
                       </td>
 
-                      {/* Thông tin xử lý */}
+                      {/* 6. Thông tin xử lý yêu cầu */}
                       <td className="px-4 py-3 min-w-[180px]">
                         <div className="space-y-0.5 text-xs text-gray-600">
-                          <div>{ticket.targetTeam || 'Chưa có dữ liệu'}</div>
+                          <div className="font-semibold text-gray-800">{ticket.targetTeam || 'Chưa có dữ liệu'}</div>
                           {ticket.handlerUser ? (
                             <>
                               <div className="text-gray-500">{ticket.handlerUser.fullName}</div>
@@ -738,17 +743,69 @@ export default function HotlineManage() {
                               )}
                             </>
                           ) : (
-                            <div className="text-gray-400 italic">Chưa có dữ liệu</div>
+                            <div className="text-gray-400 italic">Chưa có người xử lý</div>
                           )}
                         </div>
                       </td>
 
-                      {/* Sản phẩm */}
+                      {/* 7. Sản phẩm */}
                       <td className="px-4 py-3 whitespace-nowrap">
                         <div className="text-sm text-gray-700 font-medium">{ticket.productName}</div>
                         {ticket.serialNumber && (
                           <div className="text-xs text-gray-500 font-mono">{ticket.serialNumber}</div>
                         )}
+                      </td>
+
+                      {/* 8. Thông tin nội dung yêu cầu */}
+                      <td className="px-4 py-3 min-w-[200px] max-w-[280px]">
+                        <div className="space-y-1 text-xs">
+                          {ticket.serviceRequestType && (
+                            <span className="inline-block font-semibold text-blue-600 bg-blue-50 px-2 py-0.5 rounded border border-blue-100">
+                              {ticket.serviceRequestType}
+                            </span>
+                          )}
+                          {ticket.customerSupportDetail ? (
+                            <div className="text-gray-700 whitespace-pre-line line-clamp-3 leading-relaxed">
+                              {ticket.customerSupportDetail}
+                            </div>
+                          ) : (
+                            <span className="text-gray-400 italic">Chưa có nội dung</span>
+                          )}
+                        </div>
+                      </td>
+
+                      {/* 9. Thông tin nội dung xử lý */}
+                      <td className="px-4 py-3 min-w-[180px] max-w-[250px]">
+                        <div className="space-y-1 text-xs text-gray-600">
+                          {(ticket.phase3RequestType || ticket.phase3ServiceType) && (
+                            <div className="font-semibold text-amber-700">
+                              {[ticket.phase3RequestType, ticket.phase3ServiceType].filter(Boolean).join(' • ')}
+                            </div>
+                          )}
+                          {ticket.sparePartName && (
+                            <div className="text-gray-500">🔧 Linh kiện: {ticket.sparePartName}</div>
+                          )}
+                          {ticket.phase3Feedback ? (
+                            <div className="text-gray-700 whitespace-pre-line line-clamp-3">
+                              {ticket.phase3Feedback}
+                            </div>
+                          ) : (!ticket.phase3RequestType && !ticket.phase3ServiceType && !ticket.sparePartName) ? (
+                            <span className="text-gray-400 italic">Chưa có dữ liệu</span>
+                          ) : null}
+                        </div>
+                      </td>
+
+                      {/* 10. Ghi chú nội dung tư vấn */}
+                      <td className="px-4 py-3 min-w-[180px] max-w-[250px]">
+                        <div className="text-xs text-gray-700">
+                          {ticket.consultationNote ? (
+                            <div className="whitespace-pre-line line-clamp-3 leading-relaxed">
+                              {ticket.consultationNote}
+                            </div>
+                          ) : (
+                            <span className="text-gray-400 italic">Chưa có ghi chú</span>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   );
