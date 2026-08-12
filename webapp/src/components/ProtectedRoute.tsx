@@ -25,16 +25,19 @@ export default function ProtectedRoute({ allowedRoles, featureKey, requireDashbo
     return <Navigate to="/login" replace />;
   }
 
-  // Nếu có featureKey, ưu tiên kiểm tra qua PermissionContext
-  let isAllowedByPermission = false;
-  if (featureKey) {
-    isAllowedByPermission = hasPermission(featureKey);
+  // Ưu tiên kiểm tra quyền động qua PermissionContext
+  let isAllowed = false;
+  if (user.role === 'ADMIN') {
+    isAllowed = true;
+  } else if (featureKey) {
+    isAllowed = hasPermission(featureKey);
+  } else if (allowedRoles) {
+    isAllowed = allowedRoles.includes(user.role as UserRole);
+  } else {
+    isAllowed = true;
   }
 
-  // Nếu vai trò nằm trong allowedRoles HOẶC được cấp quyền động qua featureKey thì được truy cập
-  const isAllowedByRole = allowedRoles ? allowedRoles.includes(user.role as UserRole) : true;
-
-  if (!isAllowedByRole && !isAllowedByPermission) {
+  if (!isAllowed) {
     if (user.role === 'KTV') return <Navigate to="/ktv/my-orders" replace />;
     if (user.role === 'DEV') return <Navigate to="/dev/feedbacks" replace />;
     return <Navigate to="/admin/orders" replace />;

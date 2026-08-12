@@ -35,9 +35,12 @@ const STATUS_OPTIONS = [
 //  Component
 // ═══════════════════════════════════════════════════
 
+import { usePermission } from '../../context/PermissionContext';
+
 export default function HotlineTicketModal({ ticket, isOpen, onClose, onSaved, userRole }: Props) {
   const isEditMode = !!ticket;
-  const canPhase3 = ['ADMIN', 'COORDINATOR', 'HOTLINE'].includes(userRole);
+  const { hasPermission } = usePermission();
+  const canPhase3 = ['ADMIN', 'DEV'].includes(userRole) || hasPermission('HOTLINE_TICKET_VERIFY');
   // Product tree options
   const [categories, setCategories] = useState<string[]>([]);
   const [products, setProducts] = useState<any[]>([]);

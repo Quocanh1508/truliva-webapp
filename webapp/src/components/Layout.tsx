@@ -57,84 +57,81 @@ export default function Layout() {
 
   const getNavItems = () => {
     if (!user) return [];
+
+    const items: any[] = [];
     
     if (user.role === 'DEV') {
-      return [
+      items.push(
         { name: 'Quản lý & Bắn ZNS', path: '/dev/zns-manage', icon: <Send size={20} /> },
         { name: 'Sơ đồ hệ thống', path: '/dev/system-map', icon: <Network size={20} /> },
-        { name: 'Phản hồi người dùng', path: '/dev/feedbacks', icon: <MessageSquare size={20} /> },
-        { name: 'Quản lý Serial', path: '/admin/serials', icon: <Hash size={20} /> },
-        { name: 'Gửi thông báo', path: '/admin/broadcast', icon: <Send size={20} /> },
-        { name: 'Thông báo', path: '/notifications', icon: <Bell size={20} /> },
-        { name: 'Thông tin cá nhân', path: '/profile', icon: <User size={20} /> },
-      ];
+        { name: 'Phản hồi người dùng', path: '/dev/feedbacks', icon: <MessageSquare size={20} /> }
+      );
     }
     
     if (user.role === 'KTV') {
-      return [
+      items.push(
         { name: 'Dịch vụ được giao', path: '/ktv/my-orders', icon: <Wrench size={20} /> },
         { name: 'Tồn kho của tôi', path: '/ktv/inventory', icon: <Warehouse size={20} /> },
-        { name: 'Thông báo', path: '/notifications', icon: <Bell size={20} /> },
         { name: 'Tạo báo cáo', path: '/ktv/report', icon: <FileText size={20} /> },
-        { name: 'Báo cáo của tôi', path: '/ktv/my-reports', icon: <List size={20} /> },
-        { name: 'Đóng góp ý kiến', path: '/feedback', icon: <MessageSquare size={20} /> },
-        { name: 'Thông tin cá nhân', path: '/profile', icon: <User size={20} /> },
-      ];
+        { name: 'Báo cáo của tôi', path: '/ktv/my-reports', icon: <List size={20} /> }
+      );
     }
-    
-    // Office / Administrative roles
-    const items: any[] = [];
-    
-    // 1. Dashboard: Admin, Staff (Service group)
+
+    // 1. Dashboard: Admin, Dev, Staff (Service group)
     const canSeeDashboard = 
       user.role === 'ADMIN' || 
+      user.role === 'DEV' ||
       (user.role === 'STAFF' && user.group === 'Service');
     if (canSeeDashboard) {
       items.push({ name: 'Dashboard', path: '/admin', icon: <BarChart size={20} /> });
     }
+
+    // 2. Quản lý Hotline: kiểm tra quyền HOTLINE_TICKET_VIEW
+    if (hasPermission('HOTLINE_TICKET_VIEW')) {
+      items.push({ name: 'Quản lý Hotline', path: '/admin/hotlines', icon: <PhoneCall size={20} /> });
+    }
+
+    // 3. Quản lý dịch vụ: kiểm tra quyền ORDER_VIEW
+    if (hasPermission('ORDER_VIEW')) {
+      items.push({ name: 'Quản lý dịch vụ', path: '/admin/orders', icon: <Wrench size={20} /> });
+    }
     
-    // 2. Quản lý kho: kiểm tra quyền INVENTORY_VIEW
+    // 4. Quản lý kho: kiểm tra quyền INVENTORY_VIEW
     if (hasPermission('INVENTORY_VIEW')) {
       items.push({ name: 'Quản lý kho', path: '/admin/inventory', icon: <Warehouse size={20} /> });
     }
 
-    // 3. Quản lý Serial: kiểm tra quyền SERIAL_VIEW
-    if (hasPermission('SERIAL_VIEW')) {
+    // 5. Quản lý Serial: kiểm tra quyền SERIAL_VIEW
+    if (hasPermission('SERIAL_VIEW') && user.role !== 'DEV') {
       items.push({ name: 'Quản lý Serial', path: '/admin/serials', icon: <Hash size={20} /> });
     }
 
-    // 4. Quản lý Khuyến mãi: kiểm tra quyền PROMO_MANAGE
+    // 6. Quản lý Khuyến mãi: kiểm tra quyền PROMO_MANAGE
     if (hasPermission('PROMO_MANAGE')) {
       items.push({ name: 'Quản lý Khuyến mãi', path: '/admin/promos', icon: <Tag size={20} /> });
     }
-    
-    // 5. Quản lý dịch vụ: kiểm tra quyền ORDER_VIEW
-    if (hasPermission('ORDER_VIEW')) {
-      items.push({ name: 'Quản lý dịch vụ', path: '/admin/orders', icon: <Wrench size={20} /> });
-      items.push({ name: 'Quản lý Hotline', path: '/admin/hotlines', icon: <PhoneCall size={20} /> });
-    }
-    
-    // 6. Danh sách báo cáo: kiểm tra quyền REPORT_VIEW
+
+    // 7. Danh sách báo cáo: kiểm tra quyền REPORT_VIEW
     if (hasPermission('REPORT_VIEW')) {
       items.push({ name: 'Danh sách báo cáo', path: '/admin/reports', icon: <List size={20} /> });
     }
     
-    // 7. Quản lý Trạm: kiểm tra quyền STATION_MANAGE
+    // 8. Quản lý Trạm: kiểm tra quyền STATION_MANAGE
     if (hasPermission('STATION_MANAGE')) {
       items.push({ name: 'Quản lý Trạm', path: '/admin/stations', icon: <Building size={20} /> });
     }
 
-    // 8. Quản lý nhân sự & Phân quyền: kiểm tra quyền USER_MANAGE hoặc USER_PERMISSIONS_MATRIX
+    // 9. Quản lý nhân sự & Phân quyền: kiểm tra quyền USER_MANAGE hoặc USER_PERMISSIONS_MATRIX
     if (hasPermission('USER_MANAGE') || hasPermission('USER_PERMISSIONS_MATRIX')) {
       items.push({ name: 'Quản lí nhân viên', path: '/admin/users', icon: <Users size={20} /> });
     }
 
-    // 9. Ảnh mẫu báo cáo
+    // 10. Ảnh mẫu báo cáo
     if (user.role === 'ADMIN' || user.role === 'COORDINATOR') {
       items.push({ name: 'Ảnh mẫu báo cáo', path: '/admin/sample-images', icon: <ImageIcon size={20} /> });
     }
 
-    // 10. Quản lý lương: kiểm tra quyền SALARY_VIEW
+    // 11. Quản lý lương: kiểm tra quyền SALARY_VIEW
     if (hasPermission('SALARY_VIEW')) {
       items.push({ name: 'Quản lý lương', path: '/admin/salaries', icon: <Calculator size={20} /> });
     }

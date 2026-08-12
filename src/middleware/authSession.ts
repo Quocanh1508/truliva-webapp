@@ -100,6 +100,40 @@ export function requireAdmin(req: Request, res: Response, next: NextFunction): v
   next();
 }
 
+import { getDefaultPermission } from '../config/permissions';
+import { UserRole } from '@prisma/client';
+
+export async function checkDynamicPermission(role: string, featureKey: string): Promise<boolean> {
+  if (role === 'ADMIN') return true;
+  try {
+    const custom = await prisma.rolePermission.findUnique({
+      where: { role_featureKey: { role: role as UserRole, featureKey } }
+    });
+    if (custom !== null && custom !== undefined) {
+      return custom.isAllowed;
+    }
+  } catch (err) {
+    logger.warn('Failed to check dynamic permission in DB:', err);
+  }
+  return getDefaultPermission(role as UserRole, featureKey);
+}
+
+export function requirePermission(featureKey: string) {
+  return async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    const role = req.user?.role;
+    if (!role) {
+      res.status(401).json({ error: 'Chưa đăng nhập' });
+      return;
+    }
+    const isAllowed = await checkDynamicPermission(role, featureKey);
+    if (!isAllowed) {
+      res.status(403).json({ error: 'Tài khoản của bạn không có quyền thực hiện thao tác này' });
+      return;
+    }
+    next();
+  };
+}
+
 /**
  * Middleware kiểm tra quyền Coordinator (Điều phối viên) hoặc Admin.
  */
@@ -142,16 +176,14 @@ export function requireDev(req: Request, res: Response, next: NextFunction): voi
 /**
  * Middleware kiểm tra quyền Quản lý Serial (Admin, Dev, Coordinator, Hotline, Staff thuộc nhóm Hotline).
  */
-export function requireSerialAccess(req: Request, res: Response, next: NextFunction): void {
+export async function requireSerialAccess(req: Request, res: Response, next: NextFunction): Promise<void> {
   const role = req.user?.role;
-  const group = req.user?.group;
-  if (
-    role === 'ADMIN' ||
-    role === 'DEV' ||
-    role === 'COORDINATOR' ||
-    role === 'HOTLINE' ||
-    (role === 'STAFF' && group === 'Hotline')
-  ) {
+  if (!role) {
+    res.status(401).json({ error: 'Chưa đăng nhập' });
+    return;
+  }
+  const isAllowed = await checkDynamicPermission(role, 'SERIAL_VIEW');
+  if (isAllowed || role === 'ADMIN' || role === 'DEV') {
     next();
     return;
   }
