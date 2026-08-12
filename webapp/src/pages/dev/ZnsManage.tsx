@@ -143,7 +143,7 @@ export default function ZnsManage() {
             <h1 className="text-xl font-bold text-gray-900">Quản lý & Giám sát Zalo ZNS</h1>
           </div>
           <p className="text-xs text-gray-500 mt-1">
-            Theo dõi nhật ký phát tin, kiểm tra lỗi Zalo Platform & thử nghiệm gửi tin nhắn trực tiếp qua FPT FNS Gateway
+            Theo dõi nhật ký phát tin, kiểm tra lỗi Zalo Platform & thử nghiệm gửi tin nhắn trực tiếp qua Zalo Direct ZBS OpenAPI (Template 617366)
           </p>
         </div>
         <div className="flex items-center space-x-2">
@@ -166,7 +166,7 @@ export default function ZnsManage() {
           </div>
           <div>
             <p className="text-xs font-medium text-gray-500">Cổng phát tin</p>
-            <p className="text-sm font-bold text-gray-900 mt-0.5">FPT FNS Gateway</p>
+            <p className="text-sm font-bold text-gray-900 mt-0.5">Zalo Direct ZBS OpenAPI</p>
             <span className="inline-flex items-center text-[11px] text-emerald-600 font-medium mt-0.5">
               <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full mr-1 animate-pulse"></span>
               Đang hoạt động (Active)
@@ -232,7 +232,7 @@ export default function ZnsManage() {
             }`}
           >
             <Search size={15} />
-            <span>Tra cứu trực tiếp FNS (Check Status)</span>
+            <span>Tra cứu trực tiếp status Zalo (Check Status)</span>
           </button>
 
           <button
@@ -389,9 +389,9 @@ export default function ZnsManage() {
             <div className="bg-blue-50 border border-blue-200 rounded-lg p-3.5 flex items-start space-x-3 text-xs text-blue-800">
               <Info size={18} className="text-blue-600 flex-shrink-0 mt-0.5" />
               <div>
-                <p className="font-semibold">Công cụ tra cứu trạng thái Zalo Platform trực tiếp (Live FNS Check-Status)</p>
+                <p className="font-semibold">Công cụ tra cứu trạng thái Zalo Platform trực tiếp (Zalo Cloud Status Check)</p>
                 <p className="mt-0.5 text-blue-700">
-                  Nhập mã <code className="bg-blue-100 px-1 py-0.5 rounded font-mono">msg_id</code> nhận từ FNS để hệ thống truy vấn trực tiếp Zalo Cloud xem tin nhắn đã gửi đến máy khách hàng hay bị từ chối do lỗi nào (như lỗi -1124, sai số điện thoại, chặn OA,...).
+                  Nhập mã <code className="bg-blue-100 px-1 py-0.5 rounded font-mono">msg_id</code> nhận từ Zalo OpenAPI để hệ thống truy vấn trực tiếp Zalo Cloud xem tin nhắn đã gửi đến máy khách hàng hay bị từ chối do lỗi nào (như lỗi -137 hết số dư, -1124, sai số điện thoại, chặn OA,...).
                 </p>
               </div>
             </div>
@@ -417,7 +417,7 @@ export default function ZnsManage() {
             {lookupResult && (
               <div className="bg-gray-900 text-gray-100 p-4 rounded-xl font-mono text-xs space-y-3 max-w-3xl">
                 <div className="flex justify-between items-center border-b border-gray-800 pb-2">
-                  <span className="text-gray-400 font-sans font-semibold">Kết quả tra cứu FNS Check-Status</span>
+                  <span className="text-gray-400 font-sans font-semibold">Kết quả tra cứu Zalo Cloud Status</span>
                   {lookupResult.status === 2 ? (
                     <span className="text-emerald-400 font-sans font-bold flex items-center">
                       <CheckCircle2 size={14} className="mr-1" /> GỬI THÀNH CÔNG (STATUS: 2)
@@ -523,7 +523,7 @@ export default function ZnsManage() {
                   className="px-5 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-bold flex items-center space-x-2 text-xs transition-colors shadow-sm disabled:opacity-50"
                 >
                   <Send size={15} />
-                  <span>{loadingTest ? 'Đang gửi & Kiểm tra FNS...' : 'Bắt đầu gửi thử nghiệm'}</span>
+                  <span>{loadingTest ? 'Đang gửi & Kiểm tra status...' : 'Bắt đầu gửi thử nghiệm'}</span>
                 </button>
               </div>
             </form>
