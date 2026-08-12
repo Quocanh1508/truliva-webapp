@@ -21,7 +21,7 @@ export default function DateRangePicker({
   endDate,
   onChange,
   placeholder = 'Bắt đầu - kết thúc',
-  align = 'left'
+  align = 'right'
 }: DateRangePickerProps) {
   const [isOpen, setIsOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);

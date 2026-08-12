@@ -1799,6 +1799,7 @@ export default function OrderList() {
                       <DateRangePicker
                         startDate={dateType === 'appointmentTime' ? customStartDate : ''}
                         endDate={dateType === 'appointmentTime' ? customEndDate : ''}
+                        align="right"
                         onChange={(start, end) => {
                           setDateType('appointmentTime');
                           setCustomStartDate(start);
@@ -1851,6 +1852,7 @@ export default function OrderList() {
                       <DateRangePicker
                         startDate={dateType === 'completedAt' ? customStartDate : ''}
                         endDate={dateType === 'completedAt' ? customEndDate : ''}
+                        align="right"
                         onChange={(start, end) => {
                           setDateType('completedAt');
                           setCustomStartDate(start);
@@ -1903,6 +1905,7 @@ export default function OrderList() {
                       <DateRangePicker
                         startDate={dateType === 'createdAt' ? customStartDate : ''}
                         endDate={dateType === 'createdAt' ? customEndDate : ''}
+                        align="right"
                         onChange={(start, end) => {
                           setDateType('createdAt');
                           setCustomStartDate(start);
@@ -1955,6 +1958,7 @@ export default function OrderList() {
                       <DateRangePicker
                         startDate={dateType === 'updatedAt' ? customStartDate : ''}
                         endDate={dateType === 'updatedAt' ? customEndDate : ''}
+                        align="right"
                         onChange={(start, end) => {
                           setDateType('updatedAt');
                           setCustomStartDate(start);
