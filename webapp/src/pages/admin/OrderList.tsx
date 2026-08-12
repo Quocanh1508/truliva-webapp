@@ -12,7 +12,6 @@ import { usePermission } from '../../context/PermissionContext';
 import { isValidPhone, PHONE_ERROR_MSG } from '../../utils/phone';
 import ProvinceSelect from '../../components/ProvinceSelect';
 import { isValidProvince } from '../../utils/provinces';
-import HotlineManage from '../../components/hotline/HotlineManage';
 
 
 const ALL_SERVICE_TYPES = Array.from(new Set(Object.values(WORK_TYPE_SERVICES).flat()));
@@ -121,8 +120,6 @@ export default function OrderList() {
   };
 
   // Filters
-  // Main Tab: 'orders' | 'hotline'
-  const [activeMainTab, setActiveMainTab] = useState<'orders' | 'hotline'>('orders');
 
   const [search, setSearch] = useState<string>(() => getSavedFilter('search', ''));
   const [debouncedSearch, setDebouncedSearch] = useState<string>(() => getSavedFilter('search', ''));
@@ -1517,23 +1514,8 @@ export default function OrderList() {
 
       {/* Top Tabs */}
       <div className="flex justify-between items-end border-b border-gray-200 bg-gray-50 px-4 pt-1">
-        <div className="flex space-x-1">
-          <button
-            onClick={() => setActiveMainTab('orders')}
-            className={`px-5 py-2.5 text-[14px] font-medium transition-all -mb-[1px] ${
-              activeMainTab === 'orders'
-                ? 'text-[#1B3A6B] border-b-2 border-[#1B3A6B] bg-white'
-                : 'text-gray-500 border-b-2 border-transparent hover:text-gray-700'
-            }`}
-          >Yêu cầu dịch vụ</button>
-          <button
-            onClick={() => setActiveMainTab('hotline')}
-            className={`px-5 py-2.5 text-[14px] font-medium transition-all -mb-[1px] ${
-              activeMainTab === 'hotline'
-                ? 'text-[#1B3A6B] border-b-2 border-[#1B3A6B] bg-white'
-                : 'text-gray-500 border-b-2 border-transparent hover:text-gray-700'
-            }`}
-          >Yêu cầu Hotline</button>
+        <div className="flex items-center gap-2">
+          <h2 className="text-lg font-bold text-[#1B3A6B] px-4 py-2">Quản lý dịch vụ</h2>
         </div>
         
         {/* Right side: Auto Refresh */}
@@ -1600,15 +1582,6 @@ export default function OrderList() {
         </div>
       </div>
 
-      {/* ═══ HOTLINE TAB CONTENT ═══ */}
-      {activeMainTab === 'hotline' && (
-        <div className="p-4">
-          <HotlineManage />
-        </div>
-      )}
-
-      {/* ═══ ORDERS TAB CONTENT ═══ */}
-      {activeMainTab === 'orders' && (<>
       {/* Advanced Filter Popover Backdrop overlay */}
       {activeDropdown && (
         <div className="fixed inset-0 z-40 bg-black/40 md:bg-transparent" onClick={() => setActiveDropdown(null)} />
@@ -4625,7 +4598,7 @@ export default function OrderList() {
         </div>
       )}
 
-      </>)}{/* end activeMainTab === 'orders' */}
+
     </div>
   );
 }

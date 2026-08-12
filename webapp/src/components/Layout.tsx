@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { Outlet, useNavigate, useLocation, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { usePermission } from '../context/PermissionContext';
-import { LogOut, Menu, X, FileText, List, Users, BarChart, Building, Image as ImageIcon, MessageSquare, Bell, Wrench, User, Warehouse, Network, Send, Hash, Tag, Calculator, Cpu } from 'lucide-react';
+import { LogOut, Menu, X, FileText, List, Users, BarChart, Building, Image as ImageIcon, MessageSquare, Bell, Wrench, User, Warehouse, Network, Send, Hash, Tag, Calculator, Cpu, PhoneCall } from 'lucide-react';
 import { fetchApi } from '../api/client';
 import SyncManager from './SyncManager';
 import { fetchCurrentWeather, type WeatherInfo } from '../utils/weather';
@@ -111,6 +111,7 @@ export default function Layout() {
     // 5. Quản lý dịch vụ: kiểm tra quyền ORDER_VIEW
     if (hasPermission('ORDER_VIEW')) {
       items.push({ name: 'Quản lý dịch vụ', path: '/admin/orders', icon: <Wrench size={20} /> });
+      items.push({ name: 'Quản lý Hotline', path: '/admin/hotlines', icon: <PhoneCall size={20} /> });
     }
     
     // 6. Danh sách báo cáo: kiểm tra quyền REPORT_VIEW

@@ -386,16 +386,17 @@ export async function getOrders(req: Request, res: Response): Promise<void> {
     }
 
     // Xây dựng điều kiện sắp xếp
-    const orderBy: Prisma.OrderOrderByWithRelationInput = {};
     const orderDirection = sortOrder === 'asc' ? 'asc' : 'desc';
+    const orderByList: Prisma.OrderOrderByWithRelationInput[] = [];
     
     if (sortBy === 'appointmentTime') {
-      orderBy.appointmentTime = orderDirection;
+      orderByList.push({ appointmentTime: orderDirection });
     } else if (sortBy === 'updatedAt') {
-      orderBy.updatedAt = orderDirection;
+      orderByList.push({ updatedAt: orderDirection });
     } else {
-      orderBy.pancakeCreatedAt = orderDirection;
+      orderByList.push({ pancakeCreatedAt: orderDirection });
     }
+    orderByList.push({ createdAt: orderDirection });
 
     // Build statsWhere ignoring adminStatus filter to show counts of all statuses matching other active filters
     const statsConditions = conditions.filter(cond => !('adminStatus' in cond));
@@ -404,7 +405,7 @@ export async function getOrders(req: Request, res: Response): Promise<void> {
     const isKtv = req.user?.role === 'KTV';
     const findManyOptions: any = {
       where,
-      orderBy,
+      orderBy: orderByList,
       skip,
       take: limitNumber,
     };
@@ -1214,20 +1215,21 @@ export async function exportOrdersExcel(req: Request, res: Response): Promise<vo
       where.AND = conditions;
     }
 
-    const orderBy: Prisma.OrderOrderByWithRelationInput = {};
     const orderDirection = sortOrder === 'asc' ? 'asc' : 'desc';
+    const orderByList: Prisma.OrderOrderByWithRelationInput[] = [];
     
     if (sortBy === 'appointmentTime') {
-      orderBy.appointmentTime = orderDirection;
+      orderByList.push({ appointmentTime: orderDirection });
     } else if (sortBy === 'updatedAt') {
-      orderBy.updatedAt = orderDirection;
+      orderByList.push({ updatedAt: orderDirection });
     } else {
-      orderBy.pancakeCreatedAt = orderDirection;
+      orderByList.push({ pancakeCreatedAt: orderDirection });
     }
+    orderByList.push({ createdAt: orderDirection });
 
     const orders = await prisma.order.findMany({
       where,
-      orderBy,
+      orderBy: orderByList,
       select: {
         pancakeOrderId: true,
         billFullName: true,

@@ -20,60 +20,121 @@ const HOTLINE_STATUSES = [
 // ═══════════════════════════════════════════════════
 
 /**
- * GET /api/hotlines/search-customer?phone=...&serial=...
- * Tra cứu nhanh KH theo SĐT hoặc Serial, auto-fill thông tin
+ * GET /api/hotlines/search-customer?q=... (hoặc phone=..., serial=...)
+ * Tra cứu toàn bộ lịch sử KH theo Tên, Số điện thoại (chính/phụ) hoặc ID Sản phẩm / Serial
  */
 export async function searchCustomerHistory(req: Request, res: Response) {
   try {
-    const { phone, serial } = req.query;
-    const results: any = { customers: [], orders: [], serials: [] };
+    const queryParam = (req.query.q || req.query.query || req.query.search || req.query.phone || req.query.serial || '').toString().trim();
+    
+    if (!queryParam || queryParam.length < 2) {
+      return res.json({
+        query: queryParam,
+        customers: [],
+        serials: [],
+        orders: [],
+        serviceOrders: [],
+        hotlineTickets: []
+      });
+    }
 
-    if (phone && String(phone).trim().length >= 4) {
-      const phoneStr = String(phone).trim();
-
-      // Tìm trong bảng Customer
-      const customers = await prisma.customer.findMany({
+    // 1. Tìm các SĐT & Serial liên quan từ tất cả các bảng
+    const [dbCustomers, dbOrders, dbSerials, dbHotlineTickets] = await Promise.all([
+      prisma.customer.findMany({
         where: {
           OR: [
-            { phoneNumber: { contains: phoneStr } },
-            { fullName: { contains: phoneStr, mode: 'insensitive' } }
+            { phoneNumber: { contains: queryParam } },
+            { fullName: { contains: queryParam, mode: 'insensitive' } }
+          ]
+        },
+        take: 15
+      }),
+      prisma.order.findMany({
+        where: {
+          OR: [
+            { billPhoneNumber: { contains: queryParam } },
+            { billFullName: { contains: queryParam, mode: 'insensitive' } },
+            { items: { some: { productName: { contains: queryParam, mode: 'insensitive' } } } }
+          ]
+        },
+        select: { billPhoneNumber: true },
+        take: 20
+      }),
+      prisma.serial.findMany({
+        where: {
+          OR: [
+            { serialNumber: { contains: queryParam, mode: 'insensitive' } },
+            { model: { contains: queryParam, mode: 'insensitive' } },
+            { customerName: { contains: queryParam, mode: 'insensitive' } },
+            { customerPhone: { contains: queryParam } }
+          ]
+        },
+        select: { customerPhone: true, serialNumber: true },
+        take: 20
+      }),
+      prisma.hotlineTicket.findMany({
+        where: {
+          OR: [
+            { ticketCode: { contains: queryParam, mode: 'insensitive' } },
+            { customerPhone: { contains: queryParam } },
+            { secondaryPhones: { contains: queryParam } },
+            { customerName: { contains: queryParam, mode: 'insensitive' } },
+            { serialNumber: { contains: queryParam, mode: 'insensitive' } },
+            { productName: { contains: queryParam, mode: 'insensitive' } }
+          ]
+        },
+        select: { customerPhone: true, serialNumber: true },
+        take: 20
+      })
+    ]);
+
+    // Gom tập hợp SĐT & Serial tìm thấy
+    const phoneSet = new Set<string>();
+    const serialSet = new Set<string>();
+
+    if (queryParam.length >= 3) {
+      if (/^\d+$/.test(queryParam)) phoneSet.add(queryParam);
+      serialSet.add(queryParam);
+    }
+
+    dbCustomers.forEach(c => {
+      if (c.phoneNumber) phoneSet.add(c.phoneNumber.trim());
+    });
+    dbOrders.forEach(o => o.billPhoneNumber && phoneSet.add(o.billPhoneNumber.trim()));
+    dbSerials.forEach(s => {
+      if (s.customerPhone) phoneSet.add(s.customerPhone.trim());
+      if (s.serialNumber) serialSet.add(s.serialNumber.trim());
+    });
+    dbHotlineTickets.forEach(h => {
+      if (h.customerPhone) phoneSet.add(h.customerPhone.trim());
+      if (h.serialNumber) serialSet.add(h.serialNumber.trim());
+    });
+
+    const matchedPhones = Array.from(phoneSet).filter(p => p.length >= 4);
+    const matchedSerials = Array.from(serialSet).filter(s => s.length >= 3);
+
+    // 2. Truy vấn chi tiết cả 4 nhóm thông tin
+    const [finalCustomers, finalSerials, finalOrders, finalHotlineTickets] = await Promise.all([
+      // A. Thông tin Khách hàng
+      prisma.customer.findMany({
+        where: {
+          OR: [
+            { phoneNumber: { in: matchedPhones.length > 0 ? matchedPhones : undefined } },
+            { fullName: { contains: queryParam, mode: 'insensitive' } }
           ]
         },
         take: 10,
         orderBy: { updatedAt: 'desc' }
-      });
-      results.customers = customers;
+      }),
 
-      // Tìm trong bảng Order (billPhoneNumber)
-      const orders = await prisma.order.findMany({
-        where: { billPhoneNumber: { contains: phoneStr } },
-        select: {
-          id: true,
-          pancakeOrderId: true,
-          billFullName: true,
-          billPhoneNumber: true,
-          shippingAddress: true,
-          workType: true,
-          adminStatus: true,
-          items: { select: { productName: true } },
-          createdAt: true
-        },
-        take: 10,
-        orderBy: { createdAt: 'desc' }
-      });
-      results.orders = orders;
-    }
-
-    if (serial && String(serial).trim().length >= 3) {
-      const serialStr = String(serial).trim();
-
-      // 1. Tìm trong bảng Serial
-      const serials = await prisma.serial.findMany({
+      // B. Danh sách Thiết bị / Serial
+      prisma.serial.findMany({
         where: {
           OR: [
-            { serialNumber: { contains: serialStr, mode: 'insensitive' } },
-            { model: { contains: serialStr, mode: 'insensitive' } },
-            { productLine: { contains: serialStr, mode: 'insensitive' } }
+            { customerPhone: { in: matchedPhones.length > 0 ? matchedPhones : undefined } },
+            { serialNumber: { in: matchedSerials.length > 0 ? matchedSerials : undefined } },
+            { customerName: { contains: queryParam, mode: 'insensitive' } },
+            { model: { contains: queryParam, mode: 'insensitive' } }
           ]
         },
         select: {
@@ -86,106 +147,94 @@ export async function searchCustomerHistory(req: Request, res: Response) {
           address: true,
           province: true,
           status: true,
-          warrantyExpiryDate: true,
-          order: {
-            select: {
-              billFullName: true,
-              billPhoneNumber: true,
-              shippingAddress: true,
-              customer: {
-                select: {
-                  fullName: true,
-                  phoneNumber: true,
-                  fullAddress: true,
-                  provinceName: true
-                }
-              }
-            }
-          }
+          warrantyExpiryDate: true
         },
-        take: 10,
+        take: 20,
         orderBy: { createdAt: 'desc' }
-      });
+      }),
 
-      // 2. Tìm trong bảng ServiceReport theo serialNumber
-      const reports = await prisma.serviceReport.findMany({
+      // C. Đơn yêu cầu dịch vụ (Service Orders / Báo cáo kĩ thuật)
+      prisma.order.findMany({
         where: {
-          serialNumber: { contains: serialStr, mode: 'insensitive' }
+          OR: [
+            { billPhoneNumber: { in: matchedPhones.length > 0 ? matchedPhones : undefined } },
+            { billFullName: { contains: queryParam, mode: 'insensitive' } },
+            { items: { some: { productName: { contains: queryParam, mode: 'insensitive' } } } }
+          ]
         },
         select: {
           id: true,
-          customerName: true,
-          customerPhone: true,
-          address: true,
-          province: true,
-          serviceType: true,
-          serialNumber: true,
+          pancakeOrderId: true,
+          billFullName: true,
+          billPhoneNumber: true,
+          shippingAddress: true,
+          workType: true,
+          adminStatus: true,
+          assignedKtv: { select: { fullName: true } },
           createdAt: true,
-          order: {
+          items: { select: { productName: true, quantity: true } },
+          serviceReports: {
             select: {
-              billFullName: true,
-              billPhoneNumber: true,
-              shippingAddress: true
-            }
+              id: true,
+              serviceType: true,
+              serialNumber: true,
+              notes: true,
+              createdAt: true
+            },
+            take: 1
           }
         },
-        take: 10,
+        take: 20,
         orderBy: { createdAt: 'desc' }
-      });
-      results.reports = reports;
+      }),
 
-      // 3. Enrich customer info if Serial customerName/customerPhone is null
-      results.serials = serials.map((s: any) => {
-        let name = s.customerName || s.order?.billFullName || s.order?.customer?.fullName;
-        let phone = s.customerPhone || s.order?.billPhoneNumber || s.order?.customer?.phoneNumber;
-        let addr = s.address || (s.order?.shippingAddress as any)?.full_address || s.order?.customer?.fullAddress;
-        let prov = s.province || (s.order?.shippingAddress as any)?.province || s.order?.customer?.provinceName;
+      // D. Yêu cầu Hotline (Hotline Tickets)
+      prisma.hotlineTicket.findMany({
+        where: {
+          OR: [
+            { customerPhone: { in: matchedPhones.length > 0 ? matchedPhones : undefined } },
+            { secondaryPhones: { contains: queryParam } },
+            { serialNumber: { in: matchedSerials.length > 0 ? matchedSerials : undefined } },
+            { customerName: { contains: queryParam, mode: 'insensitive' } },
+            { ticketCode: { contains: queryParam, mode: 'insensitive' } },
+            { productName: { contains: queryParam, mode: 'insensitive' } }
+          ]
+        },
+        select: {
+          id: true,
+          ticketCode: true,
+          customerName: true,
+          customerPhone: true,
+          secondaryPhones: true,
+          provinceName: true,
+          address: true,
+          productName: true,
+          serialNumber: true,
+          serviceRequestType: true,
+          customerSupportDetail: true,
+          status: true,
+          source: true,
+          targetTeam: true,
+          requestTime: true,
+          createdAt: true,
+          handlerUser: { select: { id: true, fullName: true, role: true } }
+        },
+        take: 20,
+        orderBy: { createdAt: 'desc' }
+      })
+    ]);
 
-        if (!name || !phone) {
-          const matchedReport = reports.find((r: any) => r.serialNumber === s.serialNumber) || reports[0];
-          if (matchedReport) {
-            name = name || matchedReport.customerName || matchedReport.order?.billFullName;
-            phone = phone || matchedReport.customerPhone || matchedReport.order?.billPhoneNumber;
-            addr = addr || matchedReport.address;
-            prov = prov || matchedReport.province;
-          }
-        }
-
-        return {
-          id: s.id,
-          serialNumber: s.serialNumber,
-          model: s.model,
-          productLine: s.productLine,
-          customerName: name || null,
-          customerPhone: phone || null,
-          address: addr || null,
-          province: prov || null,
-          status: s.status,
-          warrantyExpiryDate: s.warrantyExpiryDate
-        };
-      });
-
-      // Nếu không có trong bảng Serial nhưng có trong ServiceReport
-      if (results.serials.length === 0 && reports.length > 0) {
-        results.serials = reports.map((r: any) => ({
-          id: r.id,
-          serialNumber: r.serialNumber,
-          model: r.serviceType || 'Máy lọc nước',
-          productLine: r.serviceType || 'Truliva',
-          customerName: r.customerName || r.order?.billFullName || null,
-          customerPhone: r.customerPhone || r.order?.billPhoneNumber || null,
-          address: r.address || null,
-          province: r.province || null,
-          status: 'Đã nghiệm thu',
-          warrantyExpiryDate: null
-        }));
-      }
-    }
-
-    return res.json(results);
+    return res.json({
+      query: queryParam,
+      customers: finalCustomers,
+      serials: finalSerials,
+      orders: finalOrders,
+      serviceOrders: finalOrders,
+      hotlineTickets: finalHotlineTickets
+    });
   } catch (error: any) {
     console.error('[searchCustomerHistory] Error:', error);
-    return res.status(500).json({ error: 'Lỗi tra cứu khách hàng', details: error.message });
+    return res.status(500).json({ error: 'Lỗi tra cứu lịch sử khách hàng', details: error.message });
   }
 }
 
@@ -276,17 +325,19 @@ async function generateTicketCode(): Promise<string> {
   const dateStr = `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}`;
   const prefix = `HL${dateStr}`;
 
-  // Đếm số phiếu đã tạo trong ngày
-  const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  const endOfDay = new Date(startOfDay.getTime() + 24 * 60 * 60 * 1000);
-
-  const countToday = await prisma.hotlineTicket.count({
-    where: {
-      createdAt: { gte: startOfDay, lt: endOfDay }
-    }
+  const lastTicket = await prisma.hotlineTicket.findFirst({
+    where: { ticketCode: { startsWith: prefix } },
+    orderBy: { ticketCode: 'desc' },
+    select: { ticketCode: true }
   });
 
-  return `${prefix}${pad(countToday + 1, 4)}`;
+  let seq = 1;
+  if (lastTicket && lastTicket.ticketCode) {
+    const lastSeq = parseInt(lastTicket.ticketCode.slice(-4));
+    if (!isNaN(lastSeq)) seq = lastSeq + 1;
+  }
+
+  return `${prefix}${pad(seq, 4)}`;
 }
 
 export async function createHotlineTicket(req: Request, res: Response) {
@@ -518,17 +569,41 @@ export async function convertToServiceOrder(req: Request, res: Response) {
       addressParts.province = existing.provinceName;
     }
 
+    // Tìm hoặc tự tạo hồ sơ Khách hàng tương ứng với SĐT
+    let customerId: string | null = null;
+    if (existing.customerPhone) {
+      const cleanPhone = existing.customerPhone.trim();
+      const foundCust = await prisma.customer.findFirst({
+        where: { phoneNumber: cleanPhone }
+      });
+      if (foundCust) {
+        customerId = foundCust.id;
+      } else {
+        const newCust = await prisma.customer.create({
+          data: {
+            fullName: existing.customerName || 'Khách hàng Hotline',
+            phoneNumber: cleanPhone,
+            address: existing.address || null,
+            provinceName: existing.provinceName || null
+          }
+        });
+        customerId = newCust.id;
+      }
+    }
+
     // Tạo Ca dịch vụ mới
     const [order, ticket] = await prisma.$transaction([
       prisma.order.create({
         data: {
           pancakeOrderId: newPancakeId,
+          customerId,
           billFullName: existing.customerName,
           billPhoneNumber: existing.customerPhone,
           shippingAddress: addressParts,
           note: `[Từ Hotline ${existing.ticketCode}] ${existing.customerSupportDetail}`,
           adminStatus: 'chờ xử lý',
           workType: existing.serviceRequestType || null,
+          pancakeCreatedAt: new Date(),
           rawData: { source: 'hotline', hotlineTicketId: existing.id, hotlineTicketCode: existing.ticketCode }
         }
       }),
@@ -690,17 +765,18 @@ export async function getHotlineHandlers(req: Request, res: Response) {
     const { team } = req.query;
     const where: any = { isActive: true };
 
-    if (team) {
-      // Map team name to role
-      const teamRoleMap: Record<string, string> = {
-        'Hotline': 'HOTLINE',
-        'Coordinator': 'COORDINATOR',
-        'Admin': 'ADMIN'
+    if (team && String(team) !== 'ALL') {
+      const teamRoleMap: Record<string, string[]> = {
+        'Hotline': ['HOTLINE', 'ADMIN', 'COORDINATOR', 'STAFF'],
+        'Coordinator': ['COORDINATOR', 'ADMIN', 'HOTLINE'],
+        'Admin': ['ADMIN'],
+        'Kỹ thuật': ['KTV', 'ADMIN', 'COORDINATOR'],
+        'KTV': ['KTV', 'ADMIN']
       };
-      const role = teamRoleMap[String(team)] || String(team);
-      where.role = role;
+      const roles = teamRoleMap[String(team)] || ['HOTLINE', 'ADMIN', 'COORDINATOR', 'STAFF', 'KTV', 'SALER', 'SALE_SUPERVISOR'];
+      where.role = { in: roles };
     } else {
-      where.role = { in: ['HOTLINE', 'ADMIN', 'COORDINATOR'] };
+      where.role = { in: ['HOTLINE', 'ADMIN', 'COORDINATOR', 'STAFF', 'KTV', 'SALER', 'SALE_SUPERVISOR'] };
     }
 
     const users = await prisma.user.findMany({

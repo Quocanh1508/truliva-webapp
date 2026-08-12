@@ -29,6 +29,7 @@ import Dashboard from './pages/admin/Dashboard';
 import ReportList from './pages/admin/ReportList';
 import UserManage from './pages/admin/UserManage';
 import OrderList from './pages/admin/OrderList';
+import HotlineManagePage from './pages/admin/HotlineManagePage';
 import StationManage from './pages/admin/StationManage';
 import SampleImageManage from './pages/admin/SampleImageManage';
 import InventoryManage from './pages/admin/InventoryManage';
@@ -362,6 +363,7 @@ export default function App() {
                 {/* All Office/Administrative Routes */}
                 <Route element={<ProtectedRoute allowedRoles={['ADMIN', 'COORDINATOR', 'SALE_SUPERVISOR', 'SALER', 'HOTLINE', 'STAFF']} featureKey="ORDER_VIEW" />}>
                   <Route path="/admin/orders" element={<OrderList />} />
+                  <Route path="/admin/hotlines" element={<HotlineManagePage />} />
                 </Route>
                 <Route element={<ProtectedRoute allowedRoles={['ADMIN', 'COORDINATOR', 'SALE_SUPERVISOR', 'SALER', 'HOTLINE', 'STAFF']} featureKey="REPORT_VIEW" />}>
                   <Route path="/admin/reports" element={<ReportList />} />

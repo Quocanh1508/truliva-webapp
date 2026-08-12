@@ -180,7 +180,7 @@ export async function sendZnsWarrantyActivation(
 ): Promise<any> {
   const cleanSerial = serialNumber.trim().replace(/[^a-zA-Z0-9_]/g, '').toUpperCase();
   const formattedPhone = formatZaloPhone(recipientPhone.trim());
-  const templateId = process.env.ZALO_ZNS_TEMPLATE_ID || '';
+  const templateId = process.env.ZALO_ZNS_TEMPLATE_ID || '617366';
 
   if (!templateId || templateId === 'YOUR_APPROVED_TEMPLATE_ID') {
     logger.warn('Chưa cấu hình ZALO_ZNS_TEMPLATE_ID trong .env. Tin nhắn ZNS sẽ giả lập gửi thành công.');
@@ -216,25 +216,33 @@ export async function sendZnsWarrantyActivation(
     expiryDateStr = `${day}/${month}/${year}`;
   }
 
+  // Common template data payload matching ZBS / ZNS approved Template 617366
+  const templateData = {
+    Ten_Khach_Hang: customerName,
+    customer_name: customerName,
+    Ten_San_Pham: productName,
+    product_name: productName,
+    So_Seri: cleanSerial,
+    code: cleanSerial,
+    serial_number: cleanSerial,
+    Ngay_Het_Bao_Hanh: expiryDateStr,
+    expiry_date: expiryDateStr,
+    time: expiryDateStr
+  };
+
   // 2. Kiểm tra nếu có cấu hình cổng FNS (FPT Notification Service)
   const fnsAppId = process.env.FNS_APP_ID || '';
   const fnsSecretKey = process.env.FNS_SECRET_KEY || '';
 
   if (fnsAppId && fnsSecretKey) {
-    // Dữ liệu gửi chuẩn cho FNS Template 10232 (chỉ gửi các biến chính xác mà Template yêu cầu)
     const fnsPayload = {
       phone: formattedPhone,
       template_id: templateId,
-      template_data: {
-        Ten_Khach_Hang: customerName,
-        Ten_San_Pham: productName,
-        So_Seri: cleanSerial,
-        Ngay_Het_Bao_Hanh: expiryDateStr
-      },
+      template_data: templateData,
       ref_id: `${cleanSerial}-${Date.now()}`
     };
 
-    logger.info('Sending ZNS warranty activation message via FNS API', { phone: formattedPhone, templateId, fnsAppId });
+    logger.info('Sending ZBS/ZNS warranty activation message via FNS API', { phone: formattedPhone, templateId, fnsAppId });
     const startTime = Date.now();
 
     try {
@@ -252,32 +260,27 @@ export async function sendZnsWarrantyActivation(
       }
 
       const durationMs = Date.now() - startTime;
-      logger.info('ZNS message sent successfully via FNS API', { refId: fnsPayload.ref_id, messageId: data.data?.message_id, durationMs: `${durationMs}ms` });
+      logger.info('ZBS/ZNS message sent successfully via FNS API', { refId: fnsPayload.ref_id, messageId: data.data?.message_id, durationMs: `${durationMs}ms` });
       return data;
     } catch (error: any) {
       const durationMs = Date.now() - startTime;
-      logger.error('Error sending ZNS message via FNS API', { error: error.message, details: error.response?.data, durationMs: `${durationMs}ms` });
-      throw new Error(`Gửi ZNS qua FNS thất bại: ${error.message}`);
+      logger.error('Error sending ZBS/ZNS message via FNS API', { error: error.message, details: error.response?.data, durationMs: `${durationMs}ms` });
+      throw new Error(`Gửi ZBS/ZNS qua FNS thất bại: ${error.message}`);
     }
   }
 
   // 3. Fallback: Lấy Access Token hợp lệ của Zalo trực tiếp nếu không dùng FNS
   const accessToken = await getValidAccessToken();
 
-  // 4. Chuẩn bị dữ liệu gửi (Zalo Direct OpenAPI - Dùng cho Template ZCA 615292)
+  // 4. Chuẩn bị dữ liệu gửi (Zalo Direct OpenAPI - Dùng cho Template 617366)
   const payload = {
     phone: formattedPhone,
-    template_id: templateId || process.env.ZALO_ZNS_TEMPLATE_ID || '10232',
-    template_data: {
-      customer_name: customerName,
-      product_name: productName,
-      code: cleanSerial,
-      time: expiryDateStr
-    },
+    template_id: templateId || '617366',
+    template_data: templateData,
     tracking_id: `${cleanSerial}-${Date.now()}`
   };
 
-  logger.info('Sending ZNS warranty activation message via Zalo Direct API', { phone: formattedPhone, templateId });
+  logger.info('Sending ZBS/ZNS warranty activation message via Zalo Direct API', { phone: formattedPhone, templateId });
   const startTimeDirect = Date.now();
 
   try {

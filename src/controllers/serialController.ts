@@ -13,7 +13,7 @@ import {
   parseExcelDate
 } from '../services/serialService';
 import { activateSerialWarranty, extractWarrantyMonths } from '../services/warrantyService';
-import { getZaloConfig, exchangeAuthorizationCode, sendZnsWarrantyActivation } from '../services/zaloService';
+import { getZaloConfig, exchangeAuthorizationCode, sendZnsWarrantyActivation, getValidAccessToken } from '../services/zaloService';
 
 export async function uploadInvoiceResponse(req: Request, res: Response): Promise<void> {
   try {
@@ -1587,7 +1587,7 @@ export async function testZnsSend(req: Request, res: Response): Promise<void> {
 
     const fnsAppId = process.env.FNS_APP_ID || '';
     const fnsSecretKey = process.env.FNS_SECRET_KEY || '';
-    const templateId = process.env.ZALO_ZNS_TEMPLATE_ID || '10232';
+    const templateId = process.env.ZALO_ZNS_TEMPLATE_ID || '617366';
 
     if (!fnsAppId || !fnsSecretKey) {
       res.status(400).json({ error: 'Chưa cấu hình cổng FPT FNS Gateway trong file .env' });
@@ -1609,49 +1609,112 @@ export async function testZnsSend(req: Request, res: Response): Promise<void> {
       template_id: templateId,
       template_data: {
         Ten_Khach_Hang: custName,
+        customer_name: custName,
         Ten_San_Pham: prodName,
+        product_name: prodName,
         So_Seri: cleanSerial,
-        Ngay_Het_Bao_Hanh: expDate
+        code: cleanSerial,
+        serial_number: cleanSerial,
+        Ngay_Het_Bao_Hanh: expDate,
+        expiry_date: expDate,
+        time: expDate
       },
       ref_id: `TEST-${cleanSerial}-${Date.now()}`
     };
 
-    logger.info('Dev ZNS Test Send requested', { phone: cleanedPhone, serialNumber: cleanSerial });
-    const sendRes = await axios.post('https://api-fns.fpt.work/api/send-message', fnsPayload, {
-      headers: {
-        'Content-Type': 'application/json',
-        'app-id': fnsAppId,
-        'secret-key': fnsSecretKey
-      }
-    });
+    let fnsResult: any = null;
+    let fnsError: any = null;
 
-    const msgId = sendRes.data?.data?.message_id;
-
-    let statusData = null;
-    if (msgId) {
-      await new Promise(resolve => setTimeout(resolve, 1500));
+    if (fnsAppId && fnsSecretKey) {
       try {
-        const checkRes = await axios.post('https://api-fns.fpt.work/api/check-status', {
-          msg_id: msgId
-        }, {
+        logger.info('Dev ZNS Test Send requested via FNS', { phone: cleanedPhone, serialNumber: cleanSerial, templateId });
+        const sendRes = await axios.post('https://api-fns.fpt.work/api/send-message', fnsPayload, {
           headers: {
             'Content-Type': 'application/json',
             'app-id': fnsAppId,
             'secret-key': fnsSecretKey
           }
         });
-        statusData = checkRes.data?.data || checkRes.data;
+        fnsResult = sendRes.data;
       } catch (err: any) {
-        statusData = { error: err.message };
+        fnsError = err.response?.data || err.message;
       }
     }
 
-    res.json({
-      success: true,
-      sendResult: sendRes.data,
-      msgId,
-      statusResult: statusData
-    });
+    // Nếu FNS thành công (code === 1)
+    if (fnsResult && fnsResult.code === 1) {
+      const msgId = fnsResult.data?.message_id;
+      let statusData = null;
+      if (msgId) {
+        await new Promise(resolve => setTimeout(resolve, 1500));
+        try {
+          const checkRes = await axios.post('https://api-fns.fpt.work/api/check-status', {
+            msg_id: msgId
+          }, {
+            headers: {
+              'Content-Type': 'application/json',
+              'app-id': fnsAppId,
+              'secret-key': fnsSecretKey
+            }
+          });
+          statusData = checkRes.data?.data || checkRes.data;
+        } catch (err: any) {
+          statusData = { error: err.message };
+        }
+      }
+
+      res.json({
+        success: true,
+        gateway: 'FPT FNS Gateway',
+        templateId,
+        sendResult: fnsResult,
+        msgId,
+        statusResult: statusData
+      });
+      return;
+    }
+
+    // Khi FNS trả lỗi (Template không đúng / 617366 thuộc ZBS Zalo Direct OpenAPI), thử nghiệm qua Zalo Direct OpenAPI
+    try {
+      const accessToken = await getValidAccessToken();
+      const zaloPayload = {
+        phone: cleanedPhone,
+        template_id: templateId,
+        template_data: {
+          customer_name: custName,
+          product_name: prodName,
+          code: cleanSerial,
+          time: expDate
+        },
+        tracking_id: `TEST-${cleanSerial}-${Date.now()}`
+      };
+
+      const zaloRes = await axios.post('https://business.openapi.zalo.me/message/template', zaloPayload, {
+        headers: {
+          'Content-Type': 'application/json',
+          'access_token': accessToken
+        }
+      });
+
+      res.json({
+        success: zaloRes.data.error === 0,
+        gateway: 'Zalo Direct ZBS OpenAPI (Template 617366)',
+        templateId,
+        fnsResult: fnsResult || fnsError,
+        sendResult: zaloRes.data,
+        msgId: zaloRes.data?.data?.message_id || null,
+        statusResult: zaloRes.data
+      });
+    } catch (zaloErr: any) {
+      res.json({
+        success: false,
+        gateway: 'Zalo Direct ZBS OpenAPI (Template 617366)',
+        templateId,
+        fnsResult: fnsResult || fnsError,
+        sendResult: zaloErr.response?.data || { error: zaloErr.message },
+        error: zaloErr.response?.data?.message || zaloErr.message
+      });
+    }
   } catch (error: any) {
     logger.error('Dev ZNS Test Send error', { error: error.message });
     res.status(500).json({ error: error.response?.data?.message || error.message });

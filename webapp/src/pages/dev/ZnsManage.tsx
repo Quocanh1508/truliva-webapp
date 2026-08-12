@@ -180,8 +180,8 @@ export default function ZnsManage() {
           </div>
           <div>
             <p className="text-xs font-medium text-gray-500">ZNS Template ID</p>
-            <p className="text-sm font-bold text-gray-900 mt-0.5">10232 (Đã phê duyệt)</p>
-            <p className="text-[11px] text-gray-400">Template dịch vụ bảo hành</p>
+            <p className="text-sm font-bold text-gray-900 mt-0.5">617366 (Đã phê duyệt)</p>
+            <p className="text-[11px] text-gray-400">Template dịch vụ bảo hành (ZBS)</p>
           </div>
         </div>
 
@@ -487,7 +487,7 @@ export default function ZnsManage() {
 
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div>
-                  <label className="block font-semibold text-gray-700 mb-1">Tên khách hàng (Ten_Khach_Hang)</label>
+                  <label className="block font-semibold text-gray-700 mb-1">Tên khách hàng (customer_name)</label>
                   <input
                     type="text"
                     value={testName}
@@ -496,7 +496,7 @@ export default function ZnsManage() {
                   />
                 </div>
                 <div>
-                  <label className="block font-semibold text-gray-700 mb-1">Tên sản phẩm (Ten_San_Pham)</label>
+                  <label className="block font-semibold text-gray-700 mb-1">Tên sản phẩm (product_name)</label>
                   <input
                     type="text"
                     value={testProduct}
@@ -505,7 +505,7 @@ export default function ZnsManage() {
                   />
                 </div>
                 <div>
-                  <label className="block font-semibold text-gray-700 mb-1">Ngày hết hạn (Ngay_Het_Bao_Hanh)</label>
+                  <label className="block font-semibold text-gray-700 mb-1">Ngày hết hạn (time)</label>
                   <input
                     type="text"
                     value={testExpiry}
@@ -532,16 +532,22 @@ export default function ZnsManage() {
               <div className="bg-gray-900 text-gray-100 p-4 rounded-xl font-mono text-xs space-y-3">
                 <div className="flex justify-between items-center border-b border-gray-800 pb-2">
                   <span className="text-gray-400 font-sans font-semibold">Kết quả thử nghiệm bắn ZNS & Live Status</span>
-                  {testResult.statusResult?.status === 2 ? (
+                  {testResult.success ? (
                     <span className="text-emerald-400 font-sans font-bold flex items-center">
-                      <CheckCircle2 size={14} className="mr-1" /> ZALO ĐÃ PHÁT THÀNH CÔNG (STATUS: 2)
+                      <CheckCircle2 size={14} className="mr-1" /> ZALO ĐÃ PHÁT THÀNH CÔNG
                     </span>
-                  ) : testResult.statusResult?.status === -1 ? (
+                  ) : testResult.sendResult?.error === -137 ? (
+                    <span className="text-amber-400 font-sans font-bold flex items-center">
+                      <AlertTriangle size={14} className="mr-1" /> TÀI KHOẢN ZBS HẾT SỐ DƯ (CODE: -137)
+                    </span>
+                  ) : testResult.sendResult?.error ? (
                     <span className="text-red-400 font-sans font-bold flex items-center">
-                      <XCircle size={14} className="mr-1" /> ZALO TỪ CHỐI TIN NHẮN (STATUS: -1)
+                      <XCircle size={14} className="mr-1" /> LỖI ZALO PLATFORM (CODE: {testResult.sendResult.error})
                     </span>
                   ) : (
-                    <span className="text-blue-400 font-sans font-bold">FNS ACCEPTED (MSG ID: {testResult.msgId})</span>
+                    <span className="text-blue-400 font-sans font-bold">
+                      {testResult.gateway || 'ZALO ZBS GATEWAY'}
+                    </span>
                   )}
                 </div>
 
