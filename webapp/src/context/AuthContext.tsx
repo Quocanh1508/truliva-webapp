@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { fetchApi } from '../api/client';
+import { fetchApi, isPublicPath } from '../api/client';
 
 export type UserRole = 'KTV' | 'ADMIN' | 'DEV' | 'SALE_SUPERVISOR' | 'SALER' | 'HOTLINE' | 'COORDINATOR' | 'STAFF';
 
@@ -44,7 +44,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   useEffect(() => {
     const token = localStorage.getItem('session_token');
 
-    // Check session on mount (always call /auth/me to fallback to HttpOnly cookie if localStorage is cleared on iOS/in-app browsers)
+    // Skip checking session for unauthenticated visitors on public landing pages (e.g. /warranty-activate)
+    if (isPublicPath() && !token) {
+      setUser(null);
+      setLoading(false);
+      return;
+    }
+
+    // Check session on mount
     fetchApi('/auth/me')
       .then((data) => {
         setUser(data.user);

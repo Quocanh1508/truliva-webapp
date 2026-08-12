@@ -2,6 +2,19 @@ import { compressImage } from '../utils/compressor';
 
 export const API_URL = '/api';
 
+export const PUBLIC_PATHS = [
+  '/login',
+  '/warranty-activate',
+  '/warranty-confirm',
+  '/forgot-password',
+  '/reset-password'
+];
+
+export function isPublicPath(pathname: string = window.location.pathname): boolean {
+  const cleanPath = pathname.toLowerCase();
+  return PUBLIC_PATHS.some(p => cleanPath === p || cleanPath.startsWith(`${p}/`) || cleanPath.startsWith(`${p}?`));
+}
+
 export async function fetchApi(endpoint: string, options: RequestInit = {}) {
   const token = localStorage.getItem('session_token');
   const headers = {
@@ -24,8 +37,8 @@ export async function fetchApi(endpoint: string, options: RequestInit = {}) {
     if (response.status === 401) {
       localStorage.removeItem('session_token');
       localStorage.removeItem('session_user');
-      // Only hard-redirect if NOT already on /login to avoid infinite reload loop
-      if (!window.location.pathname.startsWith('/login')) {
+      // Only hard-redirect if NOT on a public route
+      if (!isPublicPath()) {
         window.location.href = '/login';
       }
       throw new Error('Phiên làm việc đã hết hạn. Vui lòng đăng nhập lại.');
@@ -39,8 +52,8 @@ export async function fetchApi(endpoint: string, options: RequestInit = {}) {
     if (response.status === 401) {
       localStorage.removeItem('session_token');
       localStorage.removeItem('session_user');
-      // Only hard-redirect if NOT already on /login to avoid infinite reload loop
-      if (!window.location.pathname.startsWith('/login')) {
+      // Only hard-redirect if NOT on a public route
+      if (!isPublicPath()) {
         window.location.href = '/login';
       }
     }
