@@ -3,6 +3,7 @@ import { fetchApi, getFiltersData } from '../../api/client';
 import { X, Loader2, Clock, Send, User, ShoppingBag } from 'lucide-react';
 import ProvinceSelect from '../ProvinceSelect';
 import CategoryTreeSelect from '../CategoryTreeSelect';
+import SourceTreeSelect from '../SourceTreeSelect';
 
 // ═══════════════════════════════════════════════════
 //  Types
@@ -16,7 +17,6 @@ interface Props {
   userRole: string;
 }
 
-const SOURCE_OPTIONS = ['DTC', 'Tram/KTV', 'OI North', 'OI South', 'MT', 'Facebook', 'Lazada', 'Tiktok'];
 const SERVICE_REQUEST_OPTIONS = ['Sửa chữa', 'Lắp đặt', 'Thay lọc', 'Bảo hành', 'Tư vấn', 'Khiếu nại', 'Khác'];
 const PHASE3_REQUEST_TYPE_OPTIONS = ['Sửa chữa', 'Lắp đặt', 'Thay lọc', 'Bảo hành', 'Tư vấn', 'Khác'];
 const PHASE3_SERVICE_TYPE_OPTIONS = ['Áp lực nước yếu', 'Rò rỉ', 'Máy không hoạt động', 'TDS cao', 'Không ra nước', 'Tiếng ồn', 'Thay linh kiện', 'Khác'];
@@ -423,11 +423,10 @@ export default function HotlineTicketModal({ ticket, isOpen, onClose, onSaved, u
               {/* Nguồn */}
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-1">Nguồn *</label>
-                <select value={formData.source} onChange={(e) => updateForm('source', e.target.value)}
-                  className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-200">
-                  <option value="">Chọn</option>
-                  {SOURCE_OPTIONS.map(s => <option key={s} value={s}>{s}</option>)}
-                </select>
+                <SourceTreeSelect
+                  value={formData.source}
+                  onChange={(val: string) => updateForm('source', val)}
+                />
               </div>
 
               {/* Sản phẩm + Serial */}
