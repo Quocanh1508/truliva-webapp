@@ -314,9 +314,7 @@ export default function HotlineTicketModal({ ticket, isOpen, onClose, onSaved, u
           {/* ═══ CỘT TRÁI: Nhập thông tin yêu cầu ═══ */}
           <div className="flex-1 p-6 space-y-6 border-r border-gray-200">
 
-            {/* ── NHÓM 2: Nhập thông tin yêu cầu ── */}
             <div className="space-y-4">
-              <h3 className="text-sm font-bold text-gray-700 uppercase tracking-wide">NHÓM 2. NHẬP THÔNG TIN YÊU CẦU</h3>
 
               {/* Tên đầy đủ */}
               <div>
@@ -510,7 +508,6 @@ export default function HotlineTicketModal({ ticket, isOpen, onClose, onSaved, u
 
           {/* ═══ CỘT PHẢI: Phase 3 (Verify & Xử lý) ═══ */}
           <div className={`flex-1 p-6 space-y-4 ${!isEditMode ? 'opacity-40 pointer-events-none' : ''}`}>
-            <h3 className="text-sm font-bold text-gray-700 uppercase tracking-wide">NHÓM 3. NGƯỜI GIẢI QUYẾT NHẬN YÊU CẦU & XỬ LÝ</h3>
 
             {!canPhase3 && isEditMode && (
               <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-xs text-amber-700">
