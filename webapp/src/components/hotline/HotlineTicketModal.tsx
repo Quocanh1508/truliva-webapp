@@ -17,8 +17,26 @@ interface Props {
   userRole: string;
 }
 
-const SERVICE_REQUEST_OPTIONS = ['Sửa chữa', 'Lắp đặt', 'Thay lọc', 'Bảo hành', 'Tư vấn', 'Khiếu nại', 'Khác'];
-const PHASE3_REQUEST_TYPE_OPTIONS = ['Sửa chữa', 'Lắp đặt', 'Thay lọc', 'Bảo hành', 'Tư vấn', 'Khác'];
+const SERVICE_REQUEST_OPTIONS = [
+  'Bảo Hành - Bảo Trì',
+  'Hướng dẫn sử dụng',
+  'Khác',
+  'Lắp đặt',
+  'Thay lõi lọc',
+  'Tra cứu thông tin',
+  'Tư vấn kỹ thuật',
+  'Tư vấn sản phẩm'
+];
+const PHASE3_REQUEST_TYPE_OPTIONS = [
+  'Bảo Hành - Bảo Trì',
+  'Hướng dẫn sử dụng',
+  'Khác',
+  'Lắp đặt',
+  'Thay lõi lọc',
+  'Tra cứu thông tin',
+  'Tư vấn kỹ thuật',
+  'Tư vấn sản phẩm'
+];
 const PHASE3_SERVICE_TYPE_OPTIONS = ['Áp lực nước yếu', 'Rò rỉ', 'Máy không hoạt động', 'TDS cao', 'Không ra nước', 'Tiếng ồn', 'Thay linh kiện', 'Khác'];
 const PHASE3_ACTION_OPTIONS = [
   { key: 'VERIFY_APPROVE', label: 'Xác thực & Chuyển xử lý' },

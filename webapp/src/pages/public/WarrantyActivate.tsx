@@ -605,13 +605,14 @@ export default function WarrantyActivate() {
                   className="w-full px-3.5 py-2.5 border border-gray-300 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-200 bg-white"
                   required
                 >
-                  <option value="Sửa chữa">Sửa chữa sự cố</option>
-                  <option value="Lắp đặt">Lắp đặt mới</option>
-                  <option value="Thay lọc">Thay lõi lọc định kỳ</option>
-                  <option value="Bảo hành">Kiểm tra bảo hành</option>
-                  <option value="Tư vấn">Tư vấn sử dụng</option>
-                  <option value="Khiếu nại">Khiếu nại / Góp ý</option>
+                  <option value="Bảo Hành - Bảo Trì">Bảo Hành - Bảo Trì</option>
+                  <option value="Hướng dẫn sử dụng">Hướng dẫn sử dụng</option>
                   <option value="Khác">Khác</option>
+                  <option value="Lắp đặt">Lắp đặt</option>
+                  <option value="Thay lõi lọc">Thay lõi lọc</option>
+                  <option value="Tra cứu thông tin">Tra cứu thông tin</option>
+                  <option value="Tư vấn kỹ thuật">Tư vấn kỹ thuật</option>
+                  <option value="Tư vấn sản phẩm">Tư vấn sản phẩm</option>
                 </select>
               </div>
 
