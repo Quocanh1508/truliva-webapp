@@ -90,44 +90,14 @@ export async function activateSerialWarranty(
     const startDate = manualStartDate || new Date();
     serialUpdate.activationDate = startDate;
 
-    // 1. Tính toán thời gian bảo hành tiêu chuẩn (mặc định 12 tháng)
-    let standardMonths = 12;
-    let noteMonths: number | null = null;
-    let finalOrderId = orderId;
-    if (!finalOrderId && existingSerial.orderId) {
-      finalOrderId = existingSerial.orderId;
-    }
-
-    if (finalOrderId) {
-      const order = await prisma.order.findUnique({
-        where: { id: finalOrderId },
-        select: { note: true, rawData: true }
-      });
-      if (order) {
-        noteMonths = extractWarrantyMonths(order.note);
-        if (!noteMonths && order.rawData) {
-          let rawJson: any = order.rawData;
-          if (typeof rawJson === 'string') {
-            try { rawJson = JSON.parse(rawJson); } catch (e) {}
-          }
-          if (rawJson) {
-            noteMonths = extractWarrantyMonths(rawJson.note) || extractWarrantyMonths(rawJson.description) || extractWarrantyMonths(rawJson.customer_note);
-          }
-        }
-      }
-    }
-
-    if (noteMonths !== null) {
-      standardMonths = noteMonths;
-      logger.info(`Extracted custom standard warranty of ${standardMonths} months from order notes`, { serialNumber: cleanedSerial });
-    } else {
-      const policies = await prisma.warrantyPolicy.findMany();
-      const matchedPolicy = policies.find((p: any) => 
-        existingSerial.model.toLowerCase().includes(p.modelKeyword.toLowerCase())
-      );
-      if (matchedPolicy) {
-        standardMonths = matchedPolicy.warrantyMonths;
-      }
+    // 1. Lấy thời gian bảo hành tiêu chuẩn từ WarrantyPolicy theo Model (Không tự động quét chữ trong ghi chú)
+    let standardMonths = 24; // 24 tháng mặc định
+    const policies = await prisma.warrantyPolicy.findMany();
+    const matchedPolicy = policies.find((p: any) => 
+      existingSerial!.model.toLowerCase().includes(p.modelKeyword.toLowerCase())
+    );
+    if (matchedPolicy) {
+      standardMonths = matchedPolicy.warrantyMonths;
     }
 
     // 2. Tính toán thời gian khuyến mãi cộng thêm từ mã khuyến mãi của Đơn hàng hoặc mã truyền tay

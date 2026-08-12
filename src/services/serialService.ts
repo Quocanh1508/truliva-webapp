@@ -81,24 +81,9 @@ export async function getPreviewDuration(modelInput: string, orderId?: string) {
   if (orderId) {
     const order = await prisma.order.findUnique({
       where: { id: orderId },
-      select: { promoCode: true, note: true, rawData: true }
+      select: { promoCode: true }
     });
     if (order) {
-      const noteMonths = extractWarrantyMonths(order.note);
-      if (noteMonths !== null) {
-        standardMonths = noteMonths;
-      } else if (order.rawData) {
-        let rawJson: any = order.rawData;
-        if (typeof rawJson === 'string') {
-          try { rawJson = JSON.parse(rawJson); } catch (e) {}
-        }
-        if (rawJson) {
-          const rawNoteMonths = extractWarrantyMonths(rawJson.note) || extractWarrantyMonths(rawJson.description) || extractWarrantyMonths(rawJson.customer_note);
-          if (rawNoteMonths !== null) {
-            standardMonths = rawNoteMonths;
-          }
-        }
-      }
 
       if (order.promoCode) {
         const promo = await prisma.warrantyPromo.findUnique({

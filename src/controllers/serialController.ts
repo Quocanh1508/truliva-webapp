@@ -726,29 +726,13 @@ export async function importSerials(req: Request, res: Response): Promise<void> 
         province = matchedReport.province || province;
 
         let warrantyMonths: number | null = null;
-        const order = matchedReport.order;
-        if (order) {
-          warrantyMonths = extractWarrantyMonths(order.note);
-          if (!warrantyMonths && order.rawData) {
-            let rawJson: any = order.rawData;
-            if (typeof rawJson === 'string') {
-              try { rawJson = JSON.parse(rawJson); } catch (e) {}
-            }
-            if (rawJson) {
-              warrantyMonths = extractWarrantyMonths(rawJson.note) || extractWarrantyMonths(rawJson.description) || extractWarrantyMonths(rawJson.customer_note);
-            }
-          }
-        }
-
-        if (warrantyMonths === null) {
-          const matchedPolicy = policies.find((p: any) =>
-            modelName.toLowerCase().includes(p.modelKeyword.toLowerCase())
-          );
-          if (matchedPolicy) {
-            warrantyMonths = matchedPolicy.warrantyMonths;
-          } else {
-            warrantyMonths = 12;
-          }
+        const matchedPolicy = policies.find((p: any) =>
+          modelName.toLowerCase().includes(p.modelKeyword.toLowerCase())
+        );
+        if (matchedPolicy) {
+          warrantyMonths = matchedPolicy.warrantyMonths;
+        } else {
+          warrantyMonths = 12;
         }
 
         const expiry = new Date(activationDate!);
