@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { fetchApi, getFiltersData } from '../../api/client';
-import { X, Loader2, Clock, Send, User, ShoppingBag } from 'lucide-react';
+import { fetchApi, getFiltersData, uploadImages } from '../../api/client';
+import { X, Loader2, Clock, Send, User, ShoppingBag, UploadCloud } from 'lucide-react';
 import ProvinceSelect from '../ProvinceSelect';
 import CategoryTreeSelect from '../CategoryTreeSelect';
 import SourceTreeSelect from '../SourceTreeSelect';
@@ -195,6 +195,34 @@ export default function HotlineTicketModal({ ticket, isOpen, onClose, onSaved, u
   });
   const [saving, setSaving] = useState(false);
 
+  // Attachments state
+  const [attachmentUrls, setAttachmentUrls] = useState<string[]>([]);
+  const [uploadingAttachment, setUploadingAttachment] = useState(false);
+  const [uploadError, setUploadError] = useState('');
+
+  const handleUploadAttachments = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!e.target.files || e.target.files.length === 0) return;
+    const selectedFiles = Array.from(e.target.files);
+    if (attachmentUrls.length + selectedFiles.length > 5) {
+      setUploadError('Tối đa 5 ảnh đính kèm');
+      return;
+    }
+    setUploadingAttachment(true);
+    setUploadError('');
+    try {
+      const urls = await uploadImages(selectedFiles);
+      setAttachmentUrls(prev => [...prev, ...urls]);
+    } catch (err: any) {
+      setUploadError(err.message || 'Lỗi upload ảnh');
+    } finally {
+      setUploadingAttachment(false);
+    }
+  };
+
+  const handleRemoveAttachment = (index: number) => {
+    setAttachmentUrls(prev => prev.filter((_, i) => i !== index));
+  };
+
   // Phase 3: Verify data
   const [phase3Data, setPhase3Data] = useState({
     phase3RequestType: '', phase3ServiceType: '', sparePartName: '',
@@ -230,6 +258,7 @@ export default function HotlineTicketModal({ ticket, isOpen, onClose, onSaved, u
           targetTeam: data.targetTeam || '',
           handlerUserId: data.handlerUserId || ''
         });
+        setAttachmentUrls(data.attachmentUrls || []);
         setPhase3Data({
           phase3RequestType: data.phase3RequestType || '',
           phase3ServiceType: data.phase3ServiceType || '',
@@ -264,16 +293,17 @@ export default function HotlineTicketModal({ ticket, isOpen, onClose, onSaved, u
       return;
     }
     setSaving(true);
+    const payload = { ...formData, attachmentUrls };
     try {
       if (isEditMode) {
         await fetchApi(`/hotlines/${ticket.id}`, {
           method: 'PUT',
-          body: JSON.stringify(formData)
+          body: JSON.stringify(payload)
         });
       } else {
         await fetchApi('/hotlines', {
           method: 'POST',
-          body: JSON.stringify(formData)
+          body: JSON.stringify(payload)
         });
       }
       onSaved();
@@ -484,6 +514,56 @@ export default function HotlineTicketModal({ ticket, isOpen, onClose, onSaved, u
                 <label className="block text-sm font-semibold text-gray-700 mb-1">Nội dung khách hàng cần hỗ trợ *</label>
                 <textarea rows={3} placeholder="Mô tả chi tiết nội dung khách hàng cần hỗ trợ..." value={formData.customerSupportDetail} onChange={(e) => updateForm('customerSupportDetail', e.target.value)}
                   className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-200 resize-none" />
+              </div>
+
+              {/* Hình ảnh đính kèm (Không bắt buộc) */}
+              <div>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="text-sm font-semibold text-gray-700">
+                    Hình ảnh đính kèm <span className="text-xs text-gray-400 font-normal">(không bắt buộc)</span>
+                  </label>
+                  <span className="text-xs text-gray-400 font-medium">{attachmentUrls.length}/5 ảnh</span>
+                </div>
+
+                <div className="space-y-2">
+                  <div className="flex flex-wrap gap-2.5">
+                    {attachmentUrls.map((url, idx) => (
+                      <div key={idx} className="relative w-20 h-20 rounded-xl overflow-hidden border border-gray-200 shadow-xs group">
+                        <img src={url} alt={`attachment-${idx}`} className="w-full h-full object-cover" />
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveAttachment(idx)}
+                          className="absolute top-1 right-1 p-1 bg-black/60 text-white rounded-full hover:bg-red-600 transition-colors opacity-90"
+                          title="Xóa ảnh"
+                        >
+                          <X size={12} />
+                        </button>
+                      </div>
+                    ))}
+
+                    {attachmentUrls.length < 5 && (
+                      <label className={`w-20 h-20 border-2 border-dashed border-gray-300 rounded-xl flex flex-col items-center justify-center cursor-pointer hover:border-blue-500 hover:bg-blue-50/50 transition-all ${uploadingAttachment ? 'opacity-50 pointer-events-none' : ''}`}>
+                        {uploadingAttachment ? (
+                          <Loader2 size={18} className="animate-spin text-blue-500" />
+                        ) : (
+                          <>
+                            <UploadCloud size={20} className="text-gray-400" />
+                            <span className="text-[10px] text-gray-500 font-medium mt-1">+ Thêm ảnh</span>
+                          </>
+                        )}
+                        <input
+                          type="file"
+                          multiple
+                          accept="image/*"
+                          className="hidden"
+                          disabled={uploadingAttachment || attachmentUrls.length >= 5}
+                          onChange={handleUploadAttachments}
+                        />
+                      </label>
+                    )}
+                  </div>
+                  {uploadError && <p className="text-xs text-red-500 font-medium">{uploadError}</p>}
+                </div>
               </div>
 
               {/* Team xử lý + Người xử lý */}
