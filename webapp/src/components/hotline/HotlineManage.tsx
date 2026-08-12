@@ -50,6 +50,24 @@ const STATUS_PILLS: { key: string; label: string; color: string; bgColor: string
   { key: 'CHƯA THỰC HIỆN', label: 'CHƯA THỰC HIỆN', color: 'text-white', bgColor: 'bg-red-500', borderColor: 'border-red-500' },
 ];
 
+const getServiceOrderStatusBadge = (adminStatus: string | undefined, hasKtv: boolean) => {
+  const status = (adminStatus || 'chờ xử lý').toLowerCase();
+
+  if (status === 'hoàn thành' || status === 'đã hoàn thành') {
+    return { label: 'Hoàn thành', bg: 'bg-emerald-100', text: 'text-emerald-700' };
+  }
+  if (status === 'hủy đơn' || status === 'đã hủy') {
+    return { label: 'Hủy đơn', bg: 'bg-red-100', text: 'text-red-700' };
+  }
+  if (status.includes('hoàn') || status.includes('đổi')) {
+    return { label: 'Hoàn / Đổi', bg: 'bg-purple-100', text: 'text-purple-700' };
+  }
+  if (status === 'đang thực hiện' || status === 'đã phân công' || hasKtv) {
+    return { label: 'Đã phân công', bg: 'bg-blue-100', text: 'text-blue-700' };
+  }
+  return { label: 'Chờ xử lý', bg: 'bg-amber-100', text: 'text-amber-700' };
+};
+
 const STATUS_BADGE_MAP: Record<string, { bg: string; text: string }> = {
   'CHỜ XÁC THỰC': { bg: 'bg-yellow-100', text: 'text-yellow-700' },
   'CHƯA THỰC HIỆN': { bg: 'bg-red-100', text: 'text-red-700' },
@@ -430,23 +448,27 @@ export default function HotlineManage() {
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-gray-100">
-                        {historyResults.serviceOrders.map((o: any) => (
-                          <tr key={o.id} className="hover:bg-amber-50/40">
-                            <td className="px-3 py-2.5 font-mono text-amber-700 font-bold">#{o.pancakeOrderId || o.id.substring(0, 8)}</td>
-                            <td className="px-3 py-2.5 font-medium text-gray-800">{o.billFullName} ({o.billPhoneNumber})</td>
-                            <td className="px-3 py-2.5 font-semibold text-blue-600">{o.workType || 'Sửa chữa'}</td>
-                            <td className="px-3 py-2.5 text-gray-700">
-                              {o.items?.map((it: any) => it.productName).join(', ') || 'Thiết bị Truliva'}
-                            </td>
-                            <td className="px-3 py-2.5 text-gray-600">{o.assignedKtv?.fullName || o.assignedKtvName || 'Chưa phân công'}</td>
-                            <td className="px-3 py-2.5">
-                              <span className="px-2 py-0.5 rounded text-[11px] font-bold bg-blue-100 text-blue-700">
-                                {o.adminStatus || 'Đã tạo'}
-                              </span>
-                            </td>
-                            <td className="px-3 py-2.5 text-gray-500">{formatDateTime(o.createdAt)}</td>
-                          </tr>
-                        ))}
+                        {historyResults.serviceOrders.map((o: any) => {
+                          const hasKtv = !!(o.assignedKtv?.fullName || o.assignedKtvName);
+                          const badge = getServiceOrderStatusBadge(o.adminStatus, hasKtv);
+                          return (
+                            <tr key={o.id} className="hover:bg-amber-50/40">
+                              <td className="px-3 py-2.5 font-mono text-amber-700 font-bold">#{o.pancakeOrderId || o.id.substring(0, 8)}</td>
+                              <td className="px-3 py-2.5 font-medium text-gray-800">{o.billFullName} ({o.billPhoneNumber})</td>
+                              <td className="px-3 py-2.5 font-semibold text-blue-600">{o.workType || 'Sửa chữa'}</td>
+                              <td className="px-3 py-2.5 text-gray-700">
+                                {o.items?.map((it: any) => it.productName).join(', ') || 'Thiết bị Truliva'}
+                              </td>
+                              <td className="px-3 py-2.5 text-gray-600">{o.assignedKtv?.fullName || o.assignedKtvName || 'Chưa phân công'}</td>
+                              <td className="px-3 py-2.5">
+                                <span className={`px-2 py-0.5 rounded text-[11px] font-bold ${badge.bg} ${badge.text}`}>
+                                  {badge.label}
+                                </span>
+                              </td>
+                              <td className="px-3 py-2.5 text-gray-500">{formatDateTime(o.createdAt)}</td>
+                            </tr>
+                          );
+                        })}
                       </tbody>
                     </table>
                   </div>
