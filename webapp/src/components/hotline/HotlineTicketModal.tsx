@@ -370,8 +370,12 @@ export default function HotlineTicketModal({ ticket, isOpen, onClose, onSaved, u
 
         {/* ── Body: 2 Columns ── */}
         <div className="flex flex-col lg:flex-row">
-          {/* ═══ CỘT TRÁI: Nhập thông tin yêu cầu ═══ */}
+          {/* ═══ CỘT TRÁI: Thông tin Yêu cầu & Tiếp nhận ═══ */}
           <div className="flex-1 p-6 space-y-6 border-r border-gray-200">
+            <div className="flex items-center gap-2 pb-2 border-b border-gray-100">
+              <div className="w-2.5 h-2.5 rounded-full bg-[#00A3FF]"></div>
+              <h3 className="text-base font-bold text-[#1B3A6B]">Thông tin Yêu cầu & Tiếp nhận</h3>
+            </div>
 
             <div className="space-y-4">
 
@@ -614,8 +618,12 @@ export default function HotlineTicketModal({ ticket, isOpen, onClose, onSaved, u
             </div>
           </div>
 
-          {/* ═══ CỘT PHẢI: Phase 3 (Verify & Xử lý) ═══ */}
+          {/* ═══ CỘT PHẢI: Xác thực & Xử lý Yêu cầu ═══ */}
           <div className={`flex-1 p-6 space-y-4 ${!isEditMode ? 'opacity-40 pointer-events-none' : ''}`}>
+            <div className="flex items-center gap-2 pb-2 border-b border-gray-100 mb-2">
+              <div className="w-2.5 h-2.5 rounded-full bg-emerald-500"></div>
+              <h3 className="text-base font-bold text-[#1B3A6B]">Xác thực & Xử lý Yêu cầu</h3>
+            </div>
 
             {!canPhase3 && isEditMode && (
               <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-xs text-amber-700">
@@ -714,10 +722,10 @@ export default function HotlineTicketModal({ ticket, isOpen, onClose, onSaved, u
                 </select>
               </div>
 
-              {/* Nội dung phản hồi bước 3 */}
+              {/* Nội dung phản hồi xử lý */}
               <div className="mb-4">
-                <label className="block text-sm font-semibold text-gray-700 mb-1">Nội dung phản hồi của bước 3</label>
-                <textarea rows={2} placeholder="Nội dung phản hồi của bước 3" value={phase3Data.feedback} onChange={(e) => setPhase3Data(prev => ({ ...prev, feedback: e.target.value }))}
+                <label className="block text-sm font-semibold text-gray-700 mb-1">Nội dung phản hồi xử lý</label>
+                <textarea rows={2} placeholder="Nhập nội dung phản hồi xử lý..." value={phase3Data.feedback} onChange={(e) => setPhase3Data(prev => ({ ...prev, feedback: e.target.value }))}
                   className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-200 resize-none" />
                 {/* Lịch sử phản hồi */}
                 {ticketDetail?.feedbackHistory?.length > 0 && (
