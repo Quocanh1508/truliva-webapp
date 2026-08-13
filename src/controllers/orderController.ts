@@ -730,7 +730,8 @@ export async function createManualOrder(req: Request, res: Response): Promise<vo
       items,
       moneyToCollect,
       note,
-      promoCode
+      promoCode,
+      hotlineTicketId
     } = req.body;
 
     if (!customerName || !customerPhone) {
@@ -857,6 +858,27 @@ export async function createManualOrder(req: Request, res: Response): Promise<vo
         userName: req.user!.fullName
       }
     });
+
+    // 6. Liên kết phiếu Hotline nếu có
+    if (hotlineTicketId) {
+      await prisma.hotlineTicket.update({
+        where: { id: hotlineTicketId },
+        data: {
+          status: 'ĐÃ CHUYỂN YÊU CẦU',
+          convertedOrderId: order.id
+        }
+      }).catch(console.error);
+
+      await prisma.hotlineTicketFeedbackHistory.create({
+        data: {
+          ticketId: hotlineTicketId,
+          userId: req.user!.id,
+          userName: req.user!.fullName,
+          action: 'CONVERT_ORDER',
+          feedback: `Đã chuyển thành ca dịch vụ M${Math.abs(nextManualId)}`
+        }
+      }).catch(console.error);
+    }
 
     // Tích hợp đồng bộ tồn kho cục bộ
     try {

@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { getOrders, updateOrder, getKtvUsers, getStations, getOrderAuditLog, syncOrders, syncSingleOrder, getFiltersData, fetchApi, createOrder, searchCustomers, bulkAssignOrders, bulkCancelOrders } from '../../api/client';
 import { Search, ChevronLeft, ChevronRight, History, XCircle, Filter, RefreshCw, FileText, CheckCircle2, ClipboardCheck, Copy, UserPlus, Download, Wrench, Settings, FolderOpen, Building2, MapPin, Users, Calendar, Plus, AlertTriangle, ExternalLink, RotateCcw, Edit3, Tag, Trash2, User } from 'lucide-react';
 import { WARRANTY_SERVICE_GROUPS, REPAIR_SERVICE_GROUPS, WORK_TYPE_SERVICES } from '../../utils/workTypes';
@@ -70,6 +70,7 @@ const ROW_STATUS_OPTIONS = [
 ];
 
 export default function OrderList() {
+  const location = useLocation();
   const { confirm } = useConfirm();
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'warning' } | null>(null);
 
@@ -368,8 +369,60 @@ export default function OrderList() {
     items: [] as any[],
     moneyToCollect: 0,
     note: '',
-    promoCode: ''
+    promoCode: '',
+    hotlineTicketId: ''
   });
+
+  // Tự động mở modal và điền sẵn thông tin khi chuyển từ Hotline Ticket
+  useEffect(() => {
+    if (location.state?.createFromTicket) {
+      const ticket = location.state.createFromTicket;
+      const reqType = ticket.phase3RequestType || ticket.serviceRequestType || '';
+      const srvType = ticket.phase3ServiceType || '';
+
+      setEditingOrderId(null);
+      setCustomerSuggestions([]);
+      skipFetchRef.current = true;
+
+      setNewOrderForm({
+        customerName: ticket.customerName || '',
+        customerPhone: ticket.customerPhone || '',
+        address: ticket.customerAddress || '',
+        province: ticket.province || '',
+        workType: reqType,
+        serviceType: srvType || (['Giao hàng và Lắp đặt', 'Lắp đặt', 'Giao hàng', 'Thay lọc', 'Thay lõi lọc'].includes(reqType) ? 'Công việc đã bao gồm dịch vụ' : ''),
+        appointmentDate: '',
+        appointmentTime: '08:30',
+        items: [],
+        moneyToCollect: 0,
+        note: `[Từ Hotline ${ticket.ticketCode}] ${ticket.consultationNote || ticket.customerSupportDetail || ''}`.trim(),
+        promoCode: '',
+        hotlineTicketId: ticket.id
+      });
+
+      fetchApi('/inventory/stock')
+        .then(invData => {
+          const whs = invData.warehouses || [];
+          const prods = invData.products || [];
+          setWarehouses(whs);
+          setProductsStock(prods);
+
+          if (ticket.productName && prods.length > 0) {
+            const matched = prods.find((p: any) => p.name && p.name.toLowerCase().includes(ticket.productName.toLowerCase()));
+            if (matched) {
+              setNewOrderForm(prev => ({
+                ...prev,
+                items: [{ productName: matched.name, sku: matched.sku || null, quantity: 1, price: matched.price || 0 }]
+              }));
+            }
+          }
+        })
+        .catch(console.error);
+
+      setShowCreateModal(true);
+      window.history.replaceState({}, document.title);
+    }
+  }, [location.state]);
 
   const [promosList, setPromosList] = useState<any[]>([]);
 
@@ -452,7 +505,8 @@ export default function OrderList() {
       items: [],
       moneyToCollect: 0,
       note: '',
-      promoCode: ''
+      promoCode: '',
+      hotlineTicketId: ''
     });
 
     fetchApi('/inventory/stock')
@@ -499,7 +553,8 @@ export default function OrderList() {
       })) : [],
       moneyToCollect: order.moneyToCollect || 0,
       note: order.note || '',
-      promoCode: order.promoCode || ''
+      promoCode: order.promoCode || '',
+      hotlineTicketId: ''
     });
 
     fetchApi('/inventory/stock')
@@ -563,6 +618,11 @@ export default function OrderList() {
       }
     }
 
+    if (!newOrderForm.appointmentDate) {
+      alert('Vui lòng chọn Thời gian hẹn khách (Ngày hẹn).');
+      return;
+    }
+
     let appointmentTimeStr = null;
     if (newOrderForm.appointmentDate) {
       appointmentTimeStr = `${newOrderForm.appointmentDate}T${newOrderForm.appointmentTime || '08:30'}:00`;
@@ -581,7 +641,8 @@ export default function OrderList() {
         items: newOrderForm.items,
         moneyToCollect: Number(newOrderForm.moneyToCollect) || 0,
         note: newOrderForm.note.trim(),
-        promoCode: newOrderForm.promoCode.trim().toUpperCase() || null
+        promoCode: newOrderForm.promoCode.trim().toUpperCase() || null,
+        hotlineTicketId: newOrderForm.hotlineTicketId || null
       };
 
       if (editingOrderId) {
@@ -4063,7 +4124,7 @@ export default function OrderList() {
                 </div>
 
                 <div>
-                  <label className="block text-sm text-gray-600 mb-1">Thời gian hẹn khách</label>
+                  <label className="block text-sm text-gray-600 mb-1">Thời gian hẹn khách *</label>
                   <div className="grid grid-cols-2 gap-2">
                     <div>
                       <input

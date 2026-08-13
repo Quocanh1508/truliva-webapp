@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
+import { useNavigate } from 'react-router-dom';
 import { fetchApi } from '../../api/client';
 import { useAuth } from '../../context/AuthContext';
 import { Search, Plus, UserPlus, ArrowRightCircle, ShoppingCart, Phone, MapPin, User, Clock, Loader2, ChevronLeft, ChevronRight, X, Wrench, Package, ShieldCheck, PhoneCall, Copy, CheckCircle2 } from 'lucide-react';
@@ -247,18 +248,18 @@ export default function HotlineManage() {
     }
   };
 
-  const handleConvertToOrder = async (ticket: HotlineTicket) => {
+  const navigate = useNavigate();
+
+  const handleConvertToOrder = (ticket: HotlineTicket) => {
     if (ticket.status === 'ĐÃ CHUYỂN YÊU CẦU') {
       alert('Phiếu này đã được chuyển thành ca dịch vụ trước đó.');
       return;
     }
-    if (!confirm(`Bạn có muốn chuyển phiếu ${ticket.ticketCode} thành Ca dịch vụ không?`)) return;
-    try {
-      await fetchApi(`/hotlines/${ticket.id}/convert-to-order`, { method: 'POST' });
-      fetchTickets();
-    } catch (err: any) {
-      alert(err.message || 'Lỗi chuyển đơn');
-    }
+    navigate('/admin/orders', {
+      state: {
+        createFromTicket: ticket
+      }
+    });
   };
 
   const handlePOSNotice = () => {
