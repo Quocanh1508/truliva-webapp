@@ -47,13 +47,11 @@ interface BadgeCounts {
 
 const STATUS_PILLS: { key: string; label: string; color: string; bgColor: string; borderColor: string }[] = [
   { key: 'ALL', label: 'TỔNG YÊU CẦU', color: 'text-blue-700', bgColor: 'bg-blue-50', borderColor: 'border-blue-200' },
-  { key: 'ĐANG CHỜ NHÓM 2 PHẢN HỒI', label: 'ĐANG CHỜ NHÓM 2 PHẢN HỒI', color: 'text-amber-700', bgColor: 'bg-amber-50', borderColor: 'border-amber-200' },
-  { key: 'KHÁCH HẸN GỌI LẠI SAU', label: 'KHÁCH HẸN GỌI LẠI SAU', color: 'text-purple-700', bgColor: 'bg-purple-50', borderColor: 'border-purple-200' },
-  { key: 'CHƯA LIÊN HỆ ĐƯỢC KHÁCH', label: 'CHƯA LIÊN HỆ ĐƯỢC KHÁCH', color: 'text-gray-700', bgColor: 'bg-gray-50', borderColor: 'border-gray-200' },
-  { key: 'ĐÃ HỦY', label: 'ĐÃ HỦY', color: 'text-red-700', bgColor: 'bg-red-50', borderColor: 'border-red-200' },
-  { key: 'ĐÃ HOÀN THÀNH', label: 'ĐÃ HOÀN THÀNH', color: 'text-blue-700', bgColor: 'bg-blue-50', borderColor: 'border-blue-200' },
-  { key: 'ĐÃ CHUYỂN YÊU CẦU', label: 'ĐÃ CHUYỂN YÊU CẦU', color: 'text-emerald-700', bgColor: 'bg-emerald-50', borderColor: 'border-emerald-200' },
-  { key: 'CHƯA THỰC HIỆN', label: 'CHƯA THỰC HIỆN', color: 'text-white', bgColor: 'bg-red-500', borderColor: 'border-red-500' },
+  { key: 'Chưa thực hiện', label: 'Chưa thực hiện', color: 'text-red-700', bgColor: 'bg-red-50', borderColor: 'border-red-200' },
+  { key: 'Chưa liên hệ được khách', label: 'Chưa liên hệ được khách', color: 'text-gray-700', bgColor: 'bg-gray-50', borderColor: 'border-gray-200' },
+  { key: 'Khách hẹn gọi lại sau', label: 'Khách hẹn gọi lại sau', color: 'text-purple-700', bgColor: 'bg-purple-50', borderColor: 'border-purple-200' },
+  { key: 'Đã hoàn thành', label: 'Đã hoàn thành', color: 'text-blue-700', bgColor: 'bg-blue-50', borderColor: 'border-blue-200' },
+  { key: 'Đã hủy', label: 'Đã hủy', color: 'text-red-700', bgColor: 'bg-red-50', borderColor: 'border-red-200' },
 ];
 
 const getServiceOrderStatusBadge = (adminStatus: string | undefined, hasKtv: boolean) => {
@@ -75,7 +73,12 @@ const getServiceOrderStatusBadge = (adminStatus: string | undefined, hasKtv: boo
 };
 
 const STATUS_BADGE_MAP: Record<string, { bg: string; text: string }> = {
-  'CHỜ XÁC THỰC': { bg: 'bg-yellow-100', text: 'text-yellow-700' },
+  'Chưa thực hiện': { bg: 'bg-red-100', text: 'text-red-700' },
+  'Chưa liên hệ được khách': { bg: 'bg-gray-100', text: 'text-gray-700' },
+  'Khách hẹn gọi lại sau': { bg: 'bg-purple-100', text: 'text-purple-700' },
+  'Đã hoàn thành': { bg: 'bg-blue-100', text: 'text-blue-700' },
+  'Đã hủy': { bg: 'bg-red-100', text: 'text-red-700' },
+  'CHỜ XÁC THỰC': { bg: 'bg-red-100', text: 'text-red-700' },
   'CHƯA THỰC HIỆN': { bg: 'bg-red-100', text: 'text-red-700' },
   'ĐANG CHỜ NHÓM 2 PHẢN HỒI': { bg: 'bg-amber-100', text: 'text-amber-700' },
   'KHÁCH HẸN GỌI LẠI SAU': { bg: 'bg-purple-100', text: 'text-purple-700' },

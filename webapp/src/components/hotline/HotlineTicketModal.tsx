@@ -19,15 +19,13 @@ interface Props {
   userRole: string;
 }
 
-const PHASE3_ACTION_OPTIONS = [
-  { key: 'VERIFY_APPROVE', label: 'Xác thực & Chuyển xử lý' },
-  { key: 'REJECT_TO_PHASE2', label: 'Trả về sửa thông tin' },
-  { key: 'CANCEL', label: 'Hủy phiếu' }
-];
+
 const STATUS_OPTIONS = [
-  'CHỜ XÁC THỰC', 'CHƯA THỰC HIỆN', 'ĐANG CHỜ NHÓM 2 PHẢN HỒI',
-  'KHÁCH HẸN GỌI LẠI SAU', 'CHƯA LIÊN HỆ ĐƯỢC KHÁCH',
-  'ĐÃ CHUYỂN YÊU CẦU', 'ĐÃ HOÀN THÀNH', 'ĐÃ HỦY'
+  'Chưa liên hệ được khách',
+  'Chưa thực hiện',
+  'Đã hoàn thành',
+  'Đã hủy',
+  'Khách hẹn gọi lại sau'
 ];
 
 // ═══════════════════════════════════════════════════
@@ -239,13 +237,14 @@ export default function HotlineTicketModal({ ticket, isOpen, onClose, onSaved, u
           targetTeam: data.targetTeam || '',
           handlerUserId: data.handlerUserId || ''
         });
-        setAttachmentUrls(data.attachmentUrls || []);
+        const rawStatus = data.status || 'Chưa thực hiện';
+        const initialStatus = (rawStatus === 'CHỜ XÁC THỰC' || rawStatus === 'CHƯA THỰC HIỆN') ? 'Chưa thực hiện' : rawStatus;
         setPhase3Data({
           phase3RequestType: data.phase3RequestType || '',
           phase3ServiceType: data.phase3ServiceType || '',
           sparePartName: data.sparePartName || '',
           consultationNote: data.consultationNote || '',
-          status: data.status || '',
+          status: initialStatus,
           action: '',
           feedback: ''
         });
@@ -306,10 +305,10 @@ export default function HotlineTicketModal({ ticket, isOpen, onClose, onSaved, u
     }
   };
 
-  // ── Phase 3: Verify ──
+  // ── Phase 3: Verify / Save ──
   const handleSavePhase3 = async () => {
-    if (!phase3Data.action && !phase3Data.status) {
-      alert('Vui lòng chọn thao tác xử lý hoặc trạng thái');
+    if (!phase3Data.status) {
+      alert('Vui lòng chọn Trạng thái');
       return;
     }
     setSavingPhase3(true);
@@ -320,7 +319,7 @@ export default function HotlineTicketModal({ ticket, isOpen, onClose, onSaved, u
       });
       onSaved();
     } catch (err: any) {
-      alert(err.message || 'Lỗi xử lý Phase 3');
+      alert(err.message || 'Lỗi lưu thông tin');
     } finally {
       setSavingPhase3(false);
     }
@@ -664,11 +663,10 @@ export default function HotlineTicketModal({ ticket, isOpen, onClose, onSaved, u
                 );
               })()}
 
-              {/* Linh kiện */}
-              <div className="mb-4">
-                <label className="block text-sm font-semibold text-gray-700 mb-1">Linh kiện</label>
-                <input type="text" placeholder="Tên linh kiện (nếu có)" value={phase3Data.sparePartName} onChange={(e) => setPhase3Data(prev => ({ ...prev, sparePartName: e.target.value }))}
-                  className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-200" />
+              {/* Cảnh báo đỏ/vàng */}
+              <div className="mb-4 bg-amber-50 border border-amber-200/80 rounded-xl p-3 text-xs text-amber-800 font-medium flex items-start gap-2">
+                <span className="text-amber-600 font-bold text-sm shrink-0">⚠️</span>
+                <span className="leading-relaxed">Yêu cầu phát sinh sản phẩm hay linh kiện cần tạo bổ sung đơn hàng từ hệ thống Pancake POS</span>
               </div>
 
               {/* Đơn hàng liên kết (nếu đã convert) */}
@@ -713,50 +711,15 @@ export default function HotlineTicketModal({ ticket, isOpen, onClose, onSaved, u
                 </select>
               </div>
 
-              <hr className="border-gray-200" />
-
-              {/* Thao tác xử lý */}
-              <div className="mb-4 pt-3">
-                <label className="block text-sm font-semibold text-gray-700 mb-1">Thao tác xử lý</label>
-                <select value={phase3Data.action} onChange={(e) => setPhase3Data(prev => ({ ...prev, action: e.target.value }))}
-                  className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-200">
-                  <option value="">Chọn</option>
-                  {PHASE3_ACTION_OPTIONS.map(a => <option key={a.key} value={a.key}>{a.label}</option>)}
-                </select>
-              </div>
-
-              {/* Nội dung phản hồi xử lý */}
-              <div className="mb-4">
-                <label className="block text-sm font-semibold text-gray-700 mb-1">Nội dung phản hồi xử lý</label>
-                <textarea rows={2} placeholder="Nhập nội dung phản hồi xử lý..." value={phase3Data.feedback} onChange={(e) => setPhase3Data(prev => ({ ...prev, feedback: e.target.value }))}
-                  className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-200 resize-none" />
-                {/* Lịch sử phản hồi */}
-                {ticketDetail?.feedbackHistory?.length > 0 && (
-                  <details className="mt-2">
-                    <summary className="text-xs text-blue-500 cursor-pointer hover:underline">Lịch sử phản hồi ({ticketDetail.feedbackHistory.length})</summary>
-                    <div className="mt-1 space-y-1 max-h-32 overflow-y-auto">
-                      {ticketDetail.feedbackHistory.map((f: any) => (
-                        <div key={f.id} className="bg-gray-50 border border-gray-200 rounded p-2 text-xs">
-                          <span className="font-medium text-gray-700">{f.userName}</span>
-                          <span className="ml-1 px-1.5 py-0.5 bg-blue-100 text-blue-700 rounded text-[10px]">{f.action}</span>
-                          <span className="text-gray-400 ml-2">{new Date(f.createdAt).toLocaleString('vi-VN')}</span>
-                          <p className="text-gray-600 mt-0.5">{f.feedback}</p>
-                        </div>
-                      ))}
-                    </div>
-                  </details>
-                )}
-              </div>
-
-              {/* Nút gửi Phase 3 */}
+              {/* Nút Lưu lại */}
               <div className="flex justify-end pt-2">
                 <button
                   onClick={handleSavePhase3}
                   disabled={savingPhase3 || !canPhase3}
-                  className="px-6 py-2.5 bg-[#1B3A6B] text-white text-sm font-medium rounded-lg hover:bg-[#142d55] disabled:opacity-50 flex items-center gap-2 transition-all"
+                  className="px-6 py-2.5 bg-[#1B3A6B] text-white text-sm font-medium rounded-lg hover:bg-[#142d55] disabled:opacity-50 flex items-center gap-2 transition-all shadow-xs"
                 >
                   {savingPhase3 ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}
-                  Gửi thao tác xử lý
+                  Lưu lại
                 </button>
               </div>
             </div>

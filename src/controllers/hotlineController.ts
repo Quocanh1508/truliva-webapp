@@ -5,14 +5,19 @@ import prisma from '../config/database';
 //  HOTLINE TICKET STATUSES
 // ═══════════════════════════════════════════════════
 const HOTLINE_STATUSES = [
-  'CHỜ XÁC THỰC',          // Vừa tạo từ Phase 2, chưa qua Phase 3
-  'CHƯA THỰC HIỆN',        // Đã xác thực nhưng chưa bắt đầu xử lý
-  'ĐANG CHỜ NHÓM 2 PHẢN HỒI', // Trả về Phase 2 để sửa thông tin
-  'KHÁCH HẸN GỌI LẠI SAU', // Khách yêu cầu gọi lại sau
-  'CHƯA LIÊN HỆ ĐƯỢC KHÁCH', // Không liên lạc được
-  'ĐÃ CHUYỂN YÊU CẦU',    // Đã đẩy sang Ca dịch vụ
-  'ĐÃ HOÀN THÀNH',         // Hoàn tất xử lý
-  'ĐÃ HỦY'                 // Hủy phiếu
+  'Chưa thực hiện',
+  'Chưa liên hệ được khách',
+  'Khách hẹn gọi lại sau',
+  'Đã hoàn thành',
+  'Đã hủy',
+  'CHỜ XÁC THỰC',
+  'CHƯA THỰC HIỆN',
+  'ĐANG CHỜ NHÓM 2 PHẢN HỒI',
+  'KHÁCH HẸN GỌI LẠI SAU',
+  'CHƯA LIÊN HỆ ĐƯỢC KHÁCH',
+  'ĐÃ CHUYỂN YÊU CẦU',
+  'ĐÃ HOÀN THÀNH',
+  'ĐÃ HỦY'
 ];
 
 // ═══════════════════════════════════════════════════
@@ -385,7 +390,7 @@ export async function createHotlineTicket(req: Request, res: Response) {
         targetTeam,
         // Mặc định: Người xử lý yêu cầu là người được nhóm 2 chọn, được phân bổ hoặc mặc định là người điền thông tin
         handlerUserId: handlerUserId || user.id,
-        status: 'CHỜ XÁC THỰC'
+        status: 'Chưa thực hiện'
       },
       include: {
         createdBy: { select: { id: true, fullName: true, email: true, role: true } },
