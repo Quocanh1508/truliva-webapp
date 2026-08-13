@@ -606,7 +606,7 @@ export async function convertToServiceOrder(req: Request, res: Response) {
           billFullName: existing.customerName,
           billPhoneNumber: existing.customerPhone,
           shippingAddress: addressParts,
-          note: `[Từ Hotline ${existing.ticketCode}] ${existing.customerSupportDetail}`,
+          note: existing.consultationNote || existing.customerSupportDetail || null,
           adminStatus: 'chờ xử lý',
           workType: existing.serviceRequestType || null,
           pancakeCreatedAt: new Date(),

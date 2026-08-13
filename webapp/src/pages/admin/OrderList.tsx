@@ -395,7 +395,7 @@ export default function OrderList() {
         appointmentTime: '08:30',
         items: [],
         moneyToCollect: 0,
-        note: `[Từ Hotline ${ticket.ticketCode}] ${ticket.consultationNote || ticket.customerSupportDetail || ''}`.trim(),
+        note: (ticket.consultationNote || ticket.customerSupportDetail || '').trim(),
         promoCode: '',
         hotlineTicketId: ticket.id
       });
