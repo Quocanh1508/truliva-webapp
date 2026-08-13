@@ -152,7 +152,7 @@ export default function WarrantyActivate() {
       setStep(11);
     } catch (err: any) {
       console.error(err);
-      setSupportError(err.message || 'Có lỗi xảy ra khi gửi yêu cầu. Vui lòng liên hệ Hotline 1900 6364');
+      setSupportError(err.message || 'Có lỗi xảy ra khi gửi yêu cầu. Vui lòng liên hệ Hotline 1900 63 84 63');
     } finally {
       setSubmittingSupport(false);
     }
@@ -335,29 +335,30 @@ export default function WarrantyActivate() {
   };
 
   // ==================== STEP 0: LANDING PAGE ====================
+  // ==================== STEP 0: LANDING PAGE ====================
   if (step === 0) {
     return (
-      <div className="min-h-screen bg-[#1B2A4A] flex flex-col font-sans antialiased">
+      <div className="min-h-screen bg-[#14223A] flex flex-col font-sans antialiased text-white">
 
         {/* Header Bar */}
-        <header className="flex items-center justify-between px-5 py-4">
-          <img src="/logo.png" alt="Truliva" className="h-10 object-contain brightness-0 invert" />
-          <a href="tel:19006364" className="flex items-center gap-1.5 text-white/90 hover:text-white transition">
-            <Phone size={14} />
-            <span className="text-sm font-bold tracking-wide">1900 6364</span>
+        <header className="flex items-center justify-between px-6 py-4 border-b border-white/10 bg-[#101B2E]">
+          <img src="/logo.png" alt="Truliva" className="h-9 object-contain brightness-0 invert" />
+          <a href="tel:1900638463" className="flex items-center gap-2 text-white/90 hover:text-white transition bg-white/10 hover:bg-white/15 px-3.5 py-1.5 rounded-full text-xs font-bold tracking-wide border border-white/10">
+            <Phone size={14} className="text-blue-400" />
+            <span>1900 63 84 63</span>
           </a>
         </header>
 
         {/* Main Content */}
-        <div className="flex-1 flex flex-col items-center justify-center px-5 pb-8">
-          <div className="w-full max-w-sm space-y-3.5">
+        <div className="flex-1 flex flex-col items-center justify-center px-5 py-12">
+          <div className="w-full max-w-sm space-y-4">
 
             {/* 1. Kích hoạt bảo hành sản phẩm (Nút Đỏ) */}
             <button
               onClick={() => setStep(1)}
-              className="w-full bg-[#E53935] hover:bg-[#D32F2F] active:scale-[0.98] text-white font-bold py-4 px-5 rounded-xl text-base transition-all shadow-lg shadow-red-900/30 flex items-center gap-4 border border-red-400/20"
+              className="w-full bg-[#E53935] hover:bg-[#D32F2F] active:scale-[0.98] text-white font-bold py-4 px-5 rounded-2xl text-base transition-all shadow-xl shadow-red-950/40 flex items-center gap-4 border border-red-400/20 group"
             >
-              <div className="w-12 h-12 bg-white/15 rounded-xl flex items-center justify-center shrink-0">
+              <div className="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
                 <ShieldCheck size={26} className="text-white" />
               </div>
               <div className="text-left">
@@ -366,12 +367,12 @@ export default function WarrantyActivate() {
               </div>
             </button>
 
-            {/* 2. Hỗ trợ kỹ thuật (Nút Xanh Lá - Mở Form điền) */}
+            {/* 2. Hỗ trợ kỹ thuật (Nút Xanh Lá) */}
             <button
               onClick={() => setStep(10)}
-              className="w-full bg-[#2E7D32] hover:bg-[#1B5E20] active:scale-[0.98] text-white font-bold py-4 px-5 rounded-xl text-base transition-all shadow-lg shadow-green-900/30 flex items-center gap-4 border border-green-400/20"
+              className="w-full bg-[#2E7D32] hover:bg-[#1B5E20] active:scale-[0.98] text-white font-bold py-4 px-5 rounded-2xl text-base transition-all shadow-xl shadow-green-950/40 flex items-center gap-4 border border-green-400/20 group"
             >
-              <div className="w-12 h-12 bg-white/15 rounded-xl flex items-center justify-center shrink-0">
+              <div className="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
                 <Wrench size={26} className="text-white" />
               </div>
               <div className="text-left">
@@ -379,21 +380,21 @@ export default function WarrantyActivate() {
               </div>
             </button>
 
-            {/* 3. Zalo CSKH (Nút Xanh Dương - Tách riêng trỏ Zalo OA) */}
+            {/* 3. Zalo CSKH (Nút Xanh Dương) */}
             <a
               href="https://zalo.me/3870382725035413507"
               target="_blank"
               rel="noopener noreferrer"
-              className="w-full bg-[#0068FF] hover:bg-[#0052CC] active:scale-[0.98] text-white font-bold py-4 px-5 rounded-xl text-base transition-all shadow-lg shadow-blue-900/30 flex items-center gap-4 border border-blue-400/20"
+              className="w-full bg-[#0068FF] hover:bg-[#0052CC] active:scale-[0.98] text-white font-bold py-4 px-5 rounded-2xl text-base transition-all shadow-xl shadow-blue-950/40 flex items-center gap-4 border border-blue-400/20 group"
             >
-              <div className="w-12 h-12 bg-white/15 rounded-xl flex items-center justify-center shrink-0">
+              <div className="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
                 <svg className="w-7 h-7 fill-current text-white" viewBox="0 0 24 24">
                   <path d="M12.003 2C6.478 2 2 6.136 2 11.238c0 3.125 1.688 5.88 4.298 7.48-.12.443-.655 2.417-.655 2.417-.06.223.167.387.352.268 0 0 2.278-1.52 3.162-2.09.91.246 1.875.38 2.846.38 5.525 0 10.003-4.137 10.003-9.24C22.006 6.137 17.528 2 12.003 2z"/>
                 </svg>
               </div>
               <div className="text-left">
                 <span className="block text-[15px] font-extrabold leading-tight">Zalo CSKH</span>
-                <span className="block text-[11px] opacity-80 font-normal">Trỏ trực tiếp Zalo OA Truliva</span>
+                <span className="block text-[11px] opacity-80 font-normal">Trợ lý trực tiếp Zalo OA Truliva</span>
               </div>
             </a>
 
@@ -401,18 +402,20 @@ export default function WarrantyActivate() {
         </div>
 
         {/* Footer */}
-        <footer className="text-center px-5 pb-6 space-y-4">
-          <div className="flex items-center justify-center gap-2 text-white/50 text-[11px] font-medium flex-wrap">
+        <footer className="text-center px-5 py-6 space-y-3.5 border-t border-white/10 bg-[#101B2E]">
+          <div className="flex items-center justify-center gap-3 text-white/50 text-[11px] font-medium tracking-wide flex-wrap">
             <a href="#" className="hover:text-white/80 transition">SITEMAP</a>
             <span>|</span>
             <a href="#" className="hover:text-white/80 transition">COOKIE POLICY</a>
             <span>|</span>
             <a href="#" className="hover:text-white/80 transition">T&C</a>
+            <span>|</span>
+            <a href="#" className="hover:text-white/80 transition">PRIVACY POLICY</a>
           </div>
           <p className="text-white/40 text-[11px] font-medium">© 2026 Truliva Vietnam. Tất cả quyền được bảo lưu.</p>
           
           {/* Social Icons */}
-          <div className="flex items-center justify-center gap-4 pt-1">
+          <div className="flex items-center justify-center gap-3 pt-1">
             <a href="#" className="w-8 h-8 rounded-full border border-white/20 flex items-center justify-center text-white/50 hover:text-white hover:border-white/50 transition">
               <svg className="w-3.5 h-3.5 fill-current" viewBox="0 0 24 24"><path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/></svg>
             </a>
@@ -1111,7 +1114,7 @@ export default function WarrantyActivate() {
 
       <div className="text-center text-[10px] text-white/40 relative z-10 max-w-xs leading-relaxed">
         <p>© 2026 Truliva Vietnam. Tất cả quyền được bảo lưu.</p>
-        <p className="mt-1">Hotline CSKH: 1900 6364 (Hỗ trợ 8h00 - 18h00 hàng ngày)</p>
+        <p className="mt-1">Hotline CSKH: 1900 63 84 63 (Hỗ trợ 8h00 - 18h00 hàng ngày)</p>
       </div>
 
     </div>

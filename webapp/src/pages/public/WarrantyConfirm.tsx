@@ -87,7 +87,7 @@ export default function WarrantyConfirm() {
                 <p className="text-xs text-gray-500 leading-relaxed px-4">{error}</p>
               </div>
               <div className="bg-gray-50 p-4 rounded-xl border border-gray-100 text-xs text-gray-600 max-w-sm mx-auto">
-                📞 Hotline hỗ trợ kỹ thuật: <strong className="text-blue-600">1900 633423</strong>
+                📞 Hotline hỗ trợ kỹ thuật: <strong className="text-blue-600">1900 63 84 63</strong>
               </div>
             </div>
           )}
@@ -157,7 +157,7 @@ export default function WarrantyConfirm() {
                   </div>
                   <div className="text-left">
                     <p className="text-xs font-bold text-gray-800">Đánh giá dịch vụ 5 sao</p>
-                    <p className="text-[10px] text-gray-400">Đánh giá KTV lắp đặt giúp Pure Vita hoàn thiện tốt hơn</p>
+                    <p className="text-[10px] text-gray-400">Đánh giá KTV lắp đặt giúp Truliva hoàn thiện tốt hơn</p>
                   </div>
                 </a>
               </div>
@@ -167,7 +167,7 @@ export default function WarrantyConfirm() {
 
         {/* Footer */}
         <div className="bg-gray-50 border-t border-gray-100 p-4 text-center text-[10px] text-gray-400">
-          Pure Vita © {new Date().getFullYear()} • Hotline 1900 633423
+          Truliva Vietnam © {new Date().getFullYear()} • Hotline 1900 63 84 63
         </div>
       </div>
     </div>
