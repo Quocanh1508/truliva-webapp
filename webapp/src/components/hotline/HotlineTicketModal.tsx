@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { fetchApi, getFiltersData, uploadImages } from '../../api/client';
+import { WORK_TYPES, WORK_TYPE_SERVICES } from '../../utils/workTypes';
 import { X, Loader2, Clock, Send, User, ShoppingBag, UploadCloud } from 'lucide-react';
 import ProvinceSelect from '../ProvinceSelect';
 import CategoryTreeSelect from '../CategoryTreeSelect';
@@ -18,27 +19,6 @@ interface Props {
   userRole: string;
 }
 
-const SERVICE_REQUEST_OPTIONS = [
-  'Bảo Hành - Bảo Trì',
-  'Hướng dẫn sử dụng',
-  'Khác',
-  'Lắp đặt',
-  'Thay lõi lọc',
-  'Tra cứu thông tin',
-  'Tư vấn kỹ thuật',
-  'Tư vấn sản phẩm'
-];
-const PHASE3_REQUEST_TYPE_OPTIONS = [
-  'Bảo Hành - Bảo Trì',
-  'Hướng dẫn sử dụng',
-  'Khác',
-  'Lắp đặt',
-  'Thay lõi lọc',
-  'Tra cứu thông tin',
-  'Tư vấn kỹ thuật',
-  'Tư vấn sản phẩm'
-];
-const PHASE3_SERVICE_TYPE_OPTIONS = ['Áp lực nước yếu', 'Rò rỉ', 'Máy không hoạt động', 'TDS cao', 'Không ra nước', 'Tiếng ồn', 'Thay linh kiện', 'Khác'];
 const PHASE3_ACTION_OPTIONS = [
   { key: 'VERIFY_APPROVE', label: 'Xác thực & Chuyển xử lý' },
   { key: 'REJECT_TO_PHASE2', label: 'Trả về sửa thông tin' },
@@ -521,7 +501,7 @@ export default function HotlineTicketModal({ ticket, isOpen, onClose, onSaved, u
                 <select value={formData.serviceRequestType} onChange={(e) => updateForm('serviceRequestType', e.target.value)}
                   className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-200">
                   <option value="">Chọn</option>
-                  {SERVICE_REQUEST_OPTIONS.map(s => <option key={s} value={s}>{s}</option>)}
+                  {WORK_TYPES.map(s => <option key={s} value={s}>{s}</option>)}
                 </select>
               </div>
 
@@ -643,24 +623,46 @@ export default function HotlineTicketModal({ ticket, isOpen, onClose, onSaved, u
               </div>
 
               {/* Loại yêu cầu + Loại dịch vụ */}
-              <div className="grid grid-cols-2 gap-4 mb-4">
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-1">Loại yêu cầu *</label>
-                  <select value={phase3Data.phase3RequestType} onChange={(e) => setPhase3Data(prev => ({ ...prev, phase3RequestType: e.target.value }))}
-                    className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-200">
-                    <option value="">Chọn</option>
-                    {PHASE3_REQUEST_TYPE_OPTIONS.map(s => <option key={s} value={s}>{s}</option>)}
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-1">Loại dịch vụ *</label>
-                  <select value={phase3Data.phase3ServiceType} onChange={(e) => setPhase3Data(prev => ({ ...prev, phase3ServiceType: e.target.value }))}
-                    className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-200">
-                    <option value="">Chọn</option>
-                    {PHASE3_SERVICE_TYPE_OPTIONS.map(s => <option key={s} value={s}>{s}</option>)}
-                  </select>
-                </div>
-              </div>
+              {(() => {
+                const availableServiceTypes = phase3Data.phase3RequestType
+                  ? (WORK_TYPE_SERVICES[phase3Data.phase3RequestType] || [])
+                  : Array.from(new Set(Object.values(WORK_TYPE_SERVICES).flat()));
+
+                return (
+                  <div className="grid grid-cols-2 gap-4 mb-4">
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-700 mb-1">Loại yêu cầu *</label>
+                      <select
+                        value={phase3Data.phase3RequestType}
+                        onChange={(e) => {
+                          const newReqType = e.target.value;
+                          const allowed = WORK_TYPE_SERVICES[newReqType] || [];
+                          setPhase3Data(prev => ({
+                            ...prev,
+                            phase3RequestType: newReqType,
+                            phase3ServiceType: allowed.includes(prev.phase3ServiceType) ? prev.phase3ServiceType : ''
+                          }));
+                        }}
+                        className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-200"
+                      >
+                        <option value="">Chọn</option>
+                        {WORK_TYPES.map(s => <option key={s} value={s}>{s}</option>)}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-700 mb-1">Loại dịch vụ *</label>
+                      <select
+                        value={phase3Data.phase3ServiceType}
+                        onChange={(e) => setPhase3Data(prev => ({ ...prev, phase3ServiceType: e.target.value }))}
+                        className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-200"
+                      >
+                        <option value="">Chọn</option>
+                        {availableServiceTypes.map(s => <option key={s} value={s}>{s}</option>)}
+                      </select>
+                    </div>
+                  </div>
+                );
+              })()}
 
               {/* Linh kiện */}
               <div className="mb-4">

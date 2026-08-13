@@ -5,12 +5,33 @@ export interface ImageSlot {
 
 // ── Danh sách loại công việc ──
 export const WORK_TYPES = [
-  'Giao hàng và Lắp đặt',
-  'Lắp đặt',
-  'Giao hàng',
-  'Thay lọc',
   'Bảo hành',
+  'Giao hàng',
+  'Giao hàng và lắp đặt',
+  'Hướng dẫn và Tư vấn',
+  'Lắp đặt',
+  'Thay lõi lọc',
   'Sửa chữa',
+];
+
+// ── Danh sách Loại dịch vụ cho "Hướng dẫn và Tư vấn" ──
+export const ADVICE_CONSULTATION_SERVICES = [
+  'Hướng dẫn kích hoạt bảo hành',
+  'Hướng dẫn lắp đặt',
+  'Hướng dẫn sử dụng',
+  'Hướng dẫn thay lọc',
+  'Hướng dẫn xử lý áp lực nước yếu',
+  'Hướng dẫn xử lý chất lượng nước',
+  'Hướng dẫn xử lý máy báo đỏ 3 đèn',
+  'Hướng dẫn xử lý rò rỉ',
+  'Hướng dẫn xử lý thiết bị không hoạt động',
+  'Hướng dẫn xử lý thiết bị không ổn định',
+  'Hướng dẫn xử lý tiếng ồn',
+  'Kích hoạt bảo hành',
+  'Khác',
+  'Tra cứu thông tin',
+  'Tư vấn lõi lọc',
+  'Tư vấn sản phẩm'
 ];
 
 // ── Chi tiết dịch vụ Bảo hành theo nhóm lỗi ──
@@ -103,14 +124,17 @@ export const REPAIR_SERVICE_GROUPS: Record<string, string[]> = {
   ],
 };
 
-// ── Loại dịch vụ tương ứng với Loại công việc ──
+// ── Loại dịch vụ tương ứng với Loại công việc / Loại yêu cầu ──
 export const WORK_TYPE_SERVICES: Record<string, string[]> = {
-  'Giao hàng và Lắp đặt': ['Công việc đã bao gồm dịch vụ'],
-  'Lắp đặt': ['Công việc đã bao gồm dịch vụ'],
-  'Giao hàng': ['Công việc đã bao gồm dịch vụ'],
-  'Thay lọc': ['Công việc đã bao gồm dịch vụ'],
-  'Bảo hành': Object.values(WARRANTY_SERVICE_GROUPS).flat(),
-  'Sửa chữa': Object.values(REPAIR_SERVICE_GROUPS).flat(),
+  'Bảo hành': [...Object.values(WARRANTY_SERVICE_GROUPS).flat(), 'Khác'],
+  'Giao hàng': ['Công việc đã bao gồm dịch vụ', 'Khác'],
+  'Giao hàng và lắp đặt': ['Công việc đã bao gồm dịch vụ', 'Khác'],
+  'Giao hàng và Lắp đặt': ['Công việc đã bao gồm dịch vụ', 'Khác'],
+  'Hướng dẫn và Tư vấn': ADVICE_CONSULTATION_SERVICES,
+  'Lắp đặt': ['Công việc đã bao gồm dịch vụ', 'Khác'],
+  'Thay lọc': ['Công việc đã bao gồm dịch vụ', 'Khác'],
+  'Thay lõi lọc': ['Công việc đã bao gồm dịch vụ', 'Khác'],
+  'Sửa chữa': [...Object.values(REPAIR_SERVICE_GROUPS).flat(), 'Khác'],
 };
 
 // ── Image slots theo loại công việc ──
