@@ -281,6 +281,17 @@ export default function HotlineTicketModal({ ticket, isOpen, onClose, onSaved, u
     }
   }, [formData.targetTeam]);
 
+  // ── ESC Key listener to close modal ──
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && isOpen) {
+        onClose();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, onClose]);
+
   // ── Phase 2: Save ──
   const handleSavePhase2 = async () => {
     if (!formData.customerName || !formData.customerPhone || !formData.address || !formData.provinceName || !formData.source || !formData.productName || !formData.serviceRequestType || !formData.customerSupportDetail || !formData.targetTeam) {
@@ -572,7 +583,7 @@ export default function HotlineTicketModal({ ticket, isOpen, onClose, onSaved, u
                   <label className="block text-sm font-semibold text-gray-700 mb-1">Team xử lý yêu cầu *</label>
                   <select value={formData.targetTeam} onChange={(e) => { updateForm('targetTeam', e.target.value); updateForm('handlerUserId', ''); }}
                     className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-200">
-                    <option value="">Chọn</option>
+                    <option value="">Chọn team...</option>
                     <option value="Hotline">Hotline</option>
                     <option value="Coordinator">Coordinator</option>
                     <option value="Admin">Admin</option>
@@ -583,7 +594,7 @@ export default function HotlineTicketModal({ ticket, isOpen, onClose, onSaved, u
                   <select value={formData.handlerUserId} onChange={(e) => updateForm('handlerUserId', e.target.value)}
                     disabled={!formData.targetTeam}
                     className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-200 disabled:bg-gray-100">
-                    <option value="">Người gửi yêu cầu</option>
+                    <option value="">Chọn người xử lý...</option>
                     {handlers.map(h => <option key={h.id} value={h.id}>{h.fullName} | {h.email || ''}</option>)}
                   </select>
                 </div>

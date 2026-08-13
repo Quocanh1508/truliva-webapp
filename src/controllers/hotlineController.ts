@@ -383,7 +383,8 @@ export async function createHotlineTicket(req: Request, res: Response) {
         attachmentUrls: attachmentUrls || [],
         createdById: user.id,
         targetTeam,
-        handlerUserId: handlerUserId || null,
+        // Mặc định: Người xử lý yêu cầu là người được nhóm 2 chọn, được phân bổ hoặc mặc định là người điền thông tin
+        handlerUserId: handlerUserId || user.id,
         status: 'CHỜ XÁC THỰC'
       },
       include: {
@@ -672,7 +673,9 @@ export async function verifyHotlineTicketPhase3(req: Request, res: Response) {
       ...(phase3ServiceType && { phase3ServiceType }),
       ...(sparePartName !== undefined && { sparePartName }),
       ...(feedback && { phase3Feedback: feedback }),
-      ...(action && { phase3Action: action })
+      ...(action && { phase3Action: action }),
+      // Lưu thông tin người xử lý ở nhóm 3 nếu phiếu chưa có người xử lý
+      ...(!existing.handlerUserId && { handlerUserId: user.id })
     };
 
     // Lưu ghi chú tư vấn nếu có
@@ -766,24 +769,65 @@ export async function getHotlineHandlers(req: Request, res: Response) {
     const where: any = { isActive: true };
 
     if (team && String(team) !== 'ALL') {
-      const teamRoleMap: Record<string, string[]> = {
-        'Hotline': ['HOTLINE', 'ADMIN', 'COORDINATOR', 'STAFF'],
-        'Coordinator': ['COORDINATOR', 'ADMIN', 'HOTLINE'],
-        'Admin': ['ADMIN'],
-        'Kỹ thuật': ['KTV', 'ADMIN', 'COORDINATOR'],
-        'KTV': ['KTV', 'ADMIN']
+      const t = String(team).trim();
+      const teamRoleMap: Record<string, any> = {
+        'Hotline': {
+          OR: [
+            { role: 'HOTLINE' },
+            { group: { contains: 'Hotline', mode: 'insensitive' } }
+          ]
+        },
+        'Coordinator': {
+          OR: [
+            { role: 'COORDINATOR' },
+            { group: { contains: 'Coordinator', mode: 'insensitive' } },
+            { group: { contains: 'Điều phối', mode: 'insensitive' } }
+          ]
+        },
+        'Admin': {
+          OR: [
+            { role: 'ADMIN' },
+            { group: { contains: 'Admin', mode: 'insensitive' } }
+          ]
+        },
+        'Kỹ thuật': {
+          OR: [
+            { role: 'KTV' },
+            { group: { contains: 'Kỹ thuật', mode: 'insensitive' } }
+          ]
+        },
+        'KTV': { role: 'KTV' },
+        'Saler': { role: { in: ['SALER', 'SALE_SUPERVISOR'] } },
+        'Sales': { role: { in: ['SALER', 'SALE_SUPERVISOR'] } }
       };
-      const roles = teamRoleMap[String(team)] || ['HOTLINE', 'ADMIN', 'COORDINATOR', 'STAFF', 'KTV', 'SALER', 'SALE_SUPERVISOR'];
-      where.role = { in: roles };
+
+      const teamCondition = teamRoleMap[t];
+      if (teamCondition) {
+        Object.assign(where, teamCondition);
+      } else {
+        where.OR = [
+          { role: { in: ['HOTLINE', 'ADMIN', 'COORDINATOR', 'STAFF', 'KTV', 'SALER', 'SALE_SUPERVISOR'] } },
+          { group: { contains: t, mode: 'insensitive' } }
+        ];
+      }
     } else {
       where.role = { in: ['HOTLINE', 'ADMIN', 'COORDINATOR', 'STAFF', 'KTV', 'SALER', 'SALE_SUPERVISOR'] };
     }
 
-    const users = await prisma.user.findMany({
+    let users = await prisma.user.findMany({
       where,
-      select: { id: true, fullName: true, email: true, role: true, phoneNumber: true },
+      select: { id: true, fullName: true, email: true, role: true, phoneNumber: true, group: true },
       orderBy: { fullName: 'asc' }
     });
+
+    // Fallback: Nếu team cụ thể chưa có thành viên nào trong DB, lấy Admin/Coordinator để không bị rỗng
+    if (users.length === 0 && team && String(team) !== 'ALL') {
+      users = await prisma.user.findMany({
+        where: { isActive: true, role: { in: ['HOTLINE', 'ADMIN', 'COORDINATOR'] } },
+        select: { id: true, fullName: true, email: true, role: true, phoneNumber: true, group: true },
+        orderBy: { fullName: 'asc' }
+      });
+    }
 
     return res.json(users);
   } catch (error: any) {
