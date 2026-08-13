@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { fetchApi, getFiltersData, uploadImages } from '../../api/client';
 import { X, Loader2, Clock, Send, User, ShoppingBag, UploadCloud } from 'lucide-react';
 import ProvinceSelect from '../ProvinceSelect';
@@ -355,9 +356,9 @@ export default function HotlineTicketModal({ ticket, isOpen, onClose, onSaved, u
   //  Render
   // ═══════════════════════════════════════════════════
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/40 overflow-y-auto py-8">
-      <div className="bg-white rounded-2xl w-full max-w-6xl shadow-2xl mx-4">
+  return createPortal(
+    <div className="fixed inset-0 z-[9999] flex items-start justify-center bg-black/60 backdrop-blur-sm overflow-y-auto py-8">
+      <div className="bg-white rounded-2xl w-full max-w-6xl shadow-2xl mx-4 my-auto">
         {/* ── Header ── */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 bg-gray-50 rounded-t-2xl">
           <h2 className="text-lg font-bold text-[#1B3A6B]">
@@ -760,6 +761,7 @@ export default function HotlineTicketModal({ ticket, isOpen, onClose, onSaved, u
           </div>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }

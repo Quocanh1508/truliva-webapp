@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { fetchApi } from '../../api/client';
 import { useAuth } from '../../context/AuthContext';
 import { Search, Plus, UserPlus, ArrowRightCircle, ShoppingCart, Phone, MapPin, User, Clock, Loader2, ChevronLeft, ChevronRight, X, Wrench, Package, ShieldCheck, PhoneCall, Copy, CheckCircle2 } from 'lucide-react';
@@ -902,8 +903,8 @@ export default function HotlineManage() {
       {/* ══════════════════════════════════════════════════
            ASSIGN MODAL (Phân bổ)
          ══════════════════════════════════════════════════ */}
-      {showAssignModal && selectedTicket && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+      {showAssignModal && selectedTicket && createPortal(
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 backdrop-blur-sm">
           <div className="bg-white rounded-2xl w-full max-w-md shadow-2xl overflow-hidden">
             {/* Header */}
             <div className="bg-[#00A3FF] px-6 py-4">
@@ -958,7 +959,8 @@ export default function HotlineManage() {
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* ══════════════════════════════════════════════════
