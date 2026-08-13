@@ -226,11 +226,19 @@ export async function buildReportFilter(query: any, user: any): Promise<any> {
   if (rawMainStationIds) {
     const list = String(rawMainStationIds).split(',').map((s: string) => s.trim()).filter(Boolean);
     if (list.length > 0) {
+      // Match reports where KTV belongs to the selected main station
       stationOrConditions.push({
         ktvUser: {
           techStation: {
             mainStationId: { in: list }
           }
+        }
+      });
+      // Also match reports where the ORDER is assigned to the selected main station
+      // (covers cases where a KTV from a different station handles the order)
+      stationOrConditions.push({
+        order: {
+          mainStationId: { in: list }
         }
       });
     }
@@ -241,6 +249,12 @@ export async function buildReportFilter(query: any, user: any): Promise<any> {
     if (list.length > 0) {
       stationOrConditions.push({
         ktvUser: {
+          techStationId: { in: list }
+        }
+      });
+      // Also match reports where the ORDER is assigned to the selected tech station
+      stationOrConditions.push({
+        order: {
           techStationId: { in: list }
         }
       });

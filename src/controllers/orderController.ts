@@ -191,13 +191,21 @@ export async function getOrders(req: Request, res: Response): Promise<void> {
           conditions.push({
             OR: [
               { mainStationId: { in: actualStationIds } },
+              { assignedKtv: { techStation: { mainStationId: { in: actualStationIds } } } },
+              { serviceReports: { some: { ktvUser: { techStation: { mainStationId: { in: actualStationIds } } } } } },
               { mainStationId: null }
             ]
           });
         } else if (hasNullStation) {
           conditions.push({ mainStationId: null });
         } else {
-          conditions.push({ mainStationId: { in: actualStationIds } });
+          conditions.push({
+            OR: [
+              { mainStationId: { in: actualStationIds } },
+              { assignedKtv: { techStation: { mainStationId: { in: actualStationIds } } } },
+              { serviceReports: { some: { ktvUser: { techStation: { mainStationId: { in: actualStationIds } } } } } }
+            ]
+          });
         }
       }
     }
@@ -216,13 +224,11 @@ export async function getOrders(req: Request, res: Response): Promise<void> {
         conditions.push({ appointmentTime: dateCond });
       } else if (type === 'completedAt') {
         conditions.push({ adminStatus: 'hoàn thành' });
+        // Ngày hoàn thành = ngày tạo báo cáo nghiệm thu (serviceReport.createdAt)
+        // Không dùng order.updatedAt/pancakeUpdatedAt vì chỉ là ngày cập nhật chung,
+        // không chính xác là ngày hoàn thành dịch vụ thực tế.
         conditions.push({
-          OR: [
-            { serviceReports: { some: { createdAt: dateCond } } },
-            { serviceReports: { some: { updatedAt: dateCond } } },
-            { updatedAt: dateCond },
-            { pancakeUpdatedAt: dateCond }
-          ]
+          serviceReports: { some: { createdAt: dateCond } }
         });
       } else if (type === 'updatedAt') {
         conditions.push({ pancakeUpdatedAt: dateCond });
@@ -241,7 +247,13 @@ export async function getOrders(req: Request, res: Response): Promise<void> {
     if (techStationIds) {
       const list = typeof techStationIds === 'string' ? techStationIds.split(',') : (Array.isArray(techStationIds) ? techStationIds as string[] : []);
       if (list.length > 0) {
-        conditions.push({ techStationId: { in: list } });
+        conditions.push({
+          OR: [
+            { techStationId: { in: list } },
+            { assignedKtv: { techStationId: { in: list } } },
+            { serviceReports: { some: { ktvUser: { techStationId: { in: list } } } } }
+          ]
+        });
       }
     }
 
