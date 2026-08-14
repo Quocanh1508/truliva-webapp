@@ -36,6 +36,10 @@ const VIETNAM_PROVINCES = [
   'TP Hồ Chí Minh', 'Trà Vinh', 'Tuyên Quang', 'Vĩnh Long', 'Vĩnh Phúc', 'Yên Bái'
 ];
 
+const PRIORITY_PROVINCES = ['TP Hồ Chí Minh', 'Hà Nội', 'Đà Nẵng'];
+const OTHER_PROVINCES = VIETNAM_PROVINCES.filter(p => !PRIORITY_PROVINCES.includes(p));
+const ORDERED_VIETNAM_PROVINCES = [...PRIORITY_PROVINCES, ...OTHER_PROVINCES];
+
 interface ProductInfo {
   serialNumber: string;
   model: string;
@@ -45,16 +49,24 @@ interface ProductInfo {
   warrantyExpiryDate?: string | null;
 }
 
-function ProductSearchableSelect({
-  products,
+function GenericSearchableSelect({
+  items,
   value,
   onChange,
+  placeholder,
+  searchPlaceholder,
+  allowCustomOther = false,
+  otherLabel = '+ Sản phẩm khác',
   onSelectOther
 }: {
-  products: string[];
+  items: string[];
   value: string;
   onChange: (val: string) => void;
-  onSelectOther: () => void;
+  placeholder: string;
+  searchPlaceholder: string;
+  allowCustomOther?: boolean;
+  otherLabel?: string;
+  onSelectOther?: () => void;
 }) {
   const [isOpen, setIsOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
@@ -70,7 +82,7 @@ function ProductSearchableSelect({
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  const filtered = products.filter(p => p.toLowerCase().includes(searchTerm.toLowerCase()));
+  const filtered = items.filter(p => p.toLowerCase().includes(searchTerm.toLowerCase()));
 
   return (
     <div className="relative" ref={dropdownRef}>
@@ -80,7 +92,7 @@ function ProductSearchableSelect({
         className="w-full px-3.5 py-2.5 border border-gray-300 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-200 bg-white flex items-center justify-between text-left font-medium shadow-xs"
       >
         <span className={value ? 'text-gray-800 font-semibold truncate' : 'text-gray-400'}>
-          {value || '-- Chọn Sản phẩm --'}
+          {value || placeholder}
         </span>
         <ChevronDown size={18} className={`text-gray-400 shrink-0 ml-2 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
       </button>
@@ -93,7 +105,7 @@ function ProductSearchableSelect({
             <input
               type="text"
               autoFocus
-              placeholder="Tìm sản phẩm (VD: Delica, Lavita, UR5840...)"
+              placeholder={searchPlaceholder}
               value={searchTerm}
               onChange={e => setSearchTerm(e.target.value)}
               className="w-full text-xs outline-none bg-transparent py-1 font-medium placeholder:text-gray-400 text-gray-800"
@@ -133,27 +145,28 @@ function ProductSearchableSelect({
               ))
             ) : (
               <div className="p-3 text-center text-xs text-gray-400">
-                Không tìm thấy sản phẩm "{searchTerm}"
+                Không tìm thấy kết quả "{searchTerm}"
               </div>
             )}
 
-            {/* Always allow selecting Sản phẩm khác */}
-            <button
-              type="button"
-              onClick={() => {
-                onChange('Sản phẩm khác');
-                onSelectOther();
-                setIsOpen(false);
-                setSearchTerm('');
-              }}
-              className={`w-full text-left px-3 py-2 text-xs rounded-xl transition font-bold border-t border-gray-100 mt-1 ${
-                value === 'Sản phẩm khác'
-                  ? 'bg-blue-50 text-blue-700'
-                  : 'hover:bg-amber-50 text-amber-700'
-              }`}
-            >
-              + Sản phẩm khác
-            </button>
+            {allowCustomOther && (
+              <button
+                type="button"
+                onClick={() => {
+                  onChange('Sản phẩm khác');
+                  if (onSelectOther) onSelectOther();
+                  setIsOpen(false);
+                  setSearchTerm('');
+                }}
+                className={`w-full text-left px-3 py-2 text-xs rounded-xl transition font-bold border-t border-gray-100 mt-1 ${
+                  value === 'Sản phẩm khác'
+                    ? 'bg-blue-50 text-blue-700'
+                    : 'hover:bg-amber-50 text-amber-700'
+                }`}
+              >
+                {otherLabel}
+              </button>
+            )}
           </div>
         </div>
       )}
@@ -658,17 +671,13 @@ export default function WarrantyActivate() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">Tỉnh / Thành phố *</label>
-                  <select
+                  <GenericSearchableSelect
+                    items={ORDERED_VIETNAM_PROVINCES}
                     value={supportProvince}
-                    onChange={e => setSupportProvince(e.target.value)}
-                    className="w-full px-3.5 py-2.5 border border-gray-300 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-200 bg-white"
-                    required
-                  >
-                    <option value="">-- Chọn Tỉnh / Thành phố --</option>
-                    {VIETNAM_PROVINCES.map(p => (
-                      <option key={p} value={p}>{p}</option>
-                    ))}
-                  </select>
+                    onChange={setSupportProvince}
+                    placeholder="-- Chọn Tỉnh / Thành phố --"
+                    searchPlaceholder="Tìm tỉnh / thành phố (VD: TP.HCM, Hà Nội, Đà Nẵng...)"
+                  />
                 </div>
                 <div>
                   <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">Địa chỉ cụ thể *</label>
@@ -687,13 +696,13 @@ export default function WarrantyActivate() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">Sản phẩm *</label>
-                  <ProductSearchableSelect
-                    products={
+                  <GenericSearchableSelect
+                    items={
                       deviceTreeData.products.length > 0
                         ? Array.from(new Set(deviceTreeData.products.map((p: any) => typeof p === 'string' ? p : p.name)))
                             .filter((name: string) => {
                               const lower = name.toLowerCase();
-                              return !lower.includes('lõi') && !lower.includes('loi') && !lower.includes('linh kiện') && !lower.includes('phụ kiện') && !lower.includes('bộ dụng cụ') && !lower.includes('chảo') && !lower.includes('cảm biến');
+                              return !lower.includes('lõi') && !lower.includes('loi') && !lower.includes('linh kiện') && !lower.includes('phụ kiện') && !lower.includes('bộ dụng cụ') && !lower.includes('chảo') && !lower.includes('cảm biến') && !lower.includes('bộ lọc') && !lower.includes('bo loc');
                             })
                         : [
                             'Máy lọc nước Truliva UR61096H',
@@ -711,8 +720,7 @@ export default function WarrantyActivate() {
                             'Máy nóng lạnh treo tường Truliva W6412',
                             'Máy rửa rau Truliva QY/F-I20',
                             'Máy lọc không khí Airplus KJ260',
-                            'Máy lọc không khí Xiaomi Smart Air Purifier 4 Compact',
-                            'Bộ lọc sơ cấp Truliva P1011'
+                            'Máy lọc không khí Xiaomi Smart Air Purifier 4 Compact'
                           ]
                     }
                     value={supportProduct}
@@ -722,6 +730,10 @@ export default function WarrantyActivate() {
                         setCustomSupportProduct('');
                       }
                     }}
+                    placeholder="-- Chọn Sản phẩm --"
+                    searchPlaceholder="Tìm sản phẩm (VD: Delica, Lavita, UR5840...)"
+                    allowCustomOther={true}
+                    otherLabel="+ Sản phẩm khác"
                     onSelectOther={() => setCustomSupportProduct('')}
                   />
                   {(supportProduct === 'Sản phẩm khác' || supportProduct === 'Thiết bị khác') && (
@@ -984,7 +996,7 @@ export default function WarrantyActivate() {
                     className="w-full bg-blue-50/10 border border-gray-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 rounded-xl pl-10 pr-4 py-2.5 text-sm outline-none text-gray-800 transition-all appearance-none cursor-pointer"
                   >
                     <option value="" disabled className="text-gray-400">Chọn Tỉnh/Thành phố *</option>
-                    {VIETNAM_PROVINCES.map(p => (
+                    {ORDERED_VIETNAM_PROVINCES.map(p => (
                       <option key={p} value={p}>{p}</option>
                     ))}
                   </select>
