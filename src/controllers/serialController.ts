@@ -109,13 +109,6 @@ export async function activatePublicSerial(req: Request, res: Response): Promise
       'Chờ duyệt'
     );
 
-    let znsResult = null;
-    try {
-      znsResult = await sendZnsWarrantyActivation(cleaned, customerPhone.trim());
-    } catch (znsError: any) {
-      logger.error('Lỗi gửi tin nhắn ZNS khi khách hàng tự kích hoạt', { serialNumber: cleaned, phone: customerPhone, error: znsError.message });
-    }
-
     res.json({
       success: true,
       message: 'Gửi yêu cầu kích hoạt bảo hành thành công. Vui lòng chờ bộ phận CSKH phê duyệt.',
@@ -124,8 +117,7 @@ export async function activatePublicSerial(req: Request, res: Response): Promise
         model: updated.model,
         warrantyExpiryDate: updated.warrantyExpiryDate,
         activationDate: updated.activationDate
-      },
-      znsResult
+      }
     });
   } catch (error: any) {
     logger.error('Lỗi gửi yêu cầu kích hoạt bảo hành public', { error: error.message });
