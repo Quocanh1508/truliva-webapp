@@ -341,7 +341,7 @@ export default function WarrantyActivate() {
 
         {/* Header Bar */}
         <header className="flex items-center justify-between px-6 py-5 border-b border-white/10 bg-[#101B2E]">
-          <img src="/logo.png" alt="Truliva" className="h-20 sm:h-24 md:h-28 max-h-32 object-contain border-2 border-white/80 p-1.5 rounded-xl bg-white/10 shadow-md" />
+          <img src="/logo.png" alt="Truliva" className="h-20 sm:h-24 md:h-28 max-h-32 object-contain drop-shadow-[1.5px_0_0_#ffffff] drop-shadow-[-1.5px_0_0_#ffffff] drop-shadow-[0_1.5px_0_#ffffff] drop-shadow-[0_-1.5px_0_#ffffff] drop-shadow-[0_0_8px_rgba(255,255,255,0.4)]" />
           <a href="tel:1900638463" className="flex items-center gap-2 text-white/90 hover:text-white transition bg-white/10 hover:bg-white/15 px-4 py-2 rounded-full text-xs sm:text-sm font-bold tracking-wide border border-white/10">
             <Phone size={16} className="text-blue-400" />
             <span>1900 63 84 63</span>
@@ -440,7 +440,7 @@ export default function WarrantyActivate() {
             <ChevronLeft size={20} />
             <span>Trang chủ</span>
           </button>
-          <img src="/logo.png" alt="Truliva" className="h-20 sm:h-24 md:h-28 max-h-32 object-contain border-2 border-white/80 p-1.5 rounded-xl bg-white/10 shadow-md" />
+          <img src="/logo.png" alt="Truliva" className="h-20 sm:h-24 md:h-28 max-h-32 object-contain drop-shadow-[1.5px_0_0_#ffffff] drop-shadow-[-1.5px_0_0_#ffffff] drop-shadow-[0_1.5px_0_#ffffff] drop-shadow-[0_-1.5px_0_#ffffff] drop-shadow-[0_0_8px_rgba(255,255,255,0.4)]" />
         </header>
 
         <div className="flex-1 flex flex-col items-center justify-center p-4 py-8">
@@ -665,7 +665,7 @@ export default function WarrantyActivate() {
             <ChevronLeft size={20} />
             <span>Trang chủ</span>
           </button>
-          <img src="/logo.png" alt="Truliva" className="h-20 sm:h-24 md:h-28 max-h-32 object-contain border-2 border-white/80 p-1.5 rounded-xl bg-white/10 shadow-md" />
+          <img src="/logo.png" alt="Truliva" className="h-20 sm:h-24 md:h-28 max-h-32 object-contain drop-shadow-[1.5px_0_0_#ffffff] drop-shadow-[-1.5px_0_0_#ffffff] drop-shadow-[0_1.5px_0_#ffffff] drop-shadow-[0_-1.5px_0_#ffffff] drop-shadow-[0_0_8px_rgba(255,255,255,0.4)]" />
         </header>
 
         <div className="flex-1 flex flex-col items-center justify-center p-4 py-8">
@@ -719,7 +719,7 @@ export default function WarrantyActivate() {
           <ChevronLeft size={20} />
           <span>{step === 2 ? 'Quay lại' : 'Trang chủ'}</span>
         </button>
-        <img src="/logo.png" alt="Truliva" className="h-20 sm:h-24 md:h-28 max-h-32 object-contain border-2 border-white/80 p-1.5 rounded-xl bg-white/10 shadow-md" />
+        <img src="/logo.png" alt="Truliva" className="h-20 sm:h-24 md:h-28 max-h-32 object-contain drop-shadow-[1.5px_0_0_#ffffff] drop-shadow-[-1.5px_0_0_#ffffff] drop-shadow-[0_1.5px_0_#ffffff] drop-shadow-[0_-1.5px_0_#ffffff] drop-shadow-[0_0_8px_rgba(255,255,255,0.4)]" />
       </header>
 
       {/* Main Container */}
