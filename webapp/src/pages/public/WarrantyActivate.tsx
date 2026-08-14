@@ -461,7 +461,7 @@ export default function WarrantyActivate() {
           model: data.serial.model,
           standardMonths: productInfo.standardMonths,
           totalMonths: productInfo.totalMonths,
-          status: 'Chờ duyệt',
+          status: 'Đã kích hoạt',
           warrantyExpiryDate: data.serial.warrantyExpiryDate
         });
       }
@@ -1201,13 +1201,13 @@ export default function WarrantyActivate() {
 
             <div>
               <h2 className="text-lg font-extrabold text-gray-800 uppercase tracking-wider">
-                Đăng ký thành công!
+                Kích hoạt thành công!
               </h2>
               <p className="text-xs text-gray-500 mt-2 leading-relaxed px-2 font-medium">
-                {successMessage || 'Yêu cầu kích hoạt bảo hành điện tử của quý khách đã được lưu nhận trên hệ thống.'}
+                {successMessage || 'Bảo hành điện tử cho thiết bị của Quý khách đã được kích hoạt thành công trên hệ thống Truliva.'}
               </p>
-              <p className="text-xs text-blue-700 mt-2.5 font-semibold bg-blue-500/5 border border-blue-500/10 px-3 py-2.5 rounded-xl leading-relaxed">
-                Hướng dẫn xác nhận kích hoạt bảo hành đã được gửi qua tin nhắn Zalo đến số điện thoại di động {customerPhone}. Quý khách vui lòng kiểm tra tin nhắn để hoàn tất.
+              <p className="text-xs text-emerald-700 mt-2.5 font-semibold bg-emerald-500/10 border border-emerald-500/20 px-3 py-2.5 rounded-xl leading-relaxed">
+                Tin nhắn xác nhận kích hoạt bảo hành cùng mã Voucher ưu đãi đã được gửi qua Zalo đến số điện thoại {customerPhone}.
               </p>
             </div>
 
@@ -1219,8 +1219,8 @@ export default function WarrantyActivate() {
                 <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">
                   Thẻ bảo hành điện tử
                 </span>
-                <span className="text-[10px] font-bold text-blue-600 uppercase tracking-wider">
-                  Chờ phê duyệt
+                <span className="text-[10px] font-bold text-emerald-600 uppercase tracking-wider">
+                  Đã kích hoạt
                 </span>
               </div>
 
