@@ -659,34 +659,44 @@ export default function WarrantyActivate() {
   // ==================== STEP 11: TECH SUPPORT SUCCESS ====================
   if (step === 11) {
     return (
-      <div className="min-h-screen bg-[#1B2A4A] flex flex-col font-sans antialiased justify-center items-center p-4">
-        <div className="bg-white rounded-2xl shadow-2xl p-8 max-w-md w-full text-center space-y-5 animate-fade-in">
-          <div className="w-16 h-16 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mx-auto">
-            <CheckCircle size={36} />
-          </div>
+      <div className="min-h-screen bg-[#14223A] flex flex-col font-sans antialiased">
+        <header className="flex items-center justify-between px-6 py-4 border-b border-white/10 bg-[#101B2E]">
+          <button onClick={() => setStep(0)} className="flex items-center gap-1.5 text-white/80 hover:text-white text-sm font-semibold transition">
+            <ChevronLeft size={20} />
+            <span>Trang chủ</span>
+          </button>
+          <img src="/logo.png" alt="Truliva" className="h-14 sm:h-18 max-h-20 object-contain brightness-0 invert" />
+        </header>
 
-          <div className="space-y-2">
-            <h2 className="text-xl font-extrabold text-gray-800">Yêu Cầu Hỗ Trợ Đã Gửi Thành Công!</h2>
-            <div className="inline-block px-3 py-1 bg-blue-50 border border-blue-200 text-blue-700 font-mono font-bold text-sm rounded-lg">
-              Mã Yêu Cầu: {supportSuccessTicket}
+        <div className="flex-1 flex flex-col items-center justify-center p-4 py-8">
+          <div className="bg-white rounded-2xl shadow-2xl p-8 max-w-md w-full text-center space-y-5 animate-fade-in">
+            <div className="w-16 h-16 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mx-auto">
+              <CheckCircle size={36} />
             </div>
-            <p className="text-xs text-gray-500 leading-relaxed pt-2">
-              Bộ phận Hotline và Kỹ thuật viên Truliva đã tiếp nhận thông tin sự cố của bạn. Chúng tôi sẽ chủ động liên hệ qua số điện thoại <b>{supportPhone}</b> trong thời gian sớm nhất.
-            </p>
-          </div>
 
-          <div className="pt-2">
-            <button
-              onClick={() => {
-                setSupportName(''); setSupportPhone(''); setSupportSecondaryPhones('');
-                setSupportEmail(''); setSupportProvince(''); setSupportAddress('');
-                setSupportProduct(''); setSupportSerial(''); setSupportDetail('');
-                setStep(0);
-              }}
-              className="w-full py-3 bg-[#1B3A6B] hover:bg-[#122749] text-white rounded-xl font-bold text-sm transition shadow-md"
-            >
-              Về Trang Chủ
-            </button>
+            <div className="space-y-2">
+              <h2 className="text-xl font-extrabold text-gray-800">Yêu Cầu Hỗ Trợ Đã Gửi Thành Công!</h2>
+              <div className="inline-block px-3 py-1 bg-blue-50 border border-blue-200 text-blue-700 font-mono font-bold text-sm rounded-lg">
+                Mã Yêu Cầu: {supportSuccessTicket}
+              </div>
+              <p className="text-xs text-gray-500 leading-relaxed pt-2">
+                Bộ phận Hotline và Kỹ thuật viên Truliva đã tiếp nhận thông tin sự cố của bạn. Chúng tôi sẽ chủ động liên hệ qua số điện thoại <b>{supportPhone}</b> trong thời gian sớm nhất.
+              </p>
+            </div>
+
+            <div className="pt-2">
+              <button
+                onClick={() => {
+                  setSupportName(''); setSupportPhone(''); setSupportSecondaryPhones('');
+                  setSupportEmail(''); setSupportProvince(''); setSupportAddress('');
+                  setSupportProduct(''); setSupportSerial(''); setSupportDetail('');
+                  setStep(0);
+                }}
+                className="w-full py-3 bg-[#1B3A6B] hover:bg-[#122749] text-white rounded-xl font-bold text-sm transition shadow-md"
+              >
+                Về Trang Chủ
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -695,44 +705,47 @@ export default function WarrantyActivate() {
 
   // ==================== STEP 1-3: FORM FLOW ====================
   return (
-    <div className="min-h-screen bg-gradient-to-b from-[#0D1B3E] via-[#142952] to-[#1B3A6B] text-gray-800 flex flex-col items-center justify-center p-4 font-sans antialiased relative overflow-hidden">
+    <div className="min-h-screen bg-[#14223A] flex flex-col font-sans antialiased">
       
-      {/* Decorative background glow */}
-      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full max-w-7xl h-[400px] bg-blue-400/5 blur-[120px] rounded-full pointer-events-none" />
+      {/* Header Bar đồng bộ chuẩn UI */}
+      <header className="flex items-center justify-between px-6 py-4 border-b border-white/10 bg-[#101B2E]">
+        <button
+          onClick={() => {
+            if (step === 2) setStep(1);
+            else setStep(0);
+          }}
+          className="flex items-center gap-1.5 text-white/80 hover:text-white text-sm font-semibold transition"
+        >
+          <ChevronLeft size={20} />
+          <span>{step === 2 ? 'Quay lại' : 'Trang chủ'}</span>
+        </button>
+        <img src="/logo.png" alt="Truliva" className="h-14 sm:h-18 max-h-20 object-contain brightness-0 invert" />
+      </header>
 
       {/* Main Container */}
-      <div className="w-full max-w-md bg-white/95 backdrop-blur-xl border border-blue-100 rounded-2xl shadow-xl shadow-blue-950/10 p-6 relative z-10 my-8">
-        
-        {/* Banner Image */}
-        <div className="w-full rounded-xl overflow-hidden mb-6 shadow-sm border border-blue-100">
-          <img src="/banner.png" alt="Truliva Banner" className="w-full h-auto object-cover" />
-        </div>
-
-        {/* Branding Header */}
-        <div className="text-center mb-6">
-          <div className="w-16 h-16 bg-blue-50 border border-blue-200/50 rounded-full flex items-center justify-center mx-auto mb-3 shadow-md shadow-blue-500/5">
-            <ShieldCheck size={36} className="text-blue-600" />
+      <div className="flex-1 flex flex-col items-center justify-center p-4 py-8">
+        <div className="w-full max-w-lg bg-white rounded-2xl shadow-2xl overflow-hidden p-6 relative z-10">
+          
+          {/* Banner Image */}
+          <div className="w-full rounded-xl overflow-hidden mb-6 shadow-sm border border-blue-100">
+            <img src="/banner.png" alt="Truliva Banner" className="w-full h-auto object-cover" />
           </div>
-          <h1 className="text-xl font-extrabold uppercase tracking-wider text-transparent bg-clip-text bg-gradient-to-r from-blue-700 to-blue-500">
-            KÍCH HOẠT BẢO HÀNH
-          </h1>
-          <p className="text-[10px] text-gray-500 font-bold mt-1 uppercase tracking-widest">
-            Truliva Official
-          </p>
-        </div>
 
-        {/* STEP 1: Enter Details & Invoice */}
-        {step === 1 && (
-          <div className="space-y-4">
-            <button
-              type="button"
-              onClick={() => setStep(0)}
-              className="flex items-center gap-1.5 text-xs font-bold text-gray-600 hover:text-blue-600 transition bg-gray-100 hover:bg-blue-50 px-3 py-1.5 rounded-lg border border-gray-200"
-            >
-              <ChevronLeft size={16} />
-              <span>Quay lại Trang chủ</span>
-            </button>
+          {/* Branding Header */}
+          <div className="text-center mb-6">
+            <div className="w-16 h-16 bg-blue-50 border border-blue-200/50 rounded-full flex items-center justify-center mx-auto mb-3 shadow-md shadow-blue-500/5">
+              <ShieldCheck size={36} className="text-blue-600" />
+            </div>
+            <h1 className="text-xl font-extrabold uppercase tracking-wider text-transparent bg-clip-text bg-gradient-to-r from-blue-700 to-blue-500">
+              KÍCH HOẠT BẢO HÀNH
+            </h1>
+            <p className="text-[10px] text-gray-500 font-bold mt-1 uppercase tracking-widest">
+              Truliva Official
+            </p>
+          </div>
 
+          {/* STEP 1: Enter Details & Invoice */}
+          {step === 1 && (
             <form onSubmit={handleCheckAndProceed} className="space-y-4">
             <div className="bg-blue-50/40 border border-blue-100/60 rounded-xl p-4 text-center">
               <Sparkles size={20} className="mx-auto text-blue-600 mb-2" />
@@ -912,29 +925,11 @@ export default function WarrantyActivate() {
               )}
             </button>
           </form>
-          </div>
         )}
 
         {/* STEP 2: Check & Confirm Details */}
         {step === 2 && productInfo && (
           <form onSubmit={handleSubmitActivation} className="space-y-5">
-            <div className="flex items-center justify-between gap-2 mb-2">
-              <button
-                type="button"
-                onClick={() => setStep(1)}
-                className="flex items-center gap-1 text-xs text-gray-600 hover:text-blue-600 font-bold bg-gray-100 hover:bg-blue-50 px-2.5 py-1.5 rounded-lg border border-gray-200 transition"
-              >
-                <ChevronLeft size={16} /> Quay lại chỉnh sửa
-              </button>
-              <button
-                type="button"
-                onClick={() => setStep(0)}
-                className="text-xs font-bold text-gray-500 hover:text-blue-600 transition px-2.5 py-1.5"
-              >
-                Về Trang chủ
-              </button>
-            </div>
-
             <div className="space-y-1">
               <h3 className="font-bold text-gray-800 text-base">Kiểm tra thông tin</h3>
               <p className="text-xs text-gray-500 leading-relaxed font-medium">
@@ -1116,6 +1111,7 @@ export default function WarrantyActivate() {
           </div>
         )}
 
+        </div>
       </div>
 
       {/* Zalo OA Button */}
@@ -1123,7 +1119,7 @@ export default function WarrantyActivate() {
         href="https://zalo.me/3870382725035413507"
         target="_blank"
         rel="noopener noreferrer"
-        className="w-full max-w-md bg-white/10 hover:bg-white/15 border border-white/15 text-white/80 hover:text-white font-bold py-3.5 px-4 rounded-xl text-xs transition-all shadow-sm flex items-center justify-center gap-2.5 mb-4 relative z-10 active:scale-[0.98]"
+        className="w-full max-w-md bg-white/10 hover:bg-white/15 border border-white/15 text-white/80 hover:text-white font-bold py-3.5 px-4 rounded-xl text-xs transition-all shadow-sm flex items-center justify-center gap-2.5 mb-4 relative z-10 active:scale-[0.98] mx-auto"
       >
         <svg viewBox="0 0 24 24" className="w-5 h-5 fill-[#0068ff] shrink-0">
           <path d="M12.003 2C6.478 2 2 6.136 2 11.238c0 3.125 1.688 5.88 4.298 7.48-.12.443-.655 2.417-.655 2.417-.06.223.167.387.352.268 0 0 2.278-1.52 3.162-2.09.91.246 1.875.38 2.846.38 5.525 0 10.003-4.137 10.003-9.24C22.006 6.137 17.528 2 12.003 2zm3.36 12.164h-4.32l4.316-5.064c.2-.236.033-.593-.274-.593H10.15a.394.394 0 0 0-.394.394v.822c0 .218.176.394.394.394h3.766L9.6 13.18a.394.394 0 0 0 .274.593h4.945a.394.394 0 0 0 .394-.394V12.56a.394.394 0 0 0-.394-.394z"/>
@@ -1131,7 +1127,7 @@ export default function WarrantyActivate() {
         <span className="tracking-wide">Hỗ trợ Zalo OA: Truliva chuyên nghiệp và tận tâm</span>
       </a>
 
-      <div className="text-center text-[10px] text-white/40 relative z-10 max-w-xs leading-relaxed">
+      <div className="text-center text-[10px] text-white/40 relative z-10 max-w-xs leading-relaxed mx-auto pb-6">
         <p>© 2026 Truliva Vietnam. Tất cả quyền được bảo lưu.</p>
         <p className="mt-1">Hotline CSKH: 1900 63 84 63 (Hỗ trợ 8h00 - 18h00 hàng ngày)</p>
       </div>
