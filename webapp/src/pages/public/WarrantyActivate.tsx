@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { ShieldCheck, ArrowRight, UploadCloud, CheckCircle, AlertTriangle, Smartphone, User, MapPin, Loader2, Sparkles, ChevronLeft, Phone, Wrench, Send } from 'lucide-react';
+import { ShieldCheck, ArrowRight, UploadCloud, CheckCircle, AlertTriangle, Smartphone, User, MapPin, Loader2, Sparkles, ChevronLeft, Phone, Wrench, Send, Search, ChevronDown } from 'lucide-react';
 import { API_URL } from '../../api/client';
 import { isValidPhone, PHONE_ERROR_MSG } from '../../utils/phone';
 
@@ -43,6 +43,122 @@ interface ProductInfo {
   totalMonths: number;
   status: string;
   warrantyExpiryDate?: string | null;
+}
+
+function ProductSearchableSelect({
+  products,
+  value,
+  onChange,
+  onSelectOther
+}: {
+  products: string[];
+  value: string;
+  onChange: (val: string) => void;
+  onSelectOther: () => void;
+}) {
+  const [isOpen, setIsOpen] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+        setIsOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const filtered = products.filter(p => p.toLowerCase().includes(searchTerm.toLowerCase()));
+
+  return (
+    <div className="relative" ref={dropdownRef}>
+      <button
+        type="button"
+        onClick={() => setIsOpen(!isOpen)}
+        className="w-full px-3.5 py-2.5 border border-gray-300 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-200 bg-white flex items-center justify-between text-left font-medium shadow-xs"
+      >
+        <span className={value ? 'text-gray-800 font-semibold truncate' : 'text-gray-400'}>
+          {value || '-- Chọn Sản phẩm --'}
+        </span>
+        <ChevronDown size={18} className={`text-gray-400 shrink-0 ml-2 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+      </button>
+
+      {isOpen && (
+        <div className="absolute left-0 right-0 top-full mt-1 bg-white border border-gray-200 rounded-2xl shadow-2xl z-50 overflow-hidden text-left animate-fade-in flex flex-col max-h-72">
+          {/* Search Bar */}
+          <div className="p-2 border-b border-gray-100 bg-gray-50/90 sticky top-0 z-10 flex items-center gap-2">
+            <Search size={16} className="text-gray-400 shrink-0 ml-1" />
+            <input
+              type="text"
+              autoFocus
+              placeholder="Tìm sản phẩm (VD: Delica, Lavita, UR5840...)"
+              value={searchTerm}
+              onChange={e => setSearchTerm(e.target.value)}
+              className="w-full text-xs outline-none bg-transparent py-1 font-medium placeholder:text-gray-400 text-gray-800"
+            />
+            {searchTerm && (
+              <button
+                type="button"
+                onClick={() => setSearchTerm('')}
+                className="text-gray-400 hover:text-gray-600 text-xs px-1 font-bold"
+              >
+                ✕
+              </button>
+            )}
+          </div>
+
+          {/* List items */}
+          <div className="overflow-y-auto max-h-56 p-1.5 space-y-0.5 custom-scrollbar">
+            {filtered.length > 0 ? (
+              filtered.map((item) => (
+                <button
+                  type="button"
+                  key={item}
+                  onClick={() => {
+                    onChange(item);
+                    setIsOpen(false);
+                    setSearchTerm('');
+                  }}
+                  className={`w-full text-left px-3 py-2 text-xs rounded-xl transition flex items-center justify-between font-medium ${
+                    value === item
+                      ? 'bg-blue-50 text-blue-700 font-bold'
+                      : 'hover:bg-gray-100 text-gray-700'
+                  }`}
+                >
+                  <span>{item}</span>
+                  {value === item && <CheckCircle size={14} className="text-blue-600 shrink-0 ml-2" />}
+                </button>
+              ))
+            ) : (
+              <div className="p-3 text-center text-xs text-gray-400">
+                Không tìm thấy sản phẩm "{searchTerm}"
+              </div>
+            )}
+
+            {/* Always allow selecting Sản phẩm khác */}
+            <button
+              type="button"
+              onClick={() => {
+                onChange('Sản phẩm khác');
+                onSelectOther();
+                setIsOpen(false);
+                setSearchTerm('');
+              }}
+              className={`w-full text-left px-3 py-2 text-xs rounded-xl transition font-bold border-t border-gray-100 mt-1 ${
+                value === 'Sản phẩm khác'
+                  ? 'bg-blue-50 text-blue-700'
+                  : 'hover:bg-amber-50 text-amber-700'
+              }`}
+            >
+              + Sản phẩm khác
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
 }
 
 export default function WarrantyActivate() {
@@ -571,48 +687,43 @@ export default function WarrantyActivate() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">Sản phẩm *</label>
-                  <select
+                  <ProductSearchableSelect
+                    products={
+                      deviceTreeData.products.length > 0
+                        ? Array.from(new Set(deviceTreeData.products.map((p: any) => typeof p === 'string' ? p : p.name)))
+                            .filter((name: string) => {
+                              const lower = name.toLowerCase();
+                              return !lower.includes('lõi') && !lower.includes('loi') && !lower.includes('linh kiện') && !lower.includes('phụ kiện') && !lower.includes('bộ dụng cụ') && !lower.includes('chảo') && !lower.includes('cảm biến');
+                            })
+                        : [
+                            'Máy lọc nước Truliva UR61096H',
+                            'Máy lọc nước Truliva UR5840',
+                            'Máy lọc nước Delica UR5440',
+                            'Máy lọc nước Delica UR5640',
+                            'Máy lọc nước Delica UR5840',
+                            'Máy lọc nước Lavita CR5240',
+                            'Máy lọc nước Tanka UR3140',
+                            'Máy lọc nước Truliva Lavita CR-ZX5170',
+                            'Máy lọc nước Truliva UR3626',
+                            'Máy lọc nước Truliva UR5676',
+                            'Máy lọc nước Ultima Black',
+                            'Máy nóng lạnh Truliva Lavita YDZ-5301D',
+                            'Máy nóng lạnh treo tường Truliva W6412',
+                            'Máy rửa rau Truliva QY/F-I20',
+                            'Máy lọc không khí Airplus KJ260',
+                            'Máy lọc không khí Xiaomi Smart Air Purifier 4 Compact',
+                            'Bộ lọc sơ cấp Truliva P1011'
+                          ]
+                    }
                     value={supportProduct}
-                    onChange={e => {
-                      setSupportProduct(e.target.value);
-                      if (e.target.value !== 'Sản phẩm khác' && e.target.value !== 'Thiết bị khác') {
+                    onChange={(val) => {
+                      setSupportProduct(val);
+                      if (val !== 'Sản phẩm khác' && val !== 'Thiết bị khác') {
                         setCustomSupportProduct('');
                       }
                     }}
-                    className="w-full px-3.5 py-2.5 border border-gray-300 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-200 bg-white"
-                    required
-                  >
-                    <option value="">-- Chọn Sản phẩm --</option>
-                    {(deviceTreeData.products.length > 0
-                      ? Array.from(new Set(deviceTreeData.products.map((p: any) => typeof p === 'string' ? p : p.name)))
-                          .filter((name: string) => {
-                            const lower = name.toLowerCase();
-                            return !lower.includes('lõi') && !lower.includes('loi') && !lower.includes('linh kiện') && !lower.includes('phụ kiện') && !lower.includes('bộ dụng cụ') && !lower.includes('chảo') && !lower.includes('cảm biến');
-                          })
-                      : [
-                          'Máy lọc nước Truliva UR61096H',
-                          'Máy lọc nước Truliva UR5840',
-                          'Máy lọc nước Delica UR5440',
-                          'Máy lọc nước Delica UR5640',
-                          'Máy lọc nước Delica UR5840',
-                          'Máy lọc nước Lavita CR5240',
-                          'Máy lọc nước Tanka UR3140',
-                          'Máy lọc nước Truliva Lavita CR-ZX5170',
-                          'Máy lọc nước Truliva UR3626',
-                          'Máy lọc nước Truliva UR5676',
-                          'Máy lọc nước Ultima Black',
-                          'Máy nóng lạnh Truliva Lavita YDZ-5301D',
-                          'Máy nóng lạnh treo tường Truliva W6412',
-                          'Máy rửa rau Truliva QY/F-I20',
-                          'Máy lọc không khí Airplus KJ260',
-                          'Máy lọc không khí Xiaomi Smart Air Purifier 4 Compact',
-                          'Bộ lọc sơ cấp Truliva P1011'
-                        ]
-                    ).map((pName: string) => (
-                      <option key={pName} value={pName}>{pName}</option>
-                    ))}
-                    <option value="Sản phẩm khác">Sản phẩm khác</option>
-                  </select>
+                    onSelectOther={() => setCustomSupportProduct('')}
+                  />
                   {(supportProduct === 'Sản phẩm khác' || supportProduct === 'Thiết bị khác') && (
                     <input
                       type="text"
