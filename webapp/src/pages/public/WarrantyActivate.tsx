@@ -480,11 +480,11 @@ export default function WarrantyActivate() {
       <div className="min-h-screen bg-white flex flex-col font-sans antialiased">
 
         {/* Header Bar */}
-        <header className="flex items-center justify-between px-6 py-6 border-b border-white/10 bg-[#101B2E]">
+        <header className="flex items-center justify-between px-6 py-4 sm:py-5 border-b border-white/10 bg-[#101B2E]">
           <img 
             src="/logo.png" 
             alt="Truliva" 
-            className="h-28 sm:h-36 md:h-44 max-h-48 object-contain" 
+            className="h-14 sm:h-18 md:h-20 max-h-24 object-contain" 
             style={{
               filter: 'drop-shadow(1.5px 0 0 #ffffff) drop-shadow(-1.5px 0 0 #ffffff) drop-shadow(0 1.5px 0 #ffffff) drop-shadow(0 -1.5px 0 #ffffff) drop-shadow(1px 1px 0 #ffffff) drop-shadow(-1px -1px 0 #ffffff) drop-shadow(1px -1px 0 #ffffff) drop-shadow(-1px 1px 0 #ffffff)'
             }}
@@ -582,7 +582,7 @@ export default function WarrantyActivate() {
   if (step === 10) {
     return (
       <div className="min-h-screen bg-[#1B2A4A] flex flex-col font-sans antialiased">
-        <header className="flex items-center justify-between px-6 py-6 border-b border-white/10 bg-[#101B2E]">
+        <header className="flex items-center justify-between px-6 py-4 sm:py-5 border-b border-white/10 bg-[#101B2E]">
           <button onClick={() => setStep(0)} className="flex items-center gap-1.5 text-white/80 hover:text-white text-sm font-semibold transition">
             <ChevronLeft size={20} />
             <span>Trang chủ</span>
@@ -590,7 +590,7 @@ export default function WarrantyActivate() {
           <img 
             src="/logo.png" 
             alt="Truliva" 
-            className="h-28 sm:h-36 md:h-44 max-h-48 object-contain" 
+            className="h-14 sm:h-18 md:h-20 max-h-24 object-contain" 
             style={{
               filter: 'drop-shadow(1.5px 0 0 #ffffff) drop-shadow(-1.5px 0 0 #ffffff) drop-shadow(0 1.5px 0 #ffffff) drop-shadow(0 -1.5px 0 #ffffff) drop-shadow(1px 1px 0 #ffffff) drop-shadow(-1px -1px 0 #ffffff) drop-shadow(1px -1px 0 #ffffff) drop-shadow(-1px 1px 0 #ffffff)'
             }}
@@ -820,7 +820,7 @@ export default function WarrantyActivate() {
   if (step === 11) {
     return (
       <div className="min-h-screen bg-[#14223A] flex flex-col font-sans antialiased">
-        <header className="flex items-center justify-between px-6 py-6 border-b border-white/10 bg-[#101B2E]">
+        <header className="flex items-center justify-between px-6 py-4 sm:py-5 border-b border-white/10 bg-[#101B2E]">
           <button onClick={() => setStep(0)} className="flex items-center gap-1.5 text-white/80 hover:text-white text-sm font-semibold transition">
             <ChevronLeft size={20} />
             <span>Trang chủ</span>
@@ -828,7 +828,7 @@ export default function WarrantyActivate() {
           <img 
             src="/logo.png" 
             alt="Truliva" 
-            className="h-28 sm:h-36 md:h-44 max-h-48 object-contain" 
+            className="h-14 sm:h-18 md:h-20 max-h-24 object-contain" 
             style={{
               filter: 'drop-shadow(1.5px 0 0 #ffffff) drop-shadow(-1.5px 0 0 #ffffff) drop-shadow(0 1.5px 0 #ffffff) drop-shadow(0 -1.5px 0 #ffffff) drop-shadow(1px 1px 0 #ffffff) drop-shadow(-1px -1px 0 #ffffff) drop-shadow(1px -1px 0 #ffffff) drop-shadow(-1px 1px 0 #ffffff)'
             }}
@@ -875,7 +875,7 @@ export default function WarrantyActivate() {
     <div className="min-h-screen bg-[#14223A] flex flex-col font-sans antialiased">
       
       {/* Header Bar đồng bộ chuẩn UI */}
-      <header className="flex items-center justify-between px-6 py-6 border-b border-white/10 bg-[#101B2E]">
+      <header className="flex items-center justify-between px-6 py-4 sm:py-5 border-b border-white/10 bg-[#101B2E]">
         <button
           onClick={() => {
             if (step === 2) setStep(1);
@@ -889,7 +889,7 @@ export default function WarrantyActivate() {
         <img 
           src="/logo.png" 
           alt="Truliva" 
-          className="h-28 sm:h-36 md:h-44 max-h-48 object-contain" 
+          className="h-14 sm:h-18 md:h-20 max-h-24 object-contain" 
           style={{
             filter: 'drop-shadow(1.5px 0 0 #ffffff) drop-shadow(-1.5px 0 0 #ffffff) drop-shadow(0 1.5px 0 #ffffff) drop-shadow(0 -1.5px 0 #ffffff) drop-shadow(1px 1px 0 #ffffff) drop-shadow(-1px -1px 0 #ffffff) drop-shadow(1px -1px 0 #ffffff) drop-shadow(-1px 1px 0 #ffffff)'
           }}
