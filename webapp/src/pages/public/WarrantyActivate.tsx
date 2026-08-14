@@ -723,7 +723,17 @@ export default function WarrantyActivate() {
 
         {/* STEP 1: Enter Details & Invoice */}
         {step === 1 && (
-          <form onSubmit={handleCheckAndProceed} className="space-y-4">
+          <div className="space-y-4">
+            <button
+              type="button"
+              onClick={() => setStep(0)}
+              className="flex items-center gap-1.5 text-xs font-bold text-gray-600 hover:text-blue-600 transition bg-gray-100 hover:bg-blue-50 px-3 py-1.5 rounded-lg border border-gray-200"
+            >
+              <ChevronLeft size={16} />
+              <span>Quay lại Trang chủ</span>
+            </button>
+
+            <form onSubmit={handleCheckAndProceed} className="space-y-4">
             <div className="bg-blue-50/40 border border-blue-100/60 rounded-xl p-4 text-center">
               <Sparkles size={20} className="mx-auto text-blue-600 mb-2" />
               <p className="text-xs text-gray-600 leading-relaxed font-medium">
@@ -902,18 +912,28 @@ export default function WarrantyActivate() {
               )}
             </button>
           </form>
+          </div>
         )}
 
         {/* STEP 2: Check & Confirm Details */}
         {step === 2 && productInfo && (
           <form onSubmit={handleSubmitActivation} className="space-y-5">
-            <button
-              type="button"
-              onClick={() => setStep(1)}
-              className="flex items-center gap-1 text-xs text-gray-500 hover:text-gray-700 font-bold outline-none mb-2"
-            >
-              <ChevronLeft size={16} /> Quay lại chỉnh sửa
-            </button>
+            <div className="flex items-center justify-between gap-2 mb-2">
+              <button
+                type="button"
+                onClick={() => setStep(1)}
+                className="flex items-center gap-1 text-xs text-gray-600 hover:text-blue-600 font-bold bg-gray-100 hover:bg-blue-50 px-2.5 py-1.5 rounded-lg border border-gray-200 transition"
+              >
+                <ChevronLeft size={16} /> Quay lại chỉnh sửa
+              </button>
+              <button
+                type="button"
+                onClick={() => setStep(0)}
+                className="text-xs font-bold text-gray-500 hover:text-blue-600 transition px-2.5 py-1.5"
+              >
+                Về Trang chủ
+              </button>
+            </div>
 
             <div className="space-y-1">
               <h3 className="font-bold text-gray-800 text-base">Kiểm tra thông tin</h3>
