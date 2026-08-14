@@ -1575,21 +1575,53 @@ export async function testZnsSend(req: Request, res: Response): Promise<void> {
     const prodName = productName?.trim() || 'Máy lọc nước Truliva UR61096H';
     const expDate = expiryDate?.trim() || '20/07/2027';
 
+    const testTemplateData = {
+      // 1. Zalo ZBS Template 617366 standard underscore format (_PARAM_NAME_)
+      _TEN_KHACH_HANG_: custName,
+      _TEN_SAN_PHAM_: prodName,
+      _SO_SERI_: cleanSerial,
+      _NGAY_HET_BAO_HANH_: expDate,
+
+      // 2. Uppercase without leading/trailing underscore
+      TEN_KHACH_HANG: custName,
+      TEN_SAN_PHAM: prodName,
+      SO_SERI: cleanSerial,
+      NGAY_HET_BAO_HANH: expDate,
+
+      // 3. PascalCase / TitleCase format
+      Ten_Khach_Hang: custName,
+      Ten_San_Pham: prodName,
+      So_Seri: cleanSerial,
+      Ngay_Het_Bao_Hanh: expDate,
+
+      // 4. snake_case vietnamese
+      ten_khach_hang: custName,
+      ten_san_pham: prodName,
+      so_seri: cleanSerial,
+      ngay_het_bao_hanh: expDate,
+
+      // 5. English snake_case
+      customer_name: custName,
+      product_name: prodName,
+      code: cleanSerial,
+      serial_number: cleanSerial,
+      expiry_date: expDate,
+      time: expDate,
+      date: expDate,
+
+      // 6. English uppercase underscore format
+      _CUSTOMER_NAME_: custName,
+      _PRODUCT_NAME_: prodName,
+      _CODE_: cleanSerial,
+      _SERIAL_NUMBER_: cleanSerial,
+      _EXPIRY_DATE_: expDate,
+      _TIME_: expDate
+    };
+
     const fnsPayload = {
       phone: cleanedPhone,
       template_id: templateId,
-      template_data: {
-        Ten_Khach_Hang: custName,
-        customer_name: custName,
-        Ten_San_Pham: prodName,
-        product_name: prodName,
-        So_Seri: cleanSerial,
-        code: cleanSerial,
-        serial_number: cleanSerial,
-        Ngay_Het_Bao_Hanh: expDate,
-        expiry_date: expDate,
-        time: expDate
-      },
+      template_data: testTemplateData,
       ref_id: `TEST-${cleanSerial}-${Date.now()}`
     };
 
@@ -1651,12 +1683,7 @@ export async function testZnsSend(req: Request, res: Response): Promise<void> {
       const zaloPayload = {
         phone: cleanedPhone,
         template_id: templateId,
-        template_data: {
-          customer_name: custName,
-          product_name: prodName,
-          code: cleanSerial,
-          time: expDate
-        },
+        template_data: testTemplateData,
         tracking_id: `TEST-${cleanSerial}-${Date.now()}`
       };
 

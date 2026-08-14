@@ -218,16 +218,46 @@ export async function sendZnsWarrantyActivation(
 
   // Common template data payload matching ZBS / ZNS approved Template 617366
   const templateData = {
+    // 1. Zalo ZBS Template 617366 standard underscore format (_PARAM_NAME_)
+    _TEN_KHACH_HANG_: customerName,
+    _TEN_SAN_PHAM_: productName,
+    _SO_SERI_: cleanSerial,
+    _NGAY_HET_BAO_HANH_: expiryDateStr,
+
+    // 2. Uppercase without leading/trailing underscore
+    TEN_KHACH_HANG: customerName,
+    TEN_SAN_PHAM: productName,
+    SO_SERI: cleanSerial,
+    NGAY_HET_BAO_HANH: expiryDateStr,
+
+    // 3. PascalCase / TitleCase format
     Ten_Khach_Hang: customerName,
-    customer_name: customerName,
     Ten_San_Pham: productName,
-    product_name: productName,
     So_Seri: cleanSerial,
+    Ngay_Het_Bao_Hanh: expiryDateStr,
+
+    // 4. snake_case vietnamese
+    ten_khach_hang: customerName,
+    ten_san_pham: productName,
+    so_seri: cleanSerial,
+    ngay_het_bao_hanh: expiryDateStr,
+
+    // 5. English snake_case
+    customer_name: customerName,
+    product_name: productName,
     code: cleanSerial,
     serial_number: cleanSerial,
-    Ngay_Het_Bao_Hanh: expiryDateStr,
     expiry_date: expiryDateStr,
-    time: expiryDateStr
+    time: expiryDateStr,
+    date: expiryDateStr,
+
+    // 6. English uppercase underscore format
+    _CUSTOMER_NAME_: customerName,
+    _PRODUCT_NAME_: productName,
+    _CODE_: cleanSerial,
+    _SERIAL_NUMBER_: cleanSerial,
+    _EXPIRY_DATE_: expiryDateStr,
+    _TIME_: expiryDateStr
   };
 
   // 2. Kiểm tra nếu có cấu hình cổng FNS (FPT Notification Service)
