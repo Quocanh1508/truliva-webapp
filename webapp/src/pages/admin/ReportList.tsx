@@ -561,6 +561,8 @@ export default function ReportList() {
     customerPhone: string;
     address: string;
     model: string;
+    productName?: string;
+    workType?: string;
     orderId?: string | null;
   } | null>(null);
   const [znsPhone, setZnsPhone] = useState('');
@@ -570,9 +572,14 @@ export default function ReportList() {
   const [manualActivating, setManualActivating] = useState(false);
 
   const openActivationModalForReport = (report: any) => {
-    const modelName = (report.products && report.products.length > 0)
-      ? report.products[0].split('x')[0].trim()
-      : 'Máy lọc nước Truliva';
+    const isFilterJob = report.workType?.trim().toLowerCase() === 'thay lọc';
+    let modelName = 'Máy lọc nước Truliva';
+    if (isFilterJob) {
+      const filterNames = (report.spareParts || report.products || []).join(', ');
+      modelName = filterNames || 'Lõi lọc nước Truliva';
+    } else if (report.products && report.products.length > 0) {
+      modelName = report.products[0].split('x')[0].trim();
+    }
       
     const serial = report.serialNumber || '';
     setActivationData({
@@ -582,36 +589,57 @@ export default function ReportList() {
       customerPhone: report.customerPhone || '',
       address: report.address || '',
       model: modelName,
+      productName: modelName,
+      workType: report.workType,
       orderId: report.orderId,
     });
     setZnsPhone(report.customerPhone || '');
     setActivationStep(1);
     setShowActivationModal(true);
 
-    const initExp = new Date();
-    initExp.setMonth(initExp.getMonth() + 12);
-    setWarrantyExpiryDateStr(initExp.toLocaleDateString('vi-VN'));
+    if (isFilterJob) {
+      setWarrantyDurationText('3 tháng (Bảo hành thay lõi lọc)');
+      const exp = new Date(report.completionDate || report.createdAt || Date.now());
+      exp.setMonth(exp.getMonth() + 3);
+      const day = String(exp.getDate()).padStart(2, '0');
+      const month = String(exp.getMonth() + 1).padStart(2, '0');
+      const year = exp.getFullYear();
+      setWarrantyExpiryDateStr(`${day}/${month}/${year}`);
+    } else {
+      const initExp = new Date();
+      initExp.setMonth(initExp.getMonth() + 12);
+      const initDay = String(initExp.getDate()).padStart(2, '0');
+      const initMonth = String(initExp.getMonth() + 1).padStart(2, '0');
+      const initYear = initExp.getFullYear();
+      setWarrantyExpiryDateStr(`${initDay}/${initMonth}/${initYear}`);
 
-    setWarrantyDurationText('Đang tính toán...');
-    fetchApi(`/serials/public/preview-duration?model=${encodeURIComponent(modelName)}&orderId=${report.orderId || ''}`)
-      .then(res => {
-        const totalM = (res && res.totalMonths) ? res.totalMonths : 12;
-        let text = `${totalM} tháng`;
-        if (res && res.promoMonths > 0) {
-          text += ` (${res.standardMonths} tháng tiêu chuẩn + ${res.promoMonths} tháng khuyến mãi)`;
-        }
-        setWarrantyDurationText(text);
+      setWarrantyDurationText('Đang tính toán...');
+      fetchApi(`/serials/public/preview-duration?model=${encodeURIComponent(modelName)}&orderId=${report.orderId || ''}`)
+        .then(res => {
+          const totalM = (res && res.totalMonths) ? res.totalMonths : 12;
+          let text = `${totalM} tháng`;
+          if (res && res.promoMonths > 0) {
+            text += ` (${res.standardMonths} tháng tiêu chuẩn + ${res.promoMonths} tháng khuyến mãi)`;
+          }
+          setWarrantyDurationText(text);
 
-        const exp = new Date();
-        exp.setMonth(exp.getMonth() + totalM);
-        setWarrantyExpiryDateStr(exp.toLocaleDateString('vi-VN'));
-      })
-      .catch(() => {
-        setWarrantyDurationText('12 tháng');
-        const exp = new Date();
-        exp.setMonth(exp.getMonth() + 12);
-        setWarrantyExpiryDateStr(exp.toLocaleDateString('vi-VN'));
-      });
+          const exp = new Date();
+          exp.setMonth(exp.getMonth() + totalM);
+          const expDay = String(exp.getDate()).padStart(2, '0');
+          const expMonth = String(exp.getMonth() + 1).padStart(2, '0');
+          const expYear = exp.getFullYear();
+          setWarrantyExpiryDateStr(`${expDay}/${expMonth}/${expYear}`);
+        })
+        .catch(() => {
+          setWarrantyDurationText('12 tháng');
+          const exp = new Date();
+          exp.setMonth(exp.getMonth() + 12);
+          const expDay = String(exp.getDate()).padStart(2, '0');
+          const expMonth = String(exp.getMonth() + 1).padStart(2, '0');
+          const expYear = exp.getFullYear();
+          setWarrantyExpiryDateStr(`${expDay}/${expMonth}/${expYear}`);
+        });
+    }
   };
 
   const handleSendZns = async () => {
@@ -629,7 +657,12 @@ export default function ReportList() {
         method: 'POST',
         body: JSON.stringify({
           serialNumber: activationData.serialNumber.trim(),
-          recipientPhone: znsPhone.trim()
+          recipientPhone: znsPhone.trim(),
+          productName: activationData.productName || activationData.model,
+          warrantyMonths: activationData.workType?.trim().toLowerCase() === 'thay lọc' ? 3 : 12,
+          workType: activationData.workType,
+          customerName: activationData.customerName,
+          expiryDateStr: warrantyExpiryDateStr
         })
       });
       setActivationStep(2);

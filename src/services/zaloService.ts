@@ -176,7 +176,12 @@ export function formatZaloPhone(phone: string): string {
 export async function sendZnsWarrantyActivation(
   serialNumber: string, 
   recipientPhone: string,
-  warrantyMonths: number = 12
+  warrantyMonths: number = 12,
+  options?: {
+    customerName?: string;
+    productName?: string;
+    expiryDateStr?: string;
+  }
 ): Promise<any> {
   const cleanSerial = serialNumber.trim().replace(/[^a-zA-Z0-9_]/g, '').toUpperCase();
   const formattedPhone = formatZaloPhone(recipientPhone.trim());
@@ -187,20 +192,18 @@ export async function sendZnsWarrantyActivation(
     return { success: true, message: '[Simulation] ZNS sent successfully (Template ID not configured)' };
   }
 
-  // 1. Lấy thông tin bảo hành của Serial từ DB
+  // 1. Lấy thông tin bảo hành của Serial từ DB (nếu có)
   const serial = await prisma.serial.findUnique({
     where: { serialNumber: cleanSerial }
   });
 
-  if (!serial) {
-    throw new Error(`Không tìm thấy số Serial ${cleanSerial} trên hệ thống`);
-  }
-
-  const customerName = serial.customerName || 'Quý Khách';
-  const productName = serial.productLine || serial.model || 'Máy lọc nước Truliva';
+  const customerName = options?.customerName || serial?.customerName || 'Quý Khách';
+  const productName = options?.productName || serial?.productLine || serial?.model || (warrantyMonths === 3 ? 'Lõi lọc nước Truliva' : 'Máy lọc nước Truliva');
   
   let expiryDateStr = '';
-  if (serial.warrantyExpiryDate) {
+  if (options?.expiryDateStr) {
+    expiryDateStr = options.expiryDateStr;
+  } else if (serial?.warrantyExpiryDate) {
     const d = new Date(serial.warrantyExpiryDate);
     const day = String(d.getDate()).padStart(2, '0');
     const month = String(d.getMonth() + 1).padStart(2, '0');

@@ -1478,7 +1478,16 @@ export async function getZaloStatus(req: Request, res: Response): Promise<void> 
 
 export async function activateZns(req: Request, res: Response): Promise<void> {
   try {
-    const { serialNumber, recipientPhone } = req.body;
+    const { 
+      serialNumber, 
+      recipientPhone, 
+      productName, 
+      warrantyMonths, 
+      workType, 
+      expiryDateStr, 
+      customerName 
+    } = req.body;
+
     if (!serialNumber || !recipientPhone) {
       res.status(400).json({ error: 'Thiếu số Serial hoặc Số điện thoại nhận ZNS' });
       return;
@@ -1489,20 +1498,40 @@ export async function activateZns(req: Request, res: Response): Promise<void> {
       where: { serialNumber: cleanSerial }
     });
 
-    await activateSerialWarranty(
-      cleanSerial,
-      existingSerial?.orderId || null,
-      {
-        customerName: existingSerial?.customerName,
-        customerPhone: recipientPhone.trim(),
-        address: existingSerial?.address,
-        province: existingSerial?.province
-      },
-      'KTV',
-      'Đã kích hoạt'
-    );
+    const isFilterJob = (workType?.trim().toLowerCase() === 'thay lọc') || (warrantyMonths === 3);
+    const monthsToApply = isFilterJob ? 3 : (Number(warrantyMonths) || 12);
+    const finalCustomerName = customerName?.trim() || existingSerial?.customerName || 'Quý Khách';
+    const finalProductName = productName?.trim() || existingSerial?.productLine || existingSerial?.model || (isFilterJob ? 'Lõi lọc nước Truliva' : 'Máy lọc nước Truliva');
 
-    const znsResult = await sendZnsWarrantyActivation(cleanSerial, recipientPhone);
+    const startDate = new Date();
+
+    if (existingSerial) {
+      await activateSerialWarranty(
+        cleanSerial,
+        existingSerial?.orderId || null,
+        {
+          customerName: finalCustomerName,
+          customerPhone: recipientPhone.trim(),
+          address: existingSerial?.address,
+          province: existingSerial?.province
+        },
+        'KTV',
+        'Đã kích hoạt',
+        startDate,
+        null
+      );
+    }
+
+    const znsResult = await sendZnsWarrantyActivation(
+      cleanSerial, 
+      recipientPhone, 
+      monthsToApply,
+      {
+        customerName: finalCustomerName,
+        productName: finalProductName,
+        expiryDateStr: expiryDateStr
+      }
+    );
 
     res.json({
       success: true,
