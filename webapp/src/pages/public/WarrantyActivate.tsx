@@ -482,12 +482,9 @@ export default function WarrantyActivate() {
         {/* Header Bar */}
         <header className="flex items-center justify-between px-6 py-4 sm:py-5 border-b border-white/10 bg-[#101B2E]">
           <img 
-            src="/logo.png" 
+            src="/logo.png?v=3" 
             alt="Truliva" 
-            className="h-14 sm:h-18 md:h-20 max-h-24 object-contain" 
-            style={{
-              filter: 'drop-shadow(1.5px 0 0 #ffffff) drop-shadow(-1.5px 0 0 #ffffff) drop-shadow(0 1.5px 0 #ffffff) drop-shadow(0 -1.5px 0 #ffffff) drop-shadow(1px 1px 0 #ffffff) drop-shadow(-1px -1px 0 #ffffff) drop-shadow(1px -1px 0 #ffffff) drop-shadow(-1px 1px 0 #ffffff)'
-            }}
+            style={{ height: '44px', objectFit: 'contain', filter: 'drop-shadow(1.5px 0 0 #ffffff) drop-shadow(-1.5px 0 0 #ffffff) drop-shadow(0 1.5px 0 #ffffff) drop-shadow(0 -1.5px 0 #ffffff) drop-shadow(1px 1px 0 #ffffff) drop-shadow(-1px -1px 0 #ffffff) drop-shadow(1px -1px 0 #ffffff) drop-shadow(-1px 1px 0 #ffffff)' }}
           />
           <a href="tel:1900638463" className="flex items-center gap-2 text-white/90 hover:text-white transition bg-white/10 hover:bg-white/15 px-4 py-2 rounded-full text-xs sm:text-sm font-bold tracking-wide border border-white/10">
             <Phone size={16} className="text-blue-400" />
@@ -588,12 +585,9 @@ export default function WarrantyActivate() {
             <span>Trang chủ</span>
           </button>
           <img 
-            src="/logo.png" 
+            src="/logo.png?v=3" 
             alt="Truliva" 
-            className="h-14 sm:h-18 md:h-20 max-h-24 object-contain" 
-            style={{
-              filter: 'drop-shadow(1.5px 0 0 #ffffff) drop-shadow(-1.5px 0 0 #ffffff) drop-shadow(0 1.5px 0 #ffffff) drop-shadow(0 -1.5px 0 #ffffff) drop-shadow(1px 1px 0 #ffffff) drop-shadow(-1px -1px 0 #ffffff) drop-shadow(1px -1px 0 #ffffff) drop-shadow(-1px 1px 0 #ffffff)'
-            }}
+            style={{ height: '44px', objectFit: 'contain', filter: 'drop-shadow(1.5px 0 0 #ffffff) drop-shadow(-1.5px 0 0 #ffffff) drop-shadow(0 1.5px 0 #ffffff) drop-shadow(0 -1.5px 0 #ffffff) drop-shadow(1px 1px 0 #ffffff) drop-shadow(-1px -1px 0 #ffffff) drop-shadow(1px -1px 0 #ffffff) drop-shadow(-1px 1px 0 #ffffff)' }}
           />
         </header>
 
@@ -826,12 +820,9 @@ export default function WarrantyActivate() {
             <span>Trang chủ</span>
           </button>
           <img 
-            src="/logo.png" 
+            src="/logo.png?v=3" 
             alt="Truliva" 
-            className="h-14 sm:h-18 md:h-20 max-h-24 object-contain" 
-            style={{
-              filter: 'drop-shadow(1.5px 0 0 #ffffff) drop-shadow(-1.5px 0 0 #ffffff) drop-shadow(0 1.5px 0 #ffffff) drop-shadow(0 -1.5px 0 #ffffff) drop-shadow(1px 1px 0 #ffffff) drop-shadow(-1px -1px 0 #ffffff) drop-shadow(1px -1px 0 #ffffff) drop-shadow(-1px 1px 0 #ffffff)'
-            }}
+            style={{ height: '44px', objectFit: 'contain', filter: 'drop-shadow(1.5px 0 0 #ffffff) drop-shadow(-1.5px 0 0 #ffffff) drop-shadow(0 1.5px 0 #ffffff) drop-shadow(0 -1.5px 0 #ffffff) drop-shadow(1px 1px 0 #ffffff) drop-shadow(-1px -1px 0 #ffffff) drop-shadow(1px -1px 0 #ffffff) drop-shadow(-1px 1px 0 #ffffff)' }}
           />
         </header>
 
@@ -887,12 +878,9 @@ export default function WarrantyActivate() {
           <span>{step === 2 ? 'Quay lại' : 'Trang chủ'}</span>
         </button>
         <img 
-          src="/logo.png" 
+          src="/logo.png?v=3" 
           alt="Truliva" 
-          className="h-14 sm:h-18 md:h-20 max-h-24 object-contain" 
-          style={{
-            filter: 'drop-shadow(1.5px 0 0 #ffffff) drop-shadow(-1.5px 0 0 #ffffff) drop-shadow(0 1.5px 0 #ffffff) drop-shadow(0 -1.5px 0 #ffffff) drop-shadow(1px 1px 0 #ffffff) drop-shadow(-1px -1px 0 #ffffff) drop-shadow(1px -1px 0 #ffffff) drop-shadow(-1px 1px 0 #ffffff)'
-          }}
+          style={{ height: '44px', objectFit: 'contain', filter: 'drop-shadow(1.5px 0 0 #ffffff) drop-shadow(-1.5px 0 0 #ffffff) drop-shadow(0 1.5px 0 #ffffff) drop-shadow(0 -1.5px 0 #ffffff) drop-shadow(1px 1px 0 #ffffff) drop-shadow(-1px -1px 0 #ffffff) drop-shadow(1px -1px 0 #ffffff) drop-shadow(-1px 1px 0 #ffffff)' }}
         />
       </header>
 

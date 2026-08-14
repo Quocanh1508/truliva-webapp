@@ -175,8 +175,8 @@ export default function Layout() {
       {/* Desktop Sidebar Nav */}
       <aside className="app-sidebar">
         {/* Brand Logo */}
-        <Link to={logoPath} style={{ height: '70px', borderBottom: '1px solid var(--border-color)', display: 'flex', justifyContent: 'center', alignItems: 'center', backgroundColor: '#fff', overflow: 'hidden' }}>
-          <img src="/logo.png?v=2" alt="Truliva" style={{ height: '150px', objectFit: 'contain' }} />
+        <Link to={logoPath} style={{ height: '70px', borderBottom: '1px solid var(--border-color)', display: 'flex', justifyContent: 'center', alignItems: 'center', backgroundColor: '#fff', overflow: 'hidden', padding: '0 12px' }}>
+          <img src="/logo.png?v=3" alt="Truliva" style={{ maxHeight: '50px', width: 'auto', objectFit: 'contain' }} />
         </Link>
 
         {/* Links */}
@@ -250,7 +250,7 @@ export default function Layout() {
               <Menu size={24} />
             </button>
             <Link to={logoPath} style={{ display: 'flex', alignItems: 'center', height: '48px', overflow: 'hidden' }}>
-              <img src="/logo.png?v=2" alt="Truliva" style={{ height: '110px', objectFit: 'contain' }} />
+              <img src="/logo.png?v=3" alt="Truliva" style={{ maxHeight: '36px', width: 'auto', objectFit: 'contain' }} />
             </Link>
           </div>
 
@@ -276,7 +276,7 @@ export default function Layout() {
             {/* Header of Drawer */}
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px', borderBottom: '1px solid var(--border-color)' }}>
               <Link to={logoPath} onClick={closeMenu} style={{ display: 'flex', alignItems: 'center', height: '48px', overflow: 'hidden' }}>
-                <img src="/logo.png?v=2" alt="Truliva" style={{ height: '110px', objectFit: 'contain' }} />
+                <img src="/logo.png?v=3" alt="Truliva" style={{ maxHeight: '36px', width: 'auto', objectFit: 'contain' }} />
               </Link>
               <button onClick={closeMenu} style={{ background: 'transparent', color: 'var(--text-muted)', border: 'none' }}>
                 <X size={20} />
