@@ -3,7 +3,6 @@ import { useSearchParams } from 'react-router-dom';
 import { ShieldCheck, ArrowRight, UploadCloud, CheckCircle, AlertTriangle, Smartphone, User, MapPin, Loader2, Sparkles, ChevronLeft, Phone, Wrench, Send } from 'lucide-react';
 import { API_URL } from '../../api/client';
 import { isValidPhone, PHONE_ERROR_MSG } from '../../utils/phone';
-import CategoryTreeSelect from '../../components/CategoryTreeSelect';
 
 // Định dạng hiển thị Số Serial dạng: XXXX XXX XXX XXXXX
 const formatSerialNumber = (value: string): string => {
@@ -109,20 +108,32 @@ export default function WarrantyActivate() {
 
   const handleSubmitSupport = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!supportName.trim()) { setSupportError('Vui lòng nhập Họ và tên'); return; }
-    if (!isValidPhone(supportPhone)) { setSupportError(PHONE_ERROR_MSG); return; }
-    if (!supportProvince) { setSupportError('Vui lòng chọn Tỉnh/Thành phố'); return; }
+     const cleanPhone = supportPhone.replace(/[^0-9]/g, '');
+    if (cleanPhone.length !== 10) {
+      setSupportError('Số điện thoại không hợp lệ. Vui lòng nhập đúng 10 số liền kề nhau.');
+      return;
+    }
+
+    if (supportSecondaryPhones.trim()) {
+      const cleanSecPhone = supportSecondaryPhones.replace(/[^0-9]/g, '');
+      if (cleanSecPhone.length !== 10) {
+        setSupportError('Số điện thoại phụ không hợp lệ. Vui lòng nhập đúng 10 số liền kề nhau.');
+        return;
+      }
+    }
+
+    if (!supportProvince) { setSupportError('Vui lòng chọn Tỉnh / Thành phố'); return; }
     if (!supportAddress.trim()) { setSupportError('Vui lòng nhập địa chỉ cụ thể'); return; }
-    if (!supportProduct) { setSupportError('Vui lòng chọn Sản phẩm / Thiết bị'); return; }
-    if (supportProduct === 'Thiết bị khác' && !customSupportProduct.trim()) { setSupportError('Vui lòng nhập tên thiết bị cụ thể'); return; }
-    if (!supportServiceType) { setSupportError('Vui lòng chọn loại yêu cầu dịch vụ'); return; }
+    if (!supportProduct) { setSupportError('Vui lòng chọn Sản phẩm'); return; }
+    if ((supportProduct === 'Sản phẩm khác' || supportProduct === 'Thiết bị khác') && !customSupportProduct.trim()) { setSupportError('Vui lòng nhập tên sản phẩm cụ thể'); return; }
+    if (!supportServiceType) { setSupportError('Vui lòng chọn yêu cầu dịch vụ'); return; }
     if (!supportDetail.trim()) { setSupportError('Vui lòng nhập nội dung cần hỗ trợ'); return; }
 
     setSubmittingSupport(true);
     setSupportError('');
 
-    const finalProduct = supportProduct === 'Thiết bị khác'
-      ? (customSupportProduct.trim() || 'Thiết bị khác')
+    const finalProduct = (supportProduct === 'Sản phẩm khác' || supportProduct === 'Thiết bị khác')
+      ? (customSupportProduct.trim() || 'Sản phẩm khác')
       : supportProduct;
 
     try {
@@ -492,10 +503,11 @@ export default function WarrantyActivate() {
                   <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">Số điện thoại *</label>
                   <input
                     type="tel"
+                    maxLength={10}
                     placeholder="VD: 0912345678"
                     value={supportPhone}
-                    onChange={e => setSupportPhone(e.target.value)}
-                    className="w-full px-3.5 py-2.5 border border-gray-300 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-200"
+                    onChange={e => setSupportPhone(e.target.value.replace(/[^0-9]/g, '').slice(0, 10))}
+                    className="w-full px-3.5 py-2.5 border border-gray-300 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-200 font-mono font-semibold"
                     required
                   />
                 </div>
@@ -507,10 +519,11 @@ export default function WarrantyActivate() {
                   <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">Số điện thoại phụ</label>
                   <input
                     type="tel"
+                    maxLength={10}
                     placeholder="VD: 0914567123"
                     value={supportSecondaryPhones}
-                    onChange={e => setSupportSecondaryPhones(e.target.value)}
-                    className="w-full px-3.5 py-2.5 border border-gray-300 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-200"
+                    onChange={e => setSupportSecondaryPhones(e.target.value.replace(/[^0-9]/g, '').slice(0, 10))}
+                    className="w-full px-3.5 py-2.5 border border-gray-300 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-200 font-mono"
                   />
                 </div>
                 <div>
@@ -557,42 +570,53 @@ export default function WarrantyActivate() {
               {/* Sản phẩm + Serial */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">Sản phẩm / Thiết bị *</label>
-                  <CategoryTreeSelect
-                    categories={deviceTreeData.categories.length > 0 ? deviceTreeData.categories : [
-                      'Device', 'Water CT Device', 'Water UTS Device', 'Water WM Device', 'Air CT Device', 'Thiết bị khác'
-                    ]}
-                    products={deviceTreeData.products.length > 0 ? deviceTreeData.products : [
-                      { name: 'Máy lọc nước Truliva UR61096H', category: 'Water UTS Device' },
-                      { name: 'Máy lọc nước Truliva UR5840', category: 'Water UTS Device' },
-                      { name: 'Máy lọc nước Delica UR5440', category: 'Water UTS Device' },
-                      { name: 'Máy lọc nước Delica UR5640', category: 'Water UTS Device' },
-                      { name: 'Máy lọc nước Delica UR5840', category: 'Water UTS Device' },
-                      { name: 'Máy lọc nước Lavita CR5240', category: 'Water CT Device' },
-                      { name: 'Máy lọc nước Tanka UR3140', category: 'Water CT Device' },
-                      { name: 'Máy lọc nước Truliva Lavita CR-ZX5170', category: 'Water CT Device' },
-                      { name: 'Máy lọc nước Truliva UR3626', category: 'Water UTS Device' },
-                      { name: 'Máy lọc nước Truliva UR5676', category: 'Water UTS Device' },
-                      { name: 'Máy lọc nước Ultima Black', category: 'Water CT Device' },
-                      { name: 'Máy nóng lạnh Truliva Lavita YDZ-5301D', category: 'Water CT Device' },
-                      { name: 'Máy nóng lạnh treo tường Truliva W6412', category: 'Water WM Device' },
-                      { name: 'Máy rửa rau Truliva QY/F-I20', category: 'Water CT Device' },
-                      { name: 'Máy lọc không khí Airplus KJ260', category: 'Air CT Device' },
-                      { name: 'Máy lọc không khí Xiaomi Smart Air Purifier 4 Compact', category: 'Air CT Device' },
-                      { name: 'Bộ lọc sơ cấp Truliva P1011', category: 'Device' },
-                      { name: 'Thiết bị khác', category: 'Thiết bị khác' }
-                    ]}
-                    selected={supportProduct ? [supportProduct] : []}
-                    onChange={(nextSelected) => {
-                      const val = nextSelected[nextSelected.length - 1] || nextSelected[0] || '';
-                      setSupportProduct(val);
+                  <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">Sản phẩm *</label>
+                  <select
+                    value={supportProduct}
+                    onChange={e => {
+                      setSupportProduct(e.target.value);
+                      if (e.target.value !== 'Sản phẩm khác' && e.target.value !== 'Thiết bị khác') {
+                        setCustomSupportProduct('');
+                      }
                     }}
-                    placeholder="-- Chọn Sản phẩm / Thiết bị --"
-                  />
-                  {supportProduct === 'Thiết bị khác' && (
+                    className="w-full px-3.5 py-2.5 border border-gray-300 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-200 bg-white"
+                    required
+                  >
+                    <option value="">-- Chọn Sản phẩm --</option>
+                    {(deviceTreeData.products.length > 0
+                      ? Array.from(new Set(deviceTreeData.products.map((p: any) => typeof p === 'string' ? p : p.name)))
+                          .filter((name: string) => {
+                            const lower = name.toLowerCase();
+                            return !lower.includes('lõi') && !lower.includes('loi') && !lower.includes('linh kiện') && !lower.includes('phụ kiện') && !lower.includes('bộ dụng cụ') && !lower.includes('chảo') && !lower.includes('cảm biến');
+                          })
+                      : [
+                          'Máy lọc nước Truliva UR61096H',
+                          'Máy lọc nước Truliva UR5840',
+                          'Máy lọc nước Delica UR5440',
+                          'Máy lọc nước Delica UR5640',
+                          'Máy lọc nước Delica UR5840',
+                          'Máy lọc nước Lavita CR5240',
+                          'Máy lọc nước Tanka UR3140',
+                          'Máy lọc nước Truliva Lavita CR-ZX5170',
+                          'Máy lọc nước Truliva UR3626',
+                          'Máy lọc nước Truliva UR5676',
+                          'Máy lọc nước Ultima Black',
+                          'Máy nóng lạnh Truliva Lavita YDZ-5301D',
+                          'Máy nóng lạnh treo tường Truliva W6412',
+                          'Máy rửa rau Truliva QY/F-I20',
+                          'Máy lọc không khí Airplus KJ260',
+                          'Máy lọc không khí Xiaomi Smart Air Purifier 4 Compact',
+                          'Bộ lọc sơ cấp Truliva P1011'
+                        ]
+                    ).map((pName: string) => (
+                      <option key={pName} value={pName}>{pName}</option>
+                    ))}
+                    <option value="Sản phẩm khác">Sản phẩm khác</option>
+                  </select>
+                  {(supportProduct === 'Sản phẩm khác' || supportProduct === 'Thiết bị khác') && (
                     <input
                       type="text"
-                      placeholder="Nhập tên sản phẩm / thiết bị cụ thể..."
+                      placeholder="Nhập tên sản phẩm cụ thể..."
                       value={customSupportProduct}
                       onChange={e => setCustomSupportProduct(e.target.value)}
                       className="w-full mt-2 px-3.5 py-2.5 border border-gray-300 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-200"
@@ -614,21 +638,20 @@ export default function WarrantyActivate() {
 
               {/* Yêu cầu dịch vụ */}
               <div>
-                <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">Loại Yêu Cầu *</label>
+                <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">Yêu cầu dịch vụ *</label>
                 <select
                   value={supportServiceType}
                   onChange={e => setSupportServiceType(e.target.value)}
                   className="w-full px-3.5 py-2.5 border border-gray-300 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-200 bg-white"
                   required
                 >
-                  <option value="Bảo Hành - Bảo Trì">Bảo Hành - Bảo Trì</option>
-                  <option value="Hướng dẫn sử dụng">Hướng dẫn sử dụng</option>
-                  <option value="Khác">Khác</option>
+                  <option value="Sửa chữa">Sửa chữa sự cố</option>
+                  <option value="Bảo hành">Bảo hành - Bảo trì</option>
                   <option value="Lắp đặt">Lắp đặt</option>
                   <option value="Thay lõi lọc">Thay lõi lọc</option>
-                  <option value="Tra cứu thông tin">Tra cứu thông tin</option>
-                  <option value="Tư vấn kỹ thuật">Tư vấn kỹ thuật</option>
-                  <option value="Tư vấn sản phẩm">Tư vấn sản phẩm</option>
+                  <option value="Hướng dẫn và Tư vấn">Hướng dẫn & Tư vấn</option>
+                  <option value="Giao hàng">Giao hàng</option>
+                  <option value="Khác">Khác</option>
                 </select>
               </div>
 
