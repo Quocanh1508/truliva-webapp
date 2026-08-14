@@ -216,23 +216,34 @@ export async function sendZnsWarrantyActivation(
     expiryDateStr = `${day}/${month}/${year}`;
   }
 
-  // Common template data payload matching ZBS / ZNS approved Template 617366
+  // Common template data payload matching ZBS / ZNS approved Template 617366 & 617874
   const templateData = {
-    // 1. Zalo ZBS Template 617366 standard underscore format (_PARAM_NAME_)
-    _TEN_KHACH_HANG_: customerName,
-    _TEN_SAN_PHAM_: productName,
-    _SO_SERI_: cleanSerial,
-    _NGAY_HET_BAO_HANH_: expiryDateStr,
+    // 1. Zalo ZBS Template 617366 exact parameters
+    _TEN_KHACH_HANG_: customerName.substring(0, 30),
+    _TEN_SAN_PHAM_: productName.substring(0, 200),
+    _ID_BAO_HANH_: cleanSerial.substring(0, 30),
+    _NGAY_BAO_HANH_: expiryDateStr.substring(0, 30),
+
+    // Template 617874 param
+    _TEN_: customerName.substring(0, 30),
+
+    // Aliases with underscore
+    _SO_SERI_: cleanSerial.substring(0, 30),
+    _NGAY_HET_BAO_HANH_: expiryDateStr.substring(0, 30),
 
     // 2. Uppercase without leading/trailing underscore
     TEN_KHACH_HANG: customerName,
     TEN_SAN_PHAM: productName,
+    ID_BAO_HANH: cleanSerial,
+    NGAY_BAO_HANH: expiryDateStr,
     SO_SERI: cleanSerial,
     NGAY_HET_BAO_HANH: expiryDateStr,
 
     // 3. PascalCase / TitleCase format
     Ten_Khach_Hang: customerName,
     Ten_San_Pham: productName,
+    Id_Bao_Hanh: cleanSerial,
+    Ngay_Bao_Hanh: expiryDateStr,
     So_Seri: cleanSerial,
     Ngay_Het_Bao_Hanh: expiryDateStr,
 

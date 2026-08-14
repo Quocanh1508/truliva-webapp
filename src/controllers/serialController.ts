@@ -1576,21 +1576,32 @@ export async function testZnsSend(req: Request, res: Response): Promise<void> {
     const expDate = expiryDate?.trim() || '20/07/2027';
 
     const testTemplateData = {
-      // 1. Zalo ZBS Template 617366 standard underscore format (_PARAM_NAME_)
-      _TEN_KHACH_HANG_: custName,
-      _TEN_SAN_PHAM_: prodName,
-      _SO_SERI_: cleanSerial,
-      _NGAY_HET_BAO_HANH_: expDate,
+      // 1. Zalo ZBS Template 617366 exact parameters
+      _TEN_KHACH_HANG_: custName.substring(0, 30),
+      _TEN_SAN_PHAM_: prodName.substring(0, 200),
+      _ID_BAO_HANH_: cleanSerial.substring(0, 30),
+      _NGAY_BAO_HANH_: expDate.substring(0, 30),
+
+      // Template 617874 param
+      _TEN_: custName.substring(0, 30),
+
+      // Aliases with underscore
+      _SO_SERI_: cleanSerial.substring(0, 30),
+      _NGAY_HET_BAO_HANH_: expDate.substring(0, 30),
 
       // 2. Uppercase without leading/trailing underscore
       TEN_KHACH_HANG: custName,
       TEN_SAN_PHAM: prodName,
+      ID_BAO_HANH: cleanSerial,
+      NGAY_BAO_HANH: expDate,
       SO_SERI: cleanSerial,
       NGAY_HET_BAO_HANH: expDate,
 
       // 3. PascalCase / TitleCase format
       Ten_Khach_Hang: custName,
       Ten_San_Pham: prodName,
+      Id_Bao_Hanh: cleanSerial,
+      Ngay_Bao_Hanh: expDate,
       So_Seri: cleanSerial,
       Ngay_Het_Bao_Hanh: expDate,
 
