@@ -296,21 +296,19 @@ export async function sendZnsWarrantyActivation(
       });
 
       const data = response.data;
-      if (data.code !== 1) {
-        throw new Error(`FNS Send Error: ${data.message} (Code: ${data.code})`);
+      if (data.code === 1) {
+        const durationMs = Date.now() - startTime;
+        logger.info('ZBS/ZNS message sent successfully via FNS API', { refId: fnsPayload.ref_id, messageId: data.data?.message_id, durationMs: `${durationMs}ms` });
+        return data;
       }
-
-      const durationMs = Date.now() - startTime;
-      logger.info('ZBS/ZNS message sent successfully via FNS API', { refId: fnsPayload.ref_id, messageId: data.data?.message_id, durationMs: `${durationMs}ms` });
-      return data;
+      logger.warn('FNS send returned error code, falling back to Zalo Direct OpenAPI', { code: data.code, message: data.message });
     } catch (error: any) {
       const durationMs = Date.now() - startTime;
-      logger.error('Error sending ZBS/ZNS message via FNS API', { error: error.message, details: error.response?.data, durationMs: `${durationMs}ms` });
-      throw new Error(`Gửi ZBS/ZNS qua FNS thất bại: ${error.message}`);
+      logger.warn('Error sending ZBS/ZNS message via FNS API, falling back to Zalo Direct OpenAPI', { error: error.message, details: error.response?.data, durationMs: `${durationMs}ms` });
     }
   }
 
-  // 3. Fallback: Lấy Access Token hợp lệ của Zalo trực tiếp nếu không dùng FNS
+  // 3. Fallback / Direct: Lấy Access Token hợp lệ của Zalo trực tiếp nếu FNS không gửi được hoặc không dùng FNS
   const accessToken = await getValidAccessToken();
 
   // 4. Chuẩn bị dữ liệu gửi (Zalo Direct OpenAPI - Dùng cho Template 617366)
