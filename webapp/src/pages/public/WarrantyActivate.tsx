@@ -340,8 +340,15 @@ export default function WarrantyActivate() {
       <div className="min-h-screen bg-white flex flex-col font-sans antialiased">
 
         {/* Header Bar */}
-        <header className="flex items-center justify-between px-6 py-5 border-b border-white/10 bg-[#101B2E]">
-          <img src="/logo.png" alt="Truliva" className="h-20 sm:h-24 md:h-28 max-h-32 object-contain drop-shadow-[1.5px_0_0_#ffffff] drop-shadow-[-1.5px_0_0_#ffffff] drop-shadow-[0_1.5px_0_#ffffff] drop-shadow-[0_-1.5px_0_#ffffff] drop-shadow-[0_0_8px_rgba(255,255,255,0.4)]" />
+        <header className="flex items-center justify-between px-6 py-6 border-b border-white/10 bg-[#101B2E]">
+          <img 
+            src="/logo.png" 
+            alt="Truliva" 
+            className="h-28 sm:h-36 md:h-44 max-h-48 object-contain" 
+            style={{
+              filter: 'drop-shadow(1.5px 0 0 #ffffff) drop-shadow(-1.5px 0 0 #ffffff) drop-shadow(0 1.5px 0 #ffffff) drop-shadow(0 -1.5px 0 #ffffff) drop-shadow(1px 1px 0 #ffffff) drop-shadow(-1px -1px 0 #ffffff) drop-shadow(1px -1px 0 #ffffff) drop-shadow(-1px 1px 0 #ffffff)'
+            }}
+          />
           <a href="tel:1900638463" className="flex items-center gap-2 text-white/90 hover:text-white transition bg-white/10 hover:bg-white/15 px-4 py-2 rounded-full text-xs sm:text-sm font-bold tracking-wide border border-white/10">
             <Phone size={16} className="text-blue-400" />
             <span>1900 63 84 63</span>
@@ -435,12 +442,19 @@ export default function WarrantyActivate() {
   if (step === 10) {
     return (
       <div className="min-h-screen bg-[#1B2A4A] flex flex-col font-sans antialiased">
-        <header className="flex items-center justify-between px-6 py-5 border-b border-white/10 bg-[#101B2E]">
+        <header className="flex items-center justify-between px-6 py-6 border-b border-white/10 bg-[#101B2E]">
           <button onClick={() => setStep(0)} className="flex items-center gap-1.5 text-white/80 hover:text-white text-sm font-semibold transition">
             <ChevronLeft size={20} />
             <span>Trang chủ</span>
           </button>
-          <img src="/logo.png" alt="Truliva" className="h-20 sm:h-24 md:h-28 max-h-32 object-contain drop-shadow-[1.5px_0_0_#ffffff] drop-shadow-[-1.5px_0_0_#ffffff] drop-shadow-[0_1.5px_0_#ffffff] drop-shadow-[0_-1.5px_0_#ffffff] drop-shadow-[0_0_8px_rgba(255,255,255,0.4)]" />
+          <img 
+            src="/logo.png" 
+            alt="Truliva" 
+            className="h-28 sm:h-36 md:h-44 max-h-48 object-contain" 
+            style={{
+              filter: 'drop-shadow(1.5px 0 0 #ffffff) drop-shadow(-1.5px 0 0 #ffffff) drop-shadow(0 1.5px 0 #ffffff) drop-shadow(0 -1.5px 0 #ffffff) drop-shadow(1px 1px 0 #ffffff) drop-shadow(-1px -1px 0 #ffffff) drop-shadow(1px -1px 0 #ffffff) drop-shadow(-1px 1px 0 #ffffff)'
+            }}
+          />
         </header>
 
         <div className="flex-1 flex flex-col items-center justify-center p-4 py-8">
@@ -660,12 +674,19 @@ export default function WarrantyActivate() {
   if (step === 11) {
     return (
       <div className="min-h-screen bg-[#14223A] flex flex-col font-sans antialiased">
-        <header className="flex items-center justify-between px-6 py-5 border-b border-white/10 bg-[#101B2E]">
+        <header className="flex items-center justify-between px-6 py-6 border-b border-white/10 bg-[#101B2E]">
           <button onClick={() => setStep(0)} className="flex items-center gap-1.5 text-white/80 hover:text-white text-sm font-semibold transition">
             <ChevronLeft size={20} />
             <span>Trang chủ</span>
           </button>
-          <img src="/logo.png" alt="Truliva" className="h-20 sm:h-24 md:h-28 max-h-32 object-contain drop-shadow-[1.5px_0_0_#ffffff] drop-shadow-[-1.5px_0_0_#ffffff] drop-shadow-[0_1.5px_0_#ffffff] drop-shadow-[0_-1.5px_0_#ffffff] drop-shadow-[0_0_8px_rgba(255,255,255,0.4)]" />
+          <img 
+            src="/logo.png" 
+            alt="Truliva" 
+            className="h-28 sm:h-36 md:h-44 max-h-48 object-contain" 
+            style={{
+              filter: 'drop-shadow(1.5px 0 0 #ffffff) drop-shadow(-1.5px 0 0 #ffffff) drop-shadow(0 1.5px 0 #ffffff) drop-shadow(0 -1.5px 0 #ffffff) drop-shadow(1px 1px 0 #ffffff) drop-shadow(-1px -1px 0 #ffffff) drop-shadow(1px -1px 0 #ffffff) drop-shadow(-1px 1px 0 #ffffff)'
+            }}
+          />
         </header>
 
         <div className="flex-1 flex flex-col items-center justify-center p-4 py-8">
@@ -708,7 +729,7 @@ export default function WarrantyActivate() {
     <div className="min-h-screen bg-[#14223A] flex flex-col font-sans antialiased">
       
       {/* Header Bar đồng bộ chuẩn UI */}
-      <header className="flex items-center justify-between px-6 py-5 border-b border-white/10 bg-[#101B2E]">
+      <header className="flex items-center justify-between px-6 py-6 border-b border-white/10 bg-[#101B2E]">
         <button
           onClick={() => {
             if (step === 2) setStep(1);
@@ -719,7 +740,14 @@ export default function WarrantyActivate() {
           <ChevronLeft size={20} />
           <span>{step === 2 ? 'Quay lại' : 'Trang chủ'}</span>
         </button>
-        <img src="/logo.png" alt="Truliva" className="h-20 sm:h-24 md:h-28 max-h-32 object-contain drop-shadow-[1.5px_0_0_#ffffff] drop-shadow-[-1.5px_0_0_#ffffff] drop-shadow-[0_1.5px_0_#ffffff] drop-shadow-[0_-1.5px_0_#ffffff] drop-shadow-[0_0_8px_rgba(255,255,255,0.4)]" />
+        <img 
+          src="/logo.png" 
+          alt="Truliva" 
+          className="h-28 sm:h-36 md:h-44 max-h-48 object-contain" 
+          style={{
+            filter: 'drop-shadow(1.5px 0 0 #ffffff) drop-shadow(-1.5px 0 0 #ffffff) drop-shadow(0 1.5px 0 #ffffff) drop-shadow(0 -1.5px 0 #ffffff) drop-shadow(1px 1px 0 #ffffff) drop-shadow(-1px -1px 0 #ffffff) drop-shadow(1px -1px 0 #ffffff) drop-shadow(-1px 1px 0 #ffffff)'
+          }}
+        />
       </header>
 
       {/* Main Container */}
