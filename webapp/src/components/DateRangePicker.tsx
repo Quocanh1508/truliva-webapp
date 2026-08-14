@@ -14,6 +14,7 @@ interface DateRangePickerProps {
   onChange: (start: string, end: string) => void;
   placeholder?: string;
   align?: 'left' | 'right';
+  className?: string;
 }
 
 export default function DateRangePicker({
@@ -21,7 +22,8 @@ export default function DateRangePicker({
   endDate,
   onChange,
   placeholder = 'Bắt đầu - kết thúc',
-  align = 'right'
+  align = 'right',
+  className = ''
 }: DateRangePickerProps) {
   const [isOpen, setIsOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -314,11 +316,11 @@ export default function DateRangePicker({
   };
 
   return (
-    <div className="relative inline-block text-left" ref={containerRef}>
+    <div className={`relative ${className || 'inline-block'} text-left`} ref={containerRef}>
       {/* Date Range input trigger */}
       <div 
         onClick={() => setIsOpen(!isOpen)}
-        className="flex items-center space-x-2 px-3 py-2 text-[13px] border border-gray-300 rounded-md bg-white text-gray-700 hover:bg-gray-50 focus:outline-none cursor-pointer font-medium select-none shadow-xs min-w-[200px]"
+        className="flex items-center space-x-2 px-3 py-2 text-[13px] border border-gray-300 rounded-md bg-white text-gray-700 hover:bg-gray-50 focus:outline-none cursor-pointer font-medium select-none shadow-xs w-full min-w-[180px]"
       >
         <CalendarIcon size={15} className="text-gray-400 flex-shrink-0" />
         <span className={(!startDate && !endDate) ? 'text-gray-400' : 'text-gray-700'}>

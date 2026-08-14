@@ -3,6 +3,7 @@ import { useSearchParams } from 'react-router-dom';
 import { fetchApi, deleteReportWithReason, updateReport, uploadImages, approveReport, rejectReport, getFiltersData } from '../../api/client';
 import { Download, X, ExternalLink, Image as ImageIcon, Loader, Search, Edit3, Save, Plus, Trash2, SlidersHorizontal, RotateCcw, Calendar, ChevronLeft, ChevronRight, ShieldCheck, CheckCircle, Loader2 } from 'lucide-react';
 import CategoryTreeSelect from '../../components/CategoryTreeSelect';
+import DateRangePicker from '../../components/DateRangePicker';
 import { formatOrderId } from '../../utils/text';
 import { usePermission } from '../../context/PermissionContext';
 import { isValidPhone, PHONE_ERROR_MSG } from '../../utils/phone';
@@ -1115,36 +1116,18 @@ export default function ReportList() {
         </form>
 
         <div className="flex flex-wrap items-center gap-3">
-          {datePreset === 'custom' && (
-            <div className="flex items-center gap-2">
-              <input 
-                type="date" 
-                className="px-3 py-1.5 text-[13px] border border-gray-300 rounded-md outline-none text-gray-700 bg-white"
-                value={customStartDate}
-                onChange={(e) => { setCustomStartDate(e.target.value); setPage(1); }}
-              />
-              <span className="text-gray-400 text-sm">đến</span>
-              <input 
-                type="date" 
-                className="px-3 py-1.5 text-[13px] border border-gray-300 rounded-md outline-none text-gray-700 bg-white"
-                value={customEndDate}
-                onChange={(e) => { setCustomEndDate(e.target.value); setPage(1); }}
-              />
-            </div>
-          )}
-          <select 
-            className="px-3 py-2 text-[13px] border border-gray-300 rounded-md bg-white text-gray-700 outline-none"
-            value={datePreset}
-            onChange={(e) => { setDatePreset(e.target.value); setPage(1); }}
-          >
-            <option value="">Tất cả thời gian</option>
-            <option value="today">Hôm nay</option>
-            <option value="yesterday">Hôm qua</option>
-            <option value="week">1 tuần qua</option>
-            <option value="month">1 tháng qua</option>
-            <option value="year">1 năm qua</option>
-            <option value="custom">Tự chọn khoảng...</option>
-          </select>
+          <DateRangePicker
+            startDate={customStartDate}
+            endDate={customEndDate}
+            align="right"
+            placeholder="Khoảng thời gian"
+            onChange={(start, end) => {
+              setCustomStartDate(start);
+              setCustomEndDate(end);
+              setDatePreset(start || end ? 'custom' : '');
+              setPage(1);
+            }}
+          />
 
           <input 
             type="text" 
@@ -1278,21 +1261,17 @@ export default function ReportList() {
                 <Calendar size={12} className="text-gray-400" />
                 Thời gian hoàn thành
               </span>
-              <div className="flex items-center gap-2">
-                <input
-                  type="date"
-                  className="w-full px-2.5 py-1.5 text-[12px] border border-gray-300 rounded-md outline-none text-gray-700 bg-white"
-                  value={tempCompletedStart}
-                  onChange={(e) => setTempCompletedStart(e.target.value)}
-                />
-                <span className="text-gray-400 text-xs">đến</span>
-                <input
-                  type="date"
-                  className="w-full px-2.5 py-1.5 text-[12px] border border-gray-300 rounded-md outline-none text-gray-700 bg-white"
-                  value={tempCompletedEnd}
-                  onChange={(e) => setTempCompletedEnd(e.target.value)}
-                />
-              </div>
+              <DateRangePicker
+                startDate={tempCompletedStart}
+                endDate={tempCompletedEnd}
+                align="left"
+                className="w-full"
+                placeholder="Bắt đầu - kết thúc"
+                onChange={(start, end) => {
+                  setTempCompletedStart(start);
+                  setTempCompletedEnd(end);
+                }}
+              />
             </div>
 
             {/* Thời gian tạo đơn */}
@@ -1301,21 +1280,17 @@ export default function ReportList() {
                 <Calendar size={12} className="text-gray-400" />
                 Thời gian tạo đơn
               </span>
-              <div className="flex items-center gap-2">
-                <input
-                  type="date"
-                  className="w-full px-2.5 py-1.5 text-[12px] border border-gray-300 rounded-md outline-none text-gray-700 bg-white"
-                  value={tempCreatedStart}
-                  onChange={(e) => setTempCreatedStart(e.target.value)}
-                />
-                <span className="text-gray-400 text-xs">đến</span>
-                <input
-                  type="date"
-                  className="w-full px-2.5 py-1.5 text-[12px] border border-gray-300 rounded-md outline-none text-gray-700 bg-white"
-                  value={tempCreatedEnd}
-                  onChange={(e) => setTempCreatedEnd(e.target.value)}
-                />
-              </div>
+              <DateRangePicker
+                startDate={tempCreatedStart}
+                endDate={tempCreatedEnd}
+                align="left"
+                className="w-full"
+                placeholder="Bắt đầu - kết thúc"
+                onChange={(start, end) => {
+                  setTempCreatedStart(start);
+                  setTempCreatedEnd(end);
+                }}
+              />
             </div>
 
             {/* Thời gian cập nhật */}
@@ -1324,21 +1299,17 @@ export default function ReportList() {
                 <Calendar size={12} className="text-gray-400" />
                 Thời gian cập nhật
               </span>
-              <div className="flex items-center gap-2">
-                <input
-                  type="date"
-                  className="w-full px-2.5 py-1.5 text-[12px] border border-gray-300 rounded-md outline-none text-gray-700 bg-white"
-                  value={tempUpdatedStart}
-                  onChange={(e) => setTempUpdatedStart(e.target.value)}
-                />
-                <span className="text-gray-400 text-xs">đến</span>
-                <input
-                  type="date"
-                  className="w-full px-2.5 py-1.5 text-[12px] border border-gray-300 rounded-md outline-none text-gray-700 bg-white"
-                  value={tempUpdatedEnd}
-                  onChange={(e) => setTempUpdatedEnd(e.target.value)}
-                />
-              </div>
+              <DateRangePicker
+                startDate={tempUpdatedStart}
+                endDate={tempUpdatedEnd}
+                align="right"
+                className="w-full"
+                placeholder="Bắt đầu - kết thúc"
+                onChange={(start, end) => {
+                  setTempUpdatedStart(start);
+                  setTempUpdatedEnd(end);
+                }}
+              />
             </div>
           </div>
 
