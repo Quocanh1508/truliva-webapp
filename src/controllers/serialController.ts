@@ -1245,6 +1245,15 @@ export async function approveWarranty(req: Request, res: Response): Promise<void
       }
     });
 
+    // Tự động gửi tin nhắn ZNS thông báo kích hoạt bảo hành thành công cho khách hàng
+    if (serial.customerPhone) {
+      try {
+        await sendZnsWarrantyActivation(serial.serialNumber, serial.customerPhone);
+      } catch (znsErr: any) {
+        logger.error('Lỗi gửi ZNS sau khi Admin phê duyệt bảo hành', { serialNumber: serial.serialNumber, phone: serial.customerPhone, error: znsErr.message });
+      }
+    }
+
     res.json({ success: true, serial: updated });
   } catch (error: any) {
     logger.error('Lỗi phê duyệt bảo hành', { error: error.message });
