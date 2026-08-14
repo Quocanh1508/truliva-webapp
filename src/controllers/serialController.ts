@@ -1505,7 +1505,9 @@ export async function activateZns(req: Request, res: Response): Promise<void> {
 
     const startDate = new Date();
 
-    if (existingSerial) {
+    // CHỈ kích hoạt/cập nhật thời hạn bảo hành máy chính thức trong DB nếu là ca Lắp đặt thiết bị máy
+    // Đối với ca Thay lọc, bảo hành lõi 3 tháng chỉ gửi thông báo ZNS cho khách, KHÔNG ghi đè làm giảm thời hạn bảo hành gốc của máy trong DB
+    if (existingSerial && !isFilterJob) {
       await activateSerialWarranty(
         cleanSerial,
         existingSerial?.orderId || null,

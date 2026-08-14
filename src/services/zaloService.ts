@@ -203,6 +203,14 @@ export async function sendZnsWarrantyActivation(
   let expiryDateStr = '';
   if (options?.expiryDateStr) {
     expiryDateStr = options.expiryDateStr;
+  } else if (warrantyMonths === 3) {
+    // Với ca thay lọc, thời hạn bảo hành lõi lọc luôn tính riêng 3 tháng kể từ thời điểm thực hiện
+    const d = new Date();
+    d.setMonth(d.getMonth() + 3);
+    const day = String(d.getDate()).padStart(2, '0');
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const year = d.getFullYear();
+    expiryDateStr = `${day}/${month}/${year}`;
   } else if (serial?.warrantyExpiryDate) {
     const d = new Date(serial.warrantyExpiryDate);
     const day = String(d.getDate()).padStart(2, '0');
