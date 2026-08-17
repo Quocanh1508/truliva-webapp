@@ -1241,6 +1241,19 @@ export async function activateSerialDirect(req: Request, res: Response): Promise
       }
     });
 
+    // Tự động gửi tin nhắn ZNS thông báo kích hoạt bảo hành thành công cho khách hàng
+    if (customerPhone && customerPhone.trim() !== '') {
+      try {
+        await sendZnsWarrantyActivation(serial.serialNumber, customerPhone.trim());
+      } catch (znsErr: any) {
+        logger.error('Lỗi gửi ZNS sau khi Admin kích hoạt trực tiếp', {
+          serialNumber: serial.serialNumber,
+          phone: customerPhone,
+          error: znsErr.message
+        });
+      }
+    }
+
     res.json({ success: true, serial: updated });
   } catch (error: any) {
     logger.error('Lỗi Admin kích hoạt bảo hành', { error: error.message });
@@ -1451,6 +1464,32 @@ export async function updateSerial(req: Request, res: Response): Promise<void> {
         userName: req.user!.fullName
       }
     });
+
+    // Tự động gửi tin nhắn ZNS kích hoạt bảo hành nếu:
+    // 1. Chuyển trạng thái sang 'Đã kích hoạt' hoặc 'KH xác nhận' (isNewActive && !isOldActive)
+    // 2. HOẶC Đang ở trạng thái kích hoạt VÀ số điện thoại được cập nhật/thay đổi mới (isNewActive && phoneChanged)
+    const targetPhone = (updated.customerPhone || '').trim();
+    const oldPhone = (serial.customerPhone || '').trim();
+    const phoneChanged = targetPhone !== '' && targetPhone !== oldPhone;
+
+    if (isNewActive && (phoneChanged || !isOldActive) && targetPhone.length >= 10) {
+      try {
+        await sendZnsWarrantyActivation(updated.serialNumber, targetPhone);
+        logger.info('ZNS warranty activation triggered from updateSerial', {
+          serialNumber: updated.serialNumber,
+          phone: targetPhone,
+          status: updated.status,
+          isNewActive,
+          phoneChanged
+        });
+      } catch (znsErr: any) {
+        logger.error('Lỗi gửi ZNS sau khi Admin cập nhật serial sang kích hoạt', {
+          serialNumber: updated.serialNumber,
+          phone: targetPhone,
+          error: znsErr.message
+        });
+      }
+    }
 
     res.json({ success: true, serial: updated });
   } catch (error: any) {
