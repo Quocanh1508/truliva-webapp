@@ -406,7 +406,16 @@ export default function WarrantyActivate() {
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.error || 'Số Serial không hợp lệ hoặc đã được kích hoạt');
+        throw new Error(data.error || 'Số Serial không hợp lệ hoặc không tìm thấy');
+      }
+
+      if (data.status === 'Đã kích hoạt' || data.status === 'KH xác nhận') {
+        let expiryText = '';
+        if (data.warrantyExpiryDate) {
+          const d = new Date(data.warrantyExpiryDate);
+          expiryText = ` (Hạn bảo hành đến: ${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()})`;
+        }
+        throw new Error(`Số Serial "${data.serialNumber}" này đã được kích hoạt bảo hành trước đó${expiryText}. Nếu đây là máy của bạn, vui lòng liên hệ Hotline 1900 638 463 để được hỗ trợ kiểm tra.`);
       }
 
       setProductInfo({
