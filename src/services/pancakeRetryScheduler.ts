@@ -1,5 +1,6 @@
 import axios from 'axios';
 import prisma from '../config/database';
+import { getComboComponents, ComboComponent } from '../controllers/orderController';
 import { syncOrderStatusToPancake } from './orderProcessor';
 import logger from '../utils/logger';
 
@@ -30,7 +31,25 @@ export async function retryPancakeSync(orderId: string): Promise<void> {
 
   // 1. Đồng bộ sản phẩm & kho hàng nếu trạng thái là 'hoàn thành' hoặc 'chờ duyệt'
   if (['hoàn thành', 'chờ duyệt'].includes(order.adminStatus || '') && order.items.length > 0) {
-    const itemNames = order.items.map(i => i.productName).filter(Boolean) as string[];
+    const activeComboComponents = new Set<string>();
+    for (const item of order.items) {
+      const comps = getComboComponents(item.productName || '', item.sku);
+      if (comps) {
+        comps.forEach((c: ComboComponent) => {
+          activeComboComponents.add(c.name.trim().toLowerCase());
+          if (c.sku) activeComboComponents.add(c.sku.trim().toLowerCase());
+        });
+      }
+    }
+    const sanitizedItems = order.items.filter(item => {
+      const comps = getComboComponents(item.productName || '', item.sku);
+      if (comps) return true;
+      const iName = (item.productName || '').trim().toLowerCase();
+      const iSku = (item.sku || '').trim().toLowerCase();
+      return !activeComboComponents.has(iName) && (!iSku || !activeComboComponents.has(iSku));
+    });
+
+    const itemNames = sanitizedItems.map(i => i.productName).filter(Boolean) as string[];
     const matchedProducts = await prisma.product.findMany({
       where: {
         name: { in: itemNames },
@@ -39,7 +58,7 @@ export async function retryPancakeSync(orderId: string): Promise<void> {
     });
 
     const isWarranty = (order.workType || '').toLowerCase() === 'bảo hành';
-    const pancakeProducts = order.items.map(item => {
+    const pancakeProducts = sanitizedItems.map(item => {
       const prod = matchedProducts.find(p => p.name === item.productName);
       return {
         variation_id: prod?.pancakeProductId || null,

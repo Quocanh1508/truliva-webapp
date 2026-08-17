@@ -56,6 +56,81 @@ function copyToClipboard(text: string): boolean {
   }
 }
 
+export interface ComboComponent {
+  name: string;
+  sku?: string;
+  quantity: number;
+}
+
+export const KNOWN_COMBO_DEFINITIONS: Record<string, ComboComponent[]> = {
+  // 1. Gói Giải pháp máy nóng lạnh treo tường W6412 (Gồm máy lọc nước UR3626 + Máy nóng lạnh W6412)
+  'W6412-ECO': [
+    { name: 'Máy lọc nước Truliva UR3626', sku: '104338-0002', quantity: 1 },
+    { name: 'Máy nóng lạnh treo tường Truliva W6412', sku: '103057-001', quantity: 1 }
+  ],
+  'W6412-GOLD': [
+    { name: 'Máy lọc nước Truliva UR3626', sku: '104338-0002', quantity: 1 },
+    { name: 'Máy nóng lạnh treo tường Truliva W6412', sku: '103057-001', quantity: 1 }
+  ],
+  'W6412-PLATINUM': [
+    { name: 'Máy lọc nước Truliva UR3626', sku: '104338-0002', quantity: 1 },
+    { name: 'Máy nóng lạnh treo tường Truliva W6412', sku: '103057-001', quantity: 1 }
+  ],
+
+  // 2. Combo lõi lọc (Bộ nhiều lõi đóng gói chung)
+  'COMBO-5676-GOLD': [
+    { name: 'Lõi lọc PGP Truliva UR5676/UR5640/UR5440', quantity: 1 },
+    { name: 'Lõi lọc CTO Truliva UR5676/UR5640/UR5440', quantity: 1 }
+  ],
+  'COMBO-5840-2LOI': [
+    { name: 'Lõi lọc PGP Truliva UR5840', quantity: 1 },
+    { name: 'Lõi lọc CTO Truliva UR5840', quantity: 1 }
+  ],
+  'COMBO-5840-3LOI': [
+    { name: 'Lõi lọc PGP Truliva UR5840', quantity: 1 },
+    { name: 'Lõi lọc CTO Truliva UR5840', quantity: 1 },
+    { name: 'Lõi lọc RO Truliva UR5840', quantity: 1 }
+  ]
+};
+
+export function getComboComponents(productName: string, sku?: string | null): ComboComponent[] | null {
+  const cleanSku = (sku || '').trim().toUpperCase();
+  if (cleanSku && KNOWN_COMBO_DEFINITIONS[cleanSku]) {
+    return KNOWN_COMBO_DEFINITIONS[cleanSku];
+  }
+  
+  const cleanName = (productName || '').toLowerCase().trim();
+
+  // 1. Chỉ phát hiện Gói Giải pháp W6412 khi tên có "w6412" kèm tier (eco/gold/platinum)
+  if (cleanName.includes('w6412')) {
+    if (cleanName.includes('eco')) {
+      return KNOWN_COMBO_DEFINITIONS['W6412-ECO'];
+    }
+    if (cleanName.includes('gold')) {
+      return KNOWN_COMBO_DEFINITIONS['W6412-GOLD'];
+    }
+    if (cleanName.includes('platinum')) {
+      return KNOWN_COMBO_DEFINITIONS['W6412-PLATINUM'];
+    }
+  }
+
+  // 2. Chỉ phát hiện Combo lõi lọc khi tên BẮT BUỘC có chữ "combo" hoặc "bộ "
+  if (cleanName.includes('combo') || cleanName.startsWith('bộ ')) {
+    if (cleanName.includes('5676')) {
+      return KNOWN_COMBO_DEFINITIONS['COMBO-5676-GOLD'];
+    }
+    if (cleanName.includes('5840')) {
+      if (cleanName.includes('3 lõi') || cleanName.includes('ro')) {
+        return KNOWN_COMBO_DEFINITIONS['COMBO-5840-3LOI'];
+      }
+      return KNOWN_COMBO_DEFINITIONS['COMBO-5840-2LOI'];
+    }
+  }
+
+  // BẤT KỲ sản phẩm đơn nào khác (Lõi lọc PGP, Lõi lọc CTO, Lõi lọc PCB, Máy UR5676, v.v.) -> return null
+  return null;
+}
+
 const ROW_STATUS_OPTIONS = [
   { value: 'chờ xử lý', label: 'Chờ xử lý' },
   { value: 'đang thực hiện', label: 'Đã phân công' },
@@ -978,6 +1053,20 @@ export default function OrderList() {
     }
 
     try {
+      let finalBulkWarehouseId: string | null = bulkWarehouseId || null;
+      if (bulkWarehouseSearch && bulkWarehouseSearch.trim()) {
+        const cleanInput = removeAccents(bulkWarehouseSearch).trim().toLowerCase();
+        const matched = warehouses.find(w => w.id === bulkWarehouseId)
+          || warehouses.find(w => removeAccents(w.name).trim().toLowerCase() === cleanInput)
+          || warehouses.find(w => removeAccents(w.name).toLowerCase().includes(cleanInput));
+        if (matched) {
+          finalBulkWarehouseId = matched.id;
+        } else {
+          alert(`Kho hàng "${bulkWarehouseSearch}" không tồn tại trong hệ thống. Vui lòng chọn một kho hàng hợp lệ trong danh sách.`);
+          return;
+        }
+      }
+
       setLoading(true);
       const res = await bulkAssignOrders(selectedOrderIds, {
         mainStationId: bulkMainStationId || null,
@@ -985,7 +1074,7 @@ export default function OrderList() {
         assignedKtvId: bulkAssignedKtvId || null,
         appointmentTime: appointmentTimeISO,
         rescheduleReason: bulkRescheduleReason || null,
-        warehouseId: bulkWarehouseId || null,
+        warehouseId: finalBulkWarehouseId,
         workType: bulkWorkType || null,
         serviceType: bulkServiceType || null
       });
@@ -1357,6 +1446,42 @@ export default function OrderList() {
     }
 
     try {
+      // Tự động khử trùng lặp linh kiện con nếu đã có gói Combo trong đơn
+      const activeComboComponents = new Set<string>();
+      for (const it of tempItems) {
+        const comps = getComboComponents(it.productName, it.sku);
+        if (comps) {
+          comps.forEach(c => {
+            activeComboComponents.add(c.name.trim().toLowerCase());
+            if (c.sku) activeComboComponents.add(c.sku.trim().toLowerCase());
+          });
+        }
+      }
+      const cleanTempItems = tempItems.filter(it => {
+        const comps = getComboComponents(it.productName, it.sku);
+        if (comps) return true;
+        const iName = (it.productName || '').trim().toLowerCase();
+        const iSku = (it.sku || '').trim().toLowerCase();
+        return !activeComboComponents.has(iName) && (!iSku || !activeComboComponents.has(iSku));
+      });
+
+      // Auto match kho hàng từ input tìm kiếm nếu chưa chọn hoặc gõ text
+      let finalWarehouseId: string | null = selectedWarehouseId || null;
+      if (warehouseSearch && warehouseSearch.trim()) {
+        const cleanInput = removeAccents(warehouseSearch).trim().toLowerCase();
+        const matched = warehouses.find(w => w.id === selectedWarehouseId)
+          || warehouses.find(w => removeAccents(w.name).trim().toLowerCase() === cleanInput)
+          || warehouses.find(w => removeAccents(w.name).toLowerCase().includes(cleanInput));
+        if (matched) {
+          finalWarehouseId = matched.id;
+        } else {
+          alert(`Kho hàng "${warehouseSearch}" không tồn tại trong hệ thống. Vui lòng chọn một kho hàng hợp lệ trong danh sách.`);
+          return;
+        }
+      } else {
+        finalWarehouseId = null;
+      }
+
       await updateOrder(assignModal.orderId, {
         mainStationId: selectedMain || null,
         techStationId: selectedTech || null,
@@ -1366,8 +1491,8 @@ export default function OrderList() {
         workType: workType || null,
         serviceType: serviceType || null,
         adminStatus: selectedKtv ? 'đang thực hiện' : 'chờ xử lý', // auto update status
-        warehouseId: selectedWarehouseId || null,
-        items: tempItems,
+        warehouseId: finalWarehouseId,
+        items: cleanTempItems,
         promoCode: assignPromoCode || null
       });
       setAssignModal(null);
@@ -2777,12 +2902,23 @@ export default function OrderList() {
                       {/* Sản phẩm inline */}
                       <div className="text-gray-600 text-[11px] my-1 leading-normal">
                         {order.items && order.items.length > 0 ? (
-                          <div className="flex flex-col gap-1 mt-0.5">
+                          <div className="flex flex-col gap-1.5 mt-0.5">
                             {order.items.map((item: any, i: number) => {
                               const pName = item.productName || item.rawData?.variation_info?.name || item.rawData?.name || 'Sản phẩm';
+                              const comboComps = getComboComponents(pName, item.sku);
                               return (
-                                <div key={item.id || i} className="flex items-center flex-wrap gap-1">
-                                  <span>📦 {pName} (x{item.quantity})</span>
+                                <div key={item.id || i} className="flex flex-col gap-0.5">
+                                  <div className="flex items-center flex-wrap gap-1 font-medium text-gray-800">
+                                    <span>📦 {pName} (x{item.quantity})</span>
+                                    {comboComps && (
+                                      <span className="px-1.5 py-0.2 bg-blue-50 text-blue-700 text-[10px] rounded border border-blue-200 font-semibold">Gói Giải pháp</span>
+                                    )}
+                                  </div>
+                                  {comboComps && (
+                                    <div className="text-[10px] text-blue-700 bg-blue-50/60 rounded px-1.5 py-0.5 border border-blue-100 leading-tight">
+                                      ✨ Gồm: {comboComps.map(c => `${c.quantity * (item.quantity || 1)}x ${c.name}`).join(' + ')} <span className="text-gray-500 font-normal">(Đã tự động trừ kho theo gói)</span>
+                                    </div>
+                                  )}
                                 </div>
                               );
                             })}
@@ -3276,37 +3412,59 @@ export default function OrderList() {
                   
                   {/* List of tempItems */}
                   {tempItems.length > 0 ? (
-                    <div className="border border-gray-200 rounded divide-y max-h-40 overflow-y-auto bg-gray-50">
-                      {tempItems.map((item, idx) => (
-                        <div key={idx} className="flex justify-between items-center p-2 text-xs">
-                          <div className="font-medium text-gray-800 truncate pr-2 animate-fade-in" title={item.productName}>
-                            {item.productName} {item.sku ? `(${item.sku})` : ''}
+                    <div className="border border-gray-200 rounded divide-y max-h-52 overflow-y-auto bg-gray-50">
+                      {tempItems.map((item, idx) => {
+                        const comboComps = getComboComponents(item.productName, item.sku);
+                        return (
+                          <div key={idx} className="p-2 text-xs flex flex-col gap-1 bg-white">
+                            <div className="flex justify-between items-center">
+                              <div className="font-semibold text-gray-800 truncate pr-2" title={item.productName}>
+                                {item.productName} {item.sku ? `(${item.sku})` : ''}
+                                {comboComps && (
+                                  <span className="ml-1.5 px-1.5 py-0.5 bg-blue-100 text-blue-700 text-[10px] rounded font-bold">
+                                    {(item.productName || '').toLowerCase().includes('w6412') ? 'Gói Giải pháp' : 'Combo'}
+                                  </span>
+                                )}
+                              </div>
+                              <div className="flex items-center space-x-2 shrink-0">
+                                <input
+                                  type="number"
+                                  min={1}
+                                  className="w-12 border rounded text-center py-0.5 text-xs outline-none focus:border-blue-500 bg-white text-gray-800 font-medium"
+                                  value={item.quantity}
+                                  onChange={(e) => {
+                                    const val = parseInt(e.target.value, 10) || 1;
+                                    const newItems = [...tempItems];
+                                    newItems[idx].quantity = val;
+                                    setTempItems(newItems);
+                                  }}
+                                />
+                                <button
+                                  type="button"
+                                  className="text-red-500 hover:text-red-700 font-bold px-1"
+                                  onClick={() => {
+                                    setTempItems(tempItems.filter((_, i) => i !== idx));
+                                  }}
+                                >
+                                  Xóa
+                                </button>
+                              </div>
+                            </div>
+                            {comboComps && (
+                              <div className="text-[11px] text-blue-900 bg-blue-50/80 rounded p-1.5 border border-blue-200/70 leading-normal">
+                                <div className="font-bold flex items-center gap-1 text-blue-800">
+                                  <span>✨ Cấu thành từ {comboComps.length} thiết bị (Hệ thống đã tự động liên kết & trừ kho):</span>
+                                </div>
+                                <div className="mt-0.5 pl-2 space-y-0.5 text-blue-950 font-medium">
+                                  {comboComps.map((c, ci) => (
+                                    <div key={ci}>• <strong>{c.quantity * (item.quantity || 1)}x</strong> {c.name} {c.sku ? `(${c.sku})` : ''}</div>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
                           </div>
-                          <div className="flex items-center space-x-2 shrink-0">
-                            <input
-                              type="number"
-                              min={1}
-                              className="w-12 border rounded text-center py-0.5 text-xs outline-none focus:border-blue-500 bg-white text-gray-800"
-                              value={item.quantity}
-                              onChange={(e) => {
-                                const val = parseInt(e.target.value, 10) || 1;
-                                const newItems = [...tempItems];
-                                newItems[idx].quantity = val;
-                                setTempItems(newItems);
-                              }}
-                            />
-                            <button
-                              type="button"
-                              className="text-red-500 hover:text-red-700 font-bold px-1"
-                              onClick={() => {
-                                setTempItems(tempItems.filter((_, i) => i !== idx));
-                              }}
-                            >
-                              Xóa
-                            </button>
-                          </div>
-                        </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   ) : (
                     <div className="text-xs text-gray-400 italic bg-gray-50 border border-dashed rounded p-3 text-center">
@@ -3332,6 +3490,18 @@ export default function OrderList() {
                           .filter(id => id.startsWith('PROD:'))
                           .map(id => id.substring(5)); // Remove 'PROD:' prefix
 
+                        // Kiểm tra xem sản phẩm thêm mới có bị trùng lặp với linh kiện của gói Combo đang có trong đơn hay không
+                        const activeComboComps: string[] = [];
+                        tempItems.forEach(it => {
+                          const comps = getComboComponents(it.productName, it.sku);
+                          if (comps) {
+                            comps.forEach(c => {
+                              activeComboComps.push(c.name.toLowerCase());
+                              if (c.sku) activeComboComps.push(c.sku.toLowerCase());
+                            });
+                          }
+                        });
+
                         // Filter out items that are no longer in selected products
                         let updatedItems = tempItems.filter(item => {
                           const matched = productsStock.find(p => 
@@ -3343,6 +3513,7 @@ export default function OrderList() {
                         });
 
                         // Add newly selected products
+                        let duplicateBlockedName = '';
                         nextProductNames.forEach(name => {
                           const alreadyAdded = updatedItems.some(item => {
                             const matched = productsStock.find(p => 
@@ -3355,6 +3526,15 @@ export default function OrderList() {
 
                           if (!alreadyAdded) {
                             const prodData = productsStock.find(p => p.name === name);
+                            const cleanName = name.toLowerCase();
+                            const cleanSku = (prodData?.sku || '').toLowerCase();
+
+                            // Nếu sản phẩm này là linh kiện nằm trong gói combo đã có
+                            if (activeComboComps.includes(cleanName) || (cleanSku && activeComboComps.includes(cleanSku))) {
+                              duplicateBlockedName = name;
+                              return; // Bỏ qua không thêm để tránh nhân đôi
+                            }
+
                             if (prodData) {
                               updatedItems.push({
                                 productName: prodData.name,
@@ -3366,6 +3546,10 @@ export default function OrderList() {
                             }
                           }
                         });
+
+                        if (duplicateBlockedName) {
+                          alert(`Sản phẩm "${duplicateBlockedName}" đã nằm trong gói Giải pháp/Combo của đơn hàng này. Bạn không cần thêm lẻ để tránh bị nhân đôi số lượng máy và trừ sai kho.`);
+                        }
 
                         setTempItems(updatedItems);
                       }}
@@ -3388,13 +3572,39 @@ export default function OrderList() {
                         className="w-full border rounded p-2 pr-8 text-sm outline-none focus:border-blue-500 bg-white text-gray-800 font-medium"
                         value={warehouseSearch}
                         onChange={(e) => {
-                          setWarehouseSearch(e.target.value);
+                          const val = e.target.value;
+                          setWarehouseSearch(val);
                           setShowWarehouseDropdown(true);
-                          if (!e.target.value) {
+                          if (!val.trim()) {
                             setSelectedWarehouseId('');
+                          } else {
+                            const cleanInput = removeAccents(val).trim().toLowerCase();
+                            const matched = warehouses.find(w => removeAccents(w.name).trim().toLowerCase() === cleanInput);
+                            if (matched) {
+                              setSelectedWarehouseId(matched.id);
+                            }
                           }
                         }}
                         onFocus={() => setShowWarehouseDropdown(true)}
+                        onBlur={() => {
+                          setTimeout(() => {
+                            setShowWarehouseDropdown(false);
+                            if (warehouseSearch.trim()) {
+                              const cleanInput = removeAccents(warehouseSearch).trim().toLowerCase();
+                              const matched = warehouses.find(w => removeAccents(w.name).trim().toLowerCase() === cleanInput)
+                                || warehouses.find(w => removeAccents(w.name).toLowerCase().includes(cleanInput));
+                              if (matched) {
+                                setSelectedWarehouseId(matched.id);
+                                setWarehouseSearch(matched.name);
+                              } else {
+                                const currentWh = warehouses.find(w => w.id === selectedWarehouseId);
+                                setWarehouseSearch(currentWh ? currentWh.name : '');
+                              }
+                            } else {
+                              setSelectedWarehouseId('');
+                            }
+                          }, 200);
+                        }}
                       />
                       <button
                         type="button"
@@ -3443,24 +3653,11 @@ export default function OrderList() {
                     {loadingInventory ? (
                       <div className="text-xs text-gray-400 italic">Đang đối chiếu tồn kho...</div>
                     ) : tempItems && tempItems.length > 0 ? (
-                      <div className="space-y-1.5 max-h-40 overflow-y-auto pr-1">
+                      <div className="space-y-2 max-h-52 overflow-y-auto pr-1">
                         {tempItems.map((item: any, i: number) => {
                             const pName = item.productName || item.rawData?.variation_info?.name || item.rawData?.name || 'Sản phẩm';
                             const itemSku = item.sku || item.rawData?.sku || '';
-                            
-                            // Tìm sản phẩm trong danh sách tồn kho
-                            const stockProd = productsStock.find(p => 
-                              (itemSku && p.sku === itemSku) || 
-                              p.name.toLowerCase() === pName.toLowerCase() ||
-                              (item.rawData?.variation_id && String(p.pancakeProductId) === String(item.rawData.variation_id))
-                            );
-
-                            const available = stockProd ? ((stockProd.stocks && stockProd.stocks[selectedWarehouseId]) ?? 0) : 0;
-                            const actual = stockProd ? ((stockProd.actualStocks && stockProd.actualStocks[selectedWarehouseId]) ?? 0) : 0;
-                            const requiredQty = item.quantity || 1;
-
-                            const isOutOfStock = available === 0;
-                            const isLowStock = available > 0 && available <= 2;
+                            const comboComps = getComboComponents(pName, itemSku);
                             const isInstallation = workType === 'Lắp đặt';
 
                             // Xác định xem đơn hàng gốc có chứa sản phẩm ban đầu hay không
@@ -3476,6 +3673,79 @@ export default function OrderList() {
                                 originallyHasProducts = false;
                               }
                             }
+
+                            // Nếu là gói Combo / Giải pháp: Đối chiếu chi tiết tồn kho từng thiết bị cấu thành
+                            if (comboComps && comboComps.length > 0) {
+                              return (
+                                <div key={i} className="bg-blue-50/50 border border-blue-200 rounded p-2 text-xs space-y-1.5 shadow-2xs">
+                                  <div className="font-bold text-blue-900 flex items-center justify-between">
+                                    <span className="truncate max-w-[200px]" title={pName}>📦 {pName} (x{item.quantity || 1})</span>
+                                    <span className="text-[10px] bg-blue-100 text-blue-800 px-1.5 py-0.5 rounded font-semibold shrink-0">
+                                      Tồn kho {comboComps.length} thiết bị:
+                                    </span>
+                                  </div>
+                                  <div className="space-y-1 pl-1.5 border-l-2 border-blue-300">
+                                    {comboComps.map((comp, cIdx) => {
+                                      const requiredCompQty = comp.quantity * (item.quantity || 1);
+                                      const stockProd = productsStock.find(p =>
+                                        (comp.sku && p.sku === comp.sku) ||
+                                        p.name.toLowerCase() === comp.name.toLowerCase() ||
+                                        p.name.toLowerCase().includes(comp.name.toLowerCase())
+                                      );
+                                      const available = stockProd ? ((stockProd.stocks && stockProd.stocks[selectedWarehouseId]) ?? 0) : 0;
+                                      const actual = stockProd ? ((stockProd.actualStocks && stockProd.actualStocks[selectedWarehouseId]) ?? 0) : 0;
+                                      const isOutOfStock = available < requiredCompQty;
+                                      const isLowStock = available >= requiredCompQty && available <= requiredCompQty + 1;
+
+                                      let bgBadge = 'bg-emerald-100 text-emerald-800 border-emerald-200';
+                                      let badgeText = 'Còn hàng';
+                                      if (isInstallation || !originallyHasProducts) {
+                                        bgBadge = 'bg-blue-100 text-blue-800 border-blue-200 font-medium';
+                                        badgeText = 'Không trừ kho';
+                                      } else if (available === 0) {
+                                        bgBadge = 'bg-red-100 text-red-700 border-red-200';
+                                        badgeText = 'HẾT HÀNG';
+                                      } else if (isOutOfStock) {
+                                        bgBadge = 'bg-red-100 text-red-700 border-red-200';
+                                        badgeText = `Thiếu ${requiredCompQty - available}`;
+                                      } else if (isLowStock) {
+                                        bgBadge = 'bg-amber-100 text-amber-800 border-amber-200';
+                                        badgeText = 'Sắp hết';
+                                      }
+
+                                      return (
+                                        <div key={cIdx} className="flex justify-between items-center bg-white border border-gray-100 rounded px-2 py-1">
+                                          <div className="flex-1 min-w-0 mr-2">
+                                            <div className="font-medium text-gray-800 truncate" title={comp.name}>• {comp.name}</div>
+                                            <div className="text-[10px] text-gray-500">Mã: {comp.sku || 'N/A'} | Cần: x{requiredCompQty}</div>
+                                          </div>
+                                          <div className="text-right shrink-0">
+                                            <div className={`font-bold px-1.5 py-0.5 rounded border text-[11px] inline-block ${bgBadge}`}>
+                                              Có thể bán: {available} ({badgeText})
+                                            </div>
+                                            <div className="text-[10px] text-gray-500">Tồn thực tế: {actual}</div>
+                                          </div>
+                                        </div>
+                                      );
+                                    })}
+                                  </div>
+                                </div>
+                              );
+                            }
+
+                            // Tìm sản phẩm thông thường trong danh sách tồn kho
+                            const stockProd = productsStock.find(p => 
+                              (itemSku && p.sku === itemSku) || 
+                              p.name.toLowerCase() === pName.toLowerCase() ||
+                              (item.rawData?.variation_id && String(p.pancakeProductId) === String(item.rawData.variation_id))
+                            );
+
+                            const available = stockProd ? ((stockProd.stocks && stockProd.stocks[selectedWarehouseId]) ?? 0) : 0;
+                            const actual = stockProd ? ((stockProd.actualStocks && stockProd.actualStocks[selectedWarehouseId]) ?? 0) : 0;
+                            const requiredQty = item.quantity || 1;
+
+                            const isOutOfStock = available === 0;
+                            const isLowStock = available > 0 && available <= 2;
 
                             let bgClass = 'bg-green-50 border-green-100 text-green-800';
                             let statusText = 'Còn hàng';
@@ -4188,42 +4458,64 @@ export default function OrderList() {
                   </div>
 
                   {newOrderForm.items.length > 0 ? (
-                    <div className="border border-gray-200 rounded divide-y max-h-40 overflow-y-auto bg-gray-50">
-                      {newOrderForm.items.map((item, idx) => (
-                        <div key={idx} className="flex justify-between items-center p-2 text-xs">
-                          <div className="font-medium text-gray-800 truncate pr-2 font-mono" title={item.productName}>
-                            {item.productName} {item.sku ? `(${item.sku})` : ''}
+                    <div className="border border-gray-200 rounded divide-y max-h-52 overflow-y-auto bg-gray-50">
+                      {newOrderForm.items.map((item, idx) => {
+                        const comboComps = getComboComponents(item.productName, item.sku);
+                        return (
+                          <div key={idx} className="p-2 text-xs flex flex-col gap-1 bg-white">
+                            <div className="flex justify-between items-center">
+                              <div className="font-semibold text-gray-800 truncate pr-2" title={item.productName}>
+                                {item.productName} {item.sku ? `(${item.sku})` : ''}
+                                {comboComps && (
+                                  <span className="ml-1.5 px-1.5 py-0.5 bg-blue-100 text-blue-700 text-[10px] rounded font-bold">
+                                    {(item.productName || '').toLowerCase().includes('w6412') ? 'Gói Giải pháp' : 'Combo'}
+                                  </span>
+                                )}
+                              </div>
+                              <div className="flex items-center space-x-2 shrink-0">
+                                <input
+                                  type="number"
+                                  min={1}
+                                  className="w-12 border rounded text-center py-0.5 text-xs outline-none focus:border-blue-500 bg-white text-gray-800 font-medium"
+                                  value={item.quantity}
+                                  onChange={(e) => {
+                                    const val = parseInt(e.target.value, 10) || 1;
+                                    setNewOrderForm(prev => {
+                                      const newItems = [...prev.items];
+                                      newItems[idx].quantity = val;
+                                      return { ...prev, items: newItems };
+                                    });
+                                  }}
+                                />
+                                <button
+                                  type="button"
+                                  className="text-red-500 hover:text-red-700 font-bold px-1"
+                                  onClick={() => {
+                                    setNewOrderForm(prev => ({
+                                      ...prev,
+                                      items: prev.items.filter((_, i) => i !== idx)
+                                    }));
+                                  }}
+                                >
+                                  Xóa
+                                </button>
+                              </div>
+                            </div>
+                            {comboComps && (
+                              <div className="text-[11px] text-blue-900 bg-blue-50/80 rounded p-1.5 border border-blue-200/70 leading-normal">
+                                <div className="font-bold flex items-center gap-1 text-blue-800">
+                                  <span>✨ Cấu thành từ {comboComps.length} thiết bị (Tự động liên kết & trừ kho):</span>
+                                </div>
+                                <div className="mt-0.5 pl-2 space-y-0.5 text-blue-950 font-medium">
+                                  {comboComps.map((c, ci) => (
+                                    <div key={ci}>• <strong>{c.quantity * (item.quantity || 1)}x</strong> {c.name} {c.sku ? `(${c.sku})` : ''}</div>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
                           </div>
-                          <div className="flex items-center space-x-2 shrink-0">
-                            <input
-                              type="number"
-                              min={1}
-                              className="w-12 border rounded text-center py-0.5 text-xs outline-none focus:border-blue-500 bg-white text-gray-800 font-medium"
-                              value={item.quantity}
-                              onChange={(e) => {
-                                const val = parseInt(e.target.value, 10) || 1;
-                                setNewOrderForm(prev => {
-                                  const newItems = [...prev.items];
-                                  newItems[idx].quantity = val;
-                                  return { ...prev, items: newItems };
-                                });
-                              }}
-                            />
-                            <button
-                              type="button"
-                              className="text-red-500 hover:text-red-700 font-bold px-1"
-                              onClick={() => {
-                                setNewOrderForm(prev => ({
-                                  ...prev,
-                                  items: prev.items.filter((_, i) => i !== idx)
-                                }));
-                              }}
-                            >
-                              Xóa
-                            </button>
-                          </div>
-                        </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   ) : (
                     <div className="text-xs text-gray-400 italic bg-gray-50 border border-dashed rounded p-3 text-center">
@@ -4242,23 +4534,50 @@ export default function OrderList() {
                           .filter(id => id.startsWith('PROD:'))
                           .map(id => id.substring(5));
 
+                        // Kiểm tra xem sản phẩm thêm mới có bị trùng lặp với linh kiện của gói Combo đang có hay không
+                        const activeComboComps: string[] = [];
+                        newOrderForm.items.forEach(it => {
+                          const comps = getComboComponents(it.productName, it.sku);
+                          if (comps) {
+                            comps.forEach(c => {
+                              activeComboComps.push(c.name.toLowerCase());
+                              if (c.sku) activeComboComps.push(c.sku.toLowerCase());
+                            });
+                          }
+                        });
+
                         setNewOrderForm(prev => {
                           let updatedItems = prev.items.filter(item =>
                             nextProductNames.includes(item.productName)
                           );
 
+                          let duplicateBlockedName = '';
                           nextProductNames.forEach(name => {
                             const alreadyAdded = updatedItems.some(item => item.productName === name);
                             if (!alreadyAdded) {
                               const prodData = productsStock.find(p => p.name === name);
-                              updatedItems.push({
-                                productName: name,
-                                sku: prodData?.sku || '',
-                                quantity: 1,
-                                price: prodData?.sellingPrice || 0
-                              });
+                              const cleanName = name.toLowerCase();
+                              const cleanSku = (prodData?.sku || '').toLowerCase();
+
+                              if (activeComboComps.includes(cleanName) || (cleanSku && activeComboComps.includes(cleanSku))) {
+                                duplicateBlockedName = name;
+                                return;
+                              }
+
+                              if (prodData) {
+                                updatedItems.push({
+                                  productName: name,
+                                  sku: prodData.sku || '',
+                                  quantity: 1,
+                                  price: prodData.sellingPrice || 0
+                                });
+                              }
                             }
                           });
+
+                          if (duplicateBlockedName) {
+                            alert(`Sản phẩm "${duplicateBlockedName}" đã nằm trong gói Giải pháp/Combo của đơn hàng này. Bạn không cần thêm lẻ để tránh bị nhân đôi số lượng máy và trừ sai kho.`);
+                          }
 
                           return { ...prev, items: updatedItems };
                         });
@@ -4568,13 +4887,39 @@ export default function OrderList() {
                     className="w-full border rounded p-2 pr-8 text-sm outline-none focus:border-blue-500 bg-white text-gray-800"
                     value={bulkWarehouseSearch}
                     onChange={(e) => {
-                      setBulkWarehouseSearch(e.target.value);
+                      const val = e.target.value;
+                      setBulkWarehouseSearch(val);
                       setShowBulkWarehouseDropdown(true);
-                      if (!e.target.value) {
+                      if (!val.trim()) {
                         setBulkWarehouseId('');
+                      } else {
+                        const cleanInput = removeAccents(val).trim().toLowerCase();
+                        const matched = warehouses.find(w => removeAccents(w.name).trim().toLowerCase() === cleanInput);
+                        if (matched) {
+                          setBulkWarehouseId(matched.id);
+                        }
                       }
                     }}
                     onFocus={() => setShowBulkWarehouseDropdown(true)}
+                    onBlur={() => {
+                      setTimeout(() => {
+                        setShowBulkWarehouseDropdown(false);
+                        if (bulkWarehouseSearch.trim()) {
+                          const cleanInput = removeAccents(bulkWarehouseSearch).trim().toLowerCase();
+                          const matched = warehouses.find(w => removeAccents(w.name).trim().toLowerCase() === cleanInput)
+                            || warehouses.find(w => removeAccents(w.name).toLowerCase().includes(cleanInput));
+                          if (matched) {
+                            setBulkWarehouseId(matched.id);
+                            setBulkWarehouseSearch(matched.name);
+                          } else {
+                            const currentWh = warehouses.find(w => w.id === bulkWarehouseId);
+                            setBulkWarehouseSearch(currentWh ? currentWh.name : '');
+                          }
+                        } else {
+                          setBulkWarehouseId('');
+                        }
+                      }, 200);
+                    }}
                   />
                   <button
                     type="button"

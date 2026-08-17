@@ -14,6 +14,8 @@ import {
 } from '../services/serialService';
 import { activateSerialWarranty, extractWarrantyMonths } from '../services/warrantyService';
 import { getZaloConfig, exchangeAuthorizationCode, sendZnsWarrantyActivation, getValidAccessToken } from '../services/zaloService';
+import { sendPushNotification } from '../services/notificationService';
+import { sendWebPushNotification } from '../services/webPushService';
 
 export async function uploadInvoiceResponse(req: Request, res: Response): Promise<void> {
   try {
@@ -109,6 +111,64 @@ export async function activatePublicSerial(req: Request, res: Response): Promise
       znsResult = await sendZnsWarrantyActivation(cleaned, customerPhone.trim());
     } catch (znsError: any) {
       logger.error('Lỗi gửi tin nhắn ZNS khi khách hàng tự kích hoạt', { serialNumber: cleaned, phone: customerPhone, error: znsError.message });
+    }
+
+    // 2. Gửi thông báo trong App Truliva & Push Notification cho Quản trị viên / CSKH / Điều phối
+    try {
+      const staffUsers = await prisma.user.findMany({
+        where: {
+          role: { in: ['ADMIN', 'DEV', 'COORDINATOR', 'HOTLINE', 'SALE_SUPERVISOR', 'STAFF'] },
+          isActive: true
+        },
+        select: { id: true, pushToken: true, webPushSubscription: true }
+      });
+
+      if (staffUsers.length > 0) {
+        let expiryStr = 'Chưa xác định';
+        if (updated.warrantyExpiryDate) {
+          const d = new Date(updated.warrantyExpiryDate);
+          const day = String(d.getDate()).padStart(2, '0');
+          const month = String(d.getMonth() + 1).padStart(2, '0');
+          const year = d.getFullYear();
+          expiryStr = `${day}/${month}/${year}`;
+        }
+
+        const notifTitle = 'Khách hàng kích hoạt bảo hành';
+        const notifContent = `Khách hàng **${customerName.trim()}** (${customerPhone.trim()}) vừa kích hoạt bảo hành thành công qua link.\n- **Serial:** ${cleaned}\n- **Model:** ${updated.model || serial.model}\n- **Địa chỉ:** ${address.trim()}, ${province.trim()}\n- **Hạn bảo hành:** ${expiryStr}`;
+
+        await prisma.notification.createMany({
+          data: staffUsers.map(u => ({
+            userId: u.id,
+            title: notifTitle,
+            content: notifContent,
+            rawData: {
+              type: 'WARRANTY_ACTIVATION',
+              serialNumber: cleaned,
+              customerPhone: customerPhone.trim(),
+              customerName: customerName.trim(),
+              serialId: updated.id || serial.id
+            } as any
+          }))
+        });
+
+        // Gửi Push Notification (FCM / PWA Web Push)
+        for (const u of staffUsers) {
+          if (u.pushToken) {
+            sendPushNotification(u.id, notifTitle, `Khách hàng ${customerName.trim()} vừa kích hoạt bảo hành máy ${cleaned}`, {
+              type: 'WARRANTY_ACTIVATION',
+              serialNumber: cleaned
+            }).catch(err => logger.error('Staff push notification failed', { userId: u.id, error: err.message }));
+          }
+          if (u.webPushSubscription) {
+            sendWebPushNotification(u.id, notifTitle, `Khách hàng ${customerName.trim()} vừa kích hoạt bảo hành máy ${cleaned}`, {
+              type: 'WARRANTY_ACTIVATION',
+              serialNumber: cleaned
+            }).catch(err => logger.error('Staff web push notification failed', { userId: u.id, error: err.message }));
+          }
+        }
+      }
+    } catch (notifErr: any) {
+      logger.error('Lỗi tạo thông báo app khi khách hàng kích hoạt bảo hành', { serialNumber: cleaned, error: notifErr.message });
     }
 
     res.json({

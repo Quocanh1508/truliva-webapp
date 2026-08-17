@@ -1,0 +1,33 @@
+menu "Water filter network configuration"
+
+config TDS_NETWORK_ENABLED
+    bool "Enable Wi-Fi dashboard and Telegram notifications"
+    default n
+
+config TDS_WIFI_SSID
+    string "Wi-Fi SSID"
+    depends on TDS_NETWORK_ENABLED
+    default ""
+
+config TDS_WIFI_PASSWORD
+    string "Wi-Fi password"
+    depends on TDS_NETWORK_ENABLED
+    default ""
+
+config TDS_TELEGRAM_BOT_TOKEN
+    string "Telegram bot token"
+    depends on TDS_NETWORK_ENABLED
+    default ""
+
+config TDS_TELEGRAM_CHAT_ID
+    string "Telegram chat ID"
+    depends on TDS_NETWORK_ENABLED
+    default ""
+
+config TDS_NOTIFY_INTERVAL_SECONDS
+    int "Notification interval in seconds"
+    depends on TDS_NETWORK_ENABLED
+    range 5 86400
+    default 20
+
+endmenu

@@ -14,6 +14,81 @@ import axios from 'axios';
 
 import { buildOrderFilter } from '../services/orderService';
 
+export interface ComboComponent {
+  name: string;
+  sku?: string;
+  quantity: number;
+}
+
+export const KNOWN_COMBO_DEFINITIONS: Record<string, ComboComponent[]> = {
+  // 1. Gói Giải pháp máy nóng lạnh treo tường W6412 (Gồm máy lọc nước UR3626 + Máy nóng lạnh W6412)
+  'W6412-ECO': [
+    { name: 'Máy lọc nước Truliva UR3626', sku: '104338-0002', quantity: 1 },
+    { name: 'Máy nóng lạnh treo tường Truliva W6412', sku: '103057-001', quantity: 1 }
+  ],
+  'W6412-GOLD': [
+    { name: 'Máy lọc nước Truliva UR3626', sku: '104338-0002', quantity: 1 },
+    { name: 'Máy nóng lạnh treo tường Truliva W6412', sku: '103057-001', quantity: 1 }
+  ],
+  'W6412-PLATINUM': [
+    { name: 'Máy lọc nước Truliva UR3626', sku: '104338-0002', quantity: 1 },
+    { name: 'Máy nóng lạnh treo tường Truliva W6412', sku: '103057-001', quantity: 1 }
+  ],
+
+  // 2. Combo lõi lọc (Bộ nhiều lõi đóng gói chung)
+  'COMBO-5676-GOLD': [
+    { name: 'Lõi lọc PGP Truliva UR5676/UR5640/UR5440', quantity: 1 },
+    { name: 'Lõi lọc CTO Truliva UR5676/UR5640/UR5440', quantity: 1 }
+  ],
+  'COMBO-5840-2LOI': [
+    { name: 'Lõi lọc PGP Truliva UR5840', quantity: 1 },
+    { name: 'Lõi lọc CTO Truliva UR5840', quantity: 1 }
+  ],
+  'COMBO-5840-3LOI': [
+    { name: 'Lõi lọc PGP Truliva UR5840', quantity: 1 },
+    { name: 'Lõi lọc CTO Truliva UR5840', quantity: 1 },
+    { name: 'Lõi lọc RO Truliva UR5840', quantity: 1 }
+  ]
+};
+
+export function getComboComponents(productName: string, sku?: string | null): ComboComponent[] | null {
+  const cleanSku = (sku || '').trim().toUpperCase();
+  if (cleanSku && KNOWN_COMBO_DEFINITIONS[cleanSku]) {
+    return KNOWN_COMBO_DEFINITIONS[cleanSku];
+  }
+  
+  const cleanName = (productName || '').toLowerCase().trim();
+
+  // 1. Chỉ phát hiện Gói Giải pháp W6412 khi tên có "w6412" kèm tier (eco/gold/platinum)
+  if (cleanName.includes('w6412')) {
+    if (cleanName.includes('eco')) {
+      return KNOWN_COMBO_DEFINITIONS['W6412-ECO'];
+    }
+    if (cleanName.includes('gold')) {
+      return KNOWN_COMBO_DEFINITIONS['W6412-GOLD'];
+    }
+    if (cleanName.includes('platinum')) {
+      return KNOWN_COMBO_DEFINITIONS['W6412-PLATINUM'];
+    }
+  }
+
+  // 2. Chỉ phát hiện Combo lõi lọc khi tên BẮT BUỘC có chữ "combo" hoặc "bộ "
+  if (cleanName.includes('combo') || cleanName.startsWith('bộ ')) {
+    if (cleanName.includes('5676')) {
+      return KNOWN_COMBO_DEFINITIONS['COMBO-5676-GOLD'];
+    }
+    if (cleanName.includes('5840')) {
+      if (cleanName.includes('3 lõi') || cleanName.includes('ro')) {
+        return KNOWN_COMBO_DEFINITIONS['COMBO-5840-3LOI'];
+      }
+      return KNOWN_COMBO_DEFINITIONS['COMBO-5840-2LOI'];
+    }
+  }
+
+  // BẤT KỲ sản phẩm đơn nào khác (Lõi lọc PGP, Lõi lọc CTO, Lõi lọc PCB, Máy UR5676, v.v.) -> return null
+  return null;
+}
+
 
 /**
  * GET /api/orders
@@ -1975,14 +2050,43 @@ export async function updateOrder(req: Request, res: Response): Promise<void> {
     }
 
     if (items !== undefined && Array.isArray(items)) {
+      // Tự động khử trùng lặp (Deduplicate): Nếu đơn hàng có gói Combo/Giải pháp, loại bỏ các máy con trùng lặp cấu thành gói đó
+      const sanitizedItems: any[] = [];
+      const activeComboComponents = new Set<string>();
+
+      for (const it of items) {
+        const comps = getComboComponents(it.productName, it.sku);
+        if (comps) {
+          comps.forEach(c => {
+            activeComboComponents.add(c.name.trim().toLowerCase());
+            if (c.sku) activeComboComponents.add(c.sku.trim().toLowerCase());
+          });
+        }
+      }
+
+      for (const it of items) {
+        const comps = getComboComponents(it.productName, it.sku);
+        if (comps) {
+          sanitizedItems.push(it);
+        } else {
+          const itName = (it.productName || '').trim().toLowerCase();
+          const itSku = (it.sku || '').trim().toLowerCase();
+          if (activeComboComponents.has(itName) || (itSku && activeComboComponents.has(itSku))) {
+            logger.warn('Stripped duplicate combo component from order items', { orderId: id, productName: it.productName, sku: it.sku });
+            continue;
+          }
+          sanitizedItems.push(it);
+        }
+      }
+
       // Xóa các items cũ
       await prisma.orderItem.deleteMany({
         where: { orderId: id }
       });
 
       // Tạo các items mới
-      if (items.length > 0) {
-        const newItemsData = items.map((item: any) => {
+      if (sanitizedItems.length > 0) {
+        const newItemsData = sanitizedItems.map((item: any) => {
           return {
             orderId: id,
             productName: item.productName || 'Sản phẩm',
@@ -1999,13 +2103,13 @@ export async function updateOrder(req: Request, res: Response): Promise<void> {
       }
 
       // Cập nhật totalQuantity
-      const totalQuantity = items.reduce((acc: number, curr: any) => acc + (Number(curr.quantity) || 1), 0);
+      const totalQuantity = sanitizedItems.reduce((acc: number, curr: any) => acc + (Number(curr.quantity) || 1), 0);
       updateData.totalQuantity = totalQuantity;
       changes.push({ field: 'items', from: oldOrder.totalQuantity, to: totalQuantity });
 
       // Cập nhật totalPrice cho đơn thủ công
       if (oldOrder.pancakeOrderId < 0) {
-        const totalPrice = items.reduce((acc: number, curr: any) => acc + ((Number(curr.price) || 0) * (Number(curr.quantity) || 1)), 0);
+        const totalPrice = sanitizedItems.reduce((acc: number, curr: any) => acc + ((Number(curr.price) || 0) * (Number(curr.quantity) || 1)), 0);
         updateData.totalPrice = totalPrice;
         changes.push({ field: 'totalPrice', from: oldOrder.totalPrice, to: totalPrice });
       }

@@ -9,6 +9,7 @@ import { activateSerialWarranty, syncSerialFromReport } from '../services/warran
 import ExcelJS from 'exceljs';
 import axios from 'axios';
 import { formatOrderCode, buildReportFilter } from '../services/reportService';
+import { getComboComponents, ComboComponent } from './orderController';
 
 export async function createReport(req: Request, res: Response): Promise<void> {
   try {
@@ -460,7 +461,24 @@ export async function createReport(req: Request, res: Response): Promise<void> {
               const apiKey = process.env.PANCAKE_API_KEY;
               const shopId = '1635300067';
               if (apiKey) {
-                const pancakeProducts = reportItems.map((item: any) => {
+                const activeComboComponents = new Set<string>();
+                for (const item of reportItems) {
+                  const comps = getComboComponents(item.productName);
+                  if (comps) {
+                    comps.forEach((c: ComboComponent) => {
+                      activeComboComponents.add(c.name.trim().toLowerCase());
+                      if (c.sku) activeComboComponents.add(c.sku.trim().toLowerCase());
+                    });
+                  }
+                }
+                const sanitizedReportItems = reportItems.filter((item: any) => {
+                  const comps = getComboComponents(item.productName);
+                  if (comps) return true;
+                  const iName = (item.productName || '').trim().toLowerCase();
+                  return !activeComboComponents.has(iName);
+                });
+
+                const pancakeProducts = sanitizedReportItems.map((item: any) => {
                   const prod = matchedProducts.find(p => p.name === item.productName);
                   return {
                     variation_id: prod?.pancakeProductId || null,
@@ -1492,7 +1510,24 @@ export async function updateReport(req: Request, res: Response): Promise<void> {
             const apiKey = process.env.PANCAKE_API_KEY;
             const shopId = '1635300067';
             if (apiKey) {
-              const pancakeProducts = reportItems.map((item: any) => {
+              const activeComboComponents = new Set<string>();
+              for (const item of reportItems) {
+                const comps = getComboComponents(item.productName);
+                if (comps) {
+                  comps.forEach((c: ComboComponent) => {
+                    activeComboComponents.add(c.name.trim().toLowerCase());
+                    if (c.sku) activeComboComponents.add(c.sku.trim().toLowerCase());
+                  });
+                }
+              }
+              const sanitizedReportItems = reportItems.filter((item: any) => {
+                const comps = getComboComponents(item.productName);
+                if (comps) return true;
+                const iName = (item.productName || '').trim().toLowerCase();
+                return !activeComboComponents.has(iName);
+              });
+
+              const pancakeProducts = sanitizedReportItems.map((item: any) => {
                 const prod = matchedProducts.find(p => p.name === item.productName);
                 return {
                   variation_id: prod?.pancakeProductId || null,
@@ -1898,7 +1933,24 @@ export async function approveReport(req: Request, res: Response): Promise<void> 
         const apiKey = process.env.PANCAKE_API_KEY;
         const shopId = '1635300067';
         if (apiKey) {
-          const pancakeProducts = reportItems.map((item: any) => {
+          const activeComboComponents = new Set<string>();
+          for (const item of reportItems) {
+            const comps = getComboComponents(item.productName);
+            if (comps) {
+              comps.forEach((c: ComboComponent) => {
+                activeComboComponents.add(c.name.trim().toLowerCase());
+                if (c.sku) activeComboComponents.add(c.sku.trim().toLowerCase());
+              });
+            }
+          }
+          const sanitizedReportItems = reportItems.filter((item: any) => {
+            const comps = getComboComponents(item.productName);
+            if (comps) return true;
+            const iName = (item.productName || '').trim().toLowerCase();
+            return !activeComboComponents.has(iName);
+          });
+
+          const pancakeProducts = sanitizedReportItems.map((item: any) => {
             const prod = matchedProducts.find(p => p.name === item.productName);
             const itemPrice = isWarranty ? 0 : (item.price !== undefined && item.price !== null ? item.price : (prod?.sellingPrice || 0));
             return {
