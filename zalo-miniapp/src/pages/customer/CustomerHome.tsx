@@ -17,6 +17,7 @@ import {
 import LuckyWheelModal from '../../components/LuckyWheelModal';
 import NewsDetailModal from '../../components/NewsDetailModal';
 import { openPhone, openWebview } from 'zmp-sdk/apis';
+import { fetchZaloApi } from '../../api/client';
 
 interface CustomerHomeProps {
   user: any;
