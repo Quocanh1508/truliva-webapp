@@ -389,43 +389,99 @@ export async function getZaloOaArticles(): Promise<any[]> {
     logger.warn('Could not fetch articles directly from Zalo OA API, returning curated Truliva articles', { error: err.message });
   }
 
-  // Curated Fallback Articles from Truliva Zalo OA
+  // Curated Approved Communication Templates from Truliva Zalo OA
   return [
     {
-      id: 'oa-1',
-      title: 'Bảo vệ sức khỏe gia đình với việc thay lõi lọc nước Truliva định kỳ',
-      date: '28/12/2023',
-      views: 794,
-      image: 'https://images.unsplash.com/photo-1548839140-29a749e1bc4e?w=500&auto=format&fit=crop&q=60',
-      summary: 'Lõi lọc nước đóng vai trò trái tim của hệ thống. Thay lõi đúng định kỳ giúp giữ nguyên vị ngọt tự nhiên.',
-      url: 'https://zalo.me'
+      id: 'zns-602994',
+      templateId: '602994',
+      title: 'THU CŨ ĐỔI MỚI – NÂNG CẤP MÁY LỌC NƯỚC',
+      date: '13/07/2026',
+      views: 1420,
+      image: 'https://images.unsplash.com/photo-1548839140-29a749e1bc4e?w=600&auto=format&fit=crop&q=80',
+      summary: 'Chương trình trợ giá thu hồi máy lọc nước cũ bất kỳ lên đến 2.000.000 VNĐ khi nâng cấp lên dòng máy lọc nước thông minh Truliva.',
+      content: [
+        'Truliva trân trọng gửi tới Quý khách hàng chương trình "Thu Cũ Đổi Mới - Nâng Tầm Nguồn Nước Sạch".',
+        'Áp dụng cho tất cả các dòng máy lọc nước cũ, hư hỏng hoặc không rõ nguồn gốc thuộc mọi thương hiệu trên thị trường.',
+        'Khách hàng được hỗ trợ thu hồi máy cũ tận nhà và trợ giá trực tiếp khi nâng cấp lên dòng máy lọc nước Truliva Ro/Nano thế hệ mới.',
+        'Miễn phí 100% công lắp đặt và kiểm tra đo chỉ số TDS nước đầu vào/đầu ra tận nhà bởi đội ngũ Kỹ thuật viên chính hãng Truliva.'
+      ],
+      url: ''
     },
     {
-      id: 'oa-2',
-      title: 'Chọn máy lọc nước phù hợp cho gia đình: Những tiêu chí quan trọng',
-      date: '28/12/2023',
-      views: 925,
-      image: 'https://images.unsplash.com/photo-1527661591475-527312dd65f5?w=500&auto=format&fit=crop&q=60',
-      summary: 'Lựa chọn máy lọc nước phù hợp dựa trên chất lượng nước đầu vào và số thành viên gia đình.',
-      url: 'https://zalo.me'
+      id: 'zns-591923',
+      templateId: '591923',
+      title: 'ĐẾN HẠN THAY LỌC',
+      date: '12/06/2026',
+      views: 2850,
+      image: 'https://images.unsplash.com/photo-1527661591475-527312dd65f5?w=600&auto=format&fit=crop&q=80',
+      summary: 'Nhắc nhở chu kỳ thay thế lõi lọc định kỳ (PPC 3-6 tháng, CTO 6-9 tháng, RO 24-36 tháng) để đảm bảo chất lượng nước đạt chuẩn uống trực tiếp QCVN 6-1:2010/BYT.',
+      content: [
+        'Lõi lọc nước hoạt động như lá chắn bảo vệ sức khỏe cả gia đình bạn. Sau một thời gian dài giữ lại cặn bẩn, kim loại nặng và vi khuẩn, màng lọc sẽ bị bão hòa.',
+        'Việc không thay lõi đúng hạn có thể khiến nước bị tái nhiễm khuẩn và làm giảm tuổi thọ của bơm cũng như màng lọc RO.',
+        'Hãy kiểm tra chỉ số TDS hoặc liên hệ tổng đài Truliva 1900 638 463 để được KTV hỗ trợ kiểm tra và thay lõi chính hãng tận nhà.'
+      ],
+      url: ''
     },
     {
-      id: 'oa-3',
-      title: 'Sự Khác Biệt Giữa Dòng Máy Lọc Nước Truliva Trực Tiếp và Gián Tiếp',
-      date: '28/12/2023',
-      views: 672,
-      image: 'https://images.unsplash.com/photo-1585829365295-ab7cd400c167?w=500&auto=format&fit=crop&q=60',
-      summary: 'Phân biệt công nghệ lọc khoáng trực tiếp QCVN 6-1:2010/BYT.',
-      url: 'https://zalo.me'
+      id: 'zns-590478',
+      templateId: '590478',
+      title: 'CHIA SẺ NƯỚC SẠCH – RINH QUÀ XỊN CÙNG TRULIVA',
+      date: '14/06/2026',
+      views: 1890,
+      image: 'https://images.unsplash.com/photo-1513151233558-d860c5398176?w=600&auto=format&fit=crop&q=80',
+      summary: 'Giới thiệu người thân, bạn bè sử dụng máy lọc nước Truliva để nhận ngay Voucher 300.000 VNĐ cùng bộ quà tặng lõi lọc cao cấp.',
+      content: [
+        'Lan tỏa nguồn nước tinh khiết đến cộng đồng cùng chương trình "Chia Sẻ Nước Sạch - Rinh Quà Xịn".',
+        'Mỗi lượt giới thiệu thành công, Quý khách sẽ nhận ngay Voucher tiền mặt trừ trực tiếp vào đơn thay lõi hoặc mua sắm thiết bị mới.',
+        'Người được giới thiệu cũng nhận ngay ưu đãi giảm 10% khi đăng ký lắp đặt máy mới qua Zalo Mini App.'
+      ],
+      url: ''
     },
     {
-      id: 'oa-4',
-      title: 'Công nghệ than hoạt tính gáo dừa nén khối loại bỏ 99.9% mùi Clo',
-      date: '28/12/2023',
-      views: 815,
-      image: 'https://images.unsplash.com/photo-1560448204-e02f11c3d0e2?w=500&auto=format&fit=crop&q=60',
-      summary: 'Lõi lọc than hoạt tính Truliva giúp khử hoàn toàn mùi hợp chất hữu cơ.',
-      url: 'https://zalo.me'
+      id: 'zns-588834',
+      templateId: '588834',
+      title: 'BÍ QUYẾT GIỮ MÁY LỌC NƯỚC LAVITA LUÔN HOẠT ĐỘNG TỐT',
+      date: '14/06/2026',
+      views: 3120,
+      image: 'https://images.unsplash.com/photo-1585829365295-ab7cd400c167?w=600&auto=format&fit=crop&q=80',
+      summary: 'Hướng dẫn sử dụng, bảo dưỡng máy lọc nước Lavita / Truliva đúng cách: Xả nước định kỳ, kiểm tra áp lực nước và vệ sinh vòi lấy nước.',
+      content: [
+        'Để máy lọc nước luôn hoạt động bền bỉ với công suất tối ưu, bạn cần lưu ý một số thói quen sử dụng hàng ngày.',
+        '1. Không đặt máy ở nơi có ánh nắng trực tiếp chiếu vào hoặc gần nguồn nhiệt cao.',
+        '2. Định kỳ xả sạch bình áp nếu gia đình không sử dụng nước trong nhiều ngày liên tục.',
+        '3. Luôn duy trì nguồn điện và van cấp nước đầu vào ổn định để bảo vệ bơm tăng áp.'
+      ],
+      url: ''
+    },
+    {
+      id: 'zns-581578',
+      templateId: '581578',
+      title: 'Thiết bị lọc tại vòi chỉ từ 700.000 vnd',
+      date: '25/05/2026',
+      views: 4210,
+      image: 'https://images.unsplash.com/photo-1560448204-e02f11c3d0e2?w=600&auto=format&fit=crop&q=80',
+      summary: 'Giải pháp lọc nước sinh hoạt nhỏ gọn lắp trực tiếp tại bồn rửa, loại bỏ 99% clo dư, cặn gỉ sét với chi phí siêu tiết kiệm chỉ từ 700.000đ.',
+      content: [
+        'Thiết bị lọc tại vòi Truliva là lựa chọn hoàn hảo cho nhu cầu rửa rau củ, nấu ăn và đánh răng rửa mặt sạch khuẩn.',
+        'Lắp đặt cực kỳ đơn giản chỉ trong 3 phút, tương thích với 99% các loại vòi nước gia đình hiện nay.',
+        'Thiết kế thân vỏ trong suốt giúp bạn dễ dàng theo dõi mức độ bám bẩn của lõi lọc và chủ động thay thế khi cần.'
+      ],
+      url: ''
+    },
+    {
+      id: 'zns-580754',
+      templateId: '580754',
+      title: 'THƯ MỜI HỢP TÁC CÙNG TRULIVA',
+      date: '21/05/2026',
+      views: 2350,
+      image: 'https://images.unsplash.com/photo-1521791136064-7986c2920216?w=600&auto=format&fit=crop&q=80',
+      summary: 'Chính sách chiết khấu hấp dẫn và hỗ trợ kỹ thuật toàn diện dành cho Đại lý, Trạm kỹ thuật và Cộng tác viên trên toàn quốc.',
+      content: [
+        'Truliva mở rộng mạng lưới phân phối và trạm dịch vụ kỹ thuật ủy quyền tại 63 tỉnh thành trên toàn quốc.',
+        'Chính sách chiết khấu cao, đào tạo kỹ thuật chuyên sâu và cấp phát tài khoản phần mềm điều phối ca thông minh.',
+        'Liên hệ ngay phòng phát triển đối tác qua Hotline 1900 638 463 để nhận hồ sơ và chính sách hợp tác chi tiết.'
+      ],
+      url: ''
     }
   ];
 }
