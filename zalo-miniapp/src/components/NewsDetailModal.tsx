@@ -1,5 +1,6 @@
-import React from 'react';
-import { X, Calendar, Eye, Share2, ShieldCheck } from 'lucide-react';
+import React, { useState } from 'react';
+import { X, Calendar, Eye, Share2, ShieldCheck, Check } from 'lucide-react';
+import { openShareSheet } from 'zmp-sdk/apis';
 
 interface NewsArticle {
   id: string;
@@ -17,7 +18,45 @@ interface NewsDetailModalProps {
 }
 
 export default function NewsDetailModal({ article, onClose }: NewsDetailModalProps) {
+  const [copied, setCopied] = useState(false);
   if (!article) return null;
+
+  const handleShare = async () => {
+    try {
+      const shareUrl = `https://trulivaofficial.com/zalo-miniapp?articleId=${article.id}`;
+      const thumbUrl = article.image.startsWith('http') 
+        ? article.image 
+        : `https://trulivaofficial.com${article.image}`;
+
+      // 1. Try Zalo Mini App Native openShareSheet
+      await openShareSheet({
+        type: 'zmp',
+        data: {
+          title: article.title,
+          description: article.summary,
+          thumbnail: thumbUrl,
+          path: `/?articleId=${article.id}`
+        }
+      });
+    } catch (err) {
+      // 2. Web fallback: Web Share API or Clipboard
+      if (navigator.share) {
+        try {
+          await navigator.share({
+            title: article.title,
+            text: article.summary,
+            url: window.location.href
+          });
+          return;
+        } catch (_) {}
+      }
+      try {
+        await navigator.clipboard.writeText(window.location.href);
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2000);
+      } catch (_) {}
+    }
+  };
 
   return (
     <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4">
@@ -32,12 +71,21 @@ export default function NewsDetailModal({ article, onClose }: NewsDetailModalPro
           />
           <div className="absolute inset-0 bg-gradient-to-t from-slate-950/80 via-transparent to-black/30"></div>
           
-          <button 
-            onClick={onClose}
-            className="absolute top-3 right-3 p-2 bg-black/40 hover:bg-black/60 rounded-full text-white backdrop-blur-sm transition-colors cursor-pointer"
-          >
-            <X size={18} />
-          </button>
+          <div className="absolute top-3 right-3 flex items-center space-x-2">
+            <button 
+              onClick={handleShare}
+              title="Chia sẻ bài viết"
+              className="p-2 bg-black/40 hover:bg-black/60 rounded-full text-white backdrop-blur-sm transition-colors cursor-pointer flex items-center justify-center"
+            >
+              <Share2 size={18} />
+            </button>
+            <button 
+              onClick={onClose}
+              className="p-2 bg-black/40 hover:bg-black/60 rounded-full text-white backdrop-blur-sm transition-colors cursor-pointer flex items-center justify-center"
+            >
+              <X size={18} />
+            </button>
+          </div>
 
           <div className="absolute bottom-3 left-4 right-4 text-white space-y-1">
             <span className="text-[10px] font-bold uppercase tracking-wider bg-blue-600 px-2 py-0.5 rounded-full text-white">
@@ -81,10 +129,26 @@ export default function NewsDetailModal({ article, onClose }: NewsDetailModalPro
         {/* Footer Actions */}
         <div className="p-4 bg-slate-50 border-t border-slate-200 flex gap-2 flex-shrink-0">
           <button 
+            onClick={handleShare}
+            className="flex-1 py-2.5 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 rounded-xl font-bold text-xs shadow-sm flex items-center justify-center space-x-1.5 cursor-pointer transition-colors"
+          >
+            {copied ? (
+              <>
+                <Check size={16} className="text-emerald-600" />
+                <span className="text-emerald-700">Đã sao chép link!</span>
+              </>
+            ) : (
+              <>
+                <Share2 size={16} />
+                <span>Chia sẻ bạn bè</span>
+              </>
+            )}
+          </button>
+          <button 
             onClick={onClose}
             className="flex-1 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold text-xs shadow-sm cursor-pointer"
           >
-            Đã hiểu
+            Đóng
           </button>
         </div>
       </div>

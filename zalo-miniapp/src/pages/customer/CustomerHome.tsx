@@ -127,6 +127,18 @@ export default function CustomerHome({ user, onOpenScanner, onOpenWarranty }: Cu
       });
   }, []);
 
+  // Deep-linking: Automatically open article modal if opened via Zalo Share link (?articleId=...)
+  React.useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const sharedId = params.get('articleId');
+    if (sharedId && articles.length > 0) {
+      const target = articles.find(a => a.id === sharedId || a.templateId === sharedId);
+      if (target) {
+        setSelectedArticle(target);
+      }
+    }
+  }, [articles]);
+
   const handleArticleClick = async (news: any) => {
     if (news.url && news.url !== 'https://zalo.me' && !news.url.includes('example')) {
       try {
