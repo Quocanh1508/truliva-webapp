@@ -3,6 +3,7 @@ import { useSearchParams } from 'react-router-dom';
 import { ShieldCheck, ArrowRight, UploadCloud, CheckCircle, AlertTriangle, Smartphone, User, MapPin, Loader2, Sparkles, ChevronLeft, Phone, Wrench, Send, Search, ChevronDown } from 'lucide-react';
 import { API_URL } from '../../api/client';
 import { isValidPhone, PHONE_ERROR_MSG } from '../../utils/phone';
+import { HOTLINE_SERVICE_REQUEST_TYPES } from '../../utils/workTypes';
 
 // Định dạng hiển thị Số Serial dạng: XXXX XXX XXX XXXXX
 const formatSerialNumber = (value: string): string => {
@@ -215,7 +216,7 @@ export default function WarrantyActivate() {
     products: []
   });
   const [supportSerial, setSupportSerial] = useState('');
-  const [supportServiceType, setSupportServiceType] = useState('Sửa chữa');
+  const [supportServiceType, setSupportServiceType] = useState('Bảo Hành - Bảo Trì');
   const [supportDetail, setSupportDetail] = useState('');
   const [supportError, setSupportError] = useState('');
   const [submittingSupport, setSubmittingSupport] = useState(false);
@@ -771,13 +772,10 @@ export default function WarrantyActivate() {
                   className="w-full px-3.5 py-2.5 border border-gray-300 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-200 bg-white"
                   required
                 >
-                  <option value="Sửa chữa">Sửa chữa sự cố</option>
-                  <option value="Bảo hành">Bảo hành - Bảo trì</option>
-                  <option value="Lắp đặt">Lắp đặt</option>
-                  <option value="Thay lõi lọc">Thay lõi lọc</option>
-                  <option value="Hướng dẫn và Tư vấn">Hướng dẫn & Tư vấn</option>
-                  <option value="Giao hàng">Giao hàng</option>
-                  <option value="Khác">Khác</option>
+                  <option value="">-- Chọn yêu cầu dịch vụ --</option>
+                  {HOTLINE_SERVICE_REQUEST_TYPES.map(st => (
+                    <option key={st} value={st}>{st}</option>
+                  ))}
                 </select>
               </div>
 

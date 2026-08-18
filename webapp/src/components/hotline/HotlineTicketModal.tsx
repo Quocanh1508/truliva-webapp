@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { fetchApi, getFiltersData, uploadImages } from '../../api/client';
-import { WORK_TYPES, WORK_TYPE_SERVICES } from '../../utils/workTypes';
+import { WORK_TYPES, WORK_TYPE_SERVICES, HOTLINE_SERVICE_REQUEST_TYPES } from '../../utils/workTypes';
 import { X, Loader2, Clock, Send, User, ShoppingBag, UploadCloud } from 'lucide-react';
 import ProvinceSelect from '../ProvinceSelect';
 import CategoryTreeSelect from '../CategoryTreeSelect';
@@ -500,7 +500,7 @@ export default function HotlineTicketModal({ ticket, isOpen, onClose, onSaved, u
                 <select value={formData.serviceRequestType} onChange={(e) => updateForm('serviceRequestType', e.target.value)}
                   className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-200">
                   <option value="">Chọn</option>
-                  {WORK_TYPES.map(s => <option key={s} value={s}>{s}</option>)}
+                  {HOTLINE_SERVICE_REQUEST_TYPES.map(s => <option key={s} value={s}>{s}</option>)}
                 </select>
               </div>
 

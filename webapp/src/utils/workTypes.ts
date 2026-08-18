@@ -14,6 +14,18 @@ export const WORK_TYPES = [
   'Sửa chữa',
 ];
 
+// ── Danh sách Yêu cầu dịch vụ cho Quản lý Hotline (Droplist chuẩn thiết kế) ──
+export const HOTLINE_SERVICE_REQUEST_TYPES = [
+  'Bảo Hành - Bảo Trì',
+  'Hướng dẫn sử dụng',
+  'Khác',
+  'Lắp đặt',
+  'Thay lõi lọc',
+  'Tra cứu thông tin',
+  'Tư vấn kỹ thuật',
+  'Tư vấn sản phẩm',
+];
+
 // ── Danh sách Loại dịch vụ cho "Hướng dẫn và Tư vấn" ──
 export const ADVICE_CONSULTATION_SERVICES = [
   'Hướng dẫn kích hoạt bảo hành',
