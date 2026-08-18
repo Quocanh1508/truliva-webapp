@@ -455,6 +455,10 @@ export default function OrderList() {
       const reqType = ticket.phase3RequestType || ticket.serviceRequestType || '';
       const srvType = ticket.phase3ServiceType || '';
 
+      const ticketAddress = ticket.address || ticket.customerAddress || '';
+      const ticketProvince = ticket.provinceName || ticket.province || '';
+      const ticketProduct = (ticket.productName || '').trim();
+
       setEditingOrderId(null);
       setCustomerSuggestions([]);
       skipFetchRef.current = true;
@@ -462,13 +466,13 @@ export default function OrderList() {
       setNewOrderForm({
         customerName: ticket.customerName || '',
         customerPhone: ticket.customerPhone || '',
-        address: ticket.customerAddress || '',
-        province: ticket.province || '',
+        address: ticketAddress,
+        province: ticketProvince,
         workType: reqType,
         serviceType: srvType || (['Giao hàng và Lắp đặt', 'Lắp đặt', 'Giao hàng', 'Thay lọc', 'Thay lõi lọc'].includes(reqType) ? 'Công việc đã bao gồm dịch vụ' : ''),
         appointmentDate: '',
         appointmentTime: '08:30',
-        items: [],
+        items: ticketProduct ? [{ productName: ticketProduct, sku: null, quantity: 1, price: 0 }] : [],
         moneyToCollect: 0,
         note: (ticket.consultationNote || ticket.customerSupportDetail || '').trim(),
         promoCode: '',
@@ -482,12 +486,17 @@ export default function OrderList() {
           setWarehouses(whs);
           setProductsStock(prods);
 
-          if (ticket.productName && prods.length > 0) {
-            const matched = prods.find((p: any) => p.name && p.name.toLowerCase().includes(ticket.productName.toLowerCase()));
+          if (ticketProduct && prods.length > 0) {
+            const cleanProd = ticketProduct.toLowerCase();
+            const matched = prods.find((p: any) => {
+              if (!p.name) return false;
+              const pName = p.name.toLowerCase();
+              return pName === cleanProd || pName.includes(cleanProd) || cleanProd.includes(pName);
+            });
             if (matched) {
               setNewOrderForm(prev => ({
                 ...prev,
-                items: [{ productName: matched.name, sku: matched.sku || null, quantity: 1, price: matched.price || 0 }]
+                items: [{ productName: matched.name, sku: matched.sku || null, quantity: 1, price: matched.sellingPrice || matched.price || 0 }]
               }));
             }
           }
