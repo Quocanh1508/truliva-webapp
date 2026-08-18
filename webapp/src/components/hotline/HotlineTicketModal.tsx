@@ -307,6 +307,10 @@ export default function HotlineTicketModal({ ticket, isOpen, onClose, onSaved, u
 
   // ── Phase 3: Verify / Save ──
   const handleSavePhase3 = async () => {
+    if (!phase3Data.consultationNote?.trim()) {
+      alert('Vui lòng nhập Ghi chú nội dung tư vấn');
+      return;
+    }
     if (!phase3Data.status) {
       alert('Vui lòng chọn Trạng thái');
       return;
@@ -666,7 +670,7 @@ export default function HotlineTicketModal({ ticket, isOpen, onClose, onSaved, u
               {/* Cảnh báo đỏ/vàng */}
               <div className="mb-4 bg-amber-50 border border-amber-200/80 rounded-xl p-3 text-xs text-amber-800 font-medium flex items-start gap-2">
                 <span className="text-amber-600 font-bold text-sm shrink-0">⚠️</span>
-                <span className="leading-relaxed">Yêu cầu phát sinh sản phẩm hay linh kiện cần tạo bổ sung đơn hàng từ hệ thống Pancake POS</span>
+                <span className="leading-relaxed">Yêu cầu phát sinh sản phẩm, linh kiện hay chi phí cần tạo bổ sung đơn hàng từ hệ thống Pancake POS</span>
               </div>
 
               {/* Đơn hàng liên kết (nếu đã convert) */}
@@ -681,7 +685,7 @@ export default function HotlineTicketModal({ ticket, isOpen, onClose, onSaved, u
 
               {/* Ghi chú nội dung tư vấn */}
               <div className="mb-4">
-                <label className="block text-sm font-semibold text-gray-700 mb-1">Ghi chú nội dung tư vấn</label>
+                <label className="block text-sm font-semibold text-gray-700 mb-1">Ghi chú nội dung tư vấn *</label>
                 <textarea rows={3} placeholder="Nhập ghi chú..." value={phase3Data.consultationNote} onChange={(e) => setPhase3Data(prev => ({ ...prev, consultationNote: e.target.value }))}
                   className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-200 resize-none" />
                 {/* Lịch sử ghi chú */}
