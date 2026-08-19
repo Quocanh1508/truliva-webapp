@@ -146,6 +146,7 @@ export async function processOrderEvent(rawEventId: string | null, payload: any)
       select: {
         id: true,
         adminStatus: true,
+        assignedKtvId: true,
         warehouseId: true,
         warehouseInfo: true,
         workType: true,
@@ -158,7 +159,7 @@ export async function processOrderEvent(rawEventId: string | null, payload: any)
       }
     });
 
-    let newAdminStatus = existingOrder?.adminStatus || 'chờ xử lý';
+    let newAdminStatus = existingOrder?.adminStatus || (existingOrder?.assignedKtvId ? 'đang thực hiện' : 'chờ xử lý');
     const pStatus = (payload.status_name || '').toLowerCase();
     const statusId = typeof payload.status === 'number' ? payload.status : statusCode;
 
@@ -240,6 +241,9 @@ export async function processOrderEvent(rawEventId: string | null, payload: any)
       newAdminStatus = 'đã đổi';
     } else if (isCompleted) {
       if (newAdminStatus !== 'hủy đơn') newAdminStatus = 'hoàn thành';
+    } else if (existingOrder?.assignedKtvId && (!newAdminStatus || newAdminStatus === 'chờ xử lý')) {
+      // Đơn đã phân công KTV thì duy trì 'đang thực hiện'
+      newAdminStatus = 'đang thực hiện';
     }
 
     const isWarrantyOrder = (existingOrder?.workType || '').toLowerCase() === 'bảo hành';

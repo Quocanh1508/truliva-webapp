@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { ShieldCheck, ArrowRight, UploadCloud, CheckCircle, AlertTriangle, Smartphone, User, MapPin, Loader2, Sparkles, ChevronLeft, Phone, Wrench, Send, Search, ChevronDown } from 'lucide-react';
+import { ShieldCheck, ArrowRight, UploadCloud, CheckCircle, CheckCircle2, AlertTriangle, Smartphone, User, MapPin, Loader2, Sparkles, ChevronLeft, Phone, PhoneCall, Wrench, Send, Search, ChevronDown } from 'lucide-react';
 import { API_URL } from '../../api/client';
 import { isValidPhone, PHONE_ERROR_MSG } from '../../utils/phone';
 import { HOTLINE_SERVICE_REQUEST_TYPES } from '../../utils/workTypes';
@@ -175,6 +175,14 @@ function GenericSearchableSelect({
   );
 }
 
+interface SerialValidation {
+  status: 'IDLE' | 'CHECKING' | 'VALID' | 'ACTIVATED' | 'NOT_FOUND' | 'ERROR';
+  model?: string;
+  totalMonths?: number;
+  expiryDate?: string;
+  message?: string;
+}
+
 export default function WarrantyActivate() {
   const [searchParams] = useSearchParams();
   const serialFromUrl = searchParams.get('serial') || '';
@@ -192,10 +200,8 @@ export default function WarrantyActivate() {
   const [uploadingImage, setUploadingImage] = useState(false);
 
   // Status & Fetching States
-  const [checkingSerial, setCheckingSerial] = useState(false);
   const [productInfo, setProductInfo] = useState<ProductInfo | null>(null);
-  const [autoFillLoading, setAutoFillLoading] = useState(false);
-  const [autoFilled, setAutoFilled] = useState(false);
+  const [serialValidation, setSerialValidation] = useState<SerialValidation>({ status: 'IDLE' });
   
   // Submit state
   const [submitting, setSubmitting] = useState(false);
@@ -307,36 +313,74 @@ export default function WarrantyActivate() {
     }
   }, [serialFromUrl]);
 
-  // Auto-lookup customer data when serial reaches 15 chars
+  // Validate serial when input reaches 15 chars (without prefilling any personal data)
   useEffect(() => {
     const cleanSerial = serialInput.replace(/[^a-zA-Z0-9]/g, '');
     if (cleanSerial.length !== 15) {
-      setAutoFilled(false);
+      setSerialValidation({ status: 'IDLE' });
+      setProductInfo(null);
       return;
     }
 
     const timer = setTimeout(async () => {
-      setAutoFillLoading(true);
+      setSerialValidation({ status: 'CHECKING' });
+      setSubmitError('');
       try {
         const response = await fetch(`${API_URL}/serials/public/check/${encodeURIComponent(cleanSerial)}`);
-        if (response.ok) {
-          const data = await response.json();
-          // Auto-fill customer fields only if they are currently empty
-          if (data.customerName && !customerName) setCustomerName(data.customerName);
-          if (data.customerPhone && !customerPhone) setCustomerPhone(data.customerPhone);
-          if (data.address && !address) setAddress(data.address);
-          if (data.province && !province) setProvince(data.province);
-          if (data.customerName || data.customerPhone) setAutoFilled(true);
+        const data = await response.json();
+
+        if (!response.ok) {
+          setSerialValidation({
+            status: 'NOT_FOUND',
+            message: data.error || 'Số Serial không tồn tại trong hệ thống.'
+          });
+          setProductInfo(null);
+          return;
         }
-      } catch (err) {
-        // Silently ignore - user will see errors when submitting
-      } finally {
-        setAutoFillLoading(false);
+
+        if (data.isActivated || data.status === 'Đã kích hoạt' || data.status === 'KH xác nhận') {
+          let expiryText = '';
+          if (data.warrantyExpiryDate) {
+            const d = new Date(data.warrantyExpiryDate);
+            expiryText = `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`;
+          }
+          setSerialValidation({
+            status: 'ACTIVATED',
+            model: data.model,
+            expiryDate: expiryText,
+            message: 'Số Serial này đã được kích hoạt bảo hành trước đó.'
+          });
+          setProductInfo(null);
+          return;
+        }
+
+        // Serial is valid & unactivated
+        const totalMonths = data.totalMonths || data.standardMonths || 12;
+        setSerialValidation({
+          status: 'VALID',
+          model: data.model,
+          totalMonths,
+          message: 'Số Serial hợp lệ'
+        });
+        setProductInfo({
+          serialNumber: data.serialNumber,
+          model: data.model,
+          standardMonths: data.standardMonths,
+          totalMonths,
+          status: data.status,
+          warrantyExpiryDate: data.warrantyExpiryDate
+        });
+      } catch (err: any) {
+        setSerialValidation({
+          status: 'ERROR',
+          message: 'Không thể kết nối máy chủ để kiểm tra số Serial. Vui lòng thử lại sau.'
+        });
+        setProductInfo(null);
       }
-    }, 500); // Debounce 500ms
+    }, 400); // Debounce 400ms
 
     return () => clearTimeout(timer);
-  }, [serialInput]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [serialInput]);
 
   const handleUploadInvoice = async (file: File) => {
     setUploadingImage(true);
@@ -369,12 +413,16 @@ export default function WarrantyActivate() {
     e.preventDefault();
     const cleanSerial = serialInput.replace(/[^a-zA-Z0-9]/g, '');
 
-    if (!cleanSerial) {
-      setSubmitError('Vui lòng nhập số Serial của sản phẩm');
+    if (!cleanSerial || cleanSerial.length !== 15) {
+      setSubmitError('Số Serial bắt buộc phải gồm đúng 15 ký tự chữ và số.');
       return;
     }
-    if (cleanSerial.length !== 15) {
-      setSubmitError('Số Serial bắt buộc phải gồm đúng 15 ký tự chữ và số.');
+    if (serialValidation.status === 'ACTIVATED') {
+      setSubmitError('Số Serial này đã được kích hoạt bảo hành trước đó. Vui lòng liên hệ Hotline 1900 63 84 63 để được hỗ trợ.');
+      return;
+    }
+    if (serialValidation.status !== 'VALID' || !productInfo) {
+      setSubmitError('Vui lòng nhập số Serial hợp lệ trước khi tiếp tục.');
       return;
     }
     if (!customerName.trim()) {
@@ -398,42 +446,8 @@ export default function WarrantyActivate() {
       return;
     }
 
-    setCheckingSerial(true);
     setSubmitError('');
-    setProductInfo(null);
-
-    try {
-      const response = await fetch(`${API_URL}/serials/public/check/${encodeURIComponent(cleanSerial.trim())}`);
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || 'Số Serial không hợp lệ hoặc không tìm thấy');
-      }
-
-      if (data.status === 'Đã kích hoạt' || data.status === 'KH xác nhận') {
-        let expiryText = '';
-        if (data.warrantyExpiryDate) {
-          const d = new Date(data.warrantyExpiryDate);
-          expiryText = ` (Hạn bảo hành đến: ${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()})`;
-        }
-        throw new Error(`Số Serial "${data.serialNumber}" này đã được kích hoạt bảo hành trước đó${expiryText}. Nếu đây là máy của bạn, vui lòng liên hệ Hotline 1900 638 463 để được hỗ trợ kiểm tra.`);
-      }
-
-      setProductInfo({
-        serialNumber: data.serialNumber,
-        model: data.model,
-        standardMonths: data.standardMonths,
-        totalMonths: data.totalMonths,
-        status: data.status,
-        warrantyExpiryDate: data.warrantyExpiryDate
-      });
-      setStep(2);
-    } catch (err: any) {
-      console.error(err);
-      setSubmitError(err.message || 'Số Serial không tìm thấy trong hệ thống hoặc không hợp lệ.');
-    } finally {
-      setCheckingSerial(false);
-    }
+    setStep(2);
   };
 
   const handleSubmitActivation = async (e: React.FormEvent) => {
@@ -915,186 +929,245 @@ export default function WarrantyActivate() {
 
           {/* STEP 1: Enter Details & Invoice */}
           {step === 1 && (
-            <form onSubmit={handleCheckAndProceed} className="space-y-4">
-            <div className="bg-blue-50/40 border border-blue-100/60 rounded-xl p-4 text-center">
-              <Sparkles size={20} className="mx-auto text-blue-600 mb-2" />
-              <p className="text-xs text-gray-600 leading-relaxed font-medium">
-                Vui lòng điền đầy đủ các thông tin cá nhân và tải lên hóa đơn mua hàng để thực hiện đăng ký kích hoạt bảo hành thiết bị.
-              </p>
-            </div>
+            <form onSubmit={handleCheckAndProceed} className="space-y-5">
+              <div className="bg-blue-50/40 border border-blue-100/60 rounded-xl p-4 text-center">
+                <Sparkles size={20} className="mx-auto text-blue-600 mb-2" />
+                <p className="text-xs text-gray-600 leading-relaxed font-medium">
+                  Vui lòng nhập số Serial sản phẩm trên tem dán thiết bị để bắt đầu kích hoạt bảo hành.
+                </p>
+              </div>
 
-            {/* Serial input */}
-            <div>
-              <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-1.5">
-                Số Serial sản phẩm (*)
-              </label>
-              <div className="relative">
-                <input
-                  type="text"
-                  required
-                  placeholder="Mẫu: 1858 260 207 *****"
-                  value={serialInput}
-                  onChange={(e) => setSerialInput(formatSerialNumber(e.target.value))}
-                  disabled={checkingSerial}
-                  className="w-full bg-blue-50/10 border border-gray-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 rounded-xl px-4 py-2.5 text-sm outline-none text-gray-800 font-mono font-bold tracking-wider transition-all placeholder:text-gray-400"
-                />
-                {autoFillLoading && (
-                  <div className="absolute right-3 top-1/2 -translate-y-1/2">
-                    <Loader2 size={16} className="animate-spin text-blue-500" />
+              {/* Serial input */}
+              <div>
+                <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-1.5">
+                  Số Serial sản phẩm (*)
+                </label>
+                <div className="relative">
+                  <input
+                    type="text"
+                    required
+                    placeholder="Mẫu: 1858 260 207 *****"
+                    value={serialInput}
+                    onChange={(e) => setSerialInput(formatSerialNumber(e.target.value))}
+                    className="w-full bg-blue-50/10 border border-gray-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 rounded-xl px-4 py-2.5 text-sm outline-none text-gray-800 font-mono font-bold tracking-wider transition-all placeholder:text-gray-400"
+                  />
+                  {serialValidation.status === 'CHECKING' && (
+                    <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                      <Loader2 size={16} className="animate-spin text-blue-500" />
+                    </div>
+                  )}
+                </div>
+
+                {/* 1. Trạng thái IDLE / Chưa nhập đủ 15 ký tự */}
+                {serialValidation.status === 'IDLE' && serialInput.replace(/[^a-zA-Z0-9]/g, '').length < 15 && (
+                  <p className="text-[11px] text-gray-400 mt-1.5">
+                    * Nhập đủ 15 ký tự chữ và số trên tem máy để kiểm tra
+                  </p>
+                )}
+
+                {/* 2. Trạng thái KHÔNG TÌM THẤY / INVALID */}
+                {serialValidation.status === 'NOT_FOUND' && (
+                  <div className="mt-3 bg-rose-50 border border-rose-200 text-rose-800 text-xs p-3.5 rounded-xl flex items-start gap-2.5 animate-fade-in">
+                    <AlertTriangle size={18} className="shrink-0 text-rose-600 mt-0.5" />
+                    <div className="space-y-1">
+                      <p className="font-bold text-rose-900">Số Serial không tồn tại trong hệ thống</p>
+                      <p className="text-gray-600 leading-relaxed">
+                        Vui lòng kiểm tra lại dãy 15 ký tự trên tem dán hoặc liên hệ hotline để được hỗ trợ.
+                      </p>
+                      <div className="pt-1">
+                        <a
+                          href="tel:1900638463"
+                          className="inline-flex items-center gap-1 font-bold text-blue-600 hover:text-blue-800"
+                        >
+                          📞 Hotline CSKH: 1900 63 84 63
+                        </a>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* 3. Trạng thái ĐÃ KÍCH HOẠT BẢO HÀNH */}
+                {serialValidation.status === 'ACTIVATED' && (
+                  <div className="mt-3 bg-amber-50 border border-amber-200 text-amber-900 text-xs p-4 rounded-xl flex items-start gap-3 animate-fade-in">
+                    <AlertTriangle size={20} className="shrink-0 text-amber-600 mt-0.5" />
+                    <div className="space-y-1.5">
+                      <p className="font-bold text-sm text-amber-900">Số Serial đã được kích hoạt bảo hành</p>
+                      <p className="text-gray-700 leading-relaxed">
+                        Thiết bị <strong className="text-gray-900">{serialValidation.model}</strong> với số Serial này đã được kích hoạt bảo hành trước đó
+                        {serialValidation.expiryDate ? ` (Hạn bảo hành đến: ${serialValidation.expiryDate})` : ''}.
+                      </p>
+                      <p className="text-gray-600 text-[11px] leading-relaxed">
+                        Nếu có sai sót hoặc bạn là chủ sở hữu mới cần hỗ trợ, vui lòng liên hệ trực tiếp:
+                      </p>
+                      <div className="pt-1.5">
+                        <a
+                          href="tel:1900638463"
+                          className="inline-flex items-center gap-1.5 bg-amber-600 hover:bg-amber-700 text-white font-bold px-3.5 py-1.5 rounded-lg text-xs transition shadow-sm"
+                        >
+                          <PhoneCall size={14} /> Gọi Hotline: 1900 63 84 63
+                        </a>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* 4. Trạng thái HỢP LỆ & CHƯA KÍCH HOẠT */}
+                {serialValidation.status === 'VALID' && (
+                  <div className="mt-3 bg-emerald-50 border border-emerald-200 text-emerald-900 text-xs p-3.5 rounded-xl flex items-center justify-between animate-fade-in shadow-sm">
+                    <div className="flex items-center gap-2">
+                      <CheckCircle2 size={18} className="shrink-0 text-emerald-600" />
+                      <div>
+                        <p className="font-bold text-emerald-900">{serialValidation.model}</p>
+                        <p className="text-gray-600 text-[11px]">Bảo hành tiêu chuẩn: <strong>{serialValidation.totalMonths} tháng</strong></p>
+                      </div>
+                    </div>
+                    <span className="bg-emerald-100 text-emerald-800 font-bold px-2 py-0.5 rounded text-[10px] uppercase">
+                      Hợp lệ
+                    </span>
                   </div>
                 )}
               </div>
-              {autoFilled && (
-                <p className="text-[11px] text-emerald-600 mt-1.5 font-medium flex items-center gap-1">
-                  <CheckCircle size={12} /> Đã tự động điền thông tin khách hàng từ hệ thống
-                </p>
-              )}
-            </div>
 
-            {/* Customer Inputs */}
-            <div>
-              <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-1.5">
-                Thông tin người sử dụng (*)
-              </label>
-              <div className="space-y-3">
-                <div className="relative">
-                  <User size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-                  <input
-                    type="text"
-                    required
-                    placeholder="Họ và tên khách hàng *"
-                    value={customerName}
-                    onChange={(e) => setCustomerName(e.target.value)}
-                    className="w-full bg-blue-50/10 border border-gray-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 rounded-xl pl-10 pr-4 py-2.5 text-sm outline-none text-gray-800 transition-all"
-                  />
-                </div>
-
-                <div className="relative">
-                  <Smartphone size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-                  <input
-                    type="tel"
-                    required
-                    placeholder="Số điện thoại di động *"
-                    value={customerPhone}
-                    onChange={(e) => setCustomerPhone(e.target.value)}
-                    className="w-full bg-blue-50/10 border border-gray-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 rounded-xl pl-10 pr-4 py-2.5 text-sm outline-none text-gray-800 transition-all"
-                  />
-                </div>
-
-                {/* Dropdown select for Province/City */}
-                <div className="relative">
-                  <MapPin size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 z-10" />
-                  <select
-                    required
-                    value={province}
-                    onChange={(e) => setProvince(e.target.value)}
-                    className="w-full bg-blue-50/10 border border-gray-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 rounded-xl pl-10 pr-4 py-2.5 text-sm outline-none text-gray-800 transition-all appearance-none cursor-pointer"
-                  >
-                    <option value="" disabled className="text-gray-400">Chọn Tỉnh/Thành phố *</option>
-                    {ORDERED_VIETNAM_PROVINCES.map(p => (
-                      <option key={p} value={p}>{p}</option>
-                    ))}
-                  </select>
-                  <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-gray-400">
-                    ▼
-                  </div>
-                </div>
-
-                <div className="relative">
-                  <MapPin size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-                  <input
-                    type="text"
-                    required
-                    placeholder="Địa chỉ cụ thể (Số nhà, đường, phường...) *"
-                    value={address}
-                    onChange={(e) => setAddress(e.target.value)}
-                    className="w-full bg-blue-50/10 border border-gray-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 rounded-xl pl-10 pr-4 py-2.5 text-sm outline-none text-gray-800 transition-all"
-                  />
-                </div>
-              </div>
-            </div>
-
-            {/* Upload Invoice Image */}
-            <div>
-              <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-1.5">
-                Ảnh chụp hóa đơn mua hàng (*)
-              </label>
-
-              {invoiceImageUrl ? (
-                <div className="relative rounded-xl border border-gray-200 overflow-hidden h-[160px] group bg-gray-50">
-                  <img
-                    src={invoiceImageUrl}
-                    alt="Invoice"
-                    className="w-full h-full object-contain"
-                  />
-                  <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-all">
-                    <label className="bg-white text-gray-800 text-xs font-bold px-3.5 py-2 rounded-lg cursor-pointer hover:bg-gray-100 transition shadow">
-                      Chọn ảnh khác
-                      <input
-                        type="file"
-                        accept="image/*"
-                        className="hidden"
-                        onChange={(e) => {
-                          if (e.target.files && e.target.files[0]) {
-                            handleUploadInvoice(e.target.files[0]);
-                          }
-                        }}
-                      />
+              {/* Customer Inputs & Upload Invoice: ONLY DISPLAYED WHEN SERIAL IS VALID */}
+              {serialValidation.status === 'VALID' && (
+                <div className="space-y-4 pt-2 border-t border-gray-100 animate-fade-in">
+                  <div>
+                    <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-1.5">
+                      Thông tin người sử dụng (*)
                     </label>
-                  </div>
-                </div>
-              ) : (
-                <label className="border-2 border-dashed border-gray-200 hover:border-blue-500 hover:bg-blue-500/5 transition-all rounded-xl p-4 flex flex-col items-center justify-center cursor-pointer h-[140px] text-center">
-                  {uploadingImage ? (
-                    <div className="flex flex-col items-center gap-2">
-                      <Loader2 size={32} className="animate-spin text-blue-600" />
-                      <span className="text-xs text-gray-500 font-medium">Đang tải ảnh lên...</span>
+                    <div className="space-y-3">
+                      <div className="relative">
+                        <User size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                        <input
+                          type="text"
+                          required
+                          placeholder="Họ và tên khách hàng *"
+                          value={customerName}
+                          onChange={(e) => setCustomerName(e.target.value)}
+                          className="w-full bg-blue-50/10 border border-gray-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 rounded-xl pl-10 pr-4 py-2.5 text-sm outline-none text-gray-800 transition-all"
+                        />
+                      </div>
+
+                      <div className="relative">
+                        <Smartphone size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                        <input
+                          type="tel"
+                          required
+                          placeholder="Số điện thoại di động *"
+                          value={customerPhone}
+                          onChange={(e) => setCustomerPhone(e.target.value)}
+                          className="w-full bg-blue-50/10 border border-gray-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 rounded-xl pl-10 pr-4 py-2.5 text-sm outline-none text-gray-800 transition-all font-mono"
+                        />
+                      </div>
+
+                      {/* Dropdown select for Province/City */}
+                      <div className="relative">
+                        <MapPin size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 z-10" />
+                        <select
+                          required
+                          value={province}
+                          onChange={(e) => setProvince(e.target.value)}
+                          className="w-full bg-blue-50/10 border border-gray-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 rounded-xl pl-10 pr-4 py-2.5 text-sm outline-none text-gray-800 transition-all appearance-none cursor-pointer"
+                        >
+                          <option value="" disabled className="text-gray-400">Chọn Tỉnh/Thành phố *</option>
+                          {ORDERED_VIETNAM_PROVINCES.map(p => (
+                            <option key={p} value={p}>{p}</option>
+                          ))}
+                        </select>
+                        <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-gray-400">
+                          ▼
+                        </div>
+                      </div>
+
+                      <div className="relative">
+                        <MapPin size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                        <input
+                          type="text"
+                          required
+                          placeholder="Địa chỉ cụ thể (Số nhà, đường, phường...) *"
+                          value={address}
+                          onChange={(e) => setAddress(e.target.value)}
+                          className="w-full bg-blue-50/10 border border-gray-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 rounded-xl pl-10 pr-4 py-2.5 text-sm outline-none text-gray-800 transition-all"
+                        />
+                      </div>
                     </div>
-                  ) : (
-                    <>
-                      <UploadCloud size={36} className="text-gray-400 mb-2" />
-                      <span className="text-xs font-bold text-gray-600">Chụp/Tải lên hóa đơn mua hàng</span>
-                      <span className="text-[10px] text-gray-400 mt-1">Định dạng JPG, PNG, HEIC (tối đa 20MB)</span>
-                    </>
+                  </div>
+
+                  {/* Upload Invoice Image */}
+                  <div>
+                    <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-1.5">
+                      Ảnh chụp hóa đơn mua hàng (*)
+                    </label>
+
+                    {invoiceImageUrl ? (
+                      <div className="relative rounded-xl border border-gray-200 overflow-hidden h-[160px] group bg-gray-50">
+                        <img
+                          src={invoiceImageUrl}
+                          alt="Invoice"
+                          className="w-full h-full object-contain"
+                        />
+                        <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-all">
+                          <label className="bg-white text-gray-800 text-xs font-bold px-3.5 py-2 rounded-lg cursor-pointer hover:bg-gray-100 transition shadow">
+                            Chọn ảnh khác
+                            <input
+                              type="file"
+                              accept="image/*"
+                              className="hidden"
+                              onChange={(e) => {
+                                if (e.target.files && e.target.files[0]) {
+                                  handleUploadInvoice(e.target.files[0]);
+                                }
+                              }}
+                            />
+                          </label>
+                        </div>
+                      </div>
+                    ) : (
+                      <label className="border-2 border-dashed border-gray-200 hover:border-blue-500 hover:bg-blue-500/5 transition-all rounded-xl p-4 flex flex-col items-center justify-center cursor-pointer h-[140px] text-center">
+                        {uploadingImage ? (
+                          <div className="flex flex-col items-center gap-2">
+                            <Loader2 size={32} className="animate-spin text-blue-600" />
+                            <span className="text-xs text-gray-500 font-medium">Đang tải ảnh lên...</span>
+                          </div>
+                        ) : (
+                          <>
+                            <UploadCloud size={36} className="text-gray-400 mb-2" />
+                            <span className="text-xs font-bold text-gray-600">Chụp/Tải lên hóa đơn mua hàng</span>
+                            <span className="text-[10px] text-gray-400 mt-1">Định dạng JPG, PNG, HEIC (tối đa 20MB)</span>
+                          </>
+                        )}
+                        <input
+                          type="file"
+                          accept="image/*"
+                          className="hidden"
+                          onChange={(e) => {
+                            if (e.target.files && e.target.files[0]) {
+                              handleUploadInvoice(e.target.files[0]);
+                            }
+                          }}
+                        />
+                      </label>
+                    )}
+                  </div>
+
+                  {submitError && (
+                    <div className="bg-rose-500/5 border border-rose-500/10 text-rose-600 text-xs px-3.5 py-2.5 rounded-xl flex items-start gap-2 animate-fade-in font-medium">
+                      <AlertTriangle size={16} className="shrink-0 text-rose-500 mt-0.5" />
+                      <span>{submitError}</span>
+                    </div>
                   )}
-                  <input
-                    type="file"
-                    accept="image/*"
-                    className="hidden"
-                    onChange={(e) => {
-                      if (e.target.files && e.target.files[0]) {
-                        handleUploadInvoice(e.target.files[0]);
-                      }
-                    }}
-                  />
-                </label>
-              )}
-            </div>
 
-            {submitError && (
-              <div className="bg-rose-500/5 border border-rose-500/10 text-rose-600 text-xs px-3.5 py-2.5 rounded-xl flex items-start gap-2 animate-fade-in font-medium">
-                <AlertTriangle size={16} className="shrink-0 text-rose-500 mt-0.5" />
-                <span>{submitError}</span>
-              </div>
-            )}
-
-            <button
-              type="submit"
-              disabled={checkingSerial || uploadingImage || !invoiceImageUrl || !serialInput.trim()}
-              className="w-full bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-700 hover:to-blue-600 text-white font-bold py-3 px-4 rounded-xl text-sm transition-all shadow-md shadow-blue-500/10 active:scale-[0.98] disabled:opacity-50 flex items-center justify-center gap-2"
-            >
-              {checkingSerial ? (
-                <>
-                  <Loader2 size={16} className="animate-spin" /> Đang kiểm tra...
-                </>
-              ) : (
-                <>
-                  Kiểm tra thông tin <ArrowRight size={16} />
-                </>
+                  <button
+                    type="submit"
+                    disabled={uploadingImage || !invoiceImageUrl || !customerName.trim() || !customerPhone.trim() || !address.trim() || !province}
+                    className="w-full bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-700 hover:to-blue-600 text-white font-bold py-3 px-4 rounded-xl text-sm transition-all shadow-md shadow-blue-500/10 active:scale-[0.98] disabled:opacity-50 flex items-center justify-center gap-2 cursor-pointer"
+                  >
+                    Kiểm tra thông tin & Xác nhận <ArrowRight size={16} />
+                  </button>
+                </div>
               )}
-            </button>
-          </form>
-        )}
+            </form>
+          )}
 
         {/* STEP 2: Check & Confirm Details */}
         {step === 2 && productInfo && (

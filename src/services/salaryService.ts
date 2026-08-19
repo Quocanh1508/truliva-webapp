@@ -88,7 +88,7 @@ export function getKtvFlatRate(workType: string | null | undefined): number {
     return 40000;
   }
   if (normalized.includes('giao hàng') || normalized.includes('giao_hang')) {
-    return 0;
+    return 20000;
   }
   return 60000;
 }
@@ -184,20 +184,43 @@ export async function loadStationRates(): Promise<Map<string, any>> {
   return ratesMap;
 }
 
+// Helper to check if a KTV is official company KTV (Nguyen Minh Thuan)
+export function checkIsOfficialTrulivaKtv(ktv: { phoneNumber?: string | null; username?: string | null; fullName?: string | null } | string | null | undefined): boolean {
+  if (!ktv) return false;
+  if (typeof ktv === 'string') {
+    const norm = normalizePhone(ktv);
+    return norm === '392110073' || ktv.includes('392110073');
+  }
+  const phoneNorm = normalizePhone(ktv.phoneNumber || ktv.username);
+  if (phoneNorm === '392110073' || (ktv.phoneNumber && ktv.phoneNumber.includes('392110073'))) {
+    return true;
+  }
+  if (ktv.fullName && ktv.fullName.toLowerCase().includes('thuận') && ktv.fullName.toLowerCase().includes('nguyễn minh')) {
+    return true;
+  }
+  return false;
+}
+
 // Single report cost calculation helper
-export function calculateReportCost(report: any, ktvPhoneNorm: string, stationRate: any, customKtvRatesMap?: Map<string, number>) {
+export function calculateReportCost(
+  report: any,
+  ktvPhoneNorm: string,
+  stationRate: any,
+  customKtvRatesMap?: Map<string, number>,
+  options?: { isEligibleForDistanceFee?: boolean; isOfficialKtv?: boolean }
+) {
   let baseCost = 0;
   let distanceCost = 0;
   const workType = report.workType || report.order?.workType || 'Bảo hành';
   const rateType = getRateType(workType);
   const notes = (report.notes || report.order?.note || '').toLowerCase();
   
-  const isOfficialTrulivaKtv = ktvPhoneNorm === '392110073';
+  const isOfficialTrulivaKtv = options?.isOfficialKtv ?? checkIsOfficialTrulivaKtv(ktvPhoneNorm);
 
   if (report.customBaseCost !== null && report.customBaseCost !== undefined) {
     baseCost = report.customBaseCost;
   } else if (isOfficialTrulivaKtv) {
-    if (customKtvRatesMap && customKtvRatesMap.has(rateType) && (customKtvRatesMap.get(rateType) ?? 0) > 0) {
+    if (customKtvRatesMap && customKtvRatesMap.has(rateType) && customKtvRatesMap.get(rateType) !== undefined && customKtvRatesMap.get(rateType) !== null) {
       baseCost = customKtvRatesMap.get(rateType)!;
     } else {
       baseCost = getOfficialTrulivaBaseRate(workType);
@@ -206,16 +229,16 @@ export function calculateReportCost(report: any, ktvPhoneNorm: string, stationRa
       baseCost += 100000;
     }
   } else {
-    if (customKtvRatesMap && customKtvRatesMap.has(rateType) && (customKtvRatesMap.get(rateType) ?? 0) > 0) {
+    if (customKtvRatesMap && customKtvRatesMap.has(rateType) && customKtvRatesMap.get(rateType) !== undefined && customKtvRatesMap.get(rateType) !== null) {
       baseCost = customKtvRatesMap.get(rateType)!;
-    } else if (rateType === 'suaChua' && customKtvRatesMap && customKtvRatesMap.has('baoHanh') && (customKtvRatesMap.get('baoHanh') ?? 0) > 0) {
+    } else if (rateType === 'suaChua' && customKtvRatesMap && customKtvRatesMap.has('baoHanh') && customKtvRatesMap.get('baoHanh') !== undefined && customKtvRatesMap.get('baoHanh') !== null) {
       baseCost = customKtvRatesMap.get('baoHanh')!;
     } else if (stationRate) {
       if (stationRate.province === 'TP.HCM' && rateType === 'giaoHangLapDat' && notes.includes('giao lắp')) {
         baseCost = 250000;
       } else {
-        const specificRate = stationRate.rates[rateType] || (rateType === 'suaChua' ? stationRate.rates['baoHanh'] : null);
-        baseCost = (specificRate !== undefined && specificRate !== null && specificRate > 0) 
+        const specificRate = stationRate.rates[rateType] ?? (rateType === 'suaChua' ? stationRate.rates['baoHanh'] : null);
+        baseCost = (specificRate !== undefined && specificRate !== null && specificRate >= 0) 
           ? specificRate 
           : getKtvFlatRate(workType);
       }
@@ -228,31 +251,43 @@ export function calculateReportCost(report: any, ktvPhoneNorm: string, stationRa
   let kmRate = 3000;
   let threshold = 20;
 
-  if (customKtvRatesMap && customKtvRatesMap.has('kmRate') && (customKtvRatesMap.get('kmRate') ?? 0) > 0) {
+  if (customKtvRatesMap && customKtvRatesMap.has('kmRate') && customKtvRatesMap.get('kmRate') !== undefined && customKtvRatesMap.get('kmRate') !== null) {
     kmRate = customKtvRatesMap.get('kmRate')!;
-  } else if (stationRate?.kmRate) {
+  } else if (stationRate?.kmRate !== undefined && stationRate?.kmRate !== null) {
     kmRate = stationRate.kmRate;
   }
 
-  const isTLSC = rateType === 'thayLoc' || rateType === 'suaChua';
-
-  if (isTLSC) {
-    threshold = 50;
-    if (customKtvRatesMap && customKtvRatesMap.has('freeKmThresholdTLSC') && customKtvRatesMap.get('freeKmThresholdTLSC') !== undefined) {
-      threshold = customKtvRatesMap.get('freeKmThresholdTLSC')!;
-    } else if (stationRate?.freeKmThresholdTLSC) {
-      threshold = stationRate.freeKmThresholdTLSC;
+  if (isOfficialTrulivaKtv) {
+    // KTV chính thức: TẤT CẢ các loại dịch vụ đều áp dụng ngưỡng từ 20km
+    threshold = 20;
+    if (customKtvRatesMap && customKtvRatesMap.has('freeKmThreshold') && customKtvRatesMap.get('freeKmThreshold') !== undefined && customKtvRatesMap.get('freeKmThreshold') !== null) {
+      threshold = customKtvRatesMap.get('freeKmThreshold')!;
+    } else if (stationRate?.freeKmThreshold !== undefined && stationRate?.freeKmThreshold !== null) {
+      threshold = stationRate.freeKmThreshold;
     }
   } else {
-    threshold = 20;
-    if (customKtvRatesMap && customKtvRatesMap.has('freeKmThreshold') && customKtvRatesMap.get('freeKmThreshold') !== undefined) {
-      threshold = customKtvRatesMap.get('freeKmThreshold')!;
-    } else if (stationRate?.freeKmThreshold) {
-      threshold = stationRate.freeKmThreshold;
+    const isTLSC = rateType === 'thayLoc' || rateType === 'suaChua';
+
+    if (isTLSC) {
+      threshold = 50;
+      if (customKtvRatesMap && customKtvRatesMap.has('freeKmThresholdTLSC') && customKtvRatesMap.get('freeKmThresholdTLSC') !== undefined && customKtvRatesMap.get('freeKmThresholdTLSC') !== null) {
+        threshold = customKtvRatesMap.get('freeKmThresholdTLSC')!;
+      } else if (stationRate?.freeKmThresholdTLSC !== undefined && stationRate?.freeKmThresholdTLSC !== null) {
+        threshold = stationRate.freeKmThresholdTLSC;
+      }
+    } else {
+      threshold = 20;
+      if (customKtvRatesMap && customKtvRatesMap.has('freeKmThreshold') && customKtvRatesMap.get('freeKmThreshold') !== undefined && customKtvRatesMap.get('freeKmThreshold') !== null) {
+        threshold = customKtvRatesMap.get('freeKmThreshold')!;
+      } else if (stationRate?.freeKmThreshold !== undefined && stationRate?.freeKmThreshold !== null) {
+        threshold = stationRate.freeKmThreshold;
+      }
     }
   }
 
-  if (!stationRate?.noDistanceCost) {
+  const isEligible = options?.isEligibleForDistanceFee ?? true;
+
+  if (isEligible && !stationRate?.noDistanceCost && kmRate > 0) {
     if (distance > threshold) {
       distanceCost = (distance - threshold) * kmRate;
     }
@@ -268,8 +303,14 @@ export function calculateReportCost(report: any, ktvPhoneNorm: string, stationRa
   };
 }
 
-export function getReportCostBreakdown(report: any, ktvPhoneNorm: string, stationRate: any, userCustomRates?: Map<string, number>) {
-  const costResult = calculateReportCost(report, ktvPhoneNorm, stationRate, userCustomRates);
+export function getReportCostBreakdown(
+  report: any,
+  ktvPhoneNorm: string,
+  stationRate: any,
+  userCustomRates?: Map<string, number>,
+  options?: { isEligibleForDistanceFee?: boolean; isOfficialKtv?: boolean }
+) {
+  const costResult = calculateReportCost(report, ktvPhoneNorm, stationRate, userCustomRates, options);
   const customCostsObj = (report.customCosts as any) || {};
   const hasManualOverride = report.customBaseCost !== null && report.customBaseCost !== undefined;
 
@@ -351,26 +392,40 @@ export async function computeFullSalariesForMonth(month: string) {
     customKtvRatesByUser.get(r.userId)!.set(r.workType, r.rate);
   }
 
+  let mNum = NaN;
+  let yNum = NaN;
+  if (month.includes('/')) {
+    const parts = month.split('/');
+    mNum = Number(parts[0]);
+    yNum = Number(parts[1]);
+  } else if (month.includes('-')) {
+    const parts = month.split('-');
+    yNum = Number(parts[0]);
+    mNum = Number(parts[1]);
+  }
+
+  const monthVariants = [
+    month,
+    !isNaN(mNum) && !isNaN(yNum) ? `${mNum}/${yNum}` : '',
+    !isNaN(mNum) && !isNaN(yNum) ? `${String(mNum).padStart(2, '0')}/${yNum}` : '',
+    !isNaN(mNum) && !isNaN(yNum) ? `${yNum}-${String(mNum).padStart(2, '0')}` : '',
+    !isNaN(mNum) && !isNaN(yNum) ? `${yNum}-${mNum}` : ''
+  ].filter(Boolean);
+
+  const startDate = (!isNaN(mNum) && !isNaN(yNum) && mNum >= 1 && mNum <= 12)
+    ? new Date(Date.UTC(yNum, mNum - 1, 1, 0, 0, 0, 0))
+    : new Date(Date.UTC(2000, 0, 1));
+  const endDate = (!isNaN(mNum) && !isNaN(yNum) && mNum >= 1 && mNum <= 12)
+    ? new Date(Date.UTC(yNum, mNum, 0, 23, 59, 59, 999))
+    : new Date(Date.UTC(2099, 11, 31, 23, 59, 59, 999));
+
   const savedRecords = await prisma.salaryRecord.findMany({
-    where: { month }
+    where: { month: { in: monthVariants } }
   });
   const savedRecordsMap = new Map(savedRecords.map(r => [r.userId, r]));
 
   const result = [];
   for (const ktv of ktvs) {
-    const [mStr, yStr] = month.split('/');
-    const mNum = Number(mStr);
-    const yNum = Number(yStr);
-
-    const monthVariants = [
-      month,
-      `${mNum}/${yNum}`,
-      `${String(mNum).padStart(2, '0')}/${yNum}`
-    ];
-
-    const startDate = new Date(Date.UTC(yNum, mNum - 1, 1, 0, 0, 0, 0));
-    const endDate = new Date(Date.UTC(yNum, mNum, 0, 23, 59, 59, 999));
-
     const reports = await prisma.serviceReport.findMany({
       where: {
         ktvUserId: ktv.id,
@@ -384,15 +439,51 @@ export async function computeFullSalariesForMonth(month: string) {
     });
 
     const ktvPhoneNorm = normalizePhone(ktv.phoneNumber);
+    const isOfficialTrulivaKtv = checkIsOfficialTrulivaKtv(ktv);
     const stationRate = ktvPhoneNorm ? stationRates.get(ktvPhoneNorm) : null;
     const isStationPaid = !!stationRate;
     const userCustomRates = customKtvRatesByUser.get(ktv.id);
+
+    // KTV chính thức: Mỗi ngày chỉ lấy 1 ca có khoảng cách lớn nhất để tính phí khoảng cách
+    const eligibleDistanceReportIds = new Set<string>();
+    if (isOfficialTrulivaKtv) {
+      const reportsByDay = new Map<string, any[]>();
+      for (const r of reports) {
+        const dayKey = r.createdAt ? new Date(r.createdAt).toLocaleDateString('sv-SE', { timeZone: 'Asia/Ho_Chi_Minh' }) : 'no-date';
+        if (!reportsByDay.has(dayKey)) {
+          reportsByDay.set(dayKey, []);
+        }
+        reportsByDay.get(dayKey)!.push(r);
+      }
+
+      for (const [dayKey, dayReports] of reportsByDay.entries()) {
+        let maxDist = -1;
+        let maxReportId: string | null = null;
+        for (const r of dayReports) {
+          const dist = r.distanceKm ?? 0;
+          if (dist > maxDist) {
+            maxDist = dist;
+            maxReportId = r.id;
+          }
+        }
+        if (maxReportId) {
+          eligibleDistanceReportIds.add(maxReportId);
+        }
+      }
+    }
 
     let calculatedCost = 0;
     const reportsDetail = [];
 
     for (const report of reports) {
-      const breakdown = getReportCostBreakdown(report, ktvPhoneNorm, stationRate, userCustomRates);
+      const isEligibleForDistance = isOfficialTrulivaKtv
+        ? eligibleDistanceReportIds.has(report.id)
+        : true;
+
+      const breakdown = getReportCostBreakdown(report, ktvPhoneNorm, stationRate, userCustomRates, {
+        isEligibleForDistanceFee: isEligibleForDistance,
+        isOfficialKtv: isOfficialTrulivaKtv
+      });
       const isSunday = new Date(report.createdAt).getDay() === 0;
 
       calculatedCost += breakdown.totalCost;

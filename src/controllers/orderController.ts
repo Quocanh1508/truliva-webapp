@@ -939,7 +939,7 @@ export async function createManualOrder(req: Request, res: Response): Promise<vo
       await prisma.hotlineTicket.update({
         where: { id: hotlineTicketId },
         data: {
-          status: 'ĐÃ CHUYỂN YÊU CẦU',
+          status: 'Đã chuyển yêu cầu',
           convertedOrderId: order.id
         }
       }).catch(console.error);

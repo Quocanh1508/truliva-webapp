@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import prisma from '../config/database';
+import { broadcastEvent } from '../services/websocketService';
 
 // ═══════════════════════════════════════════════════
 //  HOTLINE TICKET STATUSES
@@ -8,16 +9,11 @@ const HOTLINE_STATUSES = [
   'Chưa thực hiện',
   'Chưa liên hệ được khách',
   'Khách hẹn gọi lại sau',
+  'Đang chờ nhóm 2 phản hồi',
+  'Đã chuyển yêu cầu',
   'Đã hoàn thành',
   'Đã hủy',
-  'CHỜ XÁC THỰC',
-  'CHƯA THỰC HIỆN',
-  'ĐANG CHỜ NHÓM 2 PHẢN HỒI',
-  'KHÁCH HẸN GỌI LẠI SAU',
-  'CHƯA LIÊN HỆ ĐƯỢC KHÁCH',
-  'ĐÃ CHUYỂN YÊU CẦU',
-  'ĐÃ HOÀN THÀNH',
-  'ĐÃ HỦY'
+  'Chờ xác thực'
 ];
 
 // ═══════════════════════════════════════════════════
@@ -244,35 +240,301 @@ export async function searchCustomerHistory(req: Request, res: Response) {
 }
 
 // ═══════════════════════════════════════════════════
+//  GET /api/hotlines/filter-options - Danh sách tùy chọn Bộ lọc
+// ═══════════════════════════════════════════════════
+
+export async function getHotlineFilterOptions(req: Request, res: Response) {
+  try {
+    const [
+      dbStatuses,
+      dbServiceRequestTypes,
+      dbProductNames,
+      dbPhase3RequestTypes,
+      dbPhase3ServiceTypes,
+      dbTargetTeams,
+      creators,
+      handlers,
+      products
+    ] = await Promise.all([
+      prisma.hotlineTicket.findMany({ select: { status: true }, distinct: ['status'] }),
+      prisma.hotlineTicket.findMany({ select: { serviceRequestType: true }, distinct: ['serviceRequestType'] }),
+      prisma.hotlineTicket.findMany({ select: { productName: true }, distinct: ['productName'] }),
+      prisma.hotlineTicket.findMany({ where: { phase3RequestType: { not: null } }, select: { phase3RequestType: true }, distinct: ['phase3RequestType'] }),
+      prisma.hotlineTicket.findMany({ where: { phase3ServiceType: { not: null } }, select: { phase3ServiceType: true }, distinct: ['phase3ServiceType'] }),
+      prisma.hotlineTicket.findMany({ select: { targetTeam: true }, distinct: ['targetTeam'] }),
+      prisma.user.findMany({
+        where: { hotlineTicketsCreated: { some: {} } },
+        select: { id: true, fullName: true, email: true, role: true },
+        orderBy: { fullName: 'asc' }
+      }),
+      prisma.user.findMany({
+        where: {
+          OR: [
+            { hotlineTicketsHandled: { some: {} } },
+            { role: { in: ['HOTLINE', 'ADMIN', 'COORDINATOR', 'DEV', 'STAFF', 'KTV'] } }
+          ]
+        },
+        select: { id: true, fullName: true, email: true, role: true },
+        orderBy: { fullName: 'asc' }
+      }),
+      prisma.product.findMany({
+        where: { isActive: true },
+        select: { name: true }
+      })
+    ]);
+
+    // Standard preset lists merged with DB distinct values
+    const standardStatuses = [
+      'Chưa thực hiện',
+      'Chưa liên hệ được khách',
+      'Khách hẹn gọi lại sau',
+      'Đang chờ nhóm 2 phản hồi',
+      'Đã chuyển yêu cầu',
+      'Đã hoàn thành',
+      'Đã hủy',
+      'Chờ xác thực'
+    ];
+
+    const normalizeStatus = (s: string) => {
+      if (!s) return '';
+      const lower = s.toLowerCase().trim();
+      if (lower === 'chưa thực hiện') return 'Chưa thực hiện';
+      if (lower === 'chưa liên hệ được khách') return 'Chưa liên hệ được khách';
+      if (lower === 'khách hẹn gọi lại sau') return 'Khách hẹn gọi lại sau';
+      if (lower === 'đang chờ nhóm 2 phản hồi') return 'Đang chờ nhóm 2 phản hồi';
+      if (lower === 'đã chuyển yêu cầu') return 'Đã chuyển yêu cầu';
+      if (lower === 'đã hoàn thành') return 'Đã hoàn thành';
+      if (lower === 'đã hủy') return 'Đã hủy';
+      if (lower === 'chờ xác thực') return 'Chờ xác thực';
+      return s;
+    };
+
+    const statuses = Array.from(new Set([
+      ...standardStatuses,
+      ...dbStatuses.map(s => normalizeStatus(s.status)).filter(Boolean)
+    ]));
+
+    const standardServiceRequests = [
+      'Bảo Hành - Bảo Trì',
+      'Hướng dẫn sử dụng',
+      'Lắp đặt',
+      'Thay lõi lọc',
+      'Tra cứu thông tin',
+      'Tư vấn kỹ thuật',
+      'Tư vấn sản phẩm',
+      'Khác'
+    ];
+    const serviceRequestTypes = Array.from(new Set([...standardServiceRequests, ...dbServiceRequestTypes.map(s => s.serviceRequestType).filter(Boolean)]));
+
+    const productNames = Array.from(new Set([
+      ...products.map(p => p.name),
+      ...dbProductNames.map(p => (p.productName || '').replace(/^PROD:\s*/i, '')).filter(Boolean)
+    ]));
+
+    const standardPhase3Requests = ['Bảo hành', 'Sửa chữa', 'Lắp đặt', 'Giao hàng', 'Thay lõi lọc', 'Hướng dẫn và Tư vấn'];
+    const phase3RequestTypes = Array.from(new Set([...standardPhase3Requests, ...dbPhase3RequestTypes.map(p => p.phase3RequestType!).filter(Boolean)]));
+
+    const phase3ServiceTypes = Array.from(new Set(dbPhase3ServiceTypes.map(p => p.phase3ServiceType!).filter(Boolean)));
+
+    const standardTeams = ['Hotline', 'Coordinator', 'Admin'];
+    const targetTeams = Array.from(new Set([...standardTeams, ...dbTargetTeams.map(t => t.targetTeam).filter(Boolean)]));
+
+    return res.json({
+      statuses,
+      serviceRequestTypes,
+      productNames,
+      phase3RequestTypes,
+      phase3ServiceTypes,
+      targetTeams,
+      creators,
+      handlers
+    });
+  } catch (error: any) {
+    console.error('[getHotlineFilterOptions] Error:', error);
+    return res.status(500).json({ error: 'Lỗi lấy tùy chọn bộ lọc hotline', details: error.message });
+  }
+}
+
+// ═══════════════════════════════════════════════════
 //  GET /api/hotlines - Danh sách Yêu cầu Hotline
 // ═══════════════════════════════════════════════════
 
 /**
- * Lấy danh sách phiếu Hotline kèm đếm badge 8 trạng thái
+ * Lấy danh sách phiếu Hotline kèm đếm badge và bộ lọc đầy đủ 10 tiêu chí
  */
 export async function getHotlineTickets(req: Request, res: Response) {
   try {
-    const { status, search, page = '1', limit = '20' } = req.query;
+    const { 
+      status, 
+      statuses,
+      serviceRequestTypes,
+      productNames,
+      phase3RequestTypes,
+      phase3ServiceTypes,
+      targetTeams,
+      creatorIds,
+      handlerUserIds,
+      requestStartDate,
+      requestEndDate,
+      handledStartDate,
+      handledEndDate,
+      search, 
+      page = '1', 
+      limit = '20',
+      sortBy = 'createdAt',
+      sortOrder = 'desc'
+    } = req.query;
+
     const pageNum = Math.max(1, parseInt(String(page)));
     const limitNum = Math.min(100, Math.max(1, parseInt(String(limit))));
     const skip = (pageNum - 1) * limitNum;
 
-    // Build where clause
-    const where: any = {};
-    if (status && String(status) !== 'ALL') {
-      where.status = String(status);
+    // Build where conditions
+    const conditions: any[] = [];
+
+    // 1. Trạng thái (status / statuses)
+    const statusList = statuses 
+      ? (typeof statuses === 'string' ? statuses.split(',') : (Array.isArray(statuses) ? statuses as string[] : []))
+      : (status && String(status) !== 'ALL' ? [String(status)] : []);
+    
+    if (statusList.length > 0) {
+      conditions.push({ status: { in: statusList } });
     }
+
+    // 2. Yêu cầu dịch vụ (serviceRequestTypes)
+    if (serviceRequestTypes) {
+      const list = typeof serviceRequestTypes === 'string' ? serviceRequestTypes.split(',') : (Array.isArray(serviceRequestTypes) ? serviceRequestTypes as string[] : []);
+      if (list.length > 0) {
+        conditions.push({ serviceRequestType: { in: list } });
+      }
+    }
+
+    // 3. Sản phẩm (productNames)
+    if (productNames) {
+      const list = typeof productNames === 'string' ? productNames.split(',') : (Array.isArray(productNames) ? productNames as string[] : []);
+      if (list.length > 0) {
+        const orProds: any[] = list.map(p => ({
+          productName: { contains: p, mode: 'insensitive' }
+        }));
+        conditions.push({ OR: orProds });
+      }
+    }
+
+    // 4. Loại yêu cầu (phase3RequestTypes)
+    if (phase3RequestTypes) {
+      const list = typeof phase3RequestTypes === 'string' ? phase3RequestTypes.split(',') : (Array.isArray(phase3RequestTypes) ? phase3RequestTypes as string[] : []);
+      if (list.length > 0) {
+        conditions.push({ phase3RequestType: { in: list } });
+      }
+    }
+
+    // 5. Loại dịch vụ (phase3ServiceTypes)
+    if (phase3ServiceTypes) {
+      const list = typeof phase3ServiceTypes === 'string' ? phase3ServiceTypes.split(',') : (Array.isArray(phase3ServiceTypes) ? phase3ServiceTypes as string[] : []);
+      if (list.length > 0) {
+        conditions.push({ phase3ServiceType: { in: list } });
+      }
+    }
+
+    // 6. Người gửi yêu cầu (creatorIds)
+    if (creatorIds) {
+      const list = typeof creatorIds === 'string' ? creatorIds.split(',') : (Array.isArray(creatorIds) ? creatorIds as string[] : []);
+      if (list.length > 0) {
+        conditions.push({ createdById: { in: list } });
+      }
+    }
+
+    // 7. Thời gian gửi yêu cầu (requestStartDate, requestEndDate)
+    if (requestStartDate || requestEndDate) {
+      const dateCond: any = {};
+      if (requestStartDate) {
+        const d = new Date(String(requestStartDate));
+        d.setHours(0, 0, 0, 0);
+        dateCond.gte = d;
+      }
+      if (requestEndDate) {
+        const d = new Date(String(requestEndDate));
+        d.setHours(23, 59, 59, 999);
+        dateCond.lte = d;
+      }
+      conditions.push({
+        OR: [
+          { requestTime: dateCond },
+          { createdAt: dateCond }
+        ]
+      });
+    }
+
+    // 8. Team xử lý yêu cầu (targetTeams)
+    if (targetTeams) {
+      const list = typeof targetTeams === 'string' ? targetTeams.split(',') : (Array.isArray(targetTeams) ? targetTeams as string[] : []);
+      if (list.length > 0) {
+        conditions.push({ targetTeam: { in: list } });
+      }
+    }
+
+    // 9. Người xử lý yêu cầu (handlerUserIds)
+    if (handlerUserIds) {
+      const list = typeof handlerUserIds === 'string' ? handlerUserIds.split(',') : (Array.isArray(handlerUserIds) ? handlerUserIds as string[] : []);
+      if (list.length > 0) {
+        const hasUnassigned = list.includes('null') || list.includes('unassigned');
+        const actualIds = list.filter(id => id && id !== 'null' && id !== 'unassigned');
+        if (hasUnassigned && actualIds.length > 0) {
+          conditions.push({
+            OR: [
+              { handlerUserId: { in: actualIds } },
+              { handlerUserId: null }
+            ]
+          });
+        } else if (hasUnassigned) {
+          conditions.push({ handlerUserId: null });
+        } else {
+          conditions.push({ handlerUserId: { in: actualIds } });
+        }
+      }
+    }
+
+    // 10. Thời gian xử lý yêu cầu (handledStartDate, handledEndDate)
+    // Tức thời điểm chuyển trạng thái "Đã chuyển yêu cầu" hoặc thời điểm Lưu lại của các trạng thái khác (updatedAt / contactTime)
+    if (handledStartDate || handledEndDate) {
+      const dateCond: any = {};
+      if (handledStartDate) {
+        const d = new Date(String(handledStartDate));
+        d.setHours(0, 0, 0, 0);
+        dateCond.gte = d;
+      }
+      if (handledEndDate) {
+        const d = new Date(String(handledEndDate));
+        d.setHours(23, 59, 59, 999);
+        dateCond.lte = d;
+      }
+      conditions.push({
+        OR: [
+          { contactTime: dateCond },
+          { updatedAt: dateCond }
+        ]
+      });
+    }
+
+    // Search keyword
     if (search && String(search).trim()) {
       const s = String(search).trim();
-      where.OR = [
-        { ticketCode: { contains: s, mode: 'insensitive' } },
-        { customerName: { contains: s, mode: 'insensitive' } },
-        { customerPhone: { contains: s } },
-        { address: { contains: s, mode: 'insensitive' } },
-        { serialNumber: { contains: s, mode: 'insensitive' } },
-        { customerSupportDetail: { contains: s, mode: 'insensitive' } }
-      ];
+      conditions.push({
+        OR: [
+          { ticketCode: { contains: s, mode: 'insensitive' } },
+          { customerName: { contains: s, mode: 'insensitive' } },
+          { customerPhone: { contains: s } },
+          { secondaryPhones: { contains: s } },
+          { address: { contains: s, mode: 'insensitive' } },
+          { serialNumber: { contains: s, mode: 'insensitive' } },
+          { customerSupportDetail: { contains: s, mode: 'insensitive' } },
+          { consultationNote: { contains: s, mode: 'insensitive' } },
+          { productName: { contains: s, mode: 'insensitive' } }
+        ]
+      });
     }
+
+    const where = conditions.length > 0 ? { AND: conditions } : {};
 
     // Parallel: fetch tickets + count + status badges
     const [tickets, totalCount, statusCounts] = await Promise.all([
@@ -283,7 +545,7 @@ export async function getHotlineTickets(req: Request, res: Response) {
           handlerUser: { select: { id: true, fullName: true, email: true, role: true } },
           convertedOrder: { select: { id: true, pancakeOrderId: true, billFullName: true, adminStatus: true } }
         },
-        orderBy: { createdAt: 'desc' },
+        orderBy: { [String(sortBy)]: String(sortOrder).toLowerCase() === 'asc' ? 'asc' : 'desc' },
         skip,
         take: limitNum
       }),
@@ -381,7 +643,7 @@ export async function createHotlineTicket(req: Request, res: Response) {
         address: address || null,
         source,
         channel: channel || null,
-        productName,
+        productName: (productName || '').replace(/^PROD:\s*/i, '').trim(),
         serialNumber: serialNumber || null,
         serviceRequestType,
         customerSupportDetail,
@@ -398,6 +660,7 @@ export async function createHotlineTicket(req: Request, res: Response) {
       }
     });
 
+    broadcastEvent('HOTLINE_TICKET_CREATED', ticket);
     return res.status(201).json(ticket);
   } catch (error: any) {
     console.error('[createHotlineTicket] Error:', error);
@@ -463,15 +726,15 @@ export async function updateHotlineTicket(req: Request, res: Response) {
         ...(address !== undefined && { address }),
         ...(source && { source }),
         ...(channel !== undefined && { channel }),
-        ...(productName && { productName }),
+        ...(productName && { productName: productName.replace(/^PROD:\s*/i, '').trim() }),
         ...(serialNumber !== undefined && { serialNumber }),
         ...(serviceRequestType && { serviceRequestType }),
         ...(customerSupportDetail && { customerSupportDetail }),
         ...(attachmentUrls && { attachmentUrls }),
         ...(targetTeam && { targetTeam }),
         ...(handlerUserId !== undefined && { handlerUserId: handlerUserId || null }),
-        // Nếu Phase 2 gửi lại sau khi bị trả về → chuyển lại trạng thái CHỜ XÁC THỰC
-        ...(existing.status === 'ĐANG CHỜ NHÓM 2 PHẢN HỒI' && { status: 'CHỜ XÁC THỰC' })
+        // Nếu Phase 2 gửi lại sau khi bị trả về → chuyển lại trạng thái Chưa thực hiện
+        ...(existing.status === 'ĐANG CHỜ NHÓM 2 PHẢN HỒI' && { status: 'Chưa thực hiện' })
       },
       include: {
         createdBy: { select: { id: true, fullName: true, email: true, role: true } },
@@ -479,6 +742,7 @@ export async function updateHotlineTicket(req: Request, res: Response) {
       }
     });
 
+    broadcastEvent('HOTLINE_TICKET_UPDATED', ticket);
     return res.json(ticket);
   } catch (error: any) {
     console.error('[updateHotlineTicket] Error:', error);
@@ -535,6 +799,7 @@ export async function assignHotlineTicket(req: Request, res: Response) {
       })
     ]);
 
+    broadcastEvent('HOTLINE_TICKET_UPDATED', ticket);
     return res.json(ticket);
   } catch (error: any) {
     console.error('[assignHotlineTicket] Error:', error);
@@ -558,7 +823,7 @@ export async function convertToServiceOrder(req: Request, res: Response) {
     const id = req.params.id as string;
     const existing = await prisma.hotlineTicket.findUnique({ where: { id } });
     if (!existing) return res.status(404).json({ error: 'Không tìm thấy phiếu' });
-    if (existing.status === 'ĐÃ CHUYỂN YÊU CẦU') {
+    if (existing.status.toLowerCase() === 'đã chuyển yêu cầu') {
       return res.status(400).json({ error: 'Phiếu này đã được chuyển thành ca dịch vụ trước đó' });
     }
 
@@ -616,7 +881,7 @@ export async function convertToServiceOrder(req: Request, res: Response) {
       prisma.hotlineTicket.update({
         where: { id },
         data: {
-          status: 'ĐÃ CHUYỂN YÊU CẦU',
+          status: 'Đã chuyển yêu cầu',
           convertedOrderId: undefined // will be set below
         }
       }),
@@ -736,6 +1001,7 @@ export async function verifyHotlineTicketPhase3(req: Request, res: Response) {
       })
     ]);
 
+    broadcastEvent('HOTLINE_TICKET_UPDATED', ticket);
     return res.json(ticket);
   } catch (error: any) {
     console.error('[verifyHotlineTicketPhase3] Error:', error);
@@ -757,6 +1023,7 @@ export async function deleteHotlineTicket(req: Request, res: Response) {
 
     const id = req.params.id as string;
     await prisma.hotlineTicket.delete({ where: { id } });
+    broadcastEvent('HOTLINE_TICKET_DELETED', { id });
     return res.json({ success: true, message: 'Đã xóa phiếu yêu cầu hotline' });
   } catch (error: any) {
     console.error('[deleteHotlineTicket] Error:', error);
@@ -895,16 +1162,18 @@ export async function createPublicTechSupportTicket(req: Request, res: Response)
         address: address.trim(),
         source: 'Webapp (Hỗ trợ kỹ thuật)',
         channel: 'Webapp',
-        productName: productName.trim(),
+        productName: (productName || '').replace(/^PROD:\s*/i, '').trim(),
         serialNumber: serialNumber ? serialNumber.trim() : null,
         serviceRequestType,
         customerSupportDetail: customerSupportDetail.trim(),
         attachmentUrls: attachmentUrls || [],
-        status: 'CHỜ XÁC THỰC',
+        status: 'Chưa thực hiện',
         createdById: systemUser.id,
         targetTeam: 'Hotline'
       }
     });
+
+    broadcastEvent('HOTLINE_TICKET_CREATED', ticket);
 
     return res.status(201).json({
       success: true,

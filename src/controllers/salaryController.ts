@@ -5,7 +5,8 @@ import ExcelJS from 'exceljs';
 import {
   computeFullSalariesForMonth,
   loadStationRates,
-  getRateType
+  getRateType,
+  checkIsOfficialTrulivaKtv
 } from '../services/salaryService';
 
 /**
@@ -77,10 +78,10 @@ export async function exportSalaries(req: Request, res: Response): Promise<void>
   try {
     const month = (req.query.month as string) || `${new Date().getMonth() + 1}/${new Date().getFullYear()}`;
 
-    const ktvIds = (req.query.ktvIds as string) || '';
-    const stationId = (req.query.stationId as string) || '';
-    const mainStationId = (req.query.mainStationId as string) || '';
-    const workTypeFilter = (req.query.workType as string) || '';
+    const ktvIds = (req.query.ktvIds as string) || (req.query.ktvId as string) || '';
+    const stationId = (req.query.stationIds as string) || (req.query.stationId as string) || '';
+    const mainStationId = (req.query.mainStationIds as string) || (req.query.mainStationId as string) || '';
+    const workTypeFilter = (req.query.workTypes as string) || (req.query.workType as string) || '';
     const completedDate = (req.query.completedDate as string) || '';
     const searchQuery = (req.query.search as string || '').toLowerCase().trim();
 
@@ -216,6 +217,8 @@ export async function exportSalaries(req: Request, res: Response): Promise<void>
     let sumTotalOther = 0;
     let sumGrandTotal = 0;
 
+    const isSpecificCaseFilter = Boolean(completedDate || workTypesList.length > 0 || searchQuery);
+
     filteredSalaries.forEach((s, idx) => {
       let ktvBaoHanh = 0;
       let ktvSuaChua = 0;
@@ -226,7 +229,30 @@ export async function exportSalaries(req: Request, res: Response): Promise<void>
       let ktvDistance = 0;
       let ktvOther = 0;
 
-      (s.cases || []).forEach((c: any) => {
+      const casesToProcess = (s.cases || []).filter((c: any) => {
+        if (completedDate) {
+          const cDate = c.createdAt ? new Date(c.createdAt).toLocaleDateString('sv-SE') : '';
+          if (cDate !== completedDate) return false;
+        }
+        if (workTypesList.length > 0) {
+          const matchWT = workTypesList.some(wt => c.workType && c.workType.toLowerCase().includes(wt.toLowerCase()));
+          if (!matchWT) return false;
+        }
+        if (searchQuery) {
+          const matchQ = s.fullName.toLowerCase().includes(searchQuery) ||
+            s.username.toLowerCase().includes(searchQuery) ||
+            (s.phoneNumber && s.phoneNumber.includes(searchQuery)) ||
+            (c.customerName && c.customerName.toLowerCase().includes(searchQuery)) ||
+            (c.customerPhone && c.customerPhone.includes(searchQuery)) ||
+            (c.province && c.province.toLowerCase().includes(searchQuery)) ||
+            (c.orderNote && c.orderNote.toLowerCase().includes(searchQuery)) ||
+            (c.reportNote && c.reportNote.toLowerCase().includes(searchQuery));
+          if (!matchQ) return false;
+        }
+        return true;
+      });
+
+      casesToProcess.forEach((c: any) => {
         ktvBaoHanh += c.baoHanhCost || 0;
         ktvSuaChua += c.suaChuaCost || 0;
         ktvGiaoHang += c.giaoHangCost || 0;
@@ -237,9 +263,11 @@ export async function exportSalaries(req: Request, res: Response): Promise<void>
         ktvOther += c.otherCost || 0;
       });
 
-      const ktvTotalCost = s.adjustedCost || (ktvBaoHanh + ktvSuaChua + ktvGiaoHang + ktvLapDat + ktvGiaoLap + ktvThayLoc + ktvDistance + ktvOther);
+      const ktvCalculatedCost = ktvBaoHanh + ktvSuaChua + ktvGiaoHang + ktvLapDat + ktvGiaoLap + ktvThayLoc + ktvDistance + ktvOther;
+      const ktvTotalCost = isSpecificCaseFilter ? ktvCalculatedCost : (s.adjustedCost || ktvCalculatedCost);
+      const displayCasesCount = isSpecificCaseFilter ? casesToProcess.length : s.casesCount;
 
-      sumTotalCases += s.casesCount;
+      sumTotalCases += displayCasesCount;
       sumTotalBaoHanh += ktvBaoHanh;
       sumTotalSuaChua += ktvSuaChua;
       sumTotalGiaoHang += ktvGiaoHang;
@@ -256,7 +284,7 @@ export async function exportSalaries(req: Request, res: Response): Promise<void>
         s.phoneNumber || '',
         s.stationName || 'Khác',
         s.mainStationName || 'Không có',
-        s.casesCount,
+        displayCasesCount,
         ktvBaoHanh,
         ktvSuaChua,
         ktvGiaoHang,
@@ -541,23 +569,36 @@ export async function getKtvRates(req: Request, res: Response): Promise<void> {
       ratesByUserMap.get(r.userId)![r.workType] = r.rate;
     }
 
+    const defaultRates = {
+      giaoHang: 20000,
+      baoHanh: 60000,
+      suaChua: 60000,
+      thayLoc: 40000,
+      lapDat: 100000,
+      giaoHangLapDat: 120000,
+      thaoLapLai: 160000,
+      kmRate: 3000,
+      freeKmThreshold: 20,
+      freeKmThresholdTLSC: 50
+    };
+
     const result = allKtvs.map(ktv => {
       const ktvPhoneNorm = (ktv.phoneNumber || '').replace(/\D/g, '').replace(/^84/, '').replace(/^0/, '');
       const stationRate = ktvPhoneNorm ? stationRates.get(ktvPhoneNorm) : null;
       const customMap = ratesByUserMap.get(ktv.id) || {};
 
-      const isOfficialTrulivaKtv = ktvPhoneNorm === '392110073';
+      const isOfficialTrulivaKtv = checkIsOfficialTrulivaKtv(ktv);
 
       const baseBaoHanh = isOfficialTrulivaKtv ? 60000 : (stationRate?.rates['baoHanh'] || 60000);
       const baseSuaChua = customMap['suaChua'] ?? customMap['baoHanh'] ?? (stationRate?.rates['suaChua'] || baseBaoHanh);
-      const baseGiaoHang = isOfficialTrulivaKtv ? 20000 : (stationRate?.rates['giaoHang'] || 0);
+      const baseGiaoHang = isOfficialTrulivaKtv ? 20000 : (stationRate?.rates['giaoHang'] || 20000);
       const baseLapDat = isOfficialTrulivaKtv ? 100000 : (stationRate?.rates['lapDat'] || 100000);
       const baseGiaoLap = isOfficialTrulivaKtv ? 120000 : (stationRate?.rates['giaoHangLapDat'] || 120000);
       const baseThayLoc = isOfficialTrulivaKtv ? 40000 : (stationRate?.rates['thayLoc'] || 40000);
 
       const baseKmRate = stationRate?.kmRate || 3000;
       const baseFreeKmThreshold = stationRate?.freeKmThreshold || 20;
-      const baseFreeKmThresholdTLSC = stationRate?.freeKmThresholdTLSC || 50;
+      const baseFreeKmThresholdTLSC = isOfficialTrulivaKtv ? 20 : (stationRate?.freeKmThresholdTLSC || 50);
 
       return {
         userId: ktv.id,
@@ -582,7 +623,7 @@ export async function getKtvRates(req: Request, res: Response): Promise<void> {
       };
     });
 
-    res.json({ success: true, matrix: result, data: result });
+    res.json({ success: true, defaultRates, matrix: result, data: result });
   } catch (error: any) {
     logger.error('Error fetching KTV rates matrix', { error: error.message });
     res.status(500).json({ error: 'Lỗi khi tải bảng ma trận đơn giá KTV' });
@@ -591,14 +632,65 @@ export async function getKtvRates(req: Request, res: Response): Promise<void> {
 
 /**
  * POST /api/salaries/rates
- * Update single rate entry for a specific KTV
+ * Update single rate entry or batch rate matrix for KTVs
  */
 export async function updateKtvRate(req: Request, res: Response): Promise<void> {
   try {
-    const { userId, workType, rate } = req.body;
+    const { rates, userId, workType, rate } = req.body;
 
+    // 1. Batch update: { rates: [ { userId, workType, rate }, ... ] }
+    if (Array.isArray(rates)) {
+      if (rates.length === 0) {
+        res.json({ success: true, message: 'Không có thay đổi nào cần lưu' });
+        return;
+      }
+
+      await prisma.$transaction(async (tx) => {
+        for (const item of rates) {
+          const uId = item.userId;
+          const wType = item.workType;
+          const rNum = Number(item.rate);
+
+          if (!uId || !wType || isNaN(rNum)) continue;
+
+          if (rNum < 0) {
+            await tx.ktvServiceRate.deleteMany({
+              where: { userId: uId, workType: wType }
+            });
+            continue;
+          }
+
+          const existing = await tx.ktvServiceRate.findFirst({
+            where: { userId: uId, workType: wType }
+          });
+
+          if (existing) {
+            await tx.ktvServiceRate.update({
+              where: { id: existing.id },
+              data: {
+                rate: rNum,
+                updatedAt: new Date()
+              }
+            });
+          } else {
+            await tx.ktvServiceRate.create({
+              data: {
+                userId: uId,
+                workType: wType,
+                rate: rNum
+              }
+            });
+          }
+        }
+      });
+
+      res.json({ success: true, message: `Đã lưu thay đổi ma trận đơn giá cho ${rates.length} mục thành công!` });
+      return;
+    }
+
+    // 2. Single update: { userId, workType, rate }
     if (!userId || !workType || rate === undefined) {
-      res.status(400).json({ error: 'Thiếu thông tin (userId, workType, rate)' });
+      res.status(400).json({ error: 'Thiếu thông tin (userId, workType, rate) hoặc danh sách rates' });
       return;
     }
 
@@ -608,7 +700,7 @@ export async function updateKtvRate(req: Request, res: Response): Promise<void> 
       await prisma.ktvServiceRate.deleteMany({
         where: { userId, workType }
       });
-      res.json({ message: 'Đã khôi phục đơn giá mặc định' });
+      res.json({ success: true, message: 'Đã khôi phục đơn giá mặc định' });
       return;
     }
 
@@ -635,7 +727,7 @@ export async function updateKtvRate(req: Request, res: Response): Promise<void> 
       });
     }
 
-    res.json({ message: 'Cập nhật đơn giá thành công', data: record });
+    res.json({ success: true, message: 'Cập nhật đơn giá thành công', data: record });
   } catch (error: any) {
     logger.error('Error updating KTV rate', { error: error.message });
     res.status(500).json({ error: 'Lỗi khi cập nhật đơn giá KTV' });

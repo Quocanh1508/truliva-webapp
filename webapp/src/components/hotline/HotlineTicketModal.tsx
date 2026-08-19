@@ -230,7 +230,7 @@ export default function HotlineTicketModal({ ticket, isOpen, onClose, onSaved, u
           address: data.address || '',
           source: data.source || '',
           channel: data.channel || '',
-          productName: data.productName || '',
+          productName: (data.productName || '').replace(/^PROD:\s*/i, '').trim(),
           serialNumber: data.serialNumber || '',
           serviceRequestType: data.serviceRequestType || '',
           customerSupportDetail: data.customerSupportDetail || '',
@@ -483,10 +483,11 @@ export default function HotlineTicketModal({ ticket, isOpen, onClose, onSaved, u
                   <CategoryTreeSelect
                     categories={categories}
                     products={products}
-                    selected={formData.productName ? [formData.productName] : []}
+                    selected={formData.productName ? (formData.productName.startsWith('PROD:') ? [formData.productName] : [`PROD:${formData.productName}`]) : []}
                     onChange={(nextSelected) => {
-                      const val = nextSelected[nextSelected.length - 1] || nextSelected[0] || '';
-                      updateForm('productName', val);
+                      const rawVal = nextSelected[nextSelected.length - 1] || nextSelected[0] || '';
+                      const cleanVal = rawVal.replace(/^PROD:\s*/i, '').trim();
+                      updateForm('productName', cleanVal);
                     }}
                     placeholder="-- Chọn sản phẩm --"
                   />

@@ -58,6 +58,64 @@ export async function syncRecentOrders(pageSize: number = 200): Promise<number> 
 }
 
 /**
+ * Tự động quét và đối soát các đơn hàng đang kẹt ở trạng thái nháp (statusCode = 0) trong DB.
+ * Nếu trên POS đã được xác nhận (status != 0), tự động đồng bộ sang đơn chính thức.
+ */
+export async function reconcileDraftOrders(): Promise<number> {
+  const apiKey = process.env.PANCAKE_API_KEY;
+  if (!apiKey) return 0;
+
+  try {
+    const draftOrders = await prisma.order.findMany({
+      where: {
+        statusCode: 0,
+        pancakeOrderId: { gt: 0 }
+      },
+      select: {
+        pancakeOrderId: true,
+        billFullName: true
+      },
+      take: 50
+    });
+
+    if (draftOrders.length === 0) return 0;
+
+    logger.info(`[DraftReconciliation] Checking ${draftOrders.length} draft orders for status changes...`);
+    let reconciledCount = 0;
+
+    for (const order of draftOrders) {
+      try {
+        const response = await axios.get(`https://pos.pages.fm/api/v1/shops/${SHOP_ID}/orders/${order.pancakeOrderId}`, {
+          params: { api_key: apiKey },
+          timeout: 8000
+        });
+
+        if (response.data?.success && response.data?.data) {
+          const payload = response.data.data;
+          if (payload.status !== 0) {
+            logger.info(`[DraftReconciliation] Draft order #${order.pancakeOrderId} confirmed on POS (status: ${payload.status}). Reconciling...`);
+            await processOrderEvent(null, payload);
+            reconciledCount++;
+          }
+        }
+      } catch (err: any) {
+        logger.warn(`[DraftReconciliation] Failed to check order #${order.pancakeOrderId}`, { error: err.message });
+      }
+      // Small pause to avoid rate limits
+      await new Promise(r => setTimeout(r, 100));
+    }
+
+    if (reconciledCount > 0) {
+      logger.info(`[DraftReconciliation] Successfully reconciled ${reconciledCount} draft orders to active orders.`);
+    }
+    return reconciledCount;
+  } catch (error: any) {
+    logger.error('reconcileDraftOrders error', { error: error.message });
+    return 0;
+  }
+}
+
+/**
  * Khởi tạo bộ lập lịch đồng bộ đơn hàng tự động (chạy ngầm).
  */
 export function startOrderSyncScheduler(intervalMinutes: number = 5): void {
@@ -66,16 +124,20 @@ export function startOrderSyncScheduler(intervalMinutes: number = 5): void {
   // Chạy ngay lập tức khi khởi động server
   setTimeout(() => {
     logger.info('Running initial startup orders sync...');
-    syncRecentOrders(50).catch(err => {
-      logger.error('Initial auto orders sync failed', { error: err.message });
-    });
+    syncRecentOrders(50)
+      .then(() => reconcileDraftOrders())
+      .catch(err => {
+        logger.error('Initial auto orders sync failed', { error: err.message });
+      });
   }, 5000); // Đợi 5 giây sau khi server start
 
   // Thiết lập interval
   setInterval(() => {
     logger.info('Running scheduled orders sync...');
-    syncRecentOrders(50).catch(err => {
-      logger.error('Scheduled auto orders sync failed', { error: err.message });
-    });
+    syncRecentOrders(50)
+      .then(() => reconcileDraftOrders())
+      .catch(err => {
+        logger.error('Scheduled auto orders sync failed', { error: err.message });
+      });
   }, intervalMinutes * 60 * 1000);
 }

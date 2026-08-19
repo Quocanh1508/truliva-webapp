@@ -174,7 +174,7 @@ export default function SalaryManage() {
           const def = data.defaultRates || defaultRates;
           const baoHanhVal = getRateVal(rates.baoHanh, def.baoHanh ?? 60000);
           map[row.userId] = {
-            giaoHang: getRateVal(rates.giaoHang, 0),
+            giaoHang: getRateVal(rates.giaoHang, def.giaoHang ?? 20000),
             baoHanh: baoHanhVal,
             suaChua: getRateVal(rates.suaChua, baoHanhVal),
             thayLoc: getRateVal(rates.thayLoc, def.thayLoc ?? 40000),
@@ -199,6 +199,8 @@ export default function SalaryManage() {
   useEffect(() => {
     if (viewMode === 'rates') {
       fetchRateMatrix();
+    } else {
+      fetchSalaries(true);
     }
   }, [viewMode]);
 
@@ -225,13 +227,15 @@ export default function SalaryManage() {
 
   const handleResetKtvRates = async (userId: string) => {
     try {
-      await fetchApi(`/salaries/rates/${userId}`, { method: 'DELETE' });
+      const res = await fetchApi(`/salaries/rates/${userId}`, { method: 'DELETE' });
       setEditedRates(prev => {
         const next = { ...prev };
         delete next[userId];
         return next;
       });
-      fetchRateMatrix();
+      setMessage({ type: 'success', text: res.message || 'Đã khôi phục đơn giá chuẩn cho KTV thành công!' });
+      await fetchRateMatrix();
+      await fetchSalaries(true);
     } catch (err: any) {
       alert(err.message || 'Lỗi khi khôi phục đơn giá');
     }
@@ -244,11 +248,7 @@ export default function SalaryManage() {
       const ratesList: Array<{ userId: string; workType: string; rate: number }> = [];
       Object.entries(editedRates).forEach(([userId, workTypes]) => {
         Object.entries(workTypes).forEach(([workType, rate]) => {
-          let finalRate = rate;
-          if (workType === 'giaoHang' && finalRate === 120000) {
-            finalRate = 0; // Sanitize legacy default 120k for delivery to 0
-          }
-          ratesList.push({ userId, workType, rate: finalRate });
+          ratesList.push({ userId, workType, rate });
         });
       });
 
@@ -257,10 +257,10 @@ export default function SalaryManage() {
         body: JSON.stringify({ rates: ratesList })
       });
 
-      if (res.success) {
+      if (res.success || res.message) {
         setMessage({ type: 'success', text: res.message || 'Cập nhật ma trận đơn giá KTV thành công!' });
-        fetchRateMatrix();
-        fetchSalaries(true);
+        await fetchRateMatrix();
+        await fetchSalaries(true);
       }
     } catch (err: any) {
       console.error(err);
@@ -460,7 +460,13 @@ export default function SalaryManage() {
       setSalaries(data.salaries || []);
     } catch (err: any) {
       console.error(err);
-      setMessage({ type: 'error', text: err.message || 'Lỗi tải dữ liệu tính thù lao' });
+      const isNetworkErr = err.message === 'Failed to fetch' || err.name === 'TypeError';
+      setMessage({
+        type: 'error',
+        text: isNetworkErr
+          ? 'Không thể kết nối đến máy chủ (Gián đoạn đường truyền mạng). Vui lòng kiểm tra lại mạng và bấm nút "Tính lại".'
+          : (err.message || 'Lỗi tải dữ liệu tính thù lao')
+      });
     } finally {
       if (!silent) setLoading(false);
     }
@@ -583,8 +589,14 @@ export default function SalaryManage() {
     try {
       const token = localStorage.getItem('session_token');
       let url = `/api/salaries/export?month=${encodeURIComponent(selectedMonth)}`;
-      if (selectedKtvsFilter.length > 0) url += `&ktvId=${encodeURIComponent(selectedKtvsFilter.join(','))}`;
-      if (selectedStationsFilter.length > 0) url += `&stationId=${encodeURIComponent(selectedStationsFilter.join(','))}`;
+      if (selectedKtvsFilter.length > 0) {
+        const ktvParam = encodeURIComponent(selectedKtvsFilter.join(','));
+        url += `&ktvId=${ktvParam}&ktvIds=${ktvParam}`;
+      }
+      if (selectedStationsFilter.length > 0) {
+        const stParam = encodeURIComponent(selectedStationsFilter.join(','));
+        url += `&stationId=${stParam}&stationIds=${stParam}`;
+      }
       if (selectedWorkTypeFilter) url += `&workType=${encodeURIComponent(selectedWorkTypeFilter)}`;
       if (selectedCompletedDateFilter) url += `&completedDate=${encodeURIComponent(selectedCompletedDateFilter)}`;
       if (searchQuery) url += `&search=${encodeURIComponent(searchQuery)}`;
@@ -1986,7 +1998,7 @@ export default function SalaryManage() {
                           <div className="flex flex-col items-center gap-1">
                             <input
                               type="text"
-                              value={currentVal === 0 ? '' : currentVal.toLocaleString('vi-VN')}
+                              value={currentVal.toLocaleString('vi-VN')}
                               onChange={(e) => handleRateCellChange(ktv.userId, workType, e.target.value)}
                               className={`w-28 text-right px-2.5 py-1.5 rounded-lg border text-xs font-bold transition focus:outline-none focus:ring-2 ${
                                 isModified
@@ -2004,8 +2016,8 @@ export default function SalaryManage() {
                       };
 
                       const renderTravelCell = (thresholdKey: 'freeKmThreshold' | 'freeKmThresholdTLSC' = 'freeKmThreshold', defaultThresh: number = 20) => {
-                        const defaultKmRate = getRateVal(ktv.rates?.kmRate, defaultRates.kmRate || 3000);
-                        const defaultThreshold = getRateVal(ktv.rates?.[thresholdKey], defaultRates[thresholdKey] || defaultThresh);
+                        const defaultKmRate = getRateVal(ktv.rates?.kmRate, defaultRates.kmRate ?? 3000);
+                        const defaultThreshold = getRateVal(ktv.rates?.[thresholdKey], defaultRates[thresholdKey] ?? defaultThresh);
 
                         const currentKmRate = userEdited['kmRate'] !== undefined ? userEdited['kmRate'] : defaultKmRate;
                         const currentThreshold = userEdited[thresholdKey] !== undefined ? userEdited[thresholdKey] : defaultThreshold;
@@ -2019,7 +2031,7 @@ export default function SalaryManage() {
                             <div className="flex items-center gap-1">
                               <input
                                 type="text"
-                                value={currentKmRate === 0 ? '' : currentKmRate.toLocaleString('vi-VN')}
+                                value={currentKmRate.toLocaleString('vi-VN')}
                                 onChange={(e) => handleRateCellChange(ktv.userId, 'kmRate', e.target.value)}
                                 placeholder="3.000"
                                 className={`w-20 text-right px-2 py-1 rounded-lg border text-xs font-bold transition focus:outline-none focus:ring-2 ${

@@ -3,6 +3,7 @@ import { requireAuth } from '../middleware/authSession';
 import {
   searchCustomerHistory,
   getHotlineTickets,
+  getHotlineFilterOptions,
   createHotlineTicket,
   getHotlineTicketById,
   updateHotlineTicket,
@@ -28,6 +29,9 @@ router.get('/search-customer', searchCustomerHistory);
 
 // Dropdown danh sách người xử lý (HOTLINE/ADMIN/COORDINATOR)
 router.get('/handlers', getHotlineHandlers);
+
+// Dữ liệu tùy chọn cho bộ lọc
+router.get('/filter-options', getHotlineFilterOptions);
 
 // CRUD
 router.get('/', getHotlineTickets);

@@ -164,20 +164,19 @@ export async function checkSerialPublicInfo(serialNumber: string, orderId?: stri
     }
   }
 
+  const isActivated = serial.status === 'Đã kích hoạt' || serial.status === 'KH xác nhận';
+
   return {
     serialNumber: serial.serialNumber,
     model: serial.model,
     status: serial.status,
+    isActivated,
     standardMonths,
     promoMonths,
     totalMonths: standardMonths + promoMonths,
     promoCode,
-    activationDate: serial.activationDate,
-    warrantyExpiryDate: serial.warrantyExpiryDate,
-    customerName: serial.customerName,
-    customerPhone: serial.customerPhone,
-    address: serial.address,
-    province: serial.province
+    activationDate: isActivated ? serial.activationDate : null,
+    warrantyExpiryDate: isActivated ? serial.warrantyExpiryDate : null
   };
 }
 

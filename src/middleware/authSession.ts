@@ -103,14 +103,38 @@ export function requireAdmin(req: Request, res: Response, next: NextFunction): v
 import { getDefaultPermission } from '../config/permissions';
 import { UserRole } from '@prisma/client';
 
-export async function checkDynamicPermission(role: string, featureKey: string): Promise<boolean> {
+export async function checkDynamicPermission(role: string, featureKey: string, group?: string | null): Promise<boolean> {
   if (role === 'ADMIN') return true;
   try {
-    const custom = await prisma.rolePermission.findUnique({
-      where: { role_featureKey: { role: role as UserRole, featureKey } }
+    const grp = (group || '').trim();
+    // 1. Kiểm tra cấu hình riêng của Group nếu có
+    if (grp) {
+      const groupCustom = await prisma.rolePermission.findUnique({
+        where: {
+          role_group_featureKey: {
+            role: role as UserRole,
+            group: grp,
+            featureKey
+          }
+        }
+      });
+      if (groupCustom !== null && groupCustom !== undefined) {
+        return groupCustom.isAllowed;
+      }
+    }
+
+    // 2. Kiểm tra cấu hình chung của Role (group = "")
+    const roleCustom = await prisma.rolePermission.findUnique({
+      where: {
+        role_group_featureKey: {
+          role: role as UserRole,
+          group: '',
+          featureKey
+        }
+      }
     });
-    if (custom !== null && custom !== undefined) {
-      return custom.isAllowed;
+    if (roleCustom !== null && roleCustom !== undefined) {
+      return roleCustom.isAllowed;
     }
   } catch (err) {
     logger.warn('Failed to check dynamic permission in DB:', err);
@@ -121,11 +145,12 @@ export async function checkDynamicPermission(role: string, featureKey: string): 
 export function requirePermission(featureKey: string) {
   return async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     const role = req.user?.role;
+    const group = req.user?.group;
     if (!role) {
       res.status(401).json({ error: 'Chưa đăng nhập' });
       return;
     }
-    const isAllowed = await checkDynamicPermission(role, featureKey);
+    const isAllowed = await checkDynamicPermission(role, featureKey, group);
     if (!isAllowed) {
       res.status(403).json({ error: 'Tài khoản của bạn không có quyền thực hiện thao tác này' });
       return;

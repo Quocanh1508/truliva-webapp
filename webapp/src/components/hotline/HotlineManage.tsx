@@ -1,10 +1,16 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import { fetchApi } from '../../api/client';
 import { useAuth } from '../../context/AuthContext';
-import { Search, Plus, UserPlus, ArrowRightCircle, ShoppingCart, Phone, MapPin, User, Clock, Loader2, ChevronLeft, ChevronRight, X, Wrench, Package, ShieldCheck, PhoneCall, Copy, CheckCircle2 } from 'lucide-react';
+import {
+  Search, Plus, UserPlus, ArrowRightCircle, ShoppingCart, Phone, MapPin, User,
+  Clock, Loader2, ChevronLeft, ChevronRight, X, Wrench, Package,
+  PhoneCall, Copy, CheckCircle2, Filter, Layers, Settings, Building2, Users,
+  Calendar, XCircle
+} from 'lucide-react';
 import HotlineTicketModal from './HotlineTicketModal';
+import DateRangePicker from '../DateRangePicker';
 
 // ═══════════════════════════════════════════════════
 //  Types
@@ -25,6 +31,8 @@ interface HotlineTicket {
   channel?: string;
   requestTime: string;
   createdAt: string;
+  updatedAt?: string;
+  contactTime?: string;
   targetTeam: string;
   createdBy?: { id: string; fullName: string; email?: string; role: string };
   handlerUser?: { id: string; fullName: string; email?: string; role: string } | null;
@@ -42,6 +50,17 @@ interface BadgeCounts {
   [key: string]: number;
 }
 
+interface FilterOptions {
+  statuses: string[];
+  serviceRequestTypes: string[];
+  productNames: string[];
+  phase3RequestTypes: string[];
+  phase3ServiceTypes: string[];
+  targetTeams: string[];
+  creators: Array<{ id: string; fullName: string; email?: string; role: string }>;
+  handlers: Array<{ id: string; fullName: string; email?: string; role: string }>;
+}
+
 // ═══════════════════════════════════════════════════
 //  Status Pill Config
 // ═══════════════════════════════════════════════════
@@ -51,34 +70,20 @@ const STATUS_PILLS: { key: string; label: string; color: string; bgColor: string
   { key: 'Chưa thực hiện', label: 'Chưa thực hiện', color: 'text-red-700', bgColor: 'bg-red-50', borderColor: 'border-red-200' },
   { key: 'Chưa liên hệ được khách', label: 'Chưa liên hệ được khách', color: 'text-gray-700', bgColor: 'bg-gray-50', borderColor: 'border-gray-200' },
   { key: 'Khách hẹn gọi lại sau', label: 'Khách hẹn gọi lại sau', color: 'text-purple-700', bgColor: 'bg-purple-50', borderColor: 'border-purple-200' },
+  { key: 'Đã chuyển yêu cầu', label: 'Đã chuyển yêu cầu', color: 'text-emerald-700', bgColor: 'bg-emerald-50', borderColor: 'border-emerald-200' },
   { key: 'Đã hoàn thành', label: 'Đã hoàn thành', color: 'text-blue-700', bgColor: 'bg-blue-50', borderColor: 'border-blue-200' },
   { key: 'Đã hủy', label: 'Đã hủy', color: 'text-red-700', bgColor: 'bg-red-50', borderColor: 'border-red-200' },
 ];
-
-const getServiceOrderStatusBadge = (adminStatus: string | undefined, hasKtv: boolean) => {
-  const status = (adminStatus || 'chờ xử lý').toLowerCase();
-
-  if (status === 'hoàn thành' || status === 'đã hoàn thành') {
-    return { label: 'Hoàn thành', bg: 'bg-emerald-100', text: 'text-emerald-700' };
-  }
-  if (status === 'hủy đơn' || status === 'đã hủy') {
-    return { label: 'Hủy đơn', bg: 'bg-red-100', text: 'text-red-700' };
-  }
-  if (status.includes('hoàn') || status.includes('đổi')) {
-    return { label: 'Hoàn / Đổi', bg: 'bg-purple-100', text: 'text-purple-700' };
-  }
-  if (status === 'đang thực hiện' || status === 'đã phân công' || hasKtv) {
-    return { label: 'Đã phân công', bg: 'bg-blue-100', text: 'text-blue-700' };
-  }
-  return { label: 'Chờ xử lý', bg: 'bg-amber-100', text: 'text-amber-700' };
-};
 
 const STATUS_BADGE_MAP: Record<string, { bg: string; text: string }> = {
   'Chưa thực hiện': { bg: 'bg-red-100', text: 'text-red-700' },
   'Chưa liên hệ được khách': { bg: 'bg-gray-100', text: 'text-gray-700' },
   'Khách hẹn gọi lại sau': { bg: 'bg-purple-100', text: 'text-purple-700' },
+  'Đang chờ nhóm 2 phản hồi': { bg: 'bg-amber-100', text: 'text-amber-700' },
+  'Đã chuyển yêu cầu': { bg: 'bg-emerald-100', text: 'text-emerald-700' },
   'Đã hoàn thành': { bg: 'bg-blue-100', text: 'text-blue-700' },
   'Đã hủy': { bg: 'bg-red-100', text: 'text-red-700' },
+  'Chờ xác thực': { bg: 'bg-red-100', text: 'text-red-700' },
   'CHỜ XÁC THỰC': { bg: 'bg-red-100', text: 'text-red-700' },
   'CHƯA THỰC HIỆN': { bg: 'bg-red-100', text: 'text-red-700' },
   'ĐANG CHỜ NHÓM 2 PHẢN HỒI': { bg: 'bg-amber-100', text: 'text-amber-700' },
@@ -89,12 +94,29 @@ const STATUS_BADGE_MAP: Record<string, { bg: string; text: string }> = {
   'ĐÃ HỦY': { bg: 'bg-red-100', text: 'text-red-700' },
 };
 
+function removeAccents(str: string): string {
+  return (str || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase();
+}
+
+function formatDateDisplay(dateStr: string): string {
+  if (!dateStr) return '';
+  const parts = dateStr.split('-');
+  if (parts.length === 3) {
+    return `${parts[2]}/${parts[1]}/${parts[0]}`;
+  }
+  return dateStr;
+}
+
 // ═══════════════════════════════════════════════════
 //  Main Component
 // ═══════════════════════════════════════════════════
 
 export default function HotlineManage() {
   const { user } = useAuth();
+  const navigate = useNavigate();
   
   // Tab chính: 'tickets' (Yêu cầu Hotline) hoặc 'history' (Tìm kiếm lịch sử KH)
   const [activeMainTab, setActiveMainTab] = useState<'tickets' | 'history'>('tickets');
@@ -108,6 +130,58 @@ export default function HotlineManage() {
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [totalCount, setTotalCount] = useState(0);
+
+  // ═══════════════════════════════════════════════════
+  //  10 Filter Criteria States
+  // ═══════════════════════════════════════════════════
+  const [filterOptions, setFilterOptions] = useState<FilterOptions>({
+    statuses: [],
+    serviceRequestTypes: [],
+    productNames: [],
+    phase3RequestTypes: [],
+    phase3ServiceTypes: [],
+    targetTeams: [],
+    creators: [],
+    handlers: []
+  });
+
+  // Applied Filters
+  const [filterStatuses, setFilterStatuses] = useState<string[]>([]);
+  const [filterServiceRequestTypes, setFilterServiceRequestTypes] = useState<string[]>([]);
+  const [filterProductNames, setFilterProductNames] = useState<string[]>([]);
+  const [filterPhase3RequestTypes, setFilterPhase3RequestTypes] = useState<string[]>([]);
+  const [filterPhase3ServiceTypes, setFilterPhase3ServiceTypes] = useState<string[]>([]);
+  const [filterCreatorIds, setFilterCreatorIds] = useState<string[]>([]);
+  const [filterTargetTeams, setFilterTargetTeams] = useState<string[]>([]);
+  const [filterHandlerUserIds, setFilterHandlerUserIds] = useState<string[]>([]);
+  const [requestStartDate, setRequestStartDate] = useState('');
+  const [requestEndDate, setRequestEndDate] = useState('');
+  const [handledStartDate, setHandledStartDate] = useState('');
+  const [handledEndDate, setHandledEndDate] = useState('');
+
+  // Dropdown Popover States
+  const [activeDropdown, setActiveDropdown] = useState<string | null>(null);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  // Temporary Sub-menu Selection States
+  const [tempStatuses, setTempStatuses] = useState<string[]>([]);
+  const [tempServiceRequestTypes, setTempServiceRequestTypes] = useState<string[]>([]);
+  const [tempProductNames, setTempProductNames] = useState<string[]>([]);
+  const [tempPhase3RequestTypes, setTempPhase3RequestTypes] = useState<string[]>([]);
+  const [tempPhase3ServiceTypes, setTempPhase3ServiceTypes] = useState<string[]>([]);
+  const [tempCreatorIds, setTempCreatorIds] = useState<string[]>([]);
+  const [tempTargetTeams, setTempTargetTeams] = useState<string[]>([]);
+  const [tempHandlerUserIds, setTempHandlerUserIds] = useState<string[]>([]);
+
+  // Sub-menu search filters
+  const [statusSearch, setStatusSearch] = useState('');
+  const [serviceReqSearch, setServiceReqSearch] = useState('');
+  const [productSearch, setProductSearch] = useState('');
+  const [phase3ReqSearch, setPhase3ReqSearch] = useState('');
+  const [phase3ServiceSearch, setPhase3ServiceSearch] = useState('');
+  const [creatorSearch, setCreatorSearch] = useState('');
+  const [teamSearch, setTeamSearch] = useState('');
+  const [handlerSearch, setHandlerSearch] = useState('');
 
   // Customer History Search tab states
   const [historyQuery, setHistoryQuery] = useState('');
@@ -127,6 +201,26 @@ export default function HotlineManage() {
   const [selectedTicket, setSelectedTicket] = useState<HotlineTicket | null>(null);
   const [copiedPhone, setCopiedPhone] = useState<string | null>(null);
 
+  // Fetch Filter Options on Mount
+  useEffect(() => {
+    fetchApi('/hotlines/filter-options')
+      .then((data: FilterOptions) => {
+        if (data) setFilterOptions(data);
+      })
+      .catch((err) => console.error('Lỗi tải danh mục bộ lọc hotline:', err));
+  }, []);
+
+  // Click outside to close dropdown popover
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setActiveDropdown(null);
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
   // ESC Key listener for Assign Modal
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -135,11 +229,14 @@ export default function HotlineManage() {
           setShowAssignModal(false);
           setSelectedTicket(null);
         }
+        if (activeDropdown) {
+          setActiveDropdown(null);
+        }
       }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [showAssignModal]);
+  }, [showAssignModal, activeDropdown]);
 
   const handleCopyPhone = (phoneStr: string, e: React.MouseEvent) => {
     e.stopPropagation();
@@ -172,12 +269,28 @@ export default function HotlineManage() {
   const [assigning, setAssigning] = useState(false);
 
   // ── Fetch tickets ──
-  const fetchTickets = useCallback(async () => {
-    setLoading(true);
+  const fetchTickets = useCallback(async (silent = false) => {
+    if (!silent) setLoading(true);
     try {
       const params = new URLSearchParams();
-      if (activeStatus !== 'ALL') params.set('status', activeStatus);
+      if (activeStatus !== 'ALL' && filterStatuses.length === 0) {
+        params.set('status', activeStatus);
+      } else if (filterStatuses.length > 0) {
+        params.set('statuses', filterStatuses.join(','));
+      }
       if (searchQuery.trim()) params.set('search', searchQuery.trim());
+      if (filterServiceRequestTypes.length > 0) params.set('serviceRequestTypes', filterServiceRequestTypes.join(','));
+      if (filterProductNames.length > 0) params.set('productNames', filterProductNames.join(','));
+      if (filterPhase3RequestTypes.length > 0) params.set('phase3RequestTypes', filterPhase3RequestTypes.join(','));
+      if (filterPhase3ServiceTypes.length > 0) params.set('phase3ServiceTypes', filterPhase3ServiceTypes.join(','));
+      if (filterCreatorIds.length > 0) params.set('creatorIds', filterCreatorIds.join(','));
+      if (filterTargetTeams.length > 0) params.set('targetTeams', filterTargetTeams.join(','));
+      if (filterHandlerUserIds.length > 0) params.set('handlerUserIds', filterHandlerUserIds.join(','));
+      if (requestStartDate) params.set('requestStartDate', requestStartDate);
+      if (requestEndDate) params.set('requestEndDate', requestEndDate);
+      if (handledStartDate) params.set('handledStartDate', handledStartDate);
+      if (handledEndDate) params.set('handledEndDate', handledEndDate);
+
       params.set('page', String(page));
       params.set('limit', '20');
 
@@ -189,15 +302,107 @@ export default function HotlineManage() {
     } catch (err) {
       console.error('Lỗi tải danh sách hotline:', err);
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
-  }, [activeStatus, searchQuery, page]);
+  }, [
+    activeStatus,
+    filterStatuses,
+    searchQuery,
+    filterServiceRequestTypes,
+    filterProductNames,
+    filterPhase3RequestTypes,
+    filterPhase3ServiceTypes,
+    filterCreatorIds,
+    filterTargetTeams,
+    filterHandlerUserIds,
+    requestStartDate,
+    requestEndDate,
+    handledStartDate,
+    handledEndDate,
+    page
+  ]);
 
   useEffect(() => {
     if (activeMainTab === 'tickets') {
       fetchTickets();
     }
   }, [fetchTickets, activeMainTab]);
+
+  // Keep reference updated to avoid closure stale state in WebSocket listener
+  const fetchTicketsRef = useRef(fetchTickets);
+  useEffect(() => {
+    fetchTicketsRef.current = fetchTickets;
+  }, [fetchTickets]);
+
+  const [wsConnected, setWsConnected] = useState(false);
+
+  // ── WebSocket real-time sync ──
+  useEffect(() => {
+    let socket: WebSocket | null = null;
+    let reconnectTimer: any = null;
+    let isSubscribed = true;
+
+    const connectWs = () => {
+      try {
+        const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        const wsUrl = `${protocol}//${window.location.host}/ws`;
+        socket = new WebSocket(wsUrl);
+
+        socket.onopen = () => {
+          if (isSubscribed) setWsConnected(true);
+        };
+
+        socket.onmessage = (event) => {
+          try {
+            const data = JSON.parse(event.data);
+            if (
+              data.type === 'HOTLINE_TICKET_CREATED' ||
+              data.type === 'HOTLINE_TICKET_UPDATED' ||
+              data.type === 'HOTLINE_TICKET_DELETED'
+            ) {
+              fetchTicketsRef.current(true); // Silent real-time update
+            }
+          } catch (err) {
+            console.error('Error parsing WebSocket message in Hotline:', err);
+          }
+        };
+
+        socket.onclose = () => {
+          if (isSubscribed) {
+            setWsConnected(false);
+            reconnectTimer = setTimeout(connectWs, 5000);
+          }
+        };
+
+        socket.onerror = () => {
+          if (socket) socket.close();
+        };
+      } catch (err) {
+        if (isSubscribed) {
+          reconnectTimer = setTimeout(connectWs, 5000);
+        }
+      }
+    };
+
+    connectWs();
+
+    return () => {
+      isSubscribed = false;
+      if (reconnectTimer) clearTimeout(reconnectTimer);
+      if (socket) socket.close();
+    };
+  }, []);
+
+  // Polling fallback every 10s if WebSocket is not connected
+  useEffect(() => {
+    if (wsConnected) return;
+    const interval = setInterval(() => {
+      if (activeMainTab === 'tickets') {
+        fetchTicketsRef.current(true);
+      }
+    }, 10000);
+    return () => clearInterval(interval);
+  }, [wsConnected, activeMainTab]);
 
   // ── History Search Handler ──
   const handleHistorySearch = async () => {
@@ -224,7 +429,7 @@ export default function HotlineManage() {
     }
   };
 
-  // ── Actions ──
+  // ── Quick Action: Phân bổ ──
   const handleAssign = async () => {
     if (!selectedTicket || !assignTeam) return;
     setAssigning(true);
@@ -238,69 +443,138 @@ export default function HotlineManage() {
       });
       setShowAssignModal(false);
       setSelectedTicket(null);
-      setAssignTeam('');
-      setAssignHandlerId('');
       fetchTickets();
     } catch (err: any) {
-      alert(err.message || 'Lỗi phân bổ');
+      alert(err.message || 'Lỗi khi phân bổ');
     } finally {
       setAssigning(false);
     }
   };
 
-  const navigate = useNavigate();
-
+  // ── Quick Action: Chuyển sang Ca dịch vụ ──
   const handleConvertToOrder = (ticket: HotlineTicket) => {
-    if (ticket.status === 'ĐÃ CHUYỂN YÊU CẦU') {
-      alert('Phiếu này đã được chuyển thành ca dịch vụ trước đó.');
-      return;
-    }
     navigate('/admin/orders', {
       state: {
-        createFromTicket: ticket
+        autoOpenCreateModal: true,
+        hotlineTicket: {
+          id: ticket.id,
+          ticketCode: ticket.ticketCode,
+          customerName: ticket.customerName,
+          customerPhone: ticket.customerPhone,
+          address: ticket.address,
+          provinceName: ticket.provinceName,
+          productName: ticket.productName,
+          serialNumber: ticket.serialNumber,
+          customerSupportDetail: ticket.customerSupportDetail,
+          workType: ticket.serviceRequestType || 'Sửa chữa',
+          serviceType: ticket.customerSupportDetail || '',
+          note: `[Tạo từ Ticket Hotline ${ticket.ticketCode}] ${ticket.customerSupportDetail || ''}`
+        }
       }
     });
   };
 
+  // ── Quick Action: Tạo đơn POS ──
   const handlePOSNotice = () => {
-    alert('Vui lòng tạo đơn mới bên POS');
+    alert('Vui lòng tạo đơn hàng trực tiếp trên hệ thống Pancake POS. Hệ thống Truliva sẽ tự động đồng bộ đơn hàng về sau vài giây.');
   };
 
-  const formatDateTime = (dt: string) => {
-    if (!dt) return '';
-    const d = new Date(dt);
-    const pad = (n: number) => String(n).padStart(2, '0');
-    return `${pad(d.getHours())}:${pad(d.getMinutes())} ${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()}`;
+  // ── Helper: Format DateTime ──
+  const formatDateTime = (dateStr?: string) => {
+    if (!dateStr) return '—';
+    try {
+      const d = new Date(dateStr);
+      return `${d.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })} ${d.toLocaleDateString('vi-VN')}`;
+    } catch {
+      return dateStr;
+    }
   };
 
-  // ═══════════════════════════════════════════════════
-  //  Render
-  // ═══════════════════════════════════════════════════
+  // ── Filter Dropdown Helpers ──
+  const toggleDropdown = (name: string) => {
+    if (activeDropdown === name) {
+      setActiveDropdown(null);
+    } else {
+      setActiveDropdown(name);
+      if (name === 'statuses') setTempStatuses([...filterStatuses]);
+      if (name === 'serviceRequestTypes') setTempServiceRequestTypes([...filterServiceRequestTypes]);
+      if (name === 'productNames') setTempProductNames([...filterProductNames]);
+      if (name === 'phase3RequestTypes') setTempPhase3RequestTypes([...filterPhase3RequestTypes]);
+      if (name === 'phase3ServiceTypes') setTempPhase3ServiceTypes([...filterPhase3ServiceTypes]);
+      if (name === 'creatorIds') setTempCreatorIds([...filterCreatorIds]);
+      if (name === 'targetTeams') setTempTargetTeams([...filterTargetTeams]);
+      if (name === 'handlerUserIds') setTempHandlerUserIds([...filterHandlerUserIds]);
+    }
+  };
+
+  const applyFilter = (type: string) => {
+    setPage(1);
+    if (type === 'statuses') setFilterStatuses([...tempStatuses]);
+    if (type === 'serviceRequestTypes') setFilterServiceRequestTypes([...tempServiceRequestTypes]);
+    if (type === 'productNames') setFilterProductNames([...tempProductNames]);
+    if (type === 'phase3RequestTypes') setFilterPhase3RequestTypes([...tempPhase3RequestTypes]);
+    if (type === 'phase3ServiceTypes') setFilterPhase3ServiceTypes([...tempPhase3ServiceTypes]);
+    if (type === 'creatorIds') setFilterCreatorIds([...tempCreatorIds]);
+    if (type === 'targetTeams') setFilterTargetTeams([...tempTargetTeams]);
+    if (type === 'handlerUserIds') setFilterHandlerUserIds([...tempHandlerUserIds]);
+    setActiveDropdown(null);
+  };
+
+  const clearAllFilters = () => {
+    setFilterStatuses([]);
+    setFilterServiceRequestTypes([]);
+    setFilterProductNames([]);
+    setFilterPhase3RequestTypes([]);
+    setFilterPhase3ServiceTypes([]);
+    setFilterCreatorIds([]);
+    setFilterTargetTeams([]);
+    setFilterHandlerUserIds([]);
+    setRequestStartDate('');
+    setRequestEndDate('');
+    setHandledStartDate('');
+    setHandledEndDate('');
+    setActiveStatus('ALL');
+    setSearchQuery('');
+    setPage(1);
+  };
+
+  const activeFiltersCount = [
+    filterStatuses.length > 0,
+    filterServiceRequestTypes.length > 0,
+    filterProductNames.length > 0,
+    filterPhase3RequestTypes.length > 0,
+    filterPhase3ServiceTypes.length > 0,
+    filterCreatorIds.length > 0,
+    filterTargetTeams.length > 0,
+    filterHandlerUserIds.length > 0,
+    !!(requestStartDate || requestEndDate),
+    !!(handledStartDate || handledEndDate)
+  ].filter(Boolean).length;
 
   return (
-    <div className="space-y-4">
-      {/* ── Main Tab Navigation ── */}
-      <div className="flex flex-wrap items-center justify-between gap-3 bg-white p-2 rounded-2xl border border-gray-200 shadow-sm">
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => setActiveMainTab('history')}
-            className={`flex items-center gap-2 px-5 py-2.5 rounded-xl font-bold text-sm transition-all ${
-              activeMainTab === 'history'
-                ? 'bg-[#1B3A6B] text-white shadow-sm'
-                : 'text-gray-600 hover:bg-gray-100'
-            }`}
-          >
-            <Search size={17} /> Tìm kiếm lịch sử khách hàng
-          </button>
+    <div className="space-y-6">
+      {/* ── Top Navigation Tabs & Header ── */}
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-gray-200 pb-4">
+        <div className="flex items-center gap-2 bg-gray-100 p-1 rounded-xl">
           <button
             onClick={() => setActiveMainTab('tickets')}
-            className={`flex items-center gap-2 px-5 py-2.5 rounded-xl font-bold text-sm transition-all ${
+            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-bold transition-all ${
               activeMainTab === 'tickets'
-                ? 'bg-[#1B3A6B] text-white shadow-sm'
-                : 'text-gray-600 hover:bg-gray-100'
+                ? 'bg-white text-[#1B3A6B] shadow-sm'
+                : 'text-gray-500 hover:text-gray-800'
             }`}
           >
-            <PhoneCall size={17} /> Yêu cầu Hotline
+            <PhoneCall size={16} /> Danh sách Yêu cầu Hotline
+          </button>
+          <button
+            onClick={() => setActiveMainTab('history')}
+            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-bold transition-all ${
+              activeMainTab === 'history'
+                ? 'bg-white text-[#1B3A6B] shadow-sm'
+                : 'text-gray-500 hover:text-gray-800'
+            }`}
+          >
+            <Search size={16} /> Tra cứu Lịch sử Khách hàng
           </button>
         </div>
 
@@ -442,93 +716,30 @@ export default function HotlineManage() {
                 {historyResults.serials?.length === 0 ? (
                   <div className="text-xs text-gray-400 py-3 italic">Không có thiết bị/serial nào</div>
                 ) : (
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-xs text-left">
-                      <thead className="bg-gray-50 border-b border-gray-200 font-semibold text-gray-600">
-                        <tr>
-                          <th className="px-3 py-2">Mã Serial</th>
-                          <th className="px-3 py-2">Sản phẩm / Dòng máy</th>
-                          <th className="px-3 py-2">Chủ sở hữu</th>
-                          <th className="px-3 py-2">Địa chỉ</th>
-                          <th className="px-3 py-2">Trạng thái bảo hành</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-gray-100">
-                        {historyResults.serials.map((s: any) => (
-                          <tr key={s.id} className="hover:bg-purple-50/40">
-                            <td className="px-3 py-2.5 font-mono text-purple-700 font-bold">{s.serialNumber}</td>
-                            <td className="px-3 py-2.5 font-medium text-gray-800">{s.model || s.productLine}</td>
-                            <td className="px-3 py-2.5">{s.customerName} ({s.customerPhone})</td>
-                            <td className="px-3 py-2.5 text-gray-500">{s.address || s.province || '-'}</td>
-                            <td className="px-3 py-2.5">
-                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-bold bg-green-100 text-green-700">
-                                <ShieldCheck size={12} /> {s.status || 'Đã kích hoạt'}
-                              </span>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {historyResults.serials.map((s: any) => (
+                      <div key={s.id} className="p-4 rounded-xl border border-gray-200 bg-purple-50/20 space-y-2 text-xs">
+                        <div className="flex items-center justify-between">
+                          <span className="font-bold text-sm text-gray-800">{s.productLine || s.model || 'Thiết bị'}</span>
+                          <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-purple-100 text-purple-700">{s.status}</span>
+                        </div>
+                        <div className="space-y-1 text-gray-600">
+                          <div>Số Serial: <b className="font-mono text-purple-700">{s.serialNumber}</b></div>
+                          {s.customerName && <div>Chủ sở hữu: <b>{s.customerName}</b> ({s.customerPhone})</div>}
+                          {s.activationDate && <div>Ngày kích hoạt: {new Date(s.activationDate).toLocaleDateString('vi-VN')}</div>}
+                          {s.warrantyExpiryDate && <div>Hết hạn BH: <b className="text-emerald-700">{new Date(s.warrantyExpiryDate).toLocaleDateString('vi-VN')}</b></div>}
+                        </div>
+                      </div>
+                    ))}
                   </div>
                 )}
               </div>
 
-              {/* 3. Các Đơn Yêu Cầu Dịch Vụ */}
-              <div className="bg-white rounded-2xl border border-gray-200 p-5 shadow-sm space-y-3">
-                <div className="flex items-center gap-2 border-b border-gray-100 pb-3">
-                  <Wrench className="text-amber-600" size={18} />
-                  <h4 className="font-bold text-gray-800 text-sm">3. Đơn yêu cầu Dịch vụ Kỹ thuật ({historyResults.serviceOrders?.length || 0})</h4>
-                </div>
-
-                {historyResults.serviceOrders?.length === 0 ? (
-                  <div className="text-xs text-gray-400 py-3 italic">Không có đơn yêu cầu dịch vụ nào</div>
-                ) : (
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-xs text-left">
-                      <thead className="bg-gray-50 border-b border-gray-200 font-semibold text-gray-600">
-                        <tr>
-                          <th className="px-3 py-2">Mã đơn</th>
-                          <th className="px-3 py-2">Khách hàng</th>
-                          <th className="px-3 py-2">Loại công việc</th>
-                          <th className="px-3 py-2">Sản phẩm / Items</th>
-                          <th className="px-3 py-2">KTV phụ trách</th>
-                          <th className="px-3 py-2">Trạng thái</th>
-                          <th className="px-3 py-2">Ngày tạo</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-gray-100">
-                        {historyResults.serviceOrders.map((o: any) => {
-                          const hasKtv = !!(o.assignedKtv?.fullName || o.assignedKtvName);
-                          const badge = getServiceOrderStatusBadge(o.adminStatus, hasKtv);
-                          return (
-                            <tr key={o.id} className="hover:bg-amber-50/40">
-                              <td className="px-3 py-2.5 font-mono text-amber-700 font-bold">#{o.pancakeOrderId || o.id.substring(0, 8)}</td>
-                              <td className="px-3 py-2.5 font-medium text-gray-800">{o.billFullName} ({o.billPhoneNumber})</td>
-                              <td className="px-3 py-2.5 font-semibold text-blue-600">{o.workType || 'Sửa chữa'}</td>
-                              <td className="px-3 py-2.5 text-gray-700">
-                                {o.items?.map((it: any) => it.productName).join(', ') || 'Thiết bị Truliva'}
-                              </td>
-                              <td className="px-3 py-2.5 text-gray-600">{o.assignedKtv?.fullName || o.assignedKtvName || 'Chưa phân công'}</td>
-                              <td className="px-3 py-2.5">
-                                <span className={`px-2 py-0.5 rounded text-[11px] font-bold ${badge.bg} ${badge.text}`}>
-                                  {badge.label}
-                                </span>
-                              </td>
-                              <td className="px-3 py-2.5 text-gray-500">{formatDateTime(o.createdAt)}</td>
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
-                  </div>
-                )}
-              </div>
-
-              {/* 4. Các Yêu Cầu Hotline */}
+              {/* 3. Các Yêu Cầu Hotline */}
               <div className="bg-white rounded-2xl border border-gray-200 p-5 shadow-sm space-y-3">
                 <div className="flex items-center gap-2 border-b border-gray-100 pb-3">
                   <PhoneCall className="text-emerald-600" size={18} />
-                  <h4 className="font-bold text-gray-800 text-sm">4. Các Yêu cầu Hotline ({historyResults.hotlineTickets?.length || 0})</h4>
+                  <h4 className="font-bold text-gray-800 text-sm">3. Các Yêu cầu Hotline ({historyResults.hotlineTickets?.length || 0})</h4>
                 </div>
 
                 {historyResults.hotlineTickets?.length === 0 ? (
@@ -562,7 +773,7 @@ export default function HotlineManage() {
                               <td className="px-3 py-2.5 font-medium text-gray-800">{t.customerName} ({t.customerPhone})</td>
                               <td className="px-3 py-2.5 text-blue-600 font-medium">{t.serviceRequestType || 'Sửa chữa'}</td>
                               <td className="px-3 py-2.5 text-gray-700">
-                                <div>{t.productName}</div>
+                                <div>{(t.productName || '').replace(/^PROD:\s*/i, '')}</div>
                                 {t.serialNumber && <div className="text-[11px] font-mono text-gray-400">{t.serialNumber}</div>}
                               </td>
                               <td className="px-3 py-2.5">
@@ -598,26 +809,748 @@ export default function HotlineManage() {
          ═══════════════════════════════════════════════════ */}
       {activeMainTab === 'tickets' && (
         <div className="space-y-4">
-          {/* ── Search Bar ── */}
-          <div className="flex items-center gap-3">
-            <div className="relative flex-1 max-w-lg">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+          {/* ── Toolbar: Search & Filter Button ── */}
+          <div className="flex flex-wrap items-center justify-between gap-3 bg-white p-3.5 rounded-xl border border-gray-200 shadow-sm">
+            {/* Search Input */}
+            <div className="relative flex-1 min-w-[260px] max-w-md">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={17} />
               <input
                 type="text"
-                placeholder="Mã yêu cầu, tên khách hàng, sđt, địa chỉ, serial, ghi chú"
+                placeholder="Tìm mã ticket, tên khách, SĐT, địa chỉ, serial, ghi chú..."
                 value={searchQuery}
                 onChange={(e) => { setSearchQuery(e.target.value); setPage(1); }}
                 onKeyDown={(e) => e.key === 'Enter' && fetchTickets()}
-                className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-200 focus:border-blue-400 outline-none"
+                className="w-full pl-9 pr-8 py-2 border border-gray-300 rounded-lg text-xs focus:ring-2 focus:ring-blue-200 focus:border-blue-500 outline-none transition-all"
               />
+              {searchQuery && (
+                <button
+                  onClick={() => { setSearchQuery(''); setPage(1); }}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                >
+                  <X size={14} />
+                </button>
+              )}
             </div>
-            <button
-              onClick={() => { setPage(1); fetchTickets(); }}
-              className="px-5 py-2.5 bg-[#00A3FF] text-white rounded-lg text-sm font-medium hover:bg-[#0090E0] transition-all"
-            >
-              Tìm kiếm
-            </button>
+
+            {/* Action Buttons */}
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => { setPage(1); fetchTickets(); }}
+                className="px-4 py-2 bg-[#00A3FF] text-white rounded-lg text-xs font-semibold hover:bg-[#0090E0] transition-all shadow-sm"
+              >
+                Tìm kiếm
+              </button>
+
+              {/* ── BỘ LỌC BUTTON & POPOVER ── */}
+              <div className="relative z-50" ref={dropdownRef}>
+                <button
+                  onClick={() => toggleDropdown('main')}
+                  className={`flex items-center gap-1.5 px-3 py-2 text-xs font-semibold border rounded-lg transition-all ${
+                    activeFiltersCount > 0
+                      ? 'bg-blue-50 text-blue-700 border-blue-300 shadow-sm'
+                      : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+                  }`}
+                >
+                  <Filter size={14} className={activeFiltersCount > 0 ? 'text-blue-600' : 'text-gray-500'} />
+                  <span>Bộ lọc</span>
+                  {activeFiltersCount > 0 && (
+                    <span className="ml-0.5 px-1.5 py-0.2 rounded-full text-[10px] font-bold bg-blue-600 text-white">
+                      {activeFiltersCount}
+                    </span>
+                  )}
+                </button>
+
+                {/* Popover Dropdown Card */}
+                {activeDropdown && (
+                  <div className="fixed md:absolute top-1/2 left-1/2 md:top-auto md:left-auto md:right-0 -translate-x-1/2 -translate-y-1/2 md:translate-x-0 md:translate-y-0 md:mt-2 bg-white border border-gray-200 rounded-xl shadow-2xl z-50 text-left min-w-[260px] animate-in fade-in zoom-in-95">
+                    {/* Main Category Menu */}
+                    {activeDropdown === 'main' && (
+                      <div className="w-64 py-1.5 text-xs text-gray-700 max-h-96 overflow-y-auto">
+                        <div className="px-3.5 py-2 text-[11px] font-bold text-gray-400 border-b border-gray-100 uppercase tracking-wider">
+                          Điều kiện lọc ({activeFiltersCount})
+                        </div>
+                        
+                        {/* 1. Trạng thái */}
+                        <button
+                          className="w-full flex items-center justify-between px-3.5 py-2 hover:bg-gray-50 text-indigo-700 font-medium transition-colors text-xs"
+                          onClick={() => toggleDropdown('statuses')}
+                        >
+                          <div className="flex items-center gap-2">
+                            <CheckCircle2 size={14} className="text-indigo-500" />
+                            <span>1. Trạng thái</span>
+                          </div>
+                          {filterStatuses.length > 0 && (
+                            <span className="text-[10px] bg-indigo-100 text-indigo-700 px-1.5 py-0.5 rounded-full font-bold">
+                              {filterStatuses.length}
+                            </span>
+                          )}
+                        </button>
+
+                        {/* 2. Yêu cầu dịch vụ */}
+                        <button
+                          className="w-full flex items-center justify-between px-3.5 py-2 hover:bg-gray-50 text-amber-700 font-medium transition-colors text-xs"
+                          onClick={() => toggleDropdown('serviceRequestTypes')}
+                        >
+                          <div className="flex items-center gap-2">
+                            <Wrench size={14} className="text-amber-500" />
+                            <span>2. Yêu cầu dịch vụ</span>
+                          </div>
+                          {filterServiceRequestTypes.length > 0 && (
+                            <span className="text-[10px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-full font-bold">
+                              {filterServiceRequestTypes.length}
+                            </span>
+                          )}
+                        </button>
+
+                        {/* 3. Sản phẩm */}
+                        <button
+                          className="w-full flex items-center justify-between px-3.5 py-2 hover:bg-gray-50 text-purple-700 font-medium transition-colors text-xs"
+                          onClick={() => toggleDropdown('productNames')}
+                        >
+                          <div className="flex items-center gap-2">
+                            <Package size={14} className="text-purple-500" />
+                            <span>3. Sản phẩm</span>
+                          </div>
+                          {filterProductNames.length > 0 && (
+                            <span className="text-[10px] bg-purple-100 text-purple-700 px-1.5 py-0.5 rounded-full font-bold">
+                              {filterProductNames.length}
+                            </span>
+                          )}
+                        </button>
+
+                        {/* 4. Loại yêu cầu */}
+                        <button
+                          className="w-full flex items-center justify-between px-3.5 py-2 hover:bg-gray-50 text-sky-700 font-medium transition-colors text-xs"
+                          onClick={() => toggleDropdown('phase3RequestTypes')}
+                        >
+                          <div className="flex items-center gap-2">
+                            <Layers size={14} className="text-sky-500" />
+                            <span>4. Loại yêu cầu</span>
+                          </div>
+                          {filterPhase3RequestTypes.length > 0 && (
+                            <span className="text-[10px] bg-sky-100 text-sky-700 px-1.5 py-0.5 rounded-full font-bold">
+                              {filterPhase3RequestTypes.length}
+                            </span>
+                          )}
+                        </button>
+
+                        {/* 5. Loại dịch vụ */}
+                        <button
+                          className="w-full flex items-center justify-between px-3.5 py-2 hover:bg-gray-50 text-teal-700 font-medium transition-colors text-xs"
+                          onClick={() => toggleDropdown('phase3ServiceTypes')}
+                        >
+                          <div className="flex items-center gap-2">
+                            <Settings size={14} className="text-teal-500" />
+                            <span>5. Loại dịch vụ</span>
+                          </div>
+                          {filterPhase3ServiceTypes.length > 0 && (
+                            <span className="text-[10px] bg-teal-100 text-teal-700 px-1.5 py-0.5 rounded-full font-bold">
+                              {filterPhase3ServiceTypes.length}
+                            </span>
+                          )}
+                        </button>
+
+                        {/* 6. Người gửi yêu cầu */}
+                        <button
+                          className="w-full flex items-center justify-between px-3.5 py-2 hover:bg-gray-50 text-rose-700 font-medium transition-colors text-xs"
+                          onClick={() => toggleDropdown('creatorIds')}
+                        >
+                          <div className="flex items-center gap-2">
+                            <User size={14} className="text-rose-500" />
+                            <span>6. Người gửi yêu cầu</span>
+                          </div>
+                          {filterCreatorIds.length > 0 && (
+                            <span className="text-[10px] bg-rose-100 text-rose-700 px-1.5 py-0.5 rounded-full font-bold">
+                              {filterCreatorIds.length}
+                            </span>
+                          )}
+                        </button>
+
+                        {/* 7. Thời gian gửi yêu cầu */}
+                        <button
+                          className="w-full flex items-center justify-between px-3.5 py-2 hover:bg-gray-50 text-blue-700 font-medium transition-colors text-xs"
+                          onClick={() => toggleDropdown('requestTimeFilter')}
+                        >
+                          <div className="flex items-center gap-2">
+                            <Calendar size={14} className="text-blue-500" />
+                            <span>7. Thời gian gửi yêu cầu</span>
+                          </div>
+                          {(requestStartDate || requestEndDate) && (
+                            <span className="text-[10px] bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded-full font-bold">
+                              1
+                            </span>
+                          )}
+                        </button>
+
+                        {/* 8. Team xử lý yêu cầu */}
+                        <button
+                          className="w-full flex items-center justify-between px-3.5 py-2 hover:bg-gray-50 text-emerald-700 font-medium transition-colors text-xs"
+                          onClick={() => toggleDropdown('targetTeams')}
+                        >
+                          <div className="flex items-center gap-2">
+                            <Building2 size={14} className="text-emerald-500" />
+                            <span>8. Team xử lý yêu cầu</span>
+                          </div>
+                          {filterTargetTeams.length > 0 && (
+                            <span className="text-[10px] bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded-full font-bold">
+                              {filterTargetTeams.length}
+                            </span>
+                          )}
+                        </button>
+
+                        {/* 9. Người xử lý yêu cầu */}
+                        <button
+                          className="w-full flex items-center justify-between px-3.5 py-2 hover:bg-gray-50 text-cyan-700 font-medium transition-colors text-xs"
+                          onClick={() => toggleDropdown('handlerUserIds')}
+                        >
+                          <div className="flex items-center gap-2">
+                            <Users size={14} className="text-cyan-500" />
+                            <span>9. Người xử lý yêu cầu</span>
+                          </div>
+                          {filterHandlerUserIds.length > 0 && (
+                            <span className="text-[10px] bg-cyan-100 text-cyan-700 px-1.5 py-0.5 rounded-full font-bold">
+                              {filterHandlerUserIds.length}
+                            </span>
+                          )}
+                        </button>
+
+                        {/* 10. Thời gian xử lý yêu cầu */}
+                        <button
+                          className="w-full flex items-center justify-between px-3.5 py-2 hover:bg-gray-50 text-orange-700 font-medium transition-colors text-xs"
+                          onClick={() => toggleDropdown('handledTimeFilter')}
+                        >
+                          <div className="flex items-center gap-2">
+                            <Clock size={14} className="text-orange-500" />
+                            <span>10. Thời gian xử lý yêu cầu</span>
+                          </div>
+                          {(handledStartDate || handledEndDate) && (
+                            <span className="text-[10px] bg-orange-100 text-orange-700 px-1.5 py-0.5 rounded-full font-bold">
+                              1
+                            </span>
+                          )}
+                        </button>
+
+                        {/* Clear all footer */}
+                        {activeFiltersCount > 0 && (
+                          <div className="p-2 border-t border-gray-100 mt-1">
+                            <button
+                              onClick={clearAllFilters}
+                              className="w-full py-1.5 text-center text-red-600 hover:bg-red-50 rounded font-bold text-[11px] transition-colors"
+                            >
+                              Xóa tất cả điều kiện lọc
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Submenu 1: Trạng thái */}
+                    {activeDropdown === 'statuses' && (
+                      <div className="p-4 w-72 space-y-3">
+                        <h4 className="font-bold text-xs text-gray-800 flex items-center gap-1.5">
+                          <CheckCircle2 size={14} className="text-indigo-600" /> Lọc theo Trạng thái
+                        </h4>
+                        <input
+                          type="text"
+                          placeholder="Tìm trạng thái..."
+                          className="w-full px-2.5 py-1.5 text-xs border border-gray-300 rounded-md outline-none focus:border-blue-500"
+                          value={statusSearch}
+                          onChange={(e) => setStatusSearch(e.target.value)}
+                        />
+                        <div className="space-y-1.5 max-h-48 overflow-y-auto pr-1">
+                          {filterOptions.statuses
+                            .filter(s => removeAccents(s).includes(removeAccents(statusSearch)))
+                            .map(st => (
+                              <label key={st} className="flex items-center space-x-2 text-xs text-gray-700 cursor-pointer hover:text-blue-600">
+                                <input
+                                  type="checkbox"
+                                  className="rounded text-blue-600 focus:ring-blue-500"
+                                  checked={tempStatuses.includes(st)}
+                                  onChange={e => {
+                                    if (e.target.checked) setTempStatuses([...tempStatuses, st]);
+                                    else setTempStatuses(tempStatuses.filter(v => v !== st));
+                                  }}
+                                />
+                                <span>{st}</span>
+                              </label>
+                            ))}
+                        </div>
+                        <div className="flex justify-between items-center mt-2 pt-2 border-t border-gray-100 text-xs">
+                          <button className="text-gray-500 px-2 py-1 hover:bg-gray-100 rounded" onClick={() => setActiveDropdown('main')}>Quay lại</button>
+                          <button className="text-red-500 px-2 py-1 hover:bg-red-50 rounded" onClick={() => setTempStatuses([])}>Bỏ chọn</button>
+                          <button className="bg-blue-600 text-white px-3 py-1 rounded hover:bg-blue-700 font-semibold" onClick={() => applyFilter('statuses')}>Áp dụng</button>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Submenu 2: Yêu cầu dịch vụ */}
+                    {activeDropdown === 'serviceRequestTypes' && (
+                      <div className="p-4 w-72 space-y-3">
+                        <h4 className="font-bold text-xs text-gray-800 flex items-center gap-1.5">
+                          <Wrench size={14} className="text-amber-600" /> Lọc theo Yêu cầu dịch vụ
+                        </h4>
+                        <input
+                          type="text"
+                          placeholder="Tìm yêu cầu dịch vụ..."
+                          className="w-full px-2.5 py-1.5 text-xs border border-gray-300 rounded-md outline-none focus:border-blue-500"
+                          value={serviceReqSearch}
+                          onChange={(e) => setServiceReqSearch(e.target.value)}
+                        />
+                        <div className="space-y-1.5 max-h-48 overflow-y-auto pr-1">
+                          {filterOptions.serviceRequestTypes
+                            .filter(t => removeAccents(t).includes(removeAccents(serviceReqSearch)))
+                            .map(srt => (
+                              <label key={srt} className="flex items-center space-x-2 text-xs text-gray-700 cursor-pointer hover:text-blue-600">
+                                <input
+                                  type="checkbox"
+                                  className="rounded text-blue-600 focus:ring-blue-500"
+                                  checked={tempServiceRequestTypes.includes(srt)}
+                                  onChange={e => {
+                                    if (e.target.checked) setTempServiceRequestTypes([...tempServiceRequestTypes, srt]);
+                                    else setTempServiceRequestTypes(tempServiceRequestTypes.filter(v => v !== srt));
+                                  }}
+                                />
+                                <span>{srt}</span>
+                              </label>
+                            ))}
+                        </div>
+                        <div className="flex justify-between items-center mt-2 pt-2 border-t border-gray-100 text-xs">
+                          <button className="text-gray-500 px-2 py-1 hover:bg-gray-100 rounded" onClick={() => setActiveDropdown('main')}>Quay lại</button>
+                          <button className="text-red-500 px-2 py-1 hover:bg-red-50 rounded" onClick={() => setTempServiceRequestTypes([])}>Bỏ chọn</button>
+                          <button className="bg-blue-600 text-white px-3 py-1 rounded hover:bg-blue-700 font-semibold" onClick={() => applyFilter('serviceRequestTypes')}>Áp dụng</button>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Submenu 3: Sản phẩm */}
+                    {activeDropdown === 'productNames' && (
+                      <div className="p-4 w-72 space-y-3">
+                        <h4 className="font-bold text-xs text-gray-800 flex items-center gap-1.5">
+                          <Package size={14} className="text-purple-600" /> Lọc theo Sản phẩm
+                        </h4>
+                        <input
+                          type="text"
+                          placeholder="Tìm sản phẩm..."
+                          className="w-full px-2.5 py-1.5 text-xs border border-gray-300 rounded-md outline-none focus:border-blue-500"
+                          value={productSearch}
+                          onChange={(e) => setProductSearch(e.target.value)}
+                        />
+                        <div className="space-y-1.5 max-h-48 overflow-y-auto pr-1">
+                          {filterOptions.productNames
+                            .filter(p => removeAccents(p).includes(removeAccents(productSearch)))
+                            .map(prod => (
+                              <label key={prod} className="flex items-center space-x-2 text-xs text-gray-700 cursor-pointer hover:text-blue-600">
+                                <input
+                                  type="checkbox"
+                                  className="rounded text-blue-600 focus:ring-blue-500"
+                                  checked={tempProductNames.includes(prod)}
+                                  onChange={e => {
+                                    if (e.target.checked) setTempProductNames([...tempProductNames, prod]);
+                                    else setTempProductNames(tempProductNames.filter(v => v !== prod));
+                                  }}
+                                />
+                                <span>{prod}</span>
+                              </label>
+                            ))}
+                        </div>
+                        <div className="flex justify-between items-center mt-2 pt-2 border-t border-gray-100 text-xs">
+                          <button className="text-gray-500 px-2 py-1 hover:bg-gray-100 rounded" onClick={() => setActiveDropdown('main')}>Quay lại</button>
+                          <button className="text-red-500 px-2 py-1 hover:bg-red-50 rounded" onClick={() => setTempProductNames([])}>Bỏ chọn</button>
+                          <button className="bg-blue-600 text-white px-3 py-1 rounded hover:bg-blue-700 font-semibold" onClick={() => applyFilter('productNames')}>Áp dụng</button>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Submenu 4: Loại yêu cầu */}
+                    {activeDropdown === 'phase3RequestTypes' && (
+                      <div className="p-4 w-72 space-y-3">
+                        <h4 className="font-bold text-xs text-gray-800 flex items-center gap-1.5">
+                          <Layers size={14} className="text-sky-600" /> Lọc theo Loại yêu cầu
+                        </h4>
+                        <input
+                          type="text"
+                          placeholder="Tìm loại yêu cầu..."
+                          className="w-full px-2.5 py-1.5 text-xs border border-gray-300 rounded-md outline-none focus:border-blue-500"
+                          value={phase3ReqSearch}
+                          onChange={(e) => setPhase3ReqSearch(e.target.value)}
+                        />
+                        <div className="space-y-1.5 max-h-48 overflow-y-auto pr-1">
+                          {filterOptions.phase3RequestTypes
+                            .filter(r => removeAccents(r).includes(removeAccents(phase3ReqSearch)))
+                            .map(prt => (
+                              <label key={prt} className="flex items-center space-x-2 text-xs text-gray-700 cursor-pointer hover:text-blue-600">
+                                <input
+                                  type="checkbox"
+                                  className="rounded text-blue-600 focus:ring-blue-500"
+                                  checked={tempPhase3RequestTypes.includes(prt)}
+                                  onChange={e => {
+                                    if (e.target.checked) setTempPhase3RequestTypes([...tempPhase3RequestTypes, prt]);
+                                    else setTempPhase3RequestTypes(tempPhase3RequestTypes.filter(v => v !== prt));
+                                  }}
+                                />
+                                <span>{prt}</span>
+                              </label>
+                            ))}
+                        </div>
+                        <div className="flex justify-between items-center mt-2 pt-2 border-t border-gray-100 text-xs">
+                          <button className="text-gray-500 px-2 py-1 hover:bg-gray-100 rounded" onClick={() => setActiveDropdown('main')}>Quay lại</button>
+                          <button className="text-red-500 px-2 py-1 hover:bg-red-50 rounded" onClick={() => setTempPhase3RequestTypes([])}>Bỏ chọn</button>
+                          <button className="bg-blue-600 text-white px-3 py-1 rounded hover:bg-blue-700 font-semibold" onClick={() => applyFilter('phase3RequestTypes')}>Áp dụng</button>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Submenu 5: Loại dịch vụ */}
+                    {activeDropdown === 'phase3ServiceTypes' && (
+                      <div className="p-4 w-72 space-y-3">
+                        <h4 className="font-bold text-xs text-gray-800 flex items-center gap-1.5">
+                          <Settings size={14} className="text-teal-600" /> Lọc theo Loại dịch vụ
+                        </h4>
+                        <input
+                          type="text"
+                          placeholder="Tìm loại dịch vụ..."
+                          className="w-full px-2.5 py-1.5 text-xs border border-gray-300 rounded-md outline-none focus:border-blue-500"
+                          value={phase3ServiceSearch}
+                          onChange={(e) => setPhase3ServiceSearch(e.target.value)}
+                        />
+                        <div className="space-y-1.5 max-h-48 overflow-y-auto pr-1">
+                          {filterOptions.phase3ServiceTypes
+                            .filter(s => removeAccents(s).includes(removeAccents(phase3ServiceSearch)))
+                            .map(pst => (
+                              <label key={pst} className="flex items-center space-x-2 text-xs text-gray-700 cursor-pointer hover:text-blue-600">
+                                <input
+                                  type="checkbox"
+                                  className="rounded text-blue-600 focus:ring-blue-500"
+                                  checked={tempPhase3ServiceTypes.includes(pst)}
+                                  onChange={e => {
+                                    if (e.target.checked) setTempPhase3ServiceTypes([...tempPhase3ServiceTypes, pst]);
+                                    else setTempPhase3ServiceTypes(tempPhase3ServiceTypes.filter(v => v !== pst));
+                                  }}
+                                />
+                                <span>{pst}</span>
+                              </label>
+                            ))}
+                        </div>
+                        <div className="flex justify-between items-center mt-2 pt-2 border-t border-gray-100 text-xs">
+                          <button className="text-gray-500 px-2 py-1 hover:bg-gray-100 rounded" onClick={() => setActiveDropdown('main')}>Quay lại</button>
+                          <button className="text-red-500 px-2 py-1 hover:bg-red-50 rounded" onClick={() => setTempPhase3ServiceTypes([])}>Bỏ chọn</button>
+                          <button className="bg-blue-600 text-white px-3 py-1 rounded hover:bg-blue-700 font-semibold" onClick={() => applyFilter('phase3ServiceTypes')}>Áp dụng</button>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Submenu 6: Người gửi yêu cầu */}
+                    {activeDropdown === 'creatorIds' && (
+                      <div className="p-4 w-72 space-y-3">
+                        <h4 className="font-bold text-xs text-gray-800 flex items-center gap-1.5">
+                          <User size={14} className="text-rose-600" /> Lọc theo Người gửi yêu cầu
+                        </h4>
+                        <input
+                          type="text"
+                          placeholder="Tìm nhân viên tạo ticket..."
+                          className="w-full px-2.5 py-1.5 text-xs border border-gray-300 rounded-md outline-none focus:border-blue-500"
+                          value={creatorSearch}
+                          onChange={(e) => setCreatorSearch(e.target.value)}
+                        />
+                        <div className="space-y-1.5 max-h-48 overflow-y-auto pr-1">
+                          {filterOptions.creators
+                            .filter(c => removeAccents(c.fullName).includes(removeAccents(creatorSearch)))
+                            .map(c => (
+                              <label key={c.id} className="flex items-center space-x-2 text-xs text-gray-700 cursor-pointer hover:text-blue-600">
+                                <input
+                                  type="checkbox"
+                                  className="rounded text-blue-600 focus:ring-blue-500"
+                                  checked={tempCreatorIds.includes(c.id)}
+                                  onChange={e => {
+                                    if (e.target.checked) setTempCreatorIds([...tempCreatorIds, c.id]);
+                                    else setTempCreatorIds(tempCreatorIds.filter(v => v !== c.id));
+                                  }}
+                                />
+                                <span>{c.fullName} <span className="text-[10px] text-gray-400 font-mono">({c.role})</span></span>
+                              </label>
+                            ))}
+                        </div>
+                        <div className="flex justify-between items-center mt-2 pt-2 border-t border-gray-100 text-xs">
+                          <button className="text-gray-500 px-2 py-1 hover:bg-gray-100 rounded" onClick={() => setActiveDropdown('main')}>Quay lại</button>
+                          <button className="text-red-500 px-2 py-1 hover:bg-red-50 rounded" onClick={() => setTempCreatorIds([])}>Bỏ chọn</button>
+                          <button className="bg-blue-600 text-white px-3 py-1 rounded hover:bg-blue-700 font-semibold" onClick={() => applyFilter('creatorIds')}>Áp dụng</button>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Submenu 7: Thời gian gửi yêu cầu */}
+                    {activeDropdown === 'requestTimeFilter' && (
+                      <div className="p-4 w-[290px] space-y-3">
+                        <h4 className="font-bold text-xs text-gray-800 flex items-center gap-1.5">
+                          <Calendar size={14} className="text-blue-600" /> Thời gian gửi yêu cầu
+                        </h4>
+                        <DateRangePicker
+                          startDate={requestStartDate}
+                          endDate={requestEndDate}
+                          align="right"
+                          onChange={(start, end) => {
+                            setRequestStartDate(start);
+                            setRequestEndDate(end);
+                            setPage(1);
+                          }}
+                        />
+                        <div className="flex justify-between items-center mt-2 pt-2 border-t border-gray-100 text-xs">
+                          <button className="text-gray-500 px-2 py-1 hover:bg-gray-100 rounded" onClick={() => setActiveDropdown('main')}>Quay lại</button>
+                          <button
+                            className="text-red-500 px-2 py-1 hover:bg-red-50 rounded"
+                            onClick={() => { setRequestStartDate(''); setRequestEndDate(''); setPage(1); }}
+                          >
+                            Xóa ngày
+                          </button>
+                          <button className="bg-blue-600 text-white px-3 py-1 rounded hover:bg-blue-700 font-semibold" onClick={() => setActiveDropdown(null)}>Đóng</button>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Submenu 8: Team xử lý yêu cầu */}
+                    {activeDropdown === 'targetTeams' && (
+                      <div className="p-4 w-72 space-y-3">
+                        <h4 className="font-bold text-xs text-gray-800 flex items-center gap-1.5">
+                          <Building2 size={14} className="text-emerald-600" /> Team xử lý yêu cầu
+                        </h4>
+                        <input
+                          type="text"
+                          placeholder="Tìm team..."
+                          className="w-full px-2.5 py-1.5 text-xs border border-gray-300 rounded-md outline-none focus:border-blue-500"
+                          value={teamSearch}
+                          onChange={(e) => setTeamSearch(e.target.value)}
+                        />
+                        <div className="space-y-1.5 max-h-48 overflow-y-auto pr-1">
+                          {filterOptions.targetTeams
+                            .filter(t => removeAccents(t).includes(removeAccents(teamSearch)))
+                            .map(team => (
+                              <label key={team} className="flex items-center space-x-2 text-xs text-gray-700 cursor-pointer hover:text-blue-600">
+                                <input
+                                  type="checkbox"
+                                  className="rounded text-blue-600 focus:ring-blue-500"
+                                  checked={tempTargetTeams.includes(team)}
+                                  onChange={e => {
+                                    if (e.target.checked) setTempTargetTeams([...tempTargetTeams, team]);
+                                    else setTempTargetTeams(tempTargetTeams.filter(v => v !== team));
+                                  }}
+                                />
+                                <span>{team}</span>
+                              </label>
+                            ))}
+                        </div>
+                        <div className="flex justify-between items-center mt-2 pt-2 border-t border-gray-100 text-xs">
+                          <button className="text-gray-500 px-2 py-1 hover:bg-gray-100 rounded" onClick={() => setActiveDropdown('main')}>Quay lại</button>
+                          <button className="text-red-500 px-2 py-1 hover:bg-red-50 rounded" onClick={() => setTempTargetTeams([])}>Bỏ chọn</button>
+                          <button className="bg-blue-600 text-white px-3 py-1 rounded hover:bg-blue-700 font-semibold" onClick={() => applyFilter('targetTeams')}>Áp dụng</button>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Submenu 9: Người xử lý yêu cầu */}
+                    {activeDropdown === 'handlerUserIds' && (
+                      <div className="p-4 w-72 space-y-3">
+                        <h4 className="font-bold text-xs text-gray-800 flex items-center gap-1.5">
+                          <Users size={14} className="text-cyan-600" /> Người xử lý yêu cầu
+                        </h4>
+                        <input
+                          type="text"
+                          placeholder="Tìm người xử lý..."
+                          className="w-full px-2.5 py-1.5 text-xs border border-gray-300 rounded-md outline-none focus:border-blue-500"
+                          value={handlerSearch}
+                          onChange={(e) => setHandlerSearch(e.target.value)}
+                        />
+                        <div className="space-y-1.5 max-h-48 overflow-y-auto pr-1">
+                          <label className="flex items-center space-x-2 text-xs font-semibold text-amber-600 border-b border-gray-100 pb-1.5 mb-1 cursor-pointer">
+                            <input
+                              type="checkbox"
+                              className="rounded text-blue-600 focus:ring-blue-500"
+                              checked={tempHandlerUserIds.includes('null')}
+                              onChange={e => {
+                                if (e.target.checked) setTempHandlerUserIds([...tempHandlerUserIds, 'null']);
+                                else setTempHandlerUserIds(tempHandlerUserIds.filter(v => v !== 'null'));
+                              }}
+                            />
+                            <span>Chưa có người xử lý / Chưa nhận</span>
+                          </label>
+                          {filterOptions.handlers
+                            .filter(h => removeAccents(h.fullName).includes(removeAccents(handlerSearch)))
+                            .map(h => (
+                              <label key={h.id} className="flex items-center space-x-2 text-xs text-gray-700 cursor-pointer hover:text-blue-600">
+                                <input
+                                  type="checkbox"
+                                  className="rounded text-blue-600 focus:ring-blue-500"
+                                  checked={tempHandlerUserIds.includes(h.id)}
+                                  onChange={e => {
+                                    if (e.target.checked) setTempHandlerUserIds([...tempHandlerUserIds, h.id]);
+                                    else setTempHandlerUserIds(tempHandlerUserIds.filter(v => v !== h.id));
+                                  }}
+                                />
+                                <span>{h.fullName} <span className="text-[10px] text-gray-400 font-mono">({h.role})</span></span>
+                              </label>
+                            ))}
+                        </div>
+                        <div className="flex justify-between items-center mt-2 pt-2 border-t border-gray-100 text-xs">
+                          <button className="text-gray-500 px-2 py-1 hover:bg-gray-100 rounded" onClick={() => setActiveDropdown('main')}>Quay lại</button>
+                          <button className="text-red-500 px-2 py-1 hover:bg-red-50 rounded" onClick={() => setTempHandlerUserIds([])}>Bỏ chọn</button>
+                          <button className="bg-blue-600 text-white px-3 py-1 rounded hover:bg-blue-700 font-semibold" onClick={() => applyFilter('handlerUserIds')}>Áp dụng</button>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Submenu 10: Thời gian xử lý yêu cầu */}
+                    {activeDropdown === 'handledTimeFilter' && (
+                      <div className="p-4 w-[290px] space-y-3">
+                        <div>
+                          <h4 className="font-bold text-xs text-gray-800 flex items-center gap-1.5">
+                            <Clock size={14} className="text-orange-600" /> Thời gian xử lý yêu cầu
+                          </h4>
+                          <p className="text-[10px] text-gray-500 mt-0.5 leading-tight">
+                            Thời điểm chuyển trạng thái "Đã chuyển yêu cầu" hoặc thời điểm Lưu lại.
+                          </p>
+                        </div>
+                        <DateRangePicker
+                          startDate={handledStartDate}
+                          endDate={handledEndDate}
+                          align="right"
+                          onChange={(start, end) => {
+                            setHandledStartDate(start);
+                            setHandledEndDate(end);
+                            setPage(1);
+                          }}
+                        />
+                        <div className="flex justify-between items-center mt-2 pt-2 border-t border-gray-100 text-xs">
+                          <button className="text-gray-500 px-2 py-1 hover:bg-gray-100 rounded" onClick={() => setActiveDropdown('main')}>Quay lại</button>
+                          <button
+                            className="text-red-500 px-2 py-1 hover:bg-red-50 rounded"
+                            onClick={() => { setHandledStartDate(''); setHandledEndDate(''); setPage(1); }}
+                          >
+                            Xóa ngày
+                          </button>
+                          <button className="bg-blue-600 text-white px-3 py-1 rounded hover:bg-blue-700 font-semibold" onClick={() => setActiveDropdown(null)}>Đóng</button>
+                        </div>
+                      </div>
+                    )}
+
+                  </div>
+                )}
+              </div>
+            </div>
           </div>
+
+          {/* ── Active Filter Badges / Chips Row ── */}
+          {activeFiltersCount > 0 && (
+            <div className="flex flex-wrap items-center gap-2 px-1">
+              <span className="text-[11px] font-bold text-gray-500 uppercase tracking-wider">Đang lọc:</span>
+
+              {/* 1. Trạng thái */}
+              {filterStatuses.length > 0 && (
+                <span className="inline-flex items-center bg-indigo-50 text-indigo-800 text-xs font-semibold px-2.5 py-1 rounded-md border border-indigo-200">
+                  Trạng thái: {filterStatuses.join(', ')}
+                  <button type="button" className="ml-1.5 text-indigo-400 hover:text-indigo-600" onClick={() => { setFilterStatuses([]); setPage(1); }}>
+                    <XCircle size={13} className="fill-indigo-100 text-indigo-600" />
+                  </button>
+                </span>
+              )}
+
+              {/* 2. Yêu cầu dịch vụ */}
+              {filterServiceRequestTypes.length > 0 && (
+                <span className="inline-flex items-center bg-amber-50 text-amber-800 text-xs font-semibold px-2.5 py-1 rounded-md border border-amber-200">
+                  Yêu cầu DV: {filterServiceRequestTypes.join(', ')}
+                  <button type="button" className="ml-1.5 text-amber-400 hover:text-amber-600" onClick={() => { setFilterServiceRequestTypes([]); setPage(1); }}>
+                    <XCircle size={13} className="fill-amber-100 text-amber-600" />
+                  </button>
+                </span>
+              )}
+
+              {/* 3. Sản phẩm */}
+              {filterProductNames.length > 0 && (
+                <span className="inline-flex items-center bg-purple-50 text-purple-800 text-xs font-semibold px-2.5 py-1 rounded-md border border-purple-200">
+                  Sản phẩm: {filterProductNames.join(', ')}
+                  <button type="button" className="ml-1.5 text-purple-400 hover:text-purple-600" onClick={() => { setFilterProductNames([]); setPage(1); }}>
+                    <XCircle size={13} className="fill-purple-100 text-purple-600" />
+                  </button>
+                </span>
+              )}
+
+              {/* 4. Loại yêu cầu */}
+              {filterPhase3RequestTypes.length > 0 && (
+                <span className="inline-flex items-center bg-sky-50 text-sky-800 text-xs font-semibold px-2.5 py-1 rounded-md border border-sky-200">
+                  Loại YC: {filterPhase3RequestTypes.join(', ')}
+                  <button type="button" className="ml-1.5 text-sky-400 hover:text-sky-600" onClick={() => { setFilterPhase3RequestTypes([]); setPage(1); }}>
+                    <XCircle size={13} className="fill-sky-100 text-sky-600" />
+                  </button>
+                </span>
+              )}
+
+              {/* 5. Loại dịch vụ */}
+              {filterPhase3ServiceTypes.length > 0 && (
+                <span className="inline-flex items-center bg-teal-50 text-teal-800 text-xs font-semibold px-2.5 py-1 rounded-md border border-teal-200">
+                  Loại DV: {filterPhase3ServiceTypes.join(', ')}
+                  <button type="button" className="ml-1.5 text-teal-400 hover:text-teal-600" onClick={() => { setFilterPhase3ServiceTypes([]); setPage(1); }}>
+                    <XCircle size={13} className="fill-teal-100 text-teal-600" />
+                  </button>
+                </span>
+              )}
+
+              {/* 6. Người gửi yêu cầu */}
+              {filterCreatorIds.length > 0 && (
+                <span className="inline-flex items-center bg-rose-50 text-rose-800 text-xs font-semibold px-2.5 py-1 rounded-md border border-rose-200">
+                  Người gửi: {filterCreatorIds.map(id => filterOptions.creators.find(c => c.id === id)?.fullName || id).join(', ')}
+                  <button type="button" className="ml-1.5 text-rose-400 hover:text-rose-600" onClick={() => { setFilterCreatorIds([]); setPage(1); }}>
+                    <XCircle size={13} className="fill-rose-100 text-rose-600" />
+                  </button>
+                </span>
+              )}
+
+              {/* 7. Thời gian gửi yêu cầu */}
+              {(requestStartDate || requestEndDate) && (
+                <span className="inline-flex items-center bg-blue-50 text-blue-800 text-xs font-semibold px-2.5 py-1 rounded-md border border-blue-200">
+                  TG gửi: {formatDateDisplay(requestStartDate)} - {formatDateDisplay(requestEndDate)}
+                  <button type="button" className="ml-1.5 text-blue-400 hover:text-blue-600" onClick={() => { setRequestStartDate(''); setRequestEndDate(''); setPage(1); }}>
+                    <XCircle size={13} className="fill-blue-100 text-blue-600" />
+                  </button>
+                </span>
+              )}
+
+              {/* 8. Team xử lý yêu cầu */}
+              {filterTargetTeams.length > 0 && (
+                <span className="inline-flex items-center bg-emerald-50 text-emerald-800 text-xs font-semibold px-2.5 py-1 rounded-md border border-emerald-200">
+                  Team xử lý: {filterTargetTeams.join(', ')}
+                  <button type="button" className="ml-1.5 text-emerald-400 hover:text-emerald-600" onClick={() => { setFilterTargetTeams([]); setPage(1); }}>
+                    <XCircle size={13} className="fill-emerald-100 text-emerald-600" />
+                  </button>
+                </span>
+              )}
+
+              {/* 9. Người xử lý yêu cầu */}
+              {filterHandlerUserIds.length > 0 && (
+                <span className="inline-flex items-center bg-cyan-50 text-cyan-800 text-xs font-semibold px-2.5 py-1 rounded-md border border-cyan-200">
+                  Người xử lý: {filterHandlerUserIds.map(id => id === 'null' ? 'Chưa nhận' : (filterOptions.handlers.find(h => h.id === id)?.fullName || id)).join(', ')}
+                  <button type="button" className="ml-1.5 text-cyan-400 hover:text-cyan-600" onClick={() => { setFilterHandlerUserIds([]); setPage(1); }}>
+                    <XCircle size={13} className="fill-cyan-100 text-cyan-600" />
+                  </button>
+                </span>
+              )}
+
+              {/* 10. Thời gian xử lý yêu cầu */}
+              {(handledStartDate || handledEndDate) && (
+                <span className="inline-flex items-center bg-orange-50 text-orange-800 text-xs font-semibold px-2.5 py-1 rounded-md border border-orange-200">
+                  TG xử lý: {formatDateDisplay(handledStartDate)} - {formatDateDisplay(handledEndDate)}
+                  <button type="button" className="ml-1.5 text-orange-400 hover:text-orange-600" onClick={() => { setHandledStartDate(''); setHandledEndDate(''); setPage(1); }}>
+                    <XCircle size={13} className="fill-orange-100 text-orange-600" />
+                  </button>
+                </span>
+              )}
+
+              {/* Clear All Button */}
+              <button
+                onClick={clearAllFilters}
+                className="text-xs text-red-600 hover:text-red-700 font-bold hover:underline ml-1"
+              >
+                Xóa tất cả bộ lọc
+              </button>
+            </div>
+          )}
 
           {/* ── Status Pills ── */}
           <div className="flex flex-wrap gap-2">
@@ -625,11 +1558,20 @@ export default function HotlineManage() {
               const count = pill.key === 'ALL'
                 ? (badgeCounts['TỔNG YÊU CẦU'] || 0)
                 : (badgeCounts[pill.key] || 0);
-              const isActive = activeStatus === pill.key;
+              const isActive = (filterStatuses.length === 0 && activeStatus === pill.key) || (filterStatuses.length === 1 && filterStatuses[0] === pill.key);
               return (
                 <button
                   key={pill.key}
-                  onClick={() => { setActiveStatus(pill.key); setPage(1); }}
+                  onClick={() => {
+                    if (pill.key === 'ALL') {
+                      setActiveStatus('ALL');
+                      setFilterStatuses([]);
+                    } else {
+                      setActiveStatus(pill.key);
+                      setFilterStatuses([pill.key]);
+                    }
+                    setPage(1);
+                  }}
                   className={`px-3 py-1.5 rounded-md text-xs font-bold border transition-all ${
                     isActive
                       ? `${pill.bgColor} ${pill.color} ${pill.borderColor} ring-2 ring-offset-1 ring-blue-300`
@@ -643,7 +1585,7 @@ export default function HotlineManage() {
           </div>
 
           {/* ── Total count ── */}
-          <div className="text-right text-sm text-gray-500">
+          <div className="text-right text-xs text-gray-500">
             Có <span className="font-semibold text-gray-700">{totalCount.toLocaleString()}</span> dòng
           </div>
 
@@ -668,7 +1610,7 @@ export default function HotlineManage() {
                 {loading ? (
                   <tr><td colSpan={10} className="text-center py-12"><Loader2 className="mx-auto animate-spin text-blue-500" size={28} /></td></tr>
                 ) : tickets.length === 0 ? (
-                  <tr><td colSpan={10} className="text-center py-12 text-gray-400">Không có yêu cầu hotline nào</td></tr>
+                  <tr><td colSpan={10} className="text-center py-12 text-gray-400">Không có yêu cầu hotline nào khớp với bộ lọc</td></tr>
                 ) : tickets.map(ticket => {
                   const statusBadge = STATUS_BADGE_MAP[ticket.status] || { bg: 'bg-gray-100', text: 'text-gray-700' };
                   return (
@@ -676,7 +1618,7 @@ export default function HotlineManage() {
                       key={ticket.id}
                       className="border-b border-gray-100 hover:bg-gray-50/70 transition-colors"
                     >
-                      {/* 1. Mã yêu cầu hotline (Click vào đây để mở Edit Ticket Modal) */}
+                      {/* 1. Mã yêu cầu hotline */}
                       <td
                         className="px-4 py-3 whitespace-nowrap cursor-pointer hover:bg-blue-50/80 transition-colors group"
                         onClick={() => { setSelectedTicket(ticket); setShowDetailModal(true); }}
@@ -815,7 +1757,7 @@ export default function HotlineManage() {
 
                       {/* 7. Sản phẩm */}
                       <td className="px-4 py-3 whitespace-nowrap">
-                        <div className="text-sm text-gray-700 font-medium">{ticket.productName}</div>
+                        <div className="text-sm text-gray-700 font-medium">{(ticket.productName || '').replace(/^PROD:\s*/i, '')}</div>
                         {ticket.serialNumber && (
                           <div className="text-xs text-gray-500 font-mono">{ticket.serialNumber}</div>
                         )}
