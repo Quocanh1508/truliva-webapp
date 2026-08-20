@@ -113,7 +113,7 @@ export default function CustomerHome({ user, onOpenScanner, onOpenWarranty }: Cu
   const [selectedArticle, setSelectedArticle] = useState<any>(null);
   const [articles, setArticles] = useState<any[]>(FEATURED_NEWS);
 
-  const userName = user?.fullName || 'Guest';
+  const userName = user?.fullName || 'Khách hàng Truliva';
 
   React.useEffect(() => {
     fetchZaloApi('/zalo-miniapp/articles')
@@ -155,7 +155,7 @@ export default function CustomerHome({ user, onOpenScanner, onOpenWarranty }: Cu
   return (
     <div className="pb-20 bg-slate-50 min-h-screen">
       {/* 1. Header Persona 3 Reload Deep Water Ocean Section */}
-      <div className="bg-gradient-to-b from-[#061226] via-[#0B2545] to-[#0F3866] text-white pt-4 pb-14 px-4 rounded-b-[2.2rem] shadow-xl relative overflow-hidden">
+      <div className="bg-gradient-to-b from-[#061226] via-[#0B2545] to-[#0F3866] text-white pt-5 pb-16 px-4 rounded-b-[2.5rem] shadow-xl relative overflow-hidden">
         
         {/* Floating Realistic Water Bubbles */}
         <div className="water-bubble w-4 h-4 left-[10%] bottom-1 bubble-anim-1"></div>
@@ -198,31 +198,31 @@ export default function CustomerHome({ user, onOpenScanner, onOpenWarranty }: Cu
       </div>
 
       {/* 2. Floating Quick Nav Card (P3R Kinetic 4-Button Grid) */}
-      <div className="max-w-md mx-auto px-4 -mt-7 relative z-10">
-        <div className="bg-white/95 backdrop-blur-md rounded-2xl shadow-[0_10px_30px_rgba(11,37,69,0.12)] p-4 border border-sky-100/80 grid grid-cols-4 gap-2.5 text-center">
+      <div className="max-w-md mx-auto px-4 -mt-10 relative z-10">
+        <div className="bg-white/95 backdrop-blur-md rounded-2xl shadow-[0_10px_30px_rgba(11,37,69,0.12)] p-3.5 border border-sky-100/80 grid grid-cols-4 gap-2 text-center">
           
           {/* Tích điểm */}
           <button 
             onClick={onOpenWarranty}
-            className="group flex flex-col items-center justify-center space-y-1.5 p-2 rounded-xl hover:bg-sky-50/80 active:scale-95 transition-all cursor-pointer"
+            className="flex flex-col items-center justify-center space-y-1.5 p-1.5 rounded-xl hover:bg-sky-50/80 active:scale-95 transition-all cursor-pointer group"
           >
-            <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-sky-50 to-blue-100/80 text-[#0284C7] flex items-center justify-center border border-sky-200/60 shadow-xs group-hover:shadow-[0_0_15px_rgba(0,163,255,0.35)] group-hover:scale-105 transition-all">
-              <Star size={22} className="text-[#0284C7] fill-sky-200" />
+            <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-sky-50 to-blue-100/80 text-[#0284C7] flex items-center justify-center border border-sky-200/60 shadow-xs group-hover:shadow-[0_0_15px_rgba(0,163,255,0.35)] group-hover:scale-105 transition-all">
+              <Star size={20} className="text-[#0284C7] fill-sky-200" />
             </div>
-            <span className="text-[11px] font-bold text-slate-700 uppercase tracking-tight">Tích điểm</span>
+            <span className="text-[11px] font-bold text-slate-700 tracking-tight whitespace-nowrap">Tích điểm</span>
           </button>
 
           {/* Ưu đãi (Vòng quay may mắn) */}
           <button 
             onClick={() => setShowWheelModal(true)}
-            className="group flex flex-col items-center justify-center space-y-1.5 p-2 rounded-xl hover:bg-cyan-50/80 active:scale-95 transition-all cursor-pointer"
+            className="flex flex-col items-center justify-center space-y-1.5 p-1.5 rounded-xl hover:bg-cyan-50/80 active:scale-95 transition-all cursor-pointer group"
           >
-            <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-cyan-50 to-sky-100/80 text-[#00A3FF] flex items-center justify-center border border-cyan-200/60 shadow-xs relative group-hover:shadow-[0_0_15px_rgba(0,210,255,0.5)] group-hover:scale-105 transition-all">
-              <Gift size={22} className="text-[#00A3FF]" />
-              <span className="absolute -top-1 -right-1 w-3 h-3 bg-[#00D2FF] rounded-full animate-ping"></span>
-              <span className="absolute -top-1 -right-1 w-3 h-3 bg-[#00D2FF] rounded-full shadow-[0_0_8px_#00D2FF]"></span>
+            <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-cyan-50 to-sky-100/80 text-[#00A3FF] flex items-center justify-center border border-cyan-200/60 shadow-xs relative group-hover:shadow-[0_0_15px_rgba(0,210,255,0.5)] group-hover:scale-105 transition-all">
+              <Gift size={20} className="text-[#00A3FF]" />
+              <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 bg-[#00D2FF] rounded-full animate-ping"></span>
+              <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 bg-[#00D2FF] rounded-full shadow-[0_0_6px_#00D2FF]"></span>
             </div>
-            <span className="text-[11px] font-bold text-slate-700 uppercase tracking-tight">Ưu đãi</span>
+            <span className="text-[11px] font-bold text-slate-700 tracking-tight whitespace-nowrap">Ưu đãi</span>
           </button>
 
           {/* Tin tức */}
@@ -231,12 +231,12 @@ export default function CustomerHome({ user, onOpenScanner, onOpenWarranty }: Cu
               const newsEl = document.getElementById('tin-tuc-noi-bat');
               newsEl?.scrollIntoView({ behavior: 'smooth' });
             }}
-            className="group flex flex-col items-center justify-center space-y-1.5 p-2 rounded-xl hover:bg-blue-50/80 active:scale-95 transition-all cursor-pointer"
+            className="flex flex-col items-center justify-center space-y-1.5 p-1.5 rounded-xl hover:bg-blue-50/80 active:scale-95 transition-all cursor-pointer group"
           >
-            <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-blue-50 to-indigo-100/80 text-[#1B3A6B] flex items-center justify-center border border-blue-200/60 shadow-xs group-hover:shadow-[0_0_15px_rgba(27,58,107,0.35)] group-hover:scale-105 transition-all">
-              <Megaphone size={22} className="text-[#1B3A6B]" />
+            <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-blue-50 to-indigo-100/80 text-[#1B3A6B] flex items-center justify-center border border-blue-200/60 shadow-xs group-hover:shadow-[0_0_15px_rgba(27,58,107,0.35)] group-hover:scale-105 transition-all">
+              <Megaphone size={20} className="text-[#1B3A6B]" />
             </div>
-            <span className="text-[11px] font-bold text-slate-700 uppercase tracking-tight">Tin tức</span>
+            <span className="text-[11px] font-bold text-slate-700 tracking-tight whitespace-nowrap">Tin tức</span>
           </button>
 
           {/* Liên hệ */}
@@ -248,12 +248,12 @@ export default function CustomerHome({ user, onOpenScanner, onOpenWarranty }: Cu
                 window.location.href = 'tel:1900638463';
               }
             }}
-            className="group flex flex-col items-center justify-center space-y-1.5 p-2 rounded-xl hover:bg-teal-50/80 active:scale-95 transition-all cursor-pointer"
+            className="flex flex-col items-center justify-center space-y-1.5 p-1.5 rounded-xl hover:bg-teal-50/80 active:scale-95 transition-all cursor-pointer group"
           >
-            <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-teal-50 to-emerald-100/80 text-teal-700 flex items-center justify-center border border-teal-200/60 shadow-xs group-hover:shadow-[0_0_15px_rgba(20,184,166,0.35)] group-hover:scale-105 transition-all">
-              <PhoneCall size={22} className="text-teal-600" />
+            <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-teal-50 to-emerald-100/80 text-teal-700 flex items-center justify-center border border-teal-200/60 shadow-xs group-hover:shadow-[0_0_15px_rgba(20,184,166,0.35)] group-hover:scale-105 transition-all">
+              <PhoneCall size={20} className="text-teal-600" />
             </div>
-            <span className="text-[11px] font-bold text-slate-700 uppercase tracking-tight">Liên hệ</span>
+            <span className="text-[11px] font-bold text-slate-700 tracking-tight whitespace-nowrap">Liên hệ</span>
           </button>
         </div>
       </div>
