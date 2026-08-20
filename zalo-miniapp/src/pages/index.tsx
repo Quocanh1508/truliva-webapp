@@ -31,7 +31,7 @@ export default function IndexPage() {
   // Dev simulation state
   const [testPhone, setTestPhone] = useState('0915185982');
 
-  const authenticateWithToken = async (phoneToken: string, userAccessToken?: string) => {
+  const authenticateWithToken = async (phoneToken: string, userAccessToken?: string, zaloProfile?: any) => {
     setLoading(true);
     setError(null);
     try {
@@ -40,15 +40,13 @@ export default function IndexPage() {
         body: JSON.stringify({
           phoneToken,
           userAccessToken,
-          zaloProfile: {
-            name: 'Khách Hàng Zalo',
-            avatar: ''
-          }
+          zaloProfile
         })
       });
 
       if (data.success) {
         setSafeStorage('zalo_session_token', data.token);
+        setSafeStorage('zalo_user_cache', JSON.stringify(data.user));
         setUser(data.user);
         await loadUserContent(data.user);
       }
@@ -78,7 +76,10 @@ export default function IndexPage() {
     setLoading(true);
     setError(null);
     try {
+      // 1. Lấy Phone Token
       const data: any = await getPhoneNumber({});
+      
+      // 2. Lấy Access Token
       let userAccessToken = '';
       try {
         userAccessToken = await getAccessToken({});
@@ -86,15 +87,32 @@ export default function IndexPage() {
         console.warn('Could not get Zalo access token:', tokenErr);
       }
 
+      // 3. Lấy Tên & Avatar thật từ Zalo
+      let zaloProfile: { id?: string; name?: string; avatar?: string } = {};
+      try {
+        const info: any = await getUserInfo({ avatarType: 'normal' });
+        if (info && (info.userInfo || info.data)) {
+          const userObj = info.userInfo || info.data;
+          zaloProfile = {
+            id: userObj.id,
+            name: userObj.name,
+            avatar: userObj.avatar
+          };
+        }
+      } catch (infoErr) {
+        console.warn('Could not get Zalo user info:', infoErr);
+      }
+
       const phoneToken = data?.number || data?.token || (data?.data && (data.data.number || data.data.token));
       if (phoneToken) {
-        await authenticateWithToken(phoneToken, userAccessToken);
+        await authenticateWithToken(phoneToken, userAccessToken, zaloProfile);
       } else {
-        await authenticateWithToken(testPhone);
+        throw new Error('Không nhận được mã xác thực từ Zalo');
       }
     } catch (sdkErr: any) {
       console.warn('Zalo SDK Phone Auth Fallback:', sdkErr);
-      await authenticateWithToken(testPhone);
+      setError(sdkErr.message || 'Chưa thể xác thực qua Zalo. Vui lòng thử lại.');
+      setLoading(false);
     }
   };
 
@@ -112,18 +130,34 @@ export default function IndexPage() {
 
   const handleLogout = () => {
     localStorage.removeItem('zalo_session_token');
+    localStorage.removeItem('zalo_user_cache');
     setUser(null);
     setMySerials([]);
     setKtvOrders([]);
+    setActiveTab('home');
   };
 
   useEffect(() => {
+    // 1. Khôi phục nhanh từ Cache để không bị chớp màn hình / mất trạng thái
+    const cachedUserStr = getSafeStorage('zalo_user_cache');
+    if (cachedUserStr) {
+      try {
+        const cachedUser = JSON.parse(cachedUserStr);
+        if (cachedUser) {
+          setUser(cachedUser);
+          loadUserContent(cachedUser);
+        }
+      } catch (e) {}
+    }
+
+    // 2. Đồng bộ phiên mới nhất từ Server
     const savedToken = getSafeStorage('zalo_session_token');
     if (savedToken) {
       fetchZaloApi('/zalo-miniapp/profile')
         .then(res => {
           if (res.success && res.user) {
             setUser(res.user);
+            setSafeStorage('zalo_user_cache', JSON.stringify(res.user));
             loadUserContent(res.user);
           }
         })

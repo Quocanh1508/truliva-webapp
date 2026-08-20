@@ -136,20 +136,36 @@ export async function authenticateZaloMiniAppUser(
     }
   }
 
+  // Cập nhật tên thật từ Zalo nếu tài khoản đang mang tên mặc định
+  if (user) {
+    const isGenericName = !user.fullName || user.fullName.startsWith('Khách hàng') || user.fullName === 'Khách Hàng Zalo' || user.fullName.startsWith('zalo_');
+    const shouldUpdateName = zaloProfile?.name && (isGenericName || (user.fullName === 'Admin Truliva' && user.group === 'CUSTOMER'));
+
+    if (shouldUpdateName) {
+      user = await prisma.user.update({
+        where: { id: user.id },
+        data: {
+          fullName: zaloProfile!.name
+        }
+      });
+    }
+  }
+
   let isNewUser = false;
 
   // 2. Nếu chưa có tài khoản User:
   if (!user) {
-    // Kiểm tra xem số ĐT này có máy trong bảng Serial không
+    // Kiểm tra xem số ĐT này có máy trong bảng Serial không để lấy tên thật
     const existingCustomerSerial = await prisma.serial.findFirst({
       where: {
         customerPhone: {
           in: phoneVariants
         }
-      }
+      },
+      orderBy: { createdAt: 'desc' }
     });
 
-    const customerName = zaloProfile?.name || existingCustomerSerial?.customerName || `Khách hàng ${cleanPhone.substring(6)}`;
+    const customerName = zaloProfile?.name || existingCustomerSerial?.customerName || `Khách hàng ${cleanPhone.slice(-4)}`;
     const generatedUsername = `zalo_${cleanPhone}`;
 
     // Tự động khởi tạo tài khoản Khách Hàng mới (chỉ cấp quyền STAFF / group CUSTOMER)
@@ -166,7 +182,7 @@ export async function authenticateZaloMiniAppUser(
     });
 
     isNewUser = true;
-    logger.info('Created new Zalo Mini App Customer user', { userId: user.id, phone: cleanPhone });
+    logger.info('Created new Zalo Mini App Customer user', { userId: user.id, phone: cleanPhone, name: customerName });
   }
 
   // 3. Tạo JWT Token đăng nhập hệ thống Truliva (giới hạn an toàn 14 ngày)
@@ -190,7 +206,8 @@ export async function authenticateZaloMiniAppUser(
       username: user.username,
       fullName: user.fullName,
       phoneNumber: user.phoneNumber || cleanPhone,
-      role: user.role
+      role: user.role,
+      avatar: zaloProfile?.avatar || null
     },
     isNewUser
   };

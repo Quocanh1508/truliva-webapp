@@ -1,5 +1,6 @@
 import React from 'react';
 import { Home, MessageCircle, User } from 'lucide-react';
+import { openChat } from 'zmp-sdk/apis';
 
 interface BottomNavBarProps {
   activeTab: 'home' | 'chat' | 'profile';
@@ -7,6 +8,17 @@ interface BottomNavBarProps {
 }
 
 export default function BottomNavBar({ activeTab, onChangeTab }: BottomNavBarProps) {
+  const handleOpenOaChat = async () => {
+    try {
+      await openChat({
+        type: 'oa',
+        id: '3870382725035413507'
+      });
+    } catch (err) {
+      window.location.href = 'https://zalo.me/3870382725035413507';
+    }
+  };
+
   return (
     <div className="fixed bottom-0 left-0 right-0 z-40 bg-white/95 backdrop-blur-md border-t border-slate-200 py-2 px-6 flex justify-around items-center max-w-md mx-auto shadow-lg">
       
@@ -24,20 +36,15 @@ export default function BottomNavBar({ activeTab, onChangeTab }: BottomNavBarPro
       </button>
 
       {/* 💬 Tin nhắn (Zalo OA) */}
-      <a 
-        href="https://zalo.me"
-        target="_blank"
-        rel="noopener noreferrer"
-        onClick={() => onChangeTab('chat')}
-        className={`flex flex-col items-center justify-center space-y-0.5 transition-colors cursor-pointer ${
-          activeTab === 'chat' ? 'text-[#0284C7] font-bold' : 'text-slate-400 hover:text-slate-600 font-medium'
-        }`}
+      <button 
+        onClick={handleOpenOaChat}
+        className="flex flex-col items-center justify-center space-y-0.5 transition-colors cursor-pointer text-slate-400 hover:text-slate-600 font-medium"
       >
-        <div className={`p-1 rounded-full ${activeTab === 'chat' ? 'bg-sky-50' : ''}`}>
+        <div className="p-1 rounded-full">
           <MessageCircle size={20} />
         </div>
         <span className="text-[10px]">Tin nhắn</span>
-      </a>
+      </button>
 
       {/* 👤 Cá nhân */}
       <button 
