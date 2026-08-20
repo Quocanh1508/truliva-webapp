@@ -146,6 +146,7 @@ app.use('/webhooks', webhookRoutes);
 
 // Apply rate limiting to secure logins against brute-force
 app.use('/api/auth/login', loginLimiter);
+app.use('/api/zalo-miniapp/auth', loginLimiter);
 
 // ── KTV Webapp API routes ──
 app.use('/api/auth', authRoutes);

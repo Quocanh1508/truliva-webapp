@@ -30,12 +30,8 @@ export function normalizePhone(phone: string): string {
 /**
  * Giải mã phoneToken từ Zalo SDK thông qua Zalo Graph API
  */
-export async function decodeZaloPhoneToken(phoneToken: string, userAccessToken?: string): Promise<string> {
-  // 1. Kiểm tra nếu phoneToken đã là số điện thoại thuần (VD: 0915185982 hoặc 84915185982)
-  const cleanStr = phoneToken.replace(/[^0-9]/g, '');
-  if ((cleanStr.startsWith('0') && cleanStr.length === 10) || (cleanStr.startsWith('84') && cleanStr.length === 11)) {
-    return normalizePhone(cleanStr);
-  }
+export async function decodeZaloPhoneToken(phoneToken: string, userAccessToken?: string): Promise<{ phone: string; isVerified: boolean }> {
+  const isDev = process.env.NODE_ENV !== 'production';
 
   const candidateKeys = Array.from(new Set([
     process.env.ZALO_MINI_APP_SECRET,
@@ -66,7 +62,8 @@ export async function decodeZaloPhoneToken(phoneToken: string, userAccessToken?:
 
       const response = await axios.get('https://graph.zalo.me/v2.0/me/info', {
         headers,
-        params
+        params,
+        timeout: 8000
       });
 
       const data = response.data;
@@ -77,19 +74,24 @@ export async function decodeZaloPhoneToken(phoneToken: string, userAccessToken?:
 
       const rawNumber = data.data?.number || data.number;
       if (rawNumber) {
-        return normalizePhone(rawNumber);
+        return { phone: normalizePhone(rawNumber), isVerified: true };
       }
     } catch (error: any) {
       lastError = error;
     }
   }
 
-  logger.error('Failed to decode Zalo Phone Token across candidate keys', { error: lastError?.message, details: lastError?.response?.data });
-  // Nếu truyền chuỗi số điện thoại test/fallback
-  if (phoneToken.length >= 9 && !isNaN(Number(phoneToken))) {
-    return normalizePhone(phoneToken);
+  // Fallback CHỈ CHO PHÉP trong môi trường Development / Local Testing
+  if (isDev) {
+    const cleanStr = phoneToken.replace(/[^0-9]/g, '');
+    if ((cleanStr.startsWith('0') && cleanStr.length === 10) || (cleanStr.startsWith('84') && cleanStr.length >= 11)) {
+      logger.warn('DEVELOPMENT ONLY: Bypassing Zalo Token for local testing phone', { phone: cleanStr });
+      return { phone: normalizePhone(cleanStr), isVerified: false };
+    }
   }
-  throw new Error(`Không thể giải mã số điện thoại Zalo: ${lastError?.message || 'secret_key is invalid'}`);
+
+  logger.error('Failed to decode Zalo Phone Token across candidate keys', { error: lastError?.message, details: lastError?.response?.data });
+  throw new Error(`Không thể giải mã số điện thoại Zalo: ${lastError?.message || 'Mã xác thực không hợp lệ'}`);
 }
 
 /**
@@ -100,29 +102,49 @@ export async function authenticateZaloMiniAppUser(
   userAccessToken?: string,
   zaloProfile?: { id?: string; name?: string; avatar?: string }
 ): Promise<ZaloAuthResult> {
-  const phone = await decodeZaloPhoneToken(phoneToken, userAccessToken);
+  const { phone, isVerified } = await decodeZaloPhoneToken(phoneToken, userAccessToken);
   const cleanPhone = normalizePhone(phone);
 
-  logger.info('Authenticating Zalo Mini App user', { phone: cleanPhone, zaloProfile });
+  logger.info('Authenticating Zalo Mini App user', { phone: cleanPhone, isVerified, zaloProfile });
 
-  // 1. Tìm người dùng trong hệ thống theo số điện thoại
+  const phoneVariants = Array.from(new Set([
+    cleanPhone,
+    cleanPhone.startsWith('0') ? '84' + cleanPhone.substring(1) : cleanPhone,
+    cleanPhone.startsWith('0') ? cleanPhone.substring(1) : cleanPhone
+  ]));
+
+  // 1. Tìm người dùng trong hệ thống theo số điện thoại (so khớp chính xác danh sách định dạng)
   let user = await prisma.user.findFirst({
     where: {
       phoneNumber: {
-        contains: cleanPhone.substring(1) // Khớp 9 số đuôi
+        in: phoneVariants
       }
     }
   });
+
+  // NẾU LÀ TÀI KHOẢN CÓ QUYỀN NỘI BỘ (ADMIN, KTV, STAFF KHÔNG PHẢI CUSTOMER)
+  // BẮT BUỘC PHẢI CÓ TOKEN ZALO XÁC THỰC THẬT (isVerified === true)
+  if (user && user.group !== 'CUSTOMER' && user.role !== 'STAFF') {
+    if (!isVerified) {
+      logger.warn('Blocked unverified phone login attempt to privileged user account', {
+        userId: user.id,
+        role: user.role,
+        group: user.group,
+        phone: cleanPhone
+      });
+      throw new Error(`Tài khoản nhân sự/quản trị (${user.role}) bắt buộc phải đăng nhập 1-chạm qua ứng dụng Zalo đã xác thực.`);
+    }
+  }
 
   let isNewUser = false;
 
   // 2. Nếu chưa có tài khoản User:
   if (!user) {
-    // Kiểm tra xem số ĐT này có phải là khách hàng trong bảng Serial hoặc Order không
+    // Kiểm tra xem số ĐT này có máy trong bảng Serial không
     const existingCustomerSerial = await prisma.serial.findFirst({
       where: {
         customerPhone: {
-          contains: cleanPhone.substring(1)
+          in: phoneVariants
         }
       }
     });
@@ -130,7 +152,7 @@ export async function authenticateZaloMiniAppUser(
     const customerName = zaloProfile?.name || existingCustomerSerial?.customerName || `Khách hàng ${cleanPhone.substring(6)}`;
     const generatedUsername = `zalo_${cleanPhone}`;
 
-    // Tự động khởi tạo tài khoản Khách Hàng mới
+    // Tự động khởi tạo tài khoản Khách Hàng mới (chỉ cấp quyền STAFF / group CUSTOMER)
     user = await prisma.user.create({
       data: {
         username: generatedUsername,
@@ -147,7 +169,7 @@ export async function authenticateZaloMiniAppUser(
     logger.info('Created new Zalo Mini App Customer user', { userId: user.id, phone: cleanPhone });
   }
 
-  // 3. Tạo JWT Token đăng nhập hệ thống Truliva
+  // 3. Tạo JWT Token đăng nhập hệ thống Truliva (giới hạn an toàn 14 ngày)
   const jwtSecret = process.env.JWT_SECRET || 'truliva-super-secret-jwt-key-2025';
   const token = jwt.sign(
     {
@@ -158,7 +180,7 @@ export async function authenticateZaloMiniAppUser(
       phoneNumber: user.phoneNumber
     },
     jwtSecret,
-    { expiresIn: '90d' }
+    { expiresIn: '14d' }
   );
 
   return {

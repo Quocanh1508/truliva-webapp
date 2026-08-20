@@ -92,12 +92,17 @@ router.get('/my-serials', requireAuth, async (req: Request, res: Response): Prom
     }
 
     const cleanPhone = phone.replace(/[^0-9]/g, '');
-    const searchPhone = cleanPhone.startsWith('0') ? cleanPhone.substring(1) : cleanPhone;
+    const standardPhone = cleanPhone.startsWith('84') ? '0' + cleanPhone.substring(2) : cleanPhone;
+    const phoneVariants = Array.from(new Set([
+      standardPhone,
+      standardPhone.startsWith('0') ? '84' + standardPhone.substring(1) : standardPhone,
+      standardPhone.startsWith('0') ? standardPhone.substring(1) : standardPhone
+    ]));
 
     const serials = await prisma.serial.findMany({
       where: {
         customerPhone: {
-          contains: searchPhone
+          in: phoneVariants
         }
       },
       orderBy: { createdAt: 'desc' }
@@ -118,15 +123,21 @@ router.get('/my-serials', requireAuth, async (req: Request, res: Response): Prom
  */
 router.get('/ktv-orders', requireAuth, async (req: Request, res: Response): Promise<void> => {
   try {
-    const userId = req.user?.id;
-    if (!userId) {
+    const user = req.user;
+    if (!user?.id) {
       res.status(401).json({ error: 'Chưa đăng nhập' });
+      return;
+    }
+
+    // Kiểm tra quyền RBAC: Chỉ KTV hoặc ADMIN mới được lấy danh sách ca giao việc
+    if (user.role !== 'KTV' && user.role !== 'ADMIN') {
+      res.status(403).json({ error: 'Chỉ Kỹ thuật viên mới có quyền xem danh sách ca dịch vụ được gán' });
       return;
     }
 
     const orders = await prisma.order.findMany({
       where: {
-        assignedKtvId: userId,
+        assignedKtvId: user.id,
         statusName: {
           notIn: ['cancelled', 'completed']
         }
