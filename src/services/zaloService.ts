@@ -362,7 +362,7 @@ export async function sendZnsWarrantyActivation(
 export async function getZaloOaArticles(): Promise<any[]> {
   try {
     const accessToken = await getValidAccessToken();
-    const response = await axios.get('https://openapi.zalo.me/v2.0/oa/article/getslice?offset=0&limit=10&type=normal', {
+    const response = await axios.get('https://openapi.zalo.me/v2.0/article/getslice?offset=0&limit=10&type=normal', {
       headers: {
         'access_token': accessToken
       }
@@ -371,17 +371,18 @@ export async function getZaloOaArticles(): Promise<any[]> {
     const data = response.data;
     if (data.error === 0 && data.data && data.data.medias && data.data.medias.length > 0) {
       return data.data.medias.map((m: any) => {
-        const dateStr = m.created_time 
-          ? new Date(Number(m.created_time)).toLocaleDateString('vi-VN')
+        const timestamp = m.create_date || m.created_time;
+        const dateStr = timestamp 
+          ? new Date(Number(timestamp)).toLocaleDateString('vi-VN')
           : 'Mới đăng';
         return {
           id: m.id,
           title: m.title,
           date: dateStr,
-          views: m.total_view || 150,
+          views: m.total_view || 0,
           image: m.thumb || m.cover?.photo_url || 'https://images.unsplash.com/photo-1548839140-29a749e1bc4e?w=500&auto=format&fit=crop&q=60',
           summary: m.description || m.summary || '',
-          url: m.url || `https://oa.zalo.me/detail/article/${m.id}`
+          url: m.link_view || m.url || `https://oa.zalo.me/detail/article/${m.id}`
         };
       });
     }
