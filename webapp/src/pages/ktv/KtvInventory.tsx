@@ -264,17 +264,17 @@ export default function KtvInventory() {
               </div>
             ) : (
               <PullToRefresh onRefresh={() => loadMyStock(true)}>
-                <div className="overflow-x-auto min-h-[300px]">
+                <div className="overflow-x-auto overflow-y-auto max-h-[calc(100vh-230px)] min-h-[300px] relative rounded-xl border border-slate-200 shadow-sm">
                   <table className="w-full text-left border-collapse table-auto">
-                    <thead>
+                    <thead className="sticky top-0 z-30 shadow-xs">
                       <tr className="bg-slate-50 border-b border-slate-200 text-slate-600 text-xs font-bold uppercase tracking-wider">
-                        <th className="px-6 py-4 sticky left-0 bg-slate-50 z-10 border-r border-slate-200 shadow-[2px_0_5px_rgba(0,0,0,0.03)]" style={{ minWidth: '240px' }}>
+                        <th className="px-6 py-4 sticky left-0 top-0 bg-slate-100 z-40 border-r border-b border-slate-200 shadow-[2px_0_5px_rgba(0,0,0,0.05)]" style={{ minWidth: '240px' }}>
                           Sản phẩm
                         </th>
-                        <th className="px-4 py-4 text-center border-r border-slate-200" style={{ width: '120px' }}>SKU / Danh mục</th>
+                        <th className="px-4 py-4 text-center sticky top-0 bg-slate-50 z-30 border-r border-b border-slate-200" style={{ width: '120px' }}>SKU / Danh mục</th>
                         
                         {warehouse && (
-                          <th className="px-4 py-4 text-center border-r border-slate-100" style={{ minWidth: '130px', maxWidth: '200px' }}>
+                          <th className="px-4 py-4 text-center sticky top-0 bg-slate-50 z-30 border-r border-b border-slate-100" style={{ minWidth: '130px', maxWidth: '200px' }}>
                             <div className="truncate font-semibold text-slate-700" title={warehouse.name}>{warehouse.name}</div>
                             {warehouse.address && <div className="text-[10px] text-slate-400 normal-case font-normal mt-0.5 truncate" title={warehouse.address}>{warehouse.address}</div>}
                           </th>

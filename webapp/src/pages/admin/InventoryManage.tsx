@@ -546,27 +546,28 @@ export default function InventoryManage() {
             </div>
 
             {/* 💻 DESKTOP MATRIX TABLE VIEW (Hiển thị màn hình máy tính >= 768px) */}
-            <div className="hidden md:block overflow-x-auto">
+            <div className="hidden md:block overflow-x-auto overflow-y-auto max-h-[calc(100vh-230px)] relative rounded-xl border border-slate-200 shadow-sm">
               <table className="w-full text-left border-collapse table-auto">
-                <thead>
+                <thead className="sticky top-0 z-30 shadow-xs">
                   <tr className="bg-slate-50 border-b border-slate-200 text-slate-600 text-xs font-bold uppercase tracking-wider">
-                    <th className="px-6 py-4 sticky left-0 bg-slate-50 z-10 border-r border-slate-200 shadow-[2px_0_5px_rgba(0,0,0,0.03)]" style={{ minWidth: '240px' }}>
+                    {/* Cột Tên SP: Vừa sticky left vừa sticky top → z-40 để luôn nổi trên cả row headers và content */}
+                    <th className="px-6 py-4 sticky left-0 top-0 bg-slate-100 z-40 border-r border-b border-slate-200 shadow-[2px_0_5px_rgba(0,0,0,0.05)]" style={{ minWidth: '240px' }}>
                       Sản phẩm
                     </th>
-                    <th className="px-4 py-4 text-center border-r border-slate-200" style={{ width: '120px' }}>SKU / Danh mục</th>
+                    <th className="px-4 py-4 text-center sticky top-0 bg-slate-50 z-30 border-r border-b border-slate-200" style={{ width: '120px' }}>SKU / Danh mục</th>
                     
                     {/* Cột hiển thị của từng kho hàng được chọn */}
                     {warehouses.filter(w => selectedWarehouses.includes(w.id)).map((w) => (
-                      <th key={w.id} className="px-4 py-4 text-center border-r border-slate-100" style={{ minWidth: '130px', maxWidth: '200px' }}>
+                      <th key={w.id} className="px-4 py-4 text-center sticky top-0 bg-slate-50 z-30 border-r border-b border-slate-100" style={{ minWidth: '130px', maxWidth: '200px' }}>
                         <div className="truncate font-semibold text-slate-700" title={w.name}>{w.name}</div>
                         {w.phone && <div className="text-[10px] text-slate-400 normal-case font-normal mt-0.5">{w.phone}</div>}
                       </th>
                     ))}
                     
-                    <th className="px-4 py-4 text-center bg-slate-100 font-bold text-slate-800 border-l border-slate-200" style={{ width: '120px' }}>
+                    <th className="px-4 py-4 text-center sticky top-0 bg-slate-100 font-bold text-slate-800 border-l border-b border-slate-200 z-30" style={{ width: '120px' }}>
                       Tổng có thể bán
                     </th>
-                    <th className="px-4 py-4 text-center bg-slate-50 font-bold text-slate-700 border-l border-slate-200" style={{ width: '120px' }}>
+                    <th className="px-4 py-4 text-center sticky top-0 bg-slate-50 font-bold text-slate-700 border-l border-b border-slate-200 z-30" style={{ width: '120px' }}>
                       Tổng tồn thực tế
                     </th>
                   </tr>
