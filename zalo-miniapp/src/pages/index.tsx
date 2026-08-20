@@ -11,7 +11,7 @@ import {
   LogIn,
   QrCode
 } from 'lucide-react';
-import { getPhoneNumber, getUserInfo, getAccessToken } from 'zmp-sdk/apis';
+import { getPhoneNumber, getUserInfo, getAccessToken, scanQRCode } from 'zmp-sdk/apis';
 import { fetchZaloApi, getSafeStorage, setSafeStorage } from '../api/client';
 import CustomerHome from './customer/CustomerHome';
 import CustomerProfile from './customer/CustomerProfile';
@@ -94,6 +94,18 @@ export default function IndexPage() {
     } catch (sdkErr: any) {
       console.warn('Zalo SDK Phone Auth Fallback:', sdkErr);
       await authenticateWithToken(testPhone);
+    }
+  };
+
+  const handleOpenScanner = async () => {
+    try {
+      const data: any = await scanQRCode({});
+      const scannedContent = data?.content || data?.data || data?.result;
+      if (scannedContent) {
+        alert(`Đã quét mã thành công: ${scannedContent}`);
+      }
+    } catch (err: any) {
+      console.warn('Scanner Error / Cancelled:', err);
     }
   };
 
@@ -208,6 +220,7 @@ export default function IndexPage() {
           {/* Home preview */}
           <CustomerHome 
             user={null} 
+            onOpenScanner={handleOpenScanner}
             onOpenWarranty={() => handle1ClickZaloAuth()} 
           />
         </div>
@@ -285,6 +298,7 @@ export default function IndexPage() {
           {activeTab === 'home' && (
             <CustomerHome 
               user={user} 
+              onOpenScanner={handleOpenScanner}
               onOpenWarranty={() => setActiveTab('profile')} 
             />
           )}
@@ -294,6 +308,7 @@ export default function IndexPage() {
               user={user} 
               mySerials={mySerials} 
               onLogout={handleLogout} 
+              onOpenScanner={handleOpenScanner}
             />
           )}
         </>
