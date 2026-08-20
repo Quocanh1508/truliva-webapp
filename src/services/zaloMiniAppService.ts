@@ -136,18 +136,22 @@ export async function authenticateZaloMiniAppUser(
     }
   }
 
-  // Cập nhật tên thật từ Zalo nếu tài khoản đang mang tên mặc định
-  if (user) {
-    const isGenericName = !user.fullName || user.fullName.startsWith('Khách hàng') || user.fullName === 'Khách Hàng Zalo' || user.fullName.startsWith('zalo_');
-    const shouldUpdateName = zaloProfile?.name && (isGenericName || (user.fullName === 'Admin Truliva' && user.group === 'CUSTOMER'));
+  // Cập nhật tên thật từ Zalo nếu tài khoản đang mang tên mặc định hoặc tên mặc định ban đầu "Admin Truliva"
+  if (user && zaloProfile?.name) {
+    const isPlaceholder = !user.fullName || 
+      user.fullName === 'Admin Truliva' || 
+      user.fullName.startsWith('Khách hàng') || 
+      user.fullName === 'Khách Hàng Zalo' || 
+      user.fullName.startsWith('zalo_');
 
-    if (shouldUpdateName) {
+    if (isPlaceholder) {
       user = await prisma.user.update({
         where: { id: user.id },
         data: {
-          fullName: zaloProfile!.name
+          fullName: zaloProfile.name
         }
       });
+      logger.info('Updated user fullName to real Zalo name', { userId: user.id, newName: zaloProfile.name });
     }
   }
 
@@ -204,7 +208,7 @@ export async function authenticateZaloMiniAppUser(
     user: {
       id: user.id,
       username: user.username,
-      fullName: user.fullName,
+      fullName: zaloProfile?.name || user.fullName,
       phoneNumber: user.phoneNumber || cleanPhone,
       role: user.role,
       avatar: zaloProfile?.avatar || null
