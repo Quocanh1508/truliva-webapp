@@ -15,6 +15,7 @@ import {
   Calendar,
   MessageSquare
 } from 'lucide-react';
+import { openWebview, openChat } from 'zmp-sdk/apis';
 
 interface CustomerProfileProps {
   user: any;
@@ -26,6 +27,28 @@ interface CustomerProfileProps {
 export default function CustomerProfile({ user, mySerials, onLogout, onOpenScanner }: CustomerProfileProps) {
   const userName = user?.fullName || 'Khách hàng Truliva';
   const userPhone = user?.phoneNumber || 'Chưa cập nhật SĐT';
+
+  const handleBookMaintenance = async (serialNumber?: string) => {
+    const url = serialNumber 
+      ? `https://trulivaofficial.com/warranty-activate?serial=${encodeURIComponent(serialNumber)}`
+      : 'https://trulivaofficial.com/warranty-activate';
+    try {
+      await openWebview({ url });
+    } catch (err) {
+      window.open(url, '_blank');
+    }
+  };
+
+  const handleOpenOaChat = async () => {
+    try {
+      await openChat({
+        type: 'oa',
+        id: '3870382725035413507'
+      });
+    } catch (err) {
+      window.location.href = 'https://zalo.me/3870382725035413507';
+    }
+  };
 
   return (
     <div className="pb-20 bg-slate-50 min-h-screen">
@@ -93,11 +116,11 @@ export default function CustomerProfile({ user, mySerials, onLogout, onOpenScann
               Máy lọc nước của tôi ({(mySerials || []).length})
             </h2>
             <button 
-              onClick={onOpenScanner}
+              onClick={() => handleBookMaintenance()}
               className="text-xs text-[#0284C7] font-bold flex items-center hover:underline cursor-pointer"
             >
               <QrCode size={14} className="mr-1" />
-              Thêm máy
+              Kích hoạt / Thêm máy
             </button>
           </div>
 
@@ -106,10 +129,10 @@ export default function CustomerProfile({ user, mySerials, onLogout, onOpenScann
               <Droplets size={32} className="mx-auto text-sky-300" />
               <p>Bạn chưa liên kết máy lọc nước nào với tài khoản Zalo này.</p>
               <button 
-                onClick={onOpenScanner}
+                onClick={() => handleBookMaintenance()}
                 className="px-4 py-2 bg-[#1B3A6B] hover:bg-[#2563EB] text-white font-bold rounded-xl text-xs shadow-sm transition-colors cursor-pointer"
               >
-                Quét mã QR trên máy ngay
+                Kích hoạt bảo hành điện tử ngay
               </button>
             </div>
           ) : (
@@ -148,7 +171,10 @@ export default function CustomerProfile({ user, mySerials, onLogout, onOpenScann
                   </div>
                 </div>
 
-                <button className="w-full py-2.5 bg-sky-50 hover:bg-sky-100 text-[#0284C7] rounded-xl text-xs font-bold transition-colors flex items-center justify-center space-x-1 cursor-pointer">
+                <button 
+                  onClick={() => handleBookMaintenance(s.serialNumber)}
+                  className="w-full py-2.5 bg-sky-50 hover:bg-sky-100 active:scale-98 text-[#0284C7] rounded-xl text-xs font-bold transition-all flex items-center justify-center space-x-1 cursor-pointer"
+                >
                   <Wrench size={14} />
                   <span>Đặt lịch KTV bảo trì / Thay lõi 1-Click</span>
                 </button>
@@ -170,7 +196,10 @@ export default function CustomerProfile({ user, mySerials, onLogout, onOpenScann
             <ChevronRight size={16} className="text-slate-400" />
           </button>
 
-          <button className="w-full p-3.5 flex items-center justify-between text-slate-800 font-semibold hover:bg-slate-50 transition-colors cursor-pointer">
+          <button 
+            onClick={() => handleBookMaintenance()}
+            className="w-full p-3.5 flex items-center justify-between text-slate-800 font-semibold hover:bg-slate-50 transition-colors cursor-pointer"
+          >
             <div className="flex items-center space-x-3">
               <div className="p-2 bg-sky-50 text-[#0284C7] rounded-xl">
                 <History size={18} />
@@ -180,8 +209,8 @@ export default function CustomerProfile({ user, mySerials, onLogout, onOpenScann
             <ChevronRight size={16} className="text-slate-400" />
           </button>
 
-          <a 
-            href="tel:19006368"
+          <button 
+            onClick={handleOpenOaChat}
             className="w-full p-3.5 flex items-center justify-between text-slate-800 font-semibold hover:bg-slate-50 transition-colors cursor-pointer"
           >
             <div className="flex items-center space-x-3">
@@ -191,7 +220,7 @@ export default function CustomerProfile({ user, mySerials, onLogout, onOpenScann
               <span>Hỗ trợ & Chat Zalo OA</span>
             </div>
             <ChevronRight size={16} className="text-slate-400" />
-          </a>
+          </button>
 
         </div>
 
