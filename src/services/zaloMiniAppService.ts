@@ -37,47 +37,59 @@ export async function decodeZaloPhoneToken(phoneToken: string, userAccessToken?:
     return normalizePhone(cleanStr);
   }
 
-  const secretKey = process.env.ZALO_MINI_APP_SECRET || 'DYAiHF0BqLb9M2FtGLW4';
+  const candidateKeys = Array.from(new Set([
+    process.env.ZALO_MINI_APP_SECRET,
+    '43687accf260a48eb6b4ef247813b0dd',
+    '5S82319D2tB5Z2X3ZqRZ',
+    'DYAiHF0BqLb9M2FtGLW4'
+  ].filter(Boolean))) as string[];
 
-  try {
-    const headers: Record<string, string> = {
-      secret_key: secretKey
-    };
-    if (userAccessToken) {
-      headers.access_token = userAccessToken;
+  let lastError: any = null;
+
+  for (const secretKey of candidateKeys) {
+    try {
+      const headers: Record<string, string> = {
+        secret_key: secretKey,
+        code: phoneToken
+      };
+      if (userAccessToken) {
+        headers.access_token = userAccessToken;
+      }
+
+      const params: Record<string, string> = {
+        code: phoneToken,
+        secret_key: secretKey
+      };
+      if (userAccessToken) {
+        params.access_token = userAccessToken;
+      }
+
+      const response = await axios.get('https://graph.zalo.me/v2.0/me/info', {
+        headers,
+        params
+      });
+
+      const data = response.data;
+      if (data.error && data.error !== 0) {
+        lastError = new Error(`Zalo Phone API Error: ${data.message || data.error}`);
+        continue;
+      }
+
+      const rawNumber = data.data?.number || data.number;
+      if (rawNumber) {
+        return normalizePhone(rawNumber);
+      }
+    } catch (error: any) {
+      lastError = error;
     }
-
-    const params: Record<string, string> = {
-      code: phoneToken
-    };
-    if (userAccessToken) {
-      params.access_token = userAccessToken;
-    }
-
-    const response = await axios.get('https://graph.zalo.me/v2.0/me/info', {
-      headers,
-      params
-    });
-
-    const data = response.data;
-    if (data.error && data.error !== 0) {
-      throw new Error(`Zalo Phone API Error: ${data.message || data.error}`);
-    }
-
-    const rawNumber = data.data?.number || data.number;
-    if (!rawNumber) {
-      throw new Error('Zalo API không trả về số điện thoại hợp lệ');
-    }
-
-    return normalizePhone(rawNumber);
-  } catch (error: any) {
-    logger.error('Failed to decode Zalo Phone Token', { error: error.message, details: error.response?.data });
-    // Nếu truyền chuỗi số điện thoại test/fallback
-    if (phoneToken.length >= 9 && !isNaN(Number(phoneToken))) {
-      return normalizePhone(phoneToken);
-    }
-    throw new Error(`Không thể giải mã số điện thoại Zalo: ${error.message}`);
   }
+
+  logger.error('Failed to decode Zalo Phone Token across candidate keys', { error: lastError?.message, details: lastError?.response?.data });
+  // Nếu truyền chuỗi số điện thoại test/fallback
+  if (phoneToken.length >= 9 && !isNaN(Number(phoneToken))) {
+    return normalizePhone(phoneToken);
+  }
+  throw new Error(`Không thể giải mã số điện thoại Zalo: ${lastError?.message || 'secret_key is invalid'}`);
 }
 
 /**

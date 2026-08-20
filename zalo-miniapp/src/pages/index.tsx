@@ -157,27 +157,52 @@ export default function IndexPage() {
         </div>
       )}
 
-      {/* Chưa đăng nhập -> Banner chào mừng + Nút 1-Click Auth */}
+      {/* Chưa đăng nhập -> Banner chào mừng + Nút Đăng nhập bằng SĐT */}
       {!loading && !user && !error && (
         <div className="p-4 pt-12 space-y-4">
-          <div className="bg-gradient-to-br from-[#1B3A6B] via-[#0A4B8F] to-[#0284C7] text-white p-6 rounded-3xl shadow-xl text-center space-y-4">
-            <div className="p-4 bg-white/10 backdrop-blur-md rounded-2xl w-16 h-16 flex items-center justify-center mx-auto text-cyan-300">
+          <div className="bg-gradient-to-br from-[#061226] via-[#0B2545] to-[#0F3866] text-white p-6 rounded-3xl shadow-xl text-center space-y-4 relative overflow-hidden">
+            {/* Water bubbles in login card */}
+            <div className="water-bubble w-4 h-4 left-[10%] bottom-1 bubble-anim-1"></div>
+            <div className="water-bubble w-5 h-5 right-[15%] bottom-2 bubble-anim-3"></div>
+
+            <div className="p-4 bg-white/10 backdrop-blur-md rounded-2xl w-16 h-16 flex items-center justify-center mx-auto text-[#00D2FF] border border-[#00D2FF]/30 shadow-[0_0_15px_rgba(0,210,255,0.3)]">
               <ShieldCheck size={36} />
             </div>
             <div>
-              <h1 className="font-extrabold text-white text-lg">Hệ Thống Dịch Vụ Truliva</h1>
+              <h1 className="font-black text-white text-lg tracking-tight">Hệ Thống Dịch Vụ Truliva</h1>
               <p className="text-xs text-sky-200 mt-1 leading-relaxed">
-                Đăng nhập 1-Click bằng số Zalo để nhận quà Vòng Quay May Mắn & Tra cứu bảo hành máy lọc nước.
+                Đăng nhập bằng số điện thoại Zalo để nhận quà Vòng Quay May Mắn & Tra cứu bảo hành máy lọc nước.
               </p>
             </div>
 
+            {/* Nút Đăng nhập bằng Số điện thoại Zalo */}
             <button
               onClick={handle1ClickZaloAuth}
-              className="w-full py-3.5 bg-[#00A3FF] hover:bg-[#0284C7] text-white rounded-2xl text-xs font-extrabold shadow-lg shadow-cyan-500/25 flex items-center justify-center space-x-2 transition-transform active:scale-95 cursor-pointer"
+              className="w-full py-3.5 bg-gradient-to-r from-[#00D2FF] to-[#0284C7] hover:from-[#00A3FF] hover:to-[#1B3A6B] text-[#061226] hover:text-white rounded-2xl text-xs font-black uppercase tracking-wider shadow-lg shadow-cyan-500/25 flex items-center justify-center space-x-2 transition-all active:scale-95 cursor-pointer"
             >
-              <LogIn size={18} />
-              <span>Đăng Nhập 1-Click Bằng Zalo</span>
+              <Phone size={16} />
+              <span>Đăng Nhập Bằng Số Điện Thoại</span>
             </button>
+
+            {/* Nhập số điện thoại thủ công */}
+            <div className="pt-2 border-t border-white/10 space-y-2 text-left">
+              <p className="text-[11px] text-sky-200 font-semibold">Hoặc nhập số điện thoại trực tiếp:</p>
+              <div className="flex gap-2">
+                <input 
+                  type="tel"
+                  value={testPhone}
+                  onChange={(e) => setTestPhone(e.target.value)}
+                  placeholder="Nhập SĐT (VD: 0915185982)"
+                  className="flex-1 bg-white/10 border border-white/20 rounded-xl px-3 py-2 text-xs text-white placeholder-slate-400 focus:outline-none focus:border-[#00D2FF]"
+                />
+                <button
+                  onClick={() => authenticateWithToken(testPhone)}
+                  className="px-4 py-2 bg-[#0284C7] hover:bg-[#00D2FF] hover:text-[#061226] text-white font-bold rounded-xl text-xs transition-colors cursor-pointer"
+                >
+                  Vào
+                </button>
+              </div>
+            </div>
           </div>
 
           {/* Home preview */}
