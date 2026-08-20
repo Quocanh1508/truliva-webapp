@@ -2697,7 +2697,7 @@ export default function OrderList() {
         </div>
       </div>
 
-      <div className="flex-1 bg-white overflow-x-auto relative min-h-[300px]">
+      <div className="flex-1 bg-white overflow-x-auto overflow-y-auto max-h-[calc(100vh-250px)] relative min-h-[300px] border-b border-gray-200">
         {loading && orders.length === 0 ? (
           <div className="flex justify-center py-12">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
@@ -2712,11 +2712,11 @@ export default function OrderList() {
             {orders.length === 0 ? (
               <div className="text-center py-12 text-gray-400">Không tìm thấy yêu cầu nào</div>
             ) : (
-              <table className="min-w-[1300px] lg:w-full text-left text-[13px]">
-            <thead className="bg-[#f8f9fa] text-gray-600 font-semibold border-b border-gray-200 z-20 lg:sticky lg:top-0">
-              <tr>
+              <table className="min-w-[1300px] lg:w-full text-left text-[13px] border-collapse">
+            <thead className="sticky top-0 z-30 shadow-xs bg-[#f8f9fa]">
+              <tr className="bg-[#f8f9fa] text-gray-700 font-bold border-b border-gray-200">
                 {(currentUser?.role === 'ADMIN' || currentUser?.role === 'DEV' || currentUser?.role === 'COORDINATOR') && (
-                  <th className="px-4 py-2 w-[40px] text-center">
+                  <th className="px-4 py-2.5 w-[40px] text-center bg-[#f8f9fa] sticky top-0 z-30 border-b border-gray-200">
                     <input
                       type="checkbox"
                       className="rounded text-blue-600 focus:ring-blue-500 cursor-pointer"
@@ -2731,14 +2731,14 @@ export default function OrderList() {
                     />
                   </th>
                 )}
-                <th className="px-4 py-2 w-[70px]">Mã đơn</th>
-                <th className="px-4 py-2 w-[190px] min-w-[190px] max-w-[200px]">Khách hàng</th>
-                <th className="px-4 py-2 w-[220px]">Công việc</th>
-                <th className="px-4 py-2 min-w-[320px]">Ghi chú</th>
-                <th className="px-4 py-2 text-center w-[140px]">Thao tác</th>
-                <th className="px-4 py-2 w-[160px]">Trạm - KTV</th>
-                <th className="px-4 py-2 w-[200px]">Thông tin máy</th>
-                <th className="px-4 py-2 w-[130px]">Tạo bởi - lúc</th>
+                <th className="px-4 py-2.5 w-[70px] bg-[#f8f9fa] sticky top-0 z-30 border-b border-gray-200">Mã đơn</th>
+                <th className="px-4 py-2.5 w-[190px] min-w-[190px] max-w-[200px] bg-[#f8f9fa] sticky top-0 z-30 border-b border-gray-200">Khách hàng</th>
+                <th className="px-4 py-2.5 w-[220px] bg-[#f8f9fa] sticky top-0 z-30 border-b border-gray-200">Công việc</th>
+                <th className="px-4 py-2.5 min-w-[320px] bg-[#f8f9fa] sticky top-0 z-30 border-b border-gray-200">Ghi chú</th>
+                <th className="px-4 py-2.5 text-center w-[140px] bg-[#f8f9fa] sticky top-0 z-30 border-b border-gray-200">Thao tác</th>
+                <th className="px-4 py-2.5 w-[160px] bg-[#f8f9fa] sticky top-0 z-30 border-b border-gray-200">Trạm - KTV</th>
+                <th className="px-4 py-2.5 w-[200px] bg-[#f8f9fa] sticky top-0 z-30 border-b border-gray-200">Thông tin máy</th>
+                <th className="px-4 py-2.5 w-[130px] bg-[#f8f9fa] sticky top-0 z-30 border-b border-gray-200">Tạo bởi - lúc</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
