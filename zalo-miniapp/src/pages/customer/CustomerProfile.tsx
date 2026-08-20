@@ -31,9 +31,12 @@ export default function CustomerProfile({ user, mySerials, onLogout, onOpenScann
     <div className="pb-20 bg-slate-50 min-h-screen">
       {/* 1. Header Profile Card (P3R Ocean Depth) */}
       <div className="bg-gradient-to-b from-[#061226] via-[#0B2545] to-[#0F3866] text-white p-5 pt-8 pb-10 rounded-b-[2.2rem] shadow-xl relative overflow-hidden">
-        {/* Underwater ambient bubbles */}
-        <div className="absolute top-2 left-6 w-16 h-16 rounded-full bg-[#00D2FF]/10 blur-xl pointer-events-none p3r-bubble-1"></div>
-        <div className="absolute bottom-2 right-8 w-14 h-14 rounded-full bg-[#0284C7]/15 blur-lg pointer-events-none p3r-bubble-2"></div>
+        {/* Floating Realistic Water Bubbles */}
+        <div className="water-bubble w-4 h-4 left-[8%] bottom-1 bubble-anim-1"></div>
+        <div className="water-bubble w-6 h-6 left-[22%] bottom-2 bubble-anim-2"></div>
+        <div className="water-bubble w-3.5 h-3.5 left-[50%] bottom-1 bubble-anim-3"></div>
+        <div className="water-bubble w-5 h-5 left-[75%] bottom-3 bubble-anim-4"></div>
+        <div className="water-bubble w-4 h-4 left-[90%] bottom-2 bubble-anim-5"></div>
 
         <div className="max-w-md mx-auto space-y-4 relative z-10">
           <div className="flex items-center space-x-4">
@@ -55,9 +58,9 @@ export default function CustomerProfile({ user, mySerials, onLogout, onOpenScann
                 {userPhone}
               </p>
               <div className="mt-2 inline-block p3r-slanted-badge bg-gradient-to-r from-[#00D2FF]/20 to-[#0284C7]/40 border border-[#00D2FF]/60 px-3 py-0.5 text-[9px] font-black text-cyan-200 uppercase tracking-wider shadow-[0_0_10px_rgba(0,210,255,0.3)]">
-                <div className="flex items-center space-x-1">
-                  <Star size={10} className="fill-[#00D2FF] text-[#00D2FF]" />
-                  <span>RANK // SILVER (250 PTS)</span>
+                <div className="flex items-center space-x-1.5">
+                  <Star size={11} className="fill-[#00D2FF] text-[#00D2FF]" />
+                  <span>Thành viên Bạc (250 Điểm)</span>
                 </div>
               </div>
             </div>

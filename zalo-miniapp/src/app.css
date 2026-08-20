@@ -25,10 +25,71 @@
   100% { transform: translateX(200%) skewX(-20deg); }
 }
 
-@keyframes p3rBubble {
-  0% { transform: translateY(100%) scale(0.6); opacity: 0; }
-  50% { opacity: 0.7; }
-  100% { transform: translateY(-120%) scale(1.1); opacity: 0; }
+/* Realistic Floating Water Bubbles Keyframes */
+@keyframes bubbleFloat1 {
+  0% { transform: translateY(130px) translateX(0) scale(0.5); opacity: 0; }
+  15% { opacity: 0.85; }
+  45% { transform: translateY(60px) translateX(10px) scale(0.9); opacity: 0.95; }
+  75% { transform: translateY(15px) translateX(-8px) scale(1.05); opacity: 0.8; }
+  100% { transform: translateY(-45px) translateX(12px) scale(1.2); opacity: 0; }
+}
+
+@keyframes bubbleFloat2 {
+  0% { transform: translateY(130px) translateX(0) scale(0.6); opacity: 0; }
+  20% { opacity: 0.9; }
+  50% { transform: translateY(65px) translateX(-12px) scale(0.85); opacity: 0.9; }
+  80% { transform: translateY(20px) translateX(8px) scale(1); opacity: 0.7; }
+  100% { transform: translateY(-45px) translateX(-10px) scale(1.15); opacity: 0; }
+}
+
+@keyframes bubbleFloat3 {
+  0% { transform: translateY(130px) translateX(0) scale(0.4); opacity: 0; }
+  15% { opacity: 0.8; }
+  50% { transform: translateY(50px) translateX(14px) scale(0.95); opacity: 0.95; }
+  85% { transform: translateY(10px) translateX(-12px) scale(1.1); opacity: 0.6; }
+  100% { transform: translateY(-45px) translateX(6px) scale(1.25); opacity: 0; }
+}
+
+/* Water Bubble Class with Glass Reflection */
+.water-bubble {
+  position: absolute;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, rgba(255, 255, 255, 0.9) 0%, rgba(255, 255, 255, 0.4) 20%, rgba(0, 210, 255, 0.3) 50%, rgba(2, 132, 199, 0.1) 80%, rgba(255, 255, 255, 0.3) 100%);
+  border: 1px solid rgba(255, 255, 255, 0.5);
+  box-shadow: inset -2px -2px 6px rgba(0, 163, 255, 0.4), inset 2px 2px 4px rgba(255, 255, 255, 0.7), 0 0 10px rgba(0, 210, 255, 0.35);
+  pointer-events: none;
+  z-index: 1;
+}
+
+.water-bubble::after {
+  content: '';
+  position: absolute;
+  top: 18%;
+  left: 22%;
+  width: 28%;
+  height: 28%;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.85);
+  filter: blur(0.5px);
+}
+
+.bubble-anim-1 {
+  animation: bubbleFloat1 5s infinite ease-in-out;
+}
+.bubble-anim-2 {
+  animation: bubbleFloat2 6.5s infinite ease-in-out 1.2s;
+}
+.bubble-anim-3 {
+  animation: bubbleFloat3 5.8s infinite ease-in-out 2.5s;
+}
+.bubble-anim-4 {
+  animation: bubbleFloat1 7s infinite ease-in-out 3.5s;
+}
+.bubble-anim-5 {
+  animation: bubbleFloat2 5.2s infinite ease-in-out 0.6s;
+}
+.bubble-anim-6 {
+  animation: bubbleFloat3 6.8s infinite ease-in-out 4.2s;
 }
 
 /* Persona 3 Reload Custom Utility Classes */
@@ -82,14 +143,4 @@
 
 .p3r-card-cut {
   clip-path: polygon(0 0, calc(100% - 14px) 0, 100% 14px, 100% 100%, 0 100%);
-}
-
-.p3r-bubble-1 {
-  animation: p3rBubble 6s infinite linear;
-}
-.p3r-bubble-2 {
-  animation: p3rBubble 8s infinite linear 2s;
-}
-.p3r-bubble-3 {
-  animation: p3rBubble 7s infinite linear 4s;
 }
