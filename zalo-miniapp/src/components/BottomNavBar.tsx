@@ -14,10 +14,10 @@ export default function BottomNavBar({ activeTab, onChangeTab }: BottomNavBarPro
       <button 
         onClick={() => onChangeTab('home')}
         className={`flex flex-col items-center justify-center space-y-0.5 transition-colors cursor-pointer ${
-          activeTab === 'home' ? 'text-blue-600 font-bold' : 'text-slate-400 hover:text-slate-600 font-medium'
+          activeTab === 'home' ? 'text-[#0284C7] font-bold' : 'text-slate-400 hover:text-slate-600 font-medium'
         }`}
       >
-        <div className={`p-1 rounded-full ${activeTab === 'home' ? 'bg-blue-50' : ''}`}>
+        <div className={`p-1 rounded-full ${activeTab === 'home' ? 'bg-sky-50' : ''}`}>
           <Home size={20} />
         </div>
         <span className="text-[10px]">Trang chủ</span>
@@ -30,10 +30,10 @@ export default function BottomNavBar({ activeTab, onChangeTab }: BottomNavBarPro
         rel="noopener noreferrer"
         onClick={() => onChangeTab('chat')}
         className={`flex flex-col items-center justify-center space-y-0.5 transition-colors cursor-pointer ${
-          activeTab === 'chat' ? 'text-blue-600 font-bold' : 'text-slate-400 hover:text-slate-600 font-medium'
+          activeTab === 'chat' ? 'text-[#0284C7] font-bold' : 'text-slate-400 hover:text-slate-600 font-medium'
         }`}
       >
-        <div className={`p-1 rounded-full ${activeTab === 'chat' ? 'bg-blue-50' : ''}`}>
+        <div className={`p-1 rounded-full ${activeTab === 'chat' ? 'bg-sky-50' : ''}`}>
           <MessageCircle size={20} />
         </div>
         <span className="text-[10px]">Tin nhắn</span>
@@ -43,10 +43,10 @@ export default function BottomNavBar({ activeTab, onChangeTab }: BottomNavBarPro
       <button 
         onClick={() => onChangeTab('profile')}
         className={`flex flex-col items-center justify-center space-y-0.5 transition-colors cursor-pointer ${
-          activeTab === 'profile' ? 'text-blue-600 font-bold' : 'text-slate-400 hover:text-slate-600 font-medium'
+          activeTab === 'profile' ? 'text-[#0284C7] font-bold' : 'text-slate-400 hover:text-slate-600 font-medium'
         }`}
       >
-        <div className={`p-1 rounded-full ${activeTab === 'profile' ? 'bg-blue-50' : ''}`}>
+        <div className={`p-1 rounded-full ${activeTab === 'profile' ? 'bg-sky-50' : ''}`}>
           <User size={20} />
         </div>
         <span className="text-[10px]">Cá nhân</span>

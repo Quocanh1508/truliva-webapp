@@ -88,10 +88,10 @@ export default function NewsDetailModal({ article, onClose }: NewsDetailModalPro
           </div>
 
           <div className="absolute bottom-3 left-4 right-4 text-white space-y-1">
-            <span className="text-[10px] font-bold uppercase tracking-wider bg-blue-600 px-2 py-0.5 rounded-full text-white">
+            <span className="text-[10px] font-bold uppercase tracking-wider bg-[#0284C7] px-2.5 py-0.5 rounded-full text-white shadow-xs">
               Cẩm Nang Truliva
             </span>
-            <div className="flex items-center space-x-3 text-[11px] text-slate-300">
+            <div className="flex items-center space-x-3 text-[11px] text-sky-200">
               <span className="flex items-center"><Calendar size={12} className="mr-1" />{article.date}</span>
               <span className="flex items-center"><Eye size={12} className="mr-1" />{article.views} lượt xem</span>
             </div>
@@ -104,7 +104,7 @@ export default function NewsDetailModal({ article, onClose }: NewsDetailModalPro
             {article.title}
           </h2>
 
-          <div className="p-3 bg-blue-50 border-l-4 border-blue-600 rounded-r-xl font-medium text-blue-900">
+          <div className="p-3 bg-sky-50 border-l-4 border-[#0284C7] rounded-r-xl font-medium text-sky-950">
             {article.summary}
           </div>
 
@@ -115,12 +115,12 @@ export default function NewsDetailModal({ article, onClose }: NewsDetailModalPro
           ))}
 
           {/* Banner quảng cáo thay lõi */}
-          <div className="bg-gradient-to-r from-blue-700 to-indigo-800 text-white p-4 rounded-2xl space-y-2 mt-4 shadow-md">
-            <div className="flex items-center space-x-2 font-bold text-amber-300">
+          <div className="bg-gradient-to-r from-[#1B3A6B] via-[#0A4B8F] to-[#0284C7] text-white p-4 rounded-2xl space-y-2 mt-4 shadow-md">
+            <div className="flex items-center space-x-2 font-bold text-cyan-300">
               <ShieldCheck size={18} />
               <span>Dịch vụ Thay Lõi Truliva Chính Hãng</span>
             </div>
-            <p className="text-[11px] text-blue-100">
+            <p className="text-[11px] text-sky-100">
               Miễn phí công thay & kiểm tra đo chỉ số TDS nước tại nhà bởi Kỹ thuật viên chính hãng Truliva.
             </p>
           </div>
@@ -130,7 +130,7 @@ export default function NewsDetailModal({ article, onClose }: NewsDetailModalPro
         <div className="p-4 bg-slate-50 border-t border-slate-200 flex gap-2 flex-shrink-0">
           <button 
             onClick={handleShare}
-            className="flex-1 py-2.5 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 rounded-xl font-bold text-xs shadow-sm flex items-center justify-center space-x-1.5 cursor-pointer transition-colors"
+            className="flex-1 py-2.5 bg-sky-50 hover:bg-sky-100 text-[#0284C7] border border-sky-200 rounded-xl font-bold text-xs shadow-sm flex items-center justify-center space-x-1.5 cursor-pointer transition-colors"
           >
             {copied ? (
               <>
@@ -146,7 +146,7 @@ export default function NewsDetailModal({ article, onClose }: NewsDetailModalPro
           </button>
           <button 
             onClick={onClose}
-            className="flex-1 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold text-xs shadow-sm cursor-pointer"
+            className="flex-1 py-2.5 bg-[#1B3A6B] hover:bg-[#2563EB] text-white rounded-xl font-bold text-xs shadow-sm transition-colors cursor-pointer"
           >
             Đóng
           </button>

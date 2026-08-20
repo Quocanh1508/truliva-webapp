@@ -155,7 +155,7 @@ export default function CustomerHome({ user, onOpenScanner, onOpenWarranty }: Cu
   return (
     <div className="pb-20 bg-slate-50 min-h-screen">
       {/* 1. Header Navy Gradient Section */}
-      <div className="bg-gradient-to-b from-blue-900 via-blue-800 to-blue-900 text-white pt-6 pb-12 px-4 rounded-b-[2rem] shadow-lg relative">
+      <div className="bg-gradient-to-br from-[#1B3A6B] via-[#0A4B8F] to-[#0284C7] text-white pt-6 pb-12 px-4 rounded-b-[2rem] shadow-lg relative">
         <div className="max-w-md mx-auto flex items-center justify-between">
           <div className="flex items-center space-x-3">
             {/* Avatar Circle */}
@@ -167,14 +167,14 @@ export default function CustomerHome({ user, onOpenScanner, onOpenWarranty }: Cu
               )}
             </div>
             <div>
-              <p className="text-xs text-blue-200 font-medium">Xin chào,</p>
+              <p className="text-xs text-sky-200 font-medium">Xin chào,</p>
               <h1 className="text-lg font-extrabold tracking-tight text-white">{userName}</h1>
             </div>
           </div>
 
           <div className="flex items-center space-x-2">
-            <span className="bg-amber-400/20 text-amber-300 border border-amber-400/30 text-[10px] font-bold px-2.5 py-1 rounded-full flex items-center space-x-1">
-              <Star size={12} className="fill-amber-400 text-amber-400" />
+            <span className="bg-cyan-400/20 text-cyan-200 border border-cyan-400/30 text-[10px] font-bold px-2.5 py-1 rounded-full flex items-center space-x-1">
+              <Star size={12} className="fill-cyan-300 text-cyan-300" />
               <span>Thành viên Bạc</span>
             </span>
           </div>
@@ -188,10 +188,10 @@ export default function CustomerHome({ user, onOpenScanner, onOpenWarranty }: Cu
           {/* Tích điểm */}
           <button 
             onClick={onOpenWarranty}
-            className="flex flex-col items-center justify-center space-y-1.5 p-2 rounded-xl hover:bg-slate-50 active:scale-95 transition-all cursor-pointer"
+            className="flex flex-col items-center justify-center space-y-1.5 p-2 rounded-xl hover:bg-sky-50 active:scale-95 transition-all cursor-pointer"
           >
-            <div className="w-12 h-12 rounded-full bg-blue-50 text-blue-700 flex items-center justify-center border border-blue-100 shadow-sm">
-              <Star size={22} className="text-blue-600 fill-blue-100" />
+            <div className="w-12 h-12 rounded-full bg-sky-50 text-sky-700 flex items-center justify-center border border-sky-100 shadow-sm">
+              <Star size={22} className="text-sky-600 fill-sky-100" />
             </div>
             <span className="text-xs font-semibold text-slate-700">Tích điểm</span>
           </button>
@@ -199,12 +199,12 @@ export default function CustomerHome({ user, onOpenScanner, onOpenWarranty }: Cu
           {/* Ưu đãi (Vòng quay may mắn) */}
           <button 
             onClick={() => setShowWheelModal(true)}
-            className="flex flex-col items-center justify-center space-y-1.5 p-2 rounded-xl hover:bg-amber-50 active:scale-95 transition-all cursor-pointer group"
+            className="flex flex-col items-center justify-center space-y-1.5 p-2 rounded-xl hover:bg-cyan-50 active:scale-95 transition-all cursor-pointer group"
           >
-            <div className="w-12 h-12 rounded-full bg-amber-50 text-amber-600 flex items-center justify-center border border-amber-100 shadow-sm relative">
-              <Gift size={22} className="text-amber-600" />
-              <span className="absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full animate-ping"></span>
-              <span className="absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full"></span>
+            <div className="w-12 h-12 rounded-full bg-cyan-50 text-cyan-700 flex items-center justify-center border border-cyan-100 shadow-sm relative">
+              <Gift size={22} className="text-cyan-600" />
+              <span className="absolute -top-1 -right-1 w-3 h-3 bg-[#00A3FF] rounded-full animate-ping"></span>
+              <span className="absolute -top-1 -right-1 w-3 h-3 bg-[#00A3FF] rounded-full"></span>
             </div>
             <span className="text-xs font-semibold text-slate-700">Ưu đãi</span>
           </button>
@@ -215,10 +215,10 @@ export default function CustomerHome({ user, onOpenScanner, onOpenWarranty }: Cu
               const newsEl = document.getElementById('tin-tuc-noi-bat');
               newsEl?.scrollIntoView({ behavior: 'smooth' });
             }}
-            className="flex flex-col items-center justify-center space-y-1.5 p-2 rounded-xl hover:bg-slate-50 active:scale-95 transition-all cursor-pointer"
+            className="flex flex-col items-center justify-center space-y-1.5 p-2 rounded-xl hover:bg-blue-50 active:scale-95 transition-all cursor-pointer"
           >
-            <div className="w-12 h-12 rounded-full bg-indigo-50 text-indigo-700 flex items-center justify-center border border-indigo-100 shadow-sm">
-              <Megaphone size={22} className="text-indigo-600" />
+            <div className="w-12 h-12 rounded-full bg-blue-50 text-blue-700 flex items-center justify-center border border-blue-100 shadow-sm">
+              <Megaphone size={22} className="text-blue-600" />
             </div>
             <span className="text-xs font-semibold text-slate-700">Tin tức</span>
           </button>
@@ -232,10 +232,10 @@ export default function CustomerHome({ user, onOpenScanner, onOpenWarranty }: Cu
                 window.location.href = 'tel:1900638463';
               }
             }}
-            className="flex flex-col items-center justify-center space-y-1.5 p-2 rounded-xl hover:bg-emerald-50 active:scale-95 transition-all cursor-pointer"
+            className="flex flex-col items-center justify-center space-y-1.5 p-2 rounded-xl hover:bg-teal-50 active:scale-95 transition-all cursor-pointer"
           >
-            <div className="w-12 h-12 rounded-full bg-emerald-50 text-emerald-700 flex items-center justify-center border border-emerald-100 shadow-sm">
-              <PhoneCall size={22} className="text-emerald-600" />
+            <div className="w-12 h-12 rounded-full bg-teal-50 text-teal-700 flex items-center justify-center border border-teal-100 shadow-sm">
+              <PhoneCall size={22} className="text-teal-600" />
             </div>
             <span className="text-xs font-semibold text-slate-700">Liên hệ</span>
           </button>
@@ -246,16 +246,16 @@ export default function CustomerHome({ user, onOpenScanner, onOpenWarranty }: Cu
       <div className="max-w-md mx-auto px-4 mt-4">
         <div 
           onClick={() => setShowWheelModal(true)}
-          className="bg-gradient-to-r from-amber-500 via-amber-600 to-orange-600 text-white rounded-2xl p-4 shadow-md flex items-center justify-between cursor-pointer hover:shadow-lg transition-shadow relative overflow-hidden"
+          className="bg-gradient-to-r from-[#1B3A6B] via-[#0284C7] to-[#00A3FF] text-white rounded-2xl p-4 shadow-md flex items-center justify-between cursor-pointer hover:shadow-lg transition-shadow relative overflow-hidden"
         >
           <div className="space-y-1 z-10">
             <span className="bg-white/20 text-white text-[10px] font-bold uppercase px-2 py-0.5 rounded-full">
               🎁 Game Vòng Quay Trúng Quà
             </span>
             <h3 className="font-extrabold text-sm text-white">Quan Tâm Zalo OA Nhận 1 Lượt Quay!</h3>
-            <p className="text-[11px] text-amber-100">100% Trúng Voucher 50K - 100K thay lõi lọc thô</p>
+            <p className="text-[11px] text-sky-100">100% Trúng Voucher 50K - 100K thay lõi lọc thô</p>
           </div>
-          <div className="p-2 bg-white/20 backdrop-blur-sm rounded-xl text-white z-10">
+          <div className="p-2 bg-white/20 backdrop-blur-sm rounded-xl text-cyan-200 z-10">
             <Sparkles size={24} />
           </div>
         </div>
@@ -265,7 +265,7 @@ export default function CustomerHome({ user, onOpenScanner, onOpenWarranty }: Cu
       <div className="max-w-md mx-auto px-4 mt-4">
         <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
           <div className="flex items-center space-x-3">
-            <div className="p-2.5 bg-blue-50 text-blue-600 rounded-xl">
+            <div className="p-2.5 bg-sky-50 text-[#0284C7] rounded-xl">
               <QrCode size={24} />
             </div>
             <div>
@@ -275,7 +275,7 @@ export default function CustomerHome({ user, onOpenScanner, onOpenWarranty }: Cu
           </div>
           <button 
             onClick={onOpenScanner}
-            className="px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold shadow-sm cursor-pointer"
+            className="px-3.5 py-2 bg-[#1B3A6B] hover:bg-[#2563EB] text-white rounded-xl text-xs font-bold shadow-sm transition-colors cursor-pointer"
           >
             Quét mã
           </button>
@@ -286,7 +286,7 @@ export default function CustomerHome({ user, onOpenScanner, onOpenWarranty }: Cu
       <div id="tin-tuc-noi-bat" className="max-w-md mx-auto px-4 mt-6 space-y-3">
         <div className="flex justify-between items-center">
           <h2 className="text-base font-extrabold text-slate-900 tracking-tight">Tin tức nổi bật</h2>
-          <button className="text-xs font-bold text-blue-700 hover:text-blue-800 flex items-center cursor-pointer">
+          <button className="text-xs font-bold text-[#0284C7] hover:text-[#1B3A6B] flex items-center transition-colors cursor-pointer">
             <span>Xem thêm</span>
             <ChevronRight size={14} />
           </button>

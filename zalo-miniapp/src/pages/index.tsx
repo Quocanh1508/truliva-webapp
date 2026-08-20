@@ -130,7 +130,7 @@ export default function IndexPage() {
       {loading && (
         <div className="min-h-screen flex items-center justify-center p-6 bg-slate-50">
           <div className="bg-white p-6 rounded-3xl shadow-lg text-center space-y-3 max-w-xs w-full">
-            <RefreshCw size={28} className="animate-spin text-blue-600 mx-auto" />
+            <RefreshCw size={28} className="animate-spin text-[#0284C7] mx-auto" />
             <p className="text-xs font-bold text-slate-700">Đang khởi chạy Zalo Mini App Truliva...</p>
           </div>
         </div>
@@ -148,7 +148,7 @@ export default function IndexPage() {
 
             <button 
               onClick={handle1ClickZaloAuth}
-              className="w-full py-2.5 bg-red-600 text-white rounded-xl font-bold flex items-center justify-center space-x-1 shadow-md cursor-pointer"
+              className="w-full py-2.5 bg-[#1B3A6B] hover:bg-[#2563EB] text-white rounded-xl font-bold flex items-center justify-center space-x-1 shadow-md transition-colors cursor-pointer"
             >
               <RefreshCw size={14} />
               <span>Thử đăng nhập lại</span>
@@ -160,20 +160,20 @@ export default function IndexPage() {
       {/* Chưa đăng nhập -> Banner chào mừng + Nút 1-Click Auth */}
       {!loading && !user && !error && (
         <div className="p-4 pt-12 space-y-4">
-          <div className="bg-gradient-to-b from-blue-900 to-blue-800 text-white p-6 rounded-3xl shadow-xl text-center space-y-4">
-            <div className="p-4 bg-white/10 backdrop-blur-md rounded-2xl w-16 h-16 flex items-center justify-center mx-auto text-amber-300">
+          <div className="bg-gradient-to-br from-[#1B3A6B] via-[#0A4B8F] to-[#0284C7] text-white p-6 rounded-3xl shadow-xl text-center space-y-4">
+            <div className="p-4 bg-white/10 backdrop-blur-md rounded-2xl w-16 h-16 flex items-center justify-center mx-auto text-cyan-300">
               <ShieldCheck size={36} />
             </div>
             <div>
               <h1 className="font-extrabold text-white text-lg">Hệ Thống Dịch Vụ Truliva</h1>
-              <p className="text-xs text-blue-200 mt-1 leading-relaxed">
+              <p className="text-xs text-sky-200 mt-1 leading-relaxed">
                 Đăng nhập 1-Click bằng số Zalo để nhận quà Vòng Quay May Mắn & Tra cứu bảo hành máy lọc nước.
               </p>
             </div>
 
             <button
               onClick={handle1ClickZaloAuth}
-              className="w-full py-3.5 bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-500 hover:to-amber-600 text-blue-950 rounded-2xl text-xs font-extrabold shadow-lg flex items-center justify-center space-x-2 transition-transform active:scale-95 cursor-pointer"
+              className="w-full py-3.5 bg-[#00A3FF] hover:bg-[#0284C7] text-white rounded-2xl text-xs font-extrabold shadow-lg shadow-cyan-500/25 flex items-center justify-center space-x-2 transition-transform active:scale-95 cursor-pointer"
             >
               <LogIn size={18} />
               <span>Đăng Nhập 1-Click Bằng Zalo</span>
@@ -191,13 +191,13 @@ export default function IndexPage() {
       {/* Đã đăng nhập - Role KTV */}
       {!loading && user && user.role === 'KTV' && (
         <div className="p-4 pb-20 space-y-4">
-          <div className="bg-blue-900 text-white p-4 rounded-2xl shadow-md flex justify-between items-center">
+          <div className="bg-[#1B3A6B] text-white p-4 rounded-2xl shadow-md flex justify-between items-center">
             <div>
-              <span className="bg-blue-600 text-white text-[10px] uppercase font-bold px-2 py-0.5 rounded-full">
+              <span className="bg-[#0284C7] text-white text-[10px] uppercase font-bold px-2 py-0.5 rounded-full">
                 Kỹ Thuật Viên
               </span>
               <h2 className="font-bold text-sm mt-1">{user.fullName}</h2>
-              <p className="text-[11px] text-blue-200">Trạm: {user.techStation?.name || 'Truliva'}</p>
+              <p className="text-[11px] text-sky-200">Trạm: {user.techStation?.name || 'Truliva'}</p>
             </div>
             <button 
               onClick={handleLogout}
@@ -220,14 +220,14 @@ export default function IndexPage() {
               <div key={order.id} className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm space-y-3">
                 <div className="flex justify-between items-start">
                   <div>
-                    <span className="bg-amber-100 text-amber-800 px-2 py-0.5 rounded text-[10px] font-bold">
+                    <span className="bg-sky-100 text-sky-800 px-2 py-0.5 rounded text-[10px] font-bold">
                       {order.code || 'Đơn hàng'}
                     </span>
                     <h3 className="font-bold text-slate-900 text-sm mt-1">{order.customerName}</h3>
                   </div>
                   <a
                     href={`tel:${order.customerPhone}`}
-                    className="p-2 bg-emerald-50 text-emerald-600 rounded-xl hover:bg-emerald-100 transition-colors"
+                    className="p-2 bg-sky-50 text-[#0284C7] rounded-xl hover:bg-sky-100 transition-colors"
                   >
                     <PhoneCall size={18} />
                   </a>
@@ -244,7 +244,7 @@ export default function IndexPage() {
                   </p>
                 </div>
 
-                <button className="w-full py-2 bg-blue-600 text-white rounded-xl text-xs font-bold flex items-center justify-center space-x-1 cursor-pointer">
+                <button className="w-full py-2.5 bg-[#1B3A6B] hover:bg-[#2563EB] text-white rounded-xl text-xs font-bold flex items-center justify-center space-x-1.5 shadow-sm transition-colors cursor-pointer">
                   <FileText size={14} />
                   <span>Nộp báo cáo ca KTV</span>
                 </button>
