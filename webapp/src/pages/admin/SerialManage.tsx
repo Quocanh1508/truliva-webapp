@@ -756,14 +756,21 @@ export default function SerialManage() {
         border: '1px solid #e2e8f0', overflow: 'hidden',
         boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
       }}>
-        <div style={{ overflowX: 'auto' }}>
+        <div style={{
+          overflowX: 'auto',
+          overflowY: 'auto',
+          maxHeight: 'calc(100vh - 240px)',
+          position: 'relative'
+        }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 14 }}>
-            <thead>
+            <thead style={{ position: 'sticky', top: 0, zIndex: 20 }}>
               <tr style={{ background: '#f8fafc', borderBottom: '2px solid #e2e8f0' }}>
                 {['Serial/ Model', 'Dòng máy', 'Thông tin khách hàng', 'Trạng thái', 'Ngày kích hoạt', 'Ngày hết hạn bảo hành'].map(h => (
                   <th key={h} style={{
                     padding: '12px 16px', textAlign: 'left',
                     fontWeight: 600, color: '#475569', whiteSpace: 'nowrap',
+                    position: 'sticky', top: 0, zIndex: 20,
+                    background: '#f8fafc', borderBottom: '2px solid #e2e8f0'
                   }}>
                     {h}
                   </th>
