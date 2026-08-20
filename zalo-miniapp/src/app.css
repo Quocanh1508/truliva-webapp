@@ -1,1 +1,95 @@
 @import "tailwindcss";
+
+@keyframes p3rWave {
+  0% { transform: translateX(0) translateZ(0) scaleY(1); }
+  50% { transform: translateX(-25%) translateZ(0) scaleY(0.85); }
+  100% { transform: translateX(-50%) translateZ(0) scaleY(1); }
+}
+
+@keyframes p3rFloat {
+  0%, 100% { transform: translateY(0) rotate(0deg); }
+  50% { transform: translateY(-6px) rotate(2deg); }
+}
+
+@keyframes p3rGlowPulse {
+  0%, 100% {
+    box-shadow: 0 0 15px rgba(0, 163, 255, 0.35), 0 0 30px rgba(0, 163, 255, 0.15);
+  }
+  50% {
+    box-shadow: 0 0 25px rgba(0, 210, 255, 0.6), 0 0 45px rgba(0, 163, 255, 0.3);
+  }
+}
+
+@keyframes p3rShimmer {
+  0% { transform: translateX(-150%) skewX(-20deg); }
+  100% { transform: translateX(200%) skewX(-20deg); }
+}
+
+@keyframes p3rBubble {
+  0% { transform: translateY(100%) scale(0.6); opacity: 0; }
+  50% { opacity: 0.7; }
+  100% { transform: translateY(-120%) scale(1.1); opacity: 0; }
+}
+
+/* Persona 3 Reload Custom Utility Classes */
+.p3r-animate-wave {
+  animation: p3rWave 12s cubic-bezier(0.36, 0.45, 0.63, 0.53) infinite;
+  will-change: transform;
+}
+
+.p3r-animate-float {
+  animation: p3rFloat 4s ease-in-out infinite;
+}
+
+.p3r-glow-cyan {
+  box-shadow: 0 0 20px rgba(0, 163, 255, 0.4), inset 0 0 10px rgba(0, 210, 255, 0.2);
+}
+
+.p3r-glow-pulse {
+  animation: p3rGlowPulse 3s infinite ease-in-out;
+}
+
+.p3r-shimmer-effect {
+  position: relative;
+  overflow: hidden;
+}
+
+.p3r-shimmer-effect::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 50%;
+  height: 100%;
+  background: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0) 0%,
+    rgba(255, 255, 255, 0.25) 50%,
+    rgba(255, 255, 255, 0) 100%
+  );
+  animation: p3rShimmer 5s infinite;
+  pointer-events: none;
+}
+
+.p3r-slanted-badge {
+  transform: skewX(-12deg);
+  border-radius: 6px;
+}
+
+.p3r-slanted-badge > * {
+  transform: skewX(12deg);
+}
+
+.p3r-card-cut {
+  clip-path: polygon(0 0, calc(100% - 14px) 0, 100% 14px, 100% 100%, 0 100%);
+}
+
+.p3r-bubble-1 {
+  animation: p3rBubble 6s infinite linear;
+}
+.p3r-bubble-2 {
+  animation: p3rBubble 8s infinite linear 2s;
+}
+.p3r-bubble-3 {
+  animation: p3rBubble 7s infinite linear 4s;
+}

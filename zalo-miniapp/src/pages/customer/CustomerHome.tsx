@@ -154,59 +154,74 @@ export default function CustomerHome({ user, onOpenScanner, onOpenWarranty }: Cu
 
   return (
     <div className="pb-20 bg-slate-50 min-h-screen">
-      {/* 1. Header Navy Gradient Section */}
-      <div className="bg-gradient-to-br from-[#1B3A6B] via-[#0A4B8F] to-[#0284C7] text-white pt-6 pb-12 px-4 rounded-b-[2rem] shadow-lg relative">
-        <div className="max-w-md mx-auto flex items-center justify-between">
-          <div className="flex items-center space-x-3">
-            {/* Avatar Circle */}
-            <div className="w-11 h-11 rounded-full bg-white/20 border-2 border-white/30 flex items-center justify-center text-white font-bold text-base shadow-inner">
-              {user?.avatar ? (
-                <img src={user.avatar} alt="Avatar" className="w-full h-full rounded-full object-cover" />
-              ) : (
-                <User size={22} />
-              )}
+      {/* 1. Header Persona 3 Reload Deep Water Ocean Section */}
+      <div className="bg-gradient-to-b from-[#061226] via-[#0B2545] to-[#0F3866] text-white pt-7 pb-14 px-4 rounded-b-[2.2rem] shadow-xl relative overflow-hidden">
+        
+        {/* P3R Ambient Underwater Light Bubbles */}
+        <div className="absolute top-2 left-8 w-20 h-20 rounded-full bg-[#00D2FF]/10 blur-xl pointer-events-none p3r-bubble-1"></div>
+        <div className="absolute top-8 right-12 w-16 h-16 rounded-full bg-[#0284C7]/15 blur-lg pointer-events-none p3r-bubble-2"></div>
+        <div className="absolute bottom-4 left-1/3 w-12 h-12 rounded-full bg-[#00A3FF]/15 blur-md pointer-events-none p3r-bubble-3"></div>
+
+        <div className="max-w-md mx-auto flex items-center justify-between relative z-10">
+          <div className="flex items-center space-x-3.5">
+            {/* Avatar Circle with P3R Neon Ring */}
+            <div className="relative">
+              <div className="w-12 h-12 rounded-full bg-[#0B2545] border-2 border-[#00D2FF] ring-2 ring-[#00D2FF]/40 flex items-center justify-center text-white font-black text-base shadow-[0_0_15px_rgba(0,210,255,0.45)] overflow-hidden">
+                {user?.avatar ? (
+                  <img src={user.avatar} alt="Avatar" className="w-full h-full rounded-full object-cover" />
+                ) : (
+                  <User size={24} className="text-cyan-200" />
+                )}
+              </div>
+              <span className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 bg-[#00D2FF] border-2 border-[#061226] rounded-full"></span>
             </div>
+
             <div>
-              <p className="text-xs text-sky-200 font-medium">Xin chào,</p>
-              <h1 className="text-lg font-extrabold tracking-tight text-white">{userName}</h1>
+              <p className="text-[10px] text-[#00D2FF] font-black uppercase tracking-widest italic flex items-center gap-1">
+                <span>WELCOME</span>
+                <span className="text-cyan-400/60">//</span>
+              </p>
+              <h1 className="text-lg font-black tracking-tight text-white drop-shadow-sm">{userName}</h1>
             </div>
           </div>
 
           <div className="flex items-center space-x-2">
-            <span className="bg-cyan-400/20 text-cyan-200 border border-cyan-400/30 text-[10px] font-bold px-2.5 py-1 rounded-full flex items-center space-x-1">
-              <Star size={12} className="fill-cyan-300 text-cyan-300" />
-              <span>Thành viên Bạc</span>
-            </span>
+            <div className="p3r-slanted-badge bg-gradient-to-r from-[#00D2FF]/20 to-[#0284C7]/40 border border-[#00D2FF]/60 px-3 py-1 text-[10px] font-black text-cyan-200 uppercase tracking-wider flex items-center space-x-1.5 shadow-[0_0_12px_rgba(0,210,255,0.3)]">
+              <div className="flex items-center space-x-1">
+                <Sparkles size={11} className="text-[#00D2FF]" />
+                <span>RANK // SILVER</span>
+              </div>
+            </div>
           </div>
         </div>
       </div>
 
-      {/* 2. White Floating Quick Nav Card (Tri kỷ 4 Nút - Tích điểm, Ưu đãi, Tin tức, Liên hệ) */}
-      <div className="max-w-md mx-auto px-4 -mt-8 relative z-10">
-        <div className="bg-white rounded-2xl shadow-xl p-4 border border-slate-100 grid grid-cols-4 gap-2 text-center">
+      {/* 2. Floating Quick Nav Card (P3R Kinetic 4-Button Grid) */}
+      <div className="max-w-md mx-auto px-4 -mt-9 relative z-10">
+        <div className="bg-white/95 backdrop-blur-md rounded-2xl shadow-[0_10px_30px_rgba(11,37,69,0.12)] p-4 border border-sky-100/80 grid grid-cols-4 gap-2.5 text-center">
           
           {/* Tích điểm */}
           <button 
             onClick={onOpenWarranty}
-            className="flex flex-col items-center justify-center space-y-1.5 p-2 rounded-xl hover:bg-sky-50 active:scale-95 transition-all cursor-pointer"
+            className="group flex flex-col items-center justify-center space-y-1.5 p-2 rounded-xl hover:bg-sky-50/80 active:scale-95 transition-all cursor-pointer"
           >
-            <div className="w-12 h-12 rounded-full bg-sky-50 text-sky-700 flex items-center justify-center border border-sky-100 shadow-sm">
-              <Star size={22} className="text-sky-600 fill-sky-100" />
+            <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-sky-50 to-blue-100/80 text-[#0284C7] flex items-center justify-center border border-sky-200/60 shadow-xs group-hover:shadow-[0_0_15px_rgba(0,163,255,0.35)] group-hover:scale-105 transition-all">
+              <Star size={22} className="text-[#0284C7] fill-sky-200" />
             </div>
-            <span className="text-xs font-semibold text-slate-700">Tích điểm</span>
+            <span className="text-[11px] font-bold text-slate-700 uppercase tracking-tight">Tích điểm</span>
           </button>
 
           {/* Ưu đãi (Vòng quay may mắn) */}
           <button 
             onClick={() => setShowWheelModal(true)}
-            className="flex flex-col items-center justify-center space-y-1.5 p-2 rounded-xl hover:bg-cyan-50 active:scale-95 transition-all cursor-pointer group"
+            className="group flex flex-col items-center justify-center space-y-1.5 p-2 rounded-xl hover:bg-cyan-50/80 active:scale-95 transition-all cursor-pointer"
           >
-            <div className="w-12 h-12 rounded-full bg-cyan-50 text-cyan-700 flex items-center justify-center border border-cyan-100 shadow-sm relative">
-              <Gift size={22} className="text-cyan-600" />
-              <span className="absolute -top-1 -right-1 w-3 h-3 bg-[#00A3FF] rounded-full animate-ping"></span>
-              <span className="absolute -top-1 -right-1 w-3 h-3 bg-[#00A3FF] rounded-full"></span>
+            <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-cyan-50 to-sky-100/80 text-[#00A3FF] flex items-center justify-center border border-cyan-200/60 shadow-xs relative group-hover:shadow-[0_0_15px_rgba(0,210,255,0.5)] group-hover:scale-105 transition-all">
+              <Gift size={22} className="text-[#00A3FF]" />
+              <span className="absolute -top-1 -right-1 w-3 h-3 bg-[#00D2FF] rounded-full animate-ping"></span>
+              <span className="absolute -top-1 -right-1 w-3 h-3 bg-[#00D2FF] rounded-full shadow-[0_0_8px_#00D2FF]"></span>
             </div>
-            <span className="text-xs font-semibold text-slate-700">Ưu đãi</span>
+            <span className="text-[11px] font-bold text-slate-700 uppercase tracking-tight">Ưu đãi</span>
           </button>
 
           {/* Tin tức */}
@@ -215,12 +230,12 @@ export default function CustomerHome({ user, onOpenScanner, onOpenWarranty }: Cu
               const newsEl = document.getElementById('tin-tuc-noi-bat');
               newsEl?.scrollIntoView({ behavior: 'smooth' });
             }}
-            className="flex flex-col items-center justify-center space-y-1.5 p-2 rounded-xl hover:bg-blue-50 active:scale-95 transition-all cursor-pointer"
+            className="group flex flex-col items-center justify-center space-y-1.5 p-2 rounded-xl hover:bg-blue-50/80 active:scale-95 transition-all cursor-pointer"
           >
-            <div className="w-12 h-12 rounded-full bg-blue-50 text-blue-700 flex items-center justify-center border border-blue-100 shadow-sm">
-              <Megaphone size={22} className="text-blue-600" />
+            <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-blue-50 to-indigo-100/80 text-[#1B3A6B] flex items-center justify-center border border-blue-200/60 shadow-xs group-hover:shadow-[0_0_15px_rgba(27,58,107,0.35)] group-hover:scale-105 transition-all">
+              <Megaphone size={22} className="text-[#1B3A6B]" />
             </div>
-            <span className="text-xs font-semibold text-slate-700">Tin tức</span>
+            <span className="text-[11px] font-bold text-slate-700 uppercase tracking-tight">Tin tức</span>
           </button>
 
           {/* Liên hệ */}
@@ -232,62 +247,69 @@ export default function CustomerHome({ user, onOpenScanner, onOpenWarranty }: Cu
                 window.location.href = 'tel:1900638463';
               }
             }}
-            className="flex flex-col items-center justify-center space-y-1.5 p-2 rounded-xl hover:bg-teal-50 active:scale-95 transition-all cursor-pointer"
+            className="group flex flex-col items-center justify-center space-y-1.5 p-2 rounded-xl hover:bg-teal-50/80 active:scale-95 transition-all cursor-pointer"
           >
-            <div className="w-12 h-12 rounded-full bg-teal-50 text-teal-700 flex items-center justify-center border border-teal-100 shadow-sm">
+            <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-teal-50 to-emerald-100/80 text-teal-700 flex items-center justify-center border border-teal-200/60 shadow-xs group-hover:shadow-[0_0_15px_rgba(20,184,166,0.35)] group-hover:scale-105 transition-all">
               <PhoneCall size={22} className="text-teal-600" />
             </div>
-            <span className="text-xs font-semibold text-slate-700">Liên hệ</span>
+            <span className="text-[11px] font-bold text-slate-700 uppercase tracking-tight">Liên hệ</span>
           </button>
         </div>
       </div>
 
-      {/* 3. Banner Vòng Quay May Mắn thu hút quan tâm Zalo OA */}
+      {/* 3. Banner Vòng Quay May Mắn (P3R Kinetic Shimmer Banner) */}
       <div className="max-w-md mx-auto px-4 mt-4">
         <div 
           onClick={() => setShowWheelModal(true)}
-          className="bg-gradient-to-r from-[#1B3A6B] via-[#0284C7] to-[#00A3FF] text-white rounded-2xl p-4 shadow-md flex items-center justify-between cursor-pointer hover:shadow-lg transition-shadow relative overflow-hidden"
+          className="p3r-shimmer-effect bg-gradient-to-r from-[#061226] via-[#0B2545] to-[#0284C7] text-white rounded-2xl p-4.5 border border-[#00D2FF]/40 shadow-[0_8px_25px_rgba(0,163,255,0.25)] flex items-center justify-between cursor-pointer hover:shadow-[0_10px_30px_rgba(0,210,255,0.4)] active:scale-[0.99] transition-all relative overflow-hidden"
         >
-          <div className="space-y-1 z-10">
-            <span className="bg-white/20 text-white text-[10px] font-bold uppercase px-2 py-0.5 rounded-full">
-              🎁 Game Vòng Quay Trúng Quà
-            </span>
-            <h3 className="font-extrabold text-sm text-white">Quan Tâm Zalo OA Nhận 1 Lượt Quay!</h3>
-            <p className="text-[11px] text-sky-100">100% Trúng Voucher 50K - 100K thay lõi lọc thô</p>
+          <div className="space-y-1.5 z-10">
+            <div className="inline-block p3r-slanted-badge bg-[#00D2FF] text-[#061226] px-2.5 py-0.5 text-[9px] font-black uppercase tracking-wider shadow-xs">
+              <span>SPECIAL // EVENT 01</span>
+            </div>
+            <h3 className="font-black italic text-[15px] text-white tracking-tight leading-tight drop-shadow-sm">
+              Quan Tâm Zalo OA Nhận 1 Lượt Quay!
+            </h3>
+            <p className="text-[11px] text-cyan-200 font-medium">100% Trúng Voucher 50K - 100K thay lõi lọc thô</p>
           </div>
-          <div className="p-2 bg-white/20 backdrop-blur-sm rounded-xl text-cyan-200 z-10">
+          <div className="p-3 bg-[#00D2FF]/20 border border-[#00D2FF]/40 backdrop-blur-md rounded-2xl text-[#00D2FF] z-10 p3r-animate-float shadow-[0_0_15px_rgba(0,210,255,0.3)]">
             <Sparkles size={24} />
           </div>
         </div>
       </div>
 
-      {/* 4. Section Quét Mã QR Bảo Hành Máy */}
+      {/* 4. Section Quét Mã QR Bảo Hành Máy (P3R Tech Scan Panel) */}
       <div className="max-w-md mx-auto px-4 mt-4">
-        <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
-          <div className="flex items-center space-x-3">
-            <div className="p-2.5 bg-sky-50 text-[#0284C7] rounded-xl">
+        <div className="bg-white p-4 rounded-2xl border border-sky-200/80 shadow-xs flex items-center justify-between hover:shadow-[0_4px_20px_rgba(0,163,255,0.12)] transition-shadow">
+          <div className="flex items-center space-x-3.5">
+            <div className="p-3 bg-gradient-to-br from-sky-50 to-cyan-100 text-[#0284C7] rounded-2xl border border-sky-200/60 shadow-xs">
               <QrCode size={24} />
             </div>
             <div>
-              <h4 className="font-bold text-xs text-slate-900">Quét mã QR Bảo Hành</h4>
-              <p className="text-[11px] text-slate-500">Kích hoạt & Xem tuổi thọ lõi lọc</p>
+              <h4 className="font-black text-xs text-slate-900 uppercase tracking-tight">Quét mã QR Bảo Hành</h4>
+              <p className="text-[11px] text-slate-500 font-medium">Kích hoạt & Xem tuổi thọ lõi lọc</p>
             </div>
           </div>
           <button 
             onClick={onOpenScanner}
-            className="px-3.5 py-2 bg-[#1B3A6B] hover:bg-[#2563EB] text-white rounded-xl text-xs font-bold shadow-sm transition-colors cursor-pointer"
+            className="p3r-slanted-badge bg-gradient-to-r from-[#1B3A6B] to-[#0284C7] hover:from-[#0284C7] hover:to-[#00D2FF] text-white px-4 py-2.5 text-xs font-black uppercase tracking-wider shadow-sm active:scale-95 transition-all cursor-pointer"
           >
-            Quét mã
+            <span>QUÉT MÃ</span>
           </button>
         </div>
       </div>
 
-      {/* 5. Section Tin tức nổi bật (2 Cột bài viết) */}
+      {/* 5. Section Tin tức nổi bật (P3R Article Showcase) */}
       <div id="tin-tuc-noi-bat" className="max-w-md mx-auto px-4 mt-6 space-y-3">
         <div className="flex justify-between items-center">
-          <h2 className="text-base font-extrabold text-slate-900 tracking-tight">Tin tức nổi bật</h2>
-          <button className="text-xs font-bold text-[#0284C7] hover:text-[#1B3A6B] flex items-center transition-colors cursor-pointer">
-            <span>Xem thêm</span>
+          <div className="flex items-center space-x-1.5">
+            <h2 className="text-xs font-black uppercase tracking-wider text-slate-900">
+              TIN TỨC TRUYỀN THÔNG
+            </h2>
+            <span className="text-[10px] font-mono text-[#0284C7] font-bold">// ARCHIVE</span>
+          </div>
+          <button className="text-[11px] font-bold text-[#0284C7] hover:text-[#1B3A6B] flex items-center transition-colors cursor-pointer uppercase tracking-tight">
+            <span>Tất cả</span>
             <ChevronRight size={14} />
           </button>
         </div>
@@ -298,27 +320,31 @@ export default function CustomerHome({ user, onOpenScanner, onOpenWarranty }: Cu
             <div 
               key={news?.id || idx}
               onClick={() => handleArticleClick(news)}
-              className="bg-white rounded-2xl overflow-hidden border border-slate-200/80 shadow-sm hover:shadow-md transition-shadow cursor-pointer flex flex-col justify-between"
+              className="bg-white rounded-2xl overflow-hidden border border-sky-100 shadow-xs hover:shadow-[0_8px_20px_rgba(0,163,255,0.15)] hover:-translate-y-0.5 transition-all duration-200 cursor-pointer flex flex-col justify-between group"
             >
-              {/* Thumbnail Image */}
-              <div className="relative h-28 bg-slate-100 overflow-hidden">
+              {/* Thumbnail Image with P3R Slanted Badge */}
+              <div className="relative h-28 bg-slate-900 overflow-hidden">
                 <img 
                   src={news?.image || 'https://images.unsplash.com/photo-1548839140-29a749e1bc4e?w=500&auto=format&fit=crop&q=60'} 
                   alt={news?.title || 'Tin tức Truliva'} 
-                  className="w-full h-full object-cover hover:scale-105 transition-transform duration-300"
+                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300 opacity-95"
                 />
+                <div className="absolute inset-0 bg-gradient-to-t from-[#061226]/80 via-transparent to-transparent opacity-60"></div>
+                <div className="absolute top-2 left-2 p3r-slanted-badge bg-[#00D2FF] text-[#061226] text-[8px] font-black px-2 py-0.5 uppercase tracking-wider shadow-xs">
+                  <span>TRULIVA</span>
+                </div>
               </div>
 
               {/* Card Content */}
               <div className="p-3 space-y-2 flex-1 flex flex-col justify-between">
-                <h3 className="font-bold text-xs text-slate-800 line-clamp-2 leading-snug">
+                <h3 className="font-bold text-xs text-slate-800 line-clamp-2 leading-snug group-hover:text-[#0284C7] transition-colors">
                   {news?.title || 'Tin tức Truliva'}
                 </h3>
 
-                <div className="flex items-center justify-between text-[10px] text-slate-400 pt-1 border-t border-slate-100">
+                <div className="flex items-center justify-between text-[10px] text-slate-400 pt-1.5 border-t border-slate-100 font-medium">
                   <span className="truncate">{news?.date ? String(news.date).split(',')[0] : ''}</span>
-                  <span className="flex items-center ml-1 flex-shrink-0">
-                    <Eye size={10} className="mr-0.5" />
+                  <span className="flex items-center ml-1 flex-shrink-0 text-slate-500">
+                    <Eye size={10} className="mr-0.5 text-[#0284C7]" />
                     {news?.views || 0}
                   </span>
                 </div>

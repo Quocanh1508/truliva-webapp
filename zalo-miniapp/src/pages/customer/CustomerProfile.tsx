@@ -29,43 +29,53 @@ export default function CustomerProfile({ user, mySerials, onLogout, onOpenScann
 
   return (
     <div className="pb-20 bg-slate-50 min-h-screen">
-      {/* 1. Header Profile Card */}
-      <div className="bg-gradient-to-br from-[#1B3A6B] via-[#0A4B8F] to-[#0284C7] text-white p-5 pt-8 rounded-b-[2rem] shadow-lg">
-        <div className="max-w-md mx-auto space-y-4">
+      {/* 1. Header Profile Card (P3R Ocean Depth) */}
+      <div className="bg-gradient-to-b from-[#061226] via-[#0B2545] to-[#0F3866] text-white p-5 pt-8 pb-10 rounded-b-[2.2rem] shadow-xl relative overflow-hidden">
+        {/* Underwater ambient bubbles */}
+        <div className="absolute top-2 left-6 w-16 h-16 rounded-full bg-[#00D2FF]/10 blur-xl pointer-events-none p3r-bubble-1"></div>
+        <div className="absolute bottom-2 right-8 w-14 h-14 rounded-full bg-[#0284C7]/15 blur-lg pointer-events-none p3r-bubble-2"></div>
+
+        <div className="max-w-md mx-auto space-y-4 relative z-10">
           <div className="flex items-center space-x-4">
-            <div className="w-16 h-16 rounded-full bg-white/20 border-2 border-white/40 flex items-center justify-center text-white font-bold text-xl shadow-md overflow-hidden">
-              {user?.avatar ? (
-                <img src={user.avatar} alt="Avatar" className="w-full h-full object-cover" />
-              ) : (
-                <User size={32} />
-              )}
+            <div className="relative">
+              <div className="w-16 h-16 rounded-full bg-[#0B2545] border-2 border-[#00D2FF] ring-2 ring-[#00D2FF]/40 flex items-center justify-center text-white font-black text-xl shadow-[0_0_18px_rgba(0,210,255,0.45)] overflow-hidden">
+                {user?.avatar ? (
+                  <img src={user.avatar} alt="Avatar" className="w-full h-full object-cover" />
+                ) : (
+                  <User size={32} className="text-cyan-200" />
+                )}
+              </div>
+              <span className="absolute bottom-0 right-0 w-4 h-4 bg-[#00D2FF] border-2 border-[#061226] rounded-full"></span>
             </div>
+            
             <div className="flex-1 min-w-0">
-              <h1 className="text-lg font-bold text-white truncate">{userName}</h1>
-              <p className="text-xs text-sky-200 flex items-center mt-0.5">
-                <Phone size={12} className="mr-1 flex-shrink-0" />
+              <h1 className="text-lg font-black text-white truncate drop-shadow-sm">{userName}</h1>
+              <p className="text-xs text-sky-200 flex items-center mt-0.5 font-medium">
+                <Phone size={12} className="mr-1 flex-shrink-0 text-[#00D2FF]" />
                 {userPhone}
               </p>
-              <div className="mt-1.5 inline-flex items-center space-x-1 bg-cyan-400/20 text-cyan-200 border border-cyan-400/30 text-[10px] font-bold px-2.5 py-0.5 rounded-full">
-                <Star size={10} className="fill-cyan-300 text-cyan-300" />
-                <span>Hạng Thành Viên Bạc (250 Điểm)</span>
+              <div className="mt-2 inline-block p3r-slanted-badge bg-gradient-to-r from-[#00D2FF]/20 to-[#0284C7]/40 border border-[#00D2FF]/60 px-3 py-0.5 text-[9px] font-black text-cyan-200 uppercase tracking-wider shadow-[0_0_10px_rgba(0,210,255,0.3)]">
+                <div className="flex items-center space-x-1">
+                  <Star size={10} className="fill-[#00D2FF] text-[#00D2FF]" />
+                  <span>RANK // SILVER (250 PTS)</span>
+                </div>
               </div>
             </div>
           </div>
 
-          {/* Quick Stats Grid */}
-          <div className="grid grid-cols-3 gap-2 bg-white/10 backdrop-blur-md rounded-2xl p-3 text-center border border-white/10 text-xs">
+          {/* Quick Stats Grid (P3R HUD Panel) */}
+          <div className="grid grid-cols-3 gap-2 bg-white/10 backdrop-blur-md rounded-2xl p-3.5 text-center border border-white/15 text-xs shadow-inner">
             <div>
-              <p className="text-[10px] text-sky-200">Máy của tôi</p>
-              <p className="font-extrabold text-white text-sm mt-0.5">{(mySerials || []).length}</p>
+              <p className="text-[9px] text-sky-200 uppercase tracking-wider font-bold">Thiết bị</p>
+              <p className="font-black text-white text-base mt-0.5">{(mySerials || []).length}</p>
             </div>
-            <div className="border-x border-white/10">
-              <p className="text-[10px] text-sky-200">Điểm thưởng</p>
-              <p className="font-extrabold text-cyan-200 text-sm mt-0.5">250</p>
+            <div className="border-x border-white/15">
+              <p className="text-[9px] text-sky-200 uppercase tracking-wider font-bold">Điểm thưởng</p>
+              <p className="font-black text-[#00D2FF] text-base mt-0.5 drop-shadow-xs">250</p>
             </div>
             <div>
-              <p className="text-[10px] text-sky-200">Voucher</p>
-              <p className="font-extrabold text-sky-200 text-sm mt-0.5">2</p>
+              <p className="text-[9px] text-sky-200 uppercase tracking-wider font-bold">Voucher</p>
+              <p className="font-black text-cyan-200 text-base mt-0.5">2</p>
             </div>
           </div>
         </div>
