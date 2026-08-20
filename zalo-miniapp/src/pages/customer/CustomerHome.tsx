@@ -155,7 +155,7 @@ export default function CustomerHome({ user, onOpenScanner, onOpenWarranty }: Cu
   return (
     <div className="pb-20 bg-slate-50 min-h-screen">
       {/* 1. Header Persona 3 Reload Deep Water Ocean Section */}
-      <div className="bg-gradient-to-b from-[#061226] via-[#0B2545] to-[#0F3866] text-white pt-7 pb-14 px-4 rounded-b-[2.2rem] shadow-xl relative overflow-hidden">
+      <div className="bg-gradient-to-b from-[#061226] via-[#0B2545] to-[#0F3866] text-white pt-4 pb-14 px-4 rounded-b-[2.2rem] shadow-xl relative overflow-hidden">
         
         {/* Floating Realistic Water Bubbles */}
         <div className="water-bubble w-4 h-4 left-[10%] bottom-1 bubble-anim-1"></div>
@@ -167,9 +167,9 @@ export default function CustomerHome({ user, onOpenScanner, onOpenWarranty }: Cu
         <div className="water-bubble w-4 h-4 left-[52%] bottom-3 bubble-anim-2"></div>
 
         <div className="max-w-md mx-auto flex items-center justify-between relative z-10">
-          <div className="flex items-center space-x-3.5">
+          <div className="flex items-center space-x-3 min-w-0 flex-1">
             {/* Avatar Circle with P3R Neon Ring */}
-            <div className="relative">
+            <div className="relative flex-shrink-0">
               <div className="w-12 h-12 rounded-full bg-[#0B2545] border-2 border-[#00D2FF] ring-2 ring-[#00D2FF]/40 flex items-center justify-center text-white font-black text-base shadow-[0_0_15px_rgba(0,210,255,0.45)] overflow-hidden">
                 {user?.avatar ? (
                   <img src={user.avatar} alt="Avatar" className="w-full h-full rounded-full object-cover" />
@@ -180,16 +180,16 @@ export default function CustomerHome({ user, onOpenScanner, onOpenWarranty }: Cu
               <span className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 bg-[#00D2FF] border-2 border-[#061226] rounded-full"></span>
             </div>
 
-            <div>
-              <p className="text-xs text-sky-200 font-medium">Xin chào,</p>
-              <h1 className="text-lg font-black tracking-tight text-white drop-shadow-sm">{userName}</h1>
+            <div className="min-w-0 flex-1">
+              <p className="text-[11px] text-sky-300 font-medium leading-none mb-1">Xin chào,</p>
+              <h1 className="text-base font-black tracking-tight text-white drop-shadow-sm truncate">{userName}</h1>
             </div>
           </div>
 
-          <div className="flex items-center space-x-2">
-            <div className="p3r-slanted-badge bg-gradient-to-r from-[#00D2FF]/20 to-[#0284C7]/40 border border-[#00D2FF]/60 px-3 py-1 text-[10px] font-black text-cyan-200 uppercase tracking-wider flex items-center space-x-1.5 shadow-[0_0_12px_rgba(0,210,255,0.3)]">
-              <div className="flex items-center space-x-1.5">
-                <Sparkles size={12} className="text-[#00D2FF]" />
+          <div className="flex-shrink-0 ml-2">
+            <div className="p3r-slanted-badge bg-gradient-to-r from-[#00D2FF]/20 to-[#0284C7]/40 border border-[#00D2FF]/60 px-2.5 py-1 text-[10px] font-black text-cyan-200 uppercase tracking-wider flex items-center space-x-1 shadow-[0_0_12px_rgba(0,210,255,0.3)]">
+              <div className="flex items-center space-x-1">
+                <Sparkles size={11} className="text-[#00D2FF]" />
                 <span>Thành viên Bạc</span>
               </div>
             </div>
@@ -198,7 +198,7 @@ export default function CustomerHome({ user, onOpenScanner, onOpenWarranty }: Cu
       </div>
 
       {/* 2. Floating Quick Nav Card (P3R Kinetic 4-Button Grid) */}
-      <div className="max-w-md mx-auto px-4 -mt-9 relative z-10">
+      <div className="max-w-md mx-auto px-4 -mt-7 relative z-10">
         <div className="bg-white/95 backdrop-blur-md rounded-2xl shadow-[0_10px_30px_rgba(11,37,69,0.12)] p-4 border border-sky-100/80 grid grid-cols-4 gap-2.5 text-center">
           
           {/* Tích điểm */}

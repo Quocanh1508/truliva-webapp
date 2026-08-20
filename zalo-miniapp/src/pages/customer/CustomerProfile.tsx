@@ -30,7 +30,7 @@ export default function CustomerProfile({ user, mySerials, onLogout, onOpenScann
   return (
     <div className="pb-20 bg-slate-50 min-h-screen">
       {/* 1. Header Profile Card (P3R Ocean Depth) */}
-      <div className="bg-gradient-to-b from-[#061226] via-[#0B2545] to-[#0F3866] text-white p-5 pt-8 pb-10 rounded-b-[2.2rem] shadow-xl relative overflow-hidden">
+      <div className="bg-gradient-to-b from-[#061226] via-[#0B2545] to-[#0F3866] text-white p-5 pt-5 pb-9 rounded-b-[2.2rem] shadow-xl relative overflow-hidden">
         {/* Floating Realistic Water Bubbles */}
         <div className="water-bubble w-4 h-4 left-[8%] bottom-1 bubble-anim-1"></div>
         <div className="water-bubble w-6 h-6 left-[22%] bottom-2 bubble-anim-2"></div>
