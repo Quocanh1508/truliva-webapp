@@ -25,7 +25,8 @@ import {
   ListFilter,
   Eye,
   MapPin,
-  RotateCcw
+  RotateCcw,
+  Navigation
 } from 'lucide-react';
 
 
@@ -288,6 +289,14 @@ export default function SalaryManage() {
   const [selectedWorkTypeFilter, setSelectedWorkTypeFilter] = useState(initial?.selectedWorkTypeFilter || '');
   const [selectedCompletedDateFilter, setSelectedCompletedDateFilter] = useState(initial?.selectedCompletedDateFilter || '');
 
+  // Khoảng cách di chuyển Filter states (Item: 2 loại khoảng cách tương ứng dịch vụ)
+  const [selectedDistancePreset, setSelectedDistancePreset] = useState<string>(initial?.selectedDistancePreset || '');
+  const [customDistanceOp, setCustomDistanceOp] = useState<'>' | '>=' | '<' | '<=' | '=' | 'between'>(initial?.customDistanceOp || '>=');
+  const [customDistanceMin, setCustomDistanceMin] = useState<string>(initial?.customDistanceMin || '');
+  const [customDistanceMax, setCustomDistanceMax] = useState<string>(initial?.customDistanceMax || '');
+  const [isDistanceDropdownOpen, setIsDistanceDropdownOpen] = useState(false);
+  const distanceDropdownRef = useRef<HTMLDivElement>(null);
+
   // Modal State cho Admin tự thêm ca / mục phí bổ sung (Item 7)
   const [showAddCaseModal, setShowAddCaseModal] = useState(false);
   const [addCaseForm, setAddCaseForm] = useState({
@@ -302,7 +311,7 @@ export default function SalaryManage() {
   });
   const [addingCase, setAddingCase] = useState(false);
 
-  // Dropdown States & Refs for Multi-Select Filters (KTV & Station)
+  // Dropdown States & Refs for Multi-Select Filters (KTV, Station, Distance)
   const [isKtvDropdownOpen, setIsKtvDropdownOpen] = useState(false);
   const [ktvSearchQuery, setKtvSearchQuery] = useState('');
   const ktvDropdownRef = useRef<HTMLDivElement>(null);
@@ -324,9 +333,25 @@ export default function SalaryManage() {
       selectedStationsFilter,
       selectedWorkTypeFilter,
       selectedCompletedDateFilter,
+      selectedDistancePreset,
+      customDistanceOp,
+      customDistanceMin,
+      customDistanceMax,
       searchQuery
     }));
-  }, [selectedMonth, viewMode, selectedKtvsFilter, selectedStationsFilter, selectedWorkTypeFilter, selectedCompletedDateFilter, searchQuery]);
+  }, [
+    selectedMonth,
+    viewMode,
+    selectedKtvsFilter,
+    selectedStationsFilter,
+    selectedWorkTypeFilter,
+    selectedCompletedDateFilter,
+    selectedDistancePreset,
+    customDistanceOp,
+    customDistanceMin,
+    customDistanceMax,
+    searchQuery
+  ]);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -335,6 +360,9 @@ export default function SalaryManage() {
       }
       if (stationDropdownRef.current && !stationDropdownRef.current.contains(event.target as Node)) {
         setIsStationDropdownOpen(false);
+      }
+      if (distanceDropdownRef.current && !distanceDropdownRef.current.contains(event.target as Node)) {
+        setIsDistanceDropdownOpen(false);
       }
       if (modalKtvDropdownRef.current && !modalKtvDropdownRef.current.contains(event.target as Node)) {
         setIsModalKtvDropdownOpen(false);
@@ -488,6 +516,9 @@ export default function SalaryManage() {
     setSelectedStationsFilter([]);
     setSelectedWorkTypeFilter('');
     setSelectedCompletedDateFilter('');
+    setSelectedDistancePreset('');
+    setCustomDistanceMin('');
+    setCustomDistanceMax('');
     fetchSalaries();
   }, [selectedMonth]);
 
@@ -599,6 +630,14 @@ export default function SalaryManage() {
       }
       if (selectedWorkTypeFilter) url += `&workType=${encodeURIComponent(selectedWorkTypeFilter)}`;
       if (selectedCompletedDateFilter) url += `&completedDate=${encodeURIComponent(selectedCompletedDateFilter)}`;
+      if (selectedDistancePreset) {
+        url += `&distancePreset=${encodeURIComponent(selectedDistancePreset)}`;
+        if (selectedDistancePreset === 'custom') {
+          url += `&distanceOp=${encodeURIComponent(customDistanceOp)}`;
+          if (customDistanceMin) url += `&distanceMin=${encodeURIComponent(customDistanceMin)}`;
+          if (customDistanceMax) url += `&distanceMax=${encodeURIComponent(customDistanceMax)}`;
+        }
+      }
       if (searchQuery) url += `&search=${encodeURIComponent(searchQuery)}`;
 
       const response = await fetch(url, {
@@ -761,6 +800,84 @@ export default function SalaryManage() {
     return list;
   }, [salaries]);
 
+  // Helper kiểm tra khoảng cách di chuyển khớp với bộ lọc (2 loại khoảng cách tương ứng dịch vụ)
+  const checkCaseDistance = (c: CaseDetail | any) => {
+    const dist = typeof c.distance === 'number' ? c.distance : (parseFloat(String(c.distance || 0)) || 0);
+    const distCost = c.distanceCost || 0;
+
+    if (!selectedDistancePreset) return true;
+
+    if (selectedDistancePreset === '>20') {
+      return dist > 20;
+    }
+    if (selectedDistancePreset === '>50') {
+      return dist > 50;
+    }
+    if (selectedDistancePreset === 'has_fee') {
+      return distCost > 0;
+    }
+    if (selectedDistancePreset === 'no_fee') {
+      return distCost === 0;
+    }
+    if (selectedDistancePreset === '0') {
+      return dist === 0;
+    }
+    if (selectedDistancePreset === '1-20') {
+      return dist >= 1 && dist <= 20;
+    }
+    if (selectedDistancePreset === '21-50') {
+      return dist >= 21 && dist <= 50;
+    }
+    if (selectedDistancePreset === '>50_range') {
+      return dist > 50;
+    }
+    if (selectedDistancePreset === 'custom') {
+      const min = customDistanceMin !== '' ? parseFloat(customDistanceMin) : null;
+      const max = customDistanceMax !== '' ? parseFloat(customDistanceMax) : null;
+
+      if (customDistanceOp === '>') {
+        return min !== null ? dist > min : true;
+      }
+      if (customDistanceOp === '>=') {
+        return min !== null ? dist >= min : true;
+      }
+      if (customDistanceOp === '<') {
+        return min !== null ? dist < min : true;
+      }
+      if (customDistanceOp === '<=') {
+        return min !== null ? dist <= min : true;
+      }
+      if (customDistanceOp === '=') {
+        return min !== null ? dist === min : true;
+      }
+      if (customDistanceOp === 'between') {
+        const m1 = min !== null ? dist >= min : true;
+        const m2 = max !== null ? dist <= max : true;
+        return m1 && m2;
+      }
+    }
+    return true;
+  };
+
+  const getDistanceFilterLabel = () => {
+    if (!selectedDistancePreset) return 'Tất cả khoảng cách';
+    if (selectedDistancePreset === '>20') return '> 20 km (Tiêu chuẩn)';
+    if (selectedDistancePreset === '>50') return '> 50 km (Thay lọc/SC)';
+    if (selectedDistancePreset === 'has_fee') return 'Có tính phí KC (> 0đ)';
+    if (selectedDistancePreset === 'no_fee') return 'Không tính phí KC (0đ)';
+    if (selectedDistancePreset === '0') return '0 km (Nội thành)';
+    if (selectedDistancePreset === '1-20') return '1 - 20 km';
+    if (selectedDistancePreset === '21-50') return '21 - 50 km';
+    if (selectedDistancePreset === '>50_range') return '> 50 km';
+    if (selectedDistancePreset === 'custom') {
+      if (customDistanceOp === 'between') {
+        return `${customDistanceMin || 0} - ${customDistanceMax || '∞'} km`;
+      }
+      return `${customDistanceOp} ${customDistanceMin || 0} km`;
+    }
+    return 'Tất cả khoảng cách';
+  };
+
   // Filtered Summary View
   const filteredSalaries = useMemo(() => {
     const normStr = (str: string | null | undefined): string => {
@@ -801,13 +918,19 @@ export default function SalaryManage() {
         return cDate === selectedCompletedDateFilter;
       }));
 
+      const matchWorkType = !selectedWorkTypeFilter || (s.cases && s.cases.some(c =>
+        c.workType && c.workType.toLowerCase().includes(selectedWorkTypeFilter.toLowerCase())
+      ));
+
+      const matchDistance = !selectedDistancePreset || (s.cases && s.cases.some(c => checkCaseDistance(c)));
+
       const matchQuery = !searchQuery || 
         s.fullName.toLowerCase().includes(searchQuery.toLowerCase()) ||
         s.username.toLowerCase().includes(searchQuery.toLowerCase()) ||
         s.phoneNumber.includes(searchQuery);
-      return matchKtv && matchStation && matchCompletedDate && matchQuery;
+      return matchKtv && matchStation && matchCompletedDate && matchWorkType && matchDistance && matchQuery;
     });
-  }, [salaries, selectedKtvsFilter, selectedStationsFilter, selectedCompletedDateFilter, searchQuery]);
+  }, [salaries, selectedKtvsFilter, selectedStationsFilter, selectedCompletedDateFilter, selectedWorkTypeFilter, selectedDistancePreset, customDistanceOp, customDistanceMin, customDistanceMax, searchQuery]);
 
   // Filtered Detailed Cases View
   const filteredCases = useMemo(() => {
@@ -847,6 +970,8 @@ export default function SalaryManage() {
       const cDate = c.createdAt ? new Date(c.createdAt).toLocaleDateString('sv-SE') : '';
       const matchCompletedDate = !selectedCompletedDateFilter || cDate === selectedCompletedDateFilter;
 
+      const matchDistance = checkCaseDistance(c);
+
       const matchQuery = !searchQuery ||
         c.ktvName.toLowerCase().includes(searchQuery.toLowerCase()) ||
         c.customerName.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -855,9 +980,9 @@ export default function SalaryManage() {
         (c.notes && c.notes.toLowerCase().includes(searchQuery.toLowerCase())) ||
         (c.products && c.products.some(p => p.toLowerCase().includes(searchQuery.toLowerCase())));
 
-      return matchKtv && matchStation && matchWorkType && matchCompletedDate && matchQuery;
+      return matchKtv && matchStation && matchWorkType && matchCompletedDate && matchDistance && matchQuery;
     });
-  }, [allCases, selectedKtvsFilter, selectedStationsFilter, selectedWorkTypeFilter, selectedCompletedDateFilter, searchQuery]);
+  }, [allCases, selectedKtvsFilter, selectedStationsFilter, selectedWorkTypeFilter, selectedCompletedDateFilter, selectedDistancePreset, customDistanceOp, customDistanceMin, customDistanceMax, searchQuery]);
 
   const formatMoney = (val: number) => {
     return val.toLocaleString('vi-VN') + ' đ';
@@ -1092,10 +1217,10 @@ export default function SalaryManage() {
           </div>
         </div>
 
-        {/* Multi-Filter Bar */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3 text-xs">
+        {/* Multi-Filter Bar (6 Cột Lọc) */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3 text-xs">
           
-          {/* 1. Lọc theo KTV (Cho phép chọn nhiều, chọn tất cả / bỏ tất cả, sắp xếp A-Z) */}
+          {/* 1. Lọc theo KTV */}
           <div className="relative" ref={ktvDropdownRef}>
             <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-1">
               Kỹ thuật viên {selectedKtvsFilter.length > 0 && selectedKtvsFilter.length !== stationFilteredKtvsInMonth.length && `(${selectedKtvsFilter.length}/${stationFilteredKtvsInMonth.length})`}
@@ -1222,7 +1347,7 @@ export default function SalaryManage() {
             )}
           </div>
 
-          {/* 2. Lọc theo Trạm (Cây Phân Cấp: Trạm Chính -> Trạm Kỹ Thuật, Cho Chọn Nhiều) */}
+          {/* 2. Lọc theo Trạm (Cây Phân Cấp) */}
           <div className="relative" ref={stationDropdownRef}>
             <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-1">
               Trạm quản lý {selectedStationsFilter.length > 0 && `(${selectedStationsFilter.length} trạm)`}
@@ -1259,41 +1384,27 @@ export default function SalaryManage() {
 
             {/* Tree Multi-Select Panel */}
             {isStationDropdownOpen && (
-              <div className="absolute left-0 top-full mt-1.5 w-72 bg-white border border-gray-200 rounded-xl shadow-2xl z-50 p-3 text-xs space-y-2 max-h-80 overflow-y-auto">
+              <div className="absolute left-0 top-full mt-1.5 w-80 bg-white border border-gray-200 rounded-xl shadow-2xl z-50 p-3 text-xs space-y-2 max-h-80 overflow-y-auto">
                 <div className="flex items-center justify-between pb-2 border-b border-gray-100 font-bold text-gray-700">
-                  <span className="text-[11px] uppercase tracking-wider text-gray-400">Danh mục Trạm</span>
-                  <div className="flex items-center gap-1 text-[11px]">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const allTechKeys = stationTree.flatMap(g => g.stations.map(st => st.key));
-                        setSelectedStationsFilter(allTechKeys);
-                      }}
-                      className="text-blue-600 hover:underline font-semibold cursor-pointer"
-                    >
-                      Chọn hết
-                    </button>
-                    <span className="text-gray-300">|</span>
-                    <button
-                      type="button"
-                      onClick={() => setSelectedStationsFilter([])}
-                      className="text-gray-500 hover:underline cursor-pointer"
-                    >
-                      Bỏ chọn
-                    </button>
-                  </div>
+                  <span className="text-blue-900">🏢 Cây quản lý trạm</span>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedStationsFilter([])}
+                    className="text-[11px] text-gray-500 hover:underline cursor-pointer"
+                  >
+                    Bỏ chọn tất cả
+                  </button>
                 </div>
 
-                <div className="space-y-3 pt-1">
+                <div className="space-y-2">
                   {stationTree.map((group) => {
-                    const groupKeys = group.stations.map(st => st.key);
-                    const isGroupAllSelected = groupKeys.every(k => selectedStationsFilter.includes(k));
+                    const groupKeys = group.stations.map(s => s.key);
+                    const isGroupAllSelected = groupKeys.length > 0 && groupKeys.every(k => selectedStationsFilter.includes(k));
                     const isGroupSomeSelected = groupKeys.some(k => selectedStationsFilter.includes(k)) && !isGroupAllSelected;
 
                     return (
-                      <div key={group.mainStationName} className="space-y-1">
-                        {/* Header: Trạm Chính (Parent Group) */}
-                        <div className="flex items-center gap-2 bg-blue-50/70 px-2 py-1.5 rounded-lg border border-blue-100 font-bold text-blue-950">
+                      <div key={group.mainStationName} className="border border-gray-100 rounded-lg p-2 bg-gray-50/50 space-y-1.5">
+                        <div className="flex items-center gap-2">
                           <input
                             type="checkbox"
                             checked={isGroupAllSelected}
@@ -1306,20 +1417,14 @@ export default function SalaryManage() {
                           <span className="truncate flex-1 text-[11px] font-extrabold text-[#1B3A6B]">
                             🏢 {group.mainStationName}
                           </span>
-                          <span className="text-[10px] bg-blue-200/60 text-blue-800 px-1.5 py-0.2 rounded-full font-bold">
-                            {group.stations.length}
-                          </span>
                         </div>
-
-                        {/* Sub-items: Trạm Kỹ Thuật (Child Stations) */}
                         <div className="pl-4 space-y-0.5">
                           {group.stations.map((st) => {
                             const isChecked = selectedStationsFilter.includes(st.key);
-
                             return (
                               <label
                                 key={st.key}
-                                className={`flex items-center gap-2 px-2 py-1 rounded-md text-xs transition cursor-pointer hover:bg-gray-50 ${
+                                className={`flex items-center gap-2 px-2 py-1 rounded-md text-xs transition cursor-pointer hover:bg-white ${
                                   isChecked ? 'bg-cyan-50/80 font-bold text-cyan-900' : 'text-gray-700 font-medium'
                                 }`}
                               >
@@ -1362,7 +1467,257 @@ export default function SalaryManage() {
             </select>
           </div>
 
-          {/* 4. Lọc theo Ngày hoàn thành */}
+          {/* 4. Lọc theo Khoảng cách di chuyển */}
+          <div className="relative" ref={distanceDropdownRef}>
+            <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-1">
+              KC di chuyển {selectedDistancePreset && '(Đang lọc)'}
+            </label>
+            <button
+              type="button"
+              onClick={() => setIsDistanceDropdownOpen(!isDistanceDropdownOpen)}
+              className={`w-full px-3 py-2 border rounded-lg text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500 flex items-center justify-between gap-2 shadow-sm cursor-pointer transition ${
+                selectedDistancePreset
+                  ? 'bg-amber-50/80 border-amber-300 text-amber-900 font-bold'
+                  : 'bg-white border-gray-200 text-gray-800 hover:border-gray-300'
+              }`}
+            >
+              <div className="flex items-center gap-1.5 truncate">
+                <Navigation className={`h-3.5 w-3.5 flex-shrink-0 ${selectedDistancePreset ? 'text-amber-600' : 'text-blue-600'}`} />
+                <span className="truncate">{getDistanceFilterLabel()}</span>
+              </div>
+              <div className="flex items-center gap-1">
+                {selectedDistancePreset && (
+                  <span
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setSelectedDistancePreset('');
+                      setCustomDistanceMin('');
+                      setCustomDistanceMax('');
+                    }}
+                    className="p-0.5 hover:bg-amber-200 rounded-full text-amber-600 cursor-pointer"
+                    title="Xóa lọc khoảng cách"
+                  >
+                    <X className="h-3 w-3" />
+                  </span>
+                )}
+                <ChevronDown className={`h-3.5 w-3.5 text-gray-400 transition-transform ${isDistanceDropdownOpen ? 'rotate-180' : ''}`} />
+              </div>
+            </button>
+
+            {/* Distance Dropdown Panel */}
+            {isDistanceDropdownOpen && (
+              <div className="absolute left-0 sm:right-0 sm:left-auto top-full mt-1.5 w-80 bg-white border border-gray-200 rounded-xl shadow-2xl z-50 p-3 text-xs space-y-3">
+                <div className="flex items-center justify-between pb-2 border-b border-gray-100 font-bold text-gray-800">
+                  <span className="flex items-center gap-1.5 text-blue-900">
+                    <Navigation className="h-3.5 w-3.5 text-blue-600" />
+                    Lọc theo khoảng cách di chuyển
+                  </span>
+                  {selectedDistancePreset && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSelectedDistancePreset('');
+                        setCustomDistanceMin('');
+                        setCustomDistanceMax('');
+                        setIsDistanceDropdownOpen(false);
+                      }}
+                      className="text-[11px] text-red-500 hover:underline font-medium cursor-pointer"
+                    >
+                      Bỏ lọc
+                    </button>
+                  )}
+                </div>
+
+                <div className="space-y-1.5">
+                  <div className="text-[10px] font-extrabold text-blue-950 uppercase tracking-wider">
+                    Theo ngưỡng dịch vụ Truliva
+                  </div>
+                  <div className="grid grid-cols-1 gap-1">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSelectedDistancePreset('>20');
+                        setIsDistanceDropdownOpen(false);
+                      }}
+                      className={`w-full text-left px-2.5 py-1.5 rounded-lg text-xs font-semibold flex items-center justify-between transition cursor-pointer ${
+                        selectedDistancePreset === '>20'
+                          ? 'bg-blue-600 text-white'
+                          : 'bg-blue-50/60 hover:bg-blue-100/80 text-blue-900'
+                      }`}
+                    >
+                      <span>⚡ {'>'} 20 km <span className="text-[11px] font-normal opacity-90">(Bảo hành, Giao hàng, Lắp đặt...)</span></span>
+                      {selectedDistancePreset === '>20' && <CheckCircle className="h-3.5 w-3.5 text-white" />}
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSelectedDistancePreset('>50');
+                        setIsDistanceDropdownOpen(false);
+                      }}
+                      className={`w-full text-left px-2.5 py-1.5 rounded-lg text-xs font-semibold flex items-center justify-between transition cursor-pointer ${
+                        selectedDistancePreset === '>50'
+                          ? 'bg-amber-600 text-white'
+                          : 'bg-amber-50/60 hover:bg-amber-100/80 text-amber-900'
+                      }`}
+                    >
+                      <span>⚡ {'>'} 50 km <span className="text-[11px] font-normal opacity-90">(Thay lọc, Sửa chữa trạm ngoài)</span></span>
+                      {selectedDistancePreset === '>50' && <CheckCircle className="h-3.5 w-3.5 text-white" />}
+                    </button>
+
+                    <div className="grid grid-cols-2 gap-1 pt-0.5">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSelectedDistancePreset('has_fee');
+                          setIsDistanceDropdownOpen(false);
+                        }}
+                        className={`px-2 py-1 rounded-md text-[11px] font-semibold text-center transition cursor-pointer ${
+                          selectedDistancePreset === 'has_fee'
+                            ? 'bg-emerald-600 text-white font-bold'
+                            : 'bg-emerald-50 text-emerald-800 hover:bg-emerald-100'
+                        }`}
+                      >
+                        💰 Có tính Phí KC
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSelectedDistancePreset('no_fee');
+                          setIsDistanceDropdownOpen(false);
+                        }}
+                        className={`px-2 py-1 rounded-md text-[11px] font-semibold text-center transition cursor-pointer ${
+                          selectedDistancePreset === 'no_fee'
+                            ? 'bg-gray-700 text-white font-bold'
+                            : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                        }`}
+                      >
+                        🛡️ Không tính Phí KC
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="space-y-1 pt-1 border-t border-gray-100">
+                  <div className="text-[10px] font-extrabold text-gray-500 uppercase tracking-wider">
+                    Khoảng km phổ biến
+                  </div>
+                  <div className="grid grid-cols-3 gap-1">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSelectedDistancePreset('0');
+                        setIsDistanceDropdownOpen(false);
+                      }}
+                      className={`px-2 py-1 rounded-md text-[11px] font-medium text-center transition cursor-pointer ${
+                        selectedDistancePreset === '0' ? 'bg-blue-600 text-white font-bold' : 'bg-gray-50 hover:bg-gray-100 text-gray-700'
+                      }`}
+                    >
+                      0 km
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSelectedDistancePreset('1-20');
+                        setIsDistanceDropdownOpen(false);
+                      }}
+                      className={`px-2 py-1 rounded-md text-[11px] font-medium text-center transition cursor-pointer ${
+                        selectedDistancePreset === '1-20' ? 'bg-blue-600 text-white font-bold' : 'bg-gray-50 hover:bg-gray-100 text-gray-700'
+                      }`}
+                    >
+                      1 - 20 km
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSelectedDistancePreset('21-50');
+                        setIsDistanceDropdownOpen(false);
+                      }}
+                      className={`px-2 py-1 rounded-md text-[11px] font-medium text-center transition cursor-pointer ${
+                        selectedDistancePreset === '21-50' ? 'bg-blue-600 text-white font-bold' : 'bg-gray-50 hover:bg-gray-100 text-gray-700'
+                      }`}
+                    >
+                      21 - 50 km
+                    </button>
+                  </div>
+                </div>
+
+                <div className="space-y-2 pt-1 border-t border-gray-100 bg-gray-50/70 p-2.5 rounded-lg border">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] font-extrabold text-gray-700 uppercase tracking-wider flex items-center gap-1">
+                      <Sliders className="h-3 w-3 text-blue-600" />
+                      Tùy chỉnh số km
+                    </span>
+                    <span className="text-[10px] text-gray-400">Ví dụ: &gt; 21 km</span>
+                  </div>
+
+                  <div className="grid grid-cols-3 gap-1.5">
+                    <select
+                      value={customDistanceOp}
+                      onChange={(e) => setCustomDistanceOp(e.target.value as any)}
+                      className="col-span-1 px-1.5 py-1 bg-white border border-gray-300 rounded text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-blue-500"
+                    >
+                      <option value=">">&gt; (Lớn hơn)</option>
+                      <option value=">=">&gt;= (Từ)</option>
+                      <option value="<">&lt; (Nhỏ hơn)</option>
+                      <option value="<=">&lt;= (Đến)</option>
+                      <option value="=">= (Bằng)</option>
+                      <option value="between">Khoảng...</option>
+                    </select>
+
+                    {customDistanceOp === 'between' ? (
+                      <>
+                        <input
+                          type="number"
+                          placeholder="Từ km"
+                          value={customDistanceMin}
+                          onChange={(e) => setCustomDistanceMin(e.target.value)}
+                          className="col-span-1 px-1.5 py-1 bg-white border border-gray-300 rounded text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-blue-500 text-center"
+                        />
+                        <input
+                          type="number"
+                          placeholder="Đến km"
+                          value={customDistanceMax}
+                          onChange={(e) => setCustomDistanceMax(e.target.value)}
+                          className="col-span-1 px-1.5 py-1 bg-white border border-gray-300 rounded text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-blue-500 text-center"
+                        />
+                      </>
+                    ) : (
+                      <div className="col-span-2 relative">
+                        <input
+                          type="number"
+                          placeholder="Nhập số km (VD: 21)"
+                          value={customDistanceMin}
+                          onChange={(e) => setCustomDistanceMin(e.target.value)}
+                          className="w-full px-2 py-1 pr-7 bg-white border border-gray-300 rounded text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-blue-500"
+                        />
+                        <span className="absolute right-2 top-1 text-[11px] font-bold text-gray-400">km</span>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="flex justify-end gap-1.5 pt-1">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (!customDistanceMin && !customDistanceMax) {
+                          setSelectedDistancePreset('');
+                        } else {
+                          setSelectedDistancePreset('custom');
+                        }
+                        setIsDistanceDropdownOpen(false);
+                      }}
+                      className="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded text-[11px] font-bold shadow-sm cursor-pointer transition"
+                    >
+                      Áp dụng
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* 5. Lọc theo Ngày hoàn thành */}
           <div>
             <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-1">
               Ngày hoàn thành {selectedCompletedDateFilter && '(Đang lọc)'}
@@ -1387,7 +1742,7 @@ export default function SalaryManage() {
             </div>
           </div>
 
-          {/* 5. Tìm kiếm từ khóa */}
+          {/* 6. Tìm kiếm từ khóa */}
           <div>
             <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-1">Tìm kiếm từ khóa</label>
             <input

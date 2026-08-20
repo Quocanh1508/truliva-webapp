@@ -85,6 +85,11 @@ export async function exportSalaries(req: Request, res: Response): Promise<void>
     const completedDate = (req.query.completedDate as string) || '';
     const searchQuery = (req.query.search as string || '').toLowerCase().trim();
 
+    const distancePreset = (req.query.distancePreset as string) || '';
+    const distanceOp = (req.query.distanceOp as string) || '>=';
+    const distanceMin = (req.query.distanceMin as string) || '';
+    const distanceMax = (req.query.distanceMax as string) || '';
+
     const ktvIdsList = ktvIds ? ktvIds.split(',').map(s => s.trim()).filter(Boolean) : [];
     const stationIdsList = stationId ? stationId.split(',').map(s => s.trim()).filter(Boolean) : [];
     const mainStationIdsList = mainStationId ? mainStationId.split(',').map(s => s.trim()).filter(Boolean) : [];
@@ -93,6 +98,64 @@ export async function exportSalaries(req: Request, res: Response): Promise<void>
     const normStr = (str: string | null | undefined): string => {
       if (!str) return '';
       return String(str).toLowerCase().replace(/trạm\s+/g, '').trim();
+    };
+
+    const checkCaseDistance = (c: any) => {
+      const dist = typeof c.distance === 'number' ? c.distance : (parseFloat(String(c.distance || 0)) || 0);
+      const distCost = c.distanceCost || 0;
+
+      if (!distancePreset) return true;
+
+      if (distancePreset === '>20') {
+        return dist > 20;
+      }
+      if (distancePreset === '>50') {
+        return dist > 50;
+      }
+      if (distancePreset === 'has_fee') {
+        return distCost > 0;
+      }
+      if (distancePreset === 'no_fee') {
+        return distCost === 0;
+      }
+      if (distancePreset === '0') {
+        return dist === 0;
+      }
+      if (distancePreset === '1-20') {
+        return dist >= 1 && dist <= 20;
+      }
+      if (distancePreset === '21-50') {
+        return dist >= 21 && dist <= 50;
+      }
+      if (distancePreset === '>50_range') {
+        return dist > 50;
+      }
+      if (distancePreset === 'custom') {
+        const min = distanceMin !== '' ? parseFloat(distanceMin) : null;
+        const max = distanceMax !== '' ? parseFloat(distanceMax) : null;
+
+        if (distanceOp === '>') {
+          return min !== null ? dist > min : true;
+        }
+        if (distanceOp === '>=') {
+          return min !== null ? dist >= min : true;
+        }
+        if (distanceOp === '<') {
+          return min !== null ? dist < min : true;
+        }
+        if (distanceOp === '<=') {
+          return min !== null ? dist <= min : true;
+        }
+        if (distanceOp === '=') {
+          return min !== null ? dist === min : true;
+        }
+        if (distanceOp === 'between') {
+          const m1 = min !== null ? dist >= min : true;
+          const m2 = max !== null ? dist <= max : true;
+          return m1 && m2;
+        }
+      }
+      return true;
     };
 
     const allSalaries = await computeFullSalariesForMonth(month);
@@ -149,6 +212,9 @@ export async function exportSalaries(req: Request, res: Response): Promise<void>
         workTypesList.some(wt => c.workType && c.workType.toLowerCase().includes(wt.toLowerCase()))
       ));
       if (!matchWorkType) return false;
+
+      const matchDistance = !distancePreset || (s.cases && s.cases.some((c: any) => checkCaseDistance(c)));
+      if (!matchDistance) return false;
 
       const matchQuery = !searchQuery ||
         s.fullName.toLowerCase().includes(searchQuery) ||
@@ -238,6 +304,7 @@ export async function exportSalaries(req: Request, res: Response): Promise<void>
           const matchWT = workTypesList.some(wt => c.workType && c.workType.toLowerCase().includes(wt.toLowerCase()));
           if (!matchWT) return false;
         }
+        if (!checkCaseDistance(c)) return false;
         if (searchQuery) {
           const matchQ = s.fullName.toLowerCase().includes(searchQuery) ||
             s.username.toLowerCase().includes(searchQuery) ||
@@ -398,6 +465,8 @@ export async function exportSalaries(req: Request, res: Response): Promise<void>
           const matchWT = workTypesList.some(wt => c.workType && c.workType.toLowerCase().includes(wt.toLowerCase()));
           if (!matchWT) continue;
         }
+
+        if (!checkCaseDistance(c)) continue;
 
         if (searchQuery) {
           const matchQ = s.fullName.toLowerCase().includes(searchQuery) ||
