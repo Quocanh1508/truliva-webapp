@@ -33,10 +33,11 @@ export function securityMiddleware(req: Request, res: Response, next: NextFuncti
       }
     }
 
-    // Bypass hoàn toàn cho Webhooks, Uploads, Health Check, Auth APIs
+    // Bypass hoàn toàn cho Webhooks, Uploads, Health Check, Auth APIs, Zalo Mini App
     if (
       url.startsWith('/webhooks/') || 
       url.startsWith('/api/auth/') || 
+      url.startsWith('/api/zalo-miniapp') || 
       url === '/health' || 
       url.startsWith('/uploads/')
     ) {

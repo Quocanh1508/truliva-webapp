@@ -54,6 +54,8 @@ app.use(helmet({
 const allowedOrigins = [
   'https://trulivaofficial.com',
   'https://www.trulivaofficial.com',
+  'https://h5.zdn.vn',
+  'https://zalo.me',
   'http://localhost:5173',
   'http://localhost:3000',
   'http://localhost',
@@ -66,6 +68,8 @@ app.use(cors({
       !origin || 
       allowedOrigins.includes(origin) || 
       origin.endsWith('trulivaofficial.com') || 
+      origin.endsWith('zdn.vn') ||
+      origin.endsWith('zalo.me') ||
       origin.startsWith('zalo://')
     ) {
       callback(null, true);
@@ -74,6 +78,8 @@ app.use(cors({
     }
   },
   credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept', 'Origin']
 }));
 
 // ── Cookie parser ──
