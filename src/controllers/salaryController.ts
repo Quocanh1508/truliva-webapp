@@ -85,7 +85,8 @@ export async function exportSalaries(req: Request, res: Response): Promise<void>
     const completedDate = (req.query.completedDate as string) || '';
     const searchQuery = (req.query.search as string || '').toLowerCase().trim();
 
-    const distancePreset = (req.query.distancePreset as string) || '';
+    const rawDistancePresets = (req.query.distancePresets as string) || (req.query.distancePreset as string) || '';
+    const distancePresetsList = rawDistancePresets ? rawDistancePresets.split(',').map(s => s.trim()).filter(Boolean) : [];
     const distanceOp = (req.query.distanceOp as string) || '>=';
     const distanceMin = (req.query.distanceMin as string) || '';
     const distanceMax = (req.query.distanceMax as string) || '';
@@ -100,62 +101,73 @@ export async function exportSalaries(req: Request, res: Response): Promise<void>
       return String(str).toLowerCase().replace(/trạm\s+/g, '').trim();
     };
 
+    const isTLSC = (wt: string | null | undefined): boolean => {
+      const s = String(wt || '').toLowerCase();
+      return s.includes('thay lọc') || s.includes('thay loc') || s.includes('sửa chữa') || s.includes('sua chua');
+    };
+
     const checkCaseDistance = (c: any) => {
       const dist = typeof c.distance === 'number' ? c.distance : (parseFloat(String(c.distance || 0)) || 0);
       const distCost = c.distanceCost || 0;
+      const isTlscCase = isTLSC(c.workType);
 
-      if (!distancePreset) return true;
+      const hasCustom = distancePresetsList.includes('custom') && (distanceMin !== '' || distanceMax !== '');
+      if (distancePresetsList.length === 0 && !hasCustom) {
+        return true;
+      }
 
-      if (distancePreset === '>20') {
-        return dist > 20;
-      }
-      if (distancePreset === '>50') {
-        return dist > 50;
-      }
-      if (distancePreset === 'has_fee') {
-        return distCost > 0;
-      }
-      if (distancePreset === 'no_fee') {
-        return distCost === 0;
-      }
-      if (distancePreset === '0') {
-        return dist === 0;
-      }
-      if (distancePreset === '1-20') {
-        return dist >= 1 && dist <= 20;
-      }
-      if (distancePreset === '21-50') {
-        return dist >= 21 && dist <= 50;
-      }
-      if (distancePreset === '>50_range') {
-        return dist > 50;
-      }
-      if (distancePreset === 'custom') {
+      const matchesPreset = distancePresetsList.some(preset => {
+        if (preset === '>20' || preset === 'threshold_standard') {
+          return !isTlscCase ? dist > 20 : (distancePresetsList.includes('>50') ? false : dist > 20);
+        }
+        if (preset === '>50' || preset === 'threshold_tlsc') {
+          return isTlscCase ? dist > 50 : (distancePresetsList.includes('>20') ? false : dist > 50);
+        }
+        if (preset === 'has_fee') {
+          return distCost > 0;
+        }
+        if (preset === 'no_fee') {
+          return distCost === 0;
+        }
+        if (preset === '0') {
+          return dist === 0;
+        }
+        if (preset === '1-20') {
+          return dist >= 1 && dist <= 20;
+        }
+        if (preset === '21-50') {
+          return dist >= 21 && dist <= 50;
+        }
+        if (preset === '>50_all' || preset === '>50_range') {
+          return dist > 50;
+        }
+        return false;
+      });
+
+      if (matchesPreset) return true;
+
+      if (hasCustom) {
         const min = distanceMin !== '' ? parseFloat(distanceMin) : null;
         const max = distanceMax !== '' ? parseFloat(distanceMax) : null;
 
         if (distanceOp === '>') {
-          return min !== null ? dist > min : true;
-        }
-        if (distanceOp === '>=') {
-          return min !== null ? dist >= min : true;
-        }
-        if (distanceOp === '<') {
-          return min !== null ? dist < min : true;
-        }
-        if (distanceOp === '<=') {
-          return min !== null ? dist <= min : true;
-        }
-        if (distanceOp === '=') {
-          return min !== null ? dist === min : true;
-        }
-        if (distanceOp === 'between') {
+          if (min !== null && dist > min) return true;
+        } else if (distanceOp === '>=') {
+          if (min !== null && dist >= min) return true;
+        } else if (distanceOp === '<') {
+          if (min !== null && dist < min) return true;
+        } else if (distanceOp === '<=') {
+          if (min !== null && dist <= min) return true;
+        } else if (distanceOp === '=') {
+          if (min !== null && dist === min) return true;
+        } else if (distanceOp === 'between') {
           const m1 = min !== null ? dist >= min : true;
           const m2 = max !== null ? dist <= max : true;
-          return m1 && m2;
+          if (m1 && m2) return true;
         }
       }
-      return true;
+
+      return false;
     };
 
     const allSalaries = await computeFullSalariesForMonth(month);
@@ -213,7 +225,7 @@ export async function exportSalaries(req: Request, res: Response): Promise<void>
       ));
       if (!matchWorkType) return false;
 
-      const matchDistance = !distancePreset || (s.cases && s.cases.some((c: any) => checkCaseDistance(c)));
+      const matchDistance = (distancePresetsList.length === 0 && !distancePresetsList.includes('custom')) || (s.cases && s.cases.some((c: any) => checkCaseDistance(c)));
       if (!matchDistance) return false;
 
       const matchQuery = !searchQuery ||
