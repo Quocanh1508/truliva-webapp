@@ -716,21 +716,112 @@ export default function HotlineManage() {
                 {historyResults.serials?.length === 0 ? (
                   <div className="text-xs text-gray-400 py-3 italic">Không có thiết bị/serial nào</div>
                 ) : (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {historyResults.serials.map((s: any) => (
-                      <div key={s.id} className="p-4 rounded-xl border border-gray-200 bg-purple-50/20 space-y-2 text-xs">
-                        <div className="flex items-center justify-between">
-                          <span className="font-bold text-sm text-gray-800">{s.productLine || s.model || 'Thiết bị'}</span>
-                          <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-purple-100 text-purple-700">{s.status}</span>
-                        </div>
-                        <div className="space-y-1 text-gray-600">
-                          <div>Số Serial: <b className="font-mono text-purple-700">{s.serialNumber}</b></div>
-                          {s.customerName && <div>Chủ sở hữu: <b>{s.customerName}</b> ({s.customerPhone})</div>}
-                          {s.activationDate && <div>Ngày kích hoạt: {new Date(s.activationDate).toLocaleDateString('vi-VN')}</div>}
-                          {s.warrantyExpiryDate && <div>Hết hạn BH: <b className="text-emerald-700">{new Date(s.warrantyExpiryDate).toLocaleDateString('vi-VN')}</b></div>}
-                        </div>
-                      </div>
-                    ))}
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-xs text-left">
+                      <thead className="bg-gray-50/80 border-b border-gray-200 font-bold text-gray-600">
+                        <tr>
+                          <th className="px-3 py-2.5 whitespace-nowrap">Mã Serial</th>
+                          <th className="px-3 py-2.5 whitespace-nowrap">Sản phẩm / Dòng máy</th>
+                          <th className="px-3 py-2.5 whitespace-nowrap">Chủ sở hữu</th>
+                          <th className="px-3 py-2.5 whitespace-nowrap">Địa chỉ</th>
+                          <th className="px-3 py-2.5 whitespace-nowrap">Trạng thái bảo hành</th>
+                          <th className="px-3 py-2.5 whitespace-nowrap">Thời điểm KHBH</th>
+                          <th className="px-3 py-2.5 whitespace-nowrap">Hạn bảo hành (Hết BH)</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-100">
+                        {historyResults.serials.map((s: any) => {
+                          const isActivated = s.status === 'Đã kích hoạt' || !!s.activationDate;
+                          const isExpired = s.warrantyExpiryDate && new Date(s.warrantyExpiryDate).getTime() < Date.now();
+
+                          let statusBadge = { bg: 'bg-gray-100', text: 'text-gray-700', label: s.status || 'Chưa kích hoạt' };
+                          if (isExpired) {
+                            statusBadge = { bg: 'bg-rose-50 border border-rose-200', text: 'text-rose-700', label: 'Đã hết hạn' };
+                          } else if (s.status === 'Đã kích hoạt' || isActivated) {
+                            statusBadge = { bg: 'bg-emerald-50 border border-emerald-200', text: 'text-emerald-700', label: 'Đã kích hoạt' };
+                          } else if (s.status === 'Chờ duyệt') {
+                            statusBadge = { bg: 'bg-amber-50 border border-amber-200', text: 'text-amber-700', label: 'Chờ duyệt' };
+                          } else if (s.status === 'KH xác nhận') {
+                            statusBadge = { bg: 'bg-blue-50 border border-blue-200', text: 'text-blue-700', label: 'KH xác nhận' };
+                          }
+
+                          return (
+                            <tr key={s.id} className="hover:bg-purple-50/30 transition-colors">
+                              {/* 1. Mã Serial */}
+                              <td className="px-3 py-2.5 font-mono text-purple-700 font-bold whitespace-nowrap">
+                                {s.serialNumber}
+                              </td>
+
+                              {/* 2. Sản phẩm / Dòng máy */}
+                              <td className="px-3 py-2.5 font-medium text-gray-800">
+                                <span className="font-semibold text-gray-900">{s.productLine || s.model || '—'}</span>
+                                {s.model && s.productLine && s.model !== s.productLine && (
+                                  <span className="block text-[11px] text-gray-400 font-normal">{s.model}</span>
+                                )}
+                              </td>
+
+                              {/* 3. Chủ sở hữu */}
+                              <td className="px-3 py-2.5 text-gray-700">
+                                {s.customerName || s.customerPhone ? (
+                                  <div>
+                                    <span className="font-medium text-gray-900">{s.customerName || 'Khách hàng'}</span>
+                                    {s.customerPhone && (
+                                      <span className="text-gray-500 text-[11px] ml-1">({s.customerPhone})</span>
+                                    )}
+                                  </div>
+                                ) : (
+                                  <span className="text-gray-400 italic">—</span>
+                                )}
+                              </td>
+
+                              {/* 4. Địa chỉ */}
+                              <td className="px-3 py-2.5 text-gray-600 max-w-xs truncate" title={[s.address, s.province].filter(Boolean).join(', ')}>
+                                {[s.address, s.province].filter(Boolean).join(', ') || <span className="text-gray-400 italic">—</span>}
+                              </td>
+
+                              {/* 5. Trạng thái bảo hành */}
+                              <td className="px-3 py-2.5 whitespace-nowrap">
+                                <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold ${statusBadge.bg} ${statusBadge.text}`}>
+                                  {isActivated && !isExpired && <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>}
+                                  {isExpired && <span className="w-1.5 h-1.5 rounded-full bg-rose-500"></span>}
+                                  {statusBadge.label}
+                                </span>
+                              </td>
+
+                              {/* 6. Thời điểm KHBH (Kích hoạt bảo hành) */}
+                              <td className="px-3 py-2.5 text-gray-700 whitespace-nowrap">
+                                {s.activationDate ? (
+                                  <div className="flex flex-col">
+                                    <span className="font-semibold text-gray-800">{formatDateTime(s.activationDate)}</span>
+                                    {s.activatedBy && (
+                                      <span className="text-[10px] text-gray-400">qua {s.activatedBy}</span>
+                                    )}
+                                  </div>
+                                ) : (
+                                  <span className="text-gray-400 italic">Chưa KHBH</span>
+                                )}
+                              </td>
+
+                              {/* 7. Thời điểm Hết hạn BH */}
+                              <td className="px-3 py-2.5 whitespace-nowrap">
+                                {s.warrantyExpiryDate ? (
+                                  <div className="flex items-center gap-1.5">
+                                    <span className={`font-bold ${isExpired ? 'text-rose-600' : 'text-emerald-700'}`}>
+                                      {formatDateTime(s.warrantyExpiryDate)}
+                                    </span>
+                                    {isExpired && (
+                                      <span className="px-1.5 py-0.2 bg-rose-100 text-rose-700 rounded text-[9px] font-bold">Hết hạn</span>
+                                    )}
+                                  </div>
+                                ) : (
+                                  <span className="text-gray-400 italic">—</span>
+                                )}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
                   </div>
                 )}
               </div>

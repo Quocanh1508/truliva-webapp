@@ -148,7 +148,11 @@ export async function searchCustomerHistory(req: Request, res: Response) {
           address: true,
           province: true,
           status: true,
-          warrantyExpiryDate: true
+          activationDate: true,
+          warrantyExpiryDate: true,
+          customerConfirmationDate: true,
+          activatedBy: true,
+          createdAt: true
         },
         take: 20,
         orderBy: { createdAt: 'desc' }
