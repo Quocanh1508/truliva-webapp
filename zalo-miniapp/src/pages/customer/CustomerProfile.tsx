@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { 
   User, 
   Phone, 
@@ -21,6 +21,9 @@ import {
 } from 'lucide-react';
 import { openWebview, openChat } from 'zmp-sdk/apis';
 import { getCustomerRank, MemberTier, RANK_CONFIGS, NEXT_TIER_ORDER } from '../../utils/memberRank';
+import CustomerVoucherModal from '../../components/CustomerVoucherModal';
+import CustomerHistoryModal from '../../components/CustomerHistoryModal';
+import CustomerLoyaltyModal from '../../components/CustomerLoyaltyModal';
 
 interface CustomerProfileProps {
   user: any;
@@ -31,6 +34,12 @@ interface CustomerProfileProps {
 
 export default function CustomerProfile({ user, mySerials, onLogout, onOpenScanner }: CustomerProfileProps) {
   const [overrideTier, setOverrideTier] = useState<MemberTier | null>(null);
+  const [showVoucherModal, setShowVoucherModal] = useState(false);
+  const [showHistoryModal, setShowHistoryModal] = useState(false);
+  const [showLoyaltyModal, setShowLoyaltyModal] = useState(false);
+  
+  const devicesSectionRef = useRef<HTMLDivElement>(null);
+
   const userName = user?.fullName || 'Khách hàng Truliva';
   const userPhone = user?.phoneNumber || 'Chưa cập nhật SĐT';
   const userPoints = Number(user?.rewardPoints ?? user?.points ?? 250);
@@ -63,6 +72,10 @@ export default function CustomerProfile({ user, mySerials, onLogout, onOpenScann
     } catch (err) {
       window.location.href = 'https://zalo.me/3870382725035413507';
     }
+  };
+
+  const scrollToDevices = () => {
+    devicesSectionRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
 
   return (
@@ -121,20 +134,31 @@ export default function CustomerProfile({ user, mySerials, onLogout, onOpenScann
             </div>
           </div>
 
-          {/* Quick Stats Grid (P3R HUD Panel) */}
-          <div className="grid grid-cols-3 gap-2 bg-white/10 backdrop-blur-md rounded-2xl p-3.5 text-center border border-white/15 text-xs shadow-inner">
-            <div>
-              <p className="text-[9px] text-sky-200 uppercase tracking-wider font-bold">Thiết bị</p>
+          {/* Quick Stats Grid (Interactive P3R HUD Panel) */}
+          <div className="grid grid-cols-3 gap-2 bg-white/10 backdrop-blur-md rounded-2xl p-2.5 text-center border border-white/15 text-xs shadow-inner">
+            <button 
+              onClick={scrollToDevices}
+              className="p-1 rounded-xl hover:bg-white/10 active:scale-95 transition-all cursor-pointer group"
+            >
+              <p className="text-[9px] text-sky-200 uppercase tracking-wider font-bold group-hover:text-white transition-colors">Thiết bị</p>
               <p className="font-black text-white text-base mt-0.5">{(mySerials || []).length}</p>
-            </div>
-            <div className="border-x border-white/15">
-              <p className="text-[9px] text-sky-200 uppercase tracking-wider font-bold">Điểm thưởng</p>
+            </button>
+
+            <button 
+              onClick={() => setShowLoyaltyModal(true)}
+              className="p-1 rounded-xl border-x border-white/15 hover:bg-white/10 active:scale-95 transition-all cursor-pointer group"
+            >
+              <p className="text-[9px] text-sky-200 uppercase tracking-wider font-bold group-hover:text-white transition-colors">Điểm thưởng</p>
               <p className="font-black text-base mt-0.5 drop-shadow-xs" style={{ color: rank.iconColor }}>{userPoints}</p>
-            </div>
-            <div>
-              <p className="text-[9px] text-sky-200 uppercase tracking-wider font-bold">Voucher</p>
-              <p className="font-black text-cyan-200 text-base mt-0.5">2</p>
-            </div>
+            </button>
+
+            <button 
+              onClick={() => setShowVoucherModal(true)}
+              className="p-1 rounded-xl hover:bg-white/10 active:scale-95 transition-all cursor-pointer group"
+            >
+              <p className="text-[9px] text-sky-200 uppercase tracking-wider font-bold group-hover:text-white transition-colors">Voucher</p>
+              <p className="font-black text-cyan-200 text-base mt-0.5">3</p>
+            </button>
           </div>
         </div>
       </div>
@@ -142,7 +166,7 @@ export default function CustomerProfile({ user, mySerials, onLogout, onOpenScann
       <div className="max-w-md mx-auto px-4 mt-4 space-y-4">
         
         {/* 2. Section Máy lọc nước của tôi */}
-        <div className="space-y-2">
+        <div ref={devicesSectionRef} className="space-y-2 scroll-mt-6">
           <div className="flex justify-between items-center">
             <h2 className="text-xs font-extrabold text-slate-700 uppercase tracking-wider">
               Máy lọc nước của tôi ({(mySerials || []).length})
@@ -218,19 +242,22 @@ export default function CustomerProfile({ user, mySerials, onLogout, onOpenScann
         {/* 3. Utility Actions List */}
         <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm divide-y divide-slate-100 text-xs">
           
-          <button className="w-full p-3.5 flex items-center justify-between text-slate-800 font-semibold hover:bg-slate-50 transition-colors cursor-pointer">
+          <button 
+            onClick={() => setShowVoucherModal(true)}
+            className="w-full p-3.5 flex items-center justify-between text-slate-800 font-semibold hover:bg-slate-50 active:bg-slate-100 transition-colors cursor-pointer"
+          >
             <div className="flex items-center space-x-3">
               <div className="p-2 bg-cyan-50 text-cyan-700 rounded-xl">
                 <Ticket size={18} />
               </div>
-              <span>Ưu đãi & Voucher của tôi (2)</span>
+              <span>Ưu đãi & Voucher của tôi (3)</span>
             </div>
             <ChevronRight size={16} className="text-slate-400" />
           </button>
 
           <button 
-            onClick={() => handleBookMaintenance()}
-            className="w-full p-3.5 flex items-center justify-between text-slate-800 font-semibold hover:bg-slate-50 transition-colors cursor-pointer"
+            onClick={() => setShowHistoryModal(true)}
+            className="w-full p-3.5 flex items-center justify-between text-slate-800 font-semibold hover:bg-slate-50 active:bg-slate-100 transition-colors cursor-pointer"
           >
             <div className="flex items-center space-x-3">
               <div className="p-2 bg-sky-50 text-[#0284C7] rounded-xl">
@@ -243,7 +270,7 @@ export default function CustomerProfile({ user, mySerials, onLogout, onOpenScann
 
           <button 
             onClick={handleOpenOaChat}
-            className="w-full p-3.5 flex items-center justify-between text-slate-800 font-semibold hover:bg-slate-50 transition-colors cursor-pointer"
+            className="w-full p-3.5 flex items-center justify-between text-slate-800 font-semibold hover:bg-slate-50 active:bg-slate-100 transition-colors cursor-pointer"
           >
             <div className="flex items-center space-x-3">
               <div className="p-2 bg-blue-50 text-blue-700 rounded-xl">
@@ -267,6 +294,34 @@ export default function CustomerProfile({ user, mySerials, onLogout, onOpenScann
           </button>
         )}
       </div>
+
+      {/* Interactive Modals */}
+      <CustomerVoucherModal
+        isOpen={showVoucherModal}
+        onClose={() => setShowVoucherModal(false)}
+        onUseVoucher={(_code) => {
+          setShowVoucherModal(false);
+          handleBookMaintenance();
+        }}
+      />
+
+      <CustomerHistoryModal
+        isOpen={showHistoryModal}
+        onClose={() => setShowHistoryModal(false)}
+        onBookService={(serialNumber) => {
+          setShowHistoryModal(false);
+          handleBookMaintenance(serialNumber);
+        }}
+      />
+
+      <CustomerLoyaltyModal
+        isOpen={showLoyaltyModal}
+        onClose={() => setShowLoyaltyModal(false)}
+        userPoints={userPoints}
+        rank={rank}
+        onOpenScanner={onOpenScanner}
+      />
     </div>
   );
 }
+
