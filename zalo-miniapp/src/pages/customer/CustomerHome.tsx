@@ -12,12 +12,16 @@ import {
   MessageSquare,
   QrCode,
   CheckCircle2,
-  Calendar
+  Calendar,
+  Crown,
+  Award,
+  Gem
 } from 'lucide-react';
 import LuckyWheelModal from '../../components/LuckyWheelModal';
 import NewsDetailModal from '../../components/NewsDetailModal';
 import { openPhone, openWebview } from 'zmp-sdk/apis';
 import { fetchZaloApi } from '../../api/client';
+import { getCustomerRank } from '../../utils/memberRank';
 
 interface CustomerHomeProps {
   user: any;
@@ -114,6 +118,7 @@ export default function CustomerHome({ user, onOpenScanner, onOpenWarranty }: Cu
   const [articles, setArticles] = useState<any[]>(FEATURED_NEWS);
 
   const userName = user?.fullName || 'Khách hàng Truliva';
+  const rank = getCustomerRank(user);
 
   React.useEffect(() => {
     fetchZaloApi('/zalo-miniapp/articles')
@@ -168,16 +173,19 @@ export default function CustomerHome({ user, onOpenScanner, onOpenWarranty }: Cu
 
         <div className="max-w-md mx-auto flex items-center justify-between relative z-10">
           <div className="flex items-center space-x-3 min-w-0 flex-1">
-            {/* Avatar Circle with P3R Neon Ring */}
+            {/* Avatar Circle with Dynamic Rank Neon Ring */}
             <div className="relative flex-shrink-0">
-              <div className="w-12 h-12 rounded-full bg-[#0B2545] border-2 border-[#00D2FF] ring-2 ring-[#00D2FF]/40 flex items-center justify-center text-white font-black text-base shadow-[0_0_15px_rgba(0,210,255,0.45)] overflow-hidden">
+              <div className={`w-12 h-12 rounded-full bg-[#0B2545] border-2 ring-2 flex items-center justify-center text-white font-black text-base overflow-hidden transition-all ${rank.ringColor}`}>
                 {user?.avatar ? (
                   <img src={user.avatar} alt="Avatar" className="w-full h-full rounded-full object-cover" />
                 ) : (
                   <User size={24} className="text-cyan-200" />
                 )}
               </div>
-              <span className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 bg-[#00D2FF] border-2 border-[#061226] rounded-full"></span>
+              <span 
+                className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 border-2 border-[#061226] rounded-full"
+                style={{ backgroundColor: rank.iconColor }}
+              ></span>
             </div>
 
             <div className="min-w-0 flex-1">
@@ -186,11 +194,20 @@ export default function CustomerHome({ user, onOpenScanner, onOpenWarranty }: Cu
             </div>
           </div>
 
+          {/* Dynamic Slanted Rank Badge */}
           <div className="flex-shrink-0 ml-2">
-            <div className="p3r-slanted-badge bg-gradient-to-r from-[#00D2FF]/20 to-[#0284C7]/40 border border-[#00D2FF]/60 px-2.5 py-1 text-[10px] font-black text-cyan-200 uppercase tracking-wider flex items-center space-x-1 shadow-[0_0_12px_rgba(0,210,255,0.3)]">
+            <div className={`p3r-slanted-badge ${rank.badgeBg} border ${rank.borderColor} px-2.5 py-1 text-[10px] font-black ${rank.textColor} uppercase tracking-wider flex items-center space-x-1 ${rank.shadowGlow} transition-all`}>
               <div className="flex items-center space-x-1">
-                <Sparkles size={11} className="text-[#00D2FF]" />
-                <span>Thành viên Bạc</span>
+                {rank.tier === 'GOLD' ? (
+                  <Crown size={11} style={{ color: rank.iconColor }} />
+                ) : rank.tier === 'DIAMOND' ? (
+                  <Gem size={11} style={{ color: rank.iconColor }} />
+                ) : rank.tier === 'BRONZE' ? (
+                  <Award size={11} style={{ color: rank.iconColor }} />
+                ) : (
+                  <Sparkles size={11} style={{ color: rank.iconColor }} />
+                )}
+                <span>{rank.label}</span>
               </div>
             </div>
           </div>

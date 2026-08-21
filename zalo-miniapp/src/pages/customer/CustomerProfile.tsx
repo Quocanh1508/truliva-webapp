@@ -13,9 +13,14 @@ import {
   LogOut,
   Droplets,
   Calendar,
-  MessageSquare
+  MessageSquare,
+  Crown,
+  Award,
+  Gem,
+  Sparkles
 } from 'lucide-react';
 import { openWebview, openChat } from 'zmp-sdk/apis';
+import { getCustomerRank } from '../../utils/memberRank';
 
 interface CustomerProfileProps {
   user: any;
@@ -27,6 +32,8 @@ interface CustomerProfileProps {
 export default function CustomerProfile({ user, mySerials, onLogout, onOpenScanner }: CustomerProfileProps) {
   const userName = user?.fullName || 'Khách hàng Truliva';
   const userPhone = user?.phoneNumber || 'Chưa cập nhật SĐT';
+  const userPoints = Number(user?.rewardPoints ?? user?.points ?? 250);
+  const rank = getCustomerRank(user, userPoints);
 
   const handleBookMaintenance = async (serialNumber?: string) => {
     const url = serialNumber 
@@ -64,14 +71,17 @@ export default function CustomerProfile({ user, mySerials, onLogout, onOpenScann
         <div className="max-w-md mx-auto space-y-4 relative z-10">
           <div className="flex items-center space-x-4">
             <div className="relative">
-              <div className="w-16 h-16 rounded-full bg-[#0B2545] border-2 border-[#00D2FF] ring-2 ring-[#00D2FF]/40 flex items-center justify-center text-white font-black text-xl shadow-[0_0_18px_rgba(0,210,255,0.45)] overflow-hidden">
+              <div className={`w-16 h-16 rounded-full bg-[#0B2545] border-2 ring-2 flex items-center justify-center text-white font-black text-xl overflow-hidden transition-all ${rank.ringColor}`}>
                 {user?.avatar ? (
                   <img src={user.avatar} alt="Avatar" className="w-full h-full object-cover" />
                 ) : (
                   <User size={32} className="text-cyan-200" />
                 )}
               </div>
-              <span className="absolute bottom-0 right-0 w-4 h-4 bg-[#00D2FF] border-2 border-[#061226] rounded-full"></span>
+              <span 
+                className="absolute bottom-0 right-0 w-4 h-4 border-2 border-[#061226] rounded-full"
+                style={{ backgroundColor: rank.iconColor }}
+              ></span>
             </div>
             
             <div className="flex-1 min-w-0">
@@ -80,10 +90,20 @@ export default function CustomerProfile({ user, mySerials, onLogout, onOpenScann
                 <Phone size={12} className="mr-1 flex-shrink-0 text-[#00D2FF]" />
                 {userPhone}
               </p>
-              <div className="mt-2 inline-block p3r-slanted-badge bg-gradient-to-r from-[#00D2FF]/20 to-[#0284C7]/40 border border-[#00D2FF]/60 px-3 py-0.5 text-[9px] font-black text-cyan-200 uppercase tracking-wider shadow-[0_0_10px_rgba(0,210,255,0.3)]">
+              
+              {/* Dynamic Rank Badge */}
+              <div className={`mt-2 inline-block p3r-slanted-badge ${rank.badgeBg} border ${rank.borderColor} px-3 py-0.5 text-[9px] font-black ${rank.textColor} uppercase tracking-wider ${rank.shadowGlow} transition-all`}>
                 <div className="flex items-center space-x-1.5">
-                  <Star size={11} className="fill-[#00D2FF] text-[#00D2FF]" />
-                  <span>Thành viên Bạc (250 Điểm)</span>
+                  {rank.tier === 'GOLD' ? (
+                    <Crown size={11} style={{ color: rank.iconColor }} />
+                  ) : rank.tier === 'DIAMOND' ? (
+                    <Gem size={11} style={{ color: rank.iconColor }} />
+                  ) : rank.tier === 'BRONZE' ? (
+                    <Award size={11} style={{ color: rank.iconColor }} />
+                  ) : (
+                    <Sparkles size={11} style={{ color: rank.iconColor }} />
+                  )}
+                  <span>{rank.label} ({userPoints} Điểm)</span>
                 </div>
               </div>
             </div>
@@ -97,7 +117,7 @@ export default function CustomerProfile({ user, mySerials, onLogout, onOpenScann
             </div>
             <div className="border-x border-white/15">
               <p className="text-[9px] text-sky-200 uppercase tracking-wider font-bold">Điểm thưởng</p>
-              <p className="font-black text-[#00D2FF] text-base mt-0.5 drop-shadow-xs">250</p>
+              <p className="font-black text-base mt-0.5 drop-shadow-xs" style={{ color: rank.iconColor }}>{userPoints}</p>
             </div>
             <div>
               <p className="text-[9px] text-sky-200 uppercase tracking-wider font-bold">Voucher</p>
