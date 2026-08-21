@@ -21,7 +21,7 @@ import LuckyWheelModal from '../../components/LuckyWheelModal';
 import NewsDetailModal from '../../components/NewsDetailModal';
 import { openPhone, openWebview } from 'zmp-sdk/apis';
 import { fetchZaloApi } from '../../api/client';
-import { getCustomerRank } from '../../utils/memberRank';
+import { getCustomerRank, MemberTier, RANK_CONFIGS, NEXT_TIER_ORDER } from '../../utils/memberRank';
 
 interface CustomerHomeProps {
   user: any;
@@ -116,9 +116,17 @@ export default function CustomerHome({ user, onOpenScanner, onOpenWarranty }: Cu
   const [showWheelModal, setShowWheelModal] = useState(false);
   const [selectedArticle, setSelectedArticle] = useState<any>(null);
   const [articles, setArticles] = useState<any[]>(FEATURED_NEWS);
+  const [overrideTier, setOverrideTier] = useState<MemberTier | null>(null);
 
   const userName = user?.fullName || 'Khách hàng Truliva';
-  const rank = getCustomerRank(user);
+  const baseRank = getCustomerRank(user);
+  const rank = overrideTier ? RANK_CONFIGS[overrideTier] : baseRank;
+
+  const handleCycleTier = () => {
+    const currentIndex = NEXT_TIER_ORDER.indexOf(rank.tier);
+    const nextTier = NEXT_TIER_ORDER[(currentIndex + 1) % NEXT_TIER_ORDER.length];
+    setOverrideTier(nextTier);
+  };
 
   React.useEffect(() => {
     fetchZaloApi('/zalo-miniapp/articles')
@@ -167,7 +175,7 @@ export default function CustomerHome({ user, onOpenScanner, onOpenWarranty }: Cu
         <div className="water-bubble w-6 h-6 left-[24%] bottom-2 bubble-anim-2"></div>
         <div className="water-bubble w-3.5 h-3.5 left-[42%] bottom-1 bubble-anim-3"></div>
         <div className="water-bubble w-5 h-5 left-[62%] bottom-3 bubble-anim-4"></div>
-        <div className="water-bubble w-3 h-3 left-[78%] bottom-1 bubble-anim-5"></div>
+        <div className="water-bubble w-3.5 h-3.5 left-[78%] bottom-1 bubble-anim-5"></div>
         <div className="water-bubble w-5.5 h-5.5 left-[88%] bottom-2 bubble-anim-6"></div>
         <div className="water-bubble w-4 h-4 left-[52%] bottom-3 bubble-anim-2"></div>
 
@@ -183,7 +191,7 @@ export default function CustomerHome({ user, onOpenScanner, onOpenWarranty }: Cu
                 )}
               </div>
               <span 
-                className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 border-2 border-[#061226] rounded-full"
+                className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 border-2 border-[#061226] rounded-full transition-all"
                 style={{ backgroundColor: rank.iconColor }}
               ></span>
             </div>
@@ -194,9 +202,13 @@ export default function CustomerHome({ user, onOpenScanner, onOpenWarranty }: Cu
             </div>
           </div>
 
-          {/* Dynamic Slanted Rank Badge */}
+          {/* Dynamic Slanted Rank Badge (Click to Preview all tiers) */}
           <div className="flex-shrink-0 ml-2">
-            <div className={`p3r-slanted-badge ${rank.badgeBg} border ${rank.borderColor} px-2.5 py-1 text-[10px] font-black ${rank.textColor} uppercase tracking-wider flex items-center space-x-1 ${rank.shadowGlow} transition-all`}>
+            <button 
+              onClick={handleCycleTier}
+              title="Nhấn để đổi xem màu các hạng thành viên: Đồng ➔ Bạc ➔ Vàng ➔ Kim Cương"
+              className={`p3r-slanted-badge ${rank.badgeBg} border ${rank.borderColor} px-2.5 py-1 text-[10px] font-black ${rank.textColor} uppercase tracking-wider flex items-center space-x-1 ${rank.shadowGlow} active:scale-95 transition-all cursor-pointer`}
+            >
               <div className="flex items-center space-x-1">
                 {rank.tier === 'GOLD' ? (
                   <Crown size={11} style={{ color: rank.iconColor }} />
@@ -209,7 +221,7 @@ export default function CustomerHome({ user, onOpenScanner, onOpenWarranty }: Cu
                 )}
                 <span>{rank.label}</span>
               </div>
-            </div>
+            </button>
           </div>
         </div>
       </div>

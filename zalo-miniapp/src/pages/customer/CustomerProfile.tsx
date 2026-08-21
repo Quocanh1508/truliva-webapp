@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { 
   User, 
   Phone, 
@@ -20,7 +20,7 @@ import {
   Sparkles
 } from 'lucide-react';
 import { openWebview, openChat } from 'zmp-sdk/apis';
-import { getCustomerRank } from '../../utils/memberRank';
+import { getCustomerRank, MemberTier, RANK_CONFIGS, NEXT_TIER_ORDER } from '../../utils/memberRank';
 
 interface CustomerProfileProps {
   user: any;
@@ -30,10 +30,18 @@ interface CustomerProfileProps {
 }
 
 export default function CustomerProfile({ user, mySerials, onLogout, onOpenScanner }: CustomerProfileProps) {
+  const [overrideTier, setOverrideTier] = useState<MemberTier | null>(null);
   const userName = user?.fullName || 'Khách hàng Truliva';
   const userPhone = user?.phoneNumber || 'Chưa cập nhật SĐT';
   const userPoints = Number(user?.rewardPoints ?? user?.points ?? 250);
-  const rank = getCustomerRank(user, userPoints);
+  const baseRank = getCustomerRank(user, userPoints);
+  const rank = overrideTier ? RANK_CONFIGS[overrideTier] : baseRank;
+
+  const handleCycleTier = () => {
+    const currentIndex = NEXT_TIER_ORDER.indexOf(rank.tier);
+    const nextTier = NEXT_TIER_ORDER[(currentIndex + 1) % NEXT_TIER_ORDER.length];
+    setOverrideTier(nextTier);
+  };
 
   const handleBookMaintenance = async (serialNumber?: string) => {
     const url = serialNumber 
@@ -79,7 +87,7 @@ export default function CustomerProfile({ user, mySerials, onLogout, onOpenScann
                 )}
               </div>
               <span 
-                className="absolute bottom-0 right-0 w-4 h-4 border-2 border-[#061226] rounded-full"
+                className="absolute bottom-0 right-0 w-4 h-4 border-2 border-[#061226] rounded-full transition-all"
                 style={{ backgroundColor: rank.iconColor }}
               ></span>
             </div>
@@ -91,8 +99,12 @@ export default function CustomerProfile({ user, mySerials, onLogout, onOpenScann
                 {userPhone}
               </p>
               
-              {/* Dynamic Rank Badge */}
-              <div className={`mt-2 inline-block p3r-slanted-badge ${rank.badgeBg} border ${rank.borderColor} px-3 py-0.5 text-[9px] font-black ${rank.textColor} uppercase tracking-wider ${rank.shadowGlow} transition-all`}>
+              {/* Dynamic Rank Badge (Click to Preview all tiers) */}
+              <button 
+                onClick={handleCycleTier}
+                title="Nhấn để đổi xem màu các hạng thành viên: Đồng ➔ Bạc ➔ Vàng ➔ Kim Cương"
+                className={`mt-2 inline-block p3r-slanted-badge ${rank.badgeBg} border ${rank.borderColor} px-3 py-0.5 text-[9px] font-black ${rank.textColor} uppercase tracking-wider ${rank.shadowGlow} active:scale-95 transition-all cursor-pointer`}
+              >
                 <div className="flex items-center space-x-1.5">
                   {rank.tier === 'GOLD' ? (
                     <Crown size={11} style={{ color: rank.iconColor }} />
@@ -103,9 +115,9 @@ export default function CustomerProfile({ user, mySerials, onLogout, onOpenScann
                   ) : (
                     <Sparkles size={11} style={{ color: rank.iconColor }} />
                   )}
-                  <span>{rank.label} ({userPoints} Điểm)</span>
+                  <span>{rank.label} ({overrideTier ? rank.minPoints : userPoints} Điểm)</span>
                 </div>
-              </div>
+              </button>
             </div>
           </div>
 
