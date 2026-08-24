@@ -1,0 +1,67 @@
+# =====================================================================
+# Strix AI Penetration Testing Configuration for Truliva System
+# Repository: https://github.com/usestrix/strix
+# =====================================================================
+
+version: "1.0"
+
+# Mục tiêu kiểm thử bảo mật
+target:
+  name: "Truliva Web Application & API Backend"
+  # URL kiểm thử mặc định (Local dev/staging sandbox)
+  url: "http://localhost:3000"
+  
+# Phạm vi quét (Scope definition)
+scope:
+  include:
+    - "http://localhost:3000/api/**"
+    - "http://localhost:3000/admin/**"
+    - "http://localhost:3000/ktv/**"
+    - "http://localhost:3000/auth/**"
+  
+  # Loại trừ các webhook bên thứ 3 và các endpoint gửi thông báo thật trong quá trình test
+  exclude:
+    - "http://localhost:3000/api/pancake/webhook"
+    - "http://localhost:3000/api/zalo/webhook"
+    - "http://localhost:3000/api/broadcast"
+
+# Cấu hình AI Agent & Sandbox
+agent:
+  # Hỗ trợ: openai (gpt-4o), anthropic (claude-3-5-sonnet), google (gemini-1.5-pro/gemini-2.0)
+  model_provider: "openai"
+  model_name: "gpt-4o"
+  max_iterations: 30
+  sandbox:
+    docker_image: "ghcr.io/usestrix/strix-sandbox:latest"
+    timeout_seconds: 1800
+
+# Tiêu chí kiểm thử bảo mật cốt lõi
+tests:
+  - id: "auth-rbac-bypass"
+    name: "Kiểm tra leo thang đặc quyền Role (ADMIN vs COORDINATOR vs KTV vs STAFF)"
+    enabled: true
+
+  - id: "idor-orders-customers"
+    name: "Kiểm tra lỗi IDOR xem/sửa đơn hàng, thông tin khách hàng, báo cáo bảo trì"
+    enabled: true
+
+  - id: "injection-sqli-nosql"
+    name: "Kiểm tra SQL/Prisma Injection & Parameter Tampering"
+    enabled: true
+
+  - id: "api-rate-limit"
+    name: "Kiểm tra giới hạn tần suất Rate Limit & OTP Brute-force"
+    enabled: true
+
+  - id: "xss-csrf-cors"
+    name: "Kiểm tra Cross-Site Scripting, CSRF và cấu hình CORS Header"
+    enabled: true
+
+# Cấu hình xuất báo cáo
+reporting:
+  output_dir: "./reports/security"
+  formats:
+    - "html"
+    - "json"
+    - "markdown"
+  require_poc: true # Chỉ báo cáo các lỗ hổng đã xác thực thành công kèm Proof-of-Concept
