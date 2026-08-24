@@ -441,7 +441,7 @@ export default function LoginPage() {
             <span>Truliva App</span>
           </div>
           <h2 className="font-bold text-[18px] mt-3.5 text-white tracking-wide leading-snug">
-            Hệ thống quản lí dịch vụ<br />và kĩ thuật viên
+            Hệ thống quản lý dịch vụ<br />và kỹ thuật viên
           </h2>
         </div>
 

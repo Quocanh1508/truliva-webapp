@@ -123,7 +123,7 @@ export default function Layout() {
 
     // 9. Quản lý nhân sự & Phân quyền: kiểm tra quyền USER_MANAGE hoặc USER_PERMISSIONS_MATRIX
     if (hasPermission('USER_MANAGE') || hasPermission('USER_PERMISSIONS_MATRIX')) {
-      items.push({ name: 'Quản lí nhân viên', path: '/admin/users', icon: <Users size={20} /> });
+      items.push({ name: 'Quản lý nhân viên', path: '/admin/users', icon: <Users size={20} /> });
     }
 
     // 10. Ảnh mẫu báo cáo
