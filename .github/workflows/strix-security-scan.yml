@@ -16,6 +16,10 @@ on:
           - google
           - openai
           - anthropic
+      model_name:
+        description: "Custom Model Name (default for Google: gemini/gemini-3.6-flash)"
+        required: false
+        default: "gemini/gemini-3.6-flash"
       api_key_input:
         description: "Direct API Key (Optional fallback if Secret not found)"
         required: false
@@ -99,6 +103,7 @@ jobs:
       - name: Run Strix Autonomous AI Pentest Scan
         env:
           MODEL_CHOICE: ${{ github.event.inputs.model_provider || 'google' }}
+          CUSTOM_MODEL: ${{ github.event.inputs.model_name }}
           DIRECT_KEY: ${{ github.event.inputs.api_key_input }}
           SECRET_GEMINI: ${{ secrets.GEMINI_API_KEY || secrets.GOOGLE_API_KEY || secrets.GOOGLE_GEMINI_API_KEY }}
           SECRET_OPENAI: ${{ secrets.OPENAI_API_KEY || secrets.OPENAI_KEY }}
@@ -141,20 +146,21 @@ jobs:
           echo "::add-mask::$ACTIVE_KEY"
           
           # Cấu hình Model & Environment
-          if [ "$MODEL_CHOICE" = "google" ]; then
-            export STRIX_LLM="gemini/gemini-2.0-flash"
-            export LLM_API_KEY="$ACTIVE_KEY"
-            export GEMINI_API_KEY="$ACTIVE_KEY"
-            export GOOGLE_API_KEY="$ACTIVE_KEY"
+          if [ -n "$CUSTOM_MODEL" ]; then
+            export STRIX_LLM="$CUSTOM_MODEL"
+          elif [ "$MODEL_CHOICE" = "google" ]; then
+            export STRIX_LLM="gemini/gemini-3.6-flash"
           elif [ "$MODEL_CHOICE" = "anthropic" ]; then
             export STRIX_LLM="anthropic/claude-3-5-sonnet-20241022"
-            export LLM_API_KEY="$ACTIVE_KEY"
-            export ANTHROPIC_API_KEY="$ACTIVE_KEY"
           else
             export STRIX_LLM="openai/gpt-4o"
-            export LLM_API_KEY="$ACTIVE_KEY"
-            export OPENAI_API_KEY="$ACTIVE_KEY"
           fi
+          
+          export LLM_API_KEY="$ACTIVE_KEY"
+          export GEMINI_API_KEY="$ACTIVE_KEY"
+          export GOOGLE_API_KEY="$ACTIVE_KEY"
+          export OPENAI_API_KEY="$ACTIVE_KEY"
+          export ANTHROPIC_API_KEY="$ACTIVE_KEY"
           
           # Ghi cấu hình cố định vào ~/.strix/cli-config.json cho Strix
           cat << EOF > ~/.strix/cli-config.json
@@ -163,7 +169,9 @@ jobs:
               "STRIX_LLM": "$STRIX_LLM",
               "LLM_API_KEY": "$ACTIVE_KEY",
               "GEMINI_API_KEY": "$ACTIVE_KEY",
-              "GOOGLE_API_KEY": "$ACTIVE_KEY"
+              "GOOGLE_API_KEY": "$ACTIVE_KEY",
+              "OPENAI_API_KEY": "$ACTIVE_KEY",
+              "ANTHROPIC_API_KEY": "$ACTIVE_KEY"
             }
           }
           EOF
