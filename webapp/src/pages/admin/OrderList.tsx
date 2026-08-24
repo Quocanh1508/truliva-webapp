@@ -3594,11 +3594,18 @@ export default function OrderList() {
                             }
                           }
                         }}
-                        onFocus={() => setShowWarehouseDropdown(true)}
+                        onFocus={() => {
+                          setWarehouseSearch('');
+                          setShowWarehouseDropdown(true);
+                        }}
                         onBlur={() => {
                           setTimeout(() => {
                             setShowWarehouseDropdown(false);
-                            if (warehouseSearch.trim()) {
+                            // Restore display name of selected warehouse
+                            if (selectedWarehouseId) {
+                              const currentWh = warehouses.find(w => w.id === selectedWarehouseId);
+                              setWarehouseSearch(currentWh ? currentWh.name : '');
+                            } else if (warehouseSearch.trim()) {
                               const cleanInput = removeAccents(warehouseSearch).trim().toLowerCase();
                               const matched = warehouses.find(w => removeAccents(w.name).trim().toLowerCase() === cleanInput)
                                 || warehouses.find(w => removeAccents(w.name).toLowerCase().includes(cleanInput));
@@ -3606,11 +3613,9 @@ export default function OrderList() {
                                 setSelectedWarehouseId(matched.id);
                                 setWarehouseSearch(matched.name);
                               } else {
-                                const currentWh = warehouses.find(w => w.id === selectedWarehouseId);
-                                setWarehouseSearch(currentWh ? currentWh.name : '');
+                                setWarehouseSearch('');
+                                setSelectedWarehouseId('');
                               }
-                            } else {
-                              setSelectedWarehouseId('');
                             }
                           }, 200);
                         }}
@@ -3618,7 +3623,15 @@ export default function OrderList() {
                       <button
                         type="button"
                         className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 text-xs focus:outline-none"
-                        onClick={() => setShowWarehouseDropdown(!showWarehouseDropdown)}
+                        onClick={() => {
+                          if (!showWarehouseDropdown) {
+                            setWarehouseSearch('');
+                          } else if (selectedWarehouseId) {
+                            const currentWh = warehouses.find(w => w.id === selectedWarehouseId);
+                            setWarehouseSearch(currentWh ? currentWh.name : '');
+                          }
+                          setShowWarehouseDropdown(!showWarehouseDropdown);
+                        }}
                       >
                         {showWarehouseDropdown ? '▲' : '▼'}
                       </button>
@@ -3626,11 +3639,17 @@ export default function OrderList() {
 
                     {showWarehouseDropdown && (
                       <>
-                        <div className="fixed inset-0 z-10" onClick={() => setShowWarehouseDropdown(false)} />
+                        <div className="fixed inset-0 z-10" onClick={() => {
+                          setShowWarehouseDropdown(false);
+                          if (selectedWarehouseId) {
+                            const currentWh = warehouses.find(w => w.id === selectedWarehouseId);
+                            setWarehouseSearch(currentWh ? currentWh.name : '');
+                          }
+                        }} />
                         
                         <div className="absolute left-0 right-0 mt-1 max-h-48 overflow-y-auto bg-white border rounded shadow-lg z-20 divide-y divide-gray-100">
                           {warehouses
-                            .filter(w => removeAccents(w.name).includes(removeAccents(warehouseSearch)))
+                            .filter(w => !warehouseSearch.trim() || removeAccents(w.name).toLowerCase().includes(removeAccents(warehouseSearch).toLowerCase()))
                             .map(w => (
                               <button
                                 key={w.id}
@@ -3647,7 +3666,7 @@ export default function OrderList() {
                                 {w.name}
                               </button>
                             ))}
-                          {warehouses.filter(w => removeAccents(w.name).includes(removeAccents(warehouseSearch))).length === 0 && (
+                          {warehouses.filter(w => !warehouseSearch.trim() || removeAccents(w.name).toLowerCase().includes(removeAccents(warehouseSearch).toLowerCase())).length === 0 && (
                             <div className="p-3 text-xs text-gray-400 italic text-center">Không tìm thấy kho hàng nào</div>
                           )}
                         </div>
@@ -4909,11 +4928,18 @@ export default function OrderList() {
                         }
                       }
                     }}
-                    onFocus={() => setShowBulkWarehouseDropdown(true)}
+                    onFocus={() => {
+                      setBulkWarehouseSearch('');
+                      setShowBulkWarehouseDropdown(true);
+                    }}
                     onBlur={() => {
                       setTimeout(() => {
                         setShowBulkWarehouseDropdown(false);
-                        if (bulkWarehouseSearch.trim()) {
+                        // Restore display name of selected warehouse
+                        if (bulkWarehouseId) {
+                          const currentWh = warehouses.find(w => w.id === bulkWarehouseId);
+                          setBulkWarehouseSearch(currentWh ? currentWh.name : '');
+                        } else if (bulkWarehouseSearch.trim()) {
                           const cleanInput = removeAccents(bulkWarehouseSearch).trim().toLowerCase();
                           const matched = warehouses.find(w => removeAccents(w.name).trim().toLowerCase() === cleanInput)
                             || warehouses.find(w => removeAccents(w.name).toLowerCase().includes(cleanInput));
@@ -4921,11 +4947,9 @@ export default function OrderList() {
                             setBulkWarehouseId(matched.id);
                             setBulkWarehouseSearch(matched.name);
                           } else {
-                            const currentWh = warehouses.find(w => w.id === bulkWarehouseId);
-                            setBulkWarehouseSearch(currentWh ? currentWh.name : '');
+                            setBulkWarehouseSearch('');
+                            setBulkWarehouseId('');
                           }
-                        } else {
-                          setBulkWarehouseId('');
                         }
                       }, 200);
                     }}
@@ -4933,7 +4957,15 @@ export default function OrderList() {
                   <button
                     type="button"
                     className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 text-xs focus:outline-none"
-                    onClick={() => setShowBulkWarehouseDropdown(!showBulkWarehouseDropdown)}
+                    onClick={() => {
+                      if (!showBulkWarehouseDropdown) {
+                        setBulkWarehouseSearch('');
+                      } else if (bulkWarehouseId) {
+                        const currentWh = warehouses.find(w => w.id === bulkWarehouseId);
+                        setBulkWarehouseSearch(currentWh ? currentWh.name : '');
+                      }
+                      setShowBulkWarehouseDropdown(!showBulkWarehouseDropdown);
+                    }}
                   >
                     {showBulkWarehouseDropdown ? '▲' : '▼'}
                   </button>
@@ -4941,7 +4973,13 @@ export default function OrderList() {
 
                 {showBulkWarehouseDropdown && (
                   <>
-                    <div className="fixed inset-0 z-10" onClick={() => setShowBulkWarehouseDropdown(false)} />
+                    <div className="fixed inset-0 z-10" onClick={() => {
+                      setShowBulkWarehouseDropdown(false);
+                      if (bulkWarehouseId) {
+                        const currentWh = warehouses.find(w => w.id === bulkWarehouseId);
+                        setBulkWarehouseSearch(currentWh ? currentWh.name : '');
+                      }
+                    }} />
                     <div className="absolute left-0 right-0 mt-1 max-h-40 overflow-y-auto bg-white border rounded shadow-lg z-20 divide-y divide-gray-100">
                       <button
                         type="button"
@@ -4955,7 +4993,7 @@ export default function OrderList() {
                         -- Giữ nguyên kho cũ (Không thay đổi) --
                       </button>
                       {warehouses
-                        .filter(w => removeAccents(w.name).includes(removeAccents(bulkWarehouseSearch)))
+                        .filter(w => !bulkWarehouseSearch.trim() || removeAccents(w.name).toLowerCase().includes(removeAccents(bulkWarehouseSearch).toLowerCase()))
                         .map(w => (
                           <button
                             key={w.id}
