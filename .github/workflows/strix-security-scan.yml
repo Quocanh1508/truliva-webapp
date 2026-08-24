@@ -17,9 +17,9 @@ on:
           - openai
           - anthropic
       model_name:
-        description: "Custom Model Name (default for Google: gemini/gemini-3.6-flash)"
+        description: "Custom Model Name (default for Google: gemini/gemini-2.5-flash)"
         required: false
-        default: "gemini/gemini-3.6-flash"
+        default: "gemini/gemini-2.5-flash"
       api_key_input:
         description: "Direct API Key (Optional fallback if Secret not found)"
         required: false
@@ -149,7 +149,7 @@ jobs:
           if [ -n "$CUSTOM_MODEL" ]; then
             export STRIX_LLM="$CUSTOM_MODEL"
           elif [ "$MODEL_CHOICE" = "google" ]; then
-            export STRIX_LLM="gemini/gemini-3.6-flash"
+            export STRIX_LLM="gemini/gemini-2.5-flash"
           elif [ "$MODEL_CHOICE" = "anthropic" ]; then
             export STRIX_LLM="anthropic/claude-3-5-sonnet-20241022"
           else
@@ -161,6 +161,8 @@ jobs:
           export GOOGLE_API_KEY="$ACTIVE_KEY"
           export OPENAI_API_KEY="$ACTIVE_KEY"
           export ANTHROPIC_API_KEY="$ACTIVE_KEY"
+          export LITELLM_NUM_RETRIES=5
+          export LITELLM_RETRY_DELAY=10
           
           # Ghi cấu hình cố định vào ~/.strix/cli-config.json cho Strix
           cat << EOF > ~/.strix/cli-config.json
