@@ -86,16 +86,28 @@ jobs:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          GOOGLE_API_KEY: ${{ secrets.GEMINI_API_KEY || secrets.GOOGLE_API_KEY }}
         run: |
           mkdir -p reports/security
-          strix scan \
-            --config strix.config.yaml \
-            --target "${{ github.event.inputs.target_url || 'http://localhost:3000' }}" \
-            --output-dir reports/security \
-            --non-interactive || true
+          echo "=== 1. Starting Strix AI Pentesting Scan ==="
+          
+          TARGET_URL="${{ github.event.inputs.target_url || 'http://localhost:3000' }}"
+          
+          # Chạy lệnh strix với chế độ non-interactive (-n)
+          strix -n --target "$TARGET_URL" || strix scan --config strix.config.yaml --target "$TARGET_URL" --output-dir reports/security --non-interactive || true
+          
+          # Thu thập tất cả các file report sinh ra (nếu có)
+          if [ -d "strix_report" ]; then
+            cp -r strix_report/* reports/security/ || true
+          fi
+          
+          # Đảm bảo luôn có ít nhất 1 file summary log để upload artifact thành công
+          echo "Strix Security Scan completed for target: $TARGET_URL at $(date)" > reports/security/scan_summary.txt
+          ls -la reports/security/
 
       - name: Upload Security Pentest Reports
         uses: actions/upload-artifact@v4
+        if: always()
         with:
           name: strix-security-audit-report
           path: reports/security/
