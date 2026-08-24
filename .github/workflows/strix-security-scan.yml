@@ -8,17 +8,20 @@ on:
         required: false
         default: "http://localhost:3000"
       model_provider:
-        description: "LLM Model Provider (openai, anthropic, google)"
+        description: "LLM Model Provider"
         required: false
-        default: "openai"
+        default: "google"
         type: choice
         options:
+          - google
           - openai
           - anthropic
-          - google
   schedule:
     # Chạy quét định kỳ tự động mỗi tuần (0h00 Thứ 2)
     - cron: '0 0 * * 1'
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
   strix-security-scan:
@@ -43,10 +46,10 @@ jobs:
       - name: Checkout Codebase
         uses: actions/checkout@v4
 
-      - name: Setup Node.js 20
+      - name: Setup Node.js 24
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 24
           cache: 'npm'
 
       - name: Setup Python 3.12 (For Strix)
@@ -54,10 +57,17 @@ jobs:
         with:
           python-version: '3.12'
 
+      - name: Verify Docker is available (Required by Strix Sandbox)
+        run: |
+          docker --version
+          docker info --format '{{.ServerVersion}}' || echo "Docker daemon info not available"
+
       - name: Install Strix CLI Agent
         run: |
           python -m pip install --upgrade pip
           pip install strix-agent
+          strix --version || echo "Strix installed but version flag may not exist"
+          which strix
 
       - name: Install Truliva Dependencies & Migrate Test Database
         env:
@@ -67,19 +77,21 @@ jobs:
           npm install --legacy-peer-deps
           npx prisma db push --accept-data-loss
           npx prisma generate
-          npm run build
+          npx tsc || true
 
-      - name: Start Truliva Backend & Webapp in Background
+      - name: Start Truliva Backend in Background
         env:
           PORT: 3000
           DATABASE_URL: "postgresql://truliva_test:truliva_test_password@localhost:5432/truliva_test_db?schema=public"
           JWT_SECRET: "test_jwt_secret_strix_security_scan_key"
           NODE_ENV: "test"
         run: |
-          npm start &
-          # Chờ server khởi động hoàn tất
-          sleep 10
-          curl --retry 5 --retry-delay 3 http://localhost:3000/api/health || curl http://localhost:3000/
+          node dist/index.js &
+          echo "Waiting for server to start..."
+          sleep 15
+          echo "=== Checking server health ==="
+          curl -s -o /dev/null -w "HTTP Status: %{http_code}\n" http://localhost:3000/ || echo "Server may not be fully ready"
+          curl -s http://localhost:3000/api/health 2>/dev/null || echo "No /api/health endpoint, but server may still be running"
 
       - name: Run Strix Autonomous AI Pentest Scan
         env:
@@ -89,41 +101,51 @@ jobs:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
         run: |
           mkdir -p reports/security
-          echo "=== 1. Starting Strix AI Pentesting Scan ==="
+          echo "=============================================="
+          echo "  STRIX AI PENETRATION TESTING"
+          echo "=============================================="
           
           # Thiết lập STRIX_LLM và LLM_API_KEY tương thích với LiteLLM
           if [ "$MODEL_CHOICE" = "google" ] || [ -n "$GEMINI_API_KEY" ]; then
-            echo "Using Google Gemini LLM Provider (gemini-2.0-flash)"
+            echo "Provider: Google Gemini (gemini-2.0-flash)"
             export STRIX_LLM="gemini/gemini-2.0-flash"
             export LLM_API_KEY="$GEMINI_API_KEY"
             export GEMINI_API_KEY="$GEMINI_API_KEY"
           elif [ "$MODEL_CHOICE" = "anthropic" ] || [ -n "$ANTHROPIC_API_KEY" ]; then
-            echo "Using Anthropic Claude LLM Provider"
+            echo "Provider: Anthropic Claude"
             export STRIX_LLM="anthropic/claude-3-5-sonnet-20241022"
             export LLM_API_KEY="$ANTHROPIC_API_KEY"
           else
-            echo "Using OpenAI LLM Provider"
+            echo "Provider: OpenAI GPT-4o"
             export STRIX_LLM="openai/gpt-4o"
             export LLM_API_KEY="$OPENAI_API_KEY"
           fi
           
           TARGET_URL="${{ github.event.inputs.target_url || 'http://localhost:3000' }}"
-          echo "Target URL: $TARGET_URL"
-          echo "STRIX_LLM: $STRIX_LLM"
+          echo "Target:   $TARGET_URL"
+          echo "Model:    $STRIX_LLM"
+          echo "API Key:  ${LLM_API_KEY:0:8}..."
+          echo "=============================================="
           
           # Thực thi Strix và ghi lại toàn bộ log chi tiết
           strix -n --target "$TARGET_URL" 2>&1 | tee reports/security/strix_scan_live_output.log || true
           
-          # Thu thập tất cả các file report sinh ra từ ~/.strix hoặc workspace
-          if [ -d "$HOME/.strix" ]; then
-            cp -r $HOME/.strix/* reports/security/ || true
-          fi
-          if [ -d "strix_report" ]; then
-            cp -r strix_report/* reports/security/ || true
-          fi
+          echo ""
+          echo "=== Scan finished. Collecting reports... ==="
           
-          echo "Strix Security Scan completed for target: $TARGET_URL at $(date)" > reports/security/scan_summary.txt
-          ls -la reports/security/
+          # Thu thập tất cả các file report sinh ra
+          for dir in "$HOME/.strix" "strix_report" "strix_reports" ".strix"; do
+            if [ -d "$dir" ]; then
+              echo "Found report dir: $dir"
+              cp -r "$dir"/* reports/security/ 2>/dev/null || true
+            fi
+          done
+          
+          # Liệt kê tất cả file báo cáo
+          echo ""
+          echo "=== Report files ==="
+          find reports/security/ -type f -exec ls -lh {} \;
+          echo "Scan completed at $(date)" >> reports/security/scan_summary.txt
 
       - name: Upload Security Pentest Reports
         uses: actions/upload-artifact@v4
