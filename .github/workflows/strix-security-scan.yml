@@ -16,6 +16,10 @@ on:
           - google
           - openai
           - anthropic
+      api_key_input:
+        description: "Direct API Key (Optional fallback if Secret not found)"
+        required: false
+        default: ""
   schedule:
     # Chạy quét định kỳ tự động mỗi tuần (0h00 Thứ 2)
     - cron: '0 0 * * 1'
@@ -66,7 +70,6 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install strix-agent
-          strix --version || echo "Strix installed but version flag may not exist"
           which strix
 
       - name: Install Truliva Dependencies & Migrate Test Database
@@ -96,38 +99,79 @@ jobs:
       - name: Run Strix Autonomous AI Pentest Scan
         env:
           MODEL_CHOICE: ${{ github.event.inputs.model_provider || 'google' }}
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-          GOOGLE_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-          LLM_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-          STRIX_LLM: "gemini/gemini-2.0-flash"
+          DIRECT_KEY: ${{ github.event.inputs.api_key_input }}
+          SECRET_GEMINI: ${{ secrets.GEMINI_API_KEY || secrets.GOOGLE_API_KEY || secrets.GOOGLE_GEMINI_API_KEY }}
+          SECRET_OPENAI: ${{ secrets.OPENAI_API_KEY || secrets.OPENAI_KEY }}
+          SECRET_ANTHROPIC: ${{ secrets.ANTHROPIC_API_KEY || secrets.CLAUDE_API_KEY }}
         run: |
           mkdir -p reports/security
+          mkdir -p ~/.strix
+          
           echo "=============================================="
-          echo "  STRIX AI PENETRATION TESTING"
+          echo "  STRIX AI PENETRATION TESTING INITIALIZATION"
           echo "=============================================="
           
-          # Thiết lập STRIX_LLM và LLM_API_KEY tương thích với LiteLLM
-          if [ "$MODEL_CHOICE" = "google" ] || [ -n "$GEMINI_API_KEY" ]; then
-            echo "Provider: Google Gemini (gemini-2.0-flash)"
-            export STRIX_LLM="gemini/gemini-2.0-flash"
-            export LLM_API_KEY="$GEMINI_API_KEY"
-            export GEMINI_API_KEY="$GEMINI_API_KEY"
-          elif [ "$MODEL_CHOICE" = "anthropic" ] || [ -n "$ANTHROPIC_API_KEY" ]; then
-            echo "Provider: Anthropic Claude"
-            export STRIX_LLM="anthropic/claude-3-5-sonnet-20241022"
-            export LLM_API_KEY="$ANTHROPIC_API_KEY"
-          else
-            echo "Provider: OpenAI GPT-4o"
-            export STRIX_LLM="openai/gpt-4o"
-            export LLM_API_KEY="$OPENAI_API_KEY"
+          # Chọn API key phù hợp từ Direct Input hoặc GitHub Secrets
+          ACTIVE_KEY=""
+          if [ -n "$DIRECT_KEY" ]; then
+            echo "::add-mask::$DIRECT_KEY"
+            ACTIVE_KEY="$DIRECT_KEY"
+            echo "=> Using API Key from workflow direct input."
+          elif [ "$MODEL_CHOICE" = "google" ] && [ -n "$SECRET_GEMINI" ]; then
+            ACTIVE_KEY="$SECRET_GEMINI"
+            echo "=> Using GEMINI_API_KEY from GitHub Secrets."
+          elif [ "$MODEL_CHOICE" = "anthropic" ] && [ -n "$SECRET_ANTHROPIC" ]; then
+            ACTIVE_KEY="$SECRET_ANTHROPIC"
+            echo "=> Using ANTHROPIC_API_KEY from GitHub Secrets."
+          elif [ -n "$SECRET_OPENAI" ]; then
+            ACTIVE_KEY="$SECRET_OPENAI"
+            echo "=> Using OPENAI_API_KEY from GitHub Secrets."
+          elif [ -n "$SECRET_GEMINI" ]; then
+            ACTIVE_KEY="$SECRET_GEMINI"
+            MODEL_CHOICE="google"
+            echo "=> Fallback: Using GEMINI_API_KEY from GitHub Secrets."
           fi
           
+          if [ -z "$ACTIVE_KEY" ]; then
+            echo "❌ ERROR: No API Key found!"
+            echo "Vui lòng kiểm tra lại Secret 'GEMINI_API_KEY' trong GitHub Settings hoặc nhập trực tiếp key vào ô 'api_key_input' khi bấm Run workflow."
+            exit 1
+          fi
+          
+          echo "::add-mask::$ACTIVE_KEY"
+          
+          # Cấu hình Model & Environment
+          if [ "$MODEL_CHOICE" = "google" ]; then
+            export STRIX_LLM="gemini/gemini-2.0-flash"
+            export LLM_API_KEY="$ACTIVE_KEY"
+            export GEMINI_API_KEY="$ACTIVE_KEY"
+            export GOOGLE_API_KEY="$ACTIVE_KEY"
+          elif [ "$MODEL_CHOICE" = "anthropic" ]; then
+            export STRIX_LLM="anthropic/claude-3-5-sonnet-20241022"
+            export LLM_API_KEY="$ACTIVE_KEY"
+            export ANTHROPIC_API_KEY="$ACTIVE_KEY"
+          else
+            export STRIX_LLM="openai/gpt-4o"
+            export LLM_API_KEY="$ACTIVE_KEY"
+            export OPENAI_API_KEY="$ACTIVE_KEY"
+          fi
+          
+          # Ghi cấu hình cố định vào ~/.strix/cli-config.json cho Strix
+          cat << EOF > ~/.strix/cli-config.json
+          {
+            "env": {
+              "STRIX_LLM": "$STRIX_LLM",
+              "LLM_API_KEY": "$ACTIVE_KEY",
+              "GEMINI_API_KEY": "$ACTIVE_KEY",
+              "GOOGLE_API_KEY": "$ACTIVE_KEY"
+            }
+          }
+          EOF
+          
           TARGET_URL="${{ github.event.inputs.target_url || 'http://localhost:3000' }}"
-          echo "Target:   $TARGET_URL"
-          echo "Model:    $STRIX_LLM"
-          echo "API Key:  ${LLM_API_KEY:0:8}..."
+          echo "Target URL: $TARGET_URL"
+          echo "Model:      $STRIX_LLM"
+          echo "API Key:    Valid (Length: ${#ACTIVE_KEY} chars)"
           echo "=============================================="
           
           # Thực thi Strix và ghi lại toàn bộ log chi tiết
