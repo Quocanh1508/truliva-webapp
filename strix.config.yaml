@@ -27,13 +27,12 @@ scope:
 
 # Cấu hình AI Agent & Sandbox
 agent:
-  # Hỗ trợ: openai (gpt-4o), anthropic (claude-3-5-sonnet), google (gemini-1.5-pro/gemini-2.0)
-  model_provider: "openai"
-  model_name: "gpt-4o"
-  max_iterations: 30
+  model_provider: "google"
+  model_name: "gemini/gemini-3.6-flash"
+  max_iterations: 15
   sandbox:
     docker_image: "ghcr.io/usestrix/strix-sandbox:latest"
-    timeout_seconds: 1800
+    timeout_seconds: 1200
 
 # Tiêu chí kiểm thử bảo mật cốt lõi
 tests:
