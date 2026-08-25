@@ -1,4 +1,5 @@
 import React from 'react';
+import P3RWaterSurface from './P3RWaterSurface';
 
 interface P3ROceanHeaderProps {
   children: React.ReactNode;
@@ -7,25 +8,13 @@ interface P3ROceanHeaderProps {
 
 export default function P3ROceanHeader({ children, className = '' }: P3ROceanHeaderProps) {
   return (
-    <div className={`relative overflow-hidden rounded-b-[2.6rem] bg-gradient-to-b from-[#030B17] via-[#071F3D] to-[#0A335C] text-white shadow-[0_16px_40px_rgba(7,31,61,0.4)] border-b-2 border-cyan-400/30 ${className}`}>
+    <div className={`relative overflow-hidden rounded-b-[2.6rem] bg-[#000D2B] text-white shadow-[0_16px_40px_rgba(0,13,43,0.5)] border-b-2 border-cyan-400/40 ${className}`}>
       
-      {/* 1. Underwater Caustics Light Ray Sweeps */}
-      <div className="absolute -top-10 -left-10 w-[140%] h-[150%] pointer-events-none z-0 overflow-hidden">
-        <div className="p3r-caustics-ray w-full h-full bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-cyan-400/25 via-sky-500/10 to-transparent"></div>
-      </div>
+      {/* 1. Exact Persona 3 Reload Dynamic Water Surface & Caustics Canvas Engine */}
+      <P3RWaterSurface className="z-0" />
 
-      {/* 2. Rising Wobble Bubbles with Crystal Highlights (8 staggered bubbles) */}
-      <div className="water-bubble w-4 h-4 left-[6%] bottom-1 bubble-anim-1"></div>
-      <div className="water-bubble w-6 h-6 left-[18%] bottom-2 bubble-anim-2"></div>
-      <div className="water-bubble w-3.5 h-3.5 left-[34%] bottom-1 bubble-anim-3"></div>
-      <div className="water-bubble w-5.5 h-5.5 left-[48%] bottom-3 bubble-anim-4"></div>
-      <div className="water-bubble w-4 h-4 left-[64%] bottom-1 bubble-anim-5"></div>
-      <div className="water-bubble w-6.5 h-6.5 left-[76%] bottom-2 bubble-anim-6"></div>
-      <div className="water-bubble w-3 h-3 left-[88%] bottom-1 bubble-anim-7"></div>
-      <div className="water-bubble w-5 h-5 left-[94%] bottom-3 bubble-anim-8"></div>
-
-      {/* 3. Persona 3 Reload 3-Layer Moving Undulating SVG Waves */}
-      <div className="absolute bottom-0 left-0 right-0 h-16 pointer-events-none z-0 overflow-hidden opacity-75">
+      {/* 2. Persona 3 Reload 3-Layer Moving Undulating SVG Wave Overlay */}
+      <div className="absolute bottom-0 left-0 right-0 h-16 pointer-events-none z-0 overflow-hidden opacity-60">
         {/* Back Wave (Deep Cyan / Navy) */}
         <svg 
           className="absolute -bottom-1 left-0 w-[200%] h-14 p3r-wave-layer-back fill-[#0284C7]/30" 
@@ -54,10 +43,11 @@ export default function P3ROceanHeader({ children, className = '' }: P3ROceanHea
         </svg>
       </div>
 
-      {/* 4. Card Content (Foreground) */}
+      {/* 3. Card Content (Foreground with subtle backdrop readability) */}
       <div className="relative z-10">
         {children}
       </div>
     </div>
   );
 }
+
