@@ -263,7 +263,7 @@ export default function InventoryManage() {
       )}
 
       {/* Filters Bar */}
-      <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm mb-6 flex flex-col gap-4 relative z-30">
+      <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm mb-6 flex flex-col gap-4 relative z-50">
         <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-end">
           
           {/* Ô Tìm kiếm sản phẩm */}
@@ -446,7 +446,7 @@ export default function InventoryManage() {
       </div>
 
       {/* Main Stock Matrix View */}
-      <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+      <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden relative z-0">
         {loading ? (
           <div className="flex flex-col items-center justify-center p-12 md:p-16">
             <span className="spinner mb-3" style={{ borderColor: 'rgba(27, 58, 107, 0.2)', borderTopColor: '#1B3A6B' }}></span>
@@ -548,7 +548,7 @@ export default function InventoryManage() {
             </div>
 
             {/* 💻 DESKTOP MATRIX TABLE VIEW (Hiển thị màn hình máy tính >= 768px) */}
-            <div className="hidden md:block overflow-x-auto overflow-y-auto max-h-[calc(100vh-230px)] relative rounded-xl border border-slate-200 shadow-sm">
+            <div className="hidden md:block overflow-x-auto overflow-y-auto max-h-[calc(100vh-230px)] relative z-0 rounded-xl border border-slate-200 shadow-sm">
               <table className="w-full text-left border-collapse table-auto">
                 <thead className="sticky top-0 z-30 shadow-xs">
                   <tr className="bg-slate-50 border-b border-slate-200 text-slate-600 text-xs font-bold uppercase tracking-wider">

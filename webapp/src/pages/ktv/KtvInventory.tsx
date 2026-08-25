@@ -217,7 +217,7 @@ export default function KtvInventory() {
       {!error && (
         <>
           {/* Filters Bar */}
-          <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm mb-6 flex flex-col gap-4 text-left">
+          <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm mb-6 flex flex-col gap-4 text-left relative z-50">
             <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-end">
               
               {/* Ô Tìm kiếm sản phẩm */}
@@ -235,7 +235,7 @@ export default function KtvInventory() {
               </div>
 
               {/* Ô Lọc danh mục */}
-              <div className="md:col-span-4 form-group mb-0">
+              <div className="md:col-span-4 form-group mb-0 relative z-40">
                 <CategoryTreeSelect
                   label="Danh mục"
                   categories={rawCategories}
@@ -330,7 +330,7 @@ export default function KtvInventory() {
           </div>
 
           {/* Main Stock Matrix Grid */}
-          <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden text-left">
+          <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden text-left relative z-0">
             {loading && products.length === 0 ? (
               <div className="flex flex-col items-center justify-center p-16">
                 <span className="spinner mb-3" style={{ borderColor: 'rgba(27, 58, 107, 0.2)', borderTopColor: '#1B3A6B' }}></span>
@@ -338,7 +338,7 @@ export default function KtvInventory() {
               </div>
             ) : (
               <PullToRefresh onRefresh={() => loadMyStock(true)}>
-                <div className="overflow-x-auto overflow-y-auto max-h-[calc(100vh-230px)] min-h-[300px] relative rounded-xl border border-slate-200 shadow-sm">
+                <div className="overflow-x-auto overflow-y-auto max-h-[calc(100vh-230px)] min-h-[300px] relative z-0 rounded-xl border border-slate-200 shadow-sm">
                   <table className="w-full text-left border-collapse table-auto">
                     <thead className="sticky top-0 z-30 shadow-xs">
                       <tr className="bg-slate-50 border-b border-slate-200 text-slate-600 text-xs font-bold uppercase tracking-wider">
