@@ -821,7 +821,7 @@ export default function WarrantyActivate() {
                   <Sparkles size={16} />
                 </div>
                 <p className={`text-xs leading-relaxed ${isDark ? 'text-slate-200' : 'text-slate-700'}`}>
-                  <strong className={`font-black tracking-wide ${isDark ? 'text-white' : 'text-[#1B3A6B]'}`}>TRULIVA</strong> – thương hiệu máy lọc nước từng thuộc sở hữu của <span className={`font-bold ${isDark ? 'text-[#00D2FF]' : 'text-[#0068FF]'}`}>Unilever (2014–2024)</span>
+                  <strong className={`font-black tracking-wide ${isDark ? 'text-white' : 'text-[#1B3A6B]'}`}>TRULIVA</strong> – thương hiệu máy lọc nước thuộc sở hữu của <span className={`font-bold ${isDark ? 'text-[#00D2FF]' : 'text-[#0068FF]'}`}>Unilever (2014–2024)</span>
                 </p>
               </div>
 
