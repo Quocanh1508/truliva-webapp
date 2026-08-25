@@ -501,10 +501,14 @@ export default function WarrantyActivate() {
   // ==================== STEP 0: LANDING PAGE ====================
   if (step === 0) {
     return (
-      <div className="min-h-screen bg-slate-50 flex flex-col font-sans antialiased">
+      <div className="min-h-screen bg-gradient-to-b from-[#061226] via-[#0B2545] to-[#061226] text-white flex flex-col font-sans antialiased relative overflow-hidden">
+        
+        {/* Ambient background glowing orbs */}
+        <div className="absolute top-1/4 left-1/2 -translate-x-1/2 w-[500px] h-[500px] bg-cyan-500/10 rounded-full blur-3xl pointer-events-none"></div>
+        <div className="absolute top-2/3 right-10 w-72 h-72 bg-blue-600/10 rounded-full blur-2xl pointer-events-none"></div>
 
         {/* Header Bar */}
-        <header className="flex items-center justify-between px-5 py-3.5 sm:py-4 bg-[#0A192F] border-b border-slate-800">
+        <header className="flex items-center justify-between px-5 py-3.5 sm:py-4 bg-[#061226]/90 backdrop-blur-md border-b border-white/10 relative z-20">
           <div className="flex items-center space-x-2">
             <img 
               src="/logo.png?v=3" 
@@ -515,88 +519,125 @@ export default function WarrantyActivate() {
           </div>
           <a 
             href="tel:1900638463" 
-            className="flex items-center gap-1.5 bg-[#173054] hover:bg-[#1E3E6D] text-white px-3.5 py-1.5 rounded-full text-xs font-bold transition-all border border-sky-400/20 shadow-xs"
+            className="flex items-center gap-1.5 bg-[#0F2F59] hover:bg-[#153E75] text-white px-3.5 py-1.5 rounded-full text-xs font-bold transition-all border border-cyan-400/30 shadow-[0_0_12px_rgba(0,210,255,0.2)]"
           >
             <PhoneCall size={14} className="text-[#00D2FF]" />
-            <span className="font-mono tracking-tight">1900 63 84 63</span>
+            <span className="font-mono tracking-tight text-white">1900 63 84 63</span>
           </a>
         </header>
 
         {/* Main Content */}
-        <div className="flex-1 flex flex-col justify-center px-5 py-6 sm:py-10 max-w-md mx-auto w-full">
-          <div className="bg-white rounded-3xl p-5 sm:p-6 shadow-[0_10px_35px_rgba(10,25,47,0.06)] border border-slate-100 space-y-5">
+        <div className="flex-1 flex flex-col justify-center px-4 py-8 sm:py-12 max-w-md mx-auto w-full relative z-10">
+          <div className="bg-white/[0.05] backdrop-blur-2xl rounded-3xl p-5 sm:p-7 shadow-[0_20px_50px_rgba(0,0,0,0.5)] border border-white/10 space-y-6">
 
-            {/* Greeting + 3D Water Drop */}
-            <div className="flex items-center justify-between pt-1 pb-2">
+            {/* Greeting + 3D Crystal Water Drop */}
+            <div className="flex items-center justify-between pt-1 pb-1">
               <div>
-                <h1 className="text-2xl font-black text-slate-900 tracking-tight">Xin chào!</h1>
-                <p className="text-xs text-slate-500 font-medium mt-1 leading-snug">
+                <h1 className="text-2xl sm:text-3xl font-black text-white tracking-tight flex items-center gap-2">
+                  <span>Xin chào!</span>
+                </h1>
+                <p className="text-xs text-sky-200/80 font-medium mt-1 leading-snug">
                   Chúng tôi luôn sẵn sàng đồng hành<br className="hidden sm:inline" /> cùng bạn.
                 </p>
               </div>
               
-              {/* 3D Realistic Water Droplet with Ripple */}
-              <div className="relative w-16 h-16 shrink-0 flex items-center justify-center">
-                <div className="absolute inset-x-0 bottom-1 h-3 rounded-full bg-cyan-200/50 blur-[2px] animate-pulse"></div>
-                <div className="absolute inset-x-2 bottom-0.5 h-2 rounded-full bg-blue-300/40 blur-[1px]"></div>
-                <svg viewBox="0 0 100 120" className="w-14 h-16 drop-shadow-[0_8px_16px_rgba(0,163,255,0.35)]">
+              {/* 3D Photorealistic Crystal Water Droplet */}
+              <div className="relative w-18 h-18 shrink-0 flex items-center justify-center">
+                {/* Glowing liquid caustics ripple rings */}
+                <div className="absolute -bottom-1 w-16 h-4 bg-cyan-400/25 rounded-full blur-md animate-pulse"></div>
+                <div className="absolute bottom-0 w-12 h-3 bg-sky-300/40 rounded-full blur-sm"></div>
+                
+                {/* Crystal 3D Water Droplet */}
+                <svg viewBox="0 0 100 120" className="w-16 h-20 filter drop-shadow-[0_10px_20px_rgba(0,210,255,0.45)]">
                   <defs>
-                    <linearGradient id="dropGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-                      <stop offset="0%" stopColor="#E0F7FF" stopOpacity="0.95" />
-                      <stop offset="30%" stopColor="#70D6FF" stopOpacity="0.85" />
-                      <stop offset="70%" stopColor="#00A3FF" stopOpacity="0.8" />
-                      <stop offset="100%" stopColor="#0066CC" stopOpacity="0.95" />
+                    {/* Outer body deep liquid gradient */}
+                    <linearGradient id="dropMainGlow" x1="0%" y1="0%" x2="100%" y2="100%">
+                      <stop offset="0%" stopColor="#E6F9FF" stopOpacity="0.95" />
+                      <stop offset="25%" stopColor="#7EE2FF" stopOpacity="0.9" />
+                      <stop offset="60%" stopColor="#00A3FF" stopOpacity="0.85" />
+                      <stop offset="100%" stopColor="#0055B3" stopOpacity="0.95" />
                     </linearGradient>
-                    <radialGradient id="dropHighlight" cx="35%" cy="30%" r="40%">
+
+                    {/* Internal caustic refraction */}
+                    <radialGradient id="causticRefraction" cx="60%" cy="75%" r="50%">
+                      <stop offset="0%" stopColor="#00FFFF" stopOpacity="0.85" />
+                      <stop offset="50%" stopColor="#00A3FF" stopOpacity="0.35" />
+                      <stop offset="100%" stopColor="#003366" stopOpacity="0" />
+                    </radialGradient>
+
+                    {/* Primary specular light curved glint */}
+                    <linearGradient id="specularGlint" x1="20%" y1="0%" x2="80%" y2="100%">
                       <stop offset="0%" stopColor="#FFFFFF" stopOpacity="0.95" />
-                      <stop offset="50%" stopColor="#FFFFFF" stopOpacity="0.4" />
+                      <stop offset="60%" stopColor="#FFFFFF" stopOpacity="0.4" />
                       <stop offset="100%" stopColor="#FFFFFF" stopOpacity="0" />
+                    </linearGradient>
+
+                    {/* Secondary bottom bounce reflection */}
+                    <radialGradient id="bottomBounceGlow" cx="50%" cy="90%" r="40%">
+                      <stop offset="0%" stopColor="#FFFFFF" stopOpacity="0.75" />
+                      <stop offset="100%" stopColor="#00A3FF" stopOpacity="0" />
                     </radialGradient>
                   </defs>
-                  <path 
-                    d="M50 5 C50 5, 10 65, 10 85 A40 40 0 0 0 90 85 C90 65, 50 5, 50 5 Z" 
-                    fill="url(#dropGrad)" 
+
+                  {/* Droplet Base Body */}
+                  <path
+                    d="M50 8 C50 8, 12 62, 12 84 A38 38 0 0 0 88 84 C88 62, 50 8, 50 8 Z"
+                    fill="url(#dropMainGlow)"
                   />
-                  <ellipse cx="38" cy="45" rx="12" ry="20" transform="rotate(-20 38 45)" fill="url(#dropHighlight)" />
-                  <circle cx="62" cy="85" r="5" fill="#FFFFFF" fillOpacity="0.6" />
+
+                  {/* Internal refractive caustic pool */}
+                  <ellipse cx="50" cy="82" rx="28" ry="24" fill="url(#causticRefraction)" />
+
+                  {/* Left Specular Glint (Top Curve) */}
+                  <path
+                    d="M48 16 C48 16, 22 58, 22 76 C22 84, 26 90, 26 90 C24 84, 28 58, 48 24 Z"
+                    fill="url(#specularGlint)"
+                  />
+
+                  {/* Secondary High Light Orb */}
+                  <circle cx="36" cy="42" r="5" fill="#FFFFFF" fillOpacity="0.85" />
+                  <circle cx="42" cy="50" r="2.5" fill="#FFFFFF" fillOpacity="0.6" />
+
+                  {/* Bottom Water Rim Light Bounce */}
+                  <ellipse cx="52" cy="98" rx="22" ry="7" fill="url(#bottomBounceGlow)" />
                 </svg>
               </div>
             </div>
 
             {/* 3 Main Action Cards */}
-            <div className="space-y-3 pt-1">
+            <div className="space-y-3.5 pt-1">
               {/* 1. Kích hoạt bảo hành sản phẩm (Nút Đỏ) */}
               <button
                 onClick={() => setStep(1)}
-                className="w-full bg-white hover:bg-red-50/40 active:scale-[0.98] rounded-2xl p-3.5 border border-red-100 shadow-[0_4px_18px_rgba(239,68,68,0.06)] hover:shadow-md transition-all flex items-center justify-between text-left group cursor-pointer"
+                className="w-full bg-gradient-to-r from-[#E53935] to-[#D32F2F] hover:brightness-110 active:scale-[0.98] rounded-2xl p-4 border border-red-400/30 shadow-lg shadow-red-950/40 hover:shadow-red-500/20 transition-all flex items-center justify-between text-left group cursor-pointer"
               >
                 <div className="flex items-center space-x-3.5">
-                  <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-[#FF4B4B] to-[#FF6B6B] flex items-center justify-center text-white shadow-sm shrink-0 group-hover:scale-105 transition-transform">
-                    <ShieldCheck size={24} strokeWidth={2.2} />
+                  <div className="w-12 h-12 rounded-xl bg-white/20 backdrop-blur-sm flex items-center justify-center text-white shadow-sm shrink-0 group-hover:scale-105 transition-transform">
+                    <ShieldCheck size={26} strokeWidth={2.2} />
                   </div>
                   <div>
-                    <h3 className="font-extrabold text-sm text-slate-900 leading-tight">Kích hoạt</h3>
-                    <p className="text-xs text-slate-500 font-medium mt-0.5">Bảo hành sản phẩm</p>
+                    <h3 className="font-extrabold text-[15px] text-white leading-tight">Kích hoạt</h3>
+                    <p className="text-xs text-white/85 font-medium mt-0.5">Bảo hành sản phẩm</p>
                   </div>
                 </div>
-                <ChevronRight size={18} className="text-red-500 group-hover:translate-x-1 transition-transform" />
+                <ChevronRight size={20} className="text-white/80 group-hover:translate-x-1 group-hover:text-white transition-all" />
               </button>
 
               {/* 2. Hỗ trợ kỹ thuật (Nút Xanh Lá) */}
               <button
                 onClick={() => setStep(10)}
-                className="w-full bg-white hover:bg-emerald-50/40 active:scale-[0.98] rounded-2xl p-3.5 border border-emerald-100 shadow-[0_4px_18px_rgba(34,197,94,0.06)] hover:shadow-md transition-all flex items-center justify-between text-left group cursor-pointer"
+                className="w-full bg-gradient-to-r from-[#2E7D32] to-[#1B5E20] hover:brightness-110 active:scale-[0.98] rounded-2xl p-4 border border-green-400/30 shadow-lg shadow-green-950/40 hover:shadow-green-500/20 transition-all flex items-center justify-between text-left group cursor-pointer"
               >
                 <div className="flex items-center space-x-3.5">
-                  <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-[#22C55E] to-[#16A34A] flex items-center justify-center text-white shadow-sm shrink-0 group-hover:scale-105 transition-transform">
-                    <Wrench size={24} strokeWidth={2.2} />
+                  <div className="w-12 h-12 rounded-xl bg-white/20 backdrop-blur-sm flex items-center justify-center text-white shadow-sm shrink-0 group-hover:scale-105 transition-transform">
+                    <Wrench size={26} strokeWidth={2.2} />
                   </div>
                   <div>
-                    <h3 className="font-extrabold text-sm text-slate-900 leading-tight">Hỗ trợ kỹ thuật</h3>
-                    <p className="text-xs text-slate-500 font-medium mt-0.5">Hướng dẫn & hỗ trợ</p>
+                    <h3 className="font-extrabold text-[15px] text-white leading-tight">Hỗ trợ kỹ thuật</h3>
+                    <p className="text-xs text-white/85 font-medium mt-0.5">Hướng dẫn & hỗ trợ</p>
                   </div>
                 </div>
-                <ChevronRight size={18} className="text-emerald-500 group-hover:translate-x-1 transition-transform" />
+                <ChevronRight size={20} className="text-white/80 group-hover:translate-x-1 group-hover:text-white transition-all" />
               </button>
 
               {/* 3. Zalo CSKH (Nút Xanh Dương) */}
@@ -604,38 +645,58 @@ export default function WarrantyActivate() {
                 href="https://zalo.me/3870382725035413507"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="w-full bg-white hover:bg-sky-50/40 active:scale-[0.98] rounded-2xl p-3.5 border border-sky-100 shadow-[0_4px_18px_rgba(0,163,255,0.06)] hover:shadow-md transition-all flex items-center justify-between text-left group cursor-pointer"
+                className="w-full bg-gradient-to-r from-[#0068FF] to-[#0052CC] hover:brightness-110 active:scale-[0.98] rounded-2xl p-4 border border-blue-400/30 shadow-lg shadow-blue-950/40 hover:shadow-blue-500/20 transition-all flex items-center justify-between text-left group cursor-pointer"
               >
                 <div className="flex items-center space-x-3.5">
-                  <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-[#0084FF] to-[#00A3FF] flex items-center justify-center text-white shadow-sm shrink-0 group-hover:scale-105 transition-transform">
-                    <svg className="w-6 h-6 fill-current" viewBox="0 0 24 24">
+                  <div className="w-12 h-12 rounded-xl bg-white/20 backdrop-blur-sm flex items-center justify-center text-white shadow-sm shrink-0 group-hover:scale-105 transition-transform">
+                    <svg className="w-7 h-7 fill-current text-white" viewBox="0 0 24 24">
                       <path d="M12.003 2C6.478 2 2 6.136 2 11.238c0 3.125 1.688 5.88 4.298 7.48-.12.443-.655 2.417-.655 2.417-.06.223.167.387.352.268 0 0 2.278-1.52 3.162-2.09.91.246 1.875.38 2.846.38 5.525 0 10.003-4.137 10.003-9.24C22.006 6.137 17.528 2 12.003 2z"/>
                     </svg>
                   </div>
                   <div>
-                    <h3 className="font-extrabold text-sm text-slate-900 leading-tight">Zalo CSKH</h3>
-                    <p className="text-xs text-slate-500 font-medium mt-0.5">Trợ lý trực tiếp trên Zalo OA</p>
+                    <h3 className="font-extrabold text-[15px] text-white leading-tight">Zalo CSKH</h3>
+                    <p className="text-xs text-white/85 font-medium mt-0.5">Trợ lý trực tiếp trên Zalo OA</p>
                   </div>
                 </div>
-                <ChevronRight size={18} className="text-[#0084FF] group-hover:translate-x-1 transition-transform" />
+                <ChevronRight size={20} className="text-white/80 group-hover:translate-x-1 group-hover:text-white transition-all" />
               </a>
             </div>
 
-            {/* Brand Heritage & Net Zero Carbon Section */}
-            <div className="mt-6 pt-4 text-xs text-slate-600 leading-relaxed space-y-2 border-t border-slate-100">
-              <p>
-                <strong className="text-slate-900 font-bold">TRULIVA</strong> – thương hiệu máy lọc nước từng thuộc sở hữu của <strong className="text-slate-900 font-bold">Unilever (2014–2024)</strong>
-              </p>
-              <p>
-                Sản phẩm <strong className="text-slate-900 font-bold">TRULIVA</strong> được sản xuất tại nhà máy đạt chứng nhận <strong className="text-slate-900 font-bold">Net Zero Carbon – Không Carbon chuẩn 6 sao</strong>, hướng đến công nghệ xanh và bảo vệ môi trường.
-              </p>
+            {/* Brand Heritage & Net Zero Carbon Section (Bắt mắt & Nổi bật) */}
+            <div className="mt-6 rounded-2xl bg-gradient-to-b from-white/[0.08] to-white/[0.02] border border-cyan-400/20 p-4 relative overflow-hidden backdrop-blur-md shadow-inner space-y-3">
+              {/* Background ambient glow inside badge */}
+              <div className="absolute top-0 right-0 w-28 h-28 bg-cyan-500/10 rounded-full blur-2xl pointer-events-none"></div>
+              <div className="absolute bottom-0 left-0 w-20 h-20 bg-emerald-500/10 rounded-full blur-xl pointer-events-none"></div>
+
+              {/* Item 1: Unilever Heritage */}
+              <div className="flex items-start gap-3">
+                <div className="w-8 h-8 rounded-xl bg-blue-500/20 border border-blue-400/30 flex items-center justify-center shrink-0 mt-0.5 text-[#00D2FF] shadow-[0_0_10px_rgba(0,210,255,0.25)]">
+                  <Sparkles size={16} />
+                </div>
+                <p className="text-xs text-slate-200 leading-relaxed">
+                  <strong className="text-white font-black tracking-wide">TRULIVA</strong> – thương hiệu máy lọc nước từng thuộc sở hữu của <span className="text-[#00D2FF] font-bold">Unilever (2014–2024)</span>
+                </p>
+              </div>
+
+              {/* Divider */}
+              <div className="h-px bg-gradient-to-r from-transparent via-white/15 to-transparent"></div>
+
+              {/* Item 2: Net Zero Carbon Certification */}
+              <div className="flex items-start gap-3">
+                <div className="w-8 h-8 rounded-xl bg-emerald-500/20 border border-emerald-400/30 flex items-center justify-center shrink-0 mt-0.5 text-emerald-300 shadow-[0_0_10px_rgba(34,197,94,0.25)]">
+                  <CheckCircle2 size={16} />
+                </div>
+                <p className="text-xs text-slate-200 leading-relaxed">
+                  Sản phẩm <strong className="text-white font-black tracking-wide">TRULIVA</strong> được sản xuất tại nhà máy đạt chứng nhận <span className="text-emerald-400 font-extrabold">Net Zero Carbon – Không Carbon chuẩn 6 sao</span>, hướng đến công nghệ xanh và bảo vệ môi trường.
+                </p>
+              </div>
             </div>
 
           </div>
         </div>
 
         {/* Footer */}
-        <footer className="text-center px-5 py-6 space-y-3 border-t border-slate-800 bg-[#0A192F]">
+        <footer className="text-center px-5 py-6 space-y-3 border-t border-white/10 bg-[#061226] relative z-20">
           <div className="flex items-center justify-center gap-2.5 text-slate-400 text-[10px] font-bold tracking-wider flex-wrap">
             <a href="#" className="hover:text-white transition">SITEMAP</a>
             <span>|</span>
