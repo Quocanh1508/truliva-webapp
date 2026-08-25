@@ -3,11 +3,12 @@ import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import { fetchApi } from '../../api/client';
 import { useAuth } from '../../context/AuthContext';
+import { usePermission } from '../../context/PermissionContext';
 import {
   Search, Plus, UserPlus, ArrowRightCircle, ShoppingCart, Phone, MapPin, User,
   Clock, Loader2, ChevronLeft, ChevronRight, X, Wrench, Package,
   PhoneCall, Copy, CheckCircle2, Filter, Layers, Settings, Building2, Users,
-  Calendar, XCircle
+  Calendar, XCircle, Download
 } from 'lucide-react';
 import HotlineTicketModal from './HotlineTicketModal';
 import DateRangePicker from '../DateRangePicker';
@@ -116,6 +117,7 @@ function formatDateDisplay(dateStr: string): string {
 
 export default function HotlineManage() {
   const { user } = useAuth();
+  const { hasPermission } = usePermission();
   const navigate = useNavigate();
   
   // Tab chính: 'tickets' (Yêu cầu Hotline) hoặc 'history' (Tìm kiếm lịch sử KH)
@@ -321,6 +323,30 @@ export default function HotlineManage() {
     handledEndDate,
     page
   ]);
+
+  // ── Xuất Excel theo bộ lọc hiện tại ──
+  const handleExportExcel = () => {
+    const params = new URLSearchParams();
+    if (activeStatus !== 'ALL' && filterStatuses.length === 0) {
+      params.set('status', activeStatus);
+    } else if (filterStatuses.length > 0) {
+      params.set('statuses', filterStatuses.join(','));
+    }
+    if (searchQuery.trim()) params.set('search', searchQuery.trim());
+    if (filterServiceRequestTypes.length > 0) params.set('serviceRequestTypes', filterServiceRequestTypes.join(','));
+    if (filterProductNames.length > 0) params.set('productNames', filterProductNames.join(','));
+    if (filterPhase3RequestTypes.length > 0) params.set('phase3RequestTypes', filterPhase3RequestTypes.join(','));
+    if (filterPhase3ServiceTypes.length > 0) params.set('phase3ServiceTypes', filterPhase3ServiceTypes.join(','));
+    if (filterCreatorIds.length > 0) params.set('creatorIds', filterCreatorIds.join(','));
+    if (filterTargetTeams.length > 0) params.set('targetTeams', filterTargetTeams.join(','));
+    if (filterHandlerUserIds.length > 0) params.set('handlerUserIds', filterHandlerUserIds.join(','));
+    if (requestStartDate) params.set('requestStartDate', requestStartDate);
+    if (requestEndDate) params.set('requestEndDate', requestEndDate);
+    if (handledStartDate) params.set('handledStartDate', handledStartDate);
+    if (handledEndDate) params.set('handledEndDate', handledEndDate);
+
+    window.open(`/api/hotlines/export?${params.toString()}`, '_blank');
+  };
 
   useEffect(() => {
     if (activeMainTab === 'tickets') {
@@ -579,12 +605,24 @@ export default function HotlineManage() {
         </div>
 
         {activeMainTab === 'tickets' && (
-          <button
-            onClick={() => { setSelectedTicket(null); setShowCreateModal(true); }}
-            className="flex items-center gap-2 px-4 py-2.5 bg-[#00A3FF] hover:bg-[#0090E0] text-white rounded-xl font-semibold text-sm shadow-sm transition-all"
-          >
-            <Plus size={18} /> Thêm mới Ticket
-          </button>
+          <div className="flex items-center gap-2">
+            {hasPermission('HOTLINE_EXPORT_EXCEL') && (
+              <button
+                onClick={handleExportExcel}
+                className="flex items-center gap-2 px-4 py-2.5 bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 rounded-xl font-semibold text-sm shadow-xs transition-all cursor-pointer"
+                title="Xuất file Excel danh sách hotline theo bộ lọc hiện tại"
+              >
+                <Download size={17} className="text-[#1B3A6B]" />
+                <span>Xuất Excel</span>
+              </button>
+            )}
+            <button
+              onClick={() => { setSelectedTicket(null); setShowCreateModal(true); }}
+              className="flex items-center gap-2 px-4 py-2.5 bg-[#00A3FF] hover:bg-[#0090E0] text-white rounded-xl font-semibold text-sm shadow-sm transition-all cursor-pointer"
+            >
+              <Plus size={18} /> Thêm mới Ticket
+            </button>
+          </div>
         )}
       </div>
 
@@ -927,10 +965,21 @@ export default function HotlineManage() {
             <div className="flex items-center gap-2">
               <button
                 onClick={() => { setPage(1); fetchTickets(); }}
-                className="px-4 py-2 bg-[#00A3FF] text-white rounded-lg text-xs font-semibold hover:bg-[#0090E0] transition-all shadow-sm"
+                className="px-4 py-2 bg-[#00A3FF] text-white rounded-lg text-xs font-semibold hover:bg-[#0090E0] transition-all shadow-sm cursor-pointer"
               >
                 Tìm kiếm
               </button>
+
+              {hasPermission('HOTLINE_EXPORT_EXCEL') && (
+                <button
+                  onClick={handleExportExcel}
+                  className="flex items-center gap-1.5 px-3 py-2 text-xs font-semibold bg-white text-gray-700 border border-gray-300 hover:bg-gray-50 rounded-lg transition-all shadow-xs cursor-pointer"
+                  title="Xuất file Excel danh sách hotline theo bộ lọc hiện tại"
+                >
+                  <Download size={14} className="text-[#1B3A6B]" />
+                  <span>Xuất Excel</span>
+                </button>
+              )}
 
               {/* ── BỘ LỌC BUTTON & POPOVER ── */}
               <div className="relative z-50" ref={dropdownRef}>

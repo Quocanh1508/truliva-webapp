@@ -5,6 +5,7 @@ import {
   getHotlineTickets,
   getHotlineFilterOptions,
   createHotlineTicket,
+  exportHotlineTickets,
   getHotlineTicketById,
   updateHotlineTicket,
   assignHotlineTicket,
@@ -33,7 +34,8 @@ router.get('/handlers', getHotlineHandlers);
 // Dữ liệu tùy chọn cho bộ lọc
 router.get('/filter-options', getHotlineFilterOptions);
 
-// CRUD
+// CRUD & Export
+router.get('/export', exportHotlineTickets);
 router.get('/', getHotlineTickets);
 router.post('/', createHotlineTicket);
 

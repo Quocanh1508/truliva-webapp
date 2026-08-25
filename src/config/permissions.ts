@@ -157,6 +157,14 @@ export const SYSTEM_FEATURES: SystemFeature[] = [
     description: 'Phân bổ, xác thực, chuyển ca dịch vụ hoặc trả về Phase 2',
     defaultRoles: ['ADMIN', 'COORDINATOR', 'HOTLINE']
   },
+  {
+    key: 'HOTLINE_EXPORT_EXCEL',
+    module: 'hotline',
+    moduleName: '📞 Quản lý Yêu Cầu Hotline',
+    name: 'Xuất Excel danh sách Yêu cầu Hotline',
+    description: 'Tải file Excel danh sách phiếu yêu cầu hotline theo bộ lọc',
+    defaultRoles: ['ADMIN', 'COORDINATOR', 'HOTLINE', 'STAFF']
+  },
 
   // 2. Quản lý Serial & Bảo hành
   {

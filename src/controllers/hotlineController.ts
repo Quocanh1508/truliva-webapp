@@ -1,4 +1,5 @@
 import { Request, Response } from 'express';
+import ExcelJS from 'exceljs';
 import prisma from '../config/database';
 import { broadcastEvent } from '../services/websocketService';
 
@@ -1253,6 +1254,289 @@ export async function getPublicSupportDevices(req: Request, res: Response) {
   } catch (error: any) {
     console.error('[getPublicSupportDevices] Error:', error);
     return res.status(500).json({ error: 'Lỗi lấy danh sách thiết bị', details: error.message });
+  }
+}
+
+// ═══════════════════════════════════════════════════
+//  GET /api/hotlines/export - Xuất Excel Danh Sách Hotline
+// ═══════════════════════════════════════════════════
+
+/**
+ * Xuất file Excel danh sách phiếu Hotline theo bộ lọc hiện tại
+ */
+export async function exportHotlineTickets(req: Request, res: Response): Promise<void> {
+  try {
+    const { 
+      status, 
+      statuses,
+      serviceRequestTypes,
+      productNames,
+      phase3RequestTypes,
+      phase3ServiceTypes,
+      targetTeams,
+      creatorIds,
+      handlerUserIds,
+      requestStartDate,
+      requestEndDate,
+      handledStartDate,
+      handledEndDate,
+      search, 
+      sortBy = 'createdAt',
+      sortOrder = 'desc'
+    } = req.query;
+
+    const conditions: any[] = [];
+
+    // 1. Trạng thái
+    const statusList = statuses 
+      ? (typeof statuses === 'string' ? statuses.split(',') : (Array.isArray(statuses) ? statuses as string[] : []))
+      : (status && String(status) !== 'ALL' ? [String(status)] : []);
+    
+    if (statusList.length > 0) {
+      conditions.push({ status: { in: statusList } });
+    }
+
+    // 2. Yêu cầu dịch vụ
+    if (serviceRequestTypes) {
+      const list = typeof serviceRequestTypes === 'string' ? serviceRequestTypes.split(',') : (Array.isArray(serviceRequestTypes) ? serviceRequestTypes as string[] : []);
+      if (list.length > 0) {
+        conditions.push({ serviceRequestType: { in: list } });
+      }
+    }
+
+    // 3. Sản phẩm
+    if (productNames) {
+      const list = typeof productNames === 'string' ? productNames.split(',') : (Array.isArray(productNames) ? productNames as string[] : []);
+      if (list.length > 0) {
+        const orProds: any[] = list.map(p => ({
+          productName: { contains: p, mode: 'insensitive' }
+        }));
+        conditions.push({ OR: orProds });
+      }
+    }
+
+    // 4. Loại yêu cầu
+    if (phase3RequestTypes) {
+      const list = typeof phase3RequestTypes === 'string' ? phase3RequestTypes.split(',') : (Array.isArray(phase3RequestTypes) ? phase3RequestTypes as string[] : []);
+      if (list.length > 0) {
+        conditions.push({ phase3RequestType: { in: list } });
+      }
+    }
+
+    // 5. Loại dịch vụ
+    if (phase3ServiceTypes) {
+      const list = typeof phase3ServiceTypes === 'string' ? phase3ServiceTypes.split(',') : (Array.isArray(phase3ServiceTypes) ? phase3ServiceTypes as string[] : []);
+      if (list.length > 0) {
+        conditions.push({ phase3ServiceType: { in: list } });
+      }
+    }
+
+    // 6. Người gửi yêu cầu
+    if (creatorIds) {
+      const list = typeof creatorIds === 'string' ? creatorIds.split(',') : (Array.isArray(creatorIds) ? creatorIds as string[] : []);
+      if (list.length > 0) {
+        conditions.push({ createdById: { in: list } });
+      }
+    }
+
+    // 7. Thời gian gửi yêu cầu
+    if (requestStartDate || requestEndDate) {
+      const dateCond: any = {};
+      if (requestStartDate) {
+        const d = new Date(String(requestStartDate));
+        d.setHours(0, 0, 0, 0);
+        dateCond.gte = d;
+      }
+      if (requestEndDate) {
+        const d = new Date(String(requestEndDate));
+        d.setHours(23, 59, 59, 999);
+        dateCond.lte = d;
+      }
+      conditions.push({
+        OR: [
+          { requestTime: dateCond },
+          { createdAt: dateCond }
+        ]
+      });
+    }
+
+    // 8. Team xử lý yêu cầu
+    if (targetTeams) {
+      const list = typeof targetTeams === 'string' ? targetTeams.split(',') : (Array.isArray(targetTeams) ? targetTeams as string[] : []);
+      if (list.length > 0) {
+        conditions.push({ targetTeam: { in: list } });
+      }
+    }
+
+    // 9. Người xử lý yêu cầu
+    if (handlerUserIds) {
+      const list = typeof handlerUserIds === 'string' ? handlerUserIds.split(',') : (Array.isArray(handlerUserIds) ? handlerUserIds as string[] : []);
+      if (list.length > 0) {
+        const hasUnassigned = list.includes('null') || list.includes('unassigned');
+        const actualIds = list.filter(id => id && id !== 'null' && id !== 'unassigned');
+        if (hasUnassigned && actualIds.length > 0) {
+          conditions.push({
+            OR: [
+              { handlerUserId: { in: actualIds } },
+              { handlerUserId: null }
+            ]
+          });
+        } else if (hasUnassigned) {
+          conditions.push({ handlerUserId: null });
+        } else {
+          conditions.push({ handlerUserId: { in: actualIds } });
+        }
+      }
+    }
+
+    // 10. Thời gian xử lý yêu cầu
+    if (handledStartDate || handledEndDate) {
+      const dateCond: any = {};
+      if (handledStartDate) {
+        const d = new Date(String(handledStartDate));
+        d.setHours(0, 0, 0, 0);
+        dateCond.gte = d;
+      }
+      if (handledEndDate) {
+        const d = new Date(String(handledEndDate));
+        d.setHours(23, 59, 59, 999);
+        dateCond.lte = d;
+      }
+      conditions.push({
+        OR: [
+          { contactTime: dateCond },
+          { updatedAt: dateCond }
+        ]
+      });
+    }
+
+    // Tìm kiếm text
+    if (search && String(search).trim()) {
+      const s = String(search).trim();
+      conditions.push({
+        OR: [
+          { ticketCode: { contains: s, mode: 'insensitive' } },
+          { customerName: { contains: s, mode: 'insensitive' } },
+          { customerPhone: { contains: s } },
+          { secondaryPhones: { contains: s } },
+          { address: { contains: s, mode: 'insensitive' } },
+          { serialNumber: { contains: s, mode: 'insensitive' } },
+          { customerSupportDetail: { contains: s, mode: 'insensitive' } },
+          { consultationNote: { contains: s, mode: 'insensitive' } },
+          { productName: { contains: s, mode: 'insensitive' } }
+        ]
+      });
+    }
+
+    const where = conditions.length > 0 ? { AND: conditions } : {};
+
+    const tickets = await prisma.hotlineTicket.findMany({
+      where,
+      include: {
+        createdBy: { select: { id: true, fullName: true, email: true, role: true } },
+        handlerUser: { select: { id: true, fullName: true, email: true, role: true } },
+        convertedOrder: { select: { id: true, pancakeOrderId: true, billFullName: true, adminStatus: true } }
+      },
+      orderBy: { [String(sortBy)]: String(sortOrder).toLowerCase() === 'asc' ? 'asc' : 'desc' }
+    });
+
+    const workbook = new ExcelJS.Workbook();
+    const worksheet = workbook.addWorksheet('Danh sách Hotline');
+
+    worksheet.columns = [
+      { header: 'STT', key: 'stt', width: 8 },
+      { header: 'Mã Ticket', key: 'ticketCode', width: 18 },
+      { header: 'Khách hàng', key: 'customerName', width: 25 },
+      { header: 'Số điện thoại', key: 'customerPhone', width: 16 },
+      { header: 'SĐT phụ', key: 'secondaryPhones', width: 16 },
+      { header: 'Tỉnh / Thành phố', key: 'provinceName', width: 20 },
+      { header: 'Địa chỉ cụ thể', key: 'address', width: 35 },
+      { header: 'Sản phẩm', key: 'productName', width: 30 },
+      { header: 'Số Serial', key: 'serialNumber', width: 20 },
+      { header: 'Yêu cầu dịch vụ', key: 'serviceRequestType', width: 22 },
+      { header: 'Loại yêu cầu (P3)', key: 'phase3RequestType', width: 20 },
+      { header: 'Loại dịch vụ (P3)', key: 'phase3ServiceType', width: 20 },
+      { header: 'Linh kiện (P3)', key: 'sparePartName', width: 25 },
+      { header: 'Nội dung KH yêu cầu', key: 'customerSupportDetail', width: 40 },
+      { header: 'Ghi chú tư vấn (P2)', key: 'consultationNote', width: 35 },
+      { header: 'Phản hồi P3', key: 'phase3Feedback', width: 35 },
+      { header: 'Trạng thái', key: 'status', width: 20 },
+      { header: 'Nguồn tiếp nhận', key: 'source', width: 20 },
+      { header: 'Team xử lý', key: 'targetTeam', width: 18 },
+      { header: 'Người xử lý', key: 'handlerUser', width: 22 },
+      { header: 'Người tạo', key: 'createdBy', width: 22 },
+      { header: 'Mã đơn chuyển đổi', key: 'convertedOrder', width: 20 },
+      { header: 'Thời gian tạo', key: 'createdAt', width: 22 },
+      { header: 'Thời gian liên hệ/xử lý', key: 'contactTime', width: 22 },
+    ];
+
+    const headerRow = worksheet.getRow(1);
+    headerRow.font = { name: 'Arial', size: 11, bold: true, color: { argb: 'FFFFFFFF' } };
+    headerRow.fill = {
+      type: 'pattern',
+      pattern: 'solid',
+      fgColor: { argb: 'FF1B3A6B' }
+    };
+    headerRow.alignment = { vertical: 'middle', horizontal: 'center' };
+    headerRow.height = 28;
+
+    const formatDateTime = (dateVal: any) => {
+      if (!dateVal) return '';
+      const d = new Date(dateVal);
+      if (isNaN(d.getTime())) return '';
+      return `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+    };
+
+    tickets.forEach((t, idx) => {
+      const row = worksheet.addRow({
+        stt: idx + 1,
+        ticketCode: t.ticketCode || '',
+        customerName: t.customerName || '',
+        customerPhone: t.customerPhone || '',
+        secondaryPhones: t.secondaryPhones || '',
+        provinceName: t.provinceName || '',
+        address: t.address || '',
+        productName: (t.productName || '').replace(/^PROD:\s*/i, ''),
+        serialNumber: t.serialNumber || '',
+        serviceRequestType: t.serviceRequestType || '',
+        phase3RequestType: t.phase3RequestType || '',
+        phase3ServiceType: t.phase3ServiceType || '',
+        sparePartName: t.sparePartName || '',
+        customerSupportDetail: t.customerSupportDetail || '',
+        consultationNote: t.consultationNote || '',
+        phase3Feedback: t.phase3Feedback || '',
+        status: t.status || '',
+        source: t.source || '',
+        targetTeam: t.targetTeam || '',
+        handlerUser: t.handlerUser?.fullName || '',
+        createdBy: t.createdBy?.fullName || '',
+        convertedOrder: t.convertedOrder?.pancakeOrderId ? `#${t.convertedOrder.pancakeOrderId}` : '',
+        createdAt: formatDateTime(t.createdAt),
+        contactTime: formatDateTime(t.contactTime || t.updatedAt),
+      });
+
+      row.getCell('stt').alignment = { horizontal: 'center' };
+      row.getCell('ticketCode').alignment = { horizontal: 'center' };
+      row.getCell('customerPhone').alignment = { horizontal: 'center' };
+      row.getCell('status').alignment = { horizontal: 'center' };
+      row.getCell('createdAt').alignment = { horizontal: 'center' };
+      row.getCell('contactTime').alignment = { horizontal: 'center' };
+    });
+
+    res.setHeader(
+      'Content-Type',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    );
+    res.setHeader(
+      'Content-Disposition',
+      'attachment; filename=' + encodeURIComponent(`Danh_sach_Yeu_cau_Hotline_${new Date().toISOString().slice(0,10)}.xlsx`)
+    );
+
+    await workbook.xlsx.write(res);
+    res.end();
+  } catch (error: any) {
+    console.error('[exportHotlineTickets] Error:', error);
+    res.status(500).json({ error: 'Lỗi xuất file Excel yêu cầu Hotline', details: error.message });
   }
 }
 
