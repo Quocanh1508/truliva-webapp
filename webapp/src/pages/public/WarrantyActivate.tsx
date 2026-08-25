@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { ShieldCheck, ArrowRight, UploadCloud, CheckCircle, CheckCircle2, AlertTriangle, Smartphone, User, MapPin, Loader2, Sparkles, ChevronLeft, ChevronRight, PhoneCall, Wrench, Send, Search, ChevronDown } from 'lucide-react';
+import { ShieldCheck, ArrowRight, UploadCloud, CheckCircle, CheckCircle2, AlertTriangle, Smartphone, User, MapPin, Loader2, Sparkles, ChevronLeft, ChevronRight, PhoneCall, Wrench, Send, Search, ChevronDown, Sun, Moon, Monitor } from 'lucide-react';
 import { API_URL } from '../../api/client';
 import { isValidPhone, PHONE_ERROR_MSG } from '../../utils/phone';
 import { HOTLINE_SERVICE_REQUEST_TYPES } from '../../utils/workTypes';
@@ -207,6 +207,107 @@ export default function WarrantyActivate() {
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
+
+  // Theme Management: Auto-detect browser/OS preference or manual user toggle ('auto' | 'light' | 'dark')
+  const [themeMode, setThemeMode] = useState<'auto' | 'light' | 'dark'>('auto');
+  const [resolvedTheme, setResolvedTheme] = useState<'light' | 'dark'>('dark');
+
+  useEffect(() => {
+    const saved = localStorage.getItem('truliva_warranty_theme') as 'auto' | 'light' | 'dark' | null;
+    const initialMode = saved || 'auto';
+    setThemeMode(initialMode);
+
+    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+    
+    const updateTheme = (mode: 'auto' | 'light' | 'dark') => {
+      if (mode === 'auto') {
+        setResolvedTheme(mediaQuery.matches ? 'dark' : 'light');
+      } else {
+        setResolvedTheme(mode);
+      }
+    };
+
+    updateTheme(initialMode);
+
+    const handleMediaChange = (e: MediaQueryListEvent) => {
+      const currentSaved = localStorage.getItem('truliva_warranty_theme') as 'auto' | 'light' | 'dark' | null;
+      if (!currentSaved || currentSaved === 'auto') {
+        setResolvedTheme(e.matches ? 'dark' : 'light');
+      }
+    };
+
+    mediaQuery.addEventListener('change', handleMediaChange);
+    return () => mediaQuery.removeEventListener('change', handleMediaChange);
+  }, []);
+
+  const handleSetTheme = (mode: 'auto' | 'light' | 'dark') => {
+    setThemeMode(mode);
+    localStorage.setItem('truliva_warranty_theme', mode);
+    if (mode === 'auto') {
+      const isDarkPref = window.matchMedia('(prefers-color-scheme: dark)').matches;
+      setResolvedTheme(isDarkPref ? 'dark' : 'light');
+    } else {
+      setResolvedTheme(mode);
+    }
+  };
+
+  const isDark = resolvedTheme === 'dark';
+
+  // Theme Switcher Widget Component (Modern Segmented Pill)
+  const renderThemeSwitcher = () => (
+    <div className={`inline-flex items-center p-0.5 rounded-full border transition-all ${
+      isDark 
+        ? 'bg-[#0D2444]/90 border-cyan-400/25 shadow-[0_0_12px_rgba(0,210,255,0.15)]' 
+        : 'bg-white/95 border-blue-200 shadow-sm'
+    }`}>
+      <button
+        type="button"
+        onClick={() => handleSetTheme('light')}
+        title="Giao diện Sáng (Light Mode)"
+        className={`p-1.5 rounded-full transition-all flex items-center justify-center cursor-pointer ${
+          themeMode === 'light'
+            ? 'bg-amber-400 text-slate-950 shadow-sm'
+            : isDark
+              ? 'text-slate-400 hover:text-white'
+              : 'text-slate-500 hover:text-amber-600'
+        }`}
+      >
+        <Sun size={13} className="stroke-[2.5]" />
+      </button>
+
+      <button
+        type="button"
+        onClick={() => handleSetTheme('auto')}
+        title="Tự động theo Trình duyệt / Thiết bị (Auto OS)"
+        className={`p-1.5 rounded-full transition-all flex items-center justify-center cursor-pointer ${
+          themeMode === 'auto'
+            ? isDark
+              ? 'bg-cyan-500 text-slate-950 shadow-sm'
+              : 'bg-[#1B3A6B] text-white shadow-sm'
+            : isDark
+              ? 'text-slate-400 hover:text-white'
+              : 'text-slate-500 hover:text-[#1B3A6B]'
+        }`}
+      >
+        <Monitor size={13} className="stroke-[2.5]" />
+      </button>
+
+      <button
+        type="button"
+        onClick={() => handleSetTheme('dark')}
+        title="Giao diện Tối (Dark Mode)"
+        className={`p-1.5 rounded-full transition-all flex items-center justify-center cursor-pointer ${
+          themeMode === 'dark'
+            ? 'bg-blue-600 text-white shadow-sm'
+            : isDark
+              ? 'text-slate-400 hover:text-white'
+              : 'text-slate-500 hover:text-blue-600'
+        }`}
+      >
+        <Moon size={13} className="stroke-[2.5]" />
+      </button>
+    </div>
+  );
 
   // Tech Support Form states (step 10 & 11)
   const [supportName, setSupportName] = useState('');
@@ -501,42 +602,74 @@ export default function WarrantyActivate() {
   // ==================== STEP 0: LANDING PAGE ====================
   if (step === 0) {
     return (
-      <div className="min-h-screen bg-gradient-to-b from-[#061226] via-[#0B2545] to-[#061226] text-white flex flex-col font-sans antialiased relative overflow-hidden">
+      <div className={`min-h-screen flex flex-col font-sans antialiased relative overflow-hidden transition-colors duration-300 ${
+        isDark
+          ? 'bg-gradient-to-b from-[#061226] via-[#0B2545] to-[#061226] text-white'
+          : 'bg-gradient-to-b from-[#EBF3FC] via-[#F4F8FD] to-[#E5EFFB] text-slate-800'
+      }`}>
         
         {/* Ambient background glowing orbs */}
-        <div className="absolute top-1/4 left-1/2 -translate-x-1/2 w-[500px] h-[500px] bg-cyan-500/10 rounded-full blur-3xl pointer-events-none"></div>
-        <div className="absolute top-2/3 right-10 w-72 h-72 bg-blue-600/10 rounded-full blur-2xl pointer-events-none"></div>
+        {isDark ? (
+          <>
+            <div className="absolute top-1/4 left-1/2 -translate-x-1/2 w-[500px] h-[500px] bg-cyan-500/10 rounded-full blur-3xl pointer-events-none"></div>
+            <div className="absolute top-2/3 right-10 w-72 h-72 bg-blue-600/10 rounded-full blur-2xl pointer-events-none"></div>
+          </>
+        ) : (
+          <>
+            <div className="absolute top-1/4 left-1/2 -translate-x-1/2 w-[500px] h-[500px] bg-sky-400/20 rounded-full blur-3xl pointer-events-none"></div>
+            <div className="absolute top-2/3 right-10 w-72 h-72 bg-blue-400/15 rounded-full blur-2xl pointer-events-none"></div>
+          </>
+        )}
 
         {/* Header Bar */}
-        <header className="flex items-center justify-between px-5 py-3.5 sm:py-4 bg-[#061226]/90 backdrop-blur-md border-b border-white/10 relative z-20">
+        <header className={`flex items-center justify-between px-5 py-3.5 sm:py-4 backdrop-blur-md border-b relative z-20 transition-colors duration-300 ${
+          isDark 
+            ? 'bg-[#061226]/90 border-white/10' 
+            : 'bg-white/85 border-blue-100/80 shadow-xs'
+        }`}>
           <div className="flex items-center space-x-2">
             <img 
               src="/logo.png?v=3" 
               alt="Truliva" 
               className="h-10 object-contain"
-              style={{ filter: 'drop-shadow(1px 0 0 #ffffff) drop-shadow(-1px 0 0 #ffffff) drop-shadow(0 1px 0 #ffffff) drop-shadow(0 -1px 0 #ffffff)' }}
+              style={{ filter: isDark ? 'drop-shadow(1px 0 0 #ffffff) drop-shadow(-1px 0 0 #ffffff) drop-shadow(0 1px 0 #ffffff) drop-shadow(0 -1px 0 #ffffff)' : 'none' }}
             />
           </div>
-          <a 
-            href="tel:1900638463" 
-            className="flex items-center gap-1.5 bg-[#0F2F59] hover:bg-[#153E75] text-white px-3.5 py-1.5 rounded-full text-xs font-bold transition-all border border-cyan-400/30 shadow-[0_0_12px_rgba(0,210,255,0.2)]"
-          >
-            <PhoneCall size={14} className="text-[#00D2FF]" />
-            <span className="font-mono tracking-tight text-white">1900 63 84 63</span>
-          </a>
+          <div className="flex items-center gap-2 sm:gap-3">
+            {renderThemeSwitcher()}
+            <a 
+              href="tel:1900638463" 
+              className={`flex items-center gap-1.5 px-3 sm:px-3.5 py-1.5 rounded-full text-xs font-bold transition-all border shadow-xs ${
+                isDark 
+                  ? 'bg-[#0F2F59] hover:bg-[#153E75] text-white border-cyan-400/30 shadow-[0_0_12px_rgba(0,210,255,0.2)]'
+                  : 'bg-blue-50 hover:bg-blue-100 text-[#1B3A6B] border-blue-200 shadow-sm'
+              }`}
+            >
+              <PhoneCall size={14} className={isDark ? "text-[#00D2FF]" : "text-[#00A3FF]"} />
+              <span className="font-mono tracking-tight">1900 63 84 63</span>
+            </a>
+          </div>
         </header>
 
         {/* Main Content */}
         <div className="flex-1 flex flex-col justify-center px-4 py-8 sm:py-12 max-w-md mx-auto w-full relative z-10">
-          <div className="bg-white/[0.05] backdrop-blur-2xl rounded-3xl p-5 sm:p-7 shadow-[0_20px_50px_rgba(0,0,0,0.5)] border border-white/10 space-y-6">
+          <div className={`backdrop-blur-2xl rounded-3xl p-5 sm:p-7 border space-y-6 transition-all duration-300 ${
+            isDark
+              ? 'bg-white/[0.05] shadow-[0_20px_50px_rgba(0,0,0,0.5)] border-white/10'
+              : 'bg-white/90 shadow-[0_20px_50px_rgba(27,58,107,0.12)] border-white/80'
+          }`}>
 
             {/* Greeting + 3D Crystal Water Drop */}
             <div className="flex items-center justify-between pt-1 pb-1">
               <div>
-                <h1 className="text-2xl sm:text-3xl font-black text-white tracking-tight flex items-center gap-2">
+                <h1 className={`text-2xl sm:text-3xl font-black tracking-tight flex items-center gap-2 ${
+                  isDark ? 'text-white' : 'text-[#1B3A6B]'
+                }`}>
                   <span>Xin chào!</span>
                 </h1>
-                <p className="text-xs text-sky-200/80 font-medium mt-1 leading-snug">
+                <p className={`text-xs font-medium mt-1 leading-snug ${
+                  isDark ? 'text-sky-200/80' : 'text-slate-500'
+                }`}>
                   Chúng tôi luôn sẵn sàng đồng hành<br className="hidden sm:inline" /> cùng bạn.
                 </p>
               </div>
@@ -544,11 +677,17 @@ export default function WarrantyActivate() {
               {/* 3D Photorealistic Crystal Water Droplet */}
               <div className="relative w-18 h-18 shrink-0 flex items-center justify-center">
                 {/* Glowing liquid caustics ripple rings */}
-                <div className="absolute -bottom-1 w-16 h-4 bg-cyan-400/25 rounded-full blur-md animate-pulse"></div>
-                <div className="absolute bottom-0 w-12 h-3 bg-sky-300/40 rounded-full blur-sm"></div>
+                <div className={`absolute -bottom-1 w-16 h-4 rounded-full blur-md animate-pulse ${
+                  isDark ? 'bg-cyan-400/25' : 'bg-sky-400/30'
+                }`}></div>
+                <div className={`absolute bottom-0 w-12 h-3 rounded-full blur-sm ${
+                  isDark ? 'bg-sky-300/40' : 'bg-sky-300/50'
+                }`}></div>
                 
                 {/* Crystal 3D Water Droplet */}
-                <svg viewBox="0 0 100 120" className="w-16 h-20 filter drop-shadow-[0_10px_20px_rgba(0,210,255,0.45)]">
+                <svg viewBox="0 0 100 120" className={`w-16 h-20 filter ${
+                  isDark ? 'drop-shadow-[0_10px_20px_rgba(0,210,255,0.45)]' : 'drop-shadow-[0_10px_20px_rgba(0,163,255,0.35)]'
+                }`}>
                   <defs>
                     {/* Outer body deep liquid gradient */}
                     <linearGradient id="dropMainGlow" x1="0%" y1="0%" x2="100%" y2="100%">
@@ -662,32 +801,44 @@ export default function WarrantyActivate() {
               </a>
             </div>
 
-            {/* Brand Heritage & Net Zero Carbon Section (Bắt mắt & Nổi bật) */}
-            <div className="mt-6 rounded-2xl bg-gradient-to-b from-white/[0.08] to-white/[0.02] border border-cyan-400/20 p-4 relative overflow-hidden backdrop-blur-md shadow-inner space-y-3">
+            {/* Brand Heritage & Net Zero Carbon Section */}
+            <div className={`mt-6 rounded-2xl border p-4 relative overflow-hidden backdrop-blur-md transition-all duration-300 space-y-3 ${
+              isDark
+                ? 'bg-gradient-to-b from-white/[0.08] to-white/[0.02] border-cyan-400/20 shadow-inner'
+                : 'bg-gradient-to-b from-blue-50/90 to-sky-50/50 border-blue-200/70 shadow-xs'
+            }`}>
               {/* Background ambient glow inside badge */}
-              <div className="absolute top-0 right-0 w-28 h-28 bg-cyan-500/10 rounded-full blur-2xl pointer-events-none"></div>
-              <div className="absolute bottom-0 left-0 w-20 h-20 bg-emerald-500/10 rounded-full blur-xl pointer-events-none"></div>
+              <div className={`absolute top-0 right-0 w-28 h-28 rounded-full blur-2xl pointer-events-none ${isDark ? 'bg-cyan-500/10' : 'bg-sky-400/20'}`}></div>
+              <div className={`absolute bottom-0 left-0 w-20 h-20 rounded-full blur-xl pointer-events-none ${isDark ? 'bg-emerald-500/10' : 'bg-emerald-400/15'}`}></div>
 
               {/* Item 1: Unilever Heritage */}
               <div className="flex items-start gap-3">
-                <div className="w-8 h-8 rounded-xl bg-blue-500/20 border border-blue-400/30 flex items-center justify-center shrink-0 mt-0.5 text-[#00D2FF] shadow-[0_0_10px_rgba(0,210,255,0.25)]">
+                <div className={`w-8 h-8 rounded-xl border flex items-center justify-center shrink-0 mt-0.5 shadow-sm ${
+                  isDark
+                    ? 'bg-blue-500/20 border-blue-400/30 text-[#00D2FF] shadow-[0_0_10px_rgba(0,210,255,0.25)]'
+                    : 'bg-blue-100 border-blue-300/60 text-[#0068FF]'
+                }`}>
                   <Sparkles size={16} />
                 </div>
-                <p className="text-xs text-slate-200 leading-relaxed">
-                  <strong className="text-white font-black tracking-wide">TRULIVA</strong> – thương hiệu máy lọc nước từng thuộc sở hữu của <span className="text-[#00D2FF] font-bold">Unilever (2014–2024)</span>
+                <p className={`text-xs leading-relaxed ${isDark ? 'text-slate-200' : 'text-slate-700'}`}>
+                  <strong className={`font-black tracking-wide ${isDark ? 'text-white' : 'text-[#1B3A6B]'}`}>TRULIVA</strong> – thương hiệu máy lọc nước từng thuộc sở hữu của <span className={`font-bold ${isDark ? 'text-[#00D2FF]' : 'text-[#0068FF]'}`}>Unilever (2014–2024)</span>
                 </p>
               </div>
 
               {/* Divider */}
-              <div className="h-px bg-gradient-to-r from-transparent via-white/15 to-transparent"></div>
+              <div className={`h-px ${isDark ? 'bg-gradient-to-r from-transparent via-white/15 to-transparent' : 'bg-gradient-to-r from-transparent via-blue-200 to-transparent'}`}></div>
 
               {/* Item 2: Net Zero Carbon Certification */}
               <div className="flex items-start gap-3">
-                <div className="w-8 h-8 rounded-xl bg-emerald-500/20 border border-emerald-400/30 flex items-center justify-center shrink-0 mt-0.5 text-emerald-300 shadow-[0_0_10px_rgba(34,197,94,0.25)]">
+                <div className={`w-8 h-8 rounded-xl border flex items-center justify-center shrink-0 mt-0.5 shadow-sm ${
+                  isDark
+                    ? 'bg-emerald-500/20 border-emerald-400/30 text-emerald-300 shadow-[0_0_10px_rgba(34,197,94,0.25)]'
+                    : 'bg-emerald-100 border-emerald-300/60 text-emerald-700'
+                }`}>
                   <CheckCircle2 size={16} />
                 </div>
-                <p className="text-xs text-slate-200 leading-relaxed">
-                  Sản phẩm <strong className="text-white font-black tracking-wide">TRULIVA</strong> được sản xuất tại nhà máy đạt chứng nhận <span className="text-emerald-400 font-extrabold">Net Zero Carbon – Không Carbon chuẩn 6 sao</span>, hướng đến công nghệ xanh và bảo vệ môi trường.
+                <p className={`text-xs leading-relaxed ${isDark ? 'text-slate-200' : 'text-slate-700'}`}>
+                  Sản phẩm <strong className={`font-black tracking-wide ${isDark ? 'text-white' : 'text-[#1B3A6B]'}`}>TRULIVA</strong> được sản xuất tại nhà máy đạt chứng nhận <span className={`font-extrabold ${isDark ? 'text-emerald-400' : 'text-emerald-700'}`}>Net Zero Carbon – Không Carbon chuẩn 6 sao</span>, hướng đến công nghệ xanh và bảo vệ môi trường.
                 </p>
               </div>
             </div>
@@ -696,27 +847,35 @@ export default function WarrantyActivate() {
         </div>
 
         {/* Footer */}
-        <footer className="text-center px-5 py-6 space-y-3 border-t border-white/10 bg-[#061226] relative z-20">
-          <div className="flex items-center justify-center gap-2.5 text-slate-400 text-[10px] font-bold tracking-wider flex-wrap">
-            <a href="#" className="hover:text-white transition">SITEMAP</a>
+        <footer className={`text-center px-5 py-6 space-y-3 border-t relative z-20 transition-colors duration-300 ${
+          isDark ? 'bg-[#061226] border-white/10 text-slate-400' : 'bg-white/90 border-blue-100 text-slate-500'
+        }`}>
+          <div className="flex items-center justify-center gap-2.5 text-[10px] font-bold tracking-wider flex-wrap">
+            <a href="#" className={`transition ${isDark ? 'hover:text-white' : 'hover:text-[#1B3A6B]'}`}>SITEMAP</a>
             <span>|</span>
-            <a href="#" className="hover:text-white transition">COOKIE POLICY</a>
+            <a href="#" className={`transition ${isDark ? 'hover:text-white' : 'hover:text-[#1B3A6B]'}`}>COOKIE POLICY</a>
             <span>|</span>
-            <a href="#" className="hover:text-white transition">T&C</a>
+            <a href="#" className={`transition ${isDark ? 'hover:text-white' : 'hover:text-[#1B3A6B]'}`}>T&C</a>
             <span>|</span>
-            <a href="#" className="hover:text-white transition">PRIVACY POLICY</a>
+            <a href="#" className={`transition ${isDark ? 'hover:text-white' : 'hover:text-[#1B3A6B]'}`}>PRIVACY POLICY</a>
           </div>
-          <p className="text-slate-400 text-[11px] font-medium">© 2026 Truliva Vietnam. Tất cả quyền được bảo lưu.</p>
+          <p className="text-[11px] font-medium">© 2026 Truliva Vietnam. Tất cả quyền được bảo lưu.</p>
           
           {/* Social Icons */}
           <div className="flex items-center justify-center gap-3 pt-1">
-            <a href="#" aria-label="Facebook" className="w-7 h-7 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-white transition">
+            <a href="#" aria-label="Facebook" className={`w-7 h-7 rounded-full flex items-center justify-center transition ${
+              isDark ? 'bg-white/10 hover:bg-white/20 text-white' : 'bg-blue-50 hover:bg-blue-100 text-[#1B3A6B]'
+            }`}>
               <svg className="w-3.5 h-3.5 fill-current" viewBox="0 0 24 24"><path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/></svg>
             </a>
-            <a href="#" aria-label="YouTube" className="w-7 h-7 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-white transition">
+            <a href="#" aria-label="YouTube" className={`w-7 h-7 rounded-full flex items-center justify-center transition ${
+              isDark ? 'bg-white/10 hover:bg-white/20 text-white' : 'bg-blue-50 hover:bg-blue-100 text-[#1B3A6B]'
+            }`}>
               <svg className="w-3.5 h-3.5 fill-current" viewBox="0 0 24 24"><path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/></svg>
             </a>
-            <a href="https://zalo.me/3870382725035413507" target="_blank" rel="noopener noreferrer" aria-label="Zalo" className="w-7 h-7 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-white transition">
+            <a href="https://zalo.me/3870382725035413507" target="_blank" rel="noopener noreferrer" aria-label="Zalo" className={`w-7 h-7 rounded-full flex items-center justify-center transition ${
+              isDark ? 'bg-white/10 hover:bg-white/20 text-white' : 'bg-blue-50 hover:bg-blue-100 text-[#1B3A6B]'
+            }`}>
               <svg className="w-3.5 h-3.5 fill-current" viewBox="0 0 24 24"><path d="M12.003 2C6.478 2 2 6.136 2 11.238c0 3.125 1.688 5.88 4.298 7.48-.12.443-.655 2.417-.655 2.417-.06.223.167.387.352.268 0 0 2.278-1.52 3.162-2.09.91.246 1.875.38 2.846.38 5.525 0 10.003-4.137 10.003-9.24C22.006 6.137 17.528 2 12.003 2z"/></svg>
             </a>
           </div>
@@ -729,21 +888,36 @@ export default function WarrantyActivate() {
   // ==================== STEP 10: PUBLIC TECH SUPPORT FORM ====================
   if (step === 10) {
     return (
-      <div className="min-h-screen bg-[#1B2A4A] flex flex-col font-sans antialiased">
-        <header className="flex items-center justify-between px-6 py-4 sm:py-5 border-b border-white/10 bg-[#101B2E]">
-          <button onClick={() => setStep(0)} className="flex items-center gap-1.5 text-white/80 hover:text-white text-sm font-semibold transition">
+      <div className={`min-h-screen flex flex-col font-sans antialiased transition-colors duration-300 ${
+        isDark
+          ? 'bg-gradient-to-b from-[#061226] via-[#0B2545] to-[#061226] text-white'
+          : 'bg-gradient-to-b from-[#EBF3FC] via-[#F4F8FD] to-[#E5EFFB] text-slate-800'
+      }`}>
+        <header className={`flex items-center justify-between px-6 py-4 sm:py-5 border-b backdrop-blur-md transition-colors duration-300 ${
+          isDark ? 'border-white/10 bg-[#061226]/90' : 'border-blue-100 bg-white/85 shadow-xs'
+        }`}>
+          <button onClick={() => setStep(0)} className={`flex items-center gap-1.5 text-sm font-semibold transition cursor-pointer ${
+            isDark ? 'text-white/80 hover:text-white' : 'text-slate-600 hover:text-[#1B3A6B]'
+          }`}>
             <ChevronLeft size={20} />
             <span>Trang chủ</span>
           </button>
-          <img 
-            src="/logo.png?v=3" 
-            alt="Truliva" 
-            style={{ height: '44px', objectFit: 'contain', filter: 'drop-shadow(1px 0 0 #ffffff) drop-shadow(-1px 0 0 #ffffff) drop-shadow(0 1px 0 #ffffff) drop-shadow(0 -1px 0 #ffffff)' }}
-          />
+          <div className="flex items-center gap-3">
+            {renderThemeSwitcher()}
+            <img 
+              src="/logo.png?v=3" 
+              alt="Truliva" 
+              style={{ height: '40px', objectFit: 'contain', filter: isDark ? 'drop-shadow(1px 0 0 #ffffff) drop-shadow(-1px 0 0 #ffffff) drop-shadow(0 1px 0 #ffffff) drop-shadow(0 -1px 0 #ffffff)' : 'none' }}
+            />
+          </div>
         </header>
 
         <div className="flex-1 flex flex-col items-center justify-center p-4 py-8">
-          <div className="w-full max-w-lg bg-white rounded-2xl shadow-2xl overflow-hidden">
+          <div className={`w-full max-w-lg rounded-2xl shadow-2xl overflow-hidden transition-all duration-300 ${
+            isDark
+              ? 'bg-[#0B1E38]/95 backdrop-blur-xl border border-cyan-500/20 text-white'
+              : 'bg-white border border-blue-100 text-slate-800'
+          }`}>
             <div className="bg-gradient-to-r from-[#1B3A6B] to-[#2563EB] p-6 text-white text-center">
               <div className="inline-flex p-3 bg-white/10 rounded-xl mb-2">
                 <Wrench size={28} className="text-white" />
@@ -763,25 +937,29 @@ export default function WarrantyActivate() {
               {/* Họ tên + SĐT */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">Họ và tên *</label>
+                  <label className={`block text-xs font-bold uppercase tracking-wider mb-1 ${isDark ? 'text-slate-300' : 'text-gray-700'}`}>Họ và tên *</label>
                   <input
                     type="text"
                     placeholder="VD: Nguyễn Văn An"
                     value={supportName}
                     onChange={e => setSupportName(e.target.value)}
-                    className="w-full px-3.5 py-2.5 border border-gray-300 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-200"
+                    className={`w-full px-3.5 py-2.5 border rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-200 ${
+                      isDark ? 'bg-white/10 border-white/20 text-white placeholder:text-slate-400' : 'bg-white border-gray-300 text-slate-800'
+                    }`}
                     required
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">Số điện thoại *</label>
+                  <label className={`block text-xs font-bold uppercase tracking-wider mb-1 ${isDark ? 'text-slate-300' : 'text-gray-700'}`}>Số điện thoại *</label>
                   <input
                     type="tel"
                     maxLength={10}
                     placeholder="VD: 0912345678"
                     value={supportPhone}
                     onChange={e => setSupportPhone(e.target.value.replace(/[^0-9]/g, '').slice(0, 10))}
-                    className="w-full px-3.5 py-2.5 border border-gray-300 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-200 font-mono font-semibold"
+                    className={`w-full px-3.5 py-2.5 border rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-200 font-mono font-semibold ${
+                      isDark ? 'bg-white/10 border-white/20 text-white placeholder:text-slate-400' : 'bg-white border-gray-300 text-slate-800'
+                    }`}
                     required
                   />
                 </div>
@@ -790,24 +968,28 @@ export default function WarrantyActivate() {
               {/* SĐT phụ + Email */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">Số điện thoại phụ</label>
+                  <label className={`block text-xs font-bold uppercase tracking-wider mb-1 ${isDark ? 'text-slate-300' : 'text-gray-700'}`}>Số điện thoại phụ</label>
                   <input
                     type="tel"
                     maxLength={10}
                     placeholder="VD: 0914567123"
                     value={supportSecondaryPhones}
                     onChange={e => setSupportSecondaryPhones(e.target.value.replace(/[^0-9]/g, '').slice(0, 10))}
-                    className="w-full px-3.5 py-2.5 border border-gray-300 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-200 font-mono"
+                    className={`w-full px-3.5 py-2.5 border rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-200 font-mono ${
+                      isDark ? 'bg-white/10 border-white/20 text-white placeholder:text-slate-400' : 'bg-white border-gray-300 text-slate-800'
+                    }`}
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">Email</label>
+                  <label className={`block text-xs font-bold uppercase tracking-wider mb-1 ${isDark ? 'text-slate-300' : 'text-gray-700'}`}>Email</label>
                   <input
                     type="email"
                     placeholder="Email của bạn"
                     value={supportEmail}
                     onChange={e => setSupportEmail(e.target.value)}
-                    className="w-full px-3.5 py-2.5 border border-gray-300 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-200"
+                    className={`w-full px-3.5 py-2.5 border rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-200 ${
+                      isDark ? 'bg-white/10 border-white/20 text-white placeholder:text-slate-400' : 'bg-white border-gray-300 text-slate-800'
+                    }`}
                   />
                 </div>
               </div>
@@ -815,7 +997,7 @@ export default function WarrantyActivate() {
               {/* Tỉnh/thành phố + Địa chỉ */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">Tỉnh / Thành phố *</label>
+                  <label className={`block text-xs font-bold uppercase tracking-wider mb-1 ${isDark ? 'text-slate-300' : 'text-gray-700'}`}>Tỉnh / Thành phố *</label>
                   <GenericSearchableSelect
                     items={ORDERED_VIETNAM_PROVINCES}
                     value={supportProvince}
@@ -825,13 +1007,15 @@ export default function WarrantyActivate() {
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">Địa chỉ cụ thể *</label>
+                  <label className={`block text-xs font-bold uppercase tracking-wider mb-1 ${isDark ? 'text-slate-300' : 'text-gray-700'}`}>Địa chỉ cụ thể *</label>
                   <input
                     type="text"
                     placeholder="VD: 123 Nguyễn Văn Cừ, Phường 4"
                     value={supportAddress}
                     onChange={e => setSupportAddress(e.target.value)}
-                    className="w-full px-3.5 py-2.5 border border-gray-300 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-200"
+                    className={`w-full px-3.5 py-2.5 border rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-200 ${
+                      isDark ? 'bg-white/10 border-white/20 text-white placeholder:text-slate-400' : 'bg-white border-gray-300 text-slate-800'
+                    }`}
                     required
                   />
                 </div>
@@ -840,7 +1024,7 @@ export default function WarrantyActivate() {
               {/* Sản phẩm + Serial */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">Sản phẩm *</label>
+                  <label className={`block text-xs font-bold uppercase tracking-wider mb-1 ${isDark ? 'text-slate-300' : 'text-gray-700'}`}>Sản phẩm *</label>
                   <GenericSearchableSelect
                     items={
                       deviceTreeData.products.length > 0
@@ -887,30 +1071,36 @@ export default function WarrantyActivate() {
                       placeholder="Nhập tên sản phẩm cụ thể..."
                       value={customSupportProduct}
                       onChange={e => setCustomSupportProduct(e.target.value)}
-                      className="w-full mt-2 px-3.5 py-2.5 border border-gray-300 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-200"
+                      className={`w-full mt-2 px-3.5 py-2.5 border rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-200 ${
+                        isDark ? 'bg-white/10 border-white/20 text-white placeholder:text-slate-400' : 'bg-white border-gray-300 text-slate-800'
+                      }`}
                       required
                     />
                   )}
                 </div>
                 <div>
-                  <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">Số Serial (nếu có)</label>
+                  <label className={`block text-xs font-bold uppercase tracking-wider mb-1 ${isDark ? 'text-slate-300' : 'text-gray-700'}`}>Số Serial (nếu có)</label>
                   <input
                     type="text"
                     placeholder="VD: 185826042700121"
                     value={supportSerial}
                     onChange={e => setSupportSerial(e.target.value)}
-                    className="w-full px-3.5 py-2.5 border border-gray-300 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-200 font-mono"
+                    className={`w-full px-3.5 py-2.5 border rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-200 font-mono ${
+                      isDark ? 'bg-white/10 border-white/20 text-white placeholder:text-slate-400' : 'bg-white border-gray-300 text-slate-800'
+                    }`}
                   />
                 </div>
               </div>
 
               {/* Yêu cầu dịch vụ */}
               <div>
-                <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">Yêu cầu dịch vụ *</label>
+                <label className={`block text-xs font-bold uppercase tracking-wider mb-1 ${isDark ? 'text-slate-300' : 'text-gray-700'}`}>Yêu cầu dịch vụ *</label>
                 <select
                   value={supportServiceType}
                   onChange={e => setSupportServiceType(e.target.value)}
-                  className="w-full px-3.5 py-2.5 border border-gray-300 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-200 bg-white"
+                  className={`w-full px-3.5 py-2.5 border rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-200 ${
+                    isDark ? 'bg-[#152B4D] border-white/20 text-white' : 'bg-white border-gray-300 text-slate-800'
+                  }`}
                   required
                 >
                   <option value="">-- Chọn yêu cầu dịch vụ --</option>
@@ -922,13 +1112,15 @@ export default function WarrantyActivate() {
 
               {/* Nội dung cần hỗ trợ */}
               <div>
-                <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">Nội dung chi tiết sự cố / Yêu cầu *</label>
+                <label className={`block text-xs font-bold uppercase tracking-wider mb-1 ${isDark ? 'text-slate-300' : 'text-gray-700'}`}>Nội dung chi tiết sự cố / Yêu cầu *</label>
                 <textarea
                   rows={3}
                   placeholder="Vui lòng mô tả chi tiết hiện trạng máy hoặc sự cố đang gặp phải..."
                   value={supportDetail}
                   onChange={e => setSupportDetail(e.target.value)}
-                  className="w-full px-3.5 py-2.5 border border-gray-300 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-200"
+                  className={`w-full px-3.5 py-2.5 border rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-200 ${
+                    isDark ? 'bg-white/10 border-white/20 text-white placeholder:text-slate-400' : 'bg-white border-gray-300 text-slate-800'
+                  }`}
                   required
                 />
               </div>
@@ -938,14 +1130,16 @@ export default function WarrantyActivate() {
                 <button
                   type="button"
                   onClick={() => setStep(0)}
-                  className="flex-1 py-3 border border-gray-300 text-gray-700 rounded-xl font-bold text-sm hover:bg-gray-50 transition"
+                  className={`flex-1 py-3 border rounded-xl font-bold text-sm transition cursor-pointer ${
+                    isDark ? 'border-white/20 text-slate-300 hover:bg-white/10' : 'border-gray-300 text-gray-700 hover:bg-gray-50'
+                  }`}
                 >
                   Hủy
                 </button>
                 <button
                   type="submit"
                   disabled={submittingSupport}
-                  className="flex-[2] py-3 bg-[#2E7D32] hover:bg-[#1B5E20] text-white rounded-xl font-extrabold text-sm transition shadow-md flex items-center justify-center gap-2 disabled:opacity-50"
+                  className="flex-[2] py-3 bg-[#2E7D32] hover:bg-[#1B5E20] text-white rounded-xl font-extrabold text-sm transition shadow-md flex items-center justify-center gap-2 disabled:opacity-50 cursor-pointer"
                 >
                   {submittingSupport ? <Loader2 size={18} className="animate-spin" /> : <Send size={18} />}
                   <span>Gửi Yêu Cầu Hỗ Trợ</span>
@@ -961,31 +1155,50 @@ export default function WarrantyActivate() {
   // ==================== STEP 11: TECH SUPPORT SUCCESS ====================
   if (step === 11) {
     return (
-      <div className="min-h-screen bg-[#14223A] flex flex-col font-sans antialiased">
-        <header className="flex items-center justify-between px-6 py-4 sm:py-5 border-b border-white/10 bg-[#101B2E]">
-          <button onClick={() => setStep(0)} className="flex items-center gap-1.5 text-white/80 hover:text-white text-sm font-semibold transition">
+      <div className={`min-h-screen flex flex-col font-sans antialiased transition-colors duration-300 ${
+        isDark
+          ? 'bg-gradient-to-b from-[#061226] via-[#0B2545] to-[#061226] text-white'
+          : 'bg-gradient-to-b from-[#EBF3FC] via-[#F4F8FD] to-[#E5EFFB] text-slate-800'
+      }`}>
+        <header className={`flex items-center justify-between px-6 py-4 sm:py-5 border-b backdrop-blur-md transition-colors duration-300 ${
+          isDark ? 'border-white/10 bg-[#061226]/90' : 'border-blue-100 bg-white/85 shadow-xs'
+        }`}>
+          <button onClick={() => setStep(0)} className={`flex items-center gap-1.5 text-sm font-semibold transition cursor-pointer ${
+            isDark ? 'text-white/80 hover:text-white' : 'text-slate-600 hover:text-[#1B3A6B]'
+          }`}>
             <ChevronLeft size={20} />
             <span>Trang chủ</span>
           </button>
-          <img 
-            src="/logo.png?v=3" 
-            alt="Truliva" 
-            style={{ height: '44px', objectFit: 'contain', filter: 'drop-shadow(1px 0 0 #ffffff) drop-shadow(-1px 0 0 #ffffff) drop-shadow(0 1px 0 #ffffff) drop-shadow(0 -1px 0 #ffffff)' }}
-          />
+          <div className="flex items-center gap-3">
+            {renderThemeSwitcher()}
+            <img 
+              src="/logo.png?v=3" 
+              alt="Truliva" 
+              style={{ height: '40px', objectFit: 'contain', filter: isDark ? 'drop-shadow(1px 0 0 #ffffff) drop-shadow(-1px 0 0 #ffffff) drop-shadow(0 1px 0 #ffffff) drop-shadow(0 -1px 0 #ffffff)' : 'none' }}
+            />
+          </div>
         </header>
 
         <div className="flex-1 flex flex-col items-center justify-center p-4 py-8">
-          <div className="bg-white rounded-2xl shadow-2xl p-8 max-w-md w-full text-center space-y-5 animate-fade-in">
-            <div className="w-16 h-16 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mx-auto">
+          <div className={`rounded-2xl shadow-2xl p-8 max-w-md w-full text-center space-y-5 animate-fade-in border transition-all duration-300 ${
+            isDark
+              ? 'bg-[#0B1E38]/95 backdrop-blur-xl border-cyan-500/20 text-white'
+              : 'bg-white border-blue-100 text-slate-800'
+          }`}>
+            <div className={`w-16 h-16 rounded-full flex items-center justify-center mx-auto ${
+              isDark ? 'bg-emerald-500/20 text-emerald-300' : 'bg-emerald-100 text-emerald-600'
+            }`}>
               <CheckCircle size={36} />
             </div>
 
             <div className="space-y-2">
-              <h2 className="text-xl font-extrabold text-gray-800">Yêu Cầu Hỗ Trợ Đã Gửi Thành Công!</h2>
-              <div className="inline-block px-3 py-1 bg-blue-50 border border-blue-200 text-blue-700 font-mono font-bold text-sm rounded-lg">
+              <h2 className={`text-xl font-extrabold ${isDark ? 'text-white' : 'text-gray-800'}`}>Yêu Cầu Hỗ Trợ Đã Gửi Thành Công!</h2>
+              <div className={`inline-block px-3 py-1 font-mono font-bold text-sm rounded-lg border ${
+                isDark ? 'bg-blue-500/20 border-cyan-400/30 text-cyan-300' : 'bg-blue-50 border-blue-200 text-blue-700'
+              }`}>
                 Mã Yêu Cầu: {supportSuccessTicket}
               </div>
-              <p className="text-xs text-gray-500 leading-relaxed pt-2">
+              <p className={`text-xs leading-relaxed pt-2 ${isDark ? 'text-slate-300' : 'text-gray-500'}`}>
                 Bộ phận Hotline và Kỹ thuật viên Truliva đã tiếp nhận thông tin sự cố của bạn. Chúng tôi sẽ chủ động liên hệ qua số điện thoại <b>{supportPhone}</b> trong thời gian sớm nhất.
               </p>
             </div>
@@ -998,7 +1211,7 @@ export default function WarrantyActivate() {
                   setSupportProduct(''); setSupportSerial(''); setSupportDetail('');
                   setStep(0);
                 }}
-                className="w-full py-3 bg-[#1B3A6B] hover:bg-[#122749] text-white rounded-xl font-bold text-sm transition shadow-md"
+                className="w-full py-3 bg-[#1B3A6B] hover:bg-[#122749] text-white rounded-xl font-bold text-sm transition shadow-md cursor-pointer"
               >
                 Về Trang Chủ
               </button>
@@ -1011,30 +1224,45 @@ export default function WarrantyActivate() {
 
   // ==================== STEP 1-3: FORM FLOW ====================
   return (
-    <div className="min-h-screen bg-[#14223A] flex flex-col font-sans antialiased">
+    <div className={`min-h-screen flex flex-col font-sans antialiased transition-colors duration-300 ${
+      isDark
+        ? 'bg-gradient-to-b from-[#061226] via-[#0B2545] to-[#061226] text-white'
+        : 'bg-gradient-to-b from-[#EBF3FC] via-[#F4F8FD] to-[#E5EFFB] text-slate-800'
+    }`}>
       
       {/* Header Bar đồng bộ chuẩn UI */}
-      <header className="flex items-center justify-between px-6 py-4 sm:py-5 border-b border-white/10 bg-[#101B2E]">
+      <header className={`flex items-center justify-between px-6 py-4 sm:py-5 border-b backdrop-blur-md transition-colors duration-300 ${
+        isDark ? 'border-white/10 bg-[#061226]/90' : 'border-blue-100 bg-white/85 shadow-xs'
+      }`}>
         <button
           onClick={() => {
             if (step === 2) setStep(1);
             else setStep(0);
           }}
-          className="flex items-center gap-1.5 text-white/80 hover:text-white text-sm font-semibold transition"
+          className={`flex items-center gap-1.5 text-sm font-semibold transition cursor-pointer ${
+            isDark ? 'text-white/80 hover:text-white' : 'text-slate-600 hover:text-[#1B3A6B]'
+          }`}
         >
           <ChevronLeft size={20} />
           <span>{step === 2 ? 'Quay lại' : 'Trang chủ'}</span>
         </button>
-        <img 
-          src="/logo.png?v=3" 
-          alt="Truliva" 
-          style={{ height: '44px', objectFit: 'contain', filter: 'drop-shadow(1px 0 0 #ffffff) drop-shadow(-1px 0 0 #ffffff) drop-shadow(0 1px 0 #ffffff) drop-shadow(0 -1px 0 #ffffff)' }}
-        />
+        <div className="flex items-center gap-3">
+          {renderThemeSwitcher()}
+          <img 
+            src="/logo.png?v=3" 
+            alt="Truliva" 
+            style={{ height: '40px', objectFit: 'contain', filter: isDark ? 'drop-shadow(1px 0 0 #ffffff) drop-shadow(-1px 0 0 #ffffff) drop-shadow(0 1px 0 #ffffff) drop-shadow(0 -1px 0 #ffffff)' : 'none' }}
+          />
+        </div>
       </header>
 
       {/* Main Container */}
       <div className="flex-1 flex flex-col items-center justify-center p-4 py-8">
-        <div className="w-full max-w-lg bg-white rounded-2xl shadow-2xl overflow-hidden p-6 relative z-10">
+        <div className={`w-full max-w-lg rounded-2xl shadow-2xl overflow-hidden p-6 relative z-10 border transition-all duration-300 ${
+          isDark
+            ? 'bg-[#0B1E38]/95 backdrop-blur-xl border-cyan-500/20 text-white'
+            : 'bg-white border-blue-100 text-slate-800'
+        }`}>
           
           {/* Banner Image */}
           <div className="w-full rounded-xl overflow-hidden mb-6 shadow-sm border border-blue-100">
@@ -1043,13 +1271,19 @@ export default function WarrantyActivate() {
 
           {/* Branding Header */}
           <div className="text-center mb-6">
-            <div className="w-16 h-16 bg-blue-50 border border-blue-200/50 rounded-full flex items-center justify-center mx-auto mb-3 shadow-md shadow-blue-500/5">
-              <ShieldCheck size={36} className="text-blue-600" />
+            <div className={`w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-3 shadow-md ${
+              isDark ? 'bg-blue-500/20 border border-cyan-400/30' : 'bg-blue-50 border border-blue-200/50 shadow-blue-500/5'
+            }`}>
+              <ShieldCheck size={36} className={isDark ? "text-cyan-400" : "text-blue-600"} />
             </div>
-            <h1 className="text-xl font-extrabold uppercase tracking-wider text-transparent bg-clip-text bg-gradient-to-r from-blue-700 to-blue-500">
+            <h1 className={`text-xl font-extrabold uppercase tracking-wider ${
+              isDark ? 'text-white' : 'text-transparent bg-clip-text bg-gradient-to-r from-blue-700 to-blue-500'
+            }`}>
               KÍCH HOẠT BẢO HÀNH
             </h1>
-            <p className="text-[10px] text-gray-500 font-bold mt-1 uppercase tracking-widest">
+            <p className={`text-[10px] font-bold mt-1 uppercase tracking-widest ${
+              isDark ? 'text-cyan-300' : 'text-gray-500'
+            }`}>
               Truliva Official
             </p>
           </div>
@@ -1057,16 +1291,18 @@ export default function WarrantyActivate() {
           {/* STEP 1: Enter Details & Invoice */}
           {step === 1 && (
             <form onSubmit={handleCheckAndProceed} className="space-y-5">
-              <div className="bg-blue-50/40 border border-blue-100/60 rounded-xl p-4 text-center">
-                <Sparkles size={20} className="mx-auto text-blue-600 mb-2" />
-                <p className="text-xs text-gray-600 leading-relaxed font-medium">
+              <div className={`border rounded-xl p-4 text-center ${
+                isDark ? 'bg-white/5 border-white/10' : 'bg-blue-50/40 border-blue-100/60'
+              }`}>
+                <Sparkles size={20} className={`mx-auto mb-2 ${isDark ? 'text-cyan-400' : 'text-blue-600'}`} />
+                <p className={`text-xs leading-relaxed font-medium ${isDark ? 'text-slate-300' : 'text-gray-600'}`}>
                   Vui lòng nhập số Serial sản phẩm trên tem dán thiết bị để bắt đầu kích hoạt bảo hành.
                 </p>
               </div>
 
               {/* Serial input */}
               <div>
-                <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-1.5">
+                <label className={`block text-xs font-bold uppercase tracking-widest mb-1.5 ${isDark ? 'text-slate-300' : 'text-gray-500'}`}>
                   Số Serial sản phẩm (*)
                 </label>
                 <div className="relative">
@@ -1076,18 +1312,22 @@ export default function WarrantyActivate() {
                     placeholder="Mẫu: 1858 260 207 *****"
                     value={serialInput}
                     onChange={(e) => setSerialInput(formatSerialNumber(e.target.value))}
-                    className="w-full bg-blue-50/10 border border-gray-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 rounded-xl px-4 py-2.5 text-sm outline-none text-gray-800 font-mono font-bold tracking-wider transition-all placeholder:text-gray-400"
+                    className={`w-full border rounded-xl px-4 py-2.5 text-sm outline-none font-mono font-bold tracking-wider transition-all ${
+                      isDark 
+                        ? 'bg-white/10 border-white/20 text-white placeholder:text-slate-400 focus:border-cyan-400 focus:ring-2 focus:ring-cyan-400/20' 
+                        : 'bg-blue-50/10 border-gray-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 text-gray-800 placeholder:text-gray-400'
+                    }`}
                   />
                   {serialValidation.status === 'CHECKING' && (
                     <div className="absolute right-3 top-1/2 -translate-y-1/2">
-                      <Loader2 size={16} className="animate-spin text-blue-500" />
+                      <Loader2 size={16} className={`animate-spin ${isDark ? 'text-cyan-400' : 'text-blue-500'}`} />
                     </div>
                   )}
                 </div>
 
                 {/* 1. Trạng thái IDLE / Chưa nhập đủ 15 ký tự */}
                 {serialValidation.status === 'IDLE' && serialInput.replace(/[^a-zA-Z0-9]/g, '').length < 15 && (
-                  <p className="text-[11px] text-gray-400 mt-1.5">
+                  <p className={`text-[11px] mt-1.5 ${isDark ? 'text-slate-400' : 'text-gray-400'}`}>
                     * Nhập đủ 15 ký tự chữ và số trên tem máy để kiểm tra
                   </p>
                 )}
@@ -1140,26 +1380,28 @@ export default function WarrantyActivate() {
 
                 {/* 4. Trạng thái HỢP LỆ & CHƯA KÍCH HOẠT */}
                 {serialValidation.status === 'VALID' && (
-                  <div className="mt-3 bg-emerald-50 border border-emerald-200 text-emerald-900 text-xs p-3.5 rounded-xl flex items-center justify-between animate-fade-in shadow-sm">
+                  <div className={`mt-3 border text-xs p-3.5 rounded-xl flex items-center justify-between animate-fade-in shadow-sm ${
+                    isDark ? 'bg-emerald-950/40 border-emerald-500/30 text-emerald-200' : 'bg-emerald-50 border-emerald-200 text-emerald-900'
+                  }`}>
                     <div className="flex items-center gap-2">
-                      <CheckCircle2 size={18} className="shrink-0 text-emerald-600" />
+                      <CheckCircle2 size={18} className="shrink-0 text-emerald-500" />
                       <div>
-                        <p className="font-bold text-emerald-900">{serialValidation.model}</p>
-                        <p className="text-gray-600 text-[11px]">Bảo hành tiêu chuẩn: <strong>{serialValidation.totalMonths} tháng</strong></p>
+                        <p className={`font-bold ${isDark ? 'text-white' : 'text-emerald-900'}`}>{serialValidation.model}</p>
+                        <p className={`text-[11px] ${isDark ? 'text-slate-300' : 'text-gray-600'}`}>Bảo hành tiêu chuẩn: <strong>{serialValidation.totalMonths} tháng</strong></p>
                       </div>
                     </div>
-                    <span className="bg-emerald-100 text-emerald-800 font-bold px-2 py-0.5 rounded text-[10px] uppercase">
+                    <span className="bg-emerald-500 text-slate-950 font-bold px-2 py-0.5 rounded text-[10px] uppercase">
                       Hợp lệ
                     </span>
                   </div>
                 )}
               </div>
 
-              {/* Customer Inputs & Upload Invoice: ONLY DISPLAYED WHEN SERIAL IS VALID */}
+              {/* Customer Inputs & Upload Invoice */}
               {serialValidation.status === 'VALID' && (
-                <div className="space-y-4 pt-2 border-t border-gray-100 animate-fade-in">
+                <div className={`space-y-4 pt-2 border-t animate-fade-in ${isDark ? 'border-white/10' : 'border-gray-100'}`}>
                   <div>
-                    <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-1.5">
+                    <label className={`block text-xs font-bold uppercase tracking-widest mb-1.5 ${isDark ? 'text-slate-300' : 'text-gray-500'}`}>
                       Thông tin người sử dụng (*)
                     </label>
                     <div className="space-y-3">
@@ -1171,7 +1413,11 @@ export default function WarrantyActivate() {
                           placeholder="Họ và tên khách hàng *"
                           value={customerName}
                           onChange={(e) => setCustomerName(e.target.value)}
-                          className="w-full bg-blue-50/10 border border-gray-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 rounded-xl pl-10 pr-4 py-2.5 text-sm outline-none text-gray-800 transition-all"
+                          className={`w-full border rounded-xl pl-10 pr-4 py-2.5 text-sm outline-none transition-all ${
+                            isDark 
+                              ? 'bg-white/10 border-white/20 text-white placeholder:text-slate-400 focus:border-cyan-400 focus:ring-2 focus:ring-cyan-400/20' 
+                              : 'bg-blue-50/10 border-gray-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 text-gray-800'
+                          }`}
                         />
                       </div>
 
@@ -1183,7 +1429,11 @@ export default function WarrantyActivate() {
                           placeholder="Số điện thoại di động *"
                           value={customerPhone}
                           onChange={(e) => setCustomerPhone(e.target.value)}
-                          className="w-full bg-blue-50/10 border border-gray-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 rounded-xl pl-10 pr-4 py-2.5 text-sm outline-none text-gray-800 transition-all font-mono"
+                          className={`w-full border rounded-xl pl-10 pr-4 py-2.5 text-sm outline-none transition-all font-mono ${
+                            isDark 
+                              ? 'bg-white/10 border-white/20 text-white placeholder:text-slate-400 focus:border-cyan-400 focus:ring-2 focus:ring-cyan-400/20' 
+                              : 'bg-blue-50/10 border-gray-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 text-gray-800'
+                          }`}
                         />
                       </div>
 
@@ -1194,11 +1444,15 @@ export default function WarrantyActivate() {
                           required
                           value={province}
                           onChange={(e) => setProvince(e.target.value)}
-                          className="w-full bg-blue-50/10 border border-gray-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 rounded-xl pl-10 pr-4 py-2.5 text-sm outline-none text-gray-800 transition-all appearance-none cursor-pointer"
+                          className={`w-full border rounded-xl pl-10 pr-4 py-2.5 text-sm outline-none transition-all appearance-none cursor-pointer ${
+                            isDark 
+                              ? 'bg-[#152B4D] border-white/20 text-white focus:border-cyan-400 focus:ring-2 focus:ring-cyan-400/20' 
+                              : 'bg-blue-50/10 border-gray-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 text-gray-800'
+                          }`}
                         >
                           <option value="" disabled className="text-gray-400">Chọn Tỉnh/Thành phố *</option>
                           {ORDERED_VIETNAM_PROVINCES.map(p => (
-                            <option key={p} value={p}>{p}</option>
+                            <option key={p} value={p} className={isDark ? 'bg-[#0B1E38] text-white' : 'bg-white text-gray-800'}>{p}</option>
                           ))}
                         </select>
                         <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-gray-400">
@@ -1214,7 +1468,11 @@ export default function WarrantyActivate() {
                           placeholder="Địa chỉ cụ thể (Số nhà, đường, phường...) *"
                           value={address}
                           onChange={(e) => setAddress(e.target.value)}
-                          className="w-full bg-blue-50/10 border border-gray-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 rounded-xl pl-10 pr-4 py-2.5 text-sm outline-none text-gray-800 transition-all"
+                          className={`w-full border rounded-xl pl-10 pr-4 py-2.5 text-sm outline-none transition-all ${
+                            isDark 
+                              ? 'bg-white/10 border-white/20 text-white placeholder:text-slate-400 focus:border-cyan-400 focus:ring-2 focus:ring-cyan-400/20' 
+                              : 'bg-blue-50/10 border-gray-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 text-gray-800'
+                          }`}
                         />
                       </div>
                     </div>
@@ -1222,12 +1480,14 @@ export default function WarrantyActivate() {
 
                   {/* Upload Invoice Image */}
                   <div>
-                    <label className="block text-xs font-bold text-gray-500 uppercase tracking-widest mb-1.5">
+                    <label className={`block text-xs font-bold uppercase tracking-widest mb-1.5 ${isDark ? 'text-slate-300' : 'text-gray-500'}`}>
                       Ảnh chụp hóa đơn mua hàng (*)
                     </label>
 
                     {invoiceImageUrl ? (
-                      <div className="relative rounded-xl border border-gray-200 overflow-hidden h-[160px] group bg-gray-50">
+                      <div className={`relative rounded-xl border overflow-hidden h-[160px] group ${
+                        isDark ? 'border-white/20 bg-white/5' : 'border-gray-200 bg-gray-50'
+                      }`}>
                         <img
                           src={invoiceImageUrl}
                           alt="Invoice"
@@ -1250,17 +1510,21 @@ export default function WarrantyActivate() {
                         </div>
                       </div>
                     ) : (
-                      <label className="border-2 border-dashed border-gray-200 hover:border-blue-500 hover:bg-blue-500/5 transition-all rounded-xl p-4 flex flex-col items-center justify-center cursor-pointer h-[140px] text-center">
+                      <label className={`border-2 border-dashed transition-all rounded-xl p-4 flex flex-col items-center justify-center cursor-pointer h-[140px] text-center ${
+                        isDark 
+                          ? 'border-white/20 hover:border-cyan-400 hover:bg-white/5' 
+                          : 'border-gray-200 hover:border-blue-500 hover:bg-blue-500/5'
+                      }`}>
                         {uploadingImage ? (
                           <div className="flex flex-col items-center gap-2">
-                            <Loader2 size={32} className="animate-spin text-blue-600" />
-                            <span className="text-xs text-gray-500 font-medium">Đang tải ảnh lên...</span>
+                            <Loader2 size={32} className={`animate-spin ${isDark ? 'text-cyan-400' : 'text-blue-600'}`} />
+                            <span className={`text-xs font-medium ${isDark ? 'text-slate-300' : 'text-gray-500'}`}>Đang tải ảnh lên...</span>
                           </div>
                         ) : (
                           <>
                             <UploadCloud size={36} className="text-gray-400 mb-2" />
-                            <span className="text-xs font-bold text-gray-600">Chụp/Tải lên hóa đơn mua hàng</span>
-                            <span className="text-[10px] text-gray-400 mt-1">Định dạng JPG, PNG, HEIC (tối đa 20MB)</span>
+                            <span className={`text-xs font-bold ${isDark ? 'text-white' : 'text-gray-600'}`}>Chụp/Tải lên hóa đơn mua hàng</span>
+                            <span className={`text-[10px] mt-1 ${isDark ? 'text-slate-400' : 'text-gray-400'}`}>Định dạng JPG, PNG, HEIC (tối đa 20MB)</span>
                           </>
                         )}
                         <input
@@ -1278,7 +1542,7 @@ export default function WarrantyActivate() {
                   </div>
 
                   {submitError && (
-                    <div className="bg-rose-500/5 border border-rose-500/10 text-rose-600 text-xs px-3.5 py-2.5 rounded-xl flex items-start gap-2 animate-fade-in font-medium">
+                    <div className="bg-rose-500/10 border border-rose-500/20 text-rose-500 text-xs px-3.5 py-2.5 rounded-xl flex items-start gap-2 animate-fade-in font-medium">
                       <AlertTriangle size={16} className="shrink-0 text-rose-500 mt-0.5" />
                       <span>{submitError}</span>
                     </div>
@@ -1300,31 +1564,35 @@ export default function WarrantyActivate() {
         {step === 2 && productInfo && (
           <form onSubmit={handleSubmitActivation} className="space-y-5">
             <div className="space-y-1">
-              <h3 className="font-bold text-gray-800 text-base">Kiểm tra thông tin</h3>
-              <p className="text-xs text-gray-500 leading-relaxed font-medium">
+              <h3 className={`font-bold text-base ${isDark ? 'text-white' : 'text-gray-800'}`}>Kiểm tra thông tin</h3>
+              <p className={`text-xs leading-relaxed font-medium ${isDark ? 'text-slate-300' : 'text-gray-500'}`}>
                 Quý khách vui lòng kiểm tra lại thông tin thiết bị và thông tin đăng ký bảo hành dưới đây trước khi xác nhận.
               </p>
             </div>
 
             {/* Display Product Info Card */}
-            <div className="bg-gradient-to-r from-blue-50 to-sky-50/50 border border-blue-100 rounded-xl p-4">
-              <span className="text-[10px] font-bold text-blue-600 bg-blue-100 px-2 py-0.5 rounded border border-blue-200/50 uppercase tracking-wider">
+            <div className={`border rounded-xl p-4 ${
+              isDark ? 'bg-white/5 border-white/10' : 'bg-gradient-to-r from-blue-50 to-sky-50/50 border-blue-100'
+            }`}>
+              <span className={`text-[10px] font-bold px-2 py-0.5 rounded border uppercase tracking-wider ${
+                isDark ? 'text-cyan-300 bg-cyan-950/40 border-cyan-500/30' : 'text-blue-600 bg-blue-100 border-blue-200/50'
+              }`}>
                 Thông tin thiết bị
               </span>
-              <h3 className="font-bold text-gray-800 text-base mt-2">{productInfo.model}</h3>
-              <div className="mt-2 space-y-1.5 text-xs text-gray-600 font-medium">
+              <h3 className={`font-bold text-base mt-2 ${isDark ? 'text-white' : 'text-gray-800'}`}>{productInfo.model}</h3>
+              <div className={`mt-2 space-y-1.5 text-xs font-medium ${isDark ? 'text-slate-300' : 'text-gray-600'}`}>
                 <div className="flex justify-between">
                   <span className="text-gray-400">Số Serial:</span>
-                  <span className="font-mono text-gray-700 font-bold">{productInfo.serialNumber}</span>
+                  <span className={`font-mono font-bold ${isDark ? 'text-white' : 'text-gray-700'}`}>{productInfo.serialNumber}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-400">Thời gian bảo hành:</span>
                   {productInfo.status === 'Đã kích hoạt' || productInfo.status === 'KH xác nhận' ? (
-                    <span className="text-rose-600 font-bold">
+                    <span className="text-rose-500 font-bold">
                       Đến ngày {productInfo.warrantyExpiryDate ? new Date(productInfo.warrantyExpiryDate).toLocaleDateString('vi-VN') : '—'}
                     </span>
                   ) : (
-                    <span className="text-blue-600 font-bold">
+                    <span className={`font-bold ${isDark ? 'text-cyan-400' : 'text-blue-600'}`}>
                       {productInfo.totalMonths || productInfo.standardMonths || 12} tháng
                     </span>
                   )}
@@ -1333,40 +1601,42 @@ export default function WarrantyActivate() {
             </div>
 
             {/* Customer Details Card */}
-            <div className="bg-gray-50 border border-gray-100 rounded-xl p-4 space-y-2.5 text-xs text-gray-600 font-medium">
-              <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">
+            <div className={`border rounded-xl p-4 space-y-2.5 text-xs font-medium ${
+              isDark ? 'bg-white/5 border-white/10 text-slate-300' : 'bg-gray-50 border-gray-100 text-gray-600'
+            }`}>
+              <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
                 Khách hàng đăng ký
               </span>
               <div className="grid grid-cols-3 gap-y-1.5 gap-x-2 pt-1">
                 <span className="text-gray-400">Họ và tên:</span>
-                <span className="col-span-2 text-gray-800 font-bold">{customerName}</span>
+                <span className={`col-span-2 font-bold ${isDark ? 'text-white' : 'text-gray-800'}`}>{customerName}</span>
                 
                 <span className="text-gray-400">Số điện thoại:</span>
-                <span className="col-span-2 text-gray-800 font-mono font-bold">{customerPhone}</span>
+                <span className={`col-span-2 font-mono font-bold ${isDark ? 'text-white' : 'text-gray-800'}`}>{customerPhone}</span>
                 
                 <span className="text-gray-400 text-left">Địa chỉ lắp đặt:</span>
-                <span className="col-span-2 text-gray-800">{address}, {province}</span>
+                <span className={`col-span-2 ${isDark ? 'text-slate-200' : 'text-gray-800'}`}>{address}, {province}</span>
               </div>
             </div>
 
             {/* Warning Banner if already activated */}
             {(productInfo.status === 'Đã kích hoạt' || productInfo.status === 'KH xác nhận') && (
-              <div className="bg-amber-500/10 border border-amber-500/20 text-amber-800 text-xs px-3.5 py-3 rounded-xl flex items-start gap-2 animate-fade-in font-semibold">
-                <AlertTriangle size={18} className="shrink-0 text-amber-600 mt-0.5" />
+              <div className="bg-amber-500/10 border border-amber-500/20 text-amber-500 text-xs px-3.5 py-3 rounded-xl flex items-start gap-2 animate-fade-in font-semibold">
+                <AlertTriangle size={18} className="shrink-0 text-amber-500 mt-0.5" />
                 <span>Sản phẩm đã được kích hoạt bảo hành trước đó.</span>
               </div>
             )}
 
             {/* Warning Banner if pending approval */}
             {productInfo.status === 'Chờ duyệt' && (
-              <div className="bg-amber-500/10 border border-amber-500/20 text-amber-800 text-xs px-3.5 py-3 rounded-xl flex items-start gap-2 animate-fade-in font-semibold">
-                <AlertTriangle size={18} className="shrink-0 text-amber-600 mt-0.5" />
+              <div className="bg-amber-500/10 border border-amber-500/20 text-amber-500 text-xs px-3.5 py-3 rounded-xl flex items-start gap-2 animate-fade-in font-semibold">
+                <AlertTriangle size={18} className="shrink-0 text-amber-500 mt-0.5" />
                 <span>Yêu cầu kích hoạt bảo hành cho sản phẩm này đang chờ duyệt.</span>
               </div>
             )}
 
             {submitError && (
-              <div className="bg-rose-500/5 border border-rose-500/10 text-rose-600 text-xs px-3.5 py-2.5 rounded-xl flex items-start gap-2 animate-fade-in font-medium">
+              <div className="bg-rose-500/10 border border-rose-500/20 text-rose-500 text-xs px-3.5 py-2.5 rounded-xl flex items-start gap-2 animate-fade-in font-medium">
                 <AlertTriangle size={16} className="shrink-0 text-rose-500 mt-0.5" />
                 <span>{submitError}</span>
               </div>
@@ -1385,7 +1655,7 @@ export default function WarrantyActivate() {
               <button
                 type="submit"
                 disabled={submitting}
-                className="w-full bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-700 hover:to-blue-600 text-white font-bold py-3 px-4 rounded-xl text-sm transition-all shadow-md shadow-blue-500/10 active:scale-[0.98] disabled:opacity-50 flex items-center justify-center gap-1.5"
+                className="w-full bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-700 hover:to-blue-600 text-white font-bold py-3 px-4 rounded-xl text-sm transition-all shadow-md shadow-blue-500/10 active:scale-[0.98] disabled:opacity-50 flex items-center justify-center gap-1.5 cursor-pointer"
               >
                 {submitting ? (
                   <>
@@ -1402,31 +1672,37 @@ export default function WarrantyActivate() {
         {/* STEP 3: Success Screen (e-Warranty Card) */}
         {step === 3 && productInfo && (
           <div className="text-center space-y-6 animate-fade-in">
-            <div className="w-14 h-14 bg-emerald-500/10 border border-emerald-500/20 rounded-full flex items-center justify-center mx-auto mb-1">
-              <CheckCircle size={32} className="text-emerald-600" />
+            <div className={`w-14 h-14 rounded-full flex items-center justify-center mx-auto mb-1 border ${
+              isDark ? 'bg-emerald-500/20 border-emerald-500/30 text-emerald-400' : 'bg-emerald-500/10 border-emerald-500/20 text-emerald-600'
+            }`}>
+              <CheckCircle size={32} />
             </div>
 
             <div>
-              <h2 className="text-lg font-extrabold text-gray-800 uppercase tracking-wider">
+              <h2 className={`text-lg font-extrabold uppercase tracking-wider ${isDark ? 'text-white' : 'text-gray-800'}`}>
                 Kích hoạt thành công!
               </h2>
-              <p className="text-xs text-gray-500 mt-2 leading-relaxed px-2 font-medium">
+              <p className={`text-xs mt-2 leading-relaxed px-2 font-medium ${isDark ? 'text-slate-300' : 'text-gray-500'}`}>
                 {successMessage || 'Bảo hành điện tử cho thiết bị của Quý khách đã được kích hoạt thành công trên hệ thống Truliva.'}
               </p>
-              <p className="text-xs text-emerald-700 mt-2.5 font-semibold bg-emerald-500/10 border border-emerald-500/20 px-3 py-2.5 rounded-xl leading-relaxed">
+              <p className={`text-xs mt-2.5 font-semibold px-3 py-2.5 rounded-xl leading-relaxed border ${
+                isDark ? 'bg-emerald-950/40 border-emerald-500/30 text-emerald-300' : 'bg-emerald-500/10 border-emerald-500/20 text-emerald-700'
+              }`}>
                 Tin nhắn xác nhận kích hoạt bảo hành cùng mã Voucher ưu đãi đã được gửi qua Zalo đến số điện thoại {customerPhone}.
               </p>
             </div>
 
             {/* Electronic Warranty Card Mockup */}
-            <div className="bg-gradient-to-br from-white to-blue-50/30 border border-blue-100 rounded-xl p-4 text-left shadow-md relative overflow-hidden">
-              <div className="absolute right-0 bottom-0 translate-x-4 translate-y-4 w-24 h-24 bg-blue-500/5 rounded-full blur-xl pointer-events-none" />
+            <div className={`border rounded-xl p-4 text-left shadow-md relative overflow-hidden ${
+              isDark ? 'bg-gradient-to-br from-[#0E274A] to-[#08172D] border-cyan-500/30 text-white' : 'bg-gradient-to-br from-white to-blue-50/30 border-blue-100 text-slate-800'
+            }`}>
+              <div className="absolute right-0 bottom-0 translate-x-4 translate-y-4 w-24 h-24 bg-blue-500/10 rounded-full blur-xl pointer-events-none" />
               
-              <div className="flex justify-between items-center border-b border-gray-100 pb-2.5 mb-3">
+              <div className={`flex justify-between items-center border-b pb-2.5 mb-3 ${isDark ? 'border-white/10' : 'border-gray-100'}`}>
                 <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">
                   Thẻ bảo hành điện tử
                 </span>
-                <span className="text-[10px] font-bold text-emerald-600 uppercase tracking-wider">
+                <span className="text-[10px] font-bold text-emerald-500 uppercase tracking-wider">
                   Đã kích hoạt
                 </span>
               </div>
@@ -1434,29 +1710,29 @@ export default function WarrantyActivate() {
               <div className="space-y-2 text-xs font-semibold">
                 <div>
                   <span className="text-gray-400 block text-[9px] uppercase tracking-wider">Model Thiết bị</span>
-                  <span className="text-gray-800 mt-0.5 block">{productInfo.model}</span>
+                  <span className={`mt-0.5 block ${isDark ? 'text-white' : 'text-gray-800'}`}>{productInfo.model}</span>
                 </div>
                 <div>
                   <span className="text-gray-400 block text-[9px] uppercase tracking-wider">Số Serial</span>
-                  <span className="text-gray-800 mt-0.5 block font-mono tracking-wider">{productInfo.serialNumber}</span>
+                  <span className={`mt-0.5 block font-mono tracking-wider ${isDark ? 'text-white' : 'text-gray-800'}`}>{productInfo.serialNumber}</span>
                 </div>
                 <div>
                   <span className="text-gray-400 block text-[9px] uppercase tracking-wider">Thời hạn bảo hành dự kiến</span>
                   {productInfo.warrantyExpiryDate ? (
-                    <span className="text-blue-600 mt-0.5 block">
+                    <span className={`mt-0.5 block ${isDark ? 'text-cyan-400' : 'text-blue-600'}`}>
                       Đến ngày {new Date(productInfo.warrantyExpiryDate).toLocaleDateString('vi-VN')}
                     </span>
                   ) : (
-                    <span className="text-blue-600 mt-0.5 block">{productInfo.totalMonths || productInfo.standardMonths || 12} tháng</span>
+                    <span className={`mt-0.5 block ${isDark ? 'text-cyan-400' : 'text-blue-600'}`}>{productInfo.totalMonths || productInfo.standardMonths || 12} tháng</span>
                   )}
                 </div>
                 <div>
                   <span className="text-gray-400 block text-[9px] uppercase tracking-wider">Họ và tên khách hàng</span>
-                  <span className="text-gray-700 mt-0.5 block">{customerName}</span>
+                  <span className={`mt-0.5 block ${isDark ? 'text-slate-200' : 'text-gray-700'}`}>{customerName}</span>
                 </div>
                 <div>
                   <span className="text-gray-400 block text-[9px] uppercase tracking-wider">Số điện thoại</span>
-                  <span className="text-gray-700 mt-0.5 block font-mono">{customerPhone}</span>
+                  <span className={`mt-0.5 block font-mono ${isDark ? 'text-slate-200' : 'text-gray-700'}`}>{customerPhone}</span>
                 </div>
               </div>
             </div>
@@ -1473,7 +1749,9 @@ export default function WarrantyActivate() {
                 setInvoiceImageUrl('');
                 setSubmitError('');
               }}
-              className="w-full bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold py-3 px-4 rounded-xl text-sm transition-all"
+              className={`w-full font-bold py-3 px-4 rounded-xl text-sm transition-all cursor-pointer ${
+                isDark ? 'bg-white/10 hover:bg-white/20 text-white' : 'bg-gray-100 hover:bg-gray-200 text-gray-700'
+              }`}
             >
               Đăng ký kích hoạt sản phẩm khác
             </button>
@@ -1488,7 +1766,11 @@ export default function WarrantyActivate() {
         href="https://zalo.me/3870382725035413507"
         target="_blank"
         rel="noopener noreferrer"
-        className="w-full max-w-md bg-white/10 hover:bg-white/15 border border-white/15 text-white/80 hover:text-white font-bold py-3.5 px-4 rounded-xl text-xs transition-all shadow-sm flex items-center justify-center gap-2.5 mb-4 relative z-10 active:scale-[0.98] mx-auto"
+        className={`w-full max-w-md border font-bold py-3.5 px-4 rounded-xl text-xs transition-all shadow-sm flex items-center justify-center gap-2.5 mb-4 relative z-10 active:scale-[0.98] mx-auto cursor-pointer ${
+          isDark 
+            ? 'bg-white/10 hover:bg-white/15 border-white/15 text-white/90 hover:text-white' 
+            : 'bg-white/90 hover:bg-white border-blue-200 text-[#1B3A6B] shadow-xs'
+        }`}
       >
         <svg viewBox="0 0 24 24" className="w-5 h-5 fill-[#0068ff] shrink-0">
           <path d="M12.003 2C6.478 2 2 6.136 2 11.238c0 3.125 1.688 5.88 4.298 7.48-.12.443-.655 2.417-.655 2.417-.06.223.167.387.352.268 0 0 2.278-1.52 3.162-2.09.91.246 1.875.38 2.846.38 5.525 0 10.003-4.137 10.003-9.24C22.006 6.137 17.528 2 12.003 2zm3.36 12.164h-4.32l4.316-5.064c.2-.236.033-.593-.274-.593H10.15a.394.394 0 0 0-.394.394v.822c0 .218.176.394.394.394h3.766L9.6 13.18a.394.394 0 0 0 .274.593h4.945a.394.394 0 0 0 .394-.394V12.56a.394.394 0 0 0-.394-.394z"/>
@@ -1496,11 +1778,13 @@ export default function WarrantyActivate() {
         <span className="tracking-wide">Hỗ trợ Zalo OA: Truliva chuyên nghiệp và tận tâm</span>
       </a>
 
-      <div className="text-center text-[10px] text-white/40 relative z-10 max-w-xs leading-relaxed mx-auto pb-6">
+      <div className={`text-center text-[10px] relative z-10 max-w-xs leading-relaxed mx-auto pb-6 ${
+        isDark ? 'text-white/40' : 'text-slate-400'
+      }`}>
         <p>© 2026 Truliva Vietnam. Tất cả quyền được bảo lưu.</p>
         <p className="mt-1">Hotline CSKH: 1900 63 84 63 (Hỗ trợ 8h00 - 18h00 hàng ngày)</p>
       </div>
-
     </div>
   );
 }
+
