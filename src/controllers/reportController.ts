@@ -748,10 +748,17 @@ export async function getMyStats(req: Request, res: Response): Promise<void> {
       }
 
       let filterDate: Date;
+      let targetReportForCompletion: any = null;
       if (isCompleted) {
-        filterDate = hasReport 
-          ? order.serviceReports[0].createdAt 
-          : (order.pancakeUpdatedAt || order.appointmentTime || order.pancakeCreatedAt || order.createdAt);
+        if (hasReport) {
+          const reportInRange = order.serviceReports.find(r => 
+            (!start || r.createdAt >= start) && (!end || r.createdAt <= end)
+          );
+          targetReportForCompletion = reportInRange || order.serviceReports[0];
+          filterDate = targetReportForCompletion.createdAt;
+        } else {
+          filterDate = order.pancakeUpdatedAt || order.appointmentTime || order.pancakeCreatedAt || order.createdAt;
+        }
       } else {
         filterDate = order.appointmentTime || order.pancakeCreatedAt || order.createdAt;
       }
@@ -764,8 +771,8 @@ export async function getMyStats(req: Request, res: Response): Promise<void> {
         const appointmentTimeMs = new Date(appointmentDateStr).getTime();
         
         let completionTimeMs = 0;
-        if (hasReport) {
-          const completionDateStr = order.serviceReports[0].createdAt.toISOString().slice(0, 10);
+        if (targetReportForCompletion) {
+          const completionDateStr = targetReportForCompletion.createdAt.toISOString().slice(0, 10);
           completionTimeMs = new Date(completionDateStr).getTime();
         } else if (order.adminStatus === 'hoàn thành') {
           const compDate = order.pancakeUpdatedAt || order.appointmentTime || order.pancakeCreatedAt || order.createdAt;
