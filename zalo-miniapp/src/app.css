@@ -1,23 +1,52 @@
 @import "tailwindcss";
 
-@keyframes p3rWave {
-  0% { transform: translateX(0) translateZ(0) scaleY(1); }
-  50% { transform: translateX(-25%) translateZ(0) scaleY(0.85); }
-  100% { transform: translateX(-50%) translateZ(0) scaleY(1); }
+/* ═══════════════════════════════════════════════════════════════
+   PERSONA 3 RELOAD (P3R) OCEAN & WATER EFFECT SYSTEM
+   ═══════════════════════════════════════════════════════════════ */
+
+/* 1. Multi-Layer Wave Horizontal Flow & Undulation */
+@keyframes p3rWaveBack {
+  0% { transform: translateX(0) scaleY(1); }
+  50% { transform: translateX(-25%) scaleY(1.2); }
+  100% { transform: translateX(-50%) scaleY(1); }
 }
 
-@keyframes p3rFloat {
-  0%, 100% { transform: translateY(0) rotate(0deg); }
-  50% { transform: translateY(-6px) rotate(2deg); }
+@keyframes p3rWaveMid {
+  0% { transform: translateX(-50%) scaleY(1); }
+  50% { transform: translateX(-25%) scaleY(0.85); }
+  100% { transform: translateX(0) scaleY(1); }
+}
+
+@keyframes p3rWaveFront {
+  0% { transform: translateX(0) scaleY(1); }
+  50% { transform: translateX(-30%) scaleY(1.15); }
+  100% { transform: translateX(-60%) scaleY(1); }
+}
+
+/* 2. Underwater Caustics & Light Ray Sweeps */
+@keyframes p3rCaustics {
+  0%, 100% {
+    opacity: 0.15;
+    transform: rotate(-30deg) translateY(-15px) scale(1);
+  }
+  50% {
+    opacity: 0.35;
+    transform: rotate(-30deg) translateY(15px) scale(1.1);
+  }
 }
 
 @keyframes p3rGlowPulse {
   0%, 100% {
-    box-shadow: 0 0 15px rgba(0, 163, 255, 0.35), 0 0 30px rgba(0, 163, 255, 0.15);
+    box-shadow: 0 0 15px rgba(0, 210, 255, 0.4), 0 0 35px rgba(0, 163, 255, 0.2);
   }
   50% {
-    box-shadow: 0 0 25px rgba(0, 210, 255, 0.6), 0 0 45px rgba(0, 163, 255, 0.3);
+    box-shadow: 0 0 28px rgba(0, 210, 255, 0.7), 0 0 50px rgba(0, 163, 255, 0.4);
   }
+}
+
+@keyframes p3rFloat {
+  0%, 100% { transform: translateY(0) rotate(0deg); }
+  50% { transform: translateY(-5px) rotate(2deg); }
 }
 
 @keyframes p3rShimmer {
@@ -25,89 +54,104 @@
   100% { transform: translateX(200%) skewX(-20deg); }
 }
 
-/* Realistic Floating Water Bubbles Keyframes */
-@keyframes bubbleFloat1 {
-  0% { transform: translateY(130px) translateX(0) scale(0.5); opacity: 0; }
+/* 3. Rising Wobble Bubbles (Sine-wave sway) */
+@keyframes bubbleWobble1 {
+  0% { transform: translateY(180px) translateX(0) scale(0.4); opacity: 0; }
   15% { opacity: 0.85; }
-  45% { transform: translateY(60px) translateX(10px) scale(0.9); opacity: 0.95; }
-  75% { transform: translateY(15px) translateX(-8px) scale(1.05); opacity: 0.8; }
-  100% { transform: translateY(-45px) translateX(12px) scale(1.2); opacity: 0; }
+  35% { transform: translateY(110px) translateX(12px) scale(0.75); }
+  65% { transform: translateY(50px) translateX(-10px) scale(0.95); opacity: 0.9; }
+  90% { opacity: 0.75; }
+  100% { transform: translateY(-30px) translateX(8px) scale(1.15); opacity: 0; }
 }
 
-@keyframes bubbleFloat2 {
-  0% { transform: translateY(130px) translateX(0) scale(0.6); opacity: 0; }
+@keyframes bubbleWobble2 {
+  0% { transform: translateY(180px) translateX(0) scale(0.5); opacity: 0; }
   20% { opacity: 0.9; }
-  50% { transform: translateY(65px) translateX(-12px) scale(0.85); opacity: 0.9; }
-  80% { transform: translateY(20px) translateX(8px) scale(1); opacity: 0.7; }
-  100% { transform: translateY(-45px) translateX(-10px) scale(1.15); opacity: 0; }
+  45% { transform: translateY(100px) translateX(-14px) scale(0.85); }
+  75% { transform: translateY(40px) translateX(12px) scale(1.05); opacity: 0.85; }
+  100% { transform: translateY(-30px) translateX(-8px) scale(1.2); opacity: 0; }
 }
 
-@keyframes bubbleFloat3 {
-  0% { transform: translateY(130px) translateX(0) scale(0.4); opacity: 0; }
+@keyframes bubbleWobble3 {
+  0% { transform: translateY(180px) translateX(0) scale(0.35); opacity: 0; }
   15% { opacity: 0.8; }
-  50% { transform: translateY(50px) translateX(14px) scale(0.95); opacity: 0.95; }
-  85% { transform: translateY(10px) translateX(-12px) scale(1.1); opacity: 0.6; }
-  100% { transform: translateY(-45px) translateX(6px) scale(1.25); opacity: 0; }
+  50% { transform: translateY(90px) translateX(16px) scale(0.8); opacity: 0.95; }
+  80% { transform: translateY(30px) translateX(-12px) scale(1); opacity: 0.7; }
+  100% { transform: translateY(-30px) translateX(10px) scale(1.1); opacity: 0; }
 }
 
-/* Water Bubble Class with Glass Reflection */
+/* Water Bubble with Crystal Glass Reflection */
 .water-bubble {
   position: absolute;
   border-radius: 50%;
-  background: radial-gradient(circle at 35% 30%, rgba(255, 255, 255, 0.9) 0%, rgba(255, 255, 255, 0.4) 20%, rgba(0, 210, 255, 0.3) 50%, rgba(2, 132, 199, 0.1) 80%, rgba(255, 255, 255, 0.3) 100%);
-  border: 1px solid rgba(255, 255, 255, 0.5);
-  box-shadow: inset -2px -2px 6px rgba(0, 163, 255, 0.4), inset 2px 2px 4px rgba(255, 255, 255, 0.7), 0 0 10px rgba(0, 210, 255, 0.35);
+  background: radial-gradient(
+    circle at 35% 30%,
+    rgba(255, 255, 255, 0.95) 0%,
+    rgba(255, 255, 255, 0.45) 20%,
+    rgba(0, 210, 255, 0.4) 50%,
+    rgba(2, 132, 199, 0.2) 80%,
+    rgba(255, 255, 255, 0.4) 100%
+  );
+  border: 1px solid rgba(255, 255, 255, 0.6);
+  box-shadow: 
+    inset -2px -2px 6px rgba(0, 163, 255, 0.5),
+    inset 2px 2px 5px rgba(255, 255, 255, 0.8),
+    0 0 12px rgba(0, 210, 255, 0.45);
   pointer-events: none;
-  z-index: 1;
+  z-index: 2;
 }
 
 .water-bubble::after {
   content: '';
   position: absolute;
   top: 18%;
-  left: 22%;
+  left: 20%;
   width: 28%;
   height: 28%;
   border-radius: 50%;
-  background: rgba(255, 255, 255, 0.85);
+  background: rgba(255, 255, 255, 0.95);
   filter: blur(0.5px);
 }
 
-.bubble-anim-1 {
-  animation: bubbleFloat1 5s infinite ease-in-out;
-}
-.bubble-anim-2 {
-  animation: bubbleFloat2 6.5s infinite ease-in-out 1.2s;
-}
-.bubble-anim-3 {
-  animation: bubbleFloat3 5.8s infinite ease-in-out 2.5s;
-}
-.bubble-anim-4 {
-  animation: bubbleFloat1 7s infinite ease-in-out 3.5s;
-}
-.bubble-anim-5 {
-  animation: bubbleFloat2 5.2s infinite ease-in-out 0.6s;
-}
-.bubble-anim-6 {
-  animation: bubbleFloat3 6.8s infinite ease-in-out 4.2s;
-}
+.bubble-anim-1 { animation: bubbleWobble1 5.2s infinite ease-in-out; }
+.bubble-anim-2 { animation: bubbleWobble2 6.8s infinite ease-in-out 1.5s; }
+.bubble-anim-3 { animation: bubbleWobble3 5.9s infinite ease-in-out 2.8s; }
+.bubble-anim-4 { animation: bubbleWobble1 7.2s infinite ease-in-out 3.7s; }
+.bubble-anim-5 { animation: bubbleWobble2 5.6s infinite ease-in-out 0.8s; }
+.bubble-anim-6 { animation: bubbleWobble3 6.4s infinite ease-in-out 4.5s; }
+.bubble-anim-7 { animation: bubbleWobble1 8.0s infinite ease-in-out 2.2s; }
+.bubble-anim-8 { animation: bubbleWobble2 6.1s infinite ease-in-out 4.9s; }
 
-/* Persona 3 Reload Custom Utility Classes */
-.p3r-animate-wave {
-  animation: p3rWave 12s cubic-bezier(0.36, 0.45, 0.63, 0.53) infinite;
+/* Persona 3 Reload Fluid SVG Waves */
+.p3r-wave-layer-back {
+  animation: p3rWaveBack 10s ease-in-out infinite;
   will-change: transform;
 }
 
-.p3r-animate-float {
-  animation: p3rFloat 4s ease-in-out infinite;
+.p3r-wave-layer-mid {
+  animation: p3rWaveMid 7s ease-in-out infinite;
+  will-change: transform;
+}
+
+.p3r-wave-layer-front {
+  animation: p3rWaveFront 5s ease-in-out infinite;
+  will-change: transform;
+}
+
+.p3r-caustics-ray {
+  animation: p3rCaustics 6s ease-in-out infinite;
 }
 
 .p3r-glow-cyan {
-  box-shadow: 0 0 20px rgba(0, 163, 255, 0.4), inset 0 0 10px rgba(0, 210, 255, 0.2);
+  box-shadow: 0 0 20px rgba(0, 210, 255, 0.5), inset 0 0 10px rgba(0, 210, 255, 0.25);
 }
 
 .p3r-glow-pulse {
   animation: p3rGlowPulse 3s infinite ease-in-out;
+}
+
+.p3r-animate-float {
+  animation: p3rFloat 4s ease-in-out infinite;
 }
 
 .p3r-shimmer-effect {
@@ -125,10 +169,10 @@
   background: linear-gradient(
     90deg,
     rgba(255, 255, 255, 0) 0%,
-    rgba(255, 255, 255, 0.25) 50%,
+    rgba(255, 255, 255, 0.3) 50%,
     rgba(255, 255, 255, 0) 100%
   );
-  animation: p3rShimmer 5s infinite;
+  animation: p3rShimmer 4s infinite;
   pointer-events: none;
 }
 
@@ -141,6 +185,3 @@
   transform: skewX(12deg);
 }
 
-.p3r-card-cut {
-  clip-path: polygon(0 0, calc(100% - 14px) 0, 100% 14px, 100% 100%, 0 100%);
-}

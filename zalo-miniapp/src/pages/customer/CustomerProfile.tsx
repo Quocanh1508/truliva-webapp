@@ -24,6 +24,7 @@ import { getCustomerRank, MemberTier, RANK_CONFIGS, NEXT_TIER_ORDER } from '../.
 import CustomerVoucherModal from '../../components/CustomerVoucherModal';
 import CustomerHistoryModal from '../../components/CustomerHistoryModal';
 import CustomerLoyaltyModal from '../../components/CustomerLoyaltyModal';
+import P3ROceanHeader from '../../components/P3ROceanHeader';
 
 interface CustomerProfileProps {
   user: any;
@@ -80,16 +81,9 @@ export default function CustomerProfile({ user, mySerials, onLogout, onOpenScann
 
   return (
     <div className="pb-24 bg-slate-50 min-h-screen">
-      {/* 1. Header Profile Card (P3R Ocean Depth) */}
-      <div className="bg-gradient-to-b from-[#061226] via-[#0B2545] to-[#0F3866] text-white p-5 pt-5 pb-10 rounded-b-[2.5rem] shadow-xl relative overflow-hidden">
-        {/* Floating Realistic Water Bubbles */}
-        <div className="water-bubble w-4 h-4 left-[8%] bottom-1 bubble-anim-1"></div>
-        <div className="water-bubble w-6 h-6 left-[22%] bottom-2 bubble-anim-2"></div>
-        <div className="water-bubble w-3.5 h-3.5 left-[50%] bottom-1 bubble-anim-3"></div>
-        <div className="water-bubble w-5 h-5 left-[75%] bottom-3 bubble-anim-4"></div>
-        <div className="water-bubble w-4 h-4 left-[90%] bottom-2 bubble-anim-5"></div>
-
-        <div className="max-w-md mx-auto space-y-4 relative z-10">
+      {/* 1. Header Profile Card with Persona 3 Reload Ocean Waves & Caustics */}
+      <P3ROceanHeader className="p-5 pt-5 pb-10">
+        <div className="max-w-md mx-auto space-y-4">
           <div className="flex items-center space-x-4">
             <div className="relative">
               <div className={`w-16 h-16 rounded-full bg-[#0B2545] border-2 ring-2 flex items-center justify-center text-white font-black text-xl overflow-hidden transition-all ${rank.ringColor}`}>
@@ -134,8 +128,8 @@ export default function CustomerProfile({ user, mySerials, onLogout, onOpenScann
             </div>
           </div>
 
-          {/* Quick Stats Grid (Interactive P3R HUD Panel) */}
-          <div className="grid grid-cols-3 gap-2 bg-white/10 backdrop-blur-md rounded-2xl p-2.5 text-center border border-white/15 text-xs shadow-inner">
+          {/* Quick Stats Grid (Interactive P3R HUD Panel with Neon Border) */}
+          <div className="grid grid-cols-3 gap-2 bg-[#041426]/70 backdrop-blur-md rounded-2xl p-2.5 text-center border border-cyan-400/30 text-xs shadow-[0_4px_20px_rgba(0,210,255,0.15)]">
             <button 
               onClick={scrollToDevices}
               className="p-1 rounded-xl hover:bg-white/10 active:scale-95 transition-all cursor-pointer group"
@@ -146,7 +140,7 @@ export default function CustomerProfile({ user, mySerials, onLogout, onOpenScann
 
             <button 
               onClick={() => setShowLoyaltyModal(true)}
-              className="p-1 rounded-xl border-x border-white/15 hover:bg-white/10 active:scale-95 transition-all cursor-pointer group"
+              className="p-1 rounded-xl border-x border-cyan-400/20 hover:bg-white/10 active:scale-95 transition-all cursor-pointer group"
             >
               <p className="text-[9px] text-sky-200 uppercase tracking-wider font-bold group-hover:text-white transition-colors">Điểm thưởng</p>
               <p className="font-black text-base mt-0.5 drop-shadow-xs" style={{ color: rank.iconColor }}>{userPoints}</p>
@@ -157,11 +151,11 @@ export default function CustomerProfile({ user, mySerials, onLogout, onOpenScann
               className="p-1 rounded-xl hover:bg-white/10 active:scale-95 transition-all cursor-pointer group"
             >
               <p className="text-[9px] text-sky-200 uppercase tracking-wider font-bold group-hover:text-white transition-colors">Voucher</p>
-              <p className="font-black text-cyan-200 text-base mt-0.5">3</p>
+              <p className="font-black text-cyan-300 text-base mt-0.5">3</p>
             </button>
           </div>
         </div>
-      </div>
+      </P3ROceanHeader>
 
       <div className="max-w-md mx-auto px-4 mt-4 space-y-4">
         

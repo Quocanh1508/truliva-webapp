@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 import LuckyWheelModal from '../../components/LuckyWheelModal';
 import NewsDetailModal from '../../components/NewsDetailModal';
+import P3ROceanHeader from '../../components/P3ROceanHeader';
 import { openPhone, openWebview } from 'zmp-sdk/apis';
 import { fetchZaloApi } from '../../api/client';
 import { getCustomerRank, MemberTier, RANK_CONFIGS, NEXT_TIER_ORDER } from '../../utils/memberRank';
@@ -168,18 +169,8 @@ export default function CustomerHome({ user, onOpenScanner, onOpenWarranty }: Cu
   return (
     <div className="pb-24 bg-slate-50 min-h-screen">
       {/* 1. Header Persona 3 Reload Deep Water Ocean Section */}
-      <div className="bg-gradient-to-b from-[#061226] via-[#0B2545] to-[#0F3866] text-white pt-5 pb-16 px-4 rounded-b-[2.5rem] shadow-xl relative overflow-hidden">
-        
-        {/* Floating Realistic Water Bubbles */}
-        <div className="water-bubble w-4 h-4 left-[10%] bottom-1 bubble-anim-1"></div>
-        <div className="water-bubble w-6 h-6 left-[24%] bottom-2 bubble-anim-2"></div>
-        <div className="water-bubble w-3.5 h-3.5 left-[42%] bottom-1 bubble-anim-3"></div>
-        <div className="water-bubble w-5 h-5 left-[62%] bottom-3 bubble-anim-4"></div>
-        <div className="water-bubble w-3.5 h-3.5 left-[78%] bottom-1 bubble-anim-5"></div>
-        <div className="water-bubble w-5.5 h-5.5 left-[88%] bottom-2 bubble-anim-6"></div>
-        <div className="water-bubble w-4 h-4 left-[52%] bottom-3 bubble-anim-2"></div>
-
-        <div className="max-w-md mx-auto flex items-center justify-between relative z-10">
+      <P3ROceanHeader className="pt-5 pb-16 px-4">
+        <div className="max-w-md mx-auto flex items-center justify-between">
           <div className="flex items-center space-x-3 min-w-0 flex-1">
             {/* Avatar Circle with Dynamic Rank Neon Ring */}
             <div className="relative flex-shrink-0">
@@ -227,7 +218,7 @@ export default function CustomerHome({ user, onOpenScanner, onOpenWarranty }: Cu
             </button>
           </div>
         </div>
-      </div>
+      </P3ROceanHeader>
 
       {/* 2. Floating Quick Nav Card (P3R Kinetic 4-Button Grid) */}
       <div className="max-w-md mx-auto px-4 -mt-10 relative z-10">
