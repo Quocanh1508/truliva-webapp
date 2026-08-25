@@ -557,7 +557,7 @@ export default function CategoryTreeSelect({
 
       {/* Dropdown Panel */}
       {isOpen && (
-        <div className="absolute top-[100%] left-0 right-0 z-40 mt-1 bg-white border border-slate-200 rounded-xl shadow-xl p-3 flex flex-col gap-3 min-w-[280px]">
+        <div className="absolute top-[100%] left-0 z-50 mt-1 bg-white border border-slate-200 rounded-xl shadow-2xl p-3 flex flex-col gap-3 min-w-[280px] md:min-w-[320px] max-w-[90vw]">
           
           {/* Quick Filter Search Bar */}
           <div className="relative">

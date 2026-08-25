@@ -263,7 +263,7 @@ export default function InventoryManage() {
       )}
 
       {/* Filters Bar */}
-      <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm mb-6 flex flex-col gap-4">
+      <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm mb-6 flex flex-col gap-4 relative z-30">
         <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-end">
           
           {/* Ô Tìm kiếm sản phẩm */}
@@ -281,7 +281,7 @@ export default function InventoryManage() {
           </div>
 
           {/* Ô Lọc danh mục */}
-          <div className="md:col-span-2 form-group mb-0">
+          <div className="md:col-span-2 form-group mb-0 relative z-40">
             <CategoryTreeSelect
               label="Danh mục"
               categories={rawCategories}
@@ -292,7 +292,7 @@ export default function InventoryManage() {
           </div>
 
           {/* Dropdown Bộ lọc Kho hàng */}
-          <div className="md:col-span-3 form-group mb-0 relative" ref={warehouseDropdownRef}>
+          <div className="md:col-span-3 form-group mb-0 relative z-40" ref={warehouseDropdownRef}>
             <label className="form-label text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1.5 flex items-center justify-between">
               <span>Hiển thị kho ({selectedWarehouses.length}/{warehouses.length})</span>
             </label>
@@ -325,13 +325,13 @@ export default function InventoryManage() {
             </button>
 
             {showWarehouseFilterDropdown && (
-              <div className="absolute left-0 right-0 mt-1 bg-white border border-slate-200 rounded-xl shadow-xl z-30 max-h-72 overflow-y-auto p-3 flex flex-col gap-2">
+              <div className="absolute left-0 mt-1 bg-white border border-slate-200 rounded-xl shadow-2xl z-50 p-3 flex flex-col gap-2 min-w-[280px] md:min-w-[340px] max-w-[90vw]">
                 {/* Thanh tìm kiếm nhanh tên kho */}
                 <div className="relative mb-1">
                   <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" size={14} />
                   <input
                     type="text"
-                    className="w-full pl-8 pr-7 py-1.5 text-xs border border-slate-250 rounded-lg outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 transition-shadow bg-white"
+                    className="w-full pl-8 pr-7 py-1.5 text-xs border border-slate-200 rounded-lg outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 transition-shadow bg-white"
                     placeholder="Tìm kiếm kho..."
                     value={warehouseSearchTerm}
                     onChange={(e) => setWarehouseSearchTerm(e.target.value)}
@@ -347,26 +347,28 @@ export default function InventoryManage() {
                 </div>
 
                 <div className="flex justify-between border-b border-slate-100 pb-2 mb-1">
-                  <button onClick={selectAllWarehouses} className="text-xs font-semibold text-[#1B3A6B] hover:underline">Chọn tất cả</button>
-                  <button onClick={clearAllWarehouses} className="text-xs font-semibold text-slate-500 hover:underline">Hủy chọn</button>
+                  <button type="button" onClick={selectAllWarehouses} className="text-xs font-semibold text-[#1B3A6B] hover:underline">Chọn tất cả</button>
+                  <button type="button" onClick={clearAllWarehouses} className="text-xs font-semibold text-slate-500 hover:underline">Hủy chọn</button>
                 </div>
                 
-                {filteredWarehouses.map((w) => (
-                  <label key={w.id} className="flex items-center gap-2 text-sm text-slate-700 hover:bg-slate-50 p-1.5 rounded cursor-pointer transition-colors">
-                    <input
-                      type="checkbox"
-                      checked={selectedWarehouses.includes(w.id)}
-                      onChange={() => toggleWarehouseSelection(w.id)}
-                      className="rounded border-slate-300 text-[#1B3A6B] focus:ring-[#1B3A6B]"
-                    />
-                    <span className="truncate" title={w.name}>{w.name}</span>
-                  </label>
-                ))}
-                {filteredWarehouses.length === 0 && (
-                  <span className="text-xs text-slate-400 italic p-3 text-center">
-                    Không tìm thấy kho hàng
-                  </span>
-                )}
+                <div className="max-h-60 overflow-y-auto flex flex-col gap-0.5 pr-1">
+                  {filteredWarehouses.map((w) => (
+                    <label key={w.id} className="flex items-center gap-2 text-xs font-medium text-slate-700 hover:bg-slate-50 p-1.5 rounded cursor-pointer transition-colors">
+                      <input
+                        type="checkbox"
+                        checked={selectedWarehouses.includes(w.id)}
+                        onChange={() => toggleWarehouseSelection(w.id)}
+                        className="rounded border-slate-300 text-[#1B3A6B] focus:ring-[#1B3A6B]"
+                      />
+                      <span className="truncate" title={w.name}>{w.name}</span>
+                    </label>
+                  ))}
+                  {filteredWarehouses.length === 0 && (
+                    <span className="text-xs text-slate-400 italic p-3 text-center">
+                      Không tìm thấy kho hàng
+                    </span>
+                  )}
+                </div>
               </div>
             )}
           </div>
