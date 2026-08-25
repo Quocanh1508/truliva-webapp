@@ -318,6 +318,13 @@ export default function MyOrders() {
                 const customerName = order.billFullName || order.customer?.fullName || 'Khách lẻ';
                 const phone = order.billPhoneNumber || order.customer?.phoneNumber || '';
                 const address = order.shippingAddress?.full_address || order.customer?.fullAddress || 'Đang cập nhật';
+                const provinceName = 
+                  order.shippingAddress?.province_name || 
+                  order.shippingAddress?.province || 
+                  order.customer?.provinceName || 
+                  order.customer?.province || 
+                  (typeof order.rawData === 'string' ? JSON.parse(order.rawData)?.shipping_address?.province_name : order.rawData?.shipping_address?.province_name) ||
+                  '';
                 
                 // Tính toán thời gian hẹn và trạng thái
                 let timeStatusText = '';
@@ -393,7 +400,16 @@ export default function MyOrders() {
                     {/* Dòng 2: Địa chỉ */}
                     <div className="flex items-start space-x-3 text-[12.5px] text-gray-600">
                       <MapPin className="text-gray-400 mt-0.5 shrink-0" size={16} />
-                      <span className="leading-relaxed">{address}</span>
+                      <div className="flex-1">
+                        <span className="leading-relaxed">{address}</span>
+                        {provinceName && (
+                          <div className="mt-1">
+                            <span className="inline-flex items-center gap-1 text-[10px] font-bold text-blue-700 bg-white border border-blue-200/80 rounded px-1.5 py-0.5 shadow-2xs">
+                              📍 {provinceName}
+                            </span>
+                          </div>
+                        )}
+                      </div>
                     </div>
 
                     {/* Dòng 3: Hẹn khách */}

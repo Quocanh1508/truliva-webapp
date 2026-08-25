@@ -2745,6 +2745,13 @@ export default function OrderList() {
               {orders.map((order, idx) => {
                 const customerName = order.billFullName || order.customer?.fullName || 'Khách lẻ';
                 const phone = order.billPhoneNumber || order.customer?.phoneNumber || '';
+                const provinceName = 
+                  order.shippingAddress?.province_name || 
+                  order.shippingAddress?.province || 
+                  order.customer?.provinceName || 
+                  order.customer?.province || 
+                  (typeof order.rawData === 'string' ? JSON.parse(order.rawData)?.shipping_address?.province_name : order.rawData?.shipping_address?.province_name) ||
+                  '';
                 const ktvName = order.assignedKtv?.fullName || 'Chưa gán';
                 const mainStationName = order.mainStation?.name
                   || order.assignedKtv?.techStation?.mainStation?.name
@@ -2846,6 +2853,13 @@ export default function OrderList() {
                       <div className="text-gray-500 text-[11px] leading-tight mt-0.5 break-all" title={order.shippingAddress?.full_address || order.customer?.fullAddress || ''}>
                         {order.shippingAddress?.full_address || order.customer?.fullAddress || 'Không có địa chỉ'}
                       </div>
+                      {provinceName && (
+                        <div className="mt-1">
+                          <span className="inline-flex items-center gap-1 text-[10px] font-bold text-blue-700 bg-blue-50 border border-blue-200/60 rounded px-1.5 py-0.5">
+                            📍 {provinceName}
+                          </span>
+                        </div>
+                      )}
                     </td>
 
                     {/* 3. Công việc */}

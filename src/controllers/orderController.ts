@@ -1354,6 +1354,7 @@ export async function exportOrdersExcel(req: Request, res: Response): Promise<vo
         rescheduleReason: true,
         cancelReason: true,
         shippingAddress: true,
+        rawData: true,
         items: {
           select: {
             productName: true
@@ -1409,6 +1410,7 @@ export async function exportOrdersExcel(req: Request, res: Response): Promise<vo
       { header: 'Họ tên khách hàng', key: 'customerName', width: 25 },
       { header: 'Số điện thoại', key: 'customerPhone', width: 18 },
       { header: 'Địa chỉ chi tiết', key: 'address', width: 35 },
+      { header: 'Tỉnh / Thành phố', key: 'province', width: 22 },
       { header: 'Trạng thái xử lý', key: 'adminStatus', width: 18 },
       { header: 'Loại công việc', key: 'workType', width: 22 },
       { header: 'Loại dịch vụ chi tiết', key: 'serviceType', width: 25 },
@@ -1434,6 +1436,13 @@ export async function exportOrdersExcel(req: Request, res: Response): Promise<vo
       const customerName = o.billFullName || o.customer?.fullName || 'Khách lẻ';
       const phone = o.billPhoneNumber || o.customer?.phoneNumber || '';
       const address = o.shippingAddress?.full_address || o.customer?.fullAddress || '';
+      const provinceName = 
+        o.shippingAddress?.province_name || 
+        o.shippingAddress?.province || 
+        o.customer?.provinceName || 
+        o.customer?.province || 
+        (typeof o.rawData === 'string' ? JSON.parse(o.rawData)?.shipping_address?.province_name : o.rawData?.shipping_address?.province_name) ||
+        '';
       const productsList = o.items.map((i: any) => i.productName).join(', ');
 
       const mainStationName = 
@@ -1452,6 +1461,7 @@ export async function exportOrdersExcel(req: Request, res: Response): Promise<vo
         customerName,
         customerPhone: phone,
         address,
+        province: provinceName,
         adminStatus: o.adminStatus || 'chờ xử lý',
         workType: o.workType || '',
         serviceType: o.serviceType || '',
