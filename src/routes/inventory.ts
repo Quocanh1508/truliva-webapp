@@ -115,7 +115,8 @@ router.get('/stock', async (req: Request, res: Response): Promise<void> => {
         fullAddress: w.full_address,
         phone: w.phone_number
       })),
-      products: productsData
+      products: productsData,
+      comboMappings: getComboMappingsForInventory()
     });
 
   } catch (error: any) {
