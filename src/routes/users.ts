@@ -87,45 +87,50 @@ router.get('/export', async (req: Request, res: Response): Promise<void> => {
   try {
     const { search, mainStationId, techStationId, status } = req.query;
 
-    const where: any = {
-      NOT: [
-        { group: 'CUSTOMER' },
-        { username: { startsWith: 'zalo_' } }
-      ]
-    };
+    const conditions: any[] = [
+      {
+        OR: [
+          { group: null },
+          { group: { not: 'CUSTOMER' } }
+        ]
+      },
+      {
+        username: { not: { startsWith: 'zalo_' } }
+      }
+    ];
 
     // 1. Tìm kiếm text
     if (search) {
       const q = String(search).trim();
-      where.AND = [
-        {
-          OR: [
-            { fullName: { contains: q, mode: 'insensitive' } },
-            { phoneNumber: { contains: q, mode: 'insensitive' } },
-            { username: { contains: q, mode: 'insensitive' } }
-          ]
-        }
-      ];
+      conditions.push({
+        OR: [
+          { fullName: { contains: q, mode: 'insensitive' } },
+          { phoneNumber: { contains: q, mode: 'insensitive' } },
+          { username: { contains: q, mode: 'insensitive' } }
+        ]
+      });
     }
 
     // 2. Lọc theo trạm chính / trạm kỹ thuật
     if (techStationId) {
-      where.techStationId = String(techStationId);
+      conditions.push({ techStationId: String(techStationId) });
     } else if (mainStationId) {
       const techStations = await prisma.techStation.findMany({
         where: { mainStationId: String(mainStationId) },
         select: { id: true }
       });
       const techStationIds = techStations.map(ts => ts.id);
-      where.techStationId = { in: techStationIds };
+      conditions.push({ techStationId: { in: techStationIds } });
     }
 
     // 3. Lọc theo tình trạng
     if (status === 'active') {
-      where.isActive = true;
+      conditions.push({ isActive: true });
     } else if (status === 'inactive') {
-      where.isActive = false;
+      conditions.push({ isActive: false });
     }
+
+    const where: any = { AND: conditions };
 
     const users = await prisma.user.findMany({
       where,
@@ -246,9 +251,16 @@ router.get('/', async (_req: Request, res: Response): Promise<void> => {
   try {
     const users = await prisma.user.findMany({
       where: {
-        NOT: [
-          { group: 'CUSTOMER' },
-          { username: { startsWith: 'zalo_' } }
+        AND: [
+          {
+            OR: [
+              { group: null },
+              { group: { not: 'CUSTOMER' } }
+            ]
+          },
+          {
+            username: { not: { startsWith: 'zalo_' } }
+          }
         ]
       },
       select: {
