@@ -166,7 +166,7 @@ export default function CustomerHome({ user, onOpenScanner, onOpenWarranty }: Cu
   };
 
   return (
-    <div className="pb-20 bg-slate-50 min-h-screen">
+    <div className="pb-24 bg-slate-50 min-h-screen">
       {/* 1. Header Persona 3 Reload Deep Water Ocean Section */}
       <div className="bg-gradient-to-b from-[#061226] via-[#0B2545] to-[#0F3866] text-white pt-5 pb-16 px-4 rounded-b-[2.5rem] shadow-xl relative overflow-hidden">
         
@@ -191,13 +191,16 @@ export default function CustomerHome({ user, onOpenScanner, onOpenWarranty }: Cu
                 )}
               </div>
               <span 
-                className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 border-2 border-[#061226] rounded-full transition-all"
+                className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 border-2 border-[#061226] rounded-full transition-all shadow-xs"
                 style={{ backgroundColor: rank.iconColor }}
               ></span>
             </div>
 
             <div className="min-w-0 flex-1">
-              <p className="text-[11px] text-sky-300 font-medium leading-none mb-1">Xin chào,</p>
+              <div className="flex items-center space-x-1 mb-0.5">
+                <span className="text-[10px] uppercase font-bold tracking-wider text-sky-300">Truliva Member</span>
+                <span className="w-1 h-1 rounded-full bg-cyan-400"></span>
+              </div>
               <h1 className="text-base font-black tracking-tight text-white drop-shadow-sm truncate">{userName}</h1>
             </div>
           </div>
@@ -228,15 +231,15 @@ export default function CustomerHome({ user, onOpenScanner, onOpenWarranty }: Cu
 
       {/* 2. Floating Quick Nav Card (P3R Kinetic 4-Button Grid) */}
       <div className="max-w-md mx-auto px-4 -mt-10 relative z-10">
-        <div className="bg-white/95 backdrop-blur-md rounded-2xl shadow-[0_10px_30px_rgba(11,37,69,0.12)] p-3.5 border border-sky-100/80 grid grid-cols-4 gap-2 text-center">
+        <div className="bg-white/95 backdrop-blur-md rounded-3xl shadow-[0_12px_36px_rgba(11,37,69,0.12)] p-3.5 border border-sky-100/90 grid grid-cols-4 gap-2 text-center">
           
           {/* Tích điểm */}
           <button 
             onClick={onOpenWarranty}
-            className="flex flex-col items-center justify-center space-y-1.5 p-1.5 rounded-xl hover:bg-sky-50/80 active:scale-95 transition-all cursor-pointer group"
+            className="flex flex-col items-center justify-center space-y-1.5 p-2 rounded-2xl hover:bg-sky-50/80 active:scale-95 transition-all cursor-pointer group"
           >
-            <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-sky-50 to-blue-100/80 text-[#0284C7] flex items-center justify-center border border-sky-200/60 shadow-xs group-hover:shadow-[0_0_15px_rgba(0,163,255,0.35)] group-hover:scale-105 transition-all">
-              <Star size={20} className="text-[#0284C7] fill-sky-200" />
+            <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-amber-50 to-orange-100/80 text-amber-600 flex items-center justify-center border border-amber-200/60 shadow-xs group-hover:shadow-[0_0_15px_rgba(245,158,11,0.35)] group-hover:scale-105 transition-all">
+              <Star size={22} className="text-amber-500 fill-amber-200" />
             </div>
             <span className="text-[11px] font-bold text-slate-700 tracking-tight whitespace-nowrap">Tích điểm</span>
           </button>
@@ -244,10 +247,10 @@ export default function CustomerHome({ user, onOpenScanner, onOpenWarranty }: Cu
           {/* Ưu đãi (Vòng quay may mắn) */}
           <button 
             onClick={() => setShowWheelModal(true)}
-            className="flex flex-col items-center justify-center space-y-1.5 p-1.5 rounded-xl hover:bg-cyan-50/80 active:scale-95 transition-all cursor-pointer group"
+            className="flex flex-col items-center justify-center space-y-1.5 p-2 rounded-2xl hover:bg-cyan-50/80 active:scale-95 transition-all cursor-pointer group"
           >
-            <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-cyan-50 to-sky-100/80 text-[#00A3FF] flex items-center justify-center border border-cyan-200/60 shadow-xs relative group-hover:shadow-[0_0_15px_rgba(0,210,255,0.5)] group-hover:scale-105 transition-all">
-              <Gift size={20} className="text-[#00A3FF]" />
+            <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-cyan-50 to-sky-100/80 text-[#00A3FF] flex items-center justify-center border border-cyan-200/60 shadow-xs relative group-hover:shadow-[0_0_15px_rgba(0,210,255,0.5)] group-hover:scale-105 transition-all">
+              <Gift size={22} className="text-[#00A3FF]" />
               <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 bg-[#00D2FF] rounded-full animate-ping"></span>
               <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 bg-[#00D2FF] rounded-full shadow-[0_0_6px_#00D2FF]"></span>
             </div>
@@ -260,10 +263,10 @@ export default function CustomerHome({ user, onOpenScanner, onOpenWarranty }: Cu
               const newsEl = document.getElementById('tin-tuc-noi-bat');
               newsEl?.scrollIntoView({ behavior: 'smooth' });
             }}
-            className="flex flex-col items-center justify-center space-y-1.5 p-1.5 rounded-xl hover:bg-blue-50/80 active:scale-95 transition-all cursor-pointer group"
+            className="flex flex-col items-center justify-center space-y-1.5 p-2 rounded-2xl hover:bg-blue-50/80 active:scale-95 transition-all cursor-pointer group"
           >
-            <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-blue-50 to-indigo-100/80 text-[#1B3A6B] flex items-center justify-center border border-blue-200/60 shadow-xs group-hover:shadow-[0_0_15px_rgba(27,58,107,0.35)] group-hover:scale-105 transition-all">
-              <Megaphone size={20} className="text-[#1B3A6B]" />
+            <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-blue-50 to-indigo-100/80 text-[#1B3A6B] flex items-center justify-center border border-blue-200/60 shadow-xs group-hover:shadow-[0_0_15px_rgba(27,58,107,0.35)] group-hover:scale-105 transition-all">
+              <Megaphone size={22} className="text-[#1B3A6B]" />
             </div>
             <span className="text-[11px] font-bold text-slate-700 tracking-tight whitespace-nowrap">Tin tức</span>
           </button>
@@ -277,12 +280,12 @@ export default function CustomerHome({ user, onOpenScanner, onOpenWarranty }: Cu
                 window.location.href = 'tel:1900638463';
               }
             }}
-            className="flex flex-col items-center justify-center space-y-1.5 p-1.5 rounded-xl hover:bg-teal-50/80 active:scale-95 transition-all cursor-pointer group"
+            className="flex flex-col items-center justify-center space-y-1.5 p-2 rounded-2xl hover:bg-emerald-50/80 active:scale-95 transition-all cursor-pointer group"
           >
-            <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-teal-50 to-emerald-100/80 text-teal-700 flex items-center justify-center border border-teal-200/60 shadow-xs group-hover:shadow-[0_0_15px_rgba(20,184,166,0.35)] group-hover:scale-105 transition-all">
-              <PhoneCall size={20} className="text-teal-600" />
+            <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-emerald-50 to-teal-100/80 text-emerald-700 flex items-center justify-center border border-emerald-200/60 shadow-xs group-hover:shadow-[0_0_15px_rgba(16,185,129,0.35)] group-hover:scale-105 transition-all">
+              <PhoneCall size={22} className="text-emerald-600" />
             </div>
-            <span className="text-[11px] font-bold text-slate-700 tracking-tight whitespace-nowrap">Liên hệ</span>
+            <span className="text-[11px] font-bold text-slate-700 tracking-tight whitespace-nowrap">Hotline</span>
           </button>
         </div>
       </div>
@@ -291,7 +294,7 @@ export default function CustomerHome({ user, onOpenScanner, onOpenWarranty }: Cu
       <div className="max-w-md mx-auto px-4 mt-4">
         <div 
           onClick={() => setShowWheelModal(true)}
-          className="p3r-shimmer-effect bg-gradient-to-r from-[#061226] via-[#0B2545] to-[#0284C7] text-white rounded-2xl p-4.5 border border-[#00D2FF]/40 shadow-[0_8px_25px_rgba(0,163,255,0.25)] flex items-center justify-between cursor-pointer hover:shadow-[0_10px_30px_rgba(0,210,255,0.4)] active:scale-[0.99] transition-all relative overflow-hidden"
+          className="p3r-shimmer-effect bg-gradient-to-r from-[#061226] via-[#0B2545] to-[#0284C7] text-white rounded-3xl p-4.5 border border-[#00D2FF]/40 shadow-[0_8px_25px_rgba(0,163,255,0.22)] flex items-center justify-between cursor-pointer hover:shadow-[0_12px_32px_rgba(0,210,255,0.35)] active:scale-[0.99] transition-all relative overflow-hidden"
         >
           <div className="space-y-1.5 z-10">
             <div className="inline-block p3r-slanted-badge bg-[#00D2FF] text-[#061226] px-2.5 py-0.5 text-[9px] font-black uppercase tracking-wider shadow-xs">
@@ -310,31 +313,52 @@ export default function CustomerHome({ user, onOpenScanner, onOpenWarranty }: Cu
 
       {/* 4. Section Quét Mã QR Bảo Hành Máy (P3R Tech Scan Panel) */}
       <div className="max-w-md mx-auto px-4 mt-4">
-        <div className="bg-white p-4 rounded-2xl border border-sky-200/80 shadow-xs flex items-center justify-between hover:shadow-[0_4px_20px_rgba(0,163,255,0.12)] transition-shadow">
+        <div className="bg-white p-4 rounded-3xl border border-sky-100 shadow-[0_4px_20px_rgba(27,58,107,0.06)] flex items-center justify-between hover:shadow-[0_8px_24px_rgba(0,163,255,0.12)] transition-shadow">
           <div className="flex items-center space-x-3.5">
             <div className="p-3 bg-gradient-to-br from-sky-50 to-cyan-100 text-[#0284C7] rounded-2xl border border-sky-200/60 shadow-xs">
               <QrCode size={24} />
             </div>
             <div>
-              <h4 className="font-black text-xs text-slate-900 uppercase tracking-tight">Quét mã QR Bảo Hành</h4>
-              <p className="text-[11px] text-slate-500 font-medium">Kích hoạt & Xem tuổi thọ lõi lọc</p>
+              <h4 className="font-black text-xs text-slate-900 uppercase tracking-tight">Kích hoạt bảo hành</h4>
+              <p className="text-[11px] text-slate-500 font-medium mt-0.5">Quét mã QR thân máy để đo TDS & lõi lọc</p>
             </div>
           </div>
           <button 
             onClick={onOpenScanner}
-            className="p3r-slanted-badge bg-gradient-to-r from-[#1B3A6B] to-[#0284C7] hover:from-[#0284C7] hover:to-[#00D2FF] text-white px-4 py-2.5 text-xs font-black uppercase tracking-wider shadow-sm active:scale-95 transition-all cursor-pointer"
+            className="p3r-slanted-badge bg-gradient-to-r from-[#1B3A6B] to-[#0284C7] hover:from-[#0284C7] hover:to-[#00D2FF] text-white px-4 py-2.5 text-xs font-black uppercase tracking-wider shadow-sm active:scale-95 transition-all cursor-pointer flex items-center space-x-1"
           >
             <span>QUÉT MÃ</span>
           </button>
         </div>
       </div>
 
-      {/* 5. Section Tin tức nổi bật (P3R Article Showcase) */}
+      {/* 5. Trust Guarantee Strip (3 Cam kết dịch vụ) */}
+      <div className="max-w-md mx-auto px-4 mt-4">
+        <div className="bg-sky-50/80 border border-sky-100/90 rounded-2xl py-2.5 px-3 flex items-center justify-between text-[10px] text-slate-600 font-semibold">
+          <div className="flex items-center space-x-1">
+            <ShieldCheck size={13} className="text-[#0284C7]" />
+            <span>Chính hãng 100%</span>
+          </div>
+          <span className="text-slate-300">•</span>
+          <div className="flex items-center space-x-1">
+            <CheckCircle2 size={13} className="text-emerald-500" />
+            <span>KTV đạt chuẩn 5★</span>
+          </div>
+          <span className="text-slate-300">•</span>
+          <div className="flex items-center space-x-1">
+            <PhoneCall size={13} className="text-[#1B3A6B]" />
+            <span>Hotline 24/7</span>
+          </div>
+        </div>
+      </div>
+
+      {/* 6. Section Tin tức nổi bật (P3R Article Showcase) */}
       <div id="tin-tuc-noi-bat" className="max-w-md mx-auto px-4 mt-6 space-y-3">
         <div className="flex justify-between items-center">
-          <div className="flex items-center space-x-1.5">
+          <div className="flex items-center space-x-2">
+            <div className="w-1.5 h-4 bg-gradient-to-b from-[#0284C7] to-[#1B3A6B] rounded-full"></div>
             <h2 className="text-xs font-black uppercase tracking-wider text-slate-900">
-              TIN TỨC TRUYỀN THÔNG
+              TIN TỨC & CẨM NANG
             </h2>
           </div>
           <button className="text-[11px] font-bold text-[#0284C7] hover:text-[#1B3A6B] flex items-center transition-colors cursor-pointer uppercase tracking-tight">
@@ -349,7 +373,7 @@ export default function CustomerHome({ user, onOpenScanner, onOpenWarranty }: Cu
             <div 
               key={news?.id || idx}
               onClick={() => handleArticleClick(news)}
-              className="bg-white rounded-2xl overflow-hidden border border-sky-100 shadow-xs hover:shadow-[0_8px_20px_rgba(0,163,255,0.15)] hover:-translate-y-0.5 transition-all duration-200 cursor-pointer flex flex-col justify-between group"
+              className="bg-white rounded-3xl overflow-hidden border border-sky-100/90 shadow-[0_4px_16px_rgba(11,37,69,0.05)] hover:shadow-[0_8px_24px_rgba(0,163,255,0.15)] hover:-translate-y-0.5 transition-all duration-200 cursor-pointer flex flex-col justify-between group"
             >
               {/* Thumbnail Image with P3R Slanted Badge */}
               <div className="relative h-28 bg-slate-900 overflow-hidden">
@@ -373,7 +397,7 @@ export default function CustomerHome({ user, onOpenScanner, onOpenWarranty }: Cu
                 <div className="flex items-center justify-between text-[10px] text-slate-400 pt-1.5 border-t border-slate-100 font-medium">
                   <span className="truncate">{news?.date ? String(news.date).split(',')[0] : ''}</span>
                   <span className="flex items-center ml-1 flex-shrink-0 text-slate-500">
-                    <Eye size={10} className="mr-0.5 text-[#0284C7]" />
+                    <Eye size={11} className="mr-0.5 text-[#0284C7]" />
                     {news?.views || 0}
                   </span>
                 </div>

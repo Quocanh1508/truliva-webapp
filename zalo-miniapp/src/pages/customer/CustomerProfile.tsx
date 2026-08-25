@@ -79,9 +79,9 @@ export default function CustomerProfile({ user, mySerials, onLogout, onOpenScann
   };
 
   return (
-    <div className="pb-20 bg-slate-50 min-h-screen">
+    <div className="pb-24 bg-slate-50 min-h-screen">
       {/* 1. Header Profile Card (P3R Ocean Depth) */}
-      <div className="bg-gradient-to-b from-[#061226] via-[#0B2545] to-[#0F3866] text-white p-5 pt-5 pb-9 rounded-b-[2.2rem] shadow-xl relative overflow-hidden">
+      <div className="bg-gradient-to-b from-[#061226] via-[#0B2545] to-[#0F3866] text-white p-5 pt-5 pb-10 rounded-b-[2.5rem] shadow-xl relative overflow-hidden">
         {/* Floating Realistic Water Bubbles */}
         <div className="water-bubble w-4 h-4 left-[8%] bottom-1 bubble-anim-1"></div>
         <div className="water-bubble w-6 h-6 left-[22%] bottom-2 bubble-anim-2"></div>
@@ -100,7 +100,7 @@ export default function CustomerProfile({ user, mySerials, onLogout, onOpenScann
                 )}
               </div>
               <span 
-                className="absolute bottom-0 right-0 w-4 h-4 border-2 border-[#061226] rounded-full transition-all"
+                className="absolute bottom-0 right-0 w-4 h-4 border-2 border-[#061226] rounded-full transition-all shadow-xs"
                 style={{ backgroundColor: rank.iconColor }}
               ></span>
             </div>
@@ -166,14 +166,17 @@ export default function CustomerProfile({ user, mySerials, onLogout, onOpenScann
       <div className="max-w-md mx-auto px-4 mt-4 space-y-4">
         
         {/* 2. Section Máy lọc nước của tôi */}
-        <div ref={devicesSectionRef} className="space-y-2 scroll-mt-6">
+        <div ref={devicesSectionRef} className="space-y-2.5 scroll-mt-6">
           <div className="flex justify-between items-center">
-            <h2 className="text-xs font-extrabold text-slate-700 uppercase tracking-wider">
-              Máy lọc nước của tôi ({(mySerials || []).length})
-            </h2>
+            <div className="flex items-center space-x-1.5">
+              <div className="w-1.5 h-4 bg-[#0284C7] rounded-full"></div>
+              <h2 className="text-xs font-black text-slate-800 uppercase tracking-wider">
+                MÁY LỌC NƯỚC CỦA TÔI ({(mySerials || []).length})
+              </h2>
+            </div>
             <button 
               onClick={() => handleBookMaintenance()}
-              className="text-xs text-[#0284C7] font-bold flex items-center hover:underline cursor-pointer"
+              className="text-xs text-[#0284C7] font-bold flex items-center hover:underline cursor-pointer tracking-tight"
             >
               <QrCode size={14} className="mr-1" />
               Kích hoạt / Thêm máy
@@ -181,58 +184,75 @@ export default function CustomerProfile({ user, mySerials, onLogout, onOpenScann
           </div>
 
           {!mySerials || mySerials.length === 0 ? (
-            <div className="bg-white p-6 rounded-2xl text-center text-xs text-slate-400 border border-slate-200/80 shadow-sm space-y-2">
-              <Droplets size={32} className="mx-auto text-sky-300" />
-              <p>Bạn chưa liên kết máy lọc nước nào với tài khoản Zalo này.</p>
+            <div className="bg-white p-6 rounded-3xl text-center text-xs text-slate-400 border border-slate-200/80 shadow-xs space-y-3">
+              <div className="w-14 h-14 mx-auto rounded-full bg-sky-50 flex items-center justify-center text-sky-500">
+                <Droplets size={28} />
+              </div>
+              <div className="space-y-1">
+                <p className="font-bold text-slate-700 text-sm">Chưa có thiết bị liên kết</p>
+                <p className="text-slate-400 text-xs">Quét mã QR trên thân máy Truliva để kích hoạt bảo hành và theo dõi tuổi thọ lõi lọc.</p>
+              </div>
               <button 
                 onClick={() => handleBookMaintenance()}
-                className="px-4 py-2 bg-[#1B3A6B] hover:bg-[#2563EB] text-white font-bold rounded-xl text-xs shadow-sm transition-colors cursor-pointer"
+                className="px-5 py-2.5 bg-gradient-to-r from-[#1B3A6B] to-[#0284C7] hover:from-[#0284C7] hover:to-[#00D2FF] text-white font-bold rounded-2xl text-xs shadow-xs active:scale-95 transition-all cursor-pointer inline-flex items-center space-x-1.5"
               >
-                Kích hoạt bảo hành điện tử ngay
+                <QrCode size={14} />
+                <span>Kích hoạt bảo hành điện tử ngay</span>
               </button>
             </div>
           ) : (
             (mySerials || []).map((s) => (
-              <div key={s.id} className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm space-y-3">
+              <div key={s.id} className="bg-white p-4 rounded-3xl border border-sky-100 shadow-[0_4px_20px_rgba(27,58,107,0.06)] space-y-3">
                 <div className="flex justify-between items-start">
                   <div>
-                    <span className="bg-sky-100 text-sky-800 px-2 py-0.5 rounded text-[10px] font-bold">
-                      {s.status || 'Đang hoạt động'}
+                    <span className="bg-emerald-50 text-emerald-700 border border-emerald-200/80 px-2 py-0.5 rounded-md text-[10px] font-bold inline-flex items-center space-x-1">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                      <span>{s.status || 'Bảo hành chính hãng'}</span>
                     </span>
-                    <h3 className="font-bold text-slate-900 text-sm mt-1">{s.model || 'Máy lọc nước Truliva RO'}</h3>
+                    <h3 className="font-bold text-slate-900 text-sm mt-1">{s.model || 'Máy lọc nước Truliva Smart RO'}</h3>
                     <p className="text-xs font-mono text-[#0284C7] mt-0.5">Serial: {s.serialNumber}</p>
                   </div>
-                  <div className="p-2 bg-sky-50 text-[#0284C7] rounded-xl">
-                    <ShieldCheck size={20} />
+                  <div className="p-2.5 bg-sky-50 text-[#0284C7] rounded-2xl border border-sky-100 shadow-xs">
+                    <ShieldCheck size={22} />
                   </div>
                 </div>
 
-                <div className="bg-slate-50 p-3 rounded-xl text-xs space-y-2 border border-slate-100">
-                  <div className="flex justify-between text-[11px] text-slate-600">
-                    <span className="flex items-center"><Calendar size={12} className="mr-1 text-slate-400" />Hạn bảo hành:</span>
+                {/* Filter Health Multi-Bars */}
+                <div className="bg-slate-50 p-3.5 rounded-2xl text-xs space-y-2.5 border border-slate-100">
+                  <div className="flex justify-between text-[11px] text-slate-600 font-medium">
+                    <span className="flex items-center"><Calendar size={13} className="mr-1 text-slate-400" />Hạn bảo hành máy:</span>
                     <span className="font-bold text-slate-800">
                       {s.warrantyExpiryDate ? new Date(s.warrantyExpiryDate).toLocaleDateString('vi-VN') : '12 Tháng'}
                     </span>
                   </div>
 
-                  {/* Filter Health Bar */}
-                  <div>
-                    <div className="flex justify-between text-[10px] text-slate-500 mb-1 font-semibold">
-                      <span>Tuổi thọ lõi lọc thô số 1</span>
-                      <span className="text-[#0284C7] font-bold">Còn 85%</span>
+                  <div className="space-y-1.5 pt-1 border-t border-slate-200/60">
+                    <div className="flex justify-between text-[10px] text-slate-600 font-semibold">
+                      <span>Lõi 1 (PP 5 Micron)</span>
+                      <span className="text-[#0284C7] font-bold">85% (Tốt)</span>
                     </div>
                     <div className="w-full bg-slate-200 h-2 rounded-full overflow-hidden">
-                      <div className="bg-[#0284C7] h-full w-[85%] rounded-full"></div>
+                      <div className="bg-gradient-to-r from-cyan-400 to-[#0284C7] h-full w-[85%] rounded-full"></div>
+                    </div>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <div className="flex justify-between text-[10px] text-slate-600 font-semibold">
+                      <span>Lõi 2 (CTO Than hoạt tính)</span>
+                      <span className="text-emerald-600 font-bold">75% (Tốt)</span>
+                    </div>
+                    <div className="w-full bg-slate-200 h-2 rounded-full overflow-hidden">
+                      <div className="bg-gradient-to-r from-emerald-400 to-teal-500 h-full w-[75%] rounded-full"></div>
                     </div>
                   </div>
                 </div>
 
                 <button 
                   onClick={() => handleBookMaintenance(s.serialNumber)}
-                  className="w-full py-2.5 bg-sky-50 hover:bg-sky-100 active:scale-98 text-[#0284C7] rounded-xl text-xs font-bold transition-all flex items-center justify-center space-x-1 cursor-pointer"
+                  className="w-full py-2.5 bg-sky-50 hover:bg-sky-100 active:scale-98 text-[#0284C7] border border-sky-200/70 rounded-2xl text-xs font-bold transition-all flex items-center justify-center space-x-1.5 cursor-pointer shadow-xs"
                 >
-                  <Wrench size={14} />
-                  <span>Đặt lịch KTV bảo trì / Thay lõi 1-Click</span>
+                  <Wrench size={15} />
+                  <span>Đặt lịch KTV bảo trì / Thay lõi tận nhà</span>
                 </button>
               </div>
             ))
@@ -240,17 +260,17 @@ export default function CustomerProfile({ user, mySerials, onLogout, onOpenScann
         </div>
 
         {/* 3. Utility Actions List */}
-        <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm divide-y divide-slate-100 text-xs">
+        <div className="bg-white rounded-3xl border border-sky-100 shadow-[0_4px_20px_rgba(27,58,107,0.06)] divide-y divide-slate-100 text-xs overflow-hidden">
           
           <button 
             onClick={() => setShowVoucherModal(true)}
             className="w-full p-3.5 flex items-center justify-between text-slate-800 font-semibold hover:bg-slate-50 active:bg-slate-100 transition-colors cursor-pointer"
           >
             <div className="flex items-center space-x-3">
-              <div className="p-2 bg-cyan-50 text-cyan-700 rounded-xl">
+              <div className="p-2.5 bg-cyan-50 text-[#00A3FF] rounded-2xl border border-cyan-100">
                 <Ticket size={18} />
               </div>
-              <span>Ưu đãi & Voucher của tôi (3)</span>
+              <span className="font-bold">Ưu đãi & Voucher của tôi (3)</span>
             </div>
             <ChevronRight size={16} className="text-slate-400" />
           </button>
@@ -260,10 +280,10 @@ export default function CustomerProfile({ user, mySerials, onLogout, onOpenScann
             className="w-full p-3.5 flex items-center justify-between text-slate-800 font-semibold hover:bg-slate-50 active:bg-slate-100 transition-colors cursor-pointer"
           >
             <div className="flex items-center space-x-3">
-              <div className="p-2 bg-sky-50 text-[#0284C7] rounded-xl">
+              <div className="p-2.5 bg-sky-50 text-[#0284C7] rounded-2xl border border-sky-100">
                 <History size={18} />
               </div>
-              <span>Lịch sử bảo trì & Thay lõi</span>
+              <span className="font-bold">Lịch sử bảo trì & Thay lõi</span>
             </div>
             <ChevronRight size={16} className="text-slate-400" />
           </button>
@@ -273,10 +293,10 @@ export default function CustomerProfile({ user, mySerials, onLogout, onOpenScann
             className="w-full p-3.5 flex items-center justify-between text-slate-800 font-semibold hover:bg-slate-50 active:bg-slate-100 transition-colors cursor-pointer"
           >
             <div className="flex items-center space-x-3">
-              <div className="p-2 bg-blue-50 text-blue-700 rounded-xl">
+              <div className="p-2.5 bg-blue-50 text-[#1B3A6B] rounded-2xl border border-blue-100">
                 <MessageSquare size={18} />
               </div>
-              <span>Hỗ trợ & Chat Zalo OA</span>
+              <span className="font-bold">Tư vấn & Hỗ trợ kỹ thuật Zalo OA</span>
             </div>
             <ChevronRight size={16} className="text-slate-400" />
           </button>
@@ -287,7 +307,7 @@ export default function CustomerProfile({ user, mySerials, onLogout, onOpenScann
         {onLogout && (
           <button
             onClick={onLogout}
-            className="w-full py-3 bg-red-50 text-red-600 hover:bg-red-100 rounded-2xl font-bold text-xs flex items-center justify-center space-x-1.5 transition-colors cursor-pointer"
+            className="w-full py-3 bg-red-50 text-red-600 hover:bg-red-100 rounded-2xl font-bold text-xs flex items-center justify-center space-x-1.5 transition-colors cursor-pointer border border-red-100"
           >
             <LogOut size={16} />
             <span>Đăng xuất khỏi Mini App</span>
