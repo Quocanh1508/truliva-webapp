@@ -81,21 +81,30 @@ router.use(requireAuth, requireCoordinatorOrAdmin);
 
 /**
  * GET /api/users/export
- * Xuất Excel danh sách KTV theo bộ lọc (Admin only)
+ * Xuất Excel danh sách KTV / Nhân viên theo bộ lọc (Admin only)
  */
 router.get('/export', async (req: Request, res: Response): Promise<void> => {
   try {
     const { search, mainStationId, techStationId, status } = req.query;
 
-    const where: any = {};
+    const where: any = {
+      NOT: [
+        { group: 'CUSTOMER' },
+        { username: { startsWith: 'zalo_' } }
+      ]
+    };
 
     // 1. Tìm kiếm text
     if (search) {
       const q = String(search).trim();
-      where.OR = [
-        { fullName: { contains: q, mode: 'insensitive' } },
-        { phoneNumber: { contains: q, mode: 'insensitive' } },
-        { username: { contains: q, mode: 'insensitive' } }
+      where.AND = [
+        {
+          OR: [
+            { fullName: { contains: q, mode: 'insensitive' } },
+            { phoneNumber: { contains: q, mode: 'insensitive' } },
+            { username: { contains: q, mode: 'insensitive' } }
+          ]
+        }
       ];
     }
 
@@ -153,7 +162,7 @@ router.get('/export', async (req: Request, res: Response): Promise<void> => {
     });
 
     const workbook = new ExcelJS.Workbook();
-    const worksheet = workbook.addWorksheet('Danh sách KTV');
+    const worksheet = workbook.addWorksheet('Danh sách Nhân viên');
 
     worksheet.columns = [
       { header: 'Họ và tên', key: 'fullName', width: 25 },
@@ -218,24 +227,30 @@ router.get('/export', async (req: Request, res: Response): Promise<void> => {
     );
     res.setHeader(
       'Content-Disposition',
-      'attachment; filename=' + encodeURIComponent('Danh_sach_KTV.xlsx')
+      'attachment; filename=' + encodeURIComponent('Danh_sach_Nhan_vien.xlsx')
     );
 
     await workbook.xlsx.write(res);
     res.end();
   } catch (error: any) {
-    logger.error('Export KTVs error', { error: error.message });
+    logger.error('Export users error', { error: error.message });
     res.status(500).json({ error: 'Lỗi xuất file Excel' });
   }
 });
 
 /**
  * GET /api/users
- * Danh sách tất cả users
+ * Danh sách tất cả nhân viên nội bộ (Loại trừ khách hàng Zalo Mini App)
  */
 router.get('/', async (_req: Request, res: Response): Promise<void> => {
   try {
     const users = await prisma.user.findMany({
+      where: {
+        NOT: [
+          { group: 'CUSTOMER' },
+          { username: { startsWith: 'zalo_' } }
+        ]
+      },
       select: {
         id: true,
         username: true,

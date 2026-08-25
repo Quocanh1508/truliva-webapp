@@ -181,7 +181,10 @@ export default function UserManage() {
   const loadUsers = async () => {
     try {
       const data = await fetchApi('/users');
-      setUsers(data.users);
+      const staffOnly = (data.users || []).filter(
+        (u: any) => u.group !== 'CUSTOMER' && !u.username?.startsWith('zalo_')
+      );
+      setUsers(staffOnly);
     } catch (e) {
       console.error(e);
     } finally {
@@ -461,7 +464,7 @@ export default function UserManage() {
 
         {/* Result count */}
         <div style={{ marginTop: '10px', fontSize: '13px', color: 'var(--text-muted)' }}>
-          Hiển thị <strong>{filteredUsers.length}</strong> / {users.length} kỹ thuật viên
+          Hiển thị <strong>{filteredUsers.length}</strong> / {users.length} nhân viên
         </div>
       </div>
 

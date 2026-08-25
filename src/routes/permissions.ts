@@ -15,9 +15,15 @@ const PREDEFINED_GROUPS: string[] = ['DTC', 'eCom', 'Service', 'DT South', 'DT N
  */
 router.get('/', requireAuth, async (req: Request, res: Response): Promise<void> => {
   try {
-    // 1. Lấy danh sách Group thực tế trong hệ thống
+    // 1. Lấy danh sách Group thực tế trong hệ thống (Loại trừ CUSTOMER Zalo)
     const dbUsersWithGroup = await prisma.user.findMany({
-      where: { group: { not: null } },
+      where: { 
+        group: { not: null },
+        NOT: [
+          { group: 'CUSTOMER' },
+          { username: { startsWith: 'zalo_' } }
+        ]
+      },
       select: { group: true },
       distinct: ['group']
     });
