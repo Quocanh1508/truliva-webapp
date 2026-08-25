@@ -694,10 +694,19 @@ export async function getMyStats(req: Request, res: Response): Promise<void> {
 
     const orders = await prisma.order.findMany({
       where: {
-        assignedKtvId: ktvUserId,
-        createdAt: {
-          gte: new Date(Date.now() - 90 * 24 * 60 * 60 * 1000)
-        }
+        OR: [
+          { assignedKtvId: ktvUserId },
+          { serviceReports: { some: { ktvUserId: ktvUserId } } }
+        ],
+        AND: [
+          {
+            OR: [
+              { statusCode: { not: 0 } },
+              { statusCode: null },
+              { pancakeOrderId: { lt: 0 } }
+            ]
+          }
+        ]
       },
       select: {
         id: true,
@@ -707,12 +716,14 @@ export async function getMyStats(req: Request, res: Response): Promise<void> {
         appointmentTime: true,
         createdAt: true,
         updatedAt: true,
+        pancakeCreatedAt: true,
+        pancakeUpdatedAt: true,
         serviceReports: {
           select: {
-            createdAt: true
+            createdAt: true,
+            ktvUserId: true
           },
-          orderBy: { createdAt: 'asc' },
-          take: 1
+          orderBy: { createdAt: 'asc' }
         }
       }
     });
@@ -738,9 +749,11 @@ export async function getMyStats(req: Request, res: Response): Promise<void> {
 
       let filterDate: Date;
       if (isCompleted) {
-        filterDate = hasReport ? order.serviceReports[0].createdAt : order.updatedAt;
+        filterDate = hasReport 
+          ? order.serviceReports[0].createdAt 
+          : (order.pancakeUpdatedAt || order.appointmentTime || order.pancakeCreatedAt || order.createdAt);
       } else {
-        filterDate = order.appointmentTime || order.createdAt;
+        filterDate = order.appointmentTime || order.pancakeCreatedAt || order.createdAt;
       }
 
       let isOnTime = false;
@@ -755,7 +768,8 @@ export async function getMyStats(req: Request, res: Response): Promise<void> {
           const completionDateStr = order.serviceReports[0].createdAt.toISOString().slice(0, 10);
           completionTimeMs = new Date(completionDateStr).getTime();
         } else if (order.adminStatus === 'hoàn thành') {
-          const completionDateStr = order.updatedAt.toISOString().slice(0, 10);
+          const compDate = order.pancakeUpdatedAt || order.appointmentTime || order.pancakeCreatedAt || order.createdAt;
+          const completionDateStr = compDate.toISOString().slice(0, 10);
           completionTimeMs = new Date(completionDateStr).getTime();
         }
 
