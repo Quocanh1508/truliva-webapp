@@ -5,6 +5,7 @@ import prisma from '../config/database';
 import logger from '../utils/logger';
 import { requireAuth, requireAdmin, requireCoordinatorOrAdmin } from '../middleware/authSession';
 import { syncProducts } from '../scripts/syncProducts';
+import { getComboMappingsForInventory } from '../controllers/orderController';
 
 const router = Router();
 const SHOP_ID = '1635300067';
@@ -481,7 +482,8 @@ router.get('/my-stock', async (req: Request, res: Response): Promise<void> => {
         address: currentWarehouse.address,
         fullAddress: currentWarehouse.full_address
       },
-      products: productsData
+      products: productsData,
+      comboMappings: getComboMappingsForInventory()
     });
 
   } catch (error: any) {

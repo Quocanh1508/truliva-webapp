@@ -1,13 +1,26 @@
-import { useEffect, useState, useMemo } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { fetchApi } from '../../api/client';
-import { Warehouse, Search, AlertTriangle, CheckSquare, Square, Download } from 'lucide-react';
+import { Warehouse, Search, AlertTriangle, CheckSquare, Square, Download, Package } from 'lucide-react';
 import CategoryTreeSelect from '../../components/CategoryTreeSelect';
 import PullToRefresh from '../../components/PullToRefresh';
 import { matchesSearchTerm } from '../../utils/text';
 
+interface ComboComponent {
+  name: string;
+  sku?: string;
+  quantity: number;
+}
+
+interface ComboMapping {
+  comboKey: string;
+  comboName: string;
+  components: ComboComponent[];
+}
+
 export default function KtvInventory() {
   const [warehouse, setWarehouse] = useState<any>(null);
   const [products, setProducts] = useState<any[]>([]);
+  const [comboMappings, setComboMappings] = useState<ComboMapping[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
@@ -38,6 +51,7 @@ export default function KtvInventory() {
       }));
 
       setProducts(transformedProducts);
+      setComboMappings(data.comboMappings || []);
       setError('');
     } catch (err: any) {
       console.error(err);
@@ -87,6 +101,66 @@ export default function KtvInventory() {
       return matchSearch && matchCategory && matchLowStock && matchInStock;
     });
   }, [products, warehouse, searchTerm, selectedCategories, lowStockThreshold, showOnlyLowStock, showOnlyInStock]);
+
+  // Tính toán nhóm Combo: nhóm các sản phẩm thành phần thuộc combo lại
+  const { comboGroups, standaloneProducts } = useMemo(() => {
+    if (!warehouse || comboMappings.length === 0) {
+      return { comboGroups: [] as any[], standaloneProducts: filteredProducts };
+    }
+
+    // Tập hợp tên sản phẩm thuộc combo (lowercase) để nhận diện
+    const comboComponentNames = new Set<string>();
+    comboMappings.forEach(cm => {
+      cm.components.forEach(c => {
+        comboComponentNames.add(c.name.trim().toLowerCase());
+        if (c.sku) comboComponentNames.add(c.sku.trim().toLowerCase());
+      });
+    });
+
+    // Tách sản phẩm: thuộc combo vs đơn lẻ
+    const standalone = filteredProducts.filter(p => {
+      const pName = (p.name || '').trim().toLowerCase();
+      const pSku = (p.sku || '').trim().toLowerCase();
+      return !comboComponentNames.has(pName) && !comboComponentNames.has(pSku);
+    });
+
+    // Tính toán từng combo group
+    const groups = comboMappings.map(cm => {
+      const matchedComponents = cm.components.map(comp => {
+        // Tìm sản phẩm khớp trong danh sách tổng (không chỉ filtered) để luôn có data
+        const matchedProduct = products.find(p => {
+          const pName = (p.name || '').trim().toLowerCase();
+          const pSku = (p.sku || '').trim().toLowerCase();
+          const cName = comp.name.trim().toLowerCase();
+          const cSku = (comp.sku || '').trim().toLowerCase();
+          return pName === cName || (cSku && pSku === cSku);
+        });
+
+        const stockQty = matchedProduct && warehouse ? (matchedProduct.stocks[warehouse.id] ?? 0) : 0;
+        const actualStockQty = matchedProduct && warehouse ? (matchedProduct.actualStocks[warehouse.id] ?? 0) : 0;
+
+        return {
+          ...comp,
+          product: matchedProduct,
+          stockQty,
+          actualStockQty
+        };
+      });
+
+      // Số combo có thể ghép = min(tồn kho từng thành phần / số lượng cần)
+      const canAssemble = Math.min(...matchedComponents.map(mc => 
+        mc.product ? Math.floor(mc.stockQty / mc.quantity) : 0
+      ));
+
+      return {
+        ...cm,
+        matchedComponents,
+        canAssemble
+      };
+    }).filter(g => g.matchedComponents.some(mc => mc.product)); // Chỉ hiển thị combo có ít nhất 1 thành phần tồn tại trong kho
+
+    return { comboGroups: groups, standaloneProducts: standalone };
+  }, [filteredProducts, products, warehouse, comboMappings]);
 
   const handleExportExcel = () => {
     const query = new URLSearchParams();
@@ -282,7 +356,78 @@ export default function KtvInventory() {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100 text-sm text-slate-700">
-                      {filteredProducts.map((p) => {
+                      {/* ═══ Combo Groups ═══ */}
+                      {comboGroups.map((group) => (
+                        <React.Fragment key={group.comboKey}>
+                          {/* Combo Header Row */}
+                          <tr className="bg-gradient-to-r from-[#1B3A6B] to-[#2563EB]">
+                            <td 
+                              colSpan={warehouse ? 3 : 2} 
+                              className="px-4 py-3"
+                            >
+                              <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-2.5">
+                                  <Package size={18} className="text-white/90" />
+                                  <span className="text-white font-bold text-sm tracking-wide">{group.comboName}</span>
+                                </div>
+                                <span className={`text-xs font-extrabold px-3 py-1 rounded-full ${
+                                  group.canAssemble > 0
+                                    ? 'bg-emerald-400/20 text-emerald-100 border border-emerald-400/30'
+                                    : 'bg-red-400/20 text-red-200 border border-red-400/30'
+                                }`}>
+                                  Có thể ghép: {group.canAssemble}
+                                </span>
+                              </div>
+                            </td>
+                          </tr>
+                          {/* Component Rows */}
+                          {group.matchedComponents.map((mc: any, idx: number) => {
+                            const isLast = idx === group.matchedComponents.length - 1;
+                            const isLowStock = mc.stockQty <= lowStockThreshold;
+                            return (
+                              <tr key={`${group.comboKey}-${idx}`} className="hover:bg-blue-50/40 transition-colors bg-blue-50/20">
+                                {/* Tên thành phần với tree connector */}
+                                <td className="px-6 py-3 font-semibold text-slate-800 sticky left-0 bg-blue-50/20 border-r border-slate-200 shadow-[2px_0_5px_rgba(0,0,0,0.03)] z-10">
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-blue-400 text-xs font-mono select-none">{isLast ? '└─' : '├─'}</span>
+                                    <span className="line-clamp-2" title={mc.name}>{mc.name}</span>
+                                  </div>
+                                </td>
+                                {/* SKU */}
+                                <td className="px-4 py-3 text-center border-r border-slate-200 whitespace-nowrap">
+                                  <div className="font-bold text-xs text-slate-600">{mc.sku || '-'}</div>
+                                  <div className="text-[11px] text-slate-400 mt-0.5">×{mc.quantity}</div>
+                                </td>
+                                {/* Tồn kho */}
+                                {warehouse && (
+                                  <td className={`px-4 py-2 text-center border-r border-slate-100 font-bold transition-all ${
+                                    isLowStock
+                                      ? 'bg-red-50 text-red-600 border-red-200/50 shadow-inner'
+                                      : 'text-slate-800'
+                                  }`}>
+                                    <div className="flex flex-col items-center">
+                                      <span className={isLowStock ? 'text-base font-extrabold' : ''}>
+                                        {mc.stockQty}
+                                      </span>
+                                      <span className="text-xs text-slate-400 font-normal mt-0.5 border-t border-slate-100 w-full pt-0.5">
+                                        {mc.actualStockQty}
+                                      </span>
+                                    </div>
+                                    {isLowStock && (
+                                      <div className="text-[9px] text-red-500 font-bold uppercase tracking-wide mt-0.5">Sắp hết</div>
+                                    )}
+                                  </td>
+                                )}
+                              </tr>
+                            );
+                          })}
+                          {/* Spacer between combo groups */}
+                          <tr className="h-1 bg-slate-100"><td colSpan={warehouse ? 3 : 2}></td></tr>
+                        </React.Fragment>
+                      ))}
+
+                      {/* ═══ Sản phẩm đơn lẻ (không thuộc combo) ═══ */}
+                      {standaloneProducts.map((p) => {
                         const stockQty = warehouse ? (p.stocks[warehouse.id] ?? 0) : 0;
                         const actualStockQty = warehouse ? (p.actualStocks[warehouse.id] ?? 0) : 0;
                         const isLowStock = stockQty <= lowStockThreshold;
@@ -327,7 +472,7 @@ export default function KtvInventory() {
                           </tr>
                         );
                       })}
-                      {filteredProducts.length === 0 && (
+                      {standaloneProducts.length === 0 && comboGroups.length === 0 && (
                         <tr>
                           <td colSpan={warehouse ? 3 : 2} className="px-6 py-12 text-center text-slate-400 italic">
                             Không tìm thấy sản phẩm phù hợp
