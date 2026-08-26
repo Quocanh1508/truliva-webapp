@@ -238,17 +238,17 @@ export const PermissionMatrix: React.FC = () => {
       </div>
 
       {/* Permission Matrix Table */}
-      <div className="overflow-x-auto border border-gray-200/80 rounded-2xl shadow-sm">
+      <div className="overflow-auto max-h-[calc(100vh-220px)] border border-gray-200/80 rounded-2xl shadow-sm relative">
         <table className="w-full text-left border-collapse">
-          <thead>
-            <tr className="bg-gray-50/90 border-b border-gray-200/80 text-xs">
-              <th className="py-3.5 px-4 font-bold text-gray-700 min-w-[280px]">
+          <thead className="sticky top-0 z-20 shadow-xs bg-slate-50">
+            <tr className="bg-slate-50 border-b border-gray-200 text-xs">
+              <th className="py-3.5 px-4 font-bold text-gray-700 min-w-[280px] sticky top-0 left-0 z-30 bg-slate-50 border-b border-gray-200 shadow-[2px_0_5px_rgba(0,0,0,0.03)]">
                 Tính năng / Hành động hệ thống
               </th>
 
               {/* TAB 1: ROLES COLUMNS */}
               {activeTab === 'roles' && roles.map(r => (
-                <th key={r.key} className="py-3.5 px-3 font-bold text-center min-w-[110px]">
+                <th key={r.key} className="py-3.5 px-3 font-bold text-center min-w-[110px] sticky top-0 z-20 bg-slate-50 border-b border-gray-200">
                   <span className={`inline-block px-2.5 py-1 rounded-lg border text-[11px] font-semibold ${r.badgeColor}`}>
                     {r.label}
                   </span>
@@ -262,7 +262,7 @@ export const PermissionMatrix: React.FC = () => {
                 const isResetting = updatingKey === `reset:${groupKey}`;
 
                 return (
-                  <th key={grp} className="py-3.5 px-3 font-bold text-center min-w-[120px]">
+                  <th key={grp} className="py-3.5 px-3 font-bold text-center min-w-[120px] sticky top-0 z-20 bg-slate-50 border-b border-gray-200">
                     <div className="flex flex-col items-center gap-1">
                       <span className={`inline-block px-2.5 py-1 rounded-lg border text-[11px] font-semibold ${
                         hasCustom
@@ -310,9 +310,9 @@ export const PermissionMatrix: React.FC = () => {
                   {/* Module Header Row */}
                   <tr 
                     onClick={() => toggleModule(mod.id)}
-                    className="bg-gray-100/70 hover:bg-gray-100 cursor-pointer font-bold text-gray-800 transition-colors"
+                    className="bg-gray-100/90 hover:bg-gray-200/80 cursor-pointer font-bold text-gray-800 transition-colors"
                   >
-                    <td colSpan={colSpanCount} className="py-2.5 px-4">
+                    <td colSpan={colSpanCount} className="py-2.5 px-4 sticky left-0 z-10 bg-gray-100/95">
                       <div className="flex items-center gap-2">
                         {isExpanded ? (
                           <ChevronDown className="h-4 w-4 text-gray-500" />
@@ -329,8 +329,8 @@ export const PermissionMatrix: React.FC = () => {
 
                   {/* Feature Rows */}
                   {isExpanded && modFeatures.map(feat => (
-                    <tr key={feat.key} className="hover:bg-blue-50/30 transition-colors">
-                      <td className="py-3 px-4 align-middle">
+                    <tr key={feat.key} className="hover:bg-blue-50/30 transition-colors group">
+                      <td className="py-3 px-4 align-middle sticky left-0 z-10 bg-white group-hover:bg-blue-50/60 border-r border-gray-100 shadow-[2px_0_5px_rgba(0,0,0,0.02)]">
                         <div className="font-semibold text-gray-900">{feat.name}</div>
                         <div className="text-[11px] text-gray-500 mt-0.5">{feat.description}</div>
                         <div className="text-[10px] font-mono text-gray-400 mt-0.5">Key: {feat.key}</div>
