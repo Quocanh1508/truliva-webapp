@@ -31,7 +31,8 @@ export const PermissionMatrix: React.FC = () => {
     reports: true,
     salaries: true,
     inventory: true,
-    system: true
+    system: true,
+    dev_tools: true
   });
   const [updatingKey, setUpdatingKey] = useState<string | null>(null);
 
@@ -59,7 +60,8 @@ export const PermissionMatrix: React.FC = () => {
   }, [groups, newGroupName]);
 
   const handleToggleRole = async (role: string, featureKey: string, currentVal: boolean) => {
-    if (role === 'ADMIN') return; // Admin luôn có tất cả quyền
+    const feat = features.find(f => f.key === featureKey);
+    if (role === 'ADMIN' && !feat?.devOnly) return; // Admin luôn có tất cả quyền thông thường
     const cellKey = `role:${role}:${featureKey}`;
     setUpdatingKey(cellKey);
     await updatePermission(role, featureKey, !currentVal);
@@ -67,7 +69,8 @@ export const PermissionMatrix: React.FC = () => {
   };
 
   const handleToggleGroup = async (role: string, group: string, featureKey: string, currentVal: boolean) => {
-    if (role === 'ADMIN') return;
+    const feat = features.find(f => f.key === featureKey);
+    if (role === 'ADMIN' && !feat?.devOnly) return;
     const cellKey = `group:${role}::${group}:${featureKey}`;
     setUpdatingKey(cellKey);
     await updatePermission(role, featureKey, !currentVal, group);
@@ -340,23 +343,24 @@ export const PermissionMatrix: React.FC = () => {
                           : getDefaultPermission(r.key, feat.key);
                         const isUpdating = updatingKey === `role:${r.key}:${feat.key}`;
                         const isAdminRole = r.key === 'ADMIN';
+                        const isLockedAdmin = isAdminRole && !feat.devOnly;
 
                         return (
                           <td key={r.key} className="py-3 px-3 text-center align-middle">
                             <button
                               type="button"
-                              disabled={isAdminRole || isUpdating}
+                              disabled={isLockedAdmin || isUpdating}
                               onClick={() => handleToggleRole(r.key, feat.key, isAllowed)}
                               className={`inline-flex items-center justify-center p-1.5 rounded-xl border transition-all ${
-                                isAdminRole
+                                isLockedAdmin
                                   ? 'bg-emerald-50 border-emerald-200 text-emerald-600 cursor-not-allowed opacity-80'
                                   : isAllowed
                                   ? 'bg-emerald-500 border-emerald-600 text-white shadow-sm hover:bg-emerald-600 active:scale-95'
                                   : 'bg-gray-100 border-gray-300 text-gray-400 hover:bg-gray-200 hover:text-gray-600 active:scale-95'
                               }`}
                               title={
-                                isAdminRole
-                                  ? 'Admin luôn có tất cả quyền hạn'
+                                isLockedAdmin
+                                  ? 'Admin luôn có tất cả quyền hạn thông thường'
                                   : isAllowed
                                   ? `Bấm để tắt quyền ${feat.name} của ${r.label}`
                                   : `Bấm để bật quyền ${feat.name} cho ${r.label}`
@@ -385,23 +389,24 @@ export const PermissionMatrix: React.FC = () => {
 
                         const isUpdating = updatingKey === `group:${groupKey}:${feat.key}`;
                         const isAdminRole = selectedRoleForGroup === 'ADMIN';
+                        const isLockedAdmin = isAdminRole && !feat.devOnly;
 
                         return (
                           <td key={grp} className="py-3 px-3 text-center align-middle">
                             <button
                               type="button"
-                              disabled={isAdminRole || isUpdating}
+                              disabled={isLockedAdmin || isUpdating}
                               onClick={() => handleToggleGroup(selectedRoleForGroup, grp, feat.key, isAllowed)}
                               className={`inline-flex items-center justify-center p-1.5 rounded-xl border transition-all ${
-                                isAdminRole
+                                isLockedAdmin
                                   ? 'bg-emerald-50 border-emerald-200 text-emerald-600 cursor-not-allowed opacity-80'
                                   : isAllowed
                                   ? 'bg-indigo-600 border-indigo-700 text-white shadow-sm hover:bg-indigo-700 active:scale-95'
                                   : 'bg-gray-100 border-gray-300 text-gray-400 hover:bg-gray-200 hover:text-gray-600 active:scale-95'
                               }`}
                               title={
-                                isAdminRole
-                                  ? 'Admin luôn có tất cả quyền hạn'
+                                isLockedAdmin
+                                  ? 'Admin luôn có tất cả quyền hạn thông thường'
                                   : isAllowed
                                   ? `Bấm để tắt quyền ${feat.name} của ${selectedRoleForGroup} nhóm ${grp}`
                                   : `Bấm để bật quyền ${feat.name} cho ${selectedRoleForGroup} nhóm ${grp}`

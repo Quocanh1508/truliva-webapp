@@ -60,12 +60,15 @@ export default function Layout() {
 
     const items: any[] = [];
     
-    if (user.role === 'DEV') {
-      items.push(
-        { name: 'Quản lý & Bắn ZNS', path: '/dev/zns-manage', icon: <Send size={20} /> },
-        { name: 'Sơ đồ hệ thống', path: '/dev/system-map', icon: <Network size={20} /> },
-        { name: 'Phản hồi người dùng', path: '/dev/feedbacks', icon: <MessageSquare size={20} /> }
-      );
+    // Công cụ Dev (mặc định bật cho role DEV, hoặc user/admin được cấp quyền trong ma trận)
+    if (hasPermission('DEV_ZNS_MANAGE')) {
+      items.push({ name: 'Quản lý & Bắn ZNS', path: '/dev/zns-manage', icon: <Send size={20} /> });
+    }
+    if (hasPermission('DEV_SYSTEM_MAP')) {
+      items.push({ name: 'Sơ đồ hệ thống', path: '/dev/system-map', icon: <Network size={20} /> });
+    }
+    if (hasPermission('DEV_FEEDBACK_MANAGE')) {
+      items.push({ name: 'Phản hồi người dùng', path: '/dev/feedbacks', icon: <MessageSquare size={20} /> });
     }
     
     if (user.role === 'KTV') {

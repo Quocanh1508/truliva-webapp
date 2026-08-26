@@ -5,6 +5,8 @@ export interface SystemFeature {
   name: string;
   description: string;
   defaultRoles: string[];
+  /** Nếu true, chỉ hiển thị cho DEV và tự động bật cho role DEV. Không hiện trong ma trận phân quyền Admin. */
+  devOnly?: boolean;
 }
 
 export const SYSTEM_MODULES = [
@@ -14,7 +16,8 @@ export const SYSTEM_MODULES = [
   { id: 'reports', name: '📝 Quản lý Báo cáo Kỹ thuật' },
   { id: 'salaries', name: '💰 Quản lý Lương & Chi phí KTV' },
   { id: 'inventory', name: '📦 Quản lý Kho & Vật tư' },
-  { id: 'system', name: '⚙️ Quản lý Hệ thống & Nhân sự' }
+  { id: 'system', name: '⚙️ Quản lý Hệ thống & Nhân sự' },
+  { id: 'dev_tools', name: '🛠️ Công cụ Nhà phát triển (Dev Only)' }
 ];
 
 export const SYSTEM_ROLES: { key: string; label: string; badgeColor: string }[] = [
@@ -361,12 +364,46 @@ export const SYSTEM_FEATURES: SystemFeature[] = [
     name: 'Xem phản hồi & góp ý hệ thống',
     description: 'Xem danh sách góp ý lỗi và đóng góp ý kiến',
     defaultRoles: ['ADMIN', 'DEV']
+  },
+
+  // 7. Công cụ Nhà phát triển (Dev Only) — Tự động bật cho DEV, ẩn khỏi ma trận Admin
+  {
+    key: 'DEV_ZNS_MANAGE',
+    module: 'dev_tools',
+    moduleName: '🛠️ Công cụ Dev',
+    name: 'Quản lý & Bắn ZNS thủ công',
+    description: 'Gửi tin nhắn Zalo ZNS thủ công, tra cứu template và kiểm tra trạng thái gửi',
+    defaultRoles: ['DEV'],
+    devOnly: true
+  },
+  {
+    key: 'DEV_SYSTEM_MAP',
+    module: 'dev_tools',
+    moduleName: '🛠️ Công cụ Dev',
+    name: 'Sơ đồ hệ thống & Cấu trúc mã nguồn',
+    description: 'Xem sơ đồ mạng lưới trạm, giám sát sức khỏe live, quy trình SOP và cấu trúc codebase',
+    defaultRoles: ['DEV'],
+    devOnly: true
+  },
+  {
+    key: 'DEV_FEEDBACK_MANAGE',
+    module: 'dev_tools',
+    moduleName: '🛠️ Công cụ Dev',
+    name: 'Quản lý phản hồi người dùng (Dev)',
+    description: 'Xem, phân loại và xử lý phản hồi lỗi & góp ý từ người dùng hệ thống',
+    defaultRoles: ['DEV'],
+    devOnly: true
   }
 ];
 
 export function getDefaultPermission(role: string, featureKey: string): boolean {
-  if (role === 'ADMIN') return true;
   const feat = SYSTEM_FEATURES.find(f => f.key === featureKey);
   if (!feat) return false;
+  // Với tính năng devOnly: Mặc định bật cho DEV, không set mặc định cho ADMIN
+  if (feat.devOnly) {
+    return role === 'DEV';
+  }
+  // Với tính năng thông thường: Admin luôn có tất cả quyền
+  if (role === 'ADMIN') return true;
   return feat.defaultRoles.includes(role);
 }

@@ -622,3 +622,29 @@ model HotlineTicketFeedbackHistory {
   @@index([ticketId])
   @@map("hotline_ticket_feedback_history")
 }
+
+// ── Lịch sử phát tin nhắn Zalo ZNS ──
+model ZnsMessageLog {
+  id              String        @id @default(uuid())
+  messageId       String?       @map("message_id")
+  phone           String
+  serialNumber    String?       @map("serial_number")
+  customerName    String?       @map("customer_name")
+  productName     String?       @map("product_name")
+  templateId      String?       @default("617366") @map("template_id")
+  status          String        @default("SUCCESS") // "SUCCESS" | "FAILED"
+  error           String?
+  durationMs      String?       @map("duration_ms")
+  gateway         String?       @default("Zalo Direct ZBS OpenAPI")
+  orderNumber     String?       @map("order_number")
+  sentAt          DateTime      @default(now()) @map("sent_at")
+  rawData         Json?         @map("raw_data")
+  createdAt       DateTime      @default(now()) @map("created_at")
+
+  @@index([phone])
+  @@index([serialNumber])
+  @@index([messageId])
+  @@index([sentAt])
+  @@map("zns_message_logs")
+}
+

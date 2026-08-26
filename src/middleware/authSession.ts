@@ -100,11 +100,13 @@ export function requireAdmin(req: Request, res: Response, next: NextFunction): v
   next();
 }
 
-import { getDefaultPermission } from '../config/permissions';
+import { getDefaultPermission, SYSTEM_FEATURES } from '../config/permissions';
 import { UserRole } from '@prisma/client';
 
 export async function checkDynamicPermission(role: string, featureKey: string, group?: string | null): Promise<boolean> {
-  if (role === 'ADMIN') return true;
+  const feat = SYSTEM_FEATURES.find(f => f.key === featureKey);
+  // Admin luôn có tất cả quyền thông thường (trừ devOnly cần được cấp trong phân quyền)
+  if (role === 'ADMIN' && !feat?.devOnly) return true;
   try {
     const grp = (group || '').trim();
     // 1. Kiểm tra cấu hình riêng của Group nếu có
@@ -190,12 +192,24 @@ export function requireDashboardAccess(req: Request, res: Response, next: NextFu
 /**
  * Middleware kiểm tra quyền DEV.
  */
-export function requireDev(req: Request, res: Response, next: NextFunction): void {
-  if (req.user?.role !== 'DEV' && req.user?.role !== 'ADMIN') {
-    res.status(403).json({ error: 'Không có quyền truy cập. Chỉ dành cho DEV/ADMIN.' });
+export async function requireDev(req: Request, res: Response, next: NextFunction): Promise<void> {
+  const role = req.user?.role;
+  if (!role) {
+    res.status(401).json({ error: 'Chưa đăng nhập' });
     return;
   }
-  next();
+  if (role === 'DEV' || role === 'ADMIN') {
+    next();
+    return;
+  }
+  const hasZns = await checkDynamicPermission(role, 'DEV_ZNS_MANAGE', req.user?.group);
+  const hasMap = await checkDynamicPermission(role, 'DEV_SYSTEM_MAP', req.user?.group);
+  const hasFb = await checkDynamicPermission(role, 'DEV_FEEDBACK_MANAGE', req.user?.group);
+  if (hasZns || hasMap || hasFb) {
+    next();
+    return;
+  }
+  res.status(403).json({ error: 'Không có quyền truy cập. Chỉ dành cho DEV/ADMIN.' });
 }
 
 /**

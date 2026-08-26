@@ -68,7 +68,10 @@ export const PermissionProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   const hasPermission = useCallback((featureKey: string): boolean => {
     if (!user) return false;
     const role = user.role;
-    if (role === 'ADMIN') return true; // Admin luôn có tất cả quyền
+    const feat = SYSTEM_FEATURES.find(f => f.key === featureKey);
+
+    // Admin luôn có tất cả quyền thông thường (trừ các tính năng devOnly cần kiểm tra cấu hình riêng)
+    if (role === 'ADMIN' && !feat?.devOnly) return true;
 
     // 1. Kiểm tra quyền riêng theo Nhóm nếu user có group
     const userGroup = user.group?.trim();

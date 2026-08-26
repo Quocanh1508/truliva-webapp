@@ -27,10 +27,10 @@ export default function ProtectedRoute({ allowedRoles, featureKey, requireDashbo
 
   // Ưu tiên kiểm tra quyền động qua PermissionContext
   let isAllowed = false;
-  if (user.role === 'ADMIN') {
-    isAllowed = true;
-  } else if (featureKey) {
+  if (featureKey) {
     isAllowed = hasPermission(featureKey);
+  } else if (user.role === 'ADMIN') {
+    isAllowed = true;
   } else if (allowedRoles) {
     isAllowed = allowedRoles.includes(user.role as UserRole);
   } else {

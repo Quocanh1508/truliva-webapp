@@ -373,9 +373,13 @@ export default function App() {
                 </Route>
 
                 {/* Dev Routes */}
-                <Route element={<ProtectedRoute allowedRoles={['DEV']} />}>
+                <Route element={<ProtectedRoute featureKey="DEV_FEEDBACK_MANAGE" allowedRoles={['DEV', 'ADMIN']} />}>
                   <Route path="/dev/feedbacks" element={<FeedbackList />} />
+                </Route>
+                <Route element={<ProtectedRoute featureKey="DEV_SYSTEM_MAP" allowedRoles={['DEV', 'ADMIN']} />}>
                   <Route path="/dev/system-map" element={<SystemMap />} />
+                </Route>
+                <Route element={<ProtectedRoute featureKey="DEV_ZNS_MANAGE" allowedRoles={['DEV', 'ADMIN']} />}>
                   <Route path="/dev/zns-manage" element={<ZnsManage />} />
                 </Route>
 

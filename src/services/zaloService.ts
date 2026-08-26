@@ -347,11 +347,74 @@ export async function sendZnsWarrantyActivation(
     }
 
     const durationMs = Date.now() - startTimeDirect;
-    logger.info('ZNS message sent successfully via Zalo Direct API', { trackingId: payload.tracking_id, messageId: data.data?.message_id, durationMs: `${durationMs}ms` });
+    logger.info('ZNS message sent successfully via Zalo Direct API', {
+      phone: formattedPhone,
+      serialNumber: cleanSerial,
+      customerName,
+      productName,
+      templateId: payload.template_id,
+      trackingId: payload.tracking_id,
+      messageId: data.data?.message_id,
+      durationMs: `${durationMs}ms`,
+      status: 'SUCCESS'
+    });
+
+    // Lưu vào bảng ZnsMessageLog trong Database
+    try {
+      await prisma.znsMessageLog.create({
+        data: {
+          messageId: data.data?.message_id || null,
+          phone: formattedPhone,
+          serialNumber: cleanSerial,
+          customerName,
+          productName,
+          templateId: payload.template_id,
+          status: 'SUCCESS',
+          durationMs: `${durationMs}ms`,
+          gateway: 'Zalo Direct ZBS OpenAPI',
+          sentAt: new Date(),
+          rawData: data
+        }
+      });
+    } catch (dbErr: any) {
+      logger.warn('Failed to save ZnsMessageLog to DB', { error: dbErr.message });
+    }
+
     return data;
   } catch (error: any) {
     const durationMs = Date.now() - startTimeDirect;
-    logger.error('Error sending ZNS message via Zalo Direct API', { error: error.message, details: error.response?.data, durationMs: `${durationMs}ms` });
+    logger.error('Error sending ZNS message via Zalo Direct API', {
+      phone: formattedPhone,
+      serialNumber: cleanSerial,
+      customerName,
+      productName,
+      templateId: payload.template_id,
+      trackingId: payload.tracking_id,
+      error: error.message,
+      details: error.response?.data,
+      durationMs: `${durationMs}ms`,
+      status: 'FAILED'
+    });
+
+    // Lưu lỗi vào bảng ZnsMessageLog trong Database
+    try {
+      await prisma.znsMessageLog.create({
+        data: {
+          phone: formattedPhone,
+          serialNumber: cleanSerial,
+          customerName,
+          productName,
+          templateId: payload.template_id,
+          status: 'FAILED',
+          error: error.message,
+          durationMs: `${durationMs}ms`,
+          gateway: 'Zalo Direct ZBS OpenAPI',
+          sentAt: new Date(),
+          rawData: { error: error.message, details: error.response?.data }
+        }
+      });
+    } catch (dbErr: any) {}
+
     throw error;
   }
 }

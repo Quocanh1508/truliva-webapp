@@ -29,7 +29,8 @@ import {
   activateManual,
   testZnsSend,
   checkZnsStatus,
-  getZnsLogs
+  getZnsLogs,
+  updateZnsLog
 } from '../controllers/serialController';
 
 cloudinary.config({
@@ -133,5 +134,6 @@ router.post('/activate-manual', requireSerialAccess, activateManual);
 router.post('/zns/test-send', requireDev, testZnsSend);
 router.post('/zns/check-status', requireDev, checkZnsStatus);
 router.get('/zns/logs', requireDev, getZnsLogs);
+router.put('/zns/logs/:id', requireDev, updateZnsLog);
 
 export default router;
