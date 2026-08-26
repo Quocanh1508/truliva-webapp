@@ -96,11 +96,19 @@ export default function MyOrders() {
     if (!user) return;
     const loadWeather = async () => {
       const stationName = user.techStation?.name || user.techStation?.mainStation?.name || '';
-      const wData = await fetchCurrentWeather(false, stationName);
+      const firstOrderAddress = orders.length > 0 ? (orders[0].shippingAddress?.city || orders[0].shippingAddress?.full_address || orders[0].address) : undefined;
+      const wData = await fetchCurrentWeather(false, stationName, firstOrderAddress);
       if (wData) setWeather(wData);
     };
     loadWeather();
-  }, [user]);
+
+    // Tự động làm mới dữ liệu thời tiết mỗi 15 phút
+    const weatherInterval = setInterval(() => {
+      loadWeather();
+    }, 15 * 60 * 1000);
+
+    return () => clearInterval(weatherInterval);
+  }, [user, orders.length > 0 ? orders[0]?.id : null]);
 
   useEffect(() => {
     const handleOnline = () => {
@@ -185,16 +193,22 @@ export default function MyOrders() {
 
   const getWeatherAlert = () => {
     if (!weather) return null;
-    const isRainy = [51, 53, 55, 56, 57, 61, 63, 65, 66, 67, 80, 81, 82].includes(weather.weatherCode);
-    const isThunderstorm = [95, 96, 99].includes(weather.weatherCode);
-    const isHot = weather.temperature >= 35;
+    const isRainy = (weather.precipitation !== undefined && weather.precipitation > 0) ||
+      (weather.rain !== undefined && weather.rain > 0) ||
+      (weather.showers !== undefined && weather.showers > 0) ||
+      [51, 53, 55, 56, 57, 61, 63, 65, 66, 67, 80, 81, 82].includes(weather.weatherCode);
+    const isThunderstorm = [95, 96, 99].includes(weather.weatherCode) || (weather.windSpeed !== undefined && weather.windSpeed >= 35);
+    const isHot = weather.temperature >= 35 || (weather.apparentTemperature !== undefined && weather.apparentTemperature >= 37);
+
+    const tempStr = `${weather.temperature}°C${weather.apparentTemperature && weather.apparentTemperature !== weather.temperature ? ` (cảm giác ${weather.apparentTemperature}°C)` : ''}`;
+    const loc = weather.locationName || 'khu vực';
 
     if (isThunderstorm) {
       return {
         bg: 'bg-red-50 border-red-200',
         text: 'text-red-800 border-red-200',
         icon: '⛈️',
-        message: `Khu vực hiện tại có dông bão (${weather.temperature}°C). Anh/chị chú ý an toàn khi di chuyển và bảo quản kỹ thiết bị điện nhé!`
+        message: `Tại ${loc} đang có dông bão / gió lớn (${tempStr}${weather.windSpeed ? `, gió ${weather.windSpeed}km/h` : ''}). Anh/chị chú ý an toàn khi di chuyển và bảo quản kỹ thiết bị điện nhé!`
       };
     }
     if (isRainy) {
@@ -202,7 +216,7 @@ export default function MyOrders() {
         bg: 'bg-indigo-50 border-indigo-200',
         text: 'text-indigo-800 border-indigo-200',
         icon: '🌧️',
-        message: `Trời đang có mưa (${weather.temperature}°C). Anh/chị chú ý mang theo áo mưa và bảo quản cẩn thận hàng hóa khi đi giao nhé!`
+        message: `Tại ${loc} đang có mưa (${tempStr}${weather.precipitation ? `, lượng mưa ~${weather.precipitation}mm` : ''}). Anh/chị chú ý mang theo áo mưa và bảo quản cẩn thận hàng hóa khi đi giao nhé!`
       };
     }
     if (isHot) {
@@ -210,7 +224,7 @@ export default function MyOrders() {
         bg: 'bg-amber-50 border-amber-200',
         text: 'text-amber-800 border-amber-200',
         icon: '☀️',
-        message: `Thời tiết hôm nay nắng nóng gay gắt (${weather.temperature}°C). Anh/chị chú ý bổ sung nước đầy đủ và giữ gìn sức khỏe nhé!`
+        message: `Thời tiết tại ${loc} hôm nay nắng nóng gay gắt (${tempStr}${weather.humidity ? `, độ ẩm ${weather.humidity}%` : ''}). Anh/chị chú ý bổ sung nước đầy đủ và giữ gìn sức khỏe nhé!`
       };
     }
     return null;

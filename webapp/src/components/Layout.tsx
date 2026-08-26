@@ -26,6 +26,13 @@ export default function Layout() {
       if (data) setWeather(data);
     };
     loadWeather();
+
+    // Tự động làm mới dữ liệu thời tiết mỗi 15 phút
+    const weatherInterval = setInterval(() => {
+      loadWeather();
+    }, 15 * 60 * 1000);
+
+    return () => clearInterval(weatherInterval);
   }, [user]);
 
   useEffect(() => {
