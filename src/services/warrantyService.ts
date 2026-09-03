@@ -9,26 +9,6 @@ export interface ActivationCustomerInfo {
   invoiceImageUrl?: string | null;
 }
 
-/**
- * Trích xuất thời gian bảo hành (số tháng) từ ghi chú/note.
- * Nhận diện các mẫu: "bảo hành 24 tháng", "bh 12 thang", "BH 24T", "bh 2 năm", "bao hanh 1 nam", "bh 3n"
- */
-export function extractWarrantyMonths(note: string | null | undefined): number | null {
-  if (!note) return null;
-  const str = note.toLowerCase();
-  
-  const monthMatch = str.match(/(?:bảo hành|bh|bao hanh)\s*(\d{1,2})\s*(?:tháng|thang|t|m)\b/i);
-  if (monthMatch) {
-    return parseInt(monthMatch[1], 10);
-  }
-
-  const yearMatch = str.match(/(?:bảo hành|bh|bao hanh)\s*(\d{1,2})\s*(?:năm|nam|n)\b/i);
-  if (yearMatch) {
-    return parseInt(yearMatch[1], 10) * 12;
-  }
-
-  return null;
-}
 
 /**
  * Kích hoạt hoặc chuyển trạng thái chờ duyệt bảo hành cho một số Serial
@@ -90,8 +70,11 @@ export async function activateSerialWarranty(
     const startDate = manualStartDate || new Date();
     serialUpdate.activationDate = startDate;
 
-    // 1. Lấy thời gian bảo hành tiêu chuẩn từ WarrantyPolicy theo Model (Không tự động quét chữ trong ghi chú)
-    let standardMonths = 24; // 24 tháng mặc định
+    // 1. Lấy thời gian bảo hành tiêu chuẩn: Duy nhất UR5840 là 24 tháng (2 năm), các dòng khác 12 tháng (1 năm)
+    const isUR5840 = (existingSerial.model || '').toUpperCase().includes('UR5840') || 
+                     (existingSerial.productLine || '').toUpperCase().includes('UR5840');
+    let standardMonths = isUR5840 ? 24 : 12;
+
     const policies = await prisma.warrantyPolicy.findMany();
     const matchedPolicy = policies.find((p: any) => 
       existingSerial!.model.toLowerCase().includes(p.modelKeyword.toLowerCase())
@@ -122,27 +105,32 @@ export async function activateSerialWarranty(
     }
 
     if (appliedPromoCode) {
-      const promo = await prisma.warrantyPromo.findUnique({
-        where: { code: appliedPromoCode }
-      });
-
-      if (promo && !promo.isLocked) {
-        const now = new Date();
-        const isStarted = !promo.startDate || now >= new Date(promo.startDate);
-        const isNotExpired = !promo.endDate || now <= new Date(promo.endDate);
-        const isModelApplicable = !promo.applicableModels || 
-                                 promo.applicableModels.length === 0 || 
-                                 promo.applicableModels.some(kw => 
-                                   existingSerial.model.toLowerCase().includes(kw.toLowerCase())
-                                 );
-
-        if (isStarted && isNotExpired && isModelApplicable) {
-          promoMonths = promo.promoMonths;
-        } else {
-          appliedPromoCode = null; // Không áp dụng nếu không thỏa mãn điều kiện
-        }
+      // Dòng máy UR5840 đã có bảo hành mặc định 24 tháng, mã 12THANGBH không cộng dồn thành 36 tháng
+      if (isUR5840 && appliedPromoCode === '12THANGBH') {
+        promoMonths = 0;
       } else {
-        appliedPromoCode = null; // Không áp dụng nếu mã bị khóa hoặc không tồn tại
+        const promo = await prisma.warrantyPromo.findUnique({
+          where: { code: appliedPromoCode }
+        });
+
+        if (promo && !promo.isLocked) {
+          const now = new Date();
+          const isStarted = !promo.startDate || now >= new Date(promo.startDate);
+          const isNotExpired = !promo.endDate || now <= new Date(promo.endDate);
+          const isModelApplicable = !promo.applicableModels || 
+                                   promo.applicableModels.length === 0 || 
+                                   promo.applicableModels.some(kw => 
+                                     existingSerial.model.toLowerCase().includes(kw.toLowerCase())
+                                   );
+
+          if (isStarted && isNotExpired && isModelApplicable) {
+            promoMonths = promo.promoMonths;
+          } else {
+            appliedPromoCode = null; // Không áp dụng nếu không thỏa mãn điều kiện
+          }
+        } else {
+          appliedPromoCode = null; // Không áp dụng nếu mã bị khóa hoặc không tồn tại
+        }
       }
     }
 

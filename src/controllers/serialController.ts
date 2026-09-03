@@ -14,7 +14,7 @@ import {
   cleanSerialNumber,
   parseExcelDate
 } from '../services/serialService';
-import { activateSerialWarranty, extractWarrantyMonths } from '../services/warrantyService';
+import { activateSerialWarranty } from '../services/warrantyService';
 import { getZaloConfig, exchangeAuthorizationCode, sendZnsWarrantyActivation, getValidAccessToken } from '../services/zaloService';
 import { sendPushNotification } from '../services/notificationService';
 import { sendWebPushNotification } from '../services/webPushService';
@@ -1600,7 +1600,10 @@ export async function activateZns(req: Request, res: Response): Promise<void> {
     });
 
     const isFilterJob = (workType?.trim().toLowerCase() === 'thay lọc') || (warrantyMonths === 3);
-    const monthsToApply = isFilterJob ? 3 : (Number(warrantyMonths) || 12);
+    const isUR5840 = (existingSerial?.model || '').toUpperCase().includes('UR5840') || 
+                     (existingSerial?.productLine || '').toUpperCase().includes('UR5840');
+    const defaultMonths = isUR5840 ? 24 : 12;
+    const monthsToApply = isFilterJob ? 3 : (Number(warrantyMonths) || defaultMonths);
     const finalCustomerName = customerName?.trim() || existingSerial?.customerName || 'Quý Khách';
     const finalProductName = productName?.trim() || existingSerial?.productLine || existingSerial?.model || (isFilterJob ? 'Lõi lọc nước Truliva' : 'Máy lọc nước Truliva');
 

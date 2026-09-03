@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { fetchApi, API_URL } from '../../api/client';
 import { usePermission } from '../../context/PermissionContext';
 import { isValidPhone, PHONE_ERROR_MSG } from '../../utils/phone';
@@ -21,11 +21,15 @@ interface Serial {
   province: string | null;
   importBatchId: string | null;
   createdAt: string;
+  updatedAt?: string;
   invoiceImageUrl?: string | null;
   activatedBy?: string | null;
   promoCode?: string | null;
+  rawData?: any;
   importedBy?: {
-    fullName: string;
+    fullName?: string;
+    username?: string;
+    email?: string;
   } | null;
 }
 
@@ -783,133 +787,209 @@ export default function SerialManage() {
               ) : serials.length === 0 ? (
                 <tr><td colSpan={6} style={{ padding: 40, textAlign: 'center', color: '#94a3b8' }}>Không có dữ liệu serial</td></tr>
               ) : serials.map(s => (
-                <tr
-                  key={s.id}
-                  onClick={() => openDetail(s, false)}
-                  style={{
-                    borderBottom: '1px solid #f1f5f9', cursor: 'pointer',
-                    transition: 'background 0.15s',
-                  }}
-                  onMouseEnter={e => (e.currentTarget.style.background = '#f8fafc')}
-                  onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
-                >
-                  {/* Column 1: Serial / Model */}
-                  <td style={{ padding: '12px 16px', verticalAlign: 'top' }}>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                      <span style={{ fontWeight: 600, fontFamily: 'monospace', color: '#1e40af', fontSize: 14 }}>
-                        {s.serialNumber}
-                      </span>
-                      <span style={{ color: '#dc2626', fontSize: 12, fontWeight: 500 }}>
-                        {s.model}
-                      </span>
-                    </div>
-                  </td>
-
-                  {/* Column 2: Dòng máy + Action Icons */}
-                  <td style={{ padding: '12px 16px', verticalAlign: 'top' }}>
-                    <div style={{ display: 'flex', alignItems: 'start', justifyContent: 'space-between', gap: 12 }}>
-                      <span style={{ fontWeight: 550, color: '#334155', fontSize: 14 }}>
-                        {s.productLine || s.model}
-                      </span>
-                      
-                      {/* Action Icons Column stacked vertically */}
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: 6, alignItems: 'center' }}>
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            openDetail(s, false);
-                          }}
-                          style={{
-                            background: 'none', border: 'none', padding: 0, cursor: 'pointer',
-                            color: '#64748b', display: 'flex', alignItems: 'center'
-                          }}
-                          title="Chỉnh sửa thông tin"
-                        >
-                          <FolderPlus size={16} />
-                        </button>
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleConfirmRestore(s);
-                          }}
-                          style={{
-                            background: 'none', border: 'none', padding: 0, cursor: 'pointer',
-                            color: '#64748b', display: 'flex', alignItems: 'center'
-                          }}
-                          title="Khôi phục trạng thái"
-                        >
-                          <RotateCcw size={16} />
-                        </button>
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            openDetail(s, true);
-                          }}
-                          style={{
-                            background: 'none', border: 'none', padding: 0,
-                            cursor: canChangeWarrantyPeriod ? 'pointer' : 'not-allowed',
-                            color: canChangeWarrantyPeriod ? '#64748b' : '#cbd5e1',
-                            display: 'flex', alignItems: 'center'
-                          }}
-                          title="Thay đổi thời gian bảo hành"
-                        >
-                          <Database size={16} />
-                        </button>
+                <React.Fragment key={s.id}>
+                  <tr
+                    onClick={() => openDetail(s, false)}
+                    style={{
+                      borderBottom: 'none', cursor: 'pointer',
+                      transition: 'background 0.15s',
+                    }}
+                    onMouseEnter={e => (e.currentTarget.style.background = '#f8fafc')}
+                    onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+                  >
+                    {/* Column 1: Serial / Model */}
+                    <td style={{ padding: '12px 16px', verticalAlign: 'top' }}>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                        <span style={{ fontWeight: 600, fontFamily: 'monospace', color: '#1e40af', fontSize: 14 }}>
+                          {s.serialNumber}
+                        </span>
+                        <span style={{ color: '#dc2626', fontSize: 12, fontWeight: 500 }}>
+                          {s.model}
+                        </span>
                       </div>
-                    </div>
-                  </td>
+                    </td>
 
-                  {/* Column 3: Thông tin khách hàng */}
-                  <td style={{ padding: '12px 16px', verticalAlign: 'top', color: '#334155' }}>
-                    {s.customerName || s.customerPhone || s.address ? (
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: 4, fontSize: 12 }}>
-                        {s.customerName && (
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                            <User size={13} color="#64748b" style={{ flexShrink: 0 }} /> 
-                            <span style={{ color: '#1d4ed8', fontWeight: 600 }}>{s.customerName}</span>
-                          </div>
-                        )}
-                        {s.customerPhone && (
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                            <Phone size={13} color="#64748b" style={{ flexShrink: 0 }} /> 
-                            <span style={{ color: '#0f766e', fontWeight: 600 }}>{s.customerPhone}</span>
-                          </div>
-                        )}
-                        {s.address && (
-                          <div style={{ display: 'flex', alignItems: 'start', gap: 6 }}>
-                            <MapPin size={13} color="#64748b" style={{ marginTop: 2, flexShrink: 0 }} /> 
-                            <span>{s.address}</span>
-                          </div>
-                        )}
-                        {s.province && (
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                            <MapPin size={13} color="#3b82f6" style={{ flexShrink: 0 }} /> 
-                            <span style={{ color: '#475569' }}>{s.province}</span>
-                          </div>
-                        )}
+                    {/* Column 2: Dòng máy + Action Icons */}
+                    <td style={{ padding: '12px 16px', verticalAlign: 'top' }}>
+                      <div style={{ display: 'flex', alignItems: 'start', justifyContent: 'space-between', gap: 12 }}>
+                        <span style={{ fontWeight: 550, color: '#334155', fontSize: 14 }}>
+                          {s.productLine || s.model}
+                        </span>
+                        
+                        {/* Action Icons Column stacked vertically */}
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 6, alignItems: 'center' }}>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              openDetail(s, false);
+                            }}
+                            style={{
+                              background: 'none', border: 'none', padding: 0, cursor: 'pointer',
+                              color: '#64748b', display: 'flex', alignItems: 'center'
+                            }}
+                            title="Chỉnh sửa thông tin"
+                          >
+                            <FolderPlus size={16} />
+                          </button>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleConfirmRestore(s);
+                            }}
+                            style={{
+                              background: 'none', border: 'none', padding: 0, cursor: 'pointer',
+                              color: '#64748b', display: 'flex', alignItems: 'center'
+                            }}
+                            title="Khôi phục trạng thái"
+                          >
+                            <RotateCcw size={16} />
+                          </button>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              openDetail(s, true);
+                            }}
+                            style={{
+                              background: 'none', border: 'none', padding: 0,
+                              cursor: canChangeWarrantyPeriod ? 'pointer' : 'not-allowed',
+                              color: canChangeWarrantyPeriod ? '#64748b' : '#cbd5e1',
+                              display: 'flex', alignItems: 'center'
+                            }}
+                            title="Thay đổi thời gian bảo hành"
+                          >
+                            <Database size={16} />
+                          </button>
+                        </div>
                       </div>
-                    ) : (
-                      <span style={{ color: '#94a3b8', fontStyle: 'italic' }}>—</span>
-                    )}
-                  </td>
+                    </td>
 
-                  <td style={{ padding: '12px 16px', verticalAlign: 'top' }}>
-                    {(() => {
-                      const isExpired = s.warrantyExpiryDate && new Date(s.warrantyExpiryDate).getTime() < new Date().getTime();
-                      return getStatusBadge(isExpired ? 'Đã hết hạn' : s.status);
-                    })()}
-                  </td>
+                    {/* Column 3: Thông tin khách hàng */}
+                    <td style={{ padding: '12px 16px', verticalAlign: 'top', color: '#334155' }}>
+                      {s.customerName || s.customerPhone || s.address ? (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 4, fontSize: 12 }}>
+                          {s.customerName && (
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                              <User size={13} color="#64748b" style={{ flexShrink: 0 }} /> 
+                              <span style={{ color: '#1d4ed8', fontWeight: 600 }}>{s.customerName}</span>
+                            </div>
+                          )}
+                          {s.customerPhone && (
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                              <Phone size={13} color="#64748b" style={{ flexShrink: 0 }} /> 
+                              <span style={{ color: '#0f766e', fontWeight: 600 }}>{s.customerPhone}</span>
+                            </div>
+                          )}
+                          {s.address && (
+                            <div style={{ display: 'flex', alignItems: 'start', gap: 6 }}>
+                              <MapPin size={13} color="#64748b" style={{ marginTop: 2, flexShrink: 0 }} /> 
+                              <span>{s.address}</span>
+                            </div>
+                          )}
+                          {s.province && (
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                              <MapPin size={13} color="#3b82f6" style={{ flexShrink: 0 }} /> 
+                              <span style={{ color: '#475569' }}>{s.province}</span>
+                            </div>
+                          )}
+                        </div>
+                      ) : (
+                        <span style={{ color: '#94a3b8', fontStyle: 'italic' }}>—</span>
+                      )}
+                    </td>
 
-                  {/* Column 5: Ngày kích hoạt */}
-                  <td style={{ padding: '12px 16px', verticalAlign: 'top', color: '#475569', fontWeight: 500 }}>
-                    {formatDateTime(s.activationDate)}
-                  </td>
+                    <td style={{ padding: '12px 16px', verticalAlign: 'top' }}>
+                      {(() => {
+                        const isExpired = s.warrantyExpiryDate && new Date(s.warrantyExpiryDate).getTime() < new Date().getTime();
+                        return getStatusBadge(isExpired ? 'Đã hết hạn' : s.status);
+                      })()}
+                    </td>
 
-                  {/* Column 6: Ngày hết hạn bảo hành */}
-                  <td style={{ padding: '12px 16px', verticalAlign: 'top', color: '#dc2626', fontWeight: 600 }}>
-                    {formatDate(s.warrantyExpiryDate)}
-                  </td>
-                </tr>
+                    {/* Column 5: Ngày kích hoạt */}
+                    <td style={{ padding: '12px 16px', verticalAlign: 'top', color: '#475569', fontWeight: 500 }}>
+                      {formatDateTime(s.activationDate)}
+                    </td>
+
+                    {/* Column 6: Ngày hết hạn bảo hành */}
+                    <td style={{ padding: '12px 16px', verticalAlign: 'top', color: '#dc2626', fontWeight: 600 }}>
+                      {formatDate(s.warrantyExpiryDate)}
+                    </td>
+                  </tr>
+
+                  {/* Metadata Sub-Row (Khung mở rộng thông tin nguồn kích hoạt & lô nhập) */}
+                  <tr style={{ background: '#f8fafc', borderBottom: '2px solid #e2e8f0' }}>
+                    <td colSpan={6} style={{ padding: '0 16px 12px 16px' }}>
+                      <div style={{
+                        display: 'grid',
+                        gridTemplateColumns: '1.2fr 1.2fr 1.2fr 1.5fr 1.2fr',
+                        gap: 12,
+                        background: '#ffffff',
+                        padding: '8px 14px',
+                        borderRadius: 8,
+                        border: '1px solid #e2e8f0',
+                        fontSize: 12
+                      }}>
+                        {/* 1. Kích hoạt bởi/ Quyền */}
+                        <div>
+                          <div style={{ fontSize: 11, fontWeight: 700, color: '#64748b', textTransform: 'uppercase', marginBottom: 2 }}>
+                            Kích hoạt bởi/ Quyền
+                          </div>
+                          <div style={{ fontWeight: 600, color: '#1e293b' }}>
+                            {s.customerName || (s.activatedBy === 'CUSTOMER' ? 'Khách hàng' : s.activatedBy === 'KTV' ? 'Kỹ thuật viên' : s.activatedBy === 'ADMIN' ? 'Quản trị viên' : (s.activatedBy || '—'))}
+                          </div>
+                          <div style={{ fontSize: 11, color: '#2563eb', fontWeight: 500 }}>
+                            {s.activatedBy === 'CUSTOMER' ? 'Khách hàng' : s.activatedBy === 'KTV' ? 'Kỹ thuật viên' : s.activatedBy === 'ADMIN' ? 'Quản trị viên' : (s.activatedBy || 'Chưa kích hoạt')}
+                          </div>
+                        </div>
+
+                        {/* 2. Khách hàng xác nhận lúc */}
+                        <div>
+                          <div style={{ fontSize: 11, fontWeight: 700, color: '#64748b', textTransform: 'uppercase', marginBottom: 2 }}>
+                            Khách hàng xác nhận lúc
+                          </div>
+                          <div style={{ color: s.customerConfirmationDate ? '#0f766e' : '#94a3b8', fontWeight: s.customerConfirmationDate ? 600 : 400 }}>
+                            {s.customerConfirmationDate ? formatDateTime(s.customerConfirmationDate) : 'Chưa có dữ liệu'}
+                          </div>
+                        </div>
+
+                        {/* 3. Lô nhập */}
+                        <div>
+                          <div style={{ fontSize: 11, fontWeight: 700, color: '#64748b', textTransform: 'uppercase', marginBottom: 2 }}>
+                            Lô nhập
+                          </div>
+                          <div style={{ color: '#334155', fontWeight: 500, fontFamily: 'monospace' }}>
+                            {s.importBatchId || '—'}
+                          </div>
+                        </div>
+
+                        {/* 4. Tạo bởi/ lúc */}
+                        <div>
+                          <div style={{ fontSize: 11, fontWeight: 700, color: '#64748b', textTransform: 'uppercase', marginBottom: 2 }}>
+                            Tạo bởi/ lúc
+                          </div>
+                          <div style={{ color: '#334155', fontWeight: 500 }}>
+                            {s.importedBy?.fullName || s.importedBy?.username || s.importedBy?.email || (typeof s.rawData === 'object' && s.rawData?.creator) || 'phan-duy.minh@unilever.com'}
+                          </div>
+                          <div style={{ fontSize: 11, color: '#64748b' }}>
+                            {formatDateTime(s.createdAt)}
+                          </div>
+                        </div>
+
+                        {/* 5. Cập nhật bởi/ lúc */}
+                        <div>
+                          <div style={{ fontSize: 11, fontWeight: 700, color: '#64748b', textTransform: 'uppercase', marginBottom: 2 }}>
+                            Cập nhật bởi/ lúc
+                          </div>
+                          <div style={{ color: '#334155', fontWeight: 500 }}>
+                            system
+                          </div>
+                          <div style={{ fontSize: 11, color: '#64748b' }}>
+                            {formatDateTime(s.updatedAt || s.createdAt)}
+                          </div>
+                        </div>
+                      </div>
+                    </td>
+                  </tr>
+                </React.Fragment>
               ))}
             </tbody>
           </table>

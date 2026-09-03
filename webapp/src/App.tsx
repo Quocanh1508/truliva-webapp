@@ -12,6 +12,7 @@ import ResetPasswordPage from './pages/ResetPasswordPage';
 import ProtectedRoute from './components/ProtectedRoute';
 import Layout from './components/Layout';
 import OfflineScreen from './components/OfflineScreen';
+import MaintenanceScreen from './components/MaintenanceScreen';
 
 // Shared Pages
 import ChangePasswordPage from './pages/ChangePasswordPage';
@@ -306,6 +307,7 @@ export default function App() {
           <PushNotificationManager>
             <ConfirmProvider>
               <OfflineScreen />
+              <MaintenanceScreen />
               <Routes>
                 <Route path="/login" element={<LoginPage />} />
                 <Route path="/forgot-password" element={<ForgotPasswordPage />} />

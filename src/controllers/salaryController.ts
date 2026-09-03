@@ -821,9 +821,11 @@ export async function updateKtvRate(req: Request, res: Response): Promise<void> 
  */
 export async function addCustomCase(req: Request, res: Response): Promise<void> {
   try {
-    const { userId, customerName, customerPhone, province, workType, amount, note, month } = req.body;
+    const { userId, ktvUserId, customerName, customerPhone, province, workType, amount, otherCost, note, notes, month } = req.body;
+    const targetUserId = userId || ktvUserId;
+    const targetNote = note || notes;
 
-    if (!userId || !workType || !month) {
+    if (!targetUserId || !workType || !month) {
       res.status(400).json({ error: 'Thiếu thông tin bắt buộc (userId, workType, month)' });
       return;
     }
@@ -846,37 +848,45 @@ export async function addCustomCase(req: Request, res: Response): Promise<void> 
     }
 
     const hasAmount = amount !== undefined && amount !== null && amount !== '';
-    const customBaseCost = hasAmount ? Number(amount) : null;
+    const parsedAmount = hasAmount ? Number(String(amount).replace(/\D/g, '')) : 0;
+    const hasOtherCost = otherCost !== undefined && otherCost !== null && otherCost !== '';
+    const parsedOtherCost = hasOtherCost ? Number(String(otherCost).replace(/\D/g, '')) : 0;
 
     const customCostsObj: any = {};
+    if (parsedOtherCost > 0) {
+      customCostsObj.otherCost = parsedOtherCost;
+    }
+
+    let customBaseCost: number | null = null;
+
     if (rateType === 'other') {
-      customCostsObj.otherCost = hasAmount ? Number(amount) : 0;
-    } else if (rateType === 'baoHanh') {
-      customCostsObj.baoHanhCost = hasAmount ? Number(amount) : 0;
-    } else if (rateType === 'suaChua') {
-      customCostsObj.suaChuaCost = hasAmount ? Number(amount) : 0;
-    } else if (rateType === 'giaoHang') {
-      customCostsObj.giaoHangCost = hasAmount ? Number(amount) : 0;
-    } else if (rateType === 'lapDat') {
-      customCostsObj.lapDatCost = hasAmount ? Number(amount) : 0;
-    } else if (rateType === 'giaoHangLapDat') {
-      customCostsObj.giaoLapCost = hasAmount ? Number(amount) : 0;
-    } else if (rateType === 'thayLoc') {
-      customCostsObj.thayLocCost = hasAmount ? Number(amount) : 0;
+      if (parsedAmount > 0) {
+        customCostsObj.otherCost = (customCostsObj.otherCost || 0) + parsedAmount;
+      }
+    } else {
+      if (parsedAmount > 0) {
+        customBaseCost = parsedAmount;
+        if (rateType === 'baoHanh') customCostsObj.baoHanhCost = parsedAmount;
+        else if (rateType === 'suaChua') customCostsObj.suaChuaCost = parsedAmount;
+        else if (rateType === 'giaoHang') customCostsObj.giaoHangCost = parsedAmount;
+        else if (rateType === 'lapDat') customCostsObj.lapDatCost = parsedAmount;
+        else if (rateType === 'giaoHangLapDat') customCostsObj.giaoLapCost = parsedAmount;
+        else if (rateType === 'thayLoc') customCostsObj.thayLocCost = parsedAmount;
+      }
     }
 
     const report = await prisma.serviceReport.create({
       data: {
         month: targetMonth,
-        ktvUserId: userId,
-        reportedById: userId,
+        ktvUserId: targetUserId,
+        reportedById: targetUserId,
         customerName: customerName || 'Ca điều chỉnh bổ sung',
         customerPhone: customerPhone || '',
         province: province || 'Khác',
         workType: workType || 'Phí khác',
         serviceType: 'Phí bổ sung admin',
         approvalStatus: 'APPROVED',
-        notes: note || 'Do Admin thêm bổ sung thủ công',
+        notes: targetNote || 'Do Admin thêm bổ sung thủ công',
         customBaseCost,
         customCosts: Object.keys(customCostsObj).length > 0 ? customCostsObj : undefined,
         createdAt: reportDate
@@ -953,6 +963,9 @@ export async function updateBaseCost(req: Request, res: Response): Promise<void>
         data: { customBaseCost: val }
       });
     } else {
+      // Mọi cột cụ thể (baoHanhCost, suaChuaCost, giaoHangCost, lapDatCost, giaoLapCost, thayLocCost, distanceCost, otherCost)
+      // CHỈ CẬP NHẬT vào customCosts[fieldName]!
+      // TUYỆT ĐỐI KHÔNG ghi đè customBaseCost để đảm bảo tính độc lập 100% giữa các cột!
       const updatedCustomCosts = {
         ...existingCustomCosts,
         [fieldName]: val
@@ -960,7 +973,6 @@ export async function updateBaseCost(req: Request, res: Response): Promise<void>
       await prisma.serviceReport.update({
         where: { id: reportId },
         data: {
-          customBaseCost: val,
           customCosts: updatedCustomCosts
         }
       });

@@ -29,6 +29,7 @@ import zaloMiniAppRoutes from './routes/zaloMiniApp';
 import iotRoutes from './routes/iot';
 import permissionRoutes from './routes/permissions';
 import hotlineRoutes from './routes/hotlines';
+import comboRoutes from './routes/combos';
 import { startOrderSyncScheduler } from './services/orderSyncScheduler';
 import { startReportCleanupScheduler } from './services/reportCleanupScheduler';
 import { startPancakeRetryScheduler } from './services/pancakeRetryScheduler';
@@ -174,6 +175,7 @@ app.use('/api/zalo-miniapp', zaloMiniAppRoutes);
 app.use('/api/iot', iotRoutes);
 app.use('/api/permissions', permissionRoutes);
 app.use('/api/hotlines', hotlineRoutes);
+app.use('/api/combos', comboRoutes);
 
 // ── Serve uploaded images ──
 app.use('/uploads', express.static(path.join(process.cwd(), 'uploads'), {
@@ -255,6 +257,14 @@ const server = app.listen(PORT, () => {
       'GET  /api/reports',
       'GET  /uploads',
     ],
+  });
+
+  // Khởi tạo cache Combo definitions từ Database
+  const { initializeComboCache } = require('./services/comboService');
+  initializeComboCache().then(() => {
+    logger.info('[ComboService] Combo cache initialized on startup');
+  }).catch((err: any) => {
+    logger.error('[ComboService] Failed to initialize combo cache', { error: err.message });
   });
 
   // Khởi động lập lịch đồng bộ đơn hàng tự động từ Pancake POS

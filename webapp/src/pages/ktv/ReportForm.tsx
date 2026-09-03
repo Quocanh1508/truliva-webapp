@@ -663,7 +663,7 @@ export default function ReportForm() {
           serialNumber: activationData.serialNumber,
           recipientPhone: znsPhone.trim(),
           productName: activationData.productName,
-          warrantyMonths: activationData.workType?.trim().toLowerCase() === 'thay lọc' ? 3 : 12,
+          warrantyMonths: activationData.workType?.trim().toLowerCase() === 'thay lọc' ? 3 : (activationData.totalMonths || 12),
           workType: activationData.workType,
           customerName: activationData.customerName,
           expiryDateStr: warrantyExpiryDateStr
@@ -723,6 +723,7 @@ export default function ReportForm() {
       fetchApi(`/serials/public/preview-duration?model=${encodeURIComponent(modelName)}&orderId=${payload.orderId || ''}`)
         .then(res => {
           const totalM = (res && res.totalMonths) ? res.totalMonths : 12;
+          setActivationData((prev: any) => ({ ...prev, totalMonths: totalM }));
           let text = `${totalM} tháng`;
           if (res && res.promoMonths > 0) {
             text += ` (${res.standardMonths} tháng tiêu chuẩn + ${res.promoMonths} tháng khuyến mãi)`;

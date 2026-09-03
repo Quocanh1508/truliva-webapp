@@ -1,6 +1,6 @@
 import prisma from '../config/database';
 import logger from '../utils/logger';
-import { activateSerialWarranty, extractWarrantyMonths } from './warrantyService';
+import { activateSerialWarranty } from './warrantyService';
 import { sendZnsWarrantyActivation } from './zaloService';
 
 /**
@@ -63,7 +63,8 @@ export function getCellText(cell: any): string {
  */
 export async function getPreviewDuration(modelInput: string, orderId?: string) {
   const model = (modelInput || '').trim();
-  let standardMonths = 12;
+  const isUR5840 = model.toUpperCase().includes('UR5840');
+  let standardMonths = isUR5840 ? 24 : 12;
 
   if (model) {
     const policies = await prisma.warrantyPolicy.findMany();
@@ -83,9 +84,11 @@ export async function getPreviewDuration(modelInput: string, orderId?: string) {
       where: { id: orderId },
       select: { promoCode: true }
     });
-    if (order) {
-
-      if (order.promoCode) {
+    if (order && order.promoCode) {
+      if (isUR5840 && order.promoCode.trim().toUpperCase() === '12THANGBH') {
+        promoMonths = 0;
+        promoCode = order.promoCode;
+      } else {
         const promo = await prisma.warrantyPromo.findUnique({
           where: { code: order.promoCode }
         });
@@ -241,7 +244,7 @@ export async function getSerialsFiltered(params: {
       take: limit,
       include: {
         importedBy: {
-          select: { fullName: true }
+          select: { fullName: true, username: true, email: true }
         }
       }
     }),

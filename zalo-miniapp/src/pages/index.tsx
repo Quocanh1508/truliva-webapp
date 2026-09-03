@@ -16,7 +16,16 @@ import { getPhoneNumber, getUserInfo, getAccessToken, scanQRCode } from 'zmp-sdk
 import { fetchZaloApi, getSafeStorage, setSafeStorage } from '../api/client';
 import CustomerHome from './customer/CustomerHome';
 import CustomerProfile from './customer/CustomerProfile';
-import BottomNavBar from '../components/BottomNavBar';
+import ProductCatalog from './customer/ProductCatalog';
+import ProductDetail from './customer/ProductDetail';
+import CartPage from './customer/CartPage';
+import CheckoutPage from './customer/CheckoutPage';
+import OrderSuccessPage from './customer/OrderSuccessPage';
+import MyOrdersPage from './customer/MyOrdersPage';
+import BottomNavBar, { MainTabType } from '../components/BottomNavBar';
+import { useCart } from '../context/CartContext';
+
+type ShopSubView = 'catalog' | 'detail' | 'cart' | 'checkout' | 'success' | 'my_orders';
 
 export default function IndexPage() {
   const [loading, setLoading] = useState(true);
@@ -25,11 +34,20 @@ export default function IndexPage() {
   const [ktvOrders, setKtvOrders] = useState<any[]>([]);
   const [error, setError] = useState<string | null>(null);
 
-  // Tab State: 'home' | 'chat' | 'profile'
-  const [activeTab, setActiveTab] = useState<'home' | 'chat' | 'profile'>('home');
+  // Tab State: 'home' | 'shop' | 'chat' | 'profile'
+  const [activeTab, setActiveTab] = useState<MainTabType>('home');
+
+  // E-Commerce Sub-View State
+  const [shopSubView, setShopSubView] = useState<ShopSubView>('catalog');
+  const [selectedProduct, setSelectedProduct] = useState<any>(null);
+  const [checkoutVoucher, setCheckoutVoucher] = useState<string | undefined>(undefined);
+  const [orderSuccessData, setOrderSuccessData] = useState<any>(null);
+  const [vietQrInfo, setVietQrInfo] = useState<any>(null);
 
   // Dev simulation state
   const [testPhone, setTestPhone] = useState('0915185982');
+
+  const { addToCart } = useCart();
 
   const authenticateWithToken = async (phoneToken: string, userAccessToken?: string, zaloProfile?: any) => {
     setLoading(true);
@@ -99,32 +117,41 @@ export default function IndexPage() {
             avatar: userObj.avatar
           };
         }
-      } catch (infoErr) {
-        console.warn('Could not get Zalo user info:', infoErr);
+      } catch (profileErr) {
+        console.warn('Could not get Zalo user profile:', profileErr);
       }
 
-      const phoneToken = data?.number || data?.token || (data?.data && (data.data.number || data.data.token));
-      if (phoneToken) {
-        await authenticateWithToken(phoneToken, userAccessToken, zaloProfile);
+      if (data && data.token) {
+        await authenticateWithToken(data.token, userAccessToken, zaloProfile);
+      } else if (data && data.number) {
+        await authenticateWithToken(data.number, userAccessToken, zaloProfile);
       } else {
-        throw new Error('Không nhận được mã xác thực từ Zalo');
+        throw new Error('Không lấy được mã xác thực Số điện thoại từ Zalo');
       }
-    } catch (sdkErr: any) {
-      console.warn('Zalo SDK Phone Auth Fallback:', sdkErr);
-      setError(sdkErr.message || 'Chưa thể xác thực qua Zalo. Vui lòng thử lại.');
-      setLoading(false);
+    } catch (err: any) {
+      console.error('Zalo Auth SDK Error:', err);
+      // Fallback dev test
+      if (testPhone) {
+        await authenticateWithToken(testPhone);
+      } else {
+        setError(err.message || 'Lỗi cấp quyền Zalo');
+        setLoading(false);
+      }
     }
   };
 
   const handleOpenScanner = async () => {
     try {
-      const data: any = await scanQRCode({});
-      const scannedContent = data?.content || data?.data || data?.result;
-      if (scannedContent) {
-        alert(`Đã quét mã thành công: ${scannedContent}`);
+      const scanResult: any = await scanQRCode({});
+      if (scanResult && scanResult.content) {
+        const content = scanResult.content;
+        const serialMatch = content.match(/serial=([A-Za-z0-9_-]+)/) || [null, content];
+        const extractedSerial = serialMatch[1];
+        window.location.href = `https://trulivaofficial.com/warranty-activate?serial=${encodeURIComponent(extractedSerial)}`;
       }
     } catch (err: any) {
-      console.warn('Scanner Error / Cancelled:', err);
+      console.warn('QR scan cancelled or not supported', err);
+      window.location.href = 'https://trulivaofficial.com/warranty-activate';
     }
   };
 
@@ -135,18 +162,17 @@ export default function IndexPage() {
     setMySerials([]);
     setKtvOrders([]);
     setActiveTab('home');
+    setShopSubView('catalog');
   };
 
   useEffect(() => {
-    // 1. Khôi phục nhanh từ Cache để không bị chớp màn hình / mất trạng thái
+    // 1. Kiểm tra cache người dùng
     const cachedUserStr = getSafeStorage('zalo_user_cache');
     if (cachedUserStr) {
       try {
         const cachedUser = JSON.parse(cachedUserStr);
-        if (cachedUser) {
-          setUser(cachedUser);
-          loadUserContent(cachedUser);
-        }
+        setUser(cachedUser);
+        loadUserContent(cachedUser);
       } catch (e) {}
     }
 
@@ -169,6 +195,33 @@ export default function IndexPage() {
       setLoading(false);
     }
   }, []);
+
+  // Handler khi chọn sản phẩm từ catalog
+  const handleSelectProduct = (product: any) => {
+    setSelectedProduct(product);
+    setShopSubView('detail');
+  };
+
+  // Handler khi nhấn "Mua ngay" trên trang chi tiết
+  const handleBuyNow = (product: any, quantity: number) => {
+    addToCart(product, quantity);
+    setShopSubView('checkout');
+  };
+
+  // Handler khi đặt hàng thành công
+  const handleOrderSuccess = (order: any, qrInfo?: any) => {
+    setOrderSuccessData(order);
+    setVietQrInfo(qrInfo);
+    setShopSubView('success');
+  };
+
+  // Handler chuyển tab chính
+  const handleTabChange = (tab: MainTabType) => {
+    setActiveTab(tab);
+    if (tab === 'shop') {
+      setShopSubView('catalog');
+    }
+  };
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-800 font-sans max-w-md mx-auto relative overflow-hidden">
@@ -208,17 +261,13 @@ export default function IndexPage() {
       {!loading && !user && !error && (
         <div className="p-4 pt-12 space-y-4">
           <div className="bg-gradient-to-br from-[#061226] via-[#0B2545] to-[#0F3866] text-white p-6 rounded-3xl shadow-xl text-center space-y-4 relative overflow-hidden">
-            {/* Water bubbles in login card */}
-            <div className="water-bubble w-4 h-4 left-[10%] bottom-1 bubble-anim-1"></div>
-            <div className="water-bubble w-5 h-5 right-[15%] bottom-2 bubble-anim-3"></div>
-
             <div className="p-4 bg-white/10 backdrop-blur-md rounded-2xl w-16 h-16 flex items-center justify-center mx-auto text-[#00D2FF] border border-[#00D2FF]/30 shadow-[0_0_15px_rgba(0,210,255,0.3)]">
               <ShieldCheck size={36} />
             </div>
             <div>
               <h1 className="font-black text-white text-lg tracking-tight">Hệ Thống Dịch Vụ Truliva</h1>
               <p className="text-xs text-sky-200 mt-1 leading-relaxed">
-                Đăng nhập bằng số điện thoại Zalo để nhận quà Vòng Quay May Mắn & Tra cứu bảo hành máy lọc nước.
+                Đăng nhập bằng số điện thoại Zalo để mua sắm máy lọc nước chính hãng & Tra cứu bảo hành điện tử.
               </p>
             </div>
 
@@ -257,6 +306,7 @@ export default function IndexPage() {
             user={null} 
             onOpenScanner={handleOpenScanner}
             onOpenWarranty={() => handle1ClickZaloAuth()} 
+            onGoToShop={() => handle1ClickZaloAuth()}
           />
         </div>
       )}
@@ -330,21 +380,94 @@ export default function IndexPage() {
       {/* Đã đăng nhập - Role Khách Hàng (Customer) */}
       {!loading && user && user.role !== 'KTV' && (
         <>
+          {/* TAB 1: Trang Chủ */}
           {activeTab === 'home' && (
             <CustomerHome 
               user={user} 
               onOpenScanner={handleOpenScanner}
-              onOpenWarranty={() => setActiveTab('profile')} 
+              onOpenWarranty={() => setActiveTab('profile')}
+              onGoToShop={() => {
+                setActiveTab('shop');
+                setShopSubView('catalog');
+              }}
             />
           )}
 
+          {/* TAB 2: Cửa Hàng & Luồng Mua Sắm (E-Commerce Flow) */}
+          {activeTab === 'shop' && (
+            <>
+              {shopSubView === 'catalog' && (
+                <ProductCatalog
+                  onSelectProduct={handleSelectProduct}
+                  onGoToCart={() => setShopSubView('cart')}
+                />
+              )}
+
+              {shopSubView === 'detail' && selectedProduct && (
+                <ProductDetail
+                  product={selectedProduct}
+                  onBack={() => setShopSubView('catalog')}
+                  onGoToCart={() => setShopSubView('cart')}
+                  onBuyNow={handleBuyNow}
+                />
+              )}
+
+              {shopSubView === 'cart' && (
+                <CartPage
+                  onBack={() => setShopSubView('catalog')}
+                  onGoToCheckout={(vCode) => {
+                    setCheckoutVoucher(vCode);
+                    setShopSubView('checkout');
+                  }}
+                  onExploreProducts={() => setShopSubView('catalog')}
+                />
+              )}
+
+              {shopSubView === 'checkout' && (
+                <CheckoutPage
+                  user={user}
+                  voucherCode={checkoutVoucher}
+                  onBack={() => setShopSubView('cart')}
+                  onOrderSuccess={handleOrderSuccess}
+                />
+              )}
+
+              {shopSubView === 'success' && (
+                <OrderSuccessPage
+                  orderData={orderSuccessData}
+                  vietQrInfo={vietQrInfo}
+                  onViewMyOrders={() => {
+                    setActiveTab('profile');
+                    setShopSubView('my_orders');
+                  }}
+                  onContinueShopping={() => setShopSubView('catalog')}
+                />
+              )}
+            </>
+          )}
+
+          {/* TAB 4: Cá Nhân */}
           {activeTab === 'profile' && (
-            <CustomerProfile 
-              user={user} 
-              mySerials={mySerials} 
-              onLogout={handleLogout} 
-              onOpenScanner={handleOpenScanner}
-            />
+            <>
+              {shopSubView === 'my_orders' ? (
+                <MyOrdersPage
+                  user={user}
+                  onBack={() => setShopSubView('catalog')}
+                  onExploreProducts={() => {
+                    setActiveTab('shop');
+                    setShopSubView('catalog');
+                  }}
+                />
+              ) : (
+                <CustomerProfile 
+                  user={user} 
+                  mySerials={mySerials} 
+                  onLogout={handleLogout} 
+                  onOpenScanner={handleOpenScanner}
+                  onViewMyOrders={() => setShopSubView('my_orders')}
+                />
+              )}
+            </>
           )}
         </>
       )}
@@ -353,7 +476,7 @@ export default function IndexPage() {
       {!loading && (
         <BottomNavBar 
           activeTab={activeTab} 
-          onChangeTab={(tab) => setActiveTab(tab)} 
+          onChangeTab={handleTabChange} 
         />
       )}
     </div>

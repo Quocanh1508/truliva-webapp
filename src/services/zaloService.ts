@@ -201,9 +201,7 @@ export async function sendZnsWarrantyActivation(
   const productName = options?.productName || serial?.productLine || serial?.model || (warrantyMonths === 3 ? 'Lõi lọc nước Truliva' : 'Máy lọc nước Truliva');
   
   let expiryDateStr = '';
-  if (options?.expiryDateStr) {
-    expiryDateStr = options.expiryDateStr;
-  } else if (warrantyMonths === 3) {
+  if (warrantyMonths === 3) {
     // Với ca thay lọc, thời hạn bảo hành lõi lọc luôn tính riêng 3 tháng kể từ thời điểm thực hiện
     const d = new Date();
     d.setMonth(d.getMonth() + 3);
@@ -212,11 +210,14 @@ export async function sendZnsWarrantyActivation(
     const year = d.getFullYear();
     expiryDateStr = `${day}/${month}/${year}`;
   } else if (serial?.warrantyExpiryDate) {
+    // Luôn ưu tiên lấy ngày hết hạn thực tế từ Database (đã được tính chính xác gồm cả Tiêu chuẩn POS + Khuyến mãi)
     const d = new Date(serial.warrantyExpiryDate);
     const day = String(d.getDate()).padStart(2, '0');
     const month = String(d.getMonth() + 1).padStart(2, '0');
     const year = d.getFullYear();
     expiryDateStr = `${day}/${month}/${year}`;
+  } else if (options?.expiryDateStr) {
+    expiryDateStr = options.expiryDateStr;
   } else {
     // Tự động cộng N tháng kể từ ngày hoàn thành / ngày kích hoạt
     const d = new Date();

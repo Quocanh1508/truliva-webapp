@@ -43,3 +43,22 @@ Dưới đây là các đúc kết thực tế để tối ưu hóa việc deplo
 ## 6. Bảo Tồn API Contract & Kiểm Thử Payload Sâu (Mandatory JSON Schema Verification)
 - **Kiểm tra Frontend trước khi sửa Backend Route/Controller**: Trước khi tái cấu trúc tệp Controller/Route, BẮT BUỘC dùng `grep_search` quét file React trong `webapp/src` để đọc chính xác tên thuộc tính JSON mà UI đang chờ (`res.data.salaries`, `res.data.reports`, ...). CẤM đổi tên thuộc tính JSON trả về.
 - **Nghiệm thu HTTP Payload thực tế**: Lệnh test verification HTTP không chỉ kiểm tra server trả về mã HTTP status 200/401, mà BẮT BUỘC phải parse JSON và verify tên thuộc tính của đối tượng mảng trả về khớp 100% với Frontend.
+
+## 7. NGUYÊN TẮC BẤT DI BẤT DỊCH: TUYỆT ĐỐI KHÔNG XÓA DỮ LIỆU (ZERO HARD-DELETE POLICY)
+- **CẤM TUYỆT ĐỐI mọi hình thức Hard Delete**:
+  - KHÔNG BAO GIỜ được sử dụng các lệnh xóa vật lý trong toàn bộ hệ thống (bao gồm Backend API, Controller, Service, Cronjob và tất cả các Script xử lý dữ liệu trong `scratch/`):
+    - CẤM `prisma.<model>.delete()`
+    - CẤM `prisma.<model>.deleteMany()`
+    - CẤM SQL `DELETE FROM <table>`
+    - CẤM SQL `TRUNCATE TABLE <table>`
+    - CẤM SQL `DROP TABLE / DROP DATABASE` (ngoại trừ quy trình phục hồi khẩn cấp có pre-restore backup).
+- **Quy chuẩn Soft-Delete & Đổi trạng thái**:
+  - Khi người dùng hoặc hệ thống muốn hủy/bỏ một thực thể:
+    - Với Đơn hàng (`Order`): BẮT BUỘC chuyển `adminStatus = 'hủy đơn'`, cập nhật `cancelReason` và ghi nhận `AuditLog`.
+    - Với các thực thể khác (`Customer`, `User`, `Station`...): BẮT BUỘC sử dụng cơ chế Soft Delete (`isActive = false` hoặc `deletedAt = new Date()`, `status = 'INACTIVE'`).
+- **Bảo tồn Vĩnh viễn Báo cáo KTV (`ServiceReport`)**:
+  - Báo cáo KTV là tài sản chứng từ nghiệm thu (hình ảnh thi công, biên lai cước xe, serial máy, chi phí phát sinh). KHÔNG BAO GIỜ được xóa báo cáo. Nếu cần tách đơn, chỉ cập nhật `orderId = null` hoặc chuyển về đúng `orderId` thực tế.
+- **Ràng buộc đối với Script bảo trì / Cứu dữ liệu**:
+  - Mọi script can thiệp dữ liệu chỉ được dùng `findMany()`, `update()`, `updateMany()`.
+  - Mọi thao tác thay đổi trạng thái phải đi kèm bản ghi giải trình trong `AuditLog` với `action: 'data_fix'` hoặc `action: 'updated'` và `reason` rõ ràng.
+

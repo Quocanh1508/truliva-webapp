@@ -173,7 +173,10 @@ export async function buildReportFilter(query: any, user: any): Promise<any> {
     }
   }
 
-  if (month) where.month = month;
+  // When searching, don't restrict by month - the user wants to find a specific report
+  // regardless of which month it belongs to. This also prevents stale frontend filters
+  // (cached in sessionStorage) from hiding search results.
+  if (month && !search) where.month = month;
   if (province) where.province = { contains: province as string, mode: 'insensitive' };
   
   if (workTypes) {
@@ -266,43 +269,46 @@ export async function buildReportFilter(query: any, user: any): Promise<any> {
     where.AND.push({ OR: stationOrConditions });
   }
 
-  if (startDate || endDate) {
-    where.createdAt = {};
-    if (startDate) where.createdAt.gte = new Date(startDate as string);
-    if (endDate) {
-      const eDate = new Date(endDate as string);
-      eDate.setHours(23, 59, 59, 999);
-      where.createdAt.lte = eDate;
+  // When searching, skip date/time range filters to prevent stale cached filters from hiding results
+  if (!search) {
+    if (startDate || endDate) {
+      where.createdAt = {};
+      if (startDate) where.createdAt.gte = new Date(startDate as string);
+      if (endDate) {
+        const eDate = new Date(endDate as string);
+        eDate.setHours(23, 59, 59, 999);
+        where.createdAt.lte = eDate;
+      }
     }
-  }
 
-  if (completedStart || completedEnd) {
-    where.createdAt = where.createdAt || {};
-    if (completedStart) where.createdAt.gte = new Date(completedStart as string);
-    if (completedEnd) {
-      const eDate = new Date(completedEnd as string);
-      eDate.setHours(23, 59, 59, 999);
-      where.createdAt.lte = eDate;
+    if (completedStart || completedEnd) {
+      where.createdAt = where.createdAt || {};
+      if (completedStart) where.createdAt.gte = new Date(completedStart as string);
+      if (completedEnd) {
+        const eDate = new Date(completedEnd as string);
+        eDate.setHours(23, 59, 59, 999);
+        where.createdAt.lte = eDate;
+      }
     }
-  }
 
-  if (createdStart || createdEnd) {
-    where.createdAt = where.createdAt || {};
-    if (createdStart) where.createdAt.gte = new Date(createdStart as string);
-    if (createdEnd) {
-      const eDate = new Date(createdEnd as string);
-      eDate.setHours(23, 59, 59, 999);
-      where.createdAt.lte = eDate;
+    if (createdStart || createdEnd) {
+      where.createdAt = where.createdAt || {};
+      if (createdStart) where.createdAt.gte = new Date(createdStart as string);
+      if (createdEnd) {
+        const eDate = new Date(createdEnd as string);
+        eDate.setHours(23, 59, 59, 999);
+        where.createdAt.lte = eDate;
+      }
     }
-  }
 
-  if (updatedStart || updatedEnd) {
-    where.updatedAt = {};
-    if (updatedStart) where.updatedAt.gte = new Date(updatedStart as string);
-    if (updatedEnd) {
-      const eDate = new Date(updatedEnd as string);
-      eDate.setHours(23, 59, 59, 999);
-      where.updatedAt.lte = eDate;
+    if (updatedStart || updatedEnd) {
+      where.updatedAt = {};
+      if (updatedStart) where.updatedAt.gte = new Date(updatedStart as string);
+      if (updatedEnd) {
+        const eDate = new Date(updatedEnd as string);
+        eDate.setHours(23, 59, 59, 999);
+        where.updatedAt.lte = eDate;
+      }
     }
   }
 
@@ -320,6 +326,8 @@ export async function buildReportFilter(query: any, user: any): Promise<any> {
       if (!isNaN(parsed)) numSearch = parsed;
     }
 
+    const cleanPhone = s.replace(/\D/g, '').replace(/^84/, '').replace(/^0/, '');
+
     const searchConditions: any[] = [
       { customerName: { contains: s, mode: 'insensitive' } },
       { customerPhone: { contains: s, mode: 'insensitive' } },
@@ -328,8 +336,22 @@ export async function buildReportFilter(query: any, user: any): Promise<any> {
       { serialNumber: { contains: s, mode: 'insensitive' } },
       { notes: { contains: s, mode: 'insensitive' } },
       { ktvUser: { fullName: { contains: s, mode: 'insensitive' } } },
-      { order: { note: { contains: s, mode: 'insensitive' } } }
+      { order: { note: { contains: s, mode: 'insensitive' } } },
+      { order: { billPhoneNumber: { contains: s, mode: 'insensitive' } } },
+      { order: { customer: { fullName: { contains: s, mode: 'insensitive' } } } },
+      { order: { customer: { phoneNumber: { contains: s, mode: 'insensitive' } } } }
     ];
+
+    if (cleanPhone && cleanPhone.length >= 7) {
+      searchConditions.push({ customerPhone: { contains: cleanPhone, mode: 'insensitive' } });
+      searchConditions.push({ order: { billPhoneNumber: { contains: cleanPhone, mode: 'insensitive' } } });
+      searchConditions.push({ order: { customer: { phoneNumber: { contains: cleanPhone, mode: 'insensitive' } } } });
+    }
+
+    if (s.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i)) {
+      searchConditions.push({ id: s });
+      searchConditions.push({ orderId: s });
+    }
 
     if (numSearch !== null) {
       searchConditions.push({ order: { pancakeOrderId: numSearch } });
@@ -341,3 +363,4 @@ export async function buildReportFilter(query: any, user: any): Promise<any> {
 
   return where;
 }
+

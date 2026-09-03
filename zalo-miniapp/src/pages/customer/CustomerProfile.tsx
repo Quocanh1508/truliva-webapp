@@ -17,13 +17,18 @@ import {
   Crown,
   Award,
   Gem,
-  Sparkles
+  Sparkles,
+  ShoppingBag,
+  Building2,
+  FileText,
+  Scale
 } from 'lucide-react';
 import { openWebview, openChat } from 'zmp-sdk/apis';
 import { getCustomerRank, MemberTier, RANK_CONFIGS, NEXT_TIER_ORDER } from '../../utils/memberRank';
 import CustomerVoucherModal from '../../components/CustomerVoucherModal';
 import CustomerHistoryModal from '../../components/CustomerHistoryModal';
 import CustomerLoyaltyModal from '../../components/CustomerLoyaltyModal';
+import LegalPagesModal, { LegalDocType } from '../../components/LegalPagesModal';
 import P3ROceanHeader from '../../components/P3ROceanHeader';
 
 interface CustomerProfileProps {
@@ -31,13 +36,24 @@ interface CustomerProfileProps {
   mySerials: any[];
   onLogout?: () => void;
   onOpenScanner?: () => void;
+  onViewMyOrders?: () => void;
 }
 
-export default function CustomerProfile({ user, mySerials, onLogout, onOpenScanner }: CustomerProfileProps) {
+export default function CustomerProfile({ 
+  user, 
+  mySerials, 
+  onLogout, 
+  onOpenScanner,
+  onViewMyOrders 
+}: CustomerProfileProps) {
   const [overrideTier, setOverrideTier] = useState<MemberTier | null>(null);
   const [showVoucherModal, setShowVoucherModal] = useState(false);
   const [showHistoryModal, setShowHistoryModal] = useState(false);
   const [showLoyaltyModal, setShowLoyaltyModal] = useState(false);
+
+  // Legal Modal
+  const [showLegalModal, setShowLegalModal] = useState(false);
+  const [legalDocType, setLegalDocType] = useState<LegalDocType>('TERMS');
   
   const devicesSectionRef = useRef<HTMLDivElement>(null);
 
@@ -59,7 +75,7 @@ export default function CustomerProfile({ user, mySerials, onLogout, onOpenScann
       : 'https://trulivaofficial.com/warranty-activate';
     try {
       await openWebview({ url });
-    } catch (err) {
+    } catch {
       window.open(url, '_blank');
     }
   };
@@ -79,9 +95,14 @@ export default function CustomerProfile({ user, mySerials, onLogout, onOpenScann
     devicesSectionRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
 
+  const handleOpenLegal = (type: LegalDocType) => {
+    setLegalDocType(type);
+    setShowLegalModal(true);
+  };
+
   return (
-    <div className="pb-24 bg-slate-50 min-h-screen">
-      {/* 1. Header Profile Card with Persona 3 Reload Ocean Waves & Caustics */}
+    <div className="pb-28 bg-slate-50 min-h-screen font-sans">
+      {/* 1. Header Profile Card with Persona 3 Reload Ocean Waves */}
       <P3ROceanHeader className="p-5 pt-5 pb-10">
         <div className="max-w-md mx-auto space-y-4">
           <div className="flex items-center space-x-4">
@@ -106,7 +127,7 @@ export default function CustomerProfile({ user, mySerials, onLogout, onOpenScann
                 {userPhone}
               </p>
               
-              {/* Dynamic Rank Badge (Click to Preview all tiers) */}
+              {/* Dynamic Rank Badge */}
               <button 
                 onClick={handleCycleTier}
                 title="Nhấn để đổi xem màu các hạng thành viên: Đồng ➔ Bạc ➔ Vàng ➔ Kim Cương"
@@ -128,7 +149,7 @@ export default function CustomerProfile({ user, mySerials, onLogout, onOpenScann
             </div>
           </div>
 
-          {/* Quick Stats Grid (Interactive P3R HUD Panel with Neon Border) */}
+          {/* Quick Stats Grid */}
           <div className="grid grid-cols-3 gap-2 bg-[#041426]/70 backdrop-blur-md rounded-2xl p-2.5 text-center border border-cyan-400/30 text-xs shadow-[0_4px_20px_rgba(0,210,255,0.15)]">
             <button 
               onClick={scrollToDevices}
@@ -158,104 +179,102 @@ export default function CustomerProfile({ user, mySerials, onLogout, onOpenScann
       </P3ROceanHeader>
 
       <div className="max-w-md mx-auto px-4 mt-4 space-y-4">
-        
-        {/* 2. Section Máy lọc nước của tôi */}
-        <div ref={devicesSectionRef} className="space-y-2.5 scroll-mt-6">
-          <div className="flex justify-between items-center">
-            <div className="flex items-center space-x-1.5">
-              <div className="w-1.5 h-4 bg-[#0284C7] rounded-full"></div>
-              <h2 className="text-xs font-black text-slate-800 uppercase tracking-wider">
-                MÁY LỌC NƯỚC CỦA TÔI ({(mySerials || []).length})
-              </h2>
+        {/* 2. My Devices Section */}
+        <div ref={devicesSectionRef} className="space-y-3 scroll-mt-6">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-2">
+              <div className="p-1.5 bg-blue-100 text-[#1B3A6B] rounded-lg">
+                <Droplets size={16} />
+              </div>
+              <h2 className="text-sm font-bold text-slate-800 tracking-tight">Máy Lọc Nước Của Tôi</h2>
             </div>
-            <button 
-              onClick={() => handleBookMaintenance()}
-              className="text-xs text-[#0284C7] font-bold flex items-center hover:underline cursor-pointer tracking-tight"
-            >
-              <QrCode size={14} className="mr-1" />
-              Kích hoạt / Thêm máy
-            </button>
+            <span className="text-[11px] font-bold text-[#0284C7] bg-sky-50 px-2 py-0.5 rounded-full border border-sky-100">
+              {(mySerials || []).length} máy
+            </span>
           </div>
 
-          {!mySerials || mySerials.length === 0 ? (
-            <div className="bg-white p-6 rounded-3xl text-center text-xs text-slate-400 border border-slate-200/80 shadow-xs space-y-3">
-              <div className="w-14 h-14 mx-auto rounded-full bg-sky-50 flex items-center justify-center text-sky-500">
-                <Droplets size={28} />
+          {(mySerials || []).length === 0 ? (
+            <div className="bg-white rounded-3xl p-5 border border-sky-100 shadow-[0_4px_20px_rgba(27,58,107,0.06)] text-center space-y-3">
+              <div className="w-12 h-12 rounded-full bg-slate-50 text-slate-400 flex items-center justify-center mx-auto border border-slate-100">
+                <Droplets size={24} />
               </div>
               <div className="space-y-1">
-                <p className="font-bold text-slate-700 text-sm">Chưa có thiết bị liên kết</p>
-                <p className="text-slate-400 text-xs">Quét mã QR trên thân máy Truliva để kích hoạt bảo hành và theo dõi tuổi thọ lõi lọc.</p>
+                <p className="text-xs font-bold text-slate-700">Chưa có thiết bị nào kích hoạt</p>
+                <p className="text-[11px] text-slate-400 max-w-xs mx-auto leading-relaxed">
+                  Quét mã QR trên thân máy hoặc nhập số Serial để theo dõi bảo hành và tuổi thọ lõi lọc tự động.
+                </p>
               </div>
-              <button 
-                onClick={() => handleBookMaintenance()}
-                className="px-5 py-2.5 bg-gradient-to-r from-[#1B3A6B] to-[#0284C7] hover:from-[#0284C7] hover:to-[#00D2FF] text-white font-bold rounded-2xl text-xs shadow-xs active:scale-95 transition-all cursor-pointer inline-flex items-center space-x-1.5"
-              >
-                <QrCode size={14} />
-                <span>Kích hoạt bảo hành điện tử ngay</span>
-              </button>
+              {onOpenScanner && (
+                <button
+                  onClick={onOpenScanner}
+                  className="inline-flex items-center space-x-2 px-4 py-2 bg-[#1B3A6B] hover:bg-[#152e55] text-white rounded-xl text-xs font-bold shadow-xs active:scale-95 transition-all cursor-pointer"
+                >
+                  <QrCode size={14} />
+                  <span>Quét mã QR thân máy</span>
+                </button>
+              )}
             </div>
           ) : (
-            (mySerials || []).map((s) => (
-              <div key={s.id} className="bg-white p-4 rounded-3xl border border-sky-100 shadow-[0_4px_20px_rgba(27,58,107,0.06)] space-y-3">
-                <div className="flex justify-between items-start">
+            mySerials.map((s, idx) => (
+              <div key={idx} className="bg-white rounded-3xl p-4 border border-sky-100 shadow-[0_4px_20px_rgba(27,58,107,0.06)] space-y-3">
+                <div className="flex items-start justify-between">
                   <div>
-                    <span className="bg-emerald-50 text-emerald-700 border border-emerald-200/80 px-2 py-0.5 rounded-md text-[10px] font-bold inline-flex items-center space-x-1">
-                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
-                      <span>{s.status || 'Bảo hành chính hãng'}</span>
-                    </span>
-                    <h3 className="font-bold text-slate-900 text-sm mt-1">{s.model || 'Máy lọc nước Truliva Smart RO'}</h3>
-                    <p className="text-xs font-mono text-[#0284C7] mt-0.5">Serial: {s.serialNumber}</p>
+                    <h3 className="font-bold text-slate-800 text-xs">{s.model || s.productLine || 'Máy lọc nước Truliva'}</h3>
+                    <p className="text-[11px] text-slate-400 font-mono mt-0.5">Serial: {s.serialNumber}</p>
                   </div>
-                  <div className="p-2.5 bg-sky-50 text-[#0284C7] rounded-2xl border border-sky-100 shadow-xs">
-                    <ShieldCheck size={22} />
+                  <span className="text-[10px] font-bold px-2 py-0.5 bg-emerald-50 text-emerald-700 rounded-full border border-emerald-100">
+                    {s.status || 'Đang hoạt động'}
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2 text-[11px] bg-slate-50 p-2.5 rounded-2xl border border-slate-100">
+                  <div>
+                    <p className="text-slate-400 text-[10px]">Ngày kích hoạt</p>
+                    <p className="font-semibold text-slate-700 mt-0.5">
+                      {s.activationDate ? new Date(s.activationDate).toLocaleDateString('vi-VN') : 'Mới lắp đặt'}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-slate-400 text-[10px]">Hạn bảo hành</p>
+                    <p className="font-semibold text-emerald-600 mt-0.5">
+                      {s.warrantyExpiryDate ? new Date(s.warrantyExpiryDate).toLocaleDateString('vi-VN') : '12 - 24 tháng'}
+                    </p>
                   </div>
                 </div>
 
-                {/* Filter Health Multi-Bars */}
-                <div className="bg-slate-50 p-3.5 rounded-2xl text-xs space-y-2.5 border border-slate-100">
-                  <div className="flex justify-between text-[11px] text-slate-600 font-medium">
-                    <span className="flex items-center"><Calendar size={13} className="mr-1 text-slate-400" />Hạn bảo hành máy:</span>
-                    <span className="font-bold text-slate-800">
-                      {s.warrantyExpiryDate ? new Date(s.warrantyExpiryDate).toLocaleDateString('vi-VN') : '12 Tháng'}
-                    </span>
-                  </div>
-
-                  <div className="space-y-1.5 pt-1 border-t border-slate-200/60">
-                    <div className="flex justify-between text-[10px] text-slate-600 font-semibold">
-                      <span>Lõi 1 (PP 5 Micron)</span>
-                      <span className="text-[#0284C7] font-bold">85% (Tốt)</span>
-                    </div>
-                    <div className="w-full bg-slate-200 h-2 rounded-full overflow-hidden">
-                      <div className="bg-gradient-to-r from-cyan-400 to-[#0284C7] h-full w-[85%] rounded-full"></div>
-                    </div>
-                  </div>
-
-                  <div className="space-y-1.5">
-                    <div className="flex justify-between text-[10px] text-slate-600 font-semibold">
-                      <span>Lõi 2 (CTO Than hoạt tính)</span>
-                      <span className="text-emerald-600 font-bold">75% (Tốt)</span>
-                    </div>
-                    <div className="w-full bg-slate-200 h-2 rounded-full overflow-hidden">
-                      <div className="bg-gradient-to-r from-emerald-400 to-teal-500 h-full w-[75%] rounded-full"></div>
-                    </div>
-                  </div>
-                </div>
-
-                <button 
+                <button
                   onClick={() => handleBookMaintenance(s.serialNumber)}
-                  className="w-full py-2.5 bg-sky-50 hover:bg-sky-100 active:scale-98 text-[#0284C7] border border-sky-200/70 rounded-2xl text-xs font-bold transition-all flex items-center justify-center space-x-1.5 cursor-pointer shadow-xs"
+                  className="w-full py-2 bg-sky-50 hover:bg-sky-100 text-[#0284C7] rounded-xl text-xs font-bold flex items-center justify-center space-x-1.5 transition-colors cursor-pointer border border-sky-100"
                 >
-                  <Wrench size={15} />
-                  <span>Đặt lịch KTV bảo trì / Thay lõi tận nhà</span>
+                  <Wrench size={14} />
+                  <span>Yêu cầu KTV bảo trì / Thay lõi</span>
                 </button>
               </div>
             ))
           )}
         </div>
 
-        {/* 3. Utility Actions List */}
+        {/* 3. E-Commerce & Service Actions List */}
         <div className="bg-white rounded-3xl border border-sky-100 shadow-[0_4px_20px_rgba(27,58,107,0.06)] divide-y divide-slate-100 text-xs overflow-hidden">
-          
+          {/* My Orders Button */}
+          {onViewMyOrders && (
+            <button 
+              onClick={onViewMyOrders}
+              className="w-full p-3.5 flex items-center justify-between text-slate-800 font-semibold hover:bg-slate-50 active:bg-slate-100 transition-colors cursor-pointer"
+            >
+              <div className="flex items-center space-x-3">
+                <div className="p-2.5 bg-blue-50 text-[#1B3A6B] rounded-2xl border border-blue-100">
+                  <ShoppingBag size={18} />
+                </div>
+                <div className="text-left">
+                  <div className="font-bold">Đơn hàng mua sắm của tôi</div>
+                  <div className="text-[10px] text-gray-400">Theo dõi tiến độ giao hàng & lắp đặt</div>
+                </div>
+              </div>
+              <ChevronRight size={16} className="text-slate-400" />
+            </button>
+          )}
+
           <button 
             onClick={() => setShowVoucherModal(true)}
             className="w-full p-3.5 flex items-center justify-between text-slate-800 font-semibold hover:bg-slate-50 active:bg-slate-100 transition-colors cursor-pointer"
@@ -294,10 +313,66 @@ export default function CustomerProfile({ user, mySerials, onLogout, onOpenScann
             </div>
             <ChevronRight size={16} className="text-slate-400" />
           </button>
-
         </div>
 
-        {/* Log out */}
+        {/* 4. ⚖️ Khung Pháp Lý & Quy Chế TMĐT (Luật TMĐT 2025 & NĐ 248/2026) */}
+        <div className="bg-white rounded-3xl border border-sky-100 shadow-[0_4px_20px_rgba(27,58,107,0.06)] divide-y divide-slate-100 text-xs overflow-hidden">
+          <div className="p-3 bg-gray-50/70 border-b border-gray-100 flex items-center justify-between text-[11px] text-gray-500 font-bold uppercase tracking-wider">
+            <span className="flex items-center gap-1.5">
+              <Scale size={14} className="text-[#1B3A6B]" />
+              Pháp Lý & Quy Chế TMĐT Truliva
+            </span>
+            <span className="text-[9px] px-1.5 py-0.5 rounded bg-blue-100 text-blue-800 font-extrabold">Luật 2025</span>
+          </div>
+
+          <button 
+            onClick={() => handleOpenLegal('COMPANY')}
+            className="w-full p-3 flex items-center justify-between text-slate-800 hover:bg-slate-50 transition-colors cursor-pointer text-left"
+          >
+            <div className="flex items-center space-x-2.5">
+              <Building2 size={16} className="text-gray-400" />
+              <span>Thông tin pháp lý doanh nghiệp</span>
+            </div>
+            <ChevronRight size={14} className="text-slate-400" />
+          </button>
+
+          <button 
+            onClick={() => handleOpenLegal('TERMS')}
+            className="w-full p-3 flex items-center justify-between text-slate-800 hover:bg-slate-50 transition-colors cursor-pointer text-left"
+          >
+            <div className="flex items-center space-x-2.5">
+              <FileText size={16} className="text-gray-400" />
+              <span>Điều khoản giao dịch mua bán hàng</span>
+            </div>
+            <ChevronRight size={14} className="text-slate-400" />
+          </button>
+
+          <button 
+            onClick={() => handleOpenLegal('PRIVACY')}
+            className="w-full p-3 flex items-center justify-between text-slate-800 hover:bg-slate-50 transition-colors cursor-pointer text-left"
+          >
+            <div className="flex items-center space-x-2.5">
+              <ShieldCheck size={16} className="text-gray-400" />
+              <span>Chính sách bảo vệ dữ liệu cá nhân</span>
+            </div>
+            <ChevronRight size={14} className="text-slate-400" />
+          </button>
+
+          <button 
+            onClick={() => handleOpenLegal('RETURN')}
+            className="w-full p-3 flex items-center justify-between text-slate-800 hover:bg-slate-50 transition-colors cursor-pointer text-left"
+          >
+            <div className="flex items-center space-x-2.5">
+              <Award size={16} className="text-gray-400" />
+              <span>Xem toàn bộ 8 chính sách TMĐT</span>
+            </div>
+            <span className="text-[10px] font-bold text-[#1B3A6B] flex items-center">
+              Chi tiết <ChevronRight size={14} />
+            </span>
+          </button>
+        </div>
+
+        {/* 5. Log out */}
         {onLogout && (
           <button
             onClick={onLogout}
@@ -335,7 +410,12 @@ export default function CustomerProfile({ user, mySerials, onLogout, onOpenScann
         rank={rank}
         onOpenScanner={onOpenScanner}
       />
+
+      <LegalPagesModal
+        isOpen={showLegalModal}
+        onClose={() => setShowLegalModal(false)}
+        initialType={legalDocType}
+      />
     </div>
   );
 }
-

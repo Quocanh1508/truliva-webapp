@@ -648,3 +648,151 @@ model ZnsMessageLog {
   @@map("zns_message_logs")
 }
 
+// ── Gói Combo Sản Phẩm (Dynamic Combo Management) ──
+model ProductCombo {
+  id            String                  @id @default(uuid())
+  comboKey      String                  @unique @map("combo_key")       // VD: "W6412-ECO", "COMBO-5840-3LOI"
+  displayName   String                  @map("display_name")           // VD: "Gói Giải pháp W6412 ECO"
+  keywords      String[]                @default([])                   // Từ khóa auto-detect: ["w6412", "eco"]
+  isActive      Boolean                 @default(true) @map("is_active")
+  sortOrder     Int                     @default(0) @map("sort_order")
+  createdAt     DateTime                @default(now()) @map("created_at")
+  updatedAt     DateTime                @updatedAt @map("updated_at")
+  components    ProductComboComponent[]
+
+  @@map("product_combos")
+}
+
+model ProductComboComponent {
+  id              String        @id @default(uuid())
+  comboId         String        @map("combo_id")
+  combo           ProductCombo  @relation(fields: [comboId], references: [id], onDelete: Cascade)
+  componentName   String        @map("component_name")     // VD: "Máy lọc nước Truliva UR3626"
+  componentSku    String?       @map("component_sku")      // VD: "104338-0002"
+  quantity        Int           @default(1)
+  sortOrder       Int           @default(0) @map("sort_order")
+
+  @@index([comboId])
+  @@map("product_combo_components")
+}
+
+// ══════════════════════════════════════════════════════════
+//  E-Commerce & Khung Pháp Lý TMĐT Zalo Mini App
+//  Tuân thủ Luật TMĐT 2025 & Nghị định 248/2026/NĐ-CP
+// ══════════════════════════════════════════════════════════
+
+// ── 1. Quản lý 8 Văn Bản & Chính Sách Pháp Lý TMĐT ──
+model LegalDocument {
+  id            String            @id @default(uuid())
+  type          String            @unique // 'COMPANY', 'TERMS', 'PRIVACY', 'RETURN', 'SHIPPING', 'WARRANTY', 'COMPLAINT', 'VOUCHER'
+  title         String
+  version       String            @default("1.0")
+  effectiveDate DateTime          @default(now()) @map("effective_date")
+  contentHtml   String            @map("content_html") @db.Text
+  summary       String?           @db.Text
+  createdAt     DateTime          @default(now()) @map("created_at")
+  updatedAt     DateTime          @updatedAt @map("updated_at")
+  consents      CustomerConsent[]
+
+  @@map("legal_documents")
+}
+
+// ── 2. Ghi Nhận Bằng Chứng Chấp Thuận Của Khách Hàng (Consent Audit Trail) ──
+model CustomerConsent {
+  id              String        @id @default(uuid())
+  customerId      String?       @map("customer_id")
+  zaloUserId      String?       @map("zalo_user_id")
+  phone           String
+  customerName    String?       @map("customer_name")
+  legalDocumentId String        @map("legal_document_id")
+  documentType    String        @map("document_type")
+  version         String
+  consentStatus   Boolean       @default(true) @map("consent_status")
+  consentTime     DateTime      @default(now()) @map("consent_time")
+  ipAddress       String?       @map("ip_address")
+  orderId         String?       @map("order_id")
+  legalDocument   LegalDocument @relation(fields: [legalDocumentId], references: [id], onDelete: Cascade)
+
+  @@index([phone])
+  @@index([orderId])
+  @@index([legalDocumentId])
+  @@map("customer_consents")
+}
+
+// ── 3. Danh Mục Sản Phẩm Bán Hàng Trực Tiếp Trên Mini App ──
+model ShopProduct {
+  id             String          @id @default(uuid())
+  sku            String          @unique
+  name           String
+  slug           String          @unique
+  category       String          // 'WATER_PURIFIER' | 'FILTER_CARTRIDGE' | 'FAUCET_FILTER' | 'ACCESSORY'
+  price          Float
+  originalPrice  Float?          @map("original_price")
+  images         String[]        @default([])
+  badge          String?         // 'Bán chạy', 'Ưu đãi 40%', 'Mới', 'Hot'
+  shortDesc      String?         @map("short_desc") @db.Text
+  description    String?         @db.Text
+  specifications Json?           // { dimensions, stages, technology, recoveryRate, power, origin }
+  warrantyMonths Int             @default(12) @map("warranty_months")
+  stockQuantity  Int             @default(999) @map("stock_quantity")
+  isActive       Boolean         @default(true) @map("is_active")
+  sortOrder      Int             @default(0) @map("sort_order")
+  createdAt      DateTime        @default(now()) @map("created_at")
+  updatedAt      DateTime        @updatedAt @map("updated_at")
+  orderItems     ShopOrderItem[]
+
+  @@index([category])
+  @@index([isActive])
+  @@map("shop_products")
+}
+
+// ── 4. Đơn Hàng Mua Sắm Từ Zalo Mini App ──
+model ShopOrder {
+  id              String          @id @default(uuid())
+  orderCode       String          @unique @map("order_code") // 'TRU-260828-XXXX'
+  zaloUserId      String?         @map("zalo_user_id")
+  customerName    String          @map("customer_name")
+  customerPhone   String          @map("customer_phone")
+  address         String
+  province        String?
+  district        String?
+  ward            String?
+  note            String?         @db.Text
+  totalAmount     Float           @map("total_amount")
+  discountAmount  Float           @default(0) @map("discount_amount")
+  shippingFee     Float           @default(0) @map("shipping_fee")
+  finalAmount     Float           @map("final_amount")
+  voucherCode     String?         @map("voucher_code")
+  paymentMethod   String          @default("COD") @map("payment_method") // 'COD', 'VIETQR', 'ZALOPAY'
+  paymentStatus   String          @default("PENDING") @map("payment_status") // 'PENDING', 'PAID', 'REFUNDED'
+  orderStatus     String          @default("PENDING") @map("order_status") // 'PENDING', 'CONFIRMED', 'PROCESSING', 'SHIPPING', 'COMPLETED', 'CANCELLED'
+  pancakeOrderId  Int?            @map("pancake_order_id")
+  internalOrderId String?         @map("internal_order_id") // Liên kết với bảng Order điều phối KTV
+  createdAt       DateTime        @default(now()) @map("created_at")
+  updatedAt       DateTime        @updatedAt @map("updated_at")
+  items           ShopOrderItem[]
+
+  @@index([customerPhone])
+  @@index([orderStatus])
+  @@index([createdAt])
+  @@map("shop_orders")
+}
+
+model ShopOrderItem {
+  id          String      @id @default(uuid())
+  shopOrderId String      @map("shop_order_id")
+  productId   String      @map("product_id")
+  productName String      @map("product_name")
+  sku         String
+  quantity    Int         @default(1)
+  unitPrice   Float       @map("unit_price")
+  totalPrice  Float       @map("total_price")
+  product     ShopProduct @relation(fields: [productId], references: [id])
+  shopOrder   ShopOrder   @relation(fields: [shopOrderId], references: [id], onDelete: Cascade)
+
+  @@index([shopOrderId])
+  @@index([productId])
+  @@map("shop_order_items")
+}
+
+

@@ -4,6 +4,7 @@ import { App, ZMPRouter, AnimationRoutes, Route, Page } from 'zmp-ui';
 import 'zmp-ui/zaui.css';
 import './app.css';
 import IndexPage from './pages/index';
+import { CartProvider } from './context/CartContext';
 
 interface Props {
   children: ReactNode;
@@ -51,15 +52,17 @@ class ErrorBoundary extends Component<Props, State> {
 const MyApp = () => {
   return (
     <ErrorBoundary>
-      <App>
-        <ZMPRouter>
-          <AnimationRoutes>
-            <Route path="/" element={<Page><IndexPage /></Page>} />
-            <Route path="/pages/index" element={<Page><IndexPage /></Page>} />
-            <Route path="*" element={<Page><IndexPage /></Page>} />
-          </AnimationRoutes>
-        </ZMPRouter>
-      </App>
+      <CartProvider>
+        <App>
+          <ZMPRouter>
+            <AnimationRoutes>
+              <Route path="/" element={<Page><IndexPage /></Page>} />
+              <Route path="/pages/index" element={<Page><IndexPage /></Page>} />
+              <Route path="*" element={<Page><IndexPage /></Page>} />
+            </AnimationRoutes>
+          </ZMPRouter>
+        </App>
+      </CartProvider>
     </ErrorBoundary>
   );
 };

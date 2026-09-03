@@ -1187,7 +1187,7 @@ export default function ReportList() {
       </div>
 
       {showFilters && (
-        <div className="bg-white p-5 rounded-lg border border-gray-200 mb-6 shadow-sm flex flex-col gap-5 animate-fade-in text-left">
+        <div className="bg-white p-5 rounded-lg border border-gray-200 mb-6 shadow-sm flex flex-col gap-5 animate-fade-in text-left relative z-30">
           {/* Row 1: Công việc & Sản phẩm */}
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             <MultiSelectDropdown
@@ -1287,7 +1287,7 @@ export default function ReportList() {
           </div>
 
           {/* Row 3: Các mốc thời gian */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 relative z-20">
             {/* Thời gian hoàn thành */}
             <div className="bg-gray-50 p-3 rounded-md border border-gray-100 flex flex-col gap-2">
               <span className="text-[11px] font-bold text-gray-500 uppercase tracking-wider flex items-center gap-1.5">

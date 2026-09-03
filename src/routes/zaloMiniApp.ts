@@ -279,4 +279,26 @@ router.get('/articles', async (_req: Request, res: Response): Promise<void> => {
   }
 });
 
+// ══════════════════════════════════════════════════════════════════════════
+//  E-Commerce & Khung Pháp Lý TMĐT Zalo Mini App
+// ══════════════════════════════════════════════════════════════════════════
+import {
+  getShopProducts,
+  getShopProductDetail,
+  getLegalDocuments,
+  getLegalDocumentByType,
+  createShopOrder,
+  getMyShopOrders,
+  getShopOrderDetail
+} from '../controllers/shopController';
+
+router.get('/shop/products', getShopProducts);
+router.get('/shop/products/:slugOrId', getShopProductDetail);
+router.get('/shop/legal-docs', getLegalDocuments);
+router.get('/shop/legal-docs/:type', getLegalDocumentByType);
+router.post('/shop/orders', createShopOrder);
+router.get('/shop/my-orders', getMyShopOrders);
+router.get('/shop/orders/:orderCodeOrId', getShopOrderDetail);
+
 export default router;
+

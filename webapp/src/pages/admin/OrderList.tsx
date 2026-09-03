@@ -1581,6 +1581,8 @@ export default function OrderList() {
 
   const clearAllFilters = () => {
     setPage(1);
+    setSearch('');
+    setDebouncedSearch('');
     setFilterPancakeOrderId('');
     setFilterAdminStatuses([]);
     setFilterKtvIds([]);
@@ -1597,6 +1599,11 @@ export default function OrderList() {
     setCustomStartDate('');
     setCustomEndDate('');
     setDateType('createdAt');
+    try {
+      sessionStorage.removeItem('truliva_order_filters');
+    } catch (e) {
+      console.error(e);
+    }
   };
 
   const openAuditModal = async (orderId: string) => {
@@ -1704,6 +1711,25 @@ export default function OrderList() {
     return `${year}-${month}-${day}`;
   })();
 
+  const hasActiveFilters = Boolean(
+    search ||
+    filterPancakeOrderId ||
+    filterAdminStatuses.length > 0 ||
+    filterKtvIds.length > 0 ||
+    filterWorkTypes.length > 0 ||
+    filterMainStationIds.length > 0 ||
+    filterCustomerName ||
+    filterCustomerPhone ||
+    filterServiceTypes.length > 0 ||
+    filterProductCategories.length > 0 ||
+    filterProductNames.length > 0 ||
+    filterTechStationIds.length > 0 ||
+    filterProvinces.length > 0 ||
+    filterCreators.length > 0 ||
+    customStartDate ||
+    customEndDate
+  );
+
   return (
     <div className="flex flex-col bg-white rounded-lg shadow-sm border border-gray-200 font-sans">
 
@@ -1790,10 +1816,20 @@ export default function OrderList() {
             <input
               type="text"
               placeholder="Tìm theo ID, Khách hàng, SĐT..."
-              className="w-full pl-9 pr-3 py-2 text-[13px] border border-gray-300 rounded-md focus:ring-1 focus:ring-blue-500 focus:border-blue-500 transition-shadow outline-none"
+              className="w-full pl-9 pr-8 py-2 text-[13px] border border-gray-300 rounded-md focus:ring-1 focus:ring-blue-500 focus:border-blue-500 transition-shadow outline-none"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
             />
+            {search && (
+              <button
+                type="button"
+                onClick={() => { setSearch(''); setDebouncedSearch(''); setPage(1); }}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 p-0.5 rounded-full hover:bg-gray-100"
+                title="Xóa tìm kiếm"
+              >
+                <XCircle size={14} />
+              </button>
+            )}
           </form>
 
           <div className="flex flex-wrap items-center gap-2 md:gap-3">
@@ -1838,10 +1874,17 @@ export default function OrderList() {
             <div className="relative z-50">
               <button
                 onClick={() => toggleDropdown('main')}
-                className="flex items-center space-x-1.5 px-3 py-2 text-[13px] border border-gray-300 rounded-md bg-white text-gray-700 hover:bg-gray-50 focus:outline-none font-medium"
+                className={`flex items-center space-x-1.5 px-3 py-2 text-[13px] border rounded-md font-medium transition-colors ${
+                  hasActiveFilters
+                    ? 'border-blue-500 bg-blue-50 text-blue-700 font-semibold shadow-xs'
+                    : 'border-gray-300 bg-white text-gray-700 hover:bg-gray-50'
+                }`}
               >
                 <Filter size={15} />
                 <span>Bộ lọc</span>
+                {hasActiveFilters && (
+                  <span className="w-2 h-2 rounded-full bg-blue-600 ml-0.5"></span>
+                )}
               </button>
 
               {/* Popover Card */}
@@ -1882,9 +1925,16 @@ export default function OrderList() {
                         <MapPin size={15} className="text-rose-500" />
                         <span>Tỉnh/Thành phố</span>
                       </button>
-                      <button className="w-full flex items-center space-x-2.5 px-4 py-2 hover:bg-gray-50 text-indigo-700 font-medium transition-colors text-[13px]" onClick={() => toggleDropdown('creator')}>
-                        <User size={15} className="text-indigo-500" />
-                        <span>Người tạo</span>
+                      <button className="w-full flex items-center justify-between px-4 py-2 hover:bg-gray-50 text-indigo-700 font-medium transition-colors text-[13px]" onClick={() => toggleDropdown('creator')}>
+                        <div className="flex items-center space-x-2.5">
+                          <User size={15} className="text-indigo-500" />
+                          <span>Người tạo</span>
+                        </div>
+                        {filterCreators.length > 0 && (
+                          <span className="text-[11px] bg-indigo-100 text-indigo-700 px-1.5 py-0.5 rounded font-semibold">
+                            {filterCreators.includes('__NONE__') ? '0' : filterCreators.length}
+                          </span>
+                        )}
                       </button>
                       <div className="h-px bg-gray-200 my-1"></div>
                       <button className="w-full flex items-center space-x-2.5 px-4 py-2 hover:bg-gray-50 text-blue-700 font-medium transition-colors text-[13px]" onClick={() => toggleDropdown('appointmentTimeFilter')}>
@@ -2524,147 +2574,242 @@ export default function OrderList() {
           </div>
         </div>
 
-        {/* Selected Filter Badges / Tags row */}
-        {(filterPancakeOrderId || filterAdminStatuses.length > 0 || filterKtvIds.length > 0 || filterWorkTypes.length > 0 || filterMainStationIds.length > 0 || filterCustomerName || filterCustomerPhone || filterServiceTypes.length > 0 || filterProductCategories.length > 0 || filterProductNames.length > 0 || filterTechStationIds.length > 0 || filterProvinces.length > 0 || customStartDate || customEndDate) && (
-          <div className="flex flex-wrap items-center gap-2 px-4 pb-3">
-            <span className="text-xs font-semibold text-gray-500 uppercase">Đang lọc:</span>
+        {/* Thanh hiển thị bộ lọc đang áp dụng (Filter Status Bar) */}
+        {hasActiveFilters ? (
+          <div className="flex flex-wrap items-center justify-between gap-2 px-4 py-2.5 bg-blue-50/95 border-t border-blue-200 shadow-xs transition-all">
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="flex items-center gap-1.5 text-blue-900 font-bold text-[12px] uppercase tracking-wide mr-1">
+                <Filter size={14} className="text-blue-600 shrink-0" />
+                <span>Đang áp dụng bộ lọc:</span>
+              </div>
 
-            {(customStartDate || customEndDate) && (
-              <span className="inline-flex items-center bg-gray-100 text-gray-800 text-xs font-medium px-2.5 py-1 rounded-md border border-gray-200">
-                {dateType === 'createdAt' && 'Ngày tạo'}
-                {dateType === 'appointmentTime' && 'Hẹn khách'}
-                {dateType === 'completedAt' && 'Hoàn thành'}
-                {dateType === 'updatedAt' && 'Cập nhật'}
-                : {formatDate(customStartDate)} - {formatDate(customEndDate)}
-                <button type="button" className="ml-1.5 text-gray-400 hover:text-gray-600 outline-none p-0.5 rounded-full hover:bg-gray-200" onClick={() => { setCustomStartDate(''); setCustomEndDate(''); setPage(1); }}>
-                  <XCircle size={14} className="fill-gray-200 hover:fill-gray-300 text-gray-500" />
-                </button>
+              {/* 1. Từ khóa tìm kiếm */}
+              {search && (
+                <span className="inline-flex items-center bg-white text-blue-800 text-xs font-semibold px-2.5 py-1 rounded-md border border-blue-200 shadow-2xs">
+                  🔍 "{search}"
+                  <button
+                    type="button"
+                    className="ml-1.5 text-blue-400 hover:text-red-500 outline-none transition-colors"
+                    onClick={() => { setSearch(''); setDebouncedSearch(''); setPage(1); }}
+                    title="Bỏ tìm kiếm"
+                  >
+                    <XCircle size={14} className="fill-blue-100 hover:fill-red-100" />
+                  </button>
+                </span>
+              )}
+
+              {/* 2. Khoảng thời gian */}
+              {(customStartDate || customEndDate) && (
+                <span className="inline-flex items-center bg-white text-blue-800 text-xs font-semibold px-2.5 py-1 rounded-md border border-blue-200 shadow-2xs">
+                  📅 {dateType === 'createdAt' && 'Ngày tạo'}
+                  {dateType === 'appointmentTime' && 'Hẹn khách'}
+                  {dateType === 'completedAt' && 'Hoàn thành'}
+                  {dateType === 'updatedAt' && 'Cập nhật'}: {formatDate(customStartDate)} - {formatDate(customEndDate)}
+                  <button
+                    type="button"
+                    className="ml-1.5 text-blue-400 hover:text-red-500 outline-none transition-colors"
+                    onClick={() => { setCustomStartDate(''); setCustomEndDate(''); setPage(1); }}
+                    title="Bỏ lọc thời gian"
+                  >
+                    <XCircle size={14} className="fill-blue-100 hover:fill-red-100" />
+                  </button>
+                </span>
+              )}
+
+              {/* 3. Người tạo */}
+              {filterCreators.length > 0 && (
+                <span className="inline-flex items-center bg-indigo-50 text-indigo-900 text-xs font-semibold px-2.5 py-1 rounded-md border border-indigo-200 shadow-2xs">
+                  👤 Người tạo: {filterCreators.includes('__NONE__') ? 'Không chọn ai' : filterCreators.join(', ')}
+                  <button
+                    type="button"
+                    className="ml-1.5 text-indigo-400 hover:text-red-500 outline-none transition-colors"
+                    onClick={() => { setFilterCreators([]); setPage(1); }}
+                    title="Bỏ lọc người tạo"
+                  >
+                    <XCircle size={14} className="fill-indigo-100 hover:fill-red-100" />
+                  </button>
+                </span>
+              )}
+
+              {/* 4. Mã đơn */}
+              {filterPancakeOrderId && (
+                <span className="inline-flex items-center bg-white text-gray-800 text-xs font-medium px-2.5 py-1 rounded-md border border-gray-200 shadow-2xs">
+                  # Mã đơn: {filterPancakeOrderId}
+                  <button
+                    type="button"
+                    className="ml-1.5 text-gray-400 hover:text-red-500 outline-none transition-colors"
+                    onClick={() => { setFilterPancakeOrderId(''); setPage(1); }}
+                  >
+                    <XCircle size={14} />
+                  </button>
+                </span>
+              )}
+
+              {/* 5. Trạng thái đơn */}
+              {filterAdminStatuses.length > 0 && (
+                <span className="inline-flex items-center bg-white text-emerald-800 text-xs font-semibold px-2.5 py-1 rounded-md border border-emerald-200 shadow-2xs">
+                  📋 Trạng thái: {filterAdminStatuses.map(s => ROW_STATUS_OPTIONS.find(o => o.value === s)?.label || s).join(', ')}
+                  <button
+                    type="button"
+                    className="ml-1.5 text-emerald-400 hover:text-red-500 outline-none transition-colors"
+                    onClick={() => { setFilterAdminStatuses([]); setPage(1); }}
+                  >
+                    <XCircle size={14} />
+                  </button>
+                </span>
+              )}
+
+              {/* 6. Kỹ thuật viên */}
+              {filterKtvIds.length > 0 && (
+                <span className="inline-flex items-center bg-white text-purple-800 text-xs font-semibold px-2.5 py-1 rounded-md border border-purple-200 shadow-2xs">
+                  🔧 KTV: {filterKtvIds.map(id => id === 'null' ? 'Chưa gán KTV' : (allKtvs.find(k => k.id === id)?.fullName || id)).join(', ')}
+                  <button
+                    type="button"
+                    className="ml-1.5 text-purple-400 hover:text-red-500 outline-none transition-colors"
+                    onClick={() => { setFilterKtvIds([]); setPage(1); }}
+                  >
+                    <XCircle size={14} />
+                  </button>
+                </span>
+              )}
+
+              {/* 7. Loại công việc */}
+              {filterWorkTypes.length > 0 && (
+                <span className="inline-flex items-center bg-white text-amber-800 text-xs font-semibold px-2.5 py-1 rounded-md border border-amber-200 shadow-2xs">
+                  ⚙️ Loại CV: {filterWorkTypes.map(w => w === 'null' ? 'Chưa xác định' : w).join(', ')}
+                  <button
+                    type="button"
+                    className="ml-1.5 text-amber-400 hover:text-red-500 outline-none transition-colors"
+                    onClick={() => { setFilterWorkTypes([]); setPage(1); }}
+                  >
+                    <XCircle size={14} />
+                  </button>
+                </span>
+              )}
+
+              {/* 8. Loại dịch vụ */}
+              {filterServiceTypes.length > 0 && (
+                <span className="inline-flex items-center bg-white text-teal-800 text-xs font-semibold px-2.5 py-1 rounded-md border border-teal-200 shadow-2xs">
+                  🛠️ Dịch vụ: {filterServiceTypes.join(', ')}
+                  <button
+                    type="button"
+                    className="ml-1.5 text-teal-400 hover:text-red-500 outline-none transition-colors"
+                    onClick={() => { setFilterServiceTypes([]); setPage(1); }}
+                  >
+                    <XCircle size={14} />
+                  </button>
+                </span>
+              )}
+
+              {/* 9. Trạm chính */}
+              {filterMainStationIds.length > 0 && (
+                <span className="inline-flex items-center bg-white text-sky-800 text-xs font-semibold px-2.5 py-1 rounded-md border border-sky-200 shadow-2xs">
+                  🏢 Trạm chính: {filterMainStationIds.map(id => id === 'null' ? 'Chưa phân trạm' : (stations.find(s => s.id === id)?.name || id)).join(', ')}
+                  <button
+                    type="button"
+                    className="ml-1.5 text-sky-400 hover:text-red-500 outline-none transition-colors"
+                    onClick={() => { setFilterMainStationIds([]); setPage(1); }}
+                  >
+                    <XCircle size={14} />
+                  </button>
+                </span>
+              )}
+
+              {/* 10. Trạm kỹ thuật */}
+              {filterTechStationIds.length > 0 && (
+                <span className="inline-flex items-center bg-white text-cyan-800 text-xs font-semibold px-2.5 py-1 rounded-md border border-cyan-200 shadow-2xs">
+                  🏢 Trạm KT: {filterTechStationIds.map(id => dbFilterOptions.techStations.find(ts => ts.id === id)?.name || id).join(', ')}
+                  <button
+                    type="button"
+                    className="ml-1.5 text-cyan-400 hover:text-red-500 outline-none transition-colors"
+                    onClick={() => { setFilterTechStationIds([]); setPage(1); }}
+                  >
+                    <XCircle size={14} />
+                  </button>
+                </span>
+              )}
+
+              {/* 11. Tỉnh/Thành phố */}
+              {filterProvinces.length > 0 && (
+                <span className="inline-flex items-center bg-white text-rose-800 text-xs font-semibold px-2.5 py-1 rounded-md border border-rose-200 shadow-2xs">
+                  📍 Tỉnh/TP: {filterProvinces.join(', ')}
+                  <button
+                    type="button"
+                    className="ml-1.5 text-rose-400 hover:text-red-500 outline-none transition-colors"
+                    onClick={() => { setFilterProvinces([]); setPage(1); }}
+                  >
+                    <XCircle size={14} />
+                  </button>
+                </span>
+              )}
+
+              {/* 12. Danh mục & Sản phẩm */}
+              {(filterProductCategories.length > 0 || filterProductNames.length > 0) && (
+                <span className="inline-flex items-center bg-white text-purple-800 text-xs font-semibold px-2.5 py-1 rounded-md border border-purple-200 shadow-2xs">
+                  📦 SP: {[...filterProductCategories, ...filterProductNames].join(', ')}
+                  <button
+                    type="button"
+                    className="ml-1.5 text-purple-400 hover:text-red-500 outline-none transition-colors"
+                    onClick={() => { setFilterProductCategories([]); setFilterProductNames([]); setPage(1); }}
+                  >
+                    <XCircle size={14} />
+                  </button>
+                </span>
+              )}
+
+              {/* 13. Tên khách / SĐT khách */}
+              {filterCustomerName && (
+                <span className="inline-flex items-center bg-white text-gray-800 text-xs font-semibold px-2.5 py-1 rounded-md border border-gray-200 shadow-2xs">
+                  👤 Khách: {filterCustomerName}
+                  <button
+                    type="button"
+                    className="ml-1.5 text-gray-400 hover:text-red-500 outline-none transition-colors"
+                    onClick={() => { setFilterCustomerName(''); setPage(1); }}
+                  >
+                    <XCircle size={14} />
+                  </button>
+                </span>
+              )}
+              {filterCustomerPhone && (
+                <span className="inline-flex items-center bg-white text-gray-800 text-xs font-semibold px-2.5 py-1 rounded-md border border-gray-200 shadow-2xs">
+                  📞 SĐT: {filterCustomerPhone}
+                  <button
+                    type="button"
+                    className="ml-1.5 text-gray-400 hover:text-red-500 outline-none transition-colors"
+                    onClick={() => { setFilterCustomerPhone(''); setPage(1); }}
+                  >
+                    <XCircle size={14} />
+                  </button>
+                </span>
+              )}
+            </div>
+
+            <div className="flex items-center gap-2 shrink-0">
+              <span className="text-xs text-blue-800 font-medium bg-white px-2.5 py-1 rounded-md border border-blue-200">
+                Tìm thấy: <b className="text-blue-900 font-bold">{stats.total}</b> đơn
               </span>
-            )}
-
-            {filterPancakeOrderId && (
-              <span className="inline-flex items-center bg-gray-100 text-gray-800 text-xs font-medium px-2.5 py-1 rounded-md border border-gray-200">
-                Mã đơn: {filterPancakeOrderId}
-                <button type="button" className="ml-1.5 text-gray-400 hover:text-gray-600 outline-none" onClick={() => { setFilterPancakeOrderId(''); setPage(1); }}>
-                  <XCircle size={14} className="fill-gray-200 hover:fill-gray-300 text-gray-500" />
-                </button>
+              <button
+                onClick={clearAllFilters}
+                className="inline-flex items-center gap-1.5 text-xs text-red-600 hover:text-white font-semibold px-2.5 py-1 rounded-md bg-white hover:bg-red-600 border border-red-200 hover:border-transparent transition-all shadow-2xs cursor-pointer"
+                title="Xóa tất cả các điều kiện lọc và quay về mặc định"
+              >
+                <RotateCcw size={13} />
+                <span>Xóa bộ lọc</span>
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div className="flex items-center justify-between px-4 py-2 bg-gray-50/80 border-t border-gray-200 text-xs text-gray-500">
+            <div className="flex items-center gap-2">
+              <Filter size={13} className="text-gray-400" />
+              <span className="font-medium text-gray-600">Bộ lọc hiện tại:</span>
+              <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold bg-gray-200/80 text-gray-700">
+                Tất cả đơn hàng (Không áp dụng lọc)
               </span>
-            )}
-
-            {filterAdminStatuses.length > 0 && (
-              <span className="inline-flex items-center bg-gray-100 text-gray-800 text-xs font-medium px-2.5 py-1 rounded-md border border-gray-200">
-                Trạng thái: {filterAdminStatuses.map(s => ROW_STATUS_OPTIONS.find(o => o.value === s)?.label || s).join(', ')}
-                <button type="button" className="ml-1.5 text-gray-400 hover:text-gray-600 outline-none" onClick={() => { setFilterAdminStatuses([]); setPage(1); }}>
-                  <XCircle size={14} className="fill-gray-200 hover:fill-gray-300 text-gray-500" />
-                </button>
-              </span>
-            )}
-
-            {filterKtvIds.length > 0 && (
-              <span className="inline-flex items-center bg-gray-100 text-gray-800 text-xs font-medium px-2.5 py-1 rounded-md border border-gray-200">
-                KTV: {filterKtvIds.map(id => id === 'null' ? 'Chưa gán KTV' : (allKtvs.find(k => k.id === id)?.fullName || id)).join(', ')}
-                <button type="button" className="ml-1.5 text-gray-400 hover:text-gray-600 outline-none" onClick={() => { setFilterKtvIds([]); setPage(1); }}>
-                  <XCircle size={14} className="fill-gray-200 hover:fill-gray-300 text-gray-500" />
-                </button>
-              </span>
-            )}
-
-            {filterWorkTypes.length > 0 && (
-              <span className="inline-flex items-center bg-gray-100 text-gray-800 text-xs font-medium px-2.5 py-1 rounded-md border border-gray-200">
-                Loại CV: {filterWorkTypes.map(w => w === 'null' ? 'Chưa xác định' : w).join(', ')}
-                <button type="button" className="ml-1.5 text-gray-400 hover:text-gray-600 outline-none" onClick={() => { setFilterWorkTypes([]); setPage(1); }}>
-                  <XCircle size={14} className="fill-gray-200 hover:fill-gray-300 text-gray-500" />
-                </button>
-              </span>
-            )}
-
-            {filterMainStationIds.length > 0 && (
-              <span className="inline-flex items-center bg-gray-100 text-gray-800 text-xs font-medium px-2.5 py-1 rounded-md border border-gray-200">
-                Trạm chính: {filterMainStationIds.map(id => id === 'null' ? 'Chưa phân trạm' : (stations.find(s => s.id === id)?.name || id)).join(', ')}
-                <button type="button" className="ml-1.5 text-gray-400 hover:text-gray-600 outline-none" onClick={() => { setFilterMainStationIds([]); setPage(1); }}>
-                  <XCircle size={14} className="fill-gray-200 hover:fill-gray-300 text-gray-500" />
-                </button>
-              </span>
-            )}
-
-            {filterCustomerName && (
-              <span className="inline-flex items-center bg-gray-100 text-gray-800 text-xs font-medium px-2.5 py-1 rounded-md border border-gray-200">
-                Tên khách: {filterCustomerName}
-                <button type="button" className="ml-1.5 text-gray-400 hover:text-gray-600 outline-none" onClick={() => { setFilterCustomerName(''); setPage(1); }}>
-                  <XCircle size={14} className="fill-gray-200 hover:fill-gray-300 text-gray-500" />
-                </button>
-              </span>
-            )}
-
-            {filterCustomerPhone && (
-              <span className="inline-flex items-center bg-gray-100 text-gray-800 text-xs font-medium px-2.5 py-1 rounded-md border border-gray-200">
-                SĐT khách: {filterCustomerPhone}
-                <button type="button" className="ml-1.5 text-gray-400 hover:text-gray-600 outline-none" onClick={() => { setFilterCustomerPhone(''); setPage(1); }}>
-                  <XCircle size={14} className="fill-gray-200 hover:fill-gray-300 text-gray-500" />
-                </button>
-              </span>
-            )}
-
-            {filterServiceTypes.length > 0 && (
-              <span className="inline-flex items-center bg-gray-100 text-gray-800 text-xs font-medium px-2.5 py-1 rounded-md border border-gray-200">
-                Dịch vụ: {filterServiceTypes.join(', ')}
-                <button type="button" className="ml-1.5 text-gray-400 hover:text-gray-600 outline-none" onClick={() => { setFilterServiceTypes([]); setPage(1); }}>
-                  <XCircle size={14} className="fill-gray-200 hover:fill-gray-300 text-gray-500" />
-                </button>
-              </span>
-            )}
-
-            {filterProductCategories.length > 0 && (
-              <span className="inline-flex items-center bg-gray-100 text-gray-800 text-xs font-medium px-2.5 py-1 rounded-md border border-gray-200">
-                Danh mục: {filterProductCategories.join(', ')}
-                <button type="button" className="ml-1.5 text-gray-400 hover:text-gray-600 outline-none" onClick={() => { setFilterProductCategories([]); setPage(1); }}>
-                  <XCircle size={14} className="fill-gray-200 hover:fill-gray-300 text-gray-500" />
-                </button>
-              </span>
-            )}
-
-            {filterProductNames.length > 0 && (
-              <span className="inline-flex items-center bg-gray-100 text-gray-800 text-xs font-medium px-2.5 py-1 rounded-md border border-gray-200">
-                Sản phẩm: {filterProductNames.join(', ')}
-                <button type="button" className="ml-1.5 text-gray-400 hover:text-gray-600 outline-none" onClick={() => { setFilterProductNames([]); setPage(1); }}>
-                  <XCircle size={14} className="fill-gray-200 hover:fill-gray-300 text-gray-500" />
-                </button>
-              </span>
-            )}
-
-            {filterTechStationIds.length > 0 && (
-              <span className="inline-flex items-center bg-gray-100 text-gray-800 text-xs font-medium px-2.5 py-1 rounded-md border border-gray-200">
-                Trạm KT: {filterTechStationIds.map(id => dbFilterOptions.techStations.find(ts => ts.id === id)?.name || id).join(', ')}
-                <button type="button" className="ml-1.5 text-gray-400 hover:text-gray-600 outline-none" onClick={() => { setFilterTechStationIds([]); setPage(1); }}>
-                  <XCircle size={14} className="fill-gray-200 hover:fill-gray-300 text-gray-500" />
-                </button>
-              </span>
-            )}
-
-            {filterProvinces.length > 0 && (
-              <span className="inline-flex items-center bg-gray-100 text-gray-800 text-xs font-medium px-2.5 py-1 rounded-md border border-gray-200">
-                Tỉnh/TP: {filterProvinces.join(', ')}
-                <button type="button" className="ml-1.5 text-gray-400 hover:text-gray-600 outline-none" onClick={() => { setFilterProvinces([]); setPage(1); }}>
-                  <XCircle size={14} className="fill-gray-200 hover:fill-gray-300 text-gray-500" />
-                </button>
-              </span>
-            )}
-
-            {filterCreators.length > 0 && (
-              <span className="inline-flex items-center bg-gray-100 text-gray-800 text-xs font-medium px-2.5 py-1 rounded-md border border-gray-200">
-                Người tạo: {filterCreators.includes('__NONE__') ? 'Không chọn ai' : filterCreators.join(', ')}
-                <button type="button" className="ml-1.5 text-gray-400 hover:text-gray-600 outline-none" onClick={() => { setFilterCreators([]); setPage(1); }}>
-                  <XCircle size={14} className="fill-gray-200 hover:fill-gray-300 text-gray-500" />
-                </button>
-              </span>
-            )}
-
-            <button
-              onClick={clearAllFilters}
-              className="text-xs text-red-600 hover:text-red-800 font-semibold px-2 py-1.5 rounded hover:bg-red-50 transition-colors"
-            >
-              Xóa tất cả bộ lọc
-            </button>
+            </div>
+            <div className="text-[11px] text-gray-400">
+              Hiển thị toàn bộ <b className="text-gray-700 font-semibold">{stats.total}</b> đơn hàng trong hệ thống
+            </div>
           </div>
         )}
       </div>
@@ -2901,8 +3046,9 @@ export default function OrderList() {
                         </div>
                       )}
                       {order.adminStatus === 'hoàn thành' && (() => {
-                        const report = order.serviceReports && order.serviceReports.length > 0 ? order.serviceReports[0] : null;
-                        const dateObj = report ? new Date(report.updatedAt || report.createdAt) : new Date(order.updatedAt);
+                        const sortedReports = (order.serviceReports || []).slice().sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+                        const report = sortedReports.length > 0 ? sortedReports[0] : null;
+                        const dateObj = report ? new Date(report.createdAt) : (order.appointmentTime ? new Date(order.appointmentTime) : new Date(order.pancakeCreatedAt || order.createdAt));
                         const timeStr = dateObj.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
                         const dateStr = dateObj.toLocaleDateString('vi-VN');
                         return (

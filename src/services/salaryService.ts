@@ -312,29 +312,27 @@ export function getReportCostBreakdown(
 ) {
   const costResult = calculateReportCost(report, ktvPhoneNorm, stationRate, userCustomRates, options);
   const customCostsObj = (report.customCosts as any) || {};
-  const hasManualOverride = report.customBaseCost !== null && report.customBaseCost !== undefined;
-
-  const baoHanhCost = (hasManualOverride && customCostsObj.baoHanhCost !== undefined)
+  const baoHanhCost = customCostsObj.baoHanhCost !== undefined
     ? Number(customCostsObj.baoHanhCost)
     : (costResult.rateType === 'baoHanh' ? costResult.baseCost : 0);
 
-  const suaChuaCost = (hasManualOverride && customCostsObj.suaChuaCost !== undefined)
+  const suaChuaCost = customCostsObj.suaChuaCost !== undefined
     ? Number(customCostsObj.suaChuaCost)
     : (costResult.rateType === 'suaChua' ? costResult.baseCost : 0);
 
-  const giaoHangCost = (hasManualOverride && customCostsObj.giaoHangCost !== undefined)
+  const giaoHangCost = customCostsObj.giaoHangCost !== undefined
     ? Number(customCostsObj.giaoHangCost)
     : (costResult.rateType === 'giaoHang' ? costResult.baseCost : 0);
 
-  const lapDatCost = (hasManualOverride && customCostsObj.lapDatCost !== undefined)
+  const lapDatCost = customCostsObj.lapDatCost !== undefined
     ? Number(customCostsObj.lapDatCost)
     : (costResult.rateType === 'lapDat' ? costResult.baseCost : 0);
 
-  const giaoLapCost = (hasManualOverride && customCostsObj.giaoLapCost !== undefined)
+  const giaoLapCost = customCostsObj.giaoLapCost !== undefined
     ? Number(customCostsObj.giaoLapCost)
     : (costResult.rateType === 'giaoHangLapDat' ? costResult.baseCost : 0);
 
-  const thayLocCost = (hasManualOverride && customCostsObj.thayLocCost !== undefined)
+  const thayLocCost = customCostsObj.thayLocCost !== undefined
     ? Number(customCostsObj.thayLocCost)
     : (costResult.rateType === 'thayLoc' ? costResult.baseCost : 0);
 

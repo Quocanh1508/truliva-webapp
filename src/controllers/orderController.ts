@@ -14,114 +14,15 @@ import axios from 'axios';
 
 import { buildOrderFilter } from '../services/orderService';
 
-export interface ComboComponent {
-  name: string;
-  sku?: string;
-  quantity: number;
-}
+// ── Combo types & functions: Import & Re-export từ ComboService (Dynamic DB-driven) ──
+import { 
+  getComboComponents, 
+  getComboMappingsForInventory,
+  ComboComponent, 
+  ComboDefinition 
+} from '../services/comboService';
+export { ComboComponent, ComboDefinition, getComboComponents, getComboMappingsForInventory };
 
-export interface ComboDefinition {
-  displayName: string;
-  components: ComboComponent[];
-}
-
-export const KNOWN_COMBO_DEFINITIONS: Record<string, ComboDefinition> = {
-  // 1. Gói Giải pháp máy nóng lạnh treo tường W6412 (Gồm máy lọc nước UR3626 + Máy nóng lạnh W6412)
-  'W6412-ECO': {
-    displayName: 'Gói Giải pháp W6412 ECO',
-    components: [
-      { name: 'Máy lọc nước Truliva UR3626', sku: '104338-0002', quantity: 1 },
-      { name: 'Máy nóng lạnh treo tường Truliva W6412', sku: '103057-001', quantity: 1 }
-    ]
-  },
-  'W6412-GOLD': {
-    displayName: 'Gói Giải pháp W6412 GOLD',
-    components: [
-      { name: 'Máy lọc nước Truliva UR3626', sku: '104338-0002', quantity: 1 },
-      { name: 'Máy nóng lạnh treo tường Truliva W6412', sku: '103057-001', quantity: 1 }
-    ]
-  },
-  'W6412-PLATINUM': {
-    displayName: 'Gói Giải pháp W6412 PLATINUM',
-    components: [
-      { name: 'Máy lọc nước Truliva UR3626', sku: '104338-0002', quantity: 1 },
-      { name: 'Máy nóng lạnh treo tường Truliva W6412', sku: '103057-001', quantity: 1 }
-    ]
-  },
-
-  // 2. Combo lõi lọc (Bộ nhiều lõi đóng gói chung)
-  'COMBO-5676-GOLD': {
-    displayName: 'Combo Lõi lọc UR5676/5640/5440',
-    components: [
-      { name: 'Lõi lọc PGP Truliva UR5676/UR5640/UR5440', quantity: 1 },
-      { name: 'Lõi lọc CTO Truliva UR5676/UR5640/UR5440', quantity: 1 }
-    ]
-  },
-  'COMBO-5840-2LOI': {
-    displayName: 'Combo Lõi lọc UR5840 (2 Lõi)',
-    components: [
-      { name: 'Lõi lọc PGP Truliva UR5840', quantity: 1 },
-      { name: 'Lõi lọc CTO Truliva UR5840', quantity: 1 }
-    ]
-  },
-  'COMBO-5840-3LOI': {
-    displayName: 'Combo Lõi lọc UR5840 (3 Lõi)',
-    components: [
-      { name: 'Lõi lọc PGP Truliva UR5840', quantity: 1 },
-      { name: 'Lõi lọc CTO Truliva UR5840', quantity: 1 },
-      { name: 'Lõi lọc RO Truliva UR5840', quantity: 1 }
-    ]
-  }
-};
-
-/**
- * Trả về danh sách combo mappings để UI Inventory nhóm sản phẩm thành phần combo.
- */
-export function getComboMappingsForInventory(): Array<{ comboKey: string; comboName: string; components: ComboComponent[] }> {
-  return Object.entries(KNOWN_COMBO_DEFINITIONS).map(([key, def]) => ({
-    comboKey: key,
-    comboName: def.displayName,
-    components: def.components
-  }));
-}
-
-export function getComboComponents(productName: string, sku?: string | null): ComboComponent[] | null {
-  const cleanSku = (sku || '').trim().toUpperCase();
-  if (cleanSku && KNOWN_COMBO_DEFINITIONS[cleanSku]) {
-    return KNOWN_COMBO_DEFINITIONS[cleanSku].components;
-  }
-  
-  const cleanName = (productName || '').toLowerCase().trim();
-
-  // 1. Chỉ phát hiện Gói Giải pháp W6412 khi tên có "w6412" kèm tier (eco/gold/platinum)
-  if (cleanName.includes('w6412')) {
-    if (cleanName.includes('eco')) {
-      return KNOWN_COMBO_DEFINITIONS['W6412-ECO'].components;
-    }
-    if (cleanName.includes('gold')) {
-      return KNOWN_COMBO_DEFINITIONS['W6412-GOLD'].components;
-    }
-    if (cleanName.includes('platinum')) {
-      return KNOWN_COMBO_DEFINITIONS['W6412-PLATINUM'].components;
-    }
-  }
-
-  // 2. Chỉ phát hiện Combo lõi lọc khi tên BẮT BUỘC có chữ "combo" hoặc "bộ "
-  if (cleanName.includes('combo') || cleanName.startsWith('bộ ')) {
-    if (cleanName.includes('5676')) {
-      return KNOWN_COMBO_DEFINITIONS['COMBO-5676-GOLD'].components;
-    }
-    if (cleanName.includes('5840')) {
-      if (cleanName.includes('3 lõi') || cleanName.includes('ro')) {
-        return KNOWN_COMBO_DEFINITIONS['COMBO-5840-3LOI'].components;
-      }
-      return KNOWN_COMBO_DEFINITIONS['COMBO-5840-2LOI'].components;
-    }
-  }
-
-  // BẤT KỲ sản phẩm đơn nào khác (Lõi lọc PGP, Lõi lọc CTO, Lõi lọc PCB, Máy UR5676, v.v.) -> return null
-  return null;
-}
 
 
 /**
@@ -1200,13 +1101,9 @@ export async function exportOrdersExcel(req: Request, res: Response): Promise<vo
         conditions.push({ appointmentTime: dateCond });
       } else if (type === 'completedAt') {
         conditions.push({ adminStatus: 'hoàn thành' });
+        // Ngày hoàn thành = ngày tạo báo cáo nghiệm thu (serviceReport.createdAt)
         conditions.push({
-          OR: [
-            { serviceReports: { some: { createdAt: dateCond } } },
-            { serviceReports: { some: { updatedAt: dateCond } } },
-            { updatedAt: dateCond },
-            { pancakeUpdatedAt: dateCond }
-          ]
+          serviceReports: { some: { createdAt: dateCond } }
         });
       } else if (type === 'updatedAt') {
         conditions.push({ pancakeUpdatedAt: dateCond });
@@ -1432,6 +1329,14 @@ export async function exportOrdersExcel(req: Request, res: Response): Promise<vo
               }
             }
           }
+        },
+        serviceReports: {
+          select: {
+            createdAt: true
+          },
+          orderBy: {
+            createdAt: 'desc'
+          }
         }
       }
     });
@@ -1446,6 +1351,7 @@ export async function exportOrdersExcel(req: Request, res: Response): Promise<vo
       { header: 'Địa chỉ chi tiết', key: 'address', width: 35 },
       { header: 'Tỉnh / Thành phố', key: 'province', width: 22 },
       { header: 'Trạng thái xử lý', key: 'adminStatus', width: 18 },
+      { header: 'Thời gian hoàn thành', key: 'completedAt', width: 22 },
       { header: 'Loại công việc', key: 'workType', width: 22 },
       { header: 'Loại dịch vụ chi tiết', key: 'serviceType', width: 25 },
       { header: 'Danh sách sản phẩm', key: 'products', width: 35 },
@@ -1490,6 +1396,11 @@ export async function exportOrdersExcel(req: Request, res: Response): Promise<vo
         o.assignedKtv?.techStation?.name || 
         '';
 
+      const latestReport = o.serviceReports && o.serviceReports.length > 0 ? o.serviceReports[0] : null;
+      const completedAtStr = o.adminStatus === 'hoàn thành'
+        ? (latestReport ? new Date(latestReport.createdAt).toLocaleString('vi-VN') : (o.appointmentTime ? new Date(o.appointmentTime).toLocaleString('vi-VN') : new Date(o.pancakeCreatedAt || o.createdAt).toLocaleString('vi-VN')))
+        : '';
+
       sheet.addRow({
         pancakeOrderId: o.pancakeOrderId < 0 ? `M${Math.abs(o.pancakeOrderId)}` : o.pancakeOrderId,
         customerName,
@@ -1497,6 +1408,7 @@ export async function exportOrdersExcel(req: Request, res: Response): Promise<vo
         address,
         province: provinceName,
         adminStatus: o.adminStatus || 'chờ xử lý',
+        completedAt: completedAtStr,
         workType: o.workType || '',
         serviceType: o.serviceType || '',
         products: productsList,
@@ -1960,6 +1872,8 @@ export async function updateOrder(req: Request, res: Response): Promise<void> {
     let targetAdminStatus = adminStatus;
     if (finalKtv && (!targetAdminStatus || targetAdminStatus === 'chờ xử lý') && (!oldOrder.adminStatus || oldOrder.adminStatus === 'chờ xử lý')) {
       targetAdminStatus = 'đang thực hiện';
+    } else if (!finalKtv && (targetAdminStatus === 'đang thực hiện' || (!targetAdminStatus && oldOrder.adminStatus === 'đang thực hiện'))) {
+      targetAdminStatus = 'chờ xử lý';
     }
 
     if (targetAdminStatus !== undefined && targetAdminStatus !== oldOrder.adminStatus) {
