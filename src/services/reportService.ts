@@ -48,13 +48,20 @@ export async function buildReportFilter(query: any, user: any): Promise<any> {
       role === 'HOTLINE' ||
       (role === 'STAFF' && group === 'Service')
     ) {
-      if (ktvId) {
-        where.ktvUserId = ktvId;
-      } else if (ktvIds) {
+      const targetKtvIds: string[] = [];
+      if (ktvId) targetKtvIds.push(ktvId);
+      if (ktvIds) {
         const list = (ktvIds as string).split(',').map((s: string) => s.trim()).filter(Boolean);
-        if (list.length > 0) {
-          where.ktvUserId = { in: list };
-        }
+        targetKtvIds.push(...list);
+      }
+      if (targetKtvIds.length > 0) {
+        where.AND = where.AND || [];
+        where.AND.push({
+          OR: [
+            { ktvUserId: { in: targetKtvIds } },
+            { order: { assignedKtvId: { in: targetKtvIds } } }
+          ]
+        });
       }
     } else {
       const orConditions: any[] = [];
@@ -162,117 +169,137 @@ export async function buildReportFilter(query: any, user: any): Promise<any> {
         where.AND.push({ OR: orConditions });
       }
 
-      if (ktvId) {
-        where.ktvUserId = ktvId;
-      } else if (ktvIds) {
+      const targetKtvIds: string[] = [];
+      if (ktvId) targetKtvIds.push(ktvId);
+      if (ktvIds) {
         const list = (ktvIds as string).split(',').map((s: string) => s.trim()).filter(Boolean);
-        if (list.length > 0) {
-          where.ktvUserId = { in: list };
-        }
+        targetKtvIds.push(...list);
+      }
+      if (targetKtvIds.length > 0) {
+        where.AND = where.AND || [];
+        where.AND.push({
+          OR: [
+            { ktvUserId: { in: targetKtvIds } },
+            { order: { assignedKtvId: { in: targetKtvIds } } }
+          ]
+        });
       }
     }
   }
 
-  // When searching, don't restrict by month - the user wants to find a specific report
-  // regardless of which month it belongs to. This also prevents stale frontend filters
-  // (cached in sessionStorage) from hiding search results.
-  if (month && !search) where.month = month;
+  // Support both 8/2026 and 08/2026 formats
+  if (month && !search) {
+    const parts = String(month).trim().split('/');
+    if (parts.length === 2) {
+      const m = parseInt(parts[0], 10);
+      const y = parts[1].trim();
+      if (!isNaN(m) && y) {
+        const v1 = `${m}/${y}`;
+        const v2 = `${m < 10 ? '0' + m : m}/${y}`;
+        where.month = { in: Array.from(new Set([v1, v2])) };
+      } else {
+        where.month = month;
+      }
+    } else {
+      where.month = month;
+    }
+  }
+
   if (province) where.province = { contains: province as string, mode: 'insensitive' };
   
-  if (workTypes) {
-    const list = (workTypes as string).split(',').map((s: string) => s.trim()).filter(Boolean);
-    if (list.length > 0) {
-      where.workType = { in: list };
+  // When searching, bypass category, station, and date filters so that stale filters in sessionStorage don't hide the search result
+  if (!search) {
+    if (workTypes) {
+      const list = (workTypes as string).split(',').map((s: string) => s.trim()).filter(Boolean);
+      if (list.length > 0) {
+        where.workType = { in: list };
+      }
     }
-  }
 
-  if (serviceTypes) {
-    const list = (serviceTypes as string).split(',').map((s: string) => s.trim()).filter(Boolean);
-    if (list.length > 0) {
-      where.serviceType = { in: list };
+    if (serviceTypes) {
+      const list = (serviceTypes as string).split(',').map((s: string) => s.trim()).filter(Boolean);
+      if (list.length > 0) {
+        where.serviceType = { in: list };
+      }
+    } else if (serviceType) {
+      where.serviceType = serviceType;
     }
-  } else if (serviceType) {
-    where.serviceType = serviceType;
-  }
 
-  if (isPaid !== undefined) where.isPaid = isPaid === 'true';
+    if (isPaid !== undefined) where.isPaid = isPaid === 'true';
 
-  if (productCategories) {
-    const categories = (productCategories as string).split(',').map((s: string) => s.trim()).filter(Boolean);
-    if (categories.length > 0) {
-      const dbProducts = await prisma.product.findMany({
-        where: { category: { in: categories, mode: 'insensitive' } },
-        select: { name: true }
-      });
-      const productNames = dbProducts.map((p: any) => p.name);
-      if (productNames.length > 0) {
-        where.products = {
-          hasSome: productNames
-        };
-      } else {
-        where.id = 'none';
+    if (productCategories) {
+      const categories = (productCategories as string).split(',').map((s: string) => s.trim()).filter(Boolean);
+      if (categories.length > 0) {
+        const catConditions = categories.map(c => ({
+          category: { contains: c, mode: 'insensitive' as const }
+        }));
+        const dbProducts = await prisma.product.findMany({
+          where: { OR: catConditions },
+          select: { name: true }
+        });
+        const productNames = dbProducts.map((p: any) => p.name);
+        if (productNames.length > 0) {
+          where.AND = where.AND || [];
+          where.AND.push({
+            OR: [
+              { products: { hasSome: productNames } },
+              { spareParts: { hasSome: productNames } }
+            ]
+          });
+        } else {
+          where.id = 'none';
+        }
+      }
+    }
+
+    if (products) {
+      const list = (products as string).split(',').map((s: string) => s.trim()).filter(Boolean);
+      if (list.length > 0) {
+        where.AND = where.AND || [];
+        where.AND.push({
+          OR: [
+            { products: { hasSome: list } },
+            { spareParts: { hasSome: list } }
+          ]
+        });
+      }
+    }
+
+    // Trạm chính: kiểm tra cả ServiceReport.mainStationId, Order.mainStationId và KTV techStation.mainStationId
+    const rawMainStationIds = mainStationIds || mainStationId;
+    if (rawMainStationIds) {
+      const list = String(rawMainStationIds).split(',').map((s: string) => s.trim()).filter(Boolean);
+      if (list.length > 0) {
+        where.AND = where.AND || [];
+        where.AND.push({
+          OR: [
+            { mainStationId: { in: list } },
+            { order: { mainStationId: { in: list } } },
+            { ktvUser: { techStation: { mainStationId: { in: list } } } }
+          ]
+        });
+      }
+    }
+
+    // Trạm kỹ thuật: điều kiện AND độc lập để thu hẹp kết quả chính xác
+    if (techStationIds) {
+      const list = String(techStationIds).split(',').map((s: string) => s.trim()).filter(Boolean);
+      if (list.length > 0) {
+        where.AND = where.AND || [];
+        where.AND.push({
+          OR: [
+            { order: { techStationId: { in: list } } },
+            { ktvUser: { techStationId: { in: list } } }
+          ]
+        });
       }
     }
   }
 
-  if (products) {
-    const list = (products as string).split(',').map((s: string) => s.trim()).filter(Boolean);
-    if (list.length > 0) {
-      where.products = {
-        hasSome: list
-      };
-    }
-  }
-
-  const stationOrConditions: any[] = [];
-  const rawMainStationIds = mainStationIds || mainStationId;
-  if (rawMainStationIds) {
-    const list = String(rawMainStationIds).split(',').map((s: string) => s.trim()).filter(Boolean);
-    if (list.length > 0) {
-      // Match reports where KTV belongs to the selected main station
-      stationOrConditions.push({
-        ktvUser: {
-          techStation: {
-            mainStationId: { in: list }
-          }
-        }
-      });
-      // Also match reports where the ORDER is assigned to the selected main station
-      // (covers cases where a KTV from a different station handles the order)
-      stationOrConditions.push({
-        order: {
-          mainStationId: { in: list }
-        }
-      });
-    }
-  }
-
-  if (techStationIds) {
-    const list = String(techStationIds).split(',').map((s: string) => s.trim()).filter(Boolean);
-    if (list.length > 0) {
-      stationOrConditions.push({
-        ktvUser: {
-          techStationId: { in: list }
-        }
-      });
-      // Also match reports where the ORDER is assigned to the selected tech station
-      stationOrConditions.push({
-        order: {
-          techStationId: { in: list }
-        }
-      });
-    }
-  }
-
-  if (stationOrConditions.length > 0) {
-    where.AND = where.AND || [];
-    where.AND.push({ OR: stationOrConditions });
-  }
-
-  // When searching, skip date/time range filters to prevent stale cached filters from hiding results
   if (!search) {
+    // 1. Khoảng ngày ngoài toolbar (startDate / endDate)
     if (startDate || endDate) {
-      where.createdAt = {};
+      where.createdAt = where.createdAt || {};
       if (startDate) where.createdAt.gte = new Date(startDate as string);
       if (endDate) {
         const eDate = new Date(endDate as string);
@@ -281,6 +308,7 @@ export async function buildReportFilter(query: any, user: any): Promise<any> {
       }
     }
 
+    // 2. Thời gian hoàn thành trong modal nâng cao (completedStart / completedEnd)
     if (completedStart || completedEnd) {
       where.createdAt = where.createdAt || {};
       if (completedStart) where.createdAt.gte = new Date(completedStart as string);
@@ -291,16 +319,25 @@ export async function buildReportFilter(query: any, user: any): Promise<any> {
       }
     }
 
+    // 3. Thời gian tạo đơn trong modal nâng cao: lọc theo ngày tạo của Đơn hàng (Order)
     if (createdStart || createdEnd) {
-      where.createdAt = where.createdAt || {};
-      if (createdStart) where.createdAt.gte = new Date(createdStart as string);
+      const orderDateFilter: any = {};
+      if (createdStart) orderDateFilter.gte = new Date(createdStart as string);
       if (createdEnd) {
         const eDate = new Date(createdEnd as string);
         eDate.setHours(23, 59, 59, 999);
-        where.createdAt.lte = eDate;
+        orderDateFilter.lte = eDate;
       }
+      where.AND = where.AND || [];
+      where.AND.push({
+        OR: [
+          { order: { pancakeCreatedAt: orderDateFilter } },
+          { order: { createdAt: orderDateFilter } }
+        ]
+      });
     }
 
+    // 4. Thời gian cập nhật trong modal nâng cao
     if (updatedStart || updatedEnd) {
       where.updatedAt = {};
       if (updatedStart) where.updatedAt.gte = new Date(updatedStart as string);

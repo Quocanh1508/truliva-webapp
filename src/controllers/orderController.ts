@@ -413,12 +413,17 @@ export async function getOrders(req: Request, res: Response): Promise<void> {
     
     if (sortBy === 'appointmentTime') {
       orderByList.push({ appointmentTime: orderDirection });
+      orderByList.push({ createdAt: orderDirection });
     } else if (sortBy === 'updatedAt') {
       orderByList.push({ updatedAt: orderDirection });
+      orderByList.push({ createdAt: orderDirection });
+    } else if (sortBy === 'pancakeOrderId' || sortBy === 'id') {
+      orderByList.push({ pancakeOrderId: orderDirection });
     } else {
-      orderByList.push({ pancakeCreatedAt: orderDirection });
+      // Mặc định hoặc khi chọn 'createdAt': Sắp xếp theo ngày tạo (createdAt) mới nhất trước
+      orderByList.push({ createdAt: orderDirection });
+      orderByList.push({ pancakeOrderId: orderDirection });
     }
-    orderByList.push({ createdAt: orderDirection });
 
     // Build statsWhere ignoring adminStatus filter to show counts of all statuses matching other active filters
     const statsConditions = conditions.filter(cond => !('adminStatus' in cond));
@@ -2079,14 +2084,13 @@ export async function updateOrder(req: Request, res: Response): Promise<void> {
       data: updateData,
     });
 
-    // Nếu chuyển sang hủy đơn, tự động xóa các báo cáo kỹ thuật liên quan
+    // [RULE 7 - ZERO HARD-DELETE POLICY] Khi chuyển sang hủy đơn, tuyệt đối không xóa báo cáo kỹ thuật
     if (adminStatus === 'hủy đơn') {
-      const deletedReports = await prisma.serviceReport.deleteMany({
-        where: { orderId: id }
+      await prisma.serviceReport.updateMany({
+        where: { orderId: id, approvalStatus: { not: 'APPROVED' } },
+        data: { approvalStatus: 'REJECTED' }
       });
-      if (deletedReports.count > 0) {
-        logger.info(`Automatically deleted ${deletedReports.count} service reports for order cancelled by Admin`, { orderId: id });
-      }
+      logger.info(`Preserved service reports for cancelled order under Zero Hard-Delete Policy`, { orderId: id });
     }
 
     // Tích hợp đồng bộ tồn kho cục bộ
@@ -2607,13 +2611,12 @@ export async function bulkCancelOrders(req: Request, res: Response): Promise<voi
         data: { adminStatus: 'hủy đơn' }
       });
 
-      // Xóa các báo cáo kỹ thuật liên quan
-      const deletedReports = await prisma.serviceReport.deleteMany({
-        where: { orderId: oldOrder.id }
+      // [RULE 7 - ZERO HARD-DELETE POLICY] Không xóa báo cáo kỹ thuật
+      await prisma.serviceReport.updateMany({
+        where: { orderId: oldOrder.id, approvalStatus: { not: 'APPROVED' } },
+        data: { approvalStatus: 'REJECTED' }
       });
-      if (deletedReports.count > 0) {
-        logger.info(`Bulk cancel: deleted ${deletedReports.count} service reports for order`, { orderId: oldOrder.id });
-      }
+      logger.info(`Bulk cancel: preserved service reports under Zero Hard-Delete Policy`, { orderId: oldOrder.id });
 
       // Đồng bộ tồn kho
       try {

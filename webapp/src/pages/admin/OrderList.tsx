@@ -1599,6 +1599,8 @@ export default function OrderList() {
     setCustomStartDate('');
     setCustomEndDate('');
     setDateType('createdAt');
+    setSortBy('createdAt');
+    setSortOrder('desc');
     try {
       sessionStorage.removeItem('truliva_order_filters');
     } catch (e) {

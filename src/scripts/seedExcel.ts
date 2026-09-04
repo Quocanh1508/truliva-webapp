@@ -28,7 +28,7 @@ async function run() {
     const sheet = workbook.worksheets[0];
 
     // Find or create a mock KTV user for these reports
-    let ktvUser = await prisma.user.findFirst({ where: { role: 'KTV' } });
+    let ktvUser = await prisma.user.findFirst({ where: { role: 'KTV', isActive: true } });
     if (!ktvUser) {
       const passwordHash = await bcrypt.hash('123456', 10);
       ktvUser = await prisma.user.create({

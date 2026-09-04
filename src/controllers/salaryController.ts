@@ -922,8 +922,14 @@ export async function deleteCustomCase(req: Request, res: Response): Promise<voi
       return;
     }
 
-    await prisma.serviceReport.delete({
-      where: { id: reportId }
+    // [RULE 7 - ZERO HARD-DELETE POLICY] Soft-delete ca bổ sung
+    await prisma.serviceReport.update({
+      where: { id: reportId },
+      data: {
+        approvalStatus: 'REJECTED',
+        orderId: null,
+        notes: '[ĐÃ HỦY CA BỔ SUNG]'
+      }
     });
 
     res.json({ message: 'Đã xóa ca dịch vụ bổ sung thành công' });

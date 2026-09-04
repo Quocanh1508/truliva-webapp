@@ -426,15 +426,49 @@ export async function computeFullSalariesForMonth(month: string) {
   for (const ktv of ktvs) {
     const reports = await prisma.serviceReport.findMany({
       where: {
-        ktvUserId: ktv.id,
         approvalStatus: 'APPROVED',
         OR: [
           { month: { in: monthVariants } },
           { createdAt: { gte: startDate, lte: endDate } }
+        ],
+        AND: [
+          {
+            OR: [
+              { ktvUserId: ktv.id },
+              {
+                AND: [
+                  { order: { assignedKtvId: ktv.id } },
+                  { ktvUser: { role: { not: 'KTV' } } }
+                ]
+              }
+            ]
+          }
         ]
       },
-      include: { order: true }
+      include: {
+        order: true,
+        ktvUser: true
+      },
+      orderBy: { createdAt: 'asc' }
     });
+
+    // ── NGHIỆP VỤ: 1 Đơn hàng = tối đa 1 Ca tính lương ──
+    // Nếu một đơn hàng có nhiều báo cáo nghiệm thu APPROVED (ví dụ KTV nộp đợt 1 rồi đợt 2 nộp bổ sung trên cùng đơn),
+    // chỉ lấy 1 báo cáo mới nhất làm ca nghiệm thu chính thức của đơn đó.
+    // Các báo cáo đơn lẻ không gắn orderId (orderId === null) vẫn được giữ nguyên đầy đủ.
+    const orderReportsMap = new Map<string, any>();
+    const adHocReports: any[] = [];
+    for (const report of reports) {
+      if (report.orderId) {
+        // Do reports được sắp xếp createdAt: 'asc', báo cáo nộp sau sẽ ghi đè báo cáo nộp trước -> lấy báo cáo mới nhất
+        orderReportsMap.set(report.orderId, report);
+      } else {
+        adHocReports.push(report);
+      }
+    }
+    const finalReports = [...orderReportsMap.values(), ...adHocReports].sort(
+      (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+    );
 
     const ktvPhoneNorm = normalizePhone(ktv.phoneNumber);
     const isOfficialTrulivaKtv = checkIsOfficialTrulivaKtv(ktv);
@@ -446,7 +480,7 @@ export async function computeFullSalariesForMonth(month: string) {
     const eligibleDistanceReportIds = new Set<string>();
     if (isOfficialTrulivaKtv) {
       const reportsByDay = new Map<string, any[]>();
-      for (const r of reports) {
+      for (const r of finalReports) {
         const dayKey = r.createdAt ? new Date(r.createdAt).toLocaleDateString('sv-SE', { timeZone: 'Asia/Ho_Chi_Minh' }) : 'no-date';
         if (!reportsByDay.has(dayKey)) {
           reportsByDay.set(dayKey, []);
@@ -473,7 +507,7 @@ export async function computeFullSalariesForMonth(month: string) {
     let calculatedCost = 0;
     const reportsDetail = [];
 
-    for (const report of reports) {
+    for (const report of finalReports) {
       const isEligibleForDistance = isOfficialTrulivaKtv
         ? eligibleDistanceReportIds.has(report.id)
         : true;
@@ -528,7 +562,7 @@ export async function computeFullSalariesForMonth(month: string) {
       province: stationRate?.province || ktv.techStation?.name || 'Chưa cập nhật',
       stationName: ktv.techStation?.name || (stationRate ? stationRate.province : 'Không có'),
       mainStationName: ktv.techStation?.mainStation?.name || 'Không có',
-      casesCount: reports.length,
+      casesCount: finalReports.length,
       isStationPaid,
       calculatedCost,
       adjustedCost,

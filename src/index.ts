@@ -270,8 +270,8 @@ const server = app.listen(PORT, () => {
   // Khởi động lập lịch đồng bộ đơn hàng tự động từ Pancake POS
   startOrderSyncScheduler(5); // Chạy định kỳ mỗi 5 phút
 
-  // Khởi động lập lịch dọn dẹp báo cáo KTV cũ hơn 60 ngày
-  startReportCleanupScheduler();
+  // [VÔ HIỆU HÓA] Tuân thủ Rule 7 - ZERO HARD-DELETE POLICY: Tuyệt đối không xóa ServiceReport cũ
+  // startReportCleanupScheduler();
 
   // Khởi động lập lịch tự động đồng bộ lại đơn lỗi sang Pancake POS
   startPancakeRetryScheduler(10); // Chạy định kỳ mỗi 10 phút

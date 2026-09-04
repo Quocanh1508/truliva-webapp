@@ -155,6 +155,12 @@ export async function processOrderEvent(rawEventId: string | null, payload: any)
             productName: true,
             quantity: true
           }
+        },
+        serviceReports: {
+          select: {
+            id: true,
+            approvalStatus: true
+          }
         }
       }
     });
@@ -240,7 +246,17 @@ export async function processOrderEvent(rawEventId: string | null, payload: any)
     } else if (isExchanged) {
       newAdminStatus = 'đã đổi';
     } else if (isCompleted) {
-      if (newAdminStatus !== 'hủy đơn') newAdminStatus = 'hoàn thành';
+      const hasReport = existingOrder?.serviceReports && existingOrder.serviceReports.some(r => r.approvalStatus !== 'REJECTED');
+      if (hasReport) {
+        if (newAdminStatus !== 'hủy đơn') newAdminStatus = 'hoàn thành';
+      } else {
+        // Nếu chưa có báo cáo nghiệm thu kỹ thuật: không được tự ý chuyển sang 'hoàn thành'
+        if (existingOrder?.assignedKtvId) {
+          newAdminStatus = 'đang thực hiện';
+        } else {
+          newAdminStatus = existingOrder?.adminStatus || 'chờ xử lý';
+        }
+      }
     } else if (existingOrder?.assignedKtvId && (!newAdminStatus || newAdminStatus === 'chờ xử lý')) {
       // Đơn đã phân công KTV thì duy trì 'đang thực hiện'
       newAdminStatus = 'đang thực hiện';
@@ -463,17 +479,16 @@ export async function processOrderEvent(rawEventId: string | null, payload: any)
       logger.error('Lỗi khấu trừ kho khi đồng bộ webhook Pancake', { orderId: order.id, error: invErr.message });
     }
 
-    // Nếu đơn hàng bị hủy, tự động xóa các báo cáo kỹ thuật liên quan
+    // [RULE 7 - ZERO HARD-DELETE POLICY] Khi đơn hàng bị hủy, tuyệt đối không xóa báo cáo kỹ thuật (chứng từ nghiệm thu).
     if (newAdminStatus === 'hủy đơn') {
-      const deletedReports = await prisma.serviceReport.deleteMany({
-        where: { orderId: order.id }
+      await prisma.serviceReport.updateMany({
+        where: { orderId: order.id, approvalStatus: { not: 'APPROVED' } },
+        data: { approvalStatus: 'REJECTED' }
       });
-      if (deletedReports.count > 0) {
-        logger.info(`Automatically deleted ${deletedReports.count} service reports for cancelled order`, {
-          orderId: order.id,
-          pancakeOrderId: systemId
-        });
-      }
+      logger.info(`Preserved service reports for cancelled order under Zero Hard-Delete Policy`, {
+        orderId: order.id,
+        pancakeOrderId: systemId
+      });
     }
 
     // ══════════════════════════════════════

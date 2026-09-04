@@ -168,10 +168,15 @@ export async function createReport(req: Request, res: Response): Promise<void> {
         }
       }
 
-      await prisma.serviceReport.deleteMany({
+      // [RULE 7 - ZERO HARD-DELETE POLICY] Không xóa báo cáo cũ, chỉ đánh dấu thay thế
+      await prisma.serviceReport.updateMany({
         where: {
           orderId,
           approvalStatus: { in: ['PENDING', 'REJECTED'] }
+        },
+        data: {
+          approvalStatus: 'REJECTED',
+          notes: 'Đã nộp báo cáo mới thay thế'
         }
       });
     }
@@ -191,7 +196,9 @@ export async function createReport(req: Request, res: Response): Promise<void> {
       isApprovalRequired = false;
     }
 
-    const targetKtvUserId = isKtv ? req.user!.id : (assignedKtvId || req.user!.id);
+    const targetKtvUserId = isKtv 
+      ? req.user!.id 
+      : (assignedKtvId || oldOrder?.assignedKtvId || req.user!.id);
     const reportedById = req.user!.id;
 
     const serviceTypeClean = (serviceType || '').trim().toLowerCase();
@@ -259,6 +266,21 @@ export async function createReport(req: Request, res: Response): Promise<void> {
         ktvUser: { select: { fullName: true } },
       },
     });
+
+    if (orderId && report.approvalStatus === 'APPROVED') {
+      // Đảm bảo 1 đơn hàng chỉ có duy nhất 1 báo cáo APPROVED:
+      await prisma.serviceReport.updateMany({
+        where: {
+          orderId,
+          id: { not: report.id },
+          approvalStatus: 'APPROVED'
+        },
+        data: {
+          approvalStatus: 'REJECTED',
+          notes: 'Đã nộp báo cáo mới thay thế'
+        }
+      });
+    }
 
     if (report.serialNumber && report.serialNumber !== 'XXXXX') {
       try {
@@ -1763,8 +1785,14 @@ export async function deleteReport(req: Request, res: Response): Promise<void> {
       }
     }
 
-    await prisma.serviceReport.delete({
+    // [RULE 7 - ZERO HARD-DELETE POLICY] Soft-delete báo cáo
+    await prisma.serviceReport.update({
       where: { id: reportId },
+      data: {
+        approvalStatus: 'REJECTED',
+        orderId: null,
+        notes: deleteReason ? `[ĐÃ HỦY] ${deleteReason}` : '[ĐÃ HỦY]'
+      }
     });
 
     logger.info('Report deleted by Admin', { reportId, adminId: req.user!.id, deleteReason });
@@ -1804,6 +1832,21 @@ export async function approveReport(req: Request, res: Response): Promise<void> 
       where: { id: reportId },
       data: { approvalStatus: 'APPROVED' }
     });
+
+    if (report.orderId) {
+      // Đảm bảo 1 đơn hàng chỉ có duy nhất 1 báo cáo APPROVED:
+      await prisma.serviceReport.updateMany({
+        where: {
+          orderId: report.orderId,
+          id: { not: reportId },
+          approvalStatus: 'APPROVED'
+        },
+        data: {
+          approvalStatus: 'REJECTED',
+          notes: 'Đã thay thế bởi báo cáo nghiệm thu mới được duyệt'
+        }
+      });
+    }
 
     const order = report.order;
     if (order) {

@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { LogIn, Download, Smartphone, X, Share2, PlusSquare, Monitor, ShieldCheck } from 'lucide-react';
+import { LogIn, Download, Smartphone, X, Share2, PlusSquare, Monitor, ShieldCheck, AlertTriangle } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { fetchApi } from '../api/client';
 import { Capacitor } from '@capacitor/core';
+import { isSandboxEnvironment } from '../components/SandboxBanner';
 
 interface Particle {
   x: number;
@@ -436,10 +437,17 @@ export default function LoginPage() {
             {/* Ambient logo glow */}
             <div className="absolute inset-0 bg-blue-500/15 blur-3xl rounded-full pointer-events-none z-[-1]" />
           </div>
-          <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full text-[13px] font-bold tracking-wide uppercase bg-blue-500/10 text-blue-400 border border-blue-500/20 select-none">
-            <ShieldCheck size={14} className="text-blue-400 animate-pulse" />
-            <span>Truliva App</span>
-          </div>
+          {isSandboxEnvironment() ? (
+            <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full text-[13px] font-bold tracking-wide uppercase bg-amber-500/20 text-amber-300 border border-amber-500/40 shadow-[0_0_20px_rgba(245,158,11,0.25)] select-none animate-pulse">
+              <AlertTriangle size={14} className="text-amber-400" />
+              <span>SANDBOX • CỔNG TEST 8443</span>
+            </div>
+          ) : (
+            <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full text-[13px] font-bold tracking-wide uppercase bg-blue-500/10 text-blue-400 border border-blue-500/20 select-none">
+              <ShieldCheck size={14} className="text-blue-400 animate-pulse" />
+              <span>Truliva App</span>
+            </div>
+          )}
           <h2 className="font-bold text-[18px] mt-3.5 text-white tracking-wide leading-snug">
             Hệ thống quản lý dịch vụ<br />và kỹ thuật viên
           </h2>

@@ -62,3 +62,16 @@ Dưới đây là các đúc kết thực tế để tối ưu hóa việc deplo
   - Mọi script can thiệp dữ liệu chỉ được dùng `findMany()`, `update()`, `updateMany()`.
   - Mọi thao tác thay đổi trạng thái phải đi kèm bản ghi giải trình trong `AuditLog` với `action: 'data_fix'` hoặc `action: 'updated'` và `reason` rõ ràng.
 
+## 8. QUY TRÌNH KIỂM THỬ SANDBOX & ZERO-RISK DEPLOYMENT POLICY
+- **Hạ tầng Sandbox độc lập**:
+  - **Database Sandbox**: `truliva_sandbox` (PostgreSQL VPS).
+  - **Backend Sandbox**: Thư mục `/var/www/truliva-sandbox`, PM2 `truliva-sandbox`, cổng `3001`.
+  - **Web App Sandbox**: `https://trulivaofficial.com:8443` (có sticky banner màu cam).
+  - **Local Tunnel Sandbox**: `node scratch/start_sandbox_db_tunnel.js` (cổng `5433`).
+  - **Script 1-Touch làm mới dữ liệu**: `bash /var/www/truliva/scripts/sync_prod_to_sandbox.sh`.
+- **Chính sách Bắt Buộc (Mandatory Staging-First Rule)**:
+  - Mọi tính năng mới, thay đổi bảng lương, chỉnh sửa logic Controller hoặc script xử lý dữ liệu phức tạp **BẮT BUỘC** phải được chạy thử nghiệm và nghiệm thu trên môi trường **Sandbox** trước.
+  - Tuyệt đối không chạy thử nghiệm tính năng chưa kiểm chứng trực tiếp trên môi trường Production.
+  - Chỉ sau khi đã nghiệm thu 100% trên Sandbox (qua HTTP và UI), mới tiến hành cập nhật lên Production theo đúng quy chuẩn Rule 4.
+
+

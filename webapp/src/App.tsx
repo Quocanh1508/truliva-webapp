@@ -13,6 +13,7 @@ import ProtectedRoute from './components/ProtectedRoute';
 import Layout from './components/Layout';
 import OfflineScreen from './components/OfflineScreen';
 import MaintenanceScreen from './components/MaintenanceScreen';
+import SandboxBanner from './components/SandboxBanner';
 
 // Shared Pages
 import ChangePasswordPage from './pages/ChangePasswordPage';
@@ -306,6 +307,7 @@ export default function App() {
         <BrowserRouter>
           <PushNotificationManager>
             <ConfirmProvider>
+              <SandboxBanner />
               <OfflineScreen />
               <MaintenanceScreen />
               <Routes>

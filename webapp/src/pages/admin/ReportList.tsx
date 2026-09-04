@@ -1,10 +1,10 @@
 import { useEffect, useState, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { fetchApi, deleteReportWithReason, updateReport, uploadImages, approveReport, rejectReport, getFiltersData } from '../../api/client';
-import { Download, X, ExternalLink, Image as ImageIcon, Loader, Search, Edit3, Save, Plus, Trash2, SlidersHorizontal, RotateCcw, Calendar, ChevronLeft, ChevronRight, ShieldCheck, CheckCircle, Loader2 } from 'lucide-react';
+import { Download, X, ExternalLink, Image as ImageIcon, Loader, Search, Edit3, Save, Plus, Trash2, SlidersHorizontal, RotateCcw, Calendar, ChevronLeft, ChevronRight, ShieldCheck, CheckCircle, Loader2, Filter, XCircle } from 'lucide-react';
 import CategoryTreeSelect from '../../components/CategoryTreeSelect';
 import DateRangePicker from '../../components/DateRangePicker';
-import { formatOrderId } from '../../utils/text';
+import { formatOrderId, matchesSearchTerm } from '../../utils/text';
 import { usePermission } from '../../context/PermissionContext';
 import { isValidPhone, PHONE_ERROR_MSG } from '../../utils/phone';
 import ProvinceSelect from '../../components/ProvinceSelect';
@@ -142,7 +142,9 @@ function MultiSelectDropdown({
   placeholder?: string;
 }) {
   const [isOpen, setIsOpen] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
   const containerRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
@@ -154,6 +156,13 @@ function MultiSelectDropdown({
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
+  useEffect(() => {
+    if (isOpen) {
+      setSearchTerm('');
+      setTimeout(() => inputRef.current?.focus(), 50);
+    }
+  }, [isOpen]);
+
   const toggleOption = (opt: string) => {
     if (selected.includes(opt)) {
       onChange(selected.filter(item => item !== opt));
@@ -162,12 +171,14 @@ function MultiSelectDropdown({
     }
   };
 
+  const filteredOptions = options.filter(opt => matchesSearchTerm(opt, searchTerm));
+
   return (
     <div className="flex flex-col gap-1 relative w-full text-left" ref={containerRef}>
       <label className="text-[11px] font-bold text-gray-500 uppercase tracking-wider">{label}</label>
       <div 
         onClick={() => setIsOpen(!isOpen)}
-        className="w-full bg-white border border-gray-300 rounded-md px-3 py-2 text-[13px] text-gray-700 cursor-pointer flex justify-between items-center hover:border-blue-400 focus:border-blue-500 transition-colors"
+        className="w-full bg-white border border-gray-300 rounded-md px-3 py-2 text-[13px] text-gray-700 cursor-pointer flex justify-between items-center hover:border-blue-400 focus:border-blue-500 transition-colors select-none"
       >
         <span className="truncate">
           {selected.length === 0 
@@ -177,24 +188,52 @@ function MultiSelectDropdown({
         <span className="text-[10px] text-gray-400">▼</span>
       </div>
       {isOpen && (
-        <div className="absolute top-[100%] left-0 right-0 z-30 mt-1 bg-white border border-gray-200 rounded-md shadow-lg max-h-48 overflow-y-auto p-2 flex flex-col gap-1.5">
-          {options.map(opt => {
-            const isChecked = selected.includes(opt);
-            return (
-              <label key={opt} className="flex items-center gap-2 px-2 py-1 hover:bg-gray-50 rounded cursor-pointer select-none text-[13px]">
-                <input
-                  type="checkbox"
-                  checked={isChecked}
-                  onChange={() => toggleOption(opt)}
-                  className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 w-4 h-4 cursor-pointer"
-                />
-                <span className="text-gray-750 font-medium">{opt}</span>
-              </label>
-            );
-          })}
-          {options.length === 0 && (
-            <span className="text-xs text-gray-400 italic p-2 text-center">Không có lựa chọn</span>
-          )}
+        <div className="absolute top-[100%] left-0 right-0 z-40 mt-1 bg-white border border-gray-200 rounded-md shadow-lg max-h-60 flex flex-col overflow-hidden animate-fade-in">
+          {/* Search bar */}
+          <div className="p-2 border-b border-gray-150 bg-gray-50 shrink-0">
+            <div className="relative flex items-center">
+              <Search size={13} className="absolute left-2.5 text-gray-400 pointer-events-none" />
+              <input
+                ref={inputRef}
+                type="text"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                placeholder="Tìm kiếm..."
+                className="w-full pl-8 pr-6 py-1 text-[12px] bg-white border border-gray-300 rounded outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all"
+                onClick={(e) => e.stopPropagation()}
+              />
+              {searchTerm && (
+                <button
+                  type="button"
+                  onClick={(e) => { e.stopPropagation(); setSearchTerm(''); inputRef.current?.focus(); }}
+                  className="absolute right-2 text-gray-400 hover:text-gray-600"
+                >
+                  <X size={12} />
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* Options list */}
+          <div className="overflow-y-auto p-2 flex flex-col gap-1 max-h-48">
+            {filteredOptions.map(opt => {
+              const isChecked = selected.includes(opt);
+              return (
+                <label key={opt} className="flex items-center gap-2 px-2 py-1.5 hover:bg-gray-50 rounded cursor-pointer select-none text-[13px] transition-colors">
+                  <input
+                    type="checkbox"
+                    checked={isChecked}
+                    onChange={() => toggleOption(opt)}
+                    className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 w-4 h-4 cursor-pointer shrink-0"
+                  />
+                  <span className="text-gray-750 font-medium truncate">{opt}</span>
+                </label>
+              );
+            })}
+            {filteredOptions.length === 0 && (
+              <span className="text-xs text-gray-400 italic p-3 text-center">Không tìm thấy kết quả</span>
+            )}
+          </div>
         </div>
       )}
     </div>
@@ -217,7 +256,9 @@ function MultiSelectObjectDropdown({
   onBeforeOpen?: () => boolean;
 }) {
   const [isOpen, setIsOpen] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
   const containerRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
@@ -228,6 +269,13 @@ function MultiSelectObjectDropdown({
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
+
+  useEffect(() => {
+    if (isOpen) {
+      setSearchTerm('');
+      setTimeout(() => inputRef.current?.focus(), 50);
+    }
+  }, [isOpen]);
 
   const toggleOption = (id: string) => {
     if (selectedIds.includes(id)) {
@@ -244,6 +292,7 @@ function MultiSelectObjectDropdown({
   };
 
   const selectedNames = getSelectedNames();
+  const filteredOptions = options.filter(opt => matchesSearchTerm(opt.name, searchTerm));
 
   return (
     <div className="flex flex-col gap-1 relative w-full text-left" ref={containerRef}>
@@ -256,7 +305,7 @@ function MultiSelectObjectDropdown({
           }
           setIsOpen(!isOpen);
         }}
-        className="w-full bg-white border border-gray-300 rounded-md px-3 py-2 text-[13px] text-gray-700 cursor-pointer flex justify-between items-center hover:border-blue-400 focus:border-blue-500 transition-colors"
+        className="w-full bg-white border border-gray-300 rounded-md px-3 py-2 text-[13px] text-gray-700 cursor-pointer flex justify-between items-center hover:border-blue-400 focus:border-blue-500 transition-colors select-none"
       >
         <span className="truncate">
           {selectedIds.length === 0 
@@ -266,24 +315,153 @@ function MultiSelectObjectDropdown({
         <span className="text-[10px] text-gray-400">▼</span>
       </div>
       {isOpen && (
-        <div className="absolute top-[100%] left-0 right-0 z-30 mt-1 bg-white border border-gray-200 rounded-md shadow-lg max-h-48 overflow-y-auto p-2 flex flex-col gap-1.5">
-          {options.map(opt => {
-            const isChecked = selectedIds.includes(opt.id);
-            return (
-              <label key={opt.id} className="flex items-center gap-2 px-2 py-1 hover:bg-gray-50 rounded cursor-pointer select-none text-[13px]">
-                <input
-                  type="checkbox"
-                  checked={isChecked}
-                  onChange={() => toggleOption(opt.id)}
-                  className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 w-4 h-4 cursor-pointer"
-                />
-                <span className="text-gray-750 font-medium">{opt.name}</span>
-              </label>
-            );
-          })}
-          {options.length === 0 && (
-            <span className="text-xs text-gray-400 italic p-2 text-center">Không có lựa chọn</span>
-          )}
+        <div className="absolute top-[100%] left-0 right-0 z-40 mt-1 bg-white border border-gray-200 rounded-md shadow-lg max-h-60 flex flex-col overflow-hidden animate-fade-in">
+          {/* Search bar */}
+          <div className="p-2 border-b border-gray-150 bg-gray-50 shrink-0">
+            <div className="relative flex items-center">
+              <Search size={13} className="absolute left-2.5 text-gray-400 pointer-events-none" />
+              <input
+                ref={inputRef}
+                type="text"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                placeholder="Tìm kiếm nhanh..."
+                className="w-full pl-8 pr-6 py-1 text-[12px] bg-white border border-gray-300 rounded outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all"
+                onClick={(e) => e.stopPropagation()}
+              />
+              {searchTerm && (
+                <button
+                  type="button"
+                  onClick={(e) => { e.stopPropagation(); setSearchTerm(''); inputRef.current?.focus(); }}
+                  className="absolute right-2 text-gray-400 hover:text-gray-600"
+                >
+                  <X size={12} />
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* Options list */}
+          <div className="overflow-y-auto p-2 flex flex-col gap-1 max-h-48">
+            {filteredOptions.map(opt => {
+              const isChecked = selectedIds.includes(opt.id);
+              return (
+                <label key={opt.id} className="flex items-center gap-2 px-2 py-1.5 hover:bg-gray-50 rounded cursor-pointer select-none text-[13px] transition-colors">
+                  <input
+                    type="checkbox"
+                    checked={isChecked}
+                    onChange={() => toggleOption(opt.id)}
+                    className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 w-4 h-4 cursor-pointer shrink-0"
+                  />
+                  <span className="text-gray-750 font-medium truncate">{opt.name}</span>
+                </label>
+              );
+            })}
+            {filteredOptions.length === 0 && (
+              <span className="text-xs text-gray-400 italic p-3 text-center">Không tìm thấy kết quả</span>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function SearchableSingleSelect({
+  label,
+  options,
+  value,
+  onChange,
+  placeholder = "Tất cả"
+}: {
+  label: string;
+  options: string[];
+  value: string;
+  onChange: (val: string) => void;
+  placeholder?: string;
+}) {
+  const [isOpen, setIsOpen] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
+  const containerRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
+        setIsOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  useEffect(() => {
+    if (isOpen) {
+      setSearchTerm('');
+      setTimeout(() => inputRef.current?.focus(), 50);
+    }
+  }, [isOpen]);
+
+  const filteredOptions = options.filter(opt => matchesSearchTerm(opt, searchTerm));
+
+  return (
+    <div className="flex flex-col gap-1 relative w-full text-left" ref={containerRef}>
+      <label className="text-[11px] font-bold text-gray-500 uppercase tracking-wider">{label}</label>
+      <div 
+        onClick={() => setIsOpen(!isOpen)}
+        className="w-full bg-white border border-gray-300 rounded-md px-3 py-2 text-[13px] text-gray-700 cursor-pointer flex justify-between items-center hover:border-blue-400 focus:border-blue-500 transition-colors select-none"
+      >
+        <span className="truncate">{value || placeholder}</span>
+        <span className="text-[10px] text-gray-400">▼</span>
+      </div>
+      {isOpen && (
+        <div className="absolute top-[100%] left-0 right-0 z-40 mt-1 bg-white border border-gray-200 rounded-md shadow-lg max-h-60 flex flex-col overflow-hidden animate-fade-in">
+          {/* Search bar */}
+          <div className="p-2 border-b border-gray-150 bg-gray-50 shrink-0">
+            <div className="relative flex items-center">
+              <Search size={13} className="absolute left-2.5 text-gray-400 pointer-events-none" />
+              <input
+                ref={inputRef}
+                type="text"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                placeholder="Tìm kiếm tỉnh thành..."
+                className="w-full pl-8 pr-6 py-1 text-[12px] bg-white border border-gray-300 rounded outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all"
+                onClick={(e) => e.stopPropagation()}
+              />
+              {searchTerm && (
+                <button
+                  type="button"
+                  onClick={(e) => { e.stopPropagation(); setSearchTerm(''); inputRef.current?.focus(); }}
+                  className="absolute right-2 text-gray-400 hover:text-gray-600"
+                >
+                  <X size={12} />
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* Options list */}
+          <div className="overflow-y-auto p-2 flex flex-col gap-1 max-h-48">
+            <div
+              onClick={() => { onChange(''); setIsOpen(false); }}
+              className={`px-2 py-1.5 hover:bg-gray-50 rounded cursor-pointer select-none text-[13px] transition-colors ${!value ? 'font-bold text-blue-600 bg-blue-50' : 'text-gray-700'}`}
+            >
+              {placeholder}
+            </div>
+            {filteredOptions.map(opt => (
+              <div
+                key={opt}
+                onClick={() => { onChange(opt); setIsOpen(false); }}
+                className={`px-2 py-1.5 hover:bg-gray-50 rounded cursor-pointer select-none text-[13px] transition-colors ${value === opt ? 'font-bold text-blue-600 bg-blue-50' : 'text-gray-700'}`}
+              >
+                {opt}
+              </div>
+            ))}
+            {filteredOptions.length === 0 && (
+              <span className="text-xs text-gray-400 italic p-3 text-center">Không tìm thấy kết quả</span>
+            )}
+          </div>
         </div>
       )}
     </div>
@@ -497,21 +675,6 @@ export default function ReportList() {
   const [showFilters, setShowFilters] = useState(false);
   const [filterOptions, setFilterOptions] = useState<FilterOptionsState | null>(null);
 
-  // Temporary filter selections in panel
-  const [tempWorkTypes, setTempWorkTypes] = useState<string[]>([]);
-  const [tempServiceTypes, setTempServiceTypes] = useState<string[]>([]);
-  const [tempCategories, setTempCategories] = useState<string[]>([]);
-  const [tempMainStationIds, setTempMainStationIds] = useState<string[]>([]);
-  const [tempTechStations, setTempTechStations] = useState<string[]>([]);
-  const [tempKtvs, setTempKtvs] = useState<string[]>([]);
-  const [tempProvince, setTempProvince] = useState('');
-  const [tempCompletedStart, setTempCompletedStart] = useState('');
-  const [tempCompletedEnd, setTempCompletedEnd] = useState('');
-  const [tempCreatedStart, setTempCreatedStart] = useState('');
-  const [tempCreatedEnd, setTempCreatedEnd] = useState('');
-  const [tempUpdatedStart, setTempUpdatedStart] = useState('');
-  const [tempUpdatedEnd, setTempUpdatedEnd] = useState('');
-
   // Applied filter parameters sent to API
   const [appliedFilters, setAppliedFilters] = useState(() => getSavedReportFilter('appliedFilters', {
     workTypes: [] as string[],
@@ -529,6 +692,50 @@ export default function ReportList() {
     updatedStart: '',
     updatedEnd: ''
   }));
+
+  // Temporary filter selections in panel (initialized from appliedFilters)
+  const [tempWorkTypes, setTempWorkTypes] = useState<string[]>(() => appliedFilters.workTypes || []);
+  const [tempServiceTypes, setTempServiceTypes] = useState<string[]>(() => appliedFilters.serviceTypes || []);
+  const [tempCategories, setTempCategories] = useState<string[]>(() => {
+    const cats = [...(appliedFilters.categories || [])];
+    const prods = (appliedFilters.products || []).map((p: string) => `PROD:${p}`);
+    return [...cats, ...prods];
+  });
+  const [tempMainStationIds, setTempMainStationIds] = useState<string[]>(() => appliedFilters.mainStationIds || []);
+  const [tempTechStations, setTempTechStations] = useState<string[]>(() => appliedFilters.techStations || []);
+  const [tempKtvs, setTempKtvs] = useState<string[]>(() => appliedFilters.ktvs || []);
+  const [tempProvince, setTempProvince] = useState<string>(() => appliedFilters.province || '');
+  const [tempCompletedStart, setTempCompletedStart] = useState<string>(() => appliedFilters.completedStart || '');
+  const [tempCompletedEnd, setTempCompletedEnd] = useState<string>(() => appliedFilters.completedEnd || '');
+  const [tempCreatedStart, setTempCreatedStart] = useState<string>(() => appliedFilters.createdStart || '');
+  const [tempCreatedEnd, setTempCreatedEnd] = useState<string>(() => appliedFilters.createdEnd || '');
+  const [tempUpdatedStart, setTempUpdatedStart] = useState<string>(() => appliedFilters.updatedStart || '');
+  const [tempUpdatedEnd, setTempUpdatedEnd] = useState<string>(() => appliedFilters.updatedEnd || '');
+
+  // Helper to sync appliedFilters to temp state whenever the modal opens
+  const syncAppliedToTemp = () => {
+    setTempWorkTypes(appliedFilters.workTypes || []);
+    setTempServiceTypes(appliedFilters.serviceTypes || []);
+    const cats = [...(appliedFilters.categories || [])];
+    const prods = (appliedFilters.products || []).map((p: string) => `PROD:${p}`);
+    setTempCategories([...cats, ...prods]);
+    setTempMainStationIds(appliedFilters.mainStationIds || []);
+    setTempTechStations(appliedFilters.techStations || []);
+    setTempKtvs(appliedFilters.ktvs || []);
+    setTempProvince(appliedFilters.province || '');
+    setTempCompletedStart(appliedFilters.completedStart || '');
+    setTempCompletedEnd(appliedFilters.completedEnd || '');
+    setTempCreatedStart(appliedFilters.createdStart || '');
+    setTempCreatedEnd(appliedFilters.createdEnd || '');
+    setTempUpdatedStart(appliedFilters.updatedStart || '');
+    setTempUpdatedEnd(appliedFilters.updatedEnd || '');
+  };
+
+  useEffect(() => {
+    if (showFilters) {
+      syncAppliedToTemp();
+    }
+  }, [showFilters]);
 
   // Save filters to sessionStorage on change
   useEffect(() => {
@@ -734,7 +941,19 @@ export default function ReportList() {
   };
 
   useEffect(() => {
-    setSearch(searchParam);
+    const timer = setTimeout(() => {
+      if (search !== searchParam) {
+        setSearchParams(search ? { search } : {});
+        setPage(1);
+      }
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [search]);
+
+  useEffect(() => {
+    if (searchParam !== search) {
+      setSearch(searchParam);
+    }
   }, [searchParam]);
 
   useEffect(() => {
@@ -889,6 +1108,7 @@ export default function ReportList() {
       updatedEnd: tempUpdatedEnd
     });
     setPage(1);
+    setShowFilters(false);
   };
 
   const resetFilters = () => {
@@ -922,6 +1142,20 @@ export default function ReportList() {
       updatedStart: '',
       updatedEnd: ''
     });
+    setPage(1);
+  };
+
+  const handleClearAllFilters = () => {
+    setSearch('');
+    setSearchParams({});
+    setFilterMonth('');
+    setCustomStartDate('');
+    setCustomEndDate('');
+    setDatePreset('');
+    resetFilters();
+    try {
+      sessionStorage.removeItem('truliva_report_filters');
+    } catch (e) {}
     setPage(1);
   };
 
@@ -1183,8 +1417,228 @@ export default function ReportList() {
             <SlidersHorizontal size={14} />
             Bộ lọc nâng cao
           </button>
+
+          {(search || filterMonth || customStartDate || customEndDate || Object.values(appliedFilters).some(v => Array.isArray(v) ? v.length > 0 : Boolean(v))) && (
+            <button
+              type="button"
+              onClick={handleClearAllFilters}
+              className="flex items-center gap-1.5 px-3 py-2 text-[13px] border border-red-200 bg-red-50 text-red-600 rounded-md hover:bg-red-100 transition-colors font-medium"
+              title="Xóa toàn bộ bộ lọc và từ khóa tìm kiếm"
+            >
+              <RotateCcw size={14} />
+              Xóa bộ lọc
+            </button>
+          )}
         </div>
       </div>
+
+      {/* Thanh hiển thị bộ lọc đang áp dụng (Filter Status Bar) */}
+      {(Boolean(
+        search ||
+        filterMonth ||
+        customStartDate ||
+        customEndDate ||
+        (appliedFilters.workTypes && appliedFilters.workTypes.length > 0) ||
+        (appliedFilters.serviceTypes && appliedFilters.serviceTypes.length > 0) ||
+        (appliedFilters.categories && appliedFilters.categories.length > 0) ||
+        (appliedFilters.products && appliedFilters.products.length > 0) ||
+        (appliedFilters.mainStationIds && appliedFilters.mainStationIds.length > 0) ||
+        (appliedFilters.techStations && appliedFilters.techStations.length > 0) ||
+        (appliedFilters.ktvs && appliedFilters.ktvs.length > 0) ||
+        appliedFilters.province ||
+        appliedFilters.completedStart ||
+        appliedFilters.completedEnd ||
+        appliedFilters.createdStart ||
+        appliedFilters.createdEnd ||
+        appliedFilters.updatedStart ||
+        appliedFilters.updatedEnd
+      )) && (
+        <div className="flex flex-wrap items-center justify-between gap-2 px-4 py-2.5 bg-blue-50/95 border border-blue-200 rounded-lg mb-6 shadow-xs transition-all text-left">
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="flex items-center gap-1.5 text-blue-900 font-bold text-[12px] uppercase tracking-wide mr-1">
+              <Filter size={14} className="text-blue-600 shrink-0" />
+              <span>Đang áp dụng bộ lọc:</span>
+            </div>
+
+            {search && (
+              <span className="inline-flex items-center bg-white text-blue-800 text-xs font-semibold px-2.5 py-1 rounded-md border border-blue-200 shadow-2xs">
+                🔍 "{search}"
+                <button
+                  type="button"
+                  className="ml-1.5 text-blue-400 hover:text-red-500 outline-none transition-colors"
+                  onClick={() => { setSearch(''); setSearchParams({}); setPage(1); }}
+                  title="Bỏ tìm kiếm"
+                >
+                  <XCircle size={14} className="fill-blue-100 hover:fill-red-100" />
+                </button>
+              </span>
+            )}
+
+            {filterMonth && (
+              <span className="inline-flex items-center bg-white text-blue-800 text-xs font-semibold px-2.5 py-1 rounded-md border border-blue-200 shadow-2xs">
+                🗓️ Tháng: {filterMonth}
+                <button
+                  type="button"
+                  className="ml-1.5 text-blue-400 hover:text-red-500 outline-none transition-colors"
+                  onClick={() => { setFilterMonth(''); setPage(1); }}
+                  title="Bỏ lọc tháng"
+                >
+                  <XCircle size={14} className="fill-blue-100 hover:fill-red-100" />
+                </button>
+              </span>
+            )}
+
+            {(customStartDate || customEndDate) && (
+              <span className="inline-flex items-center bg-white text-blue-800 text-xs font-semibold px-2.5 py-1 rounded-md border border-blue-200 shadow-2xs">
+                📅 {customStartDate || '...'} → {customEndDate || '...'}
+                <button
+                  type="button"
+                  className="ml-1.5 text-blue-400 hover:text-red-500 outline-none transition-colors"
+                  onClick={() => { setCustomStartDate(''); setCustomEndDate(''); setDatePreset(''); setPage(1); }}
+                  title="Bỏ lọc ngày"
+                >
+                  <XCircle size={14} className="fill-blue-100 hover:fill-red-100" />
+                </button>
+              </span>
+            )}
+
+            {appliedFilters.workTypes && appliedFilters.workTypes.length > 0 && (
+              <span className="inline-flex items-center bg-blue-100 text-blue-900 text-xs font-semibold px-2.5 py-1 rounded-md border border-blue-200 shadow-2xs">
+                🛠️ Công việc: {appliedFilters.workTypes.join(', ')}
+                <button
+                  type="button"
+                  className="ml-1.5 text-blue-500 hover:text-red-500 outline-none transition-colors"
+                  onClick={() => { setAppliedFilters((prev: any) => ({ ...prev, workTypes: [] })); setPage(1); }}
+                  title="Bỏ lọc loại công việc"
+                >
+                  <XCircle size={14} />
+                </button>
+              </span>
+            )}
+
+            {appliedFilters.serviceTypes && appliedFilters.serviceTypes.length > 0 && (
+              <span className="inline-flex items-center bg-indigo-50 text-indigo-900 text-xs font-semibold px-2.5 py-1 rounded-md border border-indigo-200 shadow-2xs">
+                🏷️ Dịch vụ: {appliedFilters.serviceTypes.join(', ')}
+                <button
+                  type="button"
+                  className="ml-1.5 text-indigo-500 hover:text-red-500 outline-none transition-colors"
+                  onClick={() => { setAppliedFilters((prev: any) => ({ ...prev, serviceTypes: [] })); setPage(1); }}
+                  title="Bỏ lọc loại dịch vụ"
+                >
+                  <XCircle size={14} />
+                </button>
+              </span>
+            )}
+
+            {(appliedFilters.categories.length > 0 || appliedFilters.products.length > 0) && (
+              <span className="inline-flex items-center bg-teal-50 text-teal-900 text-xs font-semibold px-2.5 py-1 rounded-md border border-teal-200 shadow-2xs">
+                📦 {[...appliedFilters.categories, ...appliedFilters.products].join(', ')}
+                <button
+                  type="button"
+                  className="ml-1.5 text-teal-500 hover:text-red-500 outline-none transition-colors"
+                  onClick={() => { setAppliedFilters((prev: any) => ({ ...prev, categories: [], products: [] })); setPage(1); }}
+                  title="Bỏ lọc sản phẩm"
+                >
+                  <XCircle size={14} />
+                </button>
+              </span>
+            )}
+
+            {appliedFilters.mainStationIds && appliedFilters.mainStationIds.length > 0 && (
+              <span className="inline-flex items-center bg-purple-50 text-purple-900 text-xs font-semibold px-2.5 py-1 rounded-md border border-purple-200 shadow-2xs">
+                🏢 Trạm chính: {appliedFilters.mainStationIds.map((id: string) => filterOptions?.mainStations.find(m => m.id === id)?.name || id).join(', ')}
+                <button
+                  type="button"
+                  className="ml-1.5 text-purple-500 hover:text-red-500 outline-none transition-colors"
+                  onClick={() => { setAppliedFilters((prev: any) => ({ ...prev, mainStationIds: [] })); setPage(1); }}
+                  title="Bỏ lọc trạm chính"
+                >
+                  <XCircle size={14} />
+                </button>
+              </span>
+            )}
+
+            {appliedFilters.techStations && appliedFilters.techStations.length > 0 && (
+              <span className="inline-flex items-center bg-amber-50 text-amber-900 text-xs font-semibold px-2.5 py-1 rounded-md border border-amber-200 shadow-2xs">
+                📍 Trạm KT: {appliedFilters.techStations.map((id: string) => filterOptions?.techStations.find(t => t.id === id)?.name || id).join(', ')}
+                <button
+                  type="button"
+                  className="ml-1.5 text-amber-500 hover:text-red-500 outline-none transition-colors"
+                  onClick={() => { setAppliedFilters((prev: any) => ({ ...prev, techStations: [] })); setPage(1); }}
+                  title="Bỏ lọc trạm kỹ thuật"
+                >
+                  <XCircle size={14} />
+                </button>
+              </span>
+            )}
+
+            {appliedFilters.ktvs && appliedFilters.ktvs.length > 0 && (
+              <span className="inline-flex items-center bg-emerald-50 text-emerald-900 text-xs font-semibold px-2.5 py-1 rounded-md border border-emerald-200 shadow-2xs">
+                👷 KTV: {appliedFilters.ktvs.map((id: string) => filterOptions?.ktvs.find((k: any) => k.id === id)?.name || (filterOptions?.ktvs.find((k: any) => k.id === id) as any)?.fullName || id).join(', ')}
+                <button
+                  type="button"
+                  className="ml-1.5 text-emerald-500 hover:text-red-500 outline-none transition-colors"
+                  onClick={() => { setAppliedFilters((prev: any) => ({ ...prev, ktvs: [] })); setPage(1); }}
+                  title="Bỏ lọc KTV"
+                >
+                  <XCircle size={14} />
+                </button>
+              </span>
+            )}
+
+            {appliedFilters.province && (
+              <span className="inline-flex items-center bg-rose-50 text-rose-900 text-xs font-semibold px-2.5 py-1 rounded-md border border-rose-200 shadow-2xs">
+                🌐 Tỉnh: {appliedFilters.province}
+                <button
+                  type="button"
+                  className="ml-1.5 text-rose-500 hover:text-red-500 outline-none transition-colors"
+                  onClick={() => { setAppliedFilters((prev: any) => ({ ...prev, province: '' })); setPage(1); }}
+                  title="Bỏ lọc tỉnh thành"
+                >
+                  <XCircle size={14} />
+                </button>
+              </span>
+            )}
+
+            {(appliedFilters.completedStart || appliedFilters.completedEnd) && (
+              <span className="inline-flex items-center bg-white text-gray-800 text-xs font-medium px-2.5 py-1 rounded-md border border-gray-200 shadow-2xs">
+                🏁 Hoàn thành: {appliedFilters.completedStart || '...'} → {appliedFilters.completedEnd || '...'}
+                <button
+                  type="button"
+                  className="ml-1.5 text-gray-400 hover:text-red-500 outline-none transition-colors"
+                  onClick={() => { setAppliedFilters((prev: any) => ({ ...prev, completedStart: '', completedEnd: '' })); setPage(1); }}
+                  title="Bỏ lọc thời gian hoàn thành"
+                >
+                  <XCircle size={14} />
+                </button>
+              </span>
+            )}
+
+            {(appliedFilters.createdStart || appliedFilters.createdEnd) && (
+              <span className="inline-flex items-center bg-white text-gray-800 text-xs font-medium px-2.5 py-1 rounded-md border border-gray-200 shadow-2xs">
+                📝 Tạo đơn: {appliedFilters.createdStart || '...'} → {appliedFilters.createdEnd || '...'}
+                <button
+                  type="button"
+                  className="ml-1.5 text-gray-400 hover:text-red-500 outline-none transition-colors"
+                  onClick={() => { setAppliedFilters((prev: any) => ({ ...prev, createdStart: '', createdEnd: '' })); setPage(1); }}
+                  title="Bỏ lọc thời gian tạo đơn"
+                >
+                  <XCircle size={14} />
+                </button>
+              </span>
+            )}
+          </div>
+
+          <button
+            type="button"
+            onClick={handleClearAllFilters}
+            className="flex items-center gap-1 text-[12px] text-red-600 hover:text-red-700 font-semibold px-2 py-1 rounded hover:bg-red-50 transition-colors shrink-0"
+          >
+            <RotateCcw size={12} />
+            Xóa tất cả
+          </button>
+        </div>
+      )}
 
       {showFilters && (
         <div className="bg-white p-5 rounded-lg border border-gray-200 mb-6 shadow-sm flex flex-col gap-5 animate-fade-in text-left relative z-30">
@@ -1231,13 +1685,6 @@ export default function ReportList() {
               }
               selectedIds={tempTechStations}
               onChange={handleTechStationsChange}
-              onBeforeOpen={() => {
-                if (tempMainStationIds.length === 0) {
-                  alert('Vui lòng chọn Trạm chính trước khi chọn Trạm kỹ thuật.');
-                  return false;
-                }
-                return true;
-              }}
             />
 
             {/* KTV (Multi Select cascading) */}
@@ -1257,33 +1704,15 @@ export default function ReportList() {
               }
               selectedIds={tempKtvs}
               onChange={setTempKtvs}
-              onBeforeOpen={() => {
-                if (tempMainStationIds.length === 0) {
-                  alert('Vui lòng chọn Trạm chính trước khi chọn Kỹ thuật viên.');
-                  return false;
-                }
-                if (tempTechStations.length === 0) {
-                  alert('Vui lòng chọn Trạm kỹ thuật trước khi chọn Kỹ thuật viên.');
-                  return false;
-                }
-                return true;
-              }}
             />
 
             {/* Tỉnh / Thành phố */}
-            <div className="flex flex-col gap-1 relative w-full text-left">
-              <label className="text-[11px] font-bold text-gray-500 uppercase tracking-wider">Tỉnh / Thành phố</label>
-              <select
-                value={tempProvince}
-                onChange={(e) => setTempProvince(e.target.value)}
-                className="w-full bg-white border border-gray-300 rounded-md px-3 py-2 text-[13px] text-gray-700 outline-none hover:border-blue-400 focus:border-blue-500 transition-colors"
-              >
-                <option value="">Tất cả</option>
-                {filterOptions?.provinces.map(p => (
-                  <option key={p} value={p}>{p}</option>
-                ))}
-              </select>
-            </div>
+            <SearchableSingleSelect
+              label="Tỉnh / Thành phố"
+              options={filterOptions?.provinces || []}
+              value={tempProvince}
+              onChange={setTempProvince}
+            />
           </div>
 
           {/* Row 3: Các mốc thời gian */}

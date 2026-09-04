@@ -384,9 +384,9 @@ export default function SalaryManage() {
     if (!modalKtvSearchQuery.trim()) return modalSortedKtvs;
     const q = modalKtvSearchQuery.toLowerCase();
     return modalSortedKtvs.filter(s =>
-      s.fullName.toLowerCase().includes(q) ||
-      s.phoneNumber.includes(q) ||
-      s.username.toLowerCase().includes(q) ||
+      (s.fullName || '').toLowerCase().includes(q) ||
+      (s.phoneNumber || '').includes(q) ||
+      (s.username || '').toLowerCase().includes(q) ||
       (s.stationName && s.stationName.toLowerCase().includes(q))
     );
   }, [modalSortedKtvs, modalKtvSearchQuery]);
@@ -704,9 +704,9 @@ export default function SalaryManage() {
     if (!ktvSearchQuery.trim()) return stationFilteredKtvsInMonth;
     const q = ktvSearchQuery.toLowerCase();
     return stationFilteredKtvsInMonth.filter(s => 
-      s.fullName.toLowerCase().includes(q) ||
-      s.phoneNumber.includes(q) ||
-      s.username.toLowerCase().includes(q)
+      (s.fullName || '').toLowerCase().includes(q) ||
+      (s.phoneNumber || '').includes(q) ||
+      (s.username || '').toLowerCase().includes(q)
     );
   }, [stationFilteredKtvsInMonth, ktvSearchQuery]);
 
@@ -956,9 +956,9 @@ export default function SalaryManage() {
       const matchDistance = (selectedDistancePresets.length === 0 && !selectedDistancePresets.includes('custom')) || (s.cases && s.cases.some(c => checkCaseDistance(c)));
 
       const matchQuery = !searchQuery || 
-        s.fullName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        s.username.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        s.phoneNumber.includes(searchQuery);
+        (s.fullName || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (s.username || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (s.phoneNumber || '').includes(searchQuery);
       return matchKtv && matchStation && matchCompletedDate && matchWorkType && matchDistance && matchQuery;
     });
   }, [salaries, selectedKtvsFilter, selectedStationsFilter, selectedCompletedDateFilter, selectedWorkTypeFilter, selectedDistancePresets, customDistanceOp, customDistanceMin, customDistanceMax, searchQuery]);
@@ -996,20 +996,21 @@ export default function SalaryManage() {
         return normMain === normF || normTech === normF;
       });
 
-      const matchWorkType = !selectedWorkTypeFilter || c.workType.toLowerCase().includes(selectedWorkTypeFilter.toLowerCase());
+      const matchWorkType = !selectedWorkTypeFilter || (c.workType || '').toLowerCase().includes(selectedWorkTypeFilter.toLowerCase());
 
       const cDate = c.createdAt ? new Date(c.createdAt).toLocaleDateString('sv-SE') : '';
       const matchCompletedDate = !selectedCompletedDateFilter || cDate === selectedCompletedDateFilter;
 
       const matchDistance = checkCaseDistance(c);
 
+      const q = searchQuery.toLowerCase();
       const matchQuery = !searchQuery ||
-        c.ktvName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        c.customerName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        (c.customerPhone && c.customerPhone.includes(searchQuery)) ||
-        (c.province && c.province.toLowerCase().includes(searchQuery.toLowerCase())) ||
-        (c.notes && c.notes.toLowerCase().includes(searchQuery.toLowerCase())) ||
-        (c.products && c.products.some(p => p.toLowerCase().includes(searchQuery.toLowerCase())));
+        (c.ktvName || '').toLowerCase().includes(q) ||
+        (c.customerName || '').toLowerCase().includes(q) ||
+        (c.customerPhone && String(c.customerPhone).includes(searchQuery)) ||
+        (c.province && c.province.toLowerCase().includes(q)) ||
+        (c.notes && c.notes.toLowerCase().includes(q)) ||
+        (c.products && Array.isArray(c.products) && c.products.some(p => p && String(p).toLowerCase().includes(q)));
 
       return matchKtv && matchStation && matchWorkType && matchCompletedDate && matchDistance && matchQuery;
     });
@@ -2418,9 +2419,9 @@ export default function SalaryManage() {
 
                       const q = searchQuery.trim().toLowerCase();
                       const matchQuery = !q || (
-                        ktv.fullName.toLowerCase().includes(q) ||
-                        ktv.username.toLowerCase().includes(q) ||
-                        ktv.phoneNumber.includes(q) ||
+                        (ktv.fullName || '').toLowerCase().includes(q) ||
+                        (ktv.username || '').toLowerCase().includes(q) ||
+                        (ktv.phoneNumber || '').includes(q) ||
                         (ktv.stationName && ktv.stationName.toLowerCase().includes(q)) ||
                         (ktv.mainStationName && ktv.mainStationName.toLowerCase().includes(q))
                       );
