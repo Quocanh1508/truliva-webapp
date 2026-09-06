@@ -26,7 +26,10 @@ import {
   Eye,
   MapPin,
   RotateCcw,
-  Navigation
+  Navigation,
+  Filter,
+  Package,
+  Briefcase
 } from 'lucide-react';
 
 
@@ -53,6 +56,7 @@ interface CaseDetail {
   reportNote?: string;
   notes?: string;
   workType: string;
+  serviceType?: string | null;
   isSunday: boolean;
   baseCost: number;
   distance: number;
@@ -287,6 +291,8 @@ export default function SalaryManage() {
   const [selectedKtvsFilter, setSelectedKtvsFilter] = useState<string[]>(initial?.selectedKtvsFilter || []);
   const [selectedStationsFilter, setSelectedStationsFilter] = useState<string[]>(initial?.selectedStationsFilter || []);
   const [selectedWorkTypeFilter, setSelectedWorkTypeFilter] = useState(initial?.selectedWorkTypeFilter || '');
+  const [selectedServiceTypeFilter, setSelectedServiceTypeFilter] = useState(initial?.selectedServiceTypeFilter || '');
+  const [selectedProductFilter, setSelectedProductFilter] = useState(initial?.selectedProductFilter || '');
   const [selectedCompletedDateFilter, setSelectedCompletedDateFilter] = useState(initial?.selectedCompletedDateFilter || '');
 
   // Khoảng cách di chuyển Filter states (Cho phép chọn nhiều ngưỡng khoảng cách cùng lúc)
@@ -314,13 +320,25 @@ export default function SalaryManage() {
   });
   const [addingCase, setAddingCase] = useState(false);
 
-  // Dropdown States & Refs for Multi-Select Filters (KTV, Station, Distance)
+  // Dropdown States & Refs for Multi-Select Filters (KTV, Station, Distance, ServiceType, Product)
   const [isKtvDropdownOpen, setIsKtvDropdownOpen] = useState(false);
   const [ktvSearchQuery, setKtvSearchQuery] = useState('');
   const ktvDropdownRef = useRef<HTMLDivElement>(null);
 
   const [isStationDropdownOpen, setIsStationDropdownOpen] = useState(false);
   const stationDropdownRef = useRef<HTMLDivElement>(null);
+
+  const [isServiceTypeDropdownOpen, setIsServiceTypeDropdownOpen] = useState(false);
+  const [serviceTypeSearchQuery, setServiceTypeSearchQuery] = useState('');
+  const serviceTypeDropdownRef = useRef<HTMLDivElement>(null);
+
+  const [isProductDropdownOpen, setIsProductDropdownOpen] = useState(false);
+  const [productSearchQuery, setProductSearchQuery] = useState('');
+  const productDropdownRef = useRef<HTMLDivElement>(null);
+
+  const [isWorkTypeDropdownOpen, setIsWorkTypeDropdownOpen] = useState(false);
+  const [workTypeSearchQuery, setWorkTypeSearchQuery] = useState('');
+  const workTypeDropdownRef = useRef<HTMLDivElement>(null);
 
   // Dropdown cho Modal Chọn KTV (Sắp xếp A-Z + Tìm kiếm gợi ý)
   const [isModalKtvDropdownOpen, setIsModalKtvDropdownOpen] = useState(false);
@@ -335,6 +353,8 @@ export default function SalaryManage() {
       selectedKtvsFilter,
       selectedStationsFilter,
       selectedWorkTypeFilter,
+      selectedServiceTypeFilter,
+      selectedProductFilter,
       selectedCompletedDateFilter,
       selectedDistancePresets,
       customDistanceOp,
@@ -348,6 +368,8 @@ export default function SalaryManage() {
     selectedKtvsFilter,
     selectedStationsFilter,
     selectedWorkTypeFilter,
+    selectedServiceTypeFilter,
+    selectedProductFilter,
     selectedCompletedDateFilter,
     selectedDistancePresets,
     customDistanceOp,
@@ -356,6 +378,7 @@ export default function SalaryManage() {
     searchQuery
   ]);
 
+  // Handle outside click để đóng dropdowns
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (ktvDropdownRef.current && !ktvDropdownRef.current.contains(event.target as Node)) {
@@ -363,6 +386,15 @@ export default function SalaryManage() {
       }
       if (stationDropdownRef.current && !stationDropdownRef.current.contains(event.target as Node)) {
         setIsStationDropdownOpen(false);
+      }
+      if (workTypeDropdownRef.current && !workTypeDropdownRef.current.contains(event.target as Node)) {
+        setIsWorkTypeDropdownOpen(false);
+      }
+      if (serviceTypeDropdownRef.current && !serviceTypeDropdownRef.current.contains(event.target as Node)) {
+        setIsServiceTypeDropdownOpen(false);
+      }
+      if (productDropdownRef.current && !productDropdownRef.current.contains(event.target as Node)) {
+        setIsProductDropdownOpen(false);
       }
       if (distanceDropdownRef.current && !distanceDropdownRef.current.contains(event.target as Node)) {
         setIsDistanceDropdownOpen(false);
@@ -518,6 +550,8 @@ export default function SalaryManage() {
     setKtvSearchQuery('');
     setSelectedStationsFilter([]);
     setSelectedWorkTypeFilter('');
+    setSelectedServiceTypeFilter('');
+    setSelectedProductFilter('');
     setSelectedCompletedDateFilter('');
     setSelectedDistancePresets([]);
     setCustomDistanceMin('');
@@ -632,6 +666,8 @@ export default function SalaryManage() {
         url += `&stationId=${stParam}&stationIds=${stParam}`;
       }
       if (selectedWorkTypeFilter) url += `&workType=${encodeURIComponent(selectedWorkTypeFilter)}`;
+      if (selectedServiceTypeFilter) url += `&serviceType=${encodeURIComponent(selectedServiceTypeFilter)}`;
+      if (selectedProductFilter) url += `&product=${encodeURIComponent(selectedProductFilter)}`;
       if (selectedCompletedDateFilter) url += `&completedDate=${encodeURIComponent(selectedCompletedDateFilter)}`;
       if (selectedDistancePresets.length > 0) {
         url += `&distancePresets=${encodeURIComponent(selectedDistancePresets.join(','))}`;
@@ -667,129 +703,11 @@ export default function SalaryManage() {
     }
   };
 
-  // Danh sách KTV có đóng ca trong tháng tương ứng, sắp xếp Họ tên theo alphabet (A-Z)
-  const activeKtvsInMonth = useMemo(() => {
-    return salaries
-      .filter(s => s.casesCount > 0)
-      .sort((a, b) => a.fullName.localeCompare(b.fullName, 'vi'));
-  }, [salaries]);
-
-  // KTVs constrained by selected station(s)
-  const stationFilteredKtvsInMonth = useMemo(() => {
-    return activeKtvsInMonth.filter(s => {
-      if (selectedStationsFilter.length === 0) return true;
-
-      const sMain = s.mainStationName && s.mainStationName !== 'Không có' ? s.mainStationName : 'Trực thuộc Truliva';
-      const sTech = s.stationName && s.stationName !== 'Không có' ? s.stationName : 'Khác';
-      const sKey = `${sMain}::${sTech}`;
-
-      return selectedStationsFilter.includes(sKey) || 
-             selectedStationsFilter.includes(s.stationName);
-    });
-  }, [activeKtvsInMonth, selectedStationsFilter]);
-
-  // Auto-prune selected KTV filter when station filter changes
-  useEffect(() => {
-    if (selectedStationsFilter.length > 0) {
-      const validKtvIds = new Set(stationFilteredKtvsInMonth.map(s => s.userId));
-      setSelectedKtvsFilter(prev => {
-        const next = prev.filter(id => validKtvIds.has(id));
-        return next.length === prev.length ? prev : next;
-      });
-    }
-  }, [selectedStationsFilter, stationFilteredKtvsInMonth]);
-
-  // Tìm kiếm KTV trong Dropdown chọn nhiều KTV
-  const filteredKtvsInDropdown = useMemo(() => {
-    if (!ktvSearchQuery.trim()) return stationFilteredKtvsInMonth;
-    const q = ktvSearchQuery.toLowerCase();
-    return stationFilteredKtvsInMonth.filter(s => 
-      (s.fullName || '').toLowerCase().includes(q) ||
-      (s.phoneNumber || '').includes(q) ||
-      (s.username || '').toLowerCase().includes(q)
-    );
-  }, [stationFilteredKtvsInMonth, ktvSearchQuery]);
-
-  // Toggle chọn 1 KTV trong bộ lọc
-  const toggleKtv = (userId: string) => {
-    setSelectedKtvsFilter(prev => {
-      if (prev.includes(userId)) {
-        return prev.filter(id => id !== userId);
-      } else {
-        return [...prev, userId];
-      }
-    });
-  };
-
-  // Toggle chọn tất cả / bỏ tất cả KTV trong bộ lọc (chỉ tác động đến KTV thuộc trạm đang chọn)
-  const toggleAllKtvs = () => {
-    const currentAvailableIds = stationFilteredKtvsInMonth.map(s => s.userId);
-    const allSelected = currentAvailableIds.length > 0 && currentAvailableIds.every(id => selectedKtvsFilter.includes(id));
-
-    if (allSelected) {
-      setSelectedKtvsFilter(prev => prev.filter(id => !currentAvailableIds.includes(id)));
-    } else {
-      setSelectedKtvsFilter(prev => Array.from(new Set([...prev, ...currentAvailableIds])));
-    }
-  };
-
-  // Cấu trúc Cây Trạm: Trạm Chính (Parent Group) -> Trạm Kỹ Thuật (Child Sub-stations)
-  // Mỗi trạm kỹ thuật được gán Unique Key = "MainStationName::TechStationName" để không bị trùng lặp khi các Trạm chính cùng có tên trạm "Hà Nội"
-  const stationTree = useMemo(() => {
-    const map = new Map<string, Map<string, { key: string; name: string }>>();
-
-    activeKtvsInMonth.forEach(s => {
-      const main = s.mainStationName && s.mainStationName !== 'Không có' ? s.mainStationName : 'Trực thuộc Truliva';
-      const tech = s.stationName && s.stationName !== 'Không có' ? s.stationName : 'Khác';
-      const key = `${main}::${tech}`;
-
-      if (!map.has(main)) {
-        map.set(main, new Map());
-      }
-      map.get(main)!.set(key, { key, name: tech });
-    });
-
-    const list: Array<{ mainStationName: string; stations: Array<{ key: string; name: string }> }> = [];
-    map.forEach((stationsMap, mainStationName) => {
-      const sortedStations = Array.from(stationsMap.values()).sort((a, b) => a.name.localeCompare(b.name, 'vi'));
-      list.push({
-        mainStationName,
-        stations: sortedStations
-      });
-    });
-
-    return list.sort((a, b) => a.mainStationName.localeCompare(b.mainStationName, 'vi'));
-  }, [activeKtvsInMonth]);
-
-  // Toggle single technical station selection using unique station key
-  const toggleStation = (stationKey: string) => {
-    setSelectedStationsFilter(prev => {
-      if (prev.includes(stationKey)) {
-        return prev.filter(s => s !== stationKey);
-      } else {
-        return [...prev, stationKey];
-      }
-    });
-  };
-
-  // Toggle all technical stations under a main station group using unique station keys
-  const toggleMainStationGroup = (groupKeys: string[]) => {
-    const allSelected = groupKeys.every(k => selectedStationsFilter.includes(k));
-    setSelectedStationsFilter(prev => {
-      if (allSelected) {
-        return prev.filter(k => !groupKeys.includes(k));
-      } else {
-        const next = new Set([...prev, ...groupKeys]);
-        return Array.from(next);
-      }
-    });
-  };
-
-  // Flattened Cases Array for Detailed View Mode
+  // Flattened Cases Array for Detailed View Mode & Faceted Dynamic Filtering
   const allCases = useMemo(() => {
     const list: Array<CaseDetail & { ktvName: string; ktvPhone: string; stationName: string; mainStationName: string; userId: string }> = [];
     for (const s of salaries) {
-      for (const c of s.cases) {
+      for (const c of s.cases || []) {
         list.push({
           ...c,
           userId: s.userId,
@@ -803,13 +721,19 @@ export default function SalaryManage() {
     return list;
   }, [salaries]);
 
+  // Helper chuẩn hóa chuỗi
+  const normStr = (str: string | null | undefined): string => {
+    if (!str) return '';
+    return String(str).toLowerCase().replace(/trạm\s+/g, '').trim();
+  };
+
   // Helper nhận diện dịch vụ Thay Lọc & Sửa Chữa (TLSC)
   const isTLSC = (wt: string | null | undefined): boolean => {
     const s = String(wt || '').toLowerCase();
     return s.includes('thay lọc') || s.includes('thay loc') || s.includes('sửa chữa') || s.includes('sua chua');
   };
 
-  // Helper kiểm tra khoảng cách di chuyển khớp với bộ lọc (2 loại khoảng cách tương ứng dịch vụ)
+  // Helper kiểm tra khoảng cách di chuyển khớp với bộ lọc
   const checkCaseDistance = (c: CaseDetail | any) => {
     const dist = typeof c.distance === 'number' ? c.distance : (parseFloat(String(c.distance || 0)) || 0);
     const distCost = c.distanceCost || 0;
@@ -909,112 +833,491 @@ export default function SalaryManage() {
     return `Đã chọn ${selectedDistancePresets.length} tiêu chí KC`;
   };
 
-  // Filtered Summary View
+  // Các hàm kiểm tra điều kiện lọc đơn lẻ cho từng ca (Atomic matchers)
+  const caseMatchesStation = (c: any) => {
+    if (selectedStationsFilter.length === 0) return true;
+    const cMain = c.mainStationName && c.mainStationName !== 'Không có' ? c.mainStationName : 'Trực thuộc Truliva';
+    const cTech = c.stationName && c.stationName !== 'Không có' ? c.stationName : 'Khác';
+    const cKey = `${cMain}::${cTech}`;
+    const normKey = normStr(cKey);
+    const normMain = normStr(cMain);
+    const normTech = normStr(cTech);
+
+    return selectedStationsFilter.some(item => {
+      const filter = item.trim();
+      if (!filter) return false;
+      const normF = normStr(filter);
+      if (filter === cKey || normF === normKey) return true;
+      if (filter.includes('::')) {
+        const [f1, f2] = filter.split('::').map(x => normStr(x));
+        return (f1 === normMain && f2 === normTech) || (f1 === normTech && f2 === normMain);
+      }
+      return normMain === normF || normTech === normF;
+    });
+  };
+
+  const caseMatchesKtv = (c: any) => {
+    if (selectedKtvsFilter.length === 0) return true;
+    return selectedKtvsFilter.includes(c.userId);
+  };
+
+  const caseMatchesWorkType = (c: any) => {
+    if (!selectedWorkTypeFilter) return true;
+    return (c.workType || '').trim().toLowerCase() === selectedWorkTypeFilter.trim().toLowerCase();
+  };
+
+  const caseMatchesServiceType = (c: any) => {
+    if (!selectedServiceTypeFilter) return true;
+    return (c.serviceType || '').trim().toLowerCase() === selectedServiceTypeFilter.trim().toLowerCase();
+  };
+
+  const caseMatchesProduct = (c: any) => {
+    if (!selectedProductFilter) return true;
+    const prods = c.products;
+    if (!prods || !Array.isArray(prods) || prods.length === 0) return false;
+    const target = selectedProductFilter.trim().toLowerCase();
+    return prods.some((p: any) => {
+      const str = (typeof p === 'string' ? p : (p?.name || p?.productName || '')).trim().toLowerCase();
+      return str === target;
+    });
+  };
+
+  const caseMatchesDate = (c: any) => {
+    if (!selectedCompletedDateFilter) return true;
+    const cDate = c.createdAt ? new Date(c.createdAt).toLocaleDateString('sv-SE') : '';
+    return cDate === selectedCompletedDateFilter;
+  };
+
+  const caseMatchesDistance = (c: any) => {
+    return checkCaseDistance(c);
+  };
+
+  const caseMatchesSearch = (c: any) => {
+    if (!searchQuery) return true;
+    const q = searchQuery.toLowerCase();
+    return (c.ktvName || '').toLowerCase().includes(q) ||
+      (c.customerName || '').toLowerCase().includes(q) ||
+      (c.customerPhone && String(c.customerPhone).includes(searchQuery)) ||
+      (c.province && c.province.toLowerCase().includes(q)) ||
+      (c.notes && c.notes.toLowerCase().includes(q)) ||
+      (c.orderNote && c.orderNote.toLowerCase().includes(q)) ||
+      (c.reportNote && c.reportNote.toLowerCase().includes(q)) ||
+      (c.workType && c.workType.toLowerCase().includes(q)) ||
+      (c.serviceType && c.serviceType.toLowerCase().includes(q)) ||
+      (c.products && Array.isArray(c.products) && c.products.some((p: any) => {
+        const str = typeof p === 'string' ? p : (p?.name || p?.productName || '');
+        return str.toLowerCase().includes(q);
+      }));
+  };
+
+  // 1. Faceted KTV List: Lọc ra KTV thỏa mãn tất cả các tiêu chí KHÁC (station, workType, serviceType, product, date, distance, search)
+  const availableKtvs = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const c of allCases) {
+      if (
+        caseMatchesStation(c) &&
+        caseMatchesWorkType(c) &&
+        caseMatchesServiceType(c) &&
+        caseMatchesProduct(c) &&
+        caseMatchesDate(c) &&
+        caseMatchesDistance(c) &&
+        caseMatchesSearch(c)
+      ) {
+        counts.set(c.userId, (counts.get(c.userId) || 0) + 1);
+      }
+    }
+
+    const hasSpecificFilters = Boolean(
+      selectedWorkTypeFilter ||
+      selectedServiceTypeFilter ||
+      selectedProductFilter ||
+      selectedCompletedDateFilter ||
+      selectedDistancePresets.length > 0 ||
+      searchQuery
+    );
+
+    return salaries
+      .filter(s => {
+        // Trạm quản lý phải thỏa mãn nếu đang chọn
+        if (selectedStationsFilter.length > 0) {
+          const sMain = s.mainStationName && s.mainStationName !== 'Không có' ? s.mainStationName : 'Trực thuộc Truliva';
+          const sTech = s.stationName && s.stationName !== 'Không có' ? s.stationName : 'Khác';
+          const sKey = `${sMain}::${sTech}`;
+          const normKey = normStr(sKey);
+          const normMain = normStr(sMain);
+          const normTech = normStr(sTech);
+          const matchSt = selectedStationsFilter.some(item => {
+            const filter = item.trim();
+            if (!filter) return false;
+            const normF = normStr(filter);
+            if (filter === sKey || normF === normKey) return true;
+            if (filter.includes('::')) {
+              const [f1, f2] = filter.split('::').map(x => normStr(x));
+              return (f1 === normMain && f2 === normTech) || (f1 === normTech && f2 === normMain);
+            }
+            return normMain === normF || normTech === normF;
+          });
+          if (!matchSt) return false;
+        }
+
+        const count = counts.get(s.userId) || 0;
+        if (hasSpecificFilters) {
+          return count > 0;
+        }
+        return s.casesCount > 0;
+      })
+      .map(s => ({
+        ...s,
+        availableCasesCount: counts.get(s.userId) || 0
+      }))
+      .sort((a, b) => a.fullName.localeCompare(b.fullName, 'vi'));
+  }, [salaries, allCases, selectedStationsFilter, selectedWorkTypeFilter, selectedServiceTypeFilter, selectedProductFilter, selectedCompletedDateFilter, selectedDistancePresets, customDistanceOp, customDistanceMin, customDistanceMax, searchQuery]);
+
+  // Tìm kiếm KTV trong Dropdown KTV
+  const filteredKtvsInDropdown = useMemo(() => {
+    if (!ktvSearchQuery.trim()) return availableKtvs;
+    const q = ktvSearchQuery.toLowerCase();
+    return availableKtvs.filter(s => 
+      (s.fullName || '').toLowerCase().includes(q) ||
+      (s.phoneNumber || '').includes(q) ||
+      (s.username || '').toLowerCase().includes(q)
+    );
+  }, [availableKtvs, ktvSearchQuery]);
+
+  // Toggle KTV selection
+  const toggleKtv = (userId: string) => {
+    setSelectedKtvsFilter(prev => {
+      if (prev.includes(userId)) {
+        return prev.filter(id => id !== userId);
+      } else {
+        return [...prev, userId];
+      }
+    });
+  };
+
+  // Toggle All Available KTVs
+  const toggleAllKtvs = () => {
+    const currentAvailableIds = availableKtvs.map(s => s.userId);
+    const allSelected = currentAvailableIds.length > 0 && currentAvailableIds.every(id => selectedKtvsFilter.includes(id));
+
+    if (allSelected) {
+      setSelectedKtvsFilter(prev => prev.filter(id => !currentAvailableIds.includes(id)));
+    } else {
+      setSelectedKtvsFilter(prev => Array.from(new Set([...prev, ...currentAvailableIds])));
+    }
+  };
+
+  // 2. Faceted Station Tree: Trạm quản lý thỏa mãn các bộ lọc khác
+  const availableStationTree = useMemo(() => {
+    const map = new Map<string, Map<string, { key: string; name: string; count: number }>>();
+    const stationCounts = new Map<string, number>();
+
+    for (const c of allCases) {
+      if (
+        caseMatchesKtv(c) &&
+        caseMatchesWorkType(c) &&
+        caseMatchesServiceType(c) &&
+        caseMatchesProduct(c) &&
+        caseMatchesDate(c) &&
+        caseMatchesDistance(c) &&
+        caseMatchesSearch(c)
+      ) {
+        const sMain = c.mainStationName && c.mainStationName !== 'Không có' ? c.mainStationName : 'Trực thuộc Truliva';
+        const sTech = c.stationName && c.stationName !== 'Không có' ? c.stationName : 'Khác';
+        const sKey = `${sMain}::${sTech}`;
+        stationCounts.set(sKey, (stationCounts.get(sKey) || 0) + 1);
+
+        if (!map.has(sMain)) {
+          map.set(sMain, new Map());
+        }
+        if (!map.get(sMain)!.has(sKey)) {
+          map.get(sMain)!.set(sKey, { key: sKey, name: sTech, count: 0 });
+        }
+        map.get(sMain)!.get(sKey)!.count = stationCounts.get(sKey)!;
+      }
+    }
+
+    // Nếu chưa có ca nào lọc hoặc không khớp, fallback nạp tất cả trạm từ active KTV
+    if (map.size === 0 && salaries.length > 0) {
+      salaries.filter(s => s.casesCount > 0).forEach(s => {
+        const sMain = s.mainStationName && s.mainStationName !== 'Không có' ? s.mainStationName : 'Trực thuộc Truliva';
+        const sTech = s.stationName && s.stationName !== 'Không có' ? s.stationName : 'Khác';
+        const sKey = `${sMain}::${sTech}`;
+        if (!map.has(sMain)) {
+          map.set(sMain, new Map());
+        }
+        if (!map.get(sMain)!.has(sKey)) {
+          map.get(sMain)!.set(sKey, { key: sKey, name: sTech, count: s.casesCount });
+        }
+      });
+    }
+
+    const list: Array<{ mainStationName: string; stations: Array<{ key: string; name: string; count: number }> }> = [];
+    map.forEach((stationsMap, mainStationName) => {
+      const sortedStations = Array.from(stationsMap.values()).sort((a, b) => a.name.localeCompare(b.name, 'vi'));
+      list.push({
+        mainStationName,
+        stations: sortedStations
+      });
+    });
+
+    return list.sort((a, b) => a.mainStationName.localeCompare(b.mainStationName, 'vi'));
+  }, [allCases, salaries, selectedKtvsFilter, selectedWorkTypeFilter, selectedServiceTypeFilter, selectedProductFilter, selectedCompletedDateFilter, selectedDistancePresets, customDistanceOp, customDistanceMin, customDistanceMax, searchQuery]);
+
+  // Toggle single technical station selection
+  const toggleStation = (stationKey: string) => {
+    setSelectedStationsFilter(prev => {
+      if (prev.includes(stationKey)) {
+        return prev.filter(s => s !== stationKey);
+      } else {
+        return [...prev, stationKey];
+      }
+    });
+  };
+
+  // Toggle all technical stations under a main station group
+  const toggleMainStationGroup = (groupKeys: string[]) => {
+    const allSelected = groupKeys.every(k => selectedStationsFilter.includes(k));
+    setSelectedStationsFilter(prev => {
+      if (allSelected) {
+        return prev.filter(k => !groupKeys.includes(k));
+      } else {
+        return Array.from(new Set([...prev, ...groupKeys]));
+      }
+    });
+  };
+
+  // 3. Faceted Work Types: Loại công việc thỏa mãn các bộ lọc khác
+  const availableWorkTypes = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const c of allCases) {
+      if (
+        caseMatchesKtv(c) &&
+        caseMatchesStation(c) &&
+        caseMatchesServiceType(c) &&
+        caseMatchesProduct(c) &&
+        caseMatchesDate(c) &&
+        caseMatchesDistance(c) &&
+        caseMatchesSearch(c)
+      ) {
+        const wt = (c.workType || '').trim();
+        if (wt) {
+          counts.set(wt, (counts.get(wt) || 0) + 1);
+        }
+      }
+    }
+    return Array.from(counts.entries())
+      .map(([name, count]) => ({ name, count }))
+      .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name, 'vi'));
+  }, [allCases, selectedKtvsFilter, selectedStationsFilter, selectedServiceTypeFilter, selectedProductFilter, selectedCompletedDateFilter, selectedDistancePresets, customDistanceOp, customDistanceMin, customDistanceMax, searchQuery]);
+
+  const filteredWorkTypesInDropdown = useMemo(() => {
+    if (!workTypeSearchQuery.trim()) return availableWorkTypes;
+    const q = workTypeSearchQuery.toLowerCase();
+    return availableWorkTypes.filter(w => w.name.toLowerCase().includes(q));
+  }, [availableWorkTypes, workTypeSearchQuery]);
+
+  // 4. Faceted Service Types: Loại dịch vụ thỏa mãn các bộ lọc khác
+  const availableServiceTypes = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const c of allCases) {
+      if (
+        caseMatchesKtv(c) &&
+        caseMatchesStation(c) &&
+        caseMatchesWorkType(c) &&
+        caseMatchesProduct(c) &&
+        caseMatchesDate(c) &&
+        caseMatchesDistance(c) &&
+        caseMatchesSearch(c)
+      ) {
+        const st = (c.serviceType || '').trim();
+        if (st) {
+          counts.set(st, (counts.get(st) || 0) + 1);
+        }
+      }
+    }
+    return Array.from(counts.entries())
+      .map(([name, count]) => ({ name, count }))
+      .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name, 'vi'));
+  }, [allCases, selectedKtvsFilter, selectedStationsFilter, selectedWorkTypeFilter, selectedProductFilter, selectedCompletedDateFilter, selectedDistancePresets, customDistanceOp, customDistanceMin, customDistanceMax, searchQuery]);
+
+  const filteredServiceTypesInDropdown = useMemo(() => {
+    if (!serviceTypeSearchQuery.trim()) return availableServiceTypes;
+    const q = serviceTypeSearchQuery.toLowerCase();
+    return availableServiceTypes.filter(s => s.name.toLowerCase().includes(q));
+  }, [availableServiceTypes, serviceTypeSearchQuery]);
+
+  // 5. Faceted Products: Sản phẩm thỏa mãn các bộ lọc khác
+  const availableProducts = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const c of allCases) {
+      if (
+        caseMatchesKtv(c) &&
+        caseMatchesStation(c) &&
+        caseMatchesWorkType(c) &&
+        caseMatchesServiceType(c) &&
+        caseMatchesDate(c) &&
+        caseMatchesDistance(c) &&
+        caseMatchesSearch(c)
+      ) {
+        if (c.products && Array.isArray(c.products)) {
+          for (const rawP of c.products) {
+            const p = (typeof rawP === 'string' ? rawP : ((rawP as any)?.name || (rawP as any)?.productName || '')).trim();
+            if (p) {
+              counts.set(p, (counts.get(p) || 0) + 1);
+            }
+          }
+        }
+      }
+    }
+    return Array.from(counts.entries())
+      .map(([name, count]) => ({ name, count }))
+      .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name, 'vi'));
+  }, [allCases, selectedKtvsFilter, selectedStationsFilter, selectedWorkTypeFilter, selectedServiceTypeFilter, selectedCompletedDateFilter, selectedDistancePresets, customDistanceOp, customDistanceMin, customDistanceMax, searchQuery]);
+
+  const filteredProductsInDropdown = useMemo(() => {
+    if (!productSearchQuery.trim()) return availableProducts;
+    const q = productSearchQuery.toLowerCase();
+    return availableProducts.filter(p => p.name.toLowerCase().includes(q));
+  }, [availableProducts, productSearchQuery]);
+
+  // Auto-prune filters khi danh sách options không còn chứa giá trị đã chọn
+  useEffect(() => {
+    if (selectedKtvsFilter.length > 0 && availableKtvs.length > 0) {
+      const validKtvIds = new Set(availableKtvs.map(s => s.userId));
+      setSelectedKtvsFilter(prev => {
+        const next = prev.filter(id => validKtvIds.has(id));
+        return next.length === prev.length ? prev : next;
+      });
+    }
+  }, [availableKtvs]);
+
+  useEffect(() => {
+    if (selectedWorkTypeFilter && availableWorkTypes.length > 0) {
+      const exists = availableWorkTypes.some(w => w.name.trim().toLowerCase() === selectedWorkTypeFilter.trim().toLowerCase());
+      if (!exists) {
+        setSelectedWorkTypeFilter('');
+      }
+    }
+  }, [availableWorkTypes, selectedWorkTypeFilter]);
+
+  useEffect(() => {
+    if (selectedServiceTypeFilter && availableServiceTypes.length > 0) {
+      const exists = availableServiceTypes.some(s => s.name.trim().toLowerCase() === selectedServiceTypeFilter.trim().toLowerCase());
+      if (!exists) {
+        setSelectedServiceTypeFilter('');
+      }
+    }
+  }, [availableServiceTypes, selectedServiceTypeFilter]);
+
+  useEffect(() => {
+    if (selectedProductFilter && availableProducts.length > 0) {
+      const exists = availableProducts.some(p => p.name.trim().toLowerCase() === selectedProductFilter.trim().toLowerCase());
+      if (!exists) {
+        setSelectedProductFilter('');
+      }
+    }
+  }, [availableProducts, selectedProductFilter]);
+
+  // Filtered Detailed Cases View
+  const filteredCases = useMemo(() => {
+    return allCases.filter(c =>
+      caseMatchesKtv(c) &&
+      caseMatchesStation(c) &&
+      caseMatchesWorkType(c) &&
+      caseMatchesServiceType(c) &&
+      caseMatchesProduct(c) &&
+      caseMatchesDate(c) &&
+      caseMatchesDistance(c) &&
+      caseMatchesSearch(c)
+    );
+  }, [allCases, selectedKtvsFilter, selectedStationsFilter, selectedWorkTypeFilter, selectedServiceTypeFilter, selectedProductFilter, selectedCompletedDateFilter, selectedDistancePresets, customDistanceOp, customDistanceMin, customDistanceMax, searchQuery]);
+
+  // Filtered Summary View (Theo KTV)
   const filteredSalaries = useMemo(() => {
-    const normStr = (str: string | null | undefined): string => {
-      if (!str) return '';
-      return String(str).toLowerCase().replace(/trạm\s+/g, '').trim();
-    };
+    const activeKtvIdsInCases = new Set(filteredCases.map(c => c.userId));
+    const hasCaseSpecificFilters = Boolean(
+      selectedWorkTypeFilter ||
+      selectedServiceTypeFilter ||
+      selectedProductFilter ||
+      selectedCompletedDateFilter ||
+      selectedDistancePresets.length > 0
+    );
 
     return salaries.filter(s => {
       const hasActivity = s.casesCount > 0 || (s.adjustedCost !== s.calculatedCost) || !!s.adjustmentNote;
       const matchKtv = selectedKtvsFilter.length === 0 ? hasActivity : selectedKtvsFilter.includes(s.userId);
+      if (!matchKtv) return false;
 
-      const sMain = s.mainStationName && s.mainStationName !== 'Không có' ? s.mainStationName : 'Trực thuộc Truliva';
-      const sTech = s.stationName && s.stationName !== 'Không có' ? s.stationName : 'Khác';
-      const sKey = `${sMain}::${sTech}`;
+      if (selectedStationsFilter.length > 0) {
+        const sMain = s.mainStationName && s.mainStationName !== 'Không có' ? s.mainStationName : 'Trực thuộc Truliva';
+        const sTech = s.stationName && s.stationName !== 'Không có' ? s.stationName : 'Khác';
+        const sKey = `${sMain}::${sTech}`;
+        const normKey = normStr(sKey);
+        const normMain = normStr(sMain);
+        const normTech = normStr(sTech);
 
-      const normKey = normStr(sKey);
-      const normMain = normStr(sMain);
-      const normTech = normStr(sTech);
+        const matchStation = selectedStationsFilter.some(item => {
+          const filter = item.trim();
+          if (!filter) return false;
+          const normF = normStr(filter);
+          if (filter === sKey || normF === normKey) return true;
+          if (filter.includes('::')) {
+            const [f1, f2] = filter.split('::').map(x => normStr(x));
+            return (f1 === normMain && f2 === normTech) || (f1 === normTech && f2 === normMain);
+          }
+          return normMain === normF || normTech === normF;
+        });
+        if (!matchStation) return false;
+      }
 
-      const matchStation = selectedStationsFilter.length === 0 || selectedStationsFilter.some(item => {
-        const filter = item.trim();
-        if (!filter) return false;
-        const normF = normStr(filter);
+      if (hasCaseSpecificFilters) {
+        return activeKtvIdsInCases.has(s.userId);
+      }
 
-        if (filter === sKey || normF === normKey) return true;
+      if (searchQuery) {
+        const q = searchQuery.toLowerCase();
+        const matchQ =
+          (s.fullName || '').toLowerCase().includes(q) ||
+          (s.username || '').toLowerCase().includes(q) ||
+          (s.phoneNumber || '').includes(searchQuery) ||
+          activeKtvIdsInCases.has(s.userId);
+        if (!matchQ) return false;
+      }
 
-        if (filter.includes('::')) {
-          const [f1, f2] = filter.split('::').map(x => normStr(x));
-          return (f1 === normMain && f2 === normTech) || (f1 === normTech && f2 === normMain);
-        }
-
-        return normMain === normF || normTech === normF;
-      });
-
-      const matchCompletedDate = !selectedCompletedDateFilter || (s.cases && s.cases.some(c => {
-        if (!c.createdAt) return false;
-        const cDate = new Date(c.createdAt).toLocaleDateString('sv-SE');
-        return cDate === selectedCompletedDateFilter;
-      }));
-
-      const matchWorkType = !selectedWorkTypeFilter || (s.cases && s.cases.some(c =>
-        c.workType && c.workType.toLowerCase().includes(selectedWorkTypeFilter.toLowerCase())
-      ));
-
-      const matchDistance = (selectedDistancePresets.length === 0 && !selectedDistancePresets.includes('custom')) || (s.cases && s.cases.some(c => checkCaseDistance(c)));
-
-      const matchQuery = !searchQuery || 
-        (s.fullName || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
-        (s.username || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
-        (s.phoneNumber || '').includes(searchQuery);
-      return matchKtv && matchStation && matchCompletedDate && matchWorkType && matchDistance && matchQuery;
+      return true;
     });
-  }, [salaries, selectedKtvsFilter, selectedStationsFilter, selectedCompletedDateFilter, selectedWorkTypeFilter, selectedDistancePresets, customDistanceOp, customDistanceMin, customDistanceMax, searchQuery]);
+  }, [salaries, filteredCases, selectedKtvsFilter, selectedStationsFilter, selectedWorkTypeFilter, selectedServiceTypeFilter, selectedProductFilter, selectedCompletedDateFilter, selectedDistancePresets, searchQuery]);
 
-  // Filtered Detailed Cases View
-  const filteredCases = useMemo(() => {
-    const normStr = (str: string | null | undefined): string => {
-      if (!str) return '';
-      return String(str).toLowerCase().replace(/trạm\s+/g, '').trim();
-    };
+  // Kiểm tra xem có bất kỳ filter nào đang active
+  const isAnyFilterActive = Boolean(
+    selectedKtvsFilter.length > 0 ||
+    selectedStationsFilter.length > 0 ||
+    selectedWorkTypeFilter ||
+    selectedServiceTypeFilter ||
+    selectedProductFilter ||
+    selectedCompletedDateFilter ||
+    selectedDistancePresets.length > 0 ||
+    searchQuery
+  );
 
-    return allCases.filter(c => {
-      const matchKtv = selectedKtvsFilter.length === 0 || selectedKtvsFilter.includes(c.userId);
-
-      const cMain = c.mainStationName && c.mainStationName !== 'Không có' ? c.mainStationName : 'Trực thuộc Truliva';
-      const cTech = c.stationName && c.stationName !== 'Không có' ? c.stationName : 'Khác';
-      const cKey = `${cMain}::${cTech}`;
-
-      const normKey = normStr(cKey);
-      const normMain = normStr(cMain);
-      const normTech = normStr(cTech);
-
-      const matchStation = selectedStationsFilter.length === 0 || selectedStationsFilter.some(item => {
-        const filter = item.trim();
-        if (!filter) return false;
-        const normF = normStr(filter);
-
-        if (filter === cKey || normF === normKey) return true;
-
-        if (filter.includes('::')) {
-          const [f1, f2] = filter.split('::').map(x => normStr(x));
-          return (f1 === normMain && f2 === normTech) || (f1 === normTech && f2 === normMain);
-        }
-
-        return normMain === normF || normTech === normF;
-      });
-
-      const matchWorkType = !selectedWorkTypeFilter || (c.workType || '').toLowerCase().includes(selectedWorkTypeFilter.toLowerCase());
-
-      const cDate = c.createdAt ? new Date(c.createdAt).toLocaleDateString('sv-SE') : '';
-      const matchCompletedDate = !selectedCompletedDateFilter || cDate === selectedCompletedDateFilter;
-
-      const matchDistance = checkCaseDistance(c);
-
-      const q = searchQuery.toLowerCase();
-      const matchQuery = !searchQuery ||
-        (c.ktvName || '').toLowerCase().includes(q) ||
-        (c.customerName || '').toLowerCase().includes(q) ||
-        (c.customerPhone && String(c.customerPhone).includes(searchQuery)) ||
-        (c.province && c.province.toLowerCase().includes(q)) ||
-        (c.notes && c.notes.toLowerCase().includes(q)) ||
-        (c.products && Array.isArray(c.products) && c.products.some(p => p && String(p).toLowerCase().includes(q)));
-
-      return matchKtv && matchStation && matchWorkType && matchCompletedDate && matchDistance && matchQuery;
-    });
-  }, [allCases, selectedKtvsFilter, selectedStationsFilter, selectedWorkTypeFilter, selectedCompletedDateFilter, selectedDistancePresets, customDistanceOp, customDistanceMin, customDistanceMax, searchQuery]);
+  // Xóa toàn bộ bộ lọc
+  const resetAllFilters = () => {
+    setSelectedKtvsFilter([]);
+    setSelectedStationsFilter([]);
+    setSelectedWorkTypeFilter('');
+    setSelectedServiceTypeFilter('');
+    setSelectedProductFilter('');
+    setSelectedCompletedDateFilter('');
+    setSelectedDistancePresets([]);
+    setCustomDistanceMin('');
+    setCustomDistanceMax('');
+    setSearchQuery('');
+    setKtvSearchQuery('');
+    setWorkTypeSearchQuery('');
+    setServiceTypeSearchQuery('');
+    setProductSearchQuery('');
+  };
 
   const formatMoney = (val: number) => {
     return val.toLocaleString('vi-VN') + ' đ';
@@ -1249,13 +1552,13 @@ export default function SalaryManage() {
           </div>
         </div>
 
-        {/* Multi-Filter Bar (6 Cột Lọc) */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3 text-xs">
+        {/* Multi-Filter Bar (8 Cột Lọc 2 Hàng x 4 Cột & Dynamic Facets) */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-2 xl:grid-cols-4 gap-3 text-xs">
           
           {/* 1. Lọc theo KTV */}
           <div className="relative" ref={ktvDropdownRef}>
             <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-1">
-              Kỹ thuật viên {selectedKtvsFilter.length > 0 && selectedKtvsFilter.length !== stationFilteredKtvsInMonth.length && `(${selectedKtvsFilter.length}/${stationFilteredKtvsInMonth.length})`}
+              Kỹ thuật viên {selectedKtvsFilter.length > 0 && selectedKtvsFilter.length !== availableKtvs.length && `(${selectedKtvsFilter.length}/${availableKtvs.length})`}
             </label>
             <button
               type="button"
@@ -1265,8 +1568,8 @@ export default function SalaryManage() {
               <div className="flex items-center gap-1.5 truncate">
                 <UserCheck className="h-3.5 w-3.5 text-blue-600 flex-shrink-0" />
                 <span className="truncate">
-                  {selectedKtvsFilter.length === 0 || selectedKtvsFilter.length === stationFilteredKtvsInMonth.length
-                    ? (selectedStationsFilter.length > 0 ? `Tất cả KTV thuộc trạm (${stationFilteredKtvsInMonth.length})` : `Tất cả KTV có ca (${stationFilteredKtvsInMonth.length})`)
+                  {selectedKtvsFilter.length === 0 || selectedKtvsFilter.length === availableKtvs.length
+                    ? (selectedStationsFilter.length > 0 ? `Tất cả KTV thuộc trạm (${availableKtvs.length})` : `Tất cả KTV có ca (${availableKtvs.length})`)
                     : `Đã chọn ${selectedKtvsFilter.length} KTV`}
                 </span>
               </div>
@@ -1295,22 +1598,22 @@ export default function SalaryManage() {
                   <label className="flex items-center gap-2 cursor-pointer font-bold text-blue-900">
                     <input
                       type="checkbox"
-                      checked={stationFilteredKtvsInMonth.length > 0 && stationFilteredKtvsInMonth.every(s => selectedKtvsFilter.includes(s.userId))}
+                      checked={availableKtvs.length > 0 && availableKtvs.every(s => selectedKtvsFilter.includes(s.userId))}
                       ref={(el) => {
                         if (el) {
-                          const count = stationFilteredKtvsInMonth.filter(s => selectedKtvsFilter.includes(s.userId)).length;
-                          el.indeterminate = count > 0 && count < stationFilteredKtvsInMonth.length;
+                          const count = availableKtvs.filter(s => selectedKtvsFilter.includes(s.userId)).length;
+                          el.indeterminate = count > 0 && count < availableKtvs.length;
                         }
                       }}
                       onChange={toggleAllKtvs}
                       className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer h-3.5 w-3.5"
                     />
-                    <span>{selectedStationsFilter.length > 0 ? 'Tất cả KTV thuộc trạm' : 'Tất cả KTV có ca'} ({stationFilteredKtvsInMonth.length})</span>
+                    <span>{selectedStationsFilter.length > 0 ? 'Tất cả KTV thuộc trạm' : 'Tất cả KTV phù hợp'} ({availableKtvs.length})</span>
                   </label>
                   <div className="flex items-center gap-1 text-[11px]">
                     <button
                       type="button"
-                      onClick={() => setSelectedKtvsFilter(stationFilteredKtvsInMonth.map(s => s.userId))}
+                      onClick={() => setSelectedKtvsFilter(availableKtvs.map(s => s.userId))}
                       className="text-blue-600 hover:underline font-semibold cursor-pointer"
                     >
                       Chọn hết
@@ -1327,7 +1630,7 @@ export default function SalaryManage() {
                 </div>
 
                 {/* Quick Search inside KTV Dropdown */}
-                {activeKtvsInMonth.length > 6 && (
+                {availableKtvs.length > 5 && (
                   <div className="relative my-1">
                     <Search className="h-3 w-3 text-gray-400 absolute left-2.5 top-2" />
                     <input
@@ -1340,7 +1643,7 @@ export default function SalaryManage() {
                   </div>
                 )}
 
-                {/* KTV Items List (Alphabetical A-Z) */}
+                {/* KTV Items List */}
                 <div className="space-y-1 pt-1">
                   {filteredKtvsInDropdown.length === 0 ? (
                     <div className="text-center py-3 text-gray-400 italic text-[11px]">
@@ -1368,7 +1671,7 @@ export default function SalaryManage() {
                             <span className="truncate">{s.fullName} ({s.phoneNumber})</span>
                           </div>
                           <span className="text-[11px] font-semibold text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded-full flex-shrink-0">
-                            {s.casesCount} ca
+                            {s.availableCasesCount !== undefined ? s.availableCasesCount : s.casesCount} ca
                           </span>
                         </label>
                       );
@@ -1429,7 +1732,7 @@ export default function SalaryManage() {
                 </div>
 
                 <div className="space-y-2">
-                  {stationTree.map((group) => {
+                  {availableStationTree.map((group) => {
                     const groupKeys = group.stations.map(s => s.key);
                     const isGroupAllSelected = groupKeys.length > 0 && groupKeys.every(k => selectedStationsFilter.includes(k));
                     const isGroupSomeSelected = groupKeys.some(k => selectedStationsFilter.includes(k)) && !isGroupAllSelected;
@@ -1469,6 +1772,9 @@ export default function SalaryManage() {
                                 <span className="truncate text-[11px] flex-1">
                                   📍 {st.name}
                                 </span>
+                                <span className="text-[10px] font-semibold text-gray-500 bg-gray-100 px-1.5 py-0.2 rounded-full flex-shrink-0">
+                                  {st.count} ca
+                                </span>
                               </label>
                             );
                           })}
@@ -1481,25 +1787,296 @@ export default function SalaryManage() {
             )}
           </div>
 
-          {/* 3. Lọc theo Loại công việc */}
-          <div>
-            <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-1">Loại công việc</label>
-            <select
-              value={selectedWorkTypeFilter}
-              onChange={(e) => setSelectedWorkTypeFilter(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+          {/* 3. Lọc theo Loại công việc (Searchable Dropdown + Faceted Count) */}
+          <div className="relative" ref={workTypeDropdownRef}>
+            <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-1">
+              Loại công việc {selectedWorkTypeFilter && '(Đang lọc)'}
+            </label>
+            <button
+              type="button"
+              onClick={() => setIsWorkTypeDropdownOpen(!isWorkTypeDropdownOpen)}
+              className={`w-full px-3 py-2 border rounded-lg text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500 flex items-center justify-between gap-2 shadow-sm cursor-pointer transition ${
+                selectedWorkTypeFilter
+                  ? 'bg-indigo-50/80 border-indigo-300 text-indigo-950 font-bold'
+                  : 'bg-white border-gray-200 text-gray-800 hover:border-gray-300'
+              }`}
             >
-              <option value="">Tất cả loại công việc</option>
-              <option value="Bảo hành">Bảo hành</option>
-              <option value="Sửa chữa">Sửa chữa</option>
-              <option value="Giao hàng và lắp đặt">Giao hàng & Lắp đặt</option>
-              <option value="Lắp đặt">Lắp đặt</option>
-              <option value="Thay lọc">Thay lọc</option>
-              <option value="Giao hàng">Giao hàng</option>
-            </select>
+              <div className="flex items-center gap-1.5 truncate">
+                <Briefcase className={`h-3.5 w-3.5 flex-shrink-0 ${selectedWorkTypeFilter ? 'text-indigo-600' : 'text-blue-600'}`} />
+                <span className="truncate">
+                  {selectedWorkTypeFilter || `Tất cả loại công việc (${availableWorkTypes.length})`}
+                </span>
+              </div>
+              <div className="flex items-center gap-1">
+                {selectedWorkTypeFilter && (
+                  <span
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setSelectedWorkTypeFilter('');
+                    }}
+                    className="p-0.5 hover:bg-indigo-200 rounded-full text-indigo-600 cursor-pointer"
+                    title="Xóa lọc loại công việc"
+                  >
+                    <X className="h-3 w-3" />
+                  </span>
+                )}
+                <ChevronDown className={`h-3.5 w-3.5 text-gray-400 transition-transform ${isWorkTypeDropdownOpen ? 'rotate-180' : ''}`} />
+              </div>
+            </button>
+
+            {isWorkTypeDropdownOpen && (
+              <div className="absolute left-0 top-full mt-1.5 w-72 bg-white border border-gray-200 rounded-xl shadow-2xl z-50 p-2.5 text-xs space-y-2 max-h-72 overflow-y-auto">
+                {availableWorkTypes.length > 4 && (
+                  <div className="relative">
+                    <Search className="h-3 w-3 text-gray-400 absolute left-2.5 top-2" />
+                    <input
+                      type="text"
+                      placeholder="Tìm loại công việc..."
+                      value={workTypeSearchQuery}
+                      onChange={(e) => setWorkTypeSearchQuery(e.target.value)}
+                      className="w-full pl-7 pr-2 py-1 bg-gray-50 border border-gray-200 rounded-md text-[11px] focus:outline-none focus:ring-1 focus:ring-blue-500"
+                    />
+                  </div>
+                )}
+
+                <div className="space-y-0.5">
+                  <div
+                    onClick={() => {
+                      setSelectedWorkTypeFilter('');
+                      setIsWorkTypeDropdownOpen(false);
+                    }}
+                    className={`px-2.5 py-1.5 rounded-lg flex items-center justify-between cursor-pointer transition ${
+                      !selectedWorkTypeFilter ? 'bg-blue-50 text-blue-900 font-bold' : 'hover:bg-gray-50 text-gray-700'
+                    }`}
+                  >
+                    <span>Tất cả loại công việc</span>
+                    <span className="text-[10px] text-gray-400">({availableWorkTypes.reduce((a, b) => a + b.count, 0)} ca)</span>
+                  </div>
+
+                  {filteredWorkTypesInDropdown.length === 0 ? (
+                    <div className="text-center py-2 text-gray-400 italic text-[11px]">
+                      Không có loại công việc phù hợp
+                    </div>
+                  ) : (
+                    filteredWorkTypesInDropdown.map(w => {
+                      const isSel = selectedWorkTypeFilter.toLowerCase() === w.name.toLowerCase();
+                      return (
+                        <div
+                          key={w.name}
+                          onClick={() => {
+                            setSelectedWorkTypeFilter(isSel ? '' : w.name);
+                            setIsWorkTypeDropdownOpen(false);
+                          }}
+                          className={`px-2.5 py-1.5 rounded-lg flex items-center justify-between cursor-pointer transition ${
+                            isSel ? 'bg-indigo-50 text-indigo-900 font-bold' : 'hover:bg-gray-50 text-gray-700'
+                          }`}
+                        >
+                          <span className="truncate">{w.name}</span>
+                          <span className="text-[10px] font-semibold text-gray-500 bg-gray-100 px-1.5 py-0.2 rounded-full flex-shrink-0 ml-1">
+                            {w.count} ca
+                          </span>
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+              </div>
+            )}
           </div>
 
-          {/* 4. Lọc theo Khoảng cách di chuyển */}
+          {/* 4. Lọc theo Loại dịch vụ (Searchable Dropdown + Faceted Count) */}
+          <div className="relative" ref={serviceTypeDropdownRef}>
+            <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-1">
+              Loại dịch vụ {selectedServiceTypeFilter && '(Đang lọc)'}
+            </label>
+            <button
+              type="button"
+              onClick={() => setIsServiceTypeDropdownOpen(!isServiceTypeDropdownOpen)}
+              className={`w-full px-3 py-2 border rounded-lg text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500 flex items-center justify-between gap-2 shadow-sm cursor-pointer transition ${
+                selectedServiceTypeFilter
+                  ? 'bg-purple-50/80 border-purple-300 text-purple-950 font-bold'
+                  : 'bg-white border-gray-200 text-gray-800 hover:border-gray-300'
+              }`}
+            >
+              <div className="flex items-center gap-1.5 truncate">
+                <Layers className={`h-3.5 w-3.5 flex-shrink-0 ${selectedServiceTypeFilter ? 'text-purple-600' : 'text-blue-600'}`} />
+                <span className="truncate">
+                  {selectedServiceTypeFilter || `Tất cả loại dịch vụ (${availableServiceTypes.length})`}
+                </span>
+              </div>
+              <div className="flex items-center gap-1">
+                {selectedServiceTypeFilter && (
+                  <span
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setSelectedServiceTypeFilter('');
+                    }}
+                    className="p-0.5 hover:bg-purple-200 rounded-full text-purple-600 cursor-pointer"
+                    title="Xóa lọc loại dịch vụ"
+                  >
+                    <X className="h-3 w-3" />
+                  </span>
+                )}
+                <ChevronDown className={`h-3.5 w-3.5 text-gray-400 transition-transform ${isServiceTypeDropdownOpen ? 'rotate-180' : ''}`} />
+              </div>
+            </button>
+
+            {isServiceTypeDropdownOpen && (
+              <div className="absolute left-0 top-full mt-1.5 w-72 bg-white border border-gray-200 rounded-xl shadow-2xl z-50 p-2.5 text-xs space-y-2 max-h-72 overflow-y-auto">
+                {availableServiceTypes.length > 4 && (
+                  <div className="relative">
+                    <Search className="h-3 w-3 text-gray-400 absolute left-2.5 top-2" />
+                    <input
+                      type="text"
+                      placeholder="Tìm loại dịch vụ..."
+                      value={serviceTypeSearchQuery}
+                      onChange={(e) => setServiceTypeSearchQuery(e.target.value)}
+                      className="w-full pl-7 pr-2 py-1 bg-gray-50 border border-gray-200 rounded-md text-[11px] focus:outline-none focus:ring-1 focus:ring-blue-500"
+                    />
+                  </div>
+                )}
+
+                <div className="space-y-0.5">
+                  <div
+                    onClick={() => {
+                      setSelectedServiceTypeFilter('');
+                      setIsServiceTypeDropdownOpen(false);
+                    }}
+                    className={`px-2.5 py-1.5 rounded-lg flex items-center justify-between cursor-pointer transition ${
+                      !selectedServiceTypeFilter ? 'bg-blue-50 text-blue-900 font-bold' : 'hover:bg-gray-50 text-gray-700'
+                    }`}
+                  >
+                    <span>Tất cả loại dịch vụ</span>
+                    <span className="text-[10px] text-gray-400">({availableServiceTypes.reduce((a, b) => a + b.count, 0)} ca)</span>
+                  </div>
+
+                  {filteredServiceTypesInDropdown.length === 0 ? (
+                    <div className="text-center py-2 text-gray-400 italic text-[11px]">
+                      Không có loại dịch vụ phù hợp
+                    </div>
+                  ) : (
+                    filteredServiceTypesInDropdown.map(st => {
+                      const isSel = selectedServiceTypeFilter.toLowerCase() === st.name.toLowerCase();
+                      return (
+                        <div
+                          key={st.name}
+                          onClick={() => {
+                            setSelectedServiceTypeFilter(isSel ? '' : st.name);
+                            setIsServiceTypeDropdownOpen(false);
+                          }}
+                          className={`px-2.5 py-1.5 rounded-lg flex items-center justify-between cursor-pointer transition ${
+                            isSel ? 'bg-purple-50 text-purple-900 font-bold' : 'hover:bg-gray-50 text-gray-700'
+                          }`}
+                        >
+                          <span className="truncate">{st.name}</span>
+                          <span className="text-[10px] font-semibold text-gray-500 bg-gray-100 px-1.5 py-0.2 rounded-full flex-shrink-0 ml-1">
+                            {st.count} ca
+                          </span>
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* 5. Lọc theo Sản phẩm (Searchable Dropdown + Faceted Count) */}
+          <div className="relative" ref={productDropdownRef}>
+            <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-1">
+              Sản phẩm {selectedProductFilter && '(Đang lọc)'}
+            </label>
+            <button
+              type="button"
+              onClick={() => setIsProductDropdownOpen(!isProductDropdownOpen)}
+              className={`w-full px-3 py-2 border rounded-lg text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500 flex items-center justify-between gap-2 shadow-sm cursor-pointer transition ${
+                selectedProductFilter
+                  ? 'bg-emerald-50/80 border-emerald-300 text-emerald-950 font-bold'
+                  : 'bg-white border-gray-200 text-gray-800 hover:border-gray-300'
+              }`}
+            >
+              <div className="flex items-center gap-1.5 truncate">
+                <Package className={`h-3.5 w-3.5 flex-shrink-0 ${selectedProductFilter ? 'text-emerald-600' : 'text-blue-600'}`} />
+                <span className="truncate">
+                  {selectedProductFilter || `Tất cả sản phẩm (${availableProducts.length})`}
+                </span>
+              </div>
+              <div className="flex items-center gap-1">
+                {selectedProductFilter && (
+                  <span
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setSelectedProductFilter('');
+                    }}
+                    className="p-0.5 hover:bg-emerald-200 rounded-full text-emerald-600 cursor-pointer"
+                    title="Xóa lọc sản phẩm"
+                  >
+                    <X className="h-3 w-3" />
+                  </span>
+                )}
+                <ChevronDown className={`h-3.5 w-3.5 text-gray-400 transition-transform ${isProductDropdownOpen ? 'rotate-180' : ''}`} />
+              </div>
+            </button>
+
+            {isProductDropdownOpen && (
+              <div className="absolute left-0 top-full mt-1.5 w-80 bg-white border border-gray-200 rounded-xl shadow-2xl z-50 p-2.5 text-xs space-y-2 max-h-72 overflow-y-auto">
+                <div className="relative">
+                  <Search className="h-3 w-3 text-gray-400 absolute left-2.5 top-2" />
+                  <input
+                    type="text"
+                    placeholder="Tìm tên sản phẩm..."
+                    value={productSearchQuery}
+                    onChange={(e) => setProductSearchQuery(e.target.value)}
+                    className="w-full pl-7 pr-2 py-1 bg-gray-50 border border-gray-200 rounded-md text-[11px] focus:outline-none focus:ring-1 focus:ring-blue-500"
+                  />
+                </div>
+
+                <div className="space-y-0.5">
+                  <div
+                    onClick={() => {
+                      setSelectedProductFilter('');
+                      setIsProductDropdownOpen(false);
+                    }}
+                    className={`px-2.5 py-1.5 rounded-lg flex items-center justify-between cursor-pointer transition ${
+                      !selectedProductFilter ? 'bg-blue-50 text-blue-900 font-bold' : 'hover:bg-gray-50 text-gray-700'
+                    }`}
+                  >
+                    <span>Tất cả sản phẩm</span>
+                    <span className="text-[10px] text-gray-400">({availableProducts.reduce((a, b) => a + b.count, 0)} ca)</span>
+                  </div>
+
+                  {filteredProductsInDropdown.length === 0 ? (
+                    <div className="text-center py-2 text-gray-400 italic text-[11px]">
+                      Không có sản phẩm phù hợp
+                    </div>
+                  ) : (
+                    filteredProductsInDropdown.map(prod => {
+                      const isSel = selectedProductFilter.toLowerCase() === prod.name.toLowerCase();
+                      return (
+                        <div
+                          key={prod.name}
+                          onClick={() => {
+                            setSelectedProductFilter(isSel ? '' : prod.name);
+                            setIsProductDropdownOpen(false);
+                          }}
+                          className={`px-2.5 py-1.5 rounded-lg flex items-center justify-between cursor-pointer transition ${
+                            isSel ? 'bg-emerald-50 text-emerald-900 font-bold' : 'hover:bg-gray-50 text-gray-700'
+                          }`}
+                        >
+                          <span className="truncate flex-1 pr-2" title={prod.name}>{prod.name}</span>
+                          <span className="text-[10px] font-semibold text-gray-500 bg-gray-100 px-1.5 py-0.2 rounded-full flex-shrink-0">
+                            {prod.count} ca
+                          </span>
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* 6. Lọc theo Khoảng cách di chuyển */}
           <div className="relative" ref={distanceDropdownRef}>
             <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-1">
               KC di chuyển {selectedDistancePresets.length > 0 && '(Đang lọc)'}
@@ -1536,7 +2113,7 @@ export default function SalaryManage() {
               </div>
             </button>
 
-            {/* Distance Dropdown Panel (Multi-Select Checkboxes) */}
+            {/* Distance Dropdown Panel */}
             {isDistanceDropdownOpen && (
               <div className="absolute left-0 sm:right-0 sm:left-auto top-full mt-1.5 w-84 bg-white border border-gray-200 rounded-xl shadow-2xl z-50 p-3 text-xs space-y-3">
                 <div className="flex items-center justify-between pb-2 border-b border-gray-100 font-bold text-gray-800">
@@ -1559,144 +2136,85 @@ export default function SalaryManage() {
                   )}
                 </div>
 
-                {/* Nhóm 1: Theo 2 loại ngưỡng tính phí dịch vụ Truliva (Cho chọn cả 2 cùng lúc) */}
                 <div className="space-y-1.5">
-                  <div className="flex items-center justify-between">
-                    <span className="text-[10px] font-extrabold text-blue-950 uppercase tracking-wider">
-                      Ngưỡng tính phí theo Dịch Vụ
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setSelectedDistancePresets(prev => {
-                          const hasBoth = prev.includes('>20') && prev.includes('>50');
-                          if (hasBoth) {
-                            return prev.filter(p => p !== '>20' && p !== '>50');
-                          } else {
-                            return Array.from(new Set([...prev, '>20', '>50']));
-                          }
-                        });
-                      }}
-                      className="text-[10px] font-bold text-blue-600 hover:underline cursor-pointer"
-                    >
-                      {selectedDistancePresets.includes('>20') && selectedDistancePresets.includes('>50') ? 'Bỏ chọn 2 ngưỡng' : '⚡ Chọn cả 2 ngưỡng'}
-                    </button>
-                  </div>
-
-                  <div className="grid grid-cols-1 gap-1.5">
-                    {/* Ngưỡng 1: > 20 km */}
-                    <label
-                      className={`flex items-start gap-2.5 p-2 rounded-lg border transition cursor-pointer ${
-                        selectedDistancePresets.includes('>20')
-                          ? 'bg-blue-50/90 border-blue-300 text-blue-950 shadow-sm'
-                          : 'bg-white border-gray-100 hover:bg-gray-50 text-gray-700'
-                      }`}
-                    >
-                      <input
-                        type="checkbox"
-                        checked={selectedDistancePresets.includes('>20')}
-                        onChange={() => toggleDistancePreset('>20')}
-                        className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer h-4 w-4 mt-0.5 flex-shrink-0"
-                      />
-                      <div className="flex-1">
-                        <div className="font-bold flex items-center gap-1 text-xs">
-                          <span>⚡ {'>'} 20 km</span>
-                          <span className="text-[10px] bg-blue-100 text-blue-800 font-semibold px-1.5 py-0.2 rounded">Tiêu chuẩn</span>
-                        </div>
-                        <div className="text-[10px] text-gray-500 mt-0.5">
-                          Bảo hành, Giao hàng, Lắp đặt, Giao lắp
-                        </div>
+                  <label
+                    className={`flex items-start gap-2.5 p-2 rounded-lg border transition cursor-pointer ${
+                      selectedDistancePresets.includes('>20')
+                        ? 'bg-blue-50/90 border-blue-300 text-blue-950 shadow-sm'
+                        : 'bg-white border-gray-100 hover:bg-gray-50 text-gray-700'
+                    }`}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={selectedDistancePresets.includes('>20')}
+                      onChange={() => toggleDistancePreset('>20')}
+                      className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer h-4 w-4 mt-0.5 flex-shrink-0"
+                    />
+                    <div className="flex-1">
+                      <div className="font-bold flex items-center gap-1 text-xs">
+                        <span>⚡ {'>'} 20 km</span>
+                        <span className="text-[10px] bg-blue-100 text-blue-800 font-semibold px-1.5 py-0.2 rounded">Tiêu chuẩn</span>
                       </div>
-                    </label>
-
-                    {/* Ngưỡng 2: > 50 km */}
-                    <label
-                      className={`flex items-start gap-2.5 p-2 rounded-lg border transition cursor-pointer ${
-                        selectedDistancePresets.includes('>50')
-                          ? 'bg-amber-50/90 border-amber-300 text-amber-950 shadow-sm'
-                          : 'bg-white border-gray-100 hover:bg-gray-50 text-gray-700'
-                      }`}
-                    >
-                      <input
-                        type="checkbox"
-                        checked={selectedDistancePresets.includes('>50')}
-                        onChange={() => toggleDistancePreset('>50')}
-                        className="rounded border-gray-300 text-amber-600 focus:ring-amber-500 cursor-pointer h-4 w-4 mt-0.5 flex-shrink-0"
-                      />
-                      <div className="flex-1">
-                        <div className="font-bold flex items-center gap-1 text-xs">
-                          <span>⚡ {'>'} 50 km</span>
-                          <span className="text-[10px] bg-amber-100 text-amber-800 font-semibold px-1.5 py-0.2 rounded">Thay lọc / SC</span>
-                        </div>
-                        <div className="text-[10px] text-gray-500 mt-0.5">
-                          Thay lõi lọc, Sửa chữa trạm ngoài
-                        </div>
+                      <div className="text-[10px] text-gray-500 mt-0.5">
+                        Bảo hành, Giao hàng, Lắp đặt, Giao lắp
                       </div>
-                    </label>
-
-                    {/* Quick Fee Presets */}
-                    <div className="grid grid-cols-2 gap-1.5 pt-0.5">
-                      <label
-                        className={`flex items-center gap-1.5 p-1.5 rounded-md border text-[11px] font-semibold transition cursor-pointer ${
-                          selectedDistancePresets.includes('has_fee')
-                            ? 'bg-emerald-50 border-emerald-300 text-emerald-900 font-bold'
-                            : 'bg-gray-50/60 border-transparent hover:bg-gray-100 text-gray-700'
-                        }`}
-                      >
-                        <input
-                          type="checkbox"
-                          checked={selectedDistancePresets.includes('has_fee')}
-                          onChange={() => toggleDistancePreset('has_fee')}
-                          className="rounded border-gray-300 text-emerald-600 focus:ring-emerald-500 cursor-pointer h-3.5 w-3.5 flex-shrink-0"
-                        />
-                        <span>💰 Có tính Phí KC</span>
-                      </label>
-
-                      <label
-                        className={`flex items-center gap-1.5 p-1.5 rounded-md border text-[11px] font-semibold transition cursor-pointer ${
-                          selectedDistancePresets.includes('no_fee')
-                            ? 'bg-slate-100 border-slate-300 text-slate-900 font-bold'
-                            : 'bg-gray-50/60 border-transparent hover:bg-gray-100 text-gray-700'
-                        }`}
-                      >
-                        <input
-                          type="checkbox"
-                          checked={selectedDistancePresets.includes('no_fee')}
-                          onChange={() => toggleDistancePreset('no_fee')}
-                          className="rounded border-gray-300 text-gray-700 focus:ring-gray-500 cursor-pointer h-3.5 w-3.5 flex-shrink-0"
-                        />
-                        <span>🛡️ Không tính Phí KC</span>
-                      </label>
                     </div>
-                  </div>
+                  </label>
+
+                  <label
+                    className={`flex items-start gap-2.5 p-2 rounded-lg border transition cursor-pointer ${
+                      selectedDistancePresets.includes('>50')
+                        ? 'bg-amber-50/90 border-amber-300 text-amber-950 shadow-sm'
+                        : 'bg-white border-gray-100 hover:bg-gray-50 text-gray-700'
+                    }`}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={selectedDistancePresets.includes('>50')}
+                      onChange={() => toggleDistancePreset('>50')}
+                      className="rounded border-gray-300 text-amber-600 focus:ring-amber-500 cursor-pointer h-4 w-4 mt-0.5 flex-shrink-0"
+                    />
+                    <div className="flex-1">
+                      <div className="font-bold flex items-center gap-1 text-xs">
+                        <span>⚡ {'>'} 50 km</span>
+                        <span className="text-[10px] bg-amber-100 text-amber-800 font-semibold px-1.5 py-0.2 rounded">Thay lọc / Sửa chữa</span>
+                      </div>
+                      <div className="text-[10px] text-gray-500 mt-0.5">
+                        Thay lõi, bảo dưỡng, sửa chữa máy
+                      </div>
+                    </div>
+                  </label>
                 </div>
 
-                {/* Nhóm 2: Khoảng km phổ biến */}
+                {/* Nhóm 2: Các mốc khoảng cách cụ thể */}
                 <div className="space-y-1.5 pt-1 border-t border-gray-100">
-                  <div className="text-[10px] font-extrabold text-gray-500 uppercase tracking-wider">
-                    Khoảng km phổ biến
-                  </div>
-                  <div className="grid grid-cols-3 gap-1.5">
+                  <span className="text-[10px] font-extrabold text-gray-500 uppercase tracking-wider block">
+                    Phân loại & Mốc khoảng cách
+                  </span>
+                  <div className="grid grid-cols-2 gap-1.5">
                     {[
-                      { key: '0', label: '0 km' },
-                      { key: '1-20', label: '1 - 20 km' },
-                      { key: '21-50', label: '21 - 50 km' }
+                      { id: 'has_fee', label: 'Có tính phí KC (> 0đ)' },
+                      { id: 'no_fee', label: 'Không tính phí (0đ)' },
+                      { id: '0', label: '0 km (Nội thành)' },
+                      { id: '1-20', label: '1 - 20 km' },
+                      { id: '21-50', label: '21 - 50 km' },
+                      { id: '>50_all', label: '> 50 km' }
                     ].map(item => {
-                      const isChecked = selectedDistancePresets.includes(item.key);
+                      const isChecked = selectedDistancePresets.includes(item.id);
                       return (
                         <label
-                          key={item.key}
-                          className={`flex items-center justify-center gap-1 px-1.5 py-1.5 rounded-md border text-[11px] font-medium transition cursor-pointer text-center ${
+                          key={item.id}
+                          className={`flex items-center gap-2 p-1.5 rounded-md border text-[11px] transition cursor-pointer ${
                             isChecked
-                              ? 'bg-blue-600 text-white border-blue-600 font-bold shadow-xs'
-                              : 'bg-gray-50 border-gray-100 hover:bg-gray-100 text-gray-700'
+                              ? 'bg-blue-50/80 border-blue-200 text-blue-900 font-semibold'
+                              : 'border-gray-100 hover:bg-gray-50 text-gray-700'
                           }`}
                         >
                           <input
                             type="checkbox"
                             checked={isChecked}
-                            onChange={() => toggleDistancePreset(item.key)}
-                            className="hidden"
+                            onChange={() => toggleDistancePreset(item.id)}
+                            className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer h-3.5 w-3.5"
                           />
                           <span>{item.label}</span>
                         </label>
@@ -1803,7 +2321,7 @@ export default function SalaryManage() {
             )}
           </div>
 
-          {/* 5. Lọc theo Ngày hoàn thành */}
+          {/* 7. Lọc theo Ngày hoàn thành */}
           <div>
             <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-1">
               Ngày hoàn thành {selectedCompletedDateFilter && '(Đang lọc)'}
@@ -1813,7 +2331,11 @@ export default function SalaryManage() {
                 type="date"
                 value={selectedCompletedDateFilter}
                 onChange={(e) => setSelectedCompletedDateFilter(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                className={`w-full px-3 py-2 border rounded-lg text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500 transition ${
+                  selectedCompletedDateFilter
+                    ? 'bg-sky-50/80 border-sky-300 text-sky-950 font-bold'
+                    : 'bg-white border-gray-200 text-gray-800'
+                }`}
               />
               {selectedCompletedDateFilter && (
                 <button
@@ -1828,19 +2350,168 @@ export default function SalaryManage() {
             </div>
           </div>
 
-          {/* 6. Tìm kiếm từ khóa */}
+          {/* 8. Tìm kiếm từ khóa */}
           <div>
             <label className="block text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-1">Tìm kiếm từ khóa</label>
-            <input
-              type="text"
-              placeholder="Nhập tên KH, SĐT, Tỉnh/TP, Ghi chú..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
+            <div className="relative">
+              <Search className="h-3.5 w-3.5 text-gray-400 absolute left-3 top-2.5" />
+              <input
+                type="text"
+                placeholder="Tên KH, SĐT, Tỉnh, Ghi chú..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full pl-8.5 pr-7 py-2 border border-gray-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+              />
+              {searchQuery && (
+                <button
+                  type="button"
+                  onClick={() => setSearchQuery('')}
+                  className="absolute right-2 top-2 p-0.5 hover:bg-gray-100 rounded-full text-gray-400 hover:text-gray-600 cursor-pointer"
+                  title="Xóa tìm kiếm"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              )}
+            </div>
           </div>
 
         </div>
+
+        {/* Active Filter Chips & Reset All Bar */}
+        {isAnyFilterActive && (
+          <div className="flex flex-wrap items-center gap-1.5 pt-3 mt-1 border-t border-gray-100 text-xs">
+            <span className="text-[11px] font-bold text-gray-500 flex items-center gap-1 mr-1">
+              <Filter className="h-3.5 w-3.5 text-blue-600" />
+              Đang lọc ({filteredCases.length} ca / {filteredSalaries.length} KTV):
+            </span>
+
+            {/* KTV Chip */}
+            {selectedKtvsFilter.length > 0 && (
+              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-blue-50 text-blue-800 border border-blue-200 shadow-xs">
+                <span>KTV: {selectedKtvsFilter.length} người</span>
+                <button
+                  onClick={() => setSelectedKtvsFilter([])}
+                  className="hover:text-blue-950 cursor-pointer p-0.5"
+                  title="Bỏ lọc KTV"
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              </span>
+            )}
+
+            {/* Station Chip */}
+            {selectedStationsFilter.length > 0 && (
+              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-cyan-50 text-cyan-800 border border-cyan-200 shadow-xs">
+                <span>Trạm: {selectedStationsFilter.length} trạm</span>
+                <button
+                  onClick={() => setSelectedStationsFilter([])}
+                  className="hover:text-cyan-950 cursor-pointer p-0.5"
+                  title="Bỏ lọc trạm"
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              </span>
+            )}
+
+            {/* Work Type Chip */}
+            {selectedWorkTypeFilter && (
+              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-indigo-50 text-indigo-800 border border-indigo-200 shadow-xs">
+                <span>CV: {selectedWorkTypeFilter}</span>
+                <button
+                  onClick={() => setSelectedWorkTypeFilter('')}
+                  className="hover:text-indigo-950 cursor-pointer p-0.5"
+                  title="Bỏ lọc loại công việc"
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              </span>
+            )}
+
+            {/* Service Type Chip */}
+            {selectedServiceTypeFilter && (
+              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-purple-50 text-purple-800 border border-purple-200 shadow-xs">
+                <span>Dịch vụ: {selectedServiceTypeFilter}</span>
+                <button
+                  onClick={() => setSelectedServiceTypeFilter('')}
+                  className="hover:text-purple-950 cursor-pointer p-0.5"
+                  title="Bỏ lọc loại dịch vụ"
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              </span>
+            )}
+
+            {/* Product Chip */}
+            {selectedProductFilter && (
+              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-200 shadow-xs">
+                <span className="max-w-[180px] truncate">SP: {selectedProductFilter}</span>
+                <button
+                  onClick={() => setSelectedProductFilter('')}
+                  className="hover:text-emerald-950 cursor-pointer p-0.5"
+                  title="Bỏ lọc sản phẩm"
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              </span>
+            )}
+
+            {/* Distance Chip */}
+            {selectedDistancePresets.length > 0 && (
+              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-amber-50 text-amber-800 border border-amber-200 shadow-xs">
+                <span>KC: {getDistanceFilterLabel()}</span>
+                <button
+                  onClick={() => {
+                    setSelectedDistancePresets([]);
+                    setCustomDistanceMin('');
+                    setCustomDistanceMax('');
+                  }}
+                  className="hover:text-amber-950 cursor-pointer p-0.5"
+                  title="Bỏ lọc khoảng cách"
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              </span>
+            )}
+
+            {/* Completed Date Chip */}
+            {selectedCompletedDateFilter && (
+              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-sky-50 text-sky-800 border border-sky-200 shadow-xs">
+                <span>Ngày: {selectedCompletedDateFilter}</span>
+                <button
+                  onClick={() => setSelectedCompletedDateFilter('')}
+                  className="hover:text-sky-950 cursor-pointer p-0.5"
+                  title="Bỏ lọc ngày"
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              </span>
+            )}
+
+            {/* Search Query Chip */}
+            {searchQuery && (
+              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-gray-100 text-gray-800 border border-gray-300 shadow-xs">
+                <span>Từ khóa: "{searchQuery}"</span>
+                <button
+                  onClick={() => setSearchQuery('')}
+                  className="hover:text-gray-950 cursor-pointer p-0.5"
+                  title="Bỏ từ khóa tìm kiếm"
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              </span>
+            )}
+
+            {/* Reset All Button */}
+            <button
+              type="button"
+              onClick={resetAllFilters}
+              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold text-red-600 hover:text-red-700 bg-red-50/70 hover:bg-red-100 border border-red-200 transition cursor-pointer ml-auto shadow-xs"
+            >
+              <RotateCcw className="h-3 w-3" />
+              Xóa tất cả bộ lọc
+            </button>
+          </div>
+        )}
 
       </div>
 

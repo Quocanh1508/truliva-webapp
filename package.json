@@ -12,7 +12,9 @@
     "postinstall": "npx prisma generate",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
-    "prisma:studio": "prisma studio",
+    "prisma:studio": "node scripts/start_vps_studio.js",
+    "studio": "node scripts/start_vps_studio.js",
+    "studio:sandbox": "node scripts/start_vps_studio.js sandbox",
     "test": "echo \"Error: no test specified\" && exit 1",
     "test:security": "node scripts/security/run-strix-scan.js"
   },

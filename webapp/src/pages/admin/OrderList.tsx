@@ -63,17 +63,17 @@ export interface ComboComponent {
 }
 
 export const KNOWN_COMBO_DEFINITIONS: Record<string, ComboComponent[]> = {
-  // 1. Gói Giải pháp máy nóng lạnh treo tường W6412 (Gồm máy lọc nước UR3626 + Máy nóng lạnh W6412)
+  // 1. Gói Giải pháp máy nóng lạnh treo tường W6412 (Gồm máy lọc nước UR3626/UR5676/UR5840 + Máy nóng lạnh W6412)
   'W6412-ECO': [
     { name: 'Máy lọc nước Truliva UR3626', sku: '104338-0002', quantity: 1 },
     { name: 'Máy nóng lạnh treo tường Truliva W6412', sku: '103057-001', quantity: 1 }
   ],
   'W6412-GOLD': [
-    { name: 'Máy lọc nước Truliva UR3626', sku: '104338-0002', quantity: 1 },
+    { name: 'Máy lọc nước Truliva UR5676', sku: '104222-0002', quantity: 1 },
     { name: 'Máy nóng lạnh treo tường Truliva W6412', sku: '103057-001', quantity: 1 }
   ],
   'W6412-PLATINUM': [
-    { name: 'Máy lọc nước Truliva UR3626', sku: '104338-0002', quantity: 1 },
+    { name: 'Máy lọc nước Truliva UR5840', sku: '104201-0003', quantity: 1 },
     { name: 'Máy nóng lạnh treo tường Truliva W6412', sku: '103057-001', quantity: 1 }
   ],
 
@@ -93,7 +93,27 @@ export const KNOWN_COMBO_DEFINITIONS: Record<string, ComboComponent[]> = {
   ]
 };
 
-export function getComboComponents(productName: string, sku?: string | null): ComboComponent[] | null {
+export function getComboComponents(productName: string, sku?: string | null, rawItem?: any): ComboComponent[] | null {
+  // 0. Ưu tiên hàng đầu: Trích xuất trực tiếp mảng components từ Pancake POS nếu có (Dynamic from POS)
+  if (rawItem) {
+    const posComponents = rawItem.components || rawItem.rawData?.components || rawItem.rawData?.composite_products;
+    if (Array.isArray(posComponents) && posComponents.length > 0) {
+      const extracted: ComboComponent[] = [];
+      for (const c of posComponents) {
+        const vInfo = c.variation_info || c.variation || c.component || {};
+        const cName = vInfo.name || vInfo.product?.name || c.name || c.product_name;
+        const cSku = vInfo.display_id || vInfo.id || c.sku;
+        const cQty = Number(c.quantity) || 1;
+        if (cName) {
+          extracted.push({ name: cName, sku: cSku, quantity: cQty });
+        }
+      }
+      if (extracted.length > 0) {
+        return extracted;
+      }
+    }
+  }
+
   const cleanSku = (sku || '').trim().toUpperCase();
   if (cleanSku && KNOWN_COMBO_DEFINITIONS[cleanSku]) {
     return KNOWN_COMBO_DEFINITIONS[cleanSku];
@@ -3076,7 +3096,7 @@ export default function OrderList() {
                           <div className="flex flex-col gap-1.5 mt-0.5">
                             {order.items.map((item: any, i: number) => {
                               const pName = item.productName || item.rawData?.variation_info?.name || item.rawData?.name || 'Sản phẩm';
-                              const comboComps = getComboComponents(pName, item.sku);
+                              const comboComps = getComboComponents(pName, item.sku, item);
                               return (
                                 <div key={item.id || i} className="flex flex-col gap-0.5">
                                   <div className="flex items-center flex-wrap gap-1 font-medium text-gray-800">
@@ -3847,7 +3867,7 @@ export default function OrderList() {
                         {tempItems.map((item: any, i: number) => {
                             const pName = item.productName || item.rawData?.variation_info?.name || item.rawData?.name || 'Sản phẩm';
                             const itemSku = item.sku || item.rawData?.sku || '';
-                            const comboComps = getComboComponents(pName, itemSku);
+                            const comboComps = getComboComponents(pName, itemSku, item);
                             const isInstallation = workType === 'Lắp đặt';
 
                             // Xác định xem đơn hàng gốc có chứa sản phẩm ban đầu hay không

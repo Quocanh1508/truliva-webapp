@@ -32,7 +32,7 @@ const FALLBACK_COMBOS: Record<string, { displayName: string; keywords: string[];
     displayName: 'Gói Giải pháp W6412 GOLD',
     keywords: ['w6412', 'gold'],
     components: [
-      { name: 'Máy lọc nước Truliva UR3626', sku: '104338-0002', quantity: 1 },
+      { name: 'Máy lọc nước Truliva UR5676', sku: '104222-0002', quantity: 1 },
       { name: 'Máy nóng lạnh treo tường Truliva W6412', sku: '103057-001', quantity: 1 }
     ]
   },
@@ -40,7 +40,7 @@ const FALLBACK_COMBOS: Record<string, { displayName: string; keywords: string[];
     displayName: 'Gói Giải pháp W6412 PLATINUM',
     keywords: ['w6412', 'platinum'],
     components: [
-      { name: 'Máy lọc nước Truliva UR3626', sku: '104338-0002', quantity: 1 },
+      { name: 'Máy lọc nước Truliva UR5840', sku: '104201-0003', quantity: 1 },
       { name: 'Máy nóng lạnh treo tường Truliva W6412', sku: '103057-001', quantity: 1 }
     ]
   },

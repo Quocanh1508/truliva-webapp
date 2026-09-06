@@ -82,6 +82,8 @@ export async function exportSalaries(req: Request, res: Response): Promise<void>
     const stationId = (req.query.stationIds as string) || (req.query.stationId as string) || '';
     const mainStationId = (req.query.mainStationIds as string) || (req.query.mainStationId as string) || '';
     const workTypeFilter = (req.query.workTypes as string) || (req.query.workType as string) || '';
+    const serviceTypeFilter = (req.query.serviceTypes as string) || (req.query.serviceType as string) || '';
+    const productFilter = (req.query.products as string) || (req.query.product as string) || '';
     const completedDate = (req.query.completedDate as string) || '';
     const searchQuery = (req.query.search as string || '').toLowerCase().trim();
 
@@ -95,6 +97,8 @@ export async function exportSalaries(req: Request, res: Response): Promise<void>
     const stationIdsList = stationId ? stationId.split(',').map(s => s.trim()).filter(Boolean) : [];
     const mainStationIdsList = mainStationId ? mainStationId.split(',').map(s => s.trim()).filter(Boolean) : [];
     const workTypesList = workTypeFilter ? workTypeFilter.split(',').map(s => s.trim()).filter(Boolean) : [];
+    const serviceTypesList = serviceTypeFilter ? serviceTypeFilter.split(',').map(s => s.trim()).filter(Boolean) : [];
+    const productsList = productFilter ? productFilter.split(',').map(s => s.trim()).filter(Boolean) : [];
 
     const normStr = (str: string | null | undefined): string => {
       if (!str) return '';
@@ -225,6 +229,16 @@ export async function exportSalaries(req: Request, res: Response): Promise<void>
       ));
       if (!matchWorkType) return false;
 
+      const matchServiceType = serviceTypesList.length === 0 || (s.cases && s.cases.some((c: any) =>
+        serviceTypesList.some(st => c.serviceType && c.serviceType.toLowerCase().includes(st.toLowerCase()))
+      ));
+      if (!matchServiceType) return false;
+
+      const matchProduct = productsList.length === 0 || (s.cases && s.cases.some((c: any) =>
+        productsList.some(p => c.products && Array.isArray(c.products) && c.products.some((prod: any) => String(prod).toLowerCase().includes(p.toLowerCase())))
+      ));
+      if (!matchProduct) return false;
+
       const matchDistance = (distancePresetsList.length === 0 && !distancePresetsList.includes('custom')) || (s.cases && s.cases.some((c: any) => checkCaseDistance(c)));
       if (!matchDistance) return false;
 
@@ -237,7 +251,9 @@ export async function exportSalaries(req: Request, res: Response): Promise<void>
           (c.customerPhone && c.customerPhone.includes(searchQuery)) ||
           (c.province && c.province.toLowerCase().includes(searchQuery)) ||
           (c.orderNote && c.orderNote.toLowerCase().includes(searchQuery)) ||
-          (c.reportNote && c.reportNote.toLowerCase().includes(searchQuery))
+          (c.reportNote && c.reportNote.toLowerCase().includes(searchQuery)) ||
+          (c.serviceType && c.serviceType.toLowerCase().includes(searchQuery)) ||
+          (c.products && Array.isArray(c.products) && c.products.some((prod: any) => String(prod).toLowerCase().includes(searchQuery)))
         ));
       if (!matchQuery) return false;
 
@@ -295,7 +311,7 @@ export async function exportSalaries(req: Request, res: Response): Promise<void>
     let sumTotalOther = 0;
     let sumGrandTotal = 0;
 
-    const isSpecificCaseFilter = Boolean(completedDate || workTypesList.length > 0 || searchQuery);
+    const isSpecificCaseFilter = Boolean(completedDate || workTypesList.length > 0 || serviceTypesList.length > 0 || productsList.length > 0 || searchQuery);
 
     filteredSalaries.forEach((s, idx) => {
       let ktvBaoHanh = 0;
@@ -316,6 +332,14 @@ export async function exportSalaries(req: Request, res: Response): Promise<void>
           const matchWT = workTypesList.some(wt => c.workType && c.workType.toLowerCase().includes(wt.toLowerCase()));
           if (!matchWT) return false;
         }
+        if (serviceTypesList.length > 0) {
+          const matchST = serviceTypesList.some(st => c.serviceType && c.serviceType.toLowerCase().includes(st.toLowerCase()));
+          if (!matchST) return false;
+        }
+        if (productsList.length > 0) {
+          const matchProd = productsList.some(p => c.products && Array.isArray(c.products) && c.products.some((prod: any) => String(prod).toLowerCase().includes(p.toLowerCase())));
+          if (!matchProd) return false;
+        }
         if (!checkCaseDistance(c)) return false;
         if (searchQuery) {
           const matchQ = s.fullName.toLowerCase().includes(searchQuery) ||
@@ -325,7 +349,9 @@ export async function exportSalaries(req: Request, res: Response): Promise<void>
             (c.customerPhone && c.customerPhone.includes(searchQuery)) ||
             (c.province && c.province.toLowerCase().includes(searchQuery)) ||
             (c.orderNote && c.orderNote.toLowerCase().includes(searchQuery)) ||
-            (c.reportNote && c.reportNote.toLowerCase().includes(searchQuery));
+            (c.reportNote && c.reportNote.toLowerCase().includes(searchQuery)) ||
+            (c.serviceType && c.serviceType.toLowerCase().includes(searchQuery)) ||
+            (c.products && Array.isArray(c.products) && c.products.some((prod: any) => String(prod).toLowerCase().includes(searchQuery)));
           if (!matchQ) return false;
         }
         return true;
@@ -478,6 +504,16 @@ export async function exportSalaries(req: Request, res: Response): Promise<void>
           if (!matchWT) continue;
         }
 
+        if (serviceTypesList.length > 0) {
+          const matchST = serviceTypesList.some(st => c.serviceType && c.serviceType.toLowerCase().includes(st.toLowerCase()));
+          if (!matchST) continue;
+        }
+
+        if (productsList.length > 0) {
+          const matchProd = productsList.some(p => c.products && Array.isArray(c.products) && c.products.some((prod: any) => String(prod).toLowerCase().includes(p.toLowerCase())));
+          if (!matchProd) continue;
+        }
+
         if (!checkCaseDistance(c)) continue;
 
         if (searchQuery) {
@@ -488,7 +524,9 @@ export async function exportSalaries(req: Request, res: Response): Promise<void>
             (c.customerPhone && c.customerPhone.includes(searchQuery)) ||
             (c.province && c.province.toLowerCase().includes(searchQuery)) ||
             (c.orderNote && c.orderNote.toLowerCase().includes(searchQuery)) ||
-            (c.reportNote && c.reportNote.toLowerCase().includes(searchQuery));
+            (c.reportNote && c.reportNote.toLowerCase().includes(searchQuery)) ||
+            (c.serviceType && c.serviceType.toLowerCase().includes(searchQuery)) ||
+            (c.products && Array.isArray(c.products) && c.products.some((prod: any) => String(prod).toLowerCase().includes(searchQuery)));
           if (!matchQ) continue;
         }
 

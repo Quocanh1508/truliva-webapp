@@ -531,6 +531,7 @@ export async function computeFullSalariesForMonth(month: string) {
         orderNote: report.order?.note || null,
         reportNote: report.notes || null,
         workType: breakdown.workType,
+        serviceType: report.serviceType || report.order?.serviceType || null,
         isSunday,
         baseCost: breakdown.baseCost,
         distance: breakdown.distance,
@@ -546,7 +547,18 @@ export async function computeFullSalariesForMonth(month: string) {
         customCosts: report.customCosts,
         totalCost: breakdown.totalCost,
         createdAt: report.createdAt,
-        products: report.products || []
+        products: (() => {
+          let prods: string[] = [];
+          if (Array.isArray(report.products) && report.products.length > 0) {
+            prods = report.products.map((p: any) => (typeof p === 'string' ? p : (p?.name || p?.productName || ''))).filter(Boolean);
+          }
+          if (prods.length === 0 && report.order?.items && Array.isArray(report.order.items)) {
+            prods = (report.order.items as any[])
+              .map((it: any) => it?.productName || it?.name || it?.title || '')
+              .filter(Boolean);
+          }
+          return Array.from(new Set(prods));
+        })()
       });
     }
 

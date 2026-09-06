@@ -29,7 +29,7 @@ const SEED_COMBOS: SeedCombo[] = [
     displayName: 'Gói Giải pháp W6412 GOLD',
     keywords: ['w6412', 'gold'],
     components: [
-      { componentName: 'Máy lọc nước Truliva UR3626', componentSku: '104338-0002', quantity: 1 },
+      { componentName: 'Máy lọc nước Truliva UR5676', componentSku: '104222-0002', quantity: 1 },
       { componentName: 'Máy nóng lạnh treo tường Truliva W6412', componentSku: '103057-001', quantity: 1 }
     ]
   },
@@ -38,7 +38,7 @@ const SEED_COMBOS: SeedCombo[] = [
     displayName: 'Gói Giải pháp W6412 PLATINUM',
     keywords: ['w6412', 'platinum'],
     components: [
-      { componentName: 'Máy lọc nước Truliva UR3626', componentSku: '104338-0002', quantity: 1 },
+      { componentName: 'Máy lọc nước Truliva UR5840', componentSku: '104201-0003', quantity: 1 },
       { componentName: 'Máy nóng lạnh treo tường Truliva W6412', componentSku: '103057-001', quantity: 1 }
     ]
   },
