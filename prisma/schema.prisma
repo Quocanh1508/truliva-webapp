@@ -57,6 +57,7 @@ model Customer {
   orders              Order[]
 
   @@map("customers")
+  @@index([phoneNumber])
 }
 
 // ── Đơn hàng ──
@@ -113,6 +114,9 @@ model Order {
   hotlineTickets      HotlineTicket[]
 
   @@map("orders")
+  @@index([assignedKtvId, adminStatus])
+  @@index([createdAt])
+  @@index([appointmentTime])
 }
 
 // ── Chi tiết sản phẩm trong đơn ──
@@ -319,6 +323,9 @@ model ServiceReport {
 
   @@map("service_reports")
   @@index([serialNumber])
+  @@index([ktvUserId, approvalStatus])
+  @@index([orderId])
+  @@index([createdAt])
 }
 
 // ── Ảnh mẫu theo loại công việc và nhãn slot ──
