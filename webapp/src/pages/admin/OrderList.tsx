@@ -260,6 +260,8 @@ export default function OrderList() {
   const [tableBounds, setTableBounds] = useState<{ left: number; width: number; tableWidth: number }>({ left: 0, width: 0, tableWidth: 0 });
   const [colWidths, setColWidths] = useState<number[]>([]);
   const [tableScrollLeft, setTableScrollLeft] = useState(0);
+  const touchStartX = useRef(0);
+  const touchStartScroll = useRef(0);
 
   useEffect(() => {
     setPageInput(String(page));
@@ -2949,11 +2951,21 @@ export default function OrderList() {
       {/* Floating Sticky Table Header */}
       {isStickyHeaderVisible && (
         <div
-          className="fixed z-40 bg-[#f8f9fa] shadow-md border-b border-gray-300 overflow-hidden pointer-events-auto"
+          className="fixed z-40 bg-[#f8f9fa] shadow-md border-b border-gray-300 overflow-hidden pointer-events-auto select-none"
           style={{
             top: `${stickyTopOffset}px`,
             left: `${tableBounds.left}px`,
             width: `${tableBounds.width}px`,
+          }}
+          onTouchStart={(e) => {
+            touchStartX.current = e.touches[0].clientX;
+            touchStartScroll.current = tableWrapperRef.current?.scrollLeft || 0;
+          }}
+          onTouchMove={(e) => {
+            const delta = touchStartX.current - e.touches[0].clientX;
+            if (tableWrapperRef.current) {
+              tableWrapperRef.current.scrollLeft = touchStartScroll.current + delta;
+            }
           }}
         >
           <table
@@ -3030,7 +3042,11 @@ export default function OrderList() {
         </div>
       )}
 
-      <div ref={tableWrapperRef} className="flex-1 bg-white overflow-x-auto relative min-h-[300px] border-b border-gray-200">
+      <div
+        ref={tableWrapperRef}
+        className="flex-1 bg-white overflow-x-auto relative min-h-[300px] border-b border-gray-200"
+        style={{ WebkitOverflowScrolling: 'touch' }}
+      >
         {loading && orders.length === 0 ? (
           <div className="flex justify-center py-12">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
