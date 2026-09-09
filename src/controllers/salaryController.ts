@@ -779,27 +779,20 @@ export async function updateKtvRate(req: Request, res: Response): Promise<void> 
             continue;
           }
 
-          const existing = await tx.ktvServiceRate.findFirst({
-            where: { userId: uId, workType: wType }
+          await tx.ktvServiceRate.upsert({
+            where: {
+              userId_workType: { userId: uId, workType: wType }
+            },
+            update: {
+              rate: rNum,
+              updatedAt: new Date()
+            },
+            create: {
+              userId: uId,
+              workType: wType,
+              rate: rNum
+            }
           });
-
-          if (existing) {
-            await tx.ktvServiceRate.update({
-              where: { id: existing.id },
-              data: {
-                rate: rNum,
-                updatedAt: new Date()
-              }
-            });
-          } else {
-            await tx.ktvServiceRate.create({
-              data: {
-                userId: uId,
-                workType: wType,
-                rate: rNum
-              }
-            });
-          }
         }
       });
 
@@ -823,28 +816,20 @@ export async function updateKtvRate(req: Request, res: Response): Promise<void> 
       return;
     }
 
-    const existing = await prisma.ktvServiceRate.findFirst({
-      where: { userId, workType }
+    const record = await prisma.ktvServiceRate.upsert({
+      where: {
+        userId_workType: { userId, workType }
+      },
+      update: {
+        rate: rateNum,
+        updatedAt: new Date()
+      },
+      create: {
+        userId,
+        workType,
+        rate: rateNum
+      }
     });
-
-    let record;
-    if (existing) {
-      record = await prisma.ktvServiceRate.update({
-        where: { id: existing.id },
-        data: {
-          rate: rateNum,
-          updatedAt: new Date()
-        }
-      });
-    } else {
-      record = await prisma.ktvServiceRate.create({
-        data: {
-          userId,
-          workType,
-          rate: rateNum
-        }
-      });
-    }
 
     res.json({ success: true, message: 'Cập nhật đơn giá thành công', data: record });
   } catch (error: any) {

@@ -246,15 +246,16 @@ export async function processOrderEvent(rawEventId: string | null, payload: any)
     } else if (isExchanged) {
       newAdminStatus = 'đã đổi';
     } else if (isCompleted) {
+      const isAssignedKtv = Boolean(existingOrder?.assignedKtvId);
       const hasReport = existingOrder?.serviceReports && existingOrder.serviceReports.some(r => r.approvalStatus !== 'REJECTED');
-      if (hasReport) {
-        if (newAdminStatus !== 'hủy đơn') newAdminStatus = 'hoàn thành';
+
+      // 1. Nếu là đơn kỹ thuật ĐÃ phân công KTV: Bắt buộc phải có báo cáo nghiệm thu
+      if (isAssignedKtv && !hasReport) {
+        newAdminStatus = 'đang thực hiện';
       } else {
-        // Nếu chưa có báo cáo nghiệm thu kỹ thuật: không được tự ý chuyển sang 'hoàn thành'
-        if (existingOrder?.assignedKtvId) {
-          newAdminStatus = 'đang thực hiện';
-        } else {
-          newAdminStatus = existingOrder?.adminStatus || 'chờ xử lý';
+        // 2. Đơn Ecom, đơn không có KTV, hoặc đơn đã có báo cáo nghiệm thu: Chuyển sang 'hoàn thành'
+        if (newAdminStatus !== 'hủy đơn') {
+          newAdminStatus = 'hoàn thành';
         }
       }
     } else if (existingOrder?.assignedKtvId && (!newAdminStatus || newAdminStatus === 'chờ xử lý')) {

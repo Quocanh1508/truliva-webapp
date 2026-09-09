@@ -29,10 +29,157 @@ import {
   Navigation,
   Filter,
   Package,
-  Briefcase
+  Briefcase,
+  Zap
 } from 'lucide-react';
 
+interface MatrixRateInputProps {
+  userId: string;
+  workType: string;
+  value: number;
+  defaultValue: number;
+  rowIndex: number;
+  colIndex: number;
+  isSaving?: boolean;
+  isSaved?: boolean;
+  isThreshold?: boolean;
+  unit?: string;
+  placeholder?: string;
+  className?: string;
+  title?: string;
+  onCommit: (userId: string, workType: string, val: number) => void;
+  onKeyDownNav: (e: React.KeyboardEvent<HTMLInputElement>, r: number, c: number, commitFn: () => void) => void;
+}
 
+const MatrixRateInput: React.FC<MatrixRateInputProps> = ({
+  userId,
+  workType,
+  value,
+  defaultValue,
+  rowIndex,
+  colIndex,
+  isSaving = false,
+  isSaved = false,
+  isThreshold = false,
+  unit,
+  placeholder,
+  className = '',
+  title = '',
+  onCommit,
+  onKeyDownNav
+}) => {
+  const [isFocused, setIsFocused] = useState(false);
+  const [localText, setLocalText] = useState('');
+
+  // Giá trị thực tế của ô: nếu value được định nghĩa (kể cả = 0), dùng value; nếu undefined thì fallback về defaultValue
+  const effectiveValue = value !== undefined ? value : defaultValue;
+
+  const displayValue = useMemo(() => {
+    if (isThreshold) {
+      return String(effectiveValue);
+    }
+    return effectiveValue.toLocaleString('vi-VN');
+  }, [effectiveValue, isThreshold]);
+
+  useEffect(() => {
+    if (!isFocused) {
+      setLocalText(displayValue);
+    }
+  }, [displayValue, isFocused]);
+
+  const commitCurrentValue = () => {
+    let num: number;
+    if (localText.trim() === '') {
+      // Nếu ô bị xóa trắng, giữ nguyên giá trị thực tế của ô, tuyệt đối không tự ý nhảy về defaultValue
+      num = effectiveValue;
+    } else {
+      const clean = localText.replace(/\D/g, '');
+      const parsed = isThreshold ? parseInt(clean, 10) : Number(clean);
+      num = isNaN(parsed) ? effectiveValue : parsed;
+    }
+    onCommit(userId, workType, num);
+  };
+
+  const handleFocus = (e: React.FocusEvent<HTMLInputElement>) => {
+    setIsFocused(true);
+    // Luôn giữ đúng chuỗi của ô (kể cả '0'), không tự ý xóa về '' gây lỗi nhảy về defaultValue khi Enter
+    setLocalText(displayValue);
+    setTimeout(() => {
+      e.target.select();
+    }, 10);
+  };
+
+  const handleBlur = () => {
+    setIsFocused(false);
+    commitCurrentValue();
+  };
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const raw = e.target.value;
+    if (raw === '') {
+      setLocalText('');
+      return;
+    }
+    const clean = raw.replace(/\D/g, '');
+    if (isThreshold) {
+      setLocalText(clean);
+    } else {
+      const num = Number(clean);
+      if (!isNaN(num)) {
+        setLocalText(num.toLocaleString('vi-VN'));
+      }
+    }
+  };
+
+  const isModified = effectiveValue !== defaultValue;
+
+  let borderStyle = 'border-gray-200 bg-gray-50 text-gray-800 focus:ring-blue-500';
+  if (isSaving) {
+    borderStyle = 'border-blue-500 bg-blue-50 text-blue-900 ring-2 ring-blue-400 animate-pulse';
+  } else if (isSaved) {
+    borderStyle = 'border-emerald-500 bg-emerald-50 text-emerald-900 ring-2 ring-emerald-400';
+  } else if (isModified) {
+    borderStyle = 'bg-cyan-50 border-cyan-400 text-cyan-900 focus:ring-cyan-500 font-extrabold shadow-sm';
+  }
+
+  return (
+    <div className="flex flex-col items-center gap-1 relative">
+      <div className="flex items-center gap-1">
+        <input
+          type="text"
+          data-grid-cell={`${rowIndex}-${colIndex}`}
+          data-row={rowIndex}
+          data-col={colIndex}
+          value={isFocused ? localText : displayValue}
+          onFocus={handleFocus}
+          onBlur={handleBlur}
+          onChange={handleChange}
+          onKeyDown={(e) => onKeyDownNav(e, rowIndex, colIndex, commitCurrentValue)}
+          placeholder={placeholder}
+          title={title}
+          className={`${className} text-right rounded-lg border text-xs font-bold transition focus:outline-none focus:ring-2 ${borderStyle}`}
+        />
+        {unit && <span className="text-[10px] text-gray-500 font-medium">{unit}</span>}
+      </div>
+
+      {isSaving ? (
+        <span className="text-[9px] font-bold text-blue-600 bg-blue-100 px-1.5 py-0.2 rounded animate-pulse">
+          Đang lưu...
+        </span>
+      ) : isSaved ? (
+        <span className="text-[9px] font-extrabold text-emerald-700 bg-emerald-100 px-1.5 py-0.2 rounded flex items-center gap-0.5 animate-in fade-in">
+          ✓ Đã lưu
+        </span>
+      ) : isModified ? (
+        <span className="text-[9px] font-extrabold text-cyan-700 bg-cyan-100 px-1.5 py-0.2 rounded">
+          Tùy chỉnh
+        </span>
+      ) : (
+        <span className="text-[9px] font-medium text-gray-400">Chuẩn</span>
+      )}
+    </div>
+  );
+};
 
 interface KtvRateRow {
   userId: string;
@@ -153,6 +300,18 @@ export default function SalaryManage() {
   const [ratesLoading, setRatesLoading] = useState(false);
   const [ratesSaving, setRatesSaving] = useState(false);
   const [editedRates, setEditedRates] = useState<Record<string, Record<string, number>>>({});
+  const initialRates = useRef<Record<string, Record<string, number>>>({});
+  const [savingCells, setSavingCells] = useState<Record<string, 'saving' | 'saved' | 'error'>>({});
+
+  // Modal Áp Dụng Cả Cột Cho Tất Cả KTV
+  const [columnApplyModal, setColumnApplyModal] = useState<{
+    isOpen: boolean;
+    workType: string;
+    columnTitle: string;
+    defaultValue: number;
+    currentInput: string;
+    applyFilteredOnly: boolean;
+  } | null>(null);
 
   const getRateVal = (item: any, fallback: number): number => {
     if (item === null || item === undefined) return fallback;
@@ -166,8 +325,8 @@ export default function SalaryManage() {
     return isNaN(num) ? fallback : num;
   };
 
-  const fetchRateMatrix = async () => {
-    setRatesLoading(true);
+  const fetchRateMatrix = async (silent = false) => {
+    if (!silent) setRatesLoading(true);
     try {
       const data = await fetchApi('/salaries/rates');
       if (data.success) {
@@ -181,7 +340,7 @@ export default function SalaryManage() {
           map[row.userId] = {
             giaoHang: getRateVal(rates.giaoHang, def.giaoHang ?? 20000),
             baoHanh: baoHanhVal,
-            suaChua: getRateVal(rates.suaChua, baoHanhVal),
+            suaChua: getRateVal(rates.suaChua, def.suaChua ?? baoHanhVal),
             thayLoc: getRateVal(rates.thayLoc, def.thayLoc ?? 40000),
             lapDat: getRateVal(rates.lapDat, def.lapDat ?? 100000),
             giaoHangLapDat: getRateVal(rates.giaoHangLapDat, def.giaoHangLapDat ?? 120000),
@@ -191,13 +350,14 @@ export default function SalaryManage() {
             freeKmThresholdTLSC: getRateVal(rates.freeKmThresholdTLSC, def.freeKmThresholdTLSC ?? 50),
           };
         });
+        initialRates.current = JSON.parse(JSON.stringify(map));
         setEditedRates(map);
       }
     } catch (err: any) {
       console.error(err);
       setMessage({ type: 'error', text: err.message || 'Lỗi khi tải ma trận đơn giá KTV' });
     } finally {
-      setRatesLoading(false);
+      if (!silent) setRatesLoading(false);
     }
   };
 
@@ -209,25 +369,127 @@ export default function SalaryManage() {
     }
   }, [viewMode]);
 
-  const handleRateCellChange = (userId: string, workType: string, val: string) => {
-    const num = val === '' ? 0 : Number(val.replace(/\D/g, ''));
-    if (isNaN(num)) return;
+  const handleRateCellChange = (userId: string, workType: string, num: number) => {
     setEditedRates(prev => {
       const ktvRates = { ...(prev[userId] || {}) };
       ktvRates[workType] = num;
-      // Nếu thay đổi Phí Bảo Hành và Phí Sửa Chữa chưa được gán tùy chỉnh riêng, tự động cập nhật Sửa Chữa = Bảo Hành
-      if (workType === 'baoHanh') {
-        const currentSuaChua = ktvRates.suaChua;
-        const currentBaoHanh = ktvRates.baoHanh;
-        if (currentSuaChua === undefined || currentSuaChua === currentBaoHanh || currentSuaChua === 120000 || currentSuaChua === 60000) {
-          ktvRates.suaChua = num;
-        }
-      }
       return {
         ...prev,
         [userId]: ktvRates
       };
     });
+  };
+
+  // Auto-Save đơn lẻ từng ô khi người dùng Enter hoặc Blur
+  const handleSaveSingleRate = async (userId: string, workType: string, rate: number) => {
+    // Cập nhật state editedRates trước
+    handleRateCellChange(userId, workType, rate);
+
+    const initialVal = initialRates.current[userId]?.[workType];
+    if (initialVal === rate) {
+      return; // Giá trị không thay đổi so với DB
+    }
+
+    const cellKey = `${userId}_${workType}`;
+    setSavingCells(prev => ({ ...prev, [cellKey]: 'saving' }));
+
+    try {
+      const res = await fetchApi('/salaries/rates', {
+        method: 'POST',
+        body: JSON.stringify({ userId, workType, rate })
+      });
+
+      if (res.success || res.message) {
+        if (!initialRates.current[userId]) initialRates.current[userId] = {};
+        initialRates.current[userId][workType] = rate;
+
+        setRateMatrix(prev => prev.map(row => {
+          if (row.userId === userId) {
+            return {
+              ...row,
+              rates: {
+                ...(row.rates || {}),
+                [workType]: rate
+              }
+            };
+          }
+          return row;
+        }));
+
+        setSavingCells(prev => ({ ...prev, [cellKey]: 'saved' }));
+        setTimeout(() => {
+          setSavingCells(prev => {
+            const next = { ...prev };
+            delete next[cellKey];
+            return next;
+          });
+        }, 1500);
+      }
+    } catch (err: any) {
+      console.error('Error auto-saving cell rate:', err);
+      setSavingCells(prev => ({ ...prev, [cellKey]: 'error' }));
+    }
+  };
+
+  // Điều hướng bằng phím mũi tên và Enter như Excel
+  const handleGridKeyDown = (
+    e: React.KeyboardEvent<HTMLInputElement>,
+    r: number,
+    c: number,
+    commitFn: () => void
+  ) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      commitFn();
+      const nextRow = e.shiftKey ? r - 1 : r + 1;
+      const target = document.querySelector<HTMLInputElement>(`input[data-grid-cell="${nextRow}-${c}"]`);
+      if (target) {
+        target.focus();
+        target.select();
+      }
+    } else if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      commitFn();
+      const target = document.querySelector<HTMLInputElement>(`input[data-grid-cell="${r + 1}-${c}"]`);
+      if (target) {
+        target.focus();
+        target.select();
+      }
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      commitFn();
+      const target = document.querySelector<HTMLInputElement>(`input[data-grid-cell="${r - 1}-${c}"]`);
+      if (target) {
+        target.focus();
+        target.select();
+      }
+    } else if (e.key === 'ArrowRight') {
+      const input = e.currentTarget;
+      const isAtEnd = input.selectionEnd === input.value.length;
+      const isAllSelected = input.selectionStart === 0 && input.selectionEnd === input.value.length;
+      if (isAtEnd || isAllSelected) {
+        const target = document.querySelector<HTMLInputElement>(`input[data-grid-cell="${r}-${c + 1}"]`);
+        if (target) {
+          e.preventDefault();
+          commitFn();
+          target.focus();
+          target.select();
+        }
+      }
+    } else if (e.key === 'ArrowLeft') {
+      const input = e.currentTarget;
+      const isAtStart = input.selectionStart === 0;
+      const isAllSelected = input.selectionStart === 0 && input.selectionEnd === input.value.length;
+      if (isAtStart || isAllSelected) {
+        const target = document.querySelector<HTMLInputElement>(`input[data-grid-cell="${r}-${c - 1}"]`);
+        if (target) {
+          e.preventDefault();
+          commitFn();
+          target.focus();
+          target.select();
+        }
+      }
+    }
   };
 
   const handleResetKtvRates = async (userId: string) => {
@@ -239,13 +501,14 @@ export default function SalaryManage() {
         return next;
       });
       setMessage({ type: 'success', text: res.message || 'Đã khôi phục đơn giá chuẩn cho KTV thành công!' });
-      await fetchRateMatrix();
+      await fetchRateMatrix(true);
       await fetchSalaries(true);
     } catch (err: any) {
       alert(err.message || 'Lỗi khi khôi phục đơn giá');
     }
   };
 
+  // Lưu toàn bộ ma trận (Chỉ gửi delta - các ô thực sự bị thay đổi)
   const handleSaveRateMatrix = async () => {
     setRatesSaving(true);
     setMessage(null);
@@ -253,8 +516,64 @@ export default function SalaryManage() {
       const ratesList: Array<{ userId: string; workType: string; rate: number }> = [];
       Object.entries(editedRates).forEach(([userId, workTypes]) => {
         Object.entries(workTypes).forEach(([workType, rate]) => {
-          ratesList.push({ userId, workType, rate });
+          const initVal = initialRates.current[userId]?.[workType];
+          if (initVal !== rate) {
+            ratesList.push({ userId, workType, rate });
+          }
         });
+      });
+
+      if (ratesList.length === 0) {
+        setMessage({ type: 'success', text: 'Tất cả đơn giá đã được đồng bộ mới nhất!' });
+        setRatesSaving(false);
+        return;
+      }
+
+      const res = await fetchApi('/salaries/rates', {
+        method: 'POST',
+        body: JSON.stringify({ rates: ratesList })
+      });
+
+      if (res.success || res.message) {
+        setMessage({ type: 'success', text: res.message || `Cập nhật ma trận đơn giá cho ${ratesList.length} mục thành công!` });
+        // Silent reload để không giật bảng và bảo toàn 100% vị trí cuộn trang
+        await fetchRateMatrix(true);
+        await fetchSalaries(true);
+      }
+    } catch (err: any) {
+      console.error(err);
+      setMessage({ type: 'error', text: err.message || 'Lỗi khi lưu đơn giá KTV' });
+    } finally {
+      setRatesSaving(false);
+    }
+  };
+
+  // Áp dụng đơn giá cho toàn bộ KTV của 1 cột
+  const handleApplyColumnToAll = async () => {
+    if (!columnApplyModal) return;
+    const { workType, currentInput, applyFilteredOnly } = columnApplyModal;
+    const cleanNum = currentInput.replace(/\D/g, '');
+    const num = Number(cleanNum);
+    if (isNaN(num) || num < 0 || cleanNum === '') {
+      alert('Vui lòng nhập số tiền hợp lệ');
+      return;
+    }
+
+    setRatesSaving(true);
+    try {
+      const targetKtvs = applyFilteredOnly ? filteredRateMatrix : rateMatrix;
+      const ratesList: Array<{ userId: string; workType: string; rate: number }> = [];
+
+      setEditedRates(prev => {
+        const next = { ...prev };
+        targetKtvs.forEach(ktv => {
+          next[ktv.userId] = {
+            ...(next[ktv.userId] || {}),
+            [workType]: num
+          };
+          ratesList.push({ userId: ktv.userId, workType, rate: num });
+        });
+        return next;
       });
 
       const res = await fetchApi('/salaries/rates', {
@@ -263,13 +582,17 @@ export default function SalaryManage() {
       });
 
       if (res.success || res.message) {
-        setMessage({ type: 'success', text: res.message || 'Cập nhật ma trận đơn giá KTV thành công!' });
-        await fetchRateMatrix();
+        setMessage({
+          type: 'success',
+          text: `Đã áp dụng thành công đơn giá ${num.toLocaleString('vi-VN')}đ cho ${targetKtvs.length} KTV!`
+        });
+        await fetchRateMatrix(true);
         await fetchSalaries(true);
+        setColumnApplyModal(null);
       }
     } catch (err: any) {
       console.error(err);
-      setMessage({ type: 'error', text: err.message || 'Lỗi khi lưu đơn giá KTV' });
+      setMessage({ type: 'error', text: err.message || 'Lỗi khi áp dụng đơn giá cho cột' });
     } finally {
       setRatesSaving(false);
     }
@@ -294,6 +617,32 @@ export default function SalaryManage() {
   const [selectedServiceTypeFilter, setSelectedServiceTypeFilter] = useState(initial?.selectedServiceTypeFilter || '');
   const [selectedProductFilter, setSelectedProductFilter] = useState(initial?.selectedProductFilter || '');
   const [selectedCompletedDateFilter, setSelectedCompletedDateFilter] = useState(initial?.selectedCompletedDateFilter || '');
+
+  // Danh sách KTV trong ma trận sau khi lọc theo KTV, Trạm, Tìm kiếm
+  const filteredRateMatrix = useMemo(() => {
+    return rateMatrix.filter(ktv => {
+      const matchKtv = selectedKtvsFilter.length === 0 || selectedKtvsFilter.includes(ktv.userId);
+
+      const kMain = ktv.mainStationName && ktv.mainStationName !== 'Không có' ? ktv.mainStationName : 'Trực thuộc Truliva';
+      const kTech = ktv.stationName && ktv.stationName !== 'Không có' ? ktv.stationName : 'Khác';
+      const kKey = `${kMain}::${kTech}`;
+
+      const matchStation = selectedStationsFilter.length === 0 || 
+        selectedStationsFilter.includes(kKey) || 
+        selectedStationsFilter.includes(ktv.stationName);
+
+      const q = searchQuery.trim().toLowerCase();
+      const matchQuery = !q || (
+        (ktv.fullName || '').toLowerCase().includes(q) ||
+        (ktv.username || '').toLowerCase().includes(q) ||
+        (ktv.phoneNumber || '').includes(q) ||
+        (ktv.stationName && ktv.stationName.toLowerCase().includes(q)) ||
+        (ktv.mainStationName && ktv.mainStationName.toLowerCase().includes(q))
+      );
+
+      return matchKtv && matchStation && matchQuery;
+    });
+  }, [rateMatrix, selectedKtvsFilter, selectedStationsFilter, searchQuery]);
 
   // Khoảng cách di chuyển Filter states (Cho phép chọn nhiều ngưỡng khoảng cách cùng lúc)
   const initPresets = Array.isArray(initial?.selectedDistancePresets) 
@@ -2988,7 +3337,7 @@ export default function SalaryManage() {
               </p>
             </div>
 
-            <div className="flex items-center gap-3">
+            <div className="flex flex-wrap items-center gap-3">
               <div className="relative">
                 <Search className="h-4 w-4 absolute left-3 top-2.5 text-gray-400" />
                 <input
@@ -3011,24 +3360,27 @@ export default function SalaryManage() {
             </div>
           </div>
 
-          {/* Quick Legend / Info Bar */}
+          {/* Quick Legend & Keyboard Helper Bar */}
           <div className="flex flex-wrap items-center justify-between bg-blue-50/60 p-3 rounded-xl border border-blue-100 text-xs text-blue-900 gap-2">
-            <div className="flex items-center gap-4">
-              <span className="font-semibold text-blue-950">Chú thích đơn giá:</span>
-              <span className="inline-flex items-center gap-1.5 bg-cyan-100 border border-cyan-300 text-cyan-900 px-2 py-0.5 rounded-full font-bold text-[11px]">
+            <div className="flex flex-wrap items-center gap-3">
+              <span className="font-semibold text-blue-950">Chú thích:</span>
+              <span className="inline-flex items-center gap-1 bg-cyan-100 border border-cyan-300 text-cyan-900 px-2 py-0.5 rounded-full font-bold text-[11px]">
                 Tùy chỉnh KTV
               </span>
-              <span className="inline-flex items-center gap-1.5 bg-gray-100 border border-gray-300 text-gray-700 px-2 py-0.5 rounded-full font-medium text-[11px]">
+              <span className="inline-flex items-center gap-1 bg-gray-100 border border-gray-300 text-gray-700 px-2 py-0.5 rounded-full font-medium text-[11px]">
                 Mặc định hệ thống
               </span>
+              <span className="inline-flex items-center gap-1 bg-emerald-100 border border-emerald-300 text-emerald-800 px-2 py-0.5 rounded-full font-bold text-[11px]">
+                ✓ Đã lưu tự động
+              </span>
             </div>
-            <div className="text-[11px] text-gray-500">
-              * Thay đổi đơn giá ở đây sẽ ngay lập tức được áp dụng khi tính toán thù lao thợ.
+            <div className="text-[11px] text-blue-800 font-medium flex items-center gap-1">
+              <span>⌨️ <strong>Phím tắt:</strong> Nhấn <strong>Enter</strong> để lưu &amp; xuống dòng • Phím mũi tên <strong>↑ ↓ ← →</strong> di chuyển như Excel</span>
             </div>
           </div>
 
           {/* Rate Matrix Table */}
-          {ratesLoading ? (
+          {ratesLoading && rateMatrix.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-20 gap-3">
               <Loader2 className="h-8 w-8 animate-spin text-[#00A3FF]" />
               <span className="text-gray-400 text-xs font-semibold">Đang tải danh sách đơn giá KTV...</span>
@@ -3040,147 +3392,198 @@ export default function SalaryManage() {
                   <tr className="bg-[#1B3A6B] text-white text-xs uppercase font-bold tracking-wider">
                     <th className="px-4 py-3 bg-[#1B3A6B] sticky top-0 z-20 border-b border-blue-900 min-w-[180px]">Kỹ thuật viên</th>
                     <th className="px-4 py-3 bg-[#1B3A6B] sticky top-0 z-20 border-b border-blue-900 min-w-[140px]">Trạm quản lý</th>
-                    <th className="px-3 py-3 bg-[#1B3A6B] sticky top-0 z-20 border-b border-blue-900 text-center min-w-[120px]">
-                      Giao hàng<br/>
-                      <span className="text-[10px] font-normal opacity-80">(Chuẩn: {(defaultRates.giaoHang || 20000).toLocaleString('vi-VN')}đ)</span>
+                    
+                    {/* Cột Giao Hàng */}
+                    <th className="px-3 py-3 bg-[#1B3A6B] sticky top-0 z-20 border-b border-blue-900 text-center min-w-[125px]">
+                      <div className="flex items-center justify-center gap-1">
+                        <span>Giao hàng</span>
+                        <button
+                          onClick={() => setColumnApplyModal({
+                            isOpen: true,
+                            workType: 'giaoHang',
+                            columnTitle: 'Giao hàng',
+                            defaultValue: defaultRates.giaoHang || 20000,
+                            currentInput: (defaultRates.giaoHang || 20000).toLocaleString('vi-VN'),
+                            applyFilteredOnly: filteredRateMatrix.length < rateMatrix.length
+                          })}
+                          className="p-1 hover:bg-white/20 rounded text-blue-200 hover:text-white transition cursor-pointer"
+                          title="Áp dụng mức giá này cho toàn bộ KTV"
+                        >
+                          <Zap className="h-3 w-3 text-cyan-300" />
+                        </button>
+                      </div>
+                      <div className="text-[10px] font-normal opacity-80 mt-0.5">(Chuẩn: {(defaultRates.giaoHang || 20000).toLocaleString('vi-VN')}đ)</div>
                     </th>
+
+                    {/* Cột Bảo Hành */}
                     <th className="px-3 py-3 bg-[#1B3A6B] sticky top-0 z-20 border-b border-blue-900 text-center min-w-[130px]">
-                      Bảo hành<br/>
-                      <span className="text-[10px] font-normal opacity-80">(Chuẩn: {(defaultRates.baoHanh || 60000).toLocaleString('vi-VN')}đ)</span>
+                      <div className="flex items-center justify-center gap-1">
+                        <span>Bảo hành</span>
+                        <button
+                          onClick={() => setColumnApplyModal({
+                            isOpen: true,
+                            workType: 'baoHanh',
+                            columnTitle: 'Bảo hành',
+                            defaultValue: defaultRates.baoHanh || 60000,
+                            currentInput: (defaultRates.baoHanh || 60000).toLocaleString('vi-VN'),
+                            applyFilteredOnly: filteredRateMatrix.length < rateMatrix.length
+                          })}
+                          className="p-1 hover:bg-white/20 rounded text-blue-200 hover:text-white transition cursor-pointer"
+                          title="Áp dụng mức giá này cho toàn bộ KTV"
+                        >
+                          <Zap className="h-3 w-3 text-cyan-300" />
+                        </button>
+                      </div>
+                      <div className="text-[10px] font-normal opacity-80 mt-0.5">(Chuẩn: {(defaultRates.baoHanh || 60000).toLocaleString('vi-VN')}đ)</div>
                     </th>
+
+                    {/* Cột Sửa Chữa */}
                     <th className="px-3 py-3 bg-[#1B3A6B] sticky top-0 z-20 border-b border-blue-900 text-center min-w-[130px]">
-                      Sửa chữa<br/>
-                      <span className="text-[10px] font-normal opacity-80">(Chuẩn: {(defaultRates.suaChua || 60000).toLocaleString('vi-VN')}đ)</span>
+                      <div className="flex items-center justify-center gap-1">
+                        <span>Sửa chữa</span>
+                        <button
+                          onClick={() => setColumnApplyModal({
+                            isOpen: true,
+                            workType: 'suaChua',
+                            columnTitle: 'Sửa chữa',
+                            defaultValue: defaultRates.suaChua || 60000,
+                            currentInput: (defaultRates.suaChua || 60000).toLocaleString('vi-VN'),
+                            applyFilteredOnly: filteredRateMatrix.length < rateMatrix.length
+                          })}
+                          className="p-1 hover:bg-white/20 rounded text-blue-200 hover:text-white transition cursor-pointer"
+                          title="Áp dụng mức giá này cho toàn bộ KTV"
+                        >
+                          <Zap className="h-3 w-3 text-cyan-300" />
+                        </button>
+                      </div>
+                      <div className="text-[10px] font-normal opacity-80 mt-0.5">(Chuẩn: {(defaultRates.suaChua || 60000).toLocaleString('vi-VN')}đ)</div>
                     </th>
-                    <th className="px-3 py-3 bg-[#1B3A6B] sticky top-0 z-20 border-b border-blue-900 text-center min-w-[120px]">
-                      Thay lọc<br/>
-                      <span className="text-[10px] font-normal opacity-80">(Chuẩn: {(defaultRates.thayLoc || 40000).toLocaleString('vi-VN')}đ)</span>
+
+                    {/* Cột Thay Lọc */}
+                    <th className="px-3 py-3 bg-[#1B3A6B] sticky top-0 z-20 border-b border-blue-900 text-center min-w-[125px]">
+                      <div className="flex items-center justify-center gap-1">
+                        <span>Thay lọc</span>
+                        <button
+                          onClick={() => setColumnApplyModal({
+                            isOpen: true,
+                            workType: 'thayLoc',
+                            columnTitle: 'Thay lọc',
+                            defaultValue: defaultRates.thayLoc || 40000,
+                            currentInput: (defaultRates.thayLoc || 40000).toLocaleString('vi-VN'),
+                            applyFilteredOnly: filteredRateMatrix.length < rateMatrix.length
+                          })}
+                          className="p-1 hover:bg-white/20 rounded text-blue-200 hover:text-white transition cursor-pointer"
+                          title="Áp dụng mức giá này cho toàn bộ KTV"
+                        >
+                          <Zap className="h-3 w-3 text-cyan-300" />
+                        </button>
+                      </div>
+                      <div className="text-[10px] font-normal opacity-80 mt-0.5">(Chuẩn: {(defaultRates.thayLoc || 40000).toLocaleString('vi-VN')}đ)</div>
                     </th>
-                    <th className="px-3 py-3 bg-[#1B3A6B] sticky top-0 z-20 border-b border-blue-900 text-center min-w-[120px]">
-                      Lắp đặt<br/>
-                      <span className="text-[10px] font-normal opacity-80">(Chuẩn: {(defaultRates.lapDat || 100000).toLocaleString('vi-VN')}đ)</span>
+
+                    {/* Cột Lắp Đặt */}
+                    <th className="px-3 py-3 bg-[#1B3A6B] sticky top-0 z-20 border-b border-blue-900 text-center min-w-[125px]">
+                      <div className="flex items-center justify-center gap-1">
+                        <span>Lắp đặt</span>
+                        <button
+                          onClick={() => setColumnApplyModal({
+                            isOpen: true,
+                            workType: 'lapDat',
+                            columnTitle: 'Lắp đặt',
+                            defaultValue: defaultRates.lapDat || 100000,
+                            currentInput: (defaultRates.lapDat || 100000).toLocaleString('vi-VN'),
+                            applyFilteredOnly: filteredRateMatrix.length < rateMatrix.length
+                          })}
+                          className="p-1 hover:bg-white/20 rounded text-blue-200 hover:text-white transition cursor-pointer"
+                          title="Áp dụng mức giá này cho toàn bộ KTV"
+                        >
+                          <Zap className="h-3 w-3 text-cyan-300" />
+                        </button>
+                      </div>
+                      <div className="text-[10px] font-normal opacity-80 mt-0.5">(Chuẩn: {(defaultRates.lapDat || 100000).toLocaleString('vi-VN')}đ)</div>
                     </th>
+
+                    {/* Cột Giao + Lắp */}
                     <th className="px-3 py-3 bg-[#1B3A6B] sticky top-0 z-20 border-b border-blue-900 text-center min-w-[130px]">
-                      Giao + Lắp<br/>
-                      <span className="text-[10px] font-normal opacity-80">(Chuẩn: {(defaultRates.giaoHangLapDat || 120000).toLocaleString('vi-VN')}đ)</span>
+                      <div className="flex items-center justify-center gap-1">
+                        <span>Giao + Lắp</span>
+                        <button
+                          onClick={() => setColumnApplyModal({
+                            isOpen: true,
+                            workType: 'giaoHangLapDat',
+                            columnTitle: 'Giao hàng và lắp đặt',
+                            defaultValue: defaultRates.giaoHangLapDat || 120000,
+                            currentInput: (defaultRates.giaoHangLapDat || 120000).toLocaleString('vi-VN'),
+                            applyFilteredOnly: filteredRateMatrix.length < rateMatrix.length
+                          })}
+                          className="p-1 hover:bg-white/20 rounded text-blue-200 hover:text-white transition cursor-pointer"
+                          title="Áp dụng mức giá này cho toàn bộ KTV"
+                        >
+                          <Zap className="h-3 w-3 text-cyan-300" />
+                        </button>
+                      </div>
+                      <div className="text-[10px] font-normal opacity-80 mt-0.5">(Chuẩn: {(defaultRates.giaoHangLapDat || 120000).toLocaleString('vi-VN')}đ)</div>
                     </th>
+
+                    {/* Cột Di Chuyển Thông Thường */}
                     <th className="px-3 py-3 bg-[#1B3A6B] sticky top-0 z-20 border-b border-blue-900 text-center min-w-[160px]">
-                      Di chuyển (Thông thường)<br/>
-                      <span className="text-[10px] font-normal opacity-80">(Chuẩn: 3.000đ/km &gt;20km)</span>
+                      <div className="flex items-center justify-center gap-1">
+                        <span>Di chuyển (Thường)</span>
+                        <button
+                          onClick={() => setColumnApplyModal({
+                            isOpen: true,
+                            workType: 'kmRate',
+                            columnTitle: 'Đơn giá di chuyển (VND/km)',
+                            defaultValue: defaultRates.kmRate || 3000,
+                            currentInput: (defaultRates.kmRate || 3000).toLocaleString('vi-VN'),
+                            applyFilteredOnly: filteredRateMatrix.length < rateMatrix.length
+                          })}
+                          className="p-1 hover:bg-white/20 rounded text-blue-200 hover:text-white transition cursor-pointer"
+                          title="Áp dụng đơn giá km này cho toàn bộ KTV"
+                        >
+                          <Zap className="h-3 w-3 text-cyan-300" />
+                        </button>
+                      </div>
+                      <div className="text-[10px] font-normal opacity-80 mt-0.5">(Chuẩn: 3.000đ/km &gt;20km)</div>
                     </th>
-                    <th className="px-3 py-3 bg-indigo-950 sticky top-0 z-20 border-b border-indigo-900 text-center min-w-[170px]">
-                      Di chuyển (Thay lọc & Sửa chữa)<br/>
-                      <span className="text-[10px] font-normal opacity-80">(Chuẩn: 3.000đ/km &gt;50km)</span>
+
+                    {/* Cột Di Chuyển TLSC */}
+                    <th className="px-3 py-3 bg-indigo-950 sticky top-0 z-20 border-b border-indigo-900 text-center min-w-[150px]">
+                      <div>Di chuyển (TL &amp; SC)</div>
+                      <div className="text-[10px] font-normal opacity-80 mt-0.5">(Chuẩn: 3.000đ/km &gt;50km)</div>
                     </th>
-                    <th className="px-3 py-3 bg-[#1B3A6B] sticky top-0 z-20 border-b border-blue-900 text-center min-w-[100px]">Thao tác</th>
+
+                    <th className="px-3 py-3 bg-[#1B3A6B] sticky top-0 z-20 border-b border-blue-900 text-center min-w-[90px]">Thao tác</th>
                   </tr>
                 </thead>
+
                 <tbody className="divide-y divide-gray-100 bg-white">
-                  {rateMatrix
-                    .filter(ktv => {
-                      const matchKtv = selectedKtvsFilter.length === 0 || selectedKtvsFilter.includes(ktv.userId);
-
-                      const kMain = ktv.mainStationName && ktv.mainStationName !== 'Không có' ? ktv.mainStationName : 'Trực thuộc Truliva';
-                      const kTech = ktv.stationName && ktv.stationName !== 'Không có' ? ktv.stationName : 'Khác';
-                      const kKey = `${kMain}::${kTech}`;
-
-                      const matchStation = selectedStationsFilter.length === 0 || 
-                        selectedStationsFilter.includes(kKey) || 
-                        selectedStationsFilter.includes(ktv.stationName);
-
-                      const q = searchQuery.trim().toLowerCase();
-                      const matchQuery = !q || (
-                        (ktv.fullName || '').toLowerCase().includes(q) ||
-                        (ktv.username || '').toLowerCase().includes(q) ||
-                        (ktv.phoneNumber || '').includes(q) ||
-                        (ktv.stationName && ktv.stationName.toLowerCase().includes(q)) ||
-                        (ktv.mainStationName && ktv.mainStationName.toLowerCase().includes(q))
-                      );
-
-                      return matchKtv && matchStation && matchQuery;
-                    })
-                    .map((ktv) => {
+                  {filteredRateMatrix.length === 0 ? (
+                    <tr>
+                      <td colSpan={11} className="py-12 text-center text-gray-400 font-medium">
+                        Không tìm thấy kỹ thuật viên nào phù hợp với bộ lọc hiện tại.
+                      </td>
+                    </tr>
+                  ) : (
+                    filteredRateMatrix.map((ktv, rowIndex) => {
                       const userEdited = editedRates[ktv.userId] || {};
-                      
-                      const renderCell = (workType: string, defaultVal: number) => {
-                        const currentVal = userEdited[workType] !== undefined ? userEdited[workType] : defaultVal;
-                        const isModified = currentVal !== defaultVal;
+                      const rates = ktv.rates || {};
 
-                        return (
-                          <div className="flex flex-col items-center gap-1">
-                            <input
-                              type="text"
-                              value={currentVal.toLocaleString('vi-VN')}
-                              onChange={(e) => handleRateCellChange(ktv.userId, workType, e.target.value)}
-                              className={`w-28 text-right px-2.5 py-1.5 rounded-lg border text-xs font-bold transition focus:outline-none focus:ring-2 ${
-                                isModified
-                                  ? 'bg-cyan-50 border-cyan-400 text-cyan-900 focus:ring-cyan-500 font-extrabold shadow-sm'
-                                  : 'bg-gray-50 border-gray-200 text-gray-800 focus:ring-blue-500'
-                              }`}
-                            />
-                            {isModified ? (
-                              <span className="text-[9px] font-extrabold text-cyan-700 bg-cyan-100 px-1.5 py-0.2 rounded">Tùy chỉnh</span>
-                            ) : (
-                              <span className="text-[9px] font-medium text-gray-400">Chuẩn</span>
-                            )}
-                          </div>
-                        );
-                      };
+                      const valGiaoHang = userEdited.giaoHang !== undefined ? userEdited.giaoHang : getRateVal(rates.giaoHang, defaultRates.giaoHang || 20000);
+                      const valBaoHanh = userEdited.baoHanh !== undefined ? userEdited.baoHanh : getRateVal(rates.baoHanh, defaultRates.baoHanh || 60000);
+                      const valSuaChua = userEdited.suaChua !== undefined ? userEdited.suaChua : getRateVal(rates.suaChua, defaultRates.suaChua || valBaoHanh);
+                      const valThayLoc = userEdited.thayLoc !== undefined ? userEdited.thayLoc : getRateVal(rates.thayLoc, defaultRates.thayLoc || 40000);
+                      const valLapDat = userEdited.lapDat !== undefined ? userEdited.lapDat : getRateVal(rates.lapDat, defaultRates.lapDat || 100000);
+                      const valGiaoLap = userEdited.giaoHangLapDat !== undefined ? userEdited.giaoHangLapDat : getRateVal(rates.giaoHangLapDat, defaultRates.giaoHangLapDat || 120000);
 
-                      const renderTravelCell = (thresholdKey: 'freeKmThreshold' | 'freeKmThresholdTLSC' = 'freeKmThreshold', defaultThresh: number = 20) => {
-                        const defaultKmRate = getRateVal(ktv.rates?.kmRate, defaultRates.kmRate ?? 3000);
-                        const defaultThreshold = getRateVal(ktv.rates?.[thresholdKey], defaultRates[thresholdKey] ?? defaultThresh);
+                      const defKmRate = getRateVal(rates.kmRate, defaultRates.kmRate || 3000);
+                      const valKmRate = userEdited.kmRate !== undefined ? userEdited.kmRate : defKmRate;
 
-                        const currentKmRate = userEdited['kmRate'] !== undefined ? userEdited['kmRate'] : defaultKmRate;
-                        const currentThreshold = userEdited[thresholdKey] !== undefined ? userEdited[thresholdKey] : defaultThreshold;
+                      const defThresh = getRateVal(rates.freeKmThreshold, defaultRates.freeKmThreshold || 20);
+                      const valThresh = userEdited.freeKmThreshold !== undefined ? userEdited.freeKmThreshold : defThresh;
 
-                        const isKmRateModified = currentKmRate !== defaultKmRate;
-                        const isThresholdModified = currentThreshold !== defaultThreshold;
-                        const isModified = isKmRateModified || isThresholdModified;
-
-                        return (
-                          <div className="flex flex-col items-center gap-1 min-w-[140px]">
-                            <div className="flex items-center gap-1">
-                              <input
-                                type="text"
-                                value={currentKmRate.toLocaleString('vi-VN')}
-                                onChange={(e) => handleRateCellChange(ktv.userId, 'kmRate', e.target.value)}
-                                placeholder="3.000"
-                                className={`w-20 text-right px-2 py-1 rounded-lg border text-xs font-bold transition focus:outline-none focus:ring-2 ${
-                                  isKmRateModified
-                                    ? 'bg-cyan-50 border-cyan-400 text-cyan-900 font-extrabold shadow-sm'
-                                    : 'bg-gray-50 border-gray-200 text-gray-800 focus:ring-blue-500'
-                                }`}
-                                title="Đơn giá phụ cấp di chuyển (VND/km)"
-                              />
-                              <span className="text-[10px] text-gray-500 font-medium">đ/km</span>
-                            </div>
-
-                            <div className="flex items-center gap-1 text-[11px] text-gray-600">
-                              <span className="text-[10px] text-gray-400">Từ</span>
-                              <input
-                                type="number"
-                                value={currentThreshold}
-                                onChange={(e) => handleRateCellChange(ktv.userId, thresholdKey, e.target.value)}
-                                placeholder={String(defaultThresh)}
-                                className={`w-12 text-center px-1 py-0.5 rounded border text-xs font-bold transition focus:outline-none focus:ring-2 ${
-                                  isThresholdModified
-                                    ? 'bg-cyan-50 border-cyan-400 text-cyan-900 font-extrabold shadow-sm'
-                                    : 'bg-gray-50 border-gray-200 text-gray-800 focus:ring-blue-500'
-                                }`}
-                                title="Ngưỡng km bắt đầu tính phụ cấp di chuyển"
-                              />
-                              <span className="text-[10px] text-gray-400">km</span>
-                            </div>
-
-                            {isModified ? (
-                              <span className="text-[9px] font-extrabold text-cyan-700 bg-cyan-100 px-1.5 py-0.2 rounded">Tùy chỉnh</span>
-                            ) : (
-                              <span className="text-[9px] font-medium text-gray-400">Chuẩn</span>
-                            )}
-                          </div>
-                        );
-                      };
+                      const defThreshTLSC = getRateVal(rates.freeKmThresholdTLSC, defaultRates.freeKmThresholdTLSC || 50);
+                      const valThreshTLSC = userEdited.freeKmThresholdTLSC !== undefined ? userEdited.freeKmThresholdTLSC : defThreshTLSC;
 
                       return (
                         <tr key={ktv.userId} className="hover:bg-blue-50/30 transition">
@@ -3194,30 +3597,178 @@ export default function SalaryManage() {
                               {ktv.stationName || 'Chưa gán trạm'}
                             </span>
                           </td>
+
+                          {/* Col 0: Giao hàng */}
                           <td className="px-3 py-3 text-center">
-                            {renderCell('giaoHang', defaultRates.giaoHang || 20000)}
+                            <MatrixRateInput
+                              userId={ktv.userId}
+                              workType="giaoHang"
+                              value={valGiaoHang}
+                              defaultValue={defaultRates.giaoHang || 20000}
+                              rowIndex={rowIndex}
+                              colIndex={0}
+                              className="w-24"
+                              isSaving={savingCells[`${ktv.userId}_giaoHang`] === 'saving'}
+                              isSaved={savingCells[`${ktv.userId}_giaoHang`] === 'saved'}
+                              onCommit={handleSaveSingleRate}
+                              onKeyDownNav={handleGridKeyDown}
+                            />
                           </td>
+
+                          {/* Col 1: Bảo hành */}
                           <td className="px-3 py-3 text-center">
-                            {renderCell('baoHanh', defaultRates.baoHanh || 60000)}
+                            <MatrixRateInput
+                              userId={ktv.userId}
+                              workType="baoHanh"
+                              value={valBaoHanh}
+                              defaultValue={defaultRates.baoHanh || 60000}
+                              rowIndex={rowIndex}
+                              colIndex={1}
+                              className="w-24"
+                              isSaving={savingCells[`${ktv.userId}_baoHanh`] === 'saving'}
+                              isSaved={savingCells[`${ktv.userId}_baoHanh`] === 'saved'}
+                              onCommit={handleSaveSingleRate}
+                              onKeyDownNav={handleGridKeyDown}
+                            />
                           </td>
+
+                          {/* Col 2: Sửa chữa */}
                           <td className="px-3 py-3 text-center">
-                            {renderCell('suaChua', defaultRates.suaChua || 60000)}
+                            <MatrixRateInput
+                              userId={ktv.userId}
+                              workType="suaChua"
+                              value={valSuaChua}
+                              defaultValue={defaultRates.suaChua || 60000}
+                              rowIndex={rowIndex}
+                              colIndex={2}
+                              className="w-24"
+                              isSaving={savingCells[`${ktv.userId}_suaChua`] === 'saving'}
+                              isSaved={savingCells[`${ktv.userId}_suaChua`] === 'saved'}
+                              onCommit={handleSaveSingleRate}
+                              onKeyDownNav={handleGridKeyDown}
+                            />
                           </td>
+
+                          {/* Col 3: Thay lọc */}
                           <td className="px-3 py-3 text-center">
-                            {renderCell('thayLoc', defaultRates.thayLoc || 40000)}
+                            <MatrixRateInput
+                              userId={ktv.userId}
+                              workType="thayLoc"
+                              value={valThayLoc}
+                              defaultValue={defaultRates.thayLoc || 40000}
+                              rowIndex={rowIndex}
+                              colIndex={3}
+                              className="w-24"
+                              isSaving={savingCells[`${ktv.userId}_thayLoc`] === 'saving'}
+                              isSaved={savingCells[`${ktv.userId}_thayLoc`] === 'saved'}
+                              onCommit={handleSaveSingleRate}
+                              onKeyDownNav={handleGridKeyDown}
+                            />
                           </td>
+
+                          {/* Col 4: Lắp đặt */}
                           <td className="px-3 py-3 text-center">
-                            {renderCell('lapDat', defaultRates.lapDat || 100000)}
+                            <MatrixRateInput
+                              userId={ktv.userId}
+                              workType="lapDat"
+                              value={valLapDat}
+                              defaultValue={defaultRates.lapDat || 100000}
+                              rowIndex={rowIndex}
+                              colIndex={4}
+                              className="w-24"
+                              isSaving={savingCells[`${ktv.userId}_lapDat`] === 'saving'}
+                              isSaved={savingCells[`${ktv.userId}_lapDat`] === 'saved'}
+                              onCommit={handleSaveSingleRate}
+                              onKeyDownNav={handleGridKeyDown}
+                            />
                           </td>
+
+                          {/* Col 5: Giao + Lắp */}
                           <td className="px-3 py-3 text-center">
-                            {renderCell('giaoHangLapDat', defaultRates.giaoHangLapDat || 120000)}
+                            <MatrixRateInput
+                              userId={ktv.userId}
+                              workType="giaoHangLapDat"
+                              value={valGiaoLap}
+                              defaultValue={defaultRates.giaoHangLapDat || 120000}
+                              rowIndex={rowIndex}
+                              colIndex={5}
+                              className="w-24"
+                              isSaving={savingCells[`${ktv.userId}_giaoHangLapDat`] === 'saving'}
+                              isSaved={savingCells[`${ktv.userId}_giaoHangLapDat`] === 'saved'}
+                              onCommit={handleSaveSingleRate}
+                              onKeyDownNav={handleGridKeyDown}
+                            />
                           </td>
+
+                          {/* Col 6 & 7: Di chuyển Thông thường */}
                           <td className="px-3 py-3 text-center">
-                            {renderTravelCell('freeKmThreshold', 20)}
+                            <div className="flex flex-col items-center gap-1.5 min-w-[140px]">
+                              <MatrixRateInput
+                                userId={ktv.userId}
+                                workType="kmRate"
+                                value={valKmRate}
+                                defaultValue={defaultRates.kmRate || 3000}
+                                rowIndex={rowIndex}
+                                colIndex={6}
+                                className="w-20"
+                                unit="đ/km"
+                                title="Đơn giá phụ cấp di chuyển (VND/km)"
+                                isSaving={savingCells[`${ktv.userId}_kmRate`] === 'saving'}
+                                isSaved={savingCells[`${ktv.userId}_kmRate`] === 'saved'}
+                                onCommit={handleSaveSingleRate}
+                                onKeyDownNav={handleGridKeyDown}
+                              />
+                              <div className="flex items-center gap-1 text-[11px] text-gray-500">
+                                <span className="text-[10px] text-gray-400">Từ</span>
+                                <MatrixRateInput
+                                  userId={ktv.userId}
+                                  workType="freeKmThreshold"
+                                  value={valThresh}
+                                  defaultValue={defaultRates.freeKmThreshold || 20}
+                                  rowIndex={rowIndex}
+                                  colIndex={7}
+                                  className="w-12 text-center"
+                                  unit="km"
+                                  isThreshold={true}
+                                  title="Ngưỡng km bắt đầu tính phụ cấp di chuyển"
+                                  isSaving={savingCells[`${ktv.userId}_freeKmThreshold`] === 'saving'}
+                                  isSaved={savingCells[`${ktv.userId}_freeKmThreshold`] === 'saved'}
+                                  onCommit={handleSaveSingleRate}
+                                  onKeyDownNav={handleGridKeyDown}
+                                />
+                              </div>
+                            </div>
                           </td>
+
+                          {/* Col 8: Di chuyển TLSC */}
                           <td className="px-3 py-3 text-center bg-indigo-50/20">
-                            {renderTravelCell('freeKmThresholdTLSC', 50)}
+                            <div className="flex flex-col items-center gap-1.5 min-w-[130px]">
+                              <div className="text-[11px] font-semibold text-indigo-900 bg-indigo-100/60 px-2 py-0.5 rounded">
+                                {valKmRate.toLocaleString('vi-VN')} đ/km
+                              </div>
+                              <div className="flex items-center gap-1 text-[11px] text-gray-500">
+                                <span className="text-[10px] text-gray-400">Từ</span>
+                                <MatrixRateInput
+                                  userId={ktv.userId}
+                                  workType="freeKmThresholdTLSC"
+                                  value={valThreshTLSC}
+                                  defaultValue={defaultRates.freeKmThresholdTLSC || 50}
+                                  rowIndex={rowIndex}
+                                  colIndex={8}
+                                  className="w-12 text-center"
+                                  unit="km"
+                                  isThreshold={true}
+                                  title="Ngưỡng km bắt đầu tính phụ cấp di chuyển cho Thay Lọc & Sửa Chữa"
+                                  isSaving={savingCells[`${ktv.userId}_freeKmThresholdTLSC`] === 'saving'}
+                                  isSaved={savingCells[`${ktv.userId}_freeKmThresholdTLSC`] === 'saved'}
+                                  onCommit={handleSaveSingleRate}
+                                  onKeyDownNav={handleGridKeyDown}
+                                />
+                              </div>
+                            </div>
                           </td>
+
+                          {/* Thao tác */}
                           <td className="px-3 py-3 text-center">
                             <button
                               onClick={() => handleResetKtvRates(ktv.userId)}
@@ -3230,11 +3781,99 @@ export default function SalaryManage() {
                           </td>
                         </tr>
                       );
-                    })}
+                    })
+                  )}
                 </tbody>
               </table>
             </div>
           )}
+        </div>
+      )}
+
+      {/* Modal Áp Dụng Đơn Giá Hàng Loạt Cho Cột */}
+      {columnApplyModal && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl w-full max-w-md shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+            <div className="bg-[#1B3A6B] text-white p-4 flex items-center justify-between">
+              <h3 className="font-bold text-sm flex items-center gap-2">
+                <Zap className="h-4 w-4 text-cyan-400" />
+                Áp dụng nhanh: {columnApplyModal.columnTitle}
+              </h3>
+              <button
+                onClick={() => setColumnApplyModal(null)}
+                className="p-1 hover:bg-white/10 rounded-lg transition text-blue-200 hover:text-white"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            <div className="p-5 space-y-4 text-xs">
+              <div>
+                <label className="block font-bold text-gray-700 mb-1">
+                  Nhập đơn giá mới (VND)
+                </label>
+                <input
+                  type="text"
+                  value={columnApplyModal.currentInput}
+                  onChange={(e) => {
+                    const clean = e.target.value.replace(/\D/g, '');
+                    const num = Number(clean);
+                    setColumnApplyModal(prev => prev ? {
+                      ...prev,
+                      currentInput: clean === '' ? '' : num.toLocaleString('vi-VN')
+                    } : null);
+                  }}
+                  autoFocus
+                  className="w-full text-right text-base font-extrabold px-3 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                  placeholder="VD: 70.000"
+                />
+              </div>
+
+              <div className="bg-blue-50 p-3 rounded-xl border border-blue-100 text-blue-900 space-y-2">
+                <div className="font-semibold flex items-center gap-1.5">
+                  <Sliders className="h-3.5 w-3.5 text-blue-600" />
+                  Phạm vi áp dụng:
+                </div>
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="radio"
+                    checked={columnApplyModal.applyFilteredOnly}
+                    onChange={() => setColumnApplyModal(prev => prev ? { ...prev, applyFilteredOnly: true } : null)}
+                    className="text-blue-600 focus:ring-blue-500"
+                  />
+                  <span>Chỉ áp dụng cho <strong>{filteredRateMatrix.length} KTV</strong> đang hiển thị (theo bộ lọc)</span>
+                </label>
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="radio"
+                    checked={!columnApplyModal.applyFilteredOnly}
+                    onChange={() => setColumnApplyModal(prev => prev ? { ...prev, applyFilteredOnly: false } : null)}
+                    className="text-blue-600 focus:ring-blue-500"
+                  />
+                  <span>Áp dụng cho toàn bộ <strong>{rateMatrix.length} KTV</strong> trong hệ thống</span>
+                </label>
+              </div>
+
+              <div className="flex items-center justify-end gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setColumnApplyModal(null)}
+                  className="px-4 py-2 border border-gray-200 rounded-xl font-semibold text-gray-600 hover:bg-gray-50 cursor-pointer min-h-[44px]"
+                >
+                  Hủy
+                </button>
+                <button
+                  type="button"
+                  disabled={ratesSaving}
+                  onClick={handleApplyColumnToAll}
+                  className="px-5 py-2 bg-[#1B3A6B] hover:bg-[#152e55] text-white font-bold rounded-xl flex items-center gap-1.5 disabled:opacity-50 shadow-md cursor-pointer min-h-[44px]"
+                >
+                  {ratesSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+                  Xác Nhận &amp; Lưu Ngay
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
       )}
 
