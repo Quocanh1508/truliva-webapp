@@ -246,9 +246,20 @@ export default function OrderList() {
 
   // Pagination
   const [page, setPage] = useState<number>(() => getSavedFilter('page', 1));
+  const [pageSize, setPageSize] = useState<number>(() => getSavedFilter('pageSize', 100));
   const [totalPages, setTotalPages] = useState(1);
-  const [_totalItems, setTotalItems] = useState(0);
+  const [totalItems, setTotalItems] = useState(0);
   const [pageInput, setPageInput] = useState('1');
+
+  // Floating Sticky Table Header states & refs
+  const tableWrapperRef = useRef<HTMLDivElement>(null);
+  const tableRef = useRef<HTMLTableElement>(null);
+  const realTheadRef = useRef<HTMLTableSectionElement>(null);
+  const [isStickyHeaderVisible, setIsStickyHeaderVisible] = useState(false);
+  const [stickyTopOffset, setStickyTopOffset] = useState(0);
+  const [tableBounds, setTableBounds] = useState<{ left: number; width: number; tableWidth: number }>({ left: 0, width: 0, tableWidth: 0 });
+  const [colWidths, setColWidths] = useState<number[]>([]);
+  const [tableScrollLeft, setTableScrollLeft] = useState(0);
 
   useEffect(() => {
     setPageInput(String(page));
@@ -302,7 +313,8 @@ export default function OrderList() {
       filterTechStationIds,
       filterProvinces,
       filterCreators,
-      page
+      page,
+      pageSize
     };
     sessionStorage.setItem('truliva_order_filters', JSON.stringify(filterState));
   }, [
@@ -325,7 +337,8 @@ export default function OrderList() {
     filterTechStationIds,
     filterProvinces,
     filterCreators,
-    page
+    page,
+    pageSize
   ]);
 
   // Dropdown / Popover states
@@ -781,7 +794,7 @@ export default function OrderList() {
       const { startDate, endDate } = getDateRange();
       const res = await getOrders({
         page,
-        limit: 100,
+        limit: pageSize,
         search: debouncedSearch,
         sortBy,
         sortOrder,
@@ -931,6 +944,7 @@ export default function OrderList() {
     fetchOrdersData();
   }, [
     page,
+    pageSize,
     sortBy,
     sortOrder,
     customStartDate,
@@ -951,6 +965,74 @@ export default function OrderList() {
     dateType,
     debouncedSearch
   ]);
+
+  // Sync Floating Sticky Header
+  useEffect(() => {
+    const getTopOffset = () => {
+      let offset = 0;
+      // 1. Sandbox banner
+      const banner = document.querySelector('.bg-gradient-to-r.from-amber-500');
+      if (banner) {
+        const bRect = banner.getBoundingClientRect();
+        if (bRect.bottom > 0) offset += bRect.height;
+      }
+      // 2. Mobile app-header (< 1024px)
+      if (window.innerWidth < 1024) {
+        const appHeader = document.querySelector('.app-header');
+        if (appHeader) {
+          const hRect = appHeader.getBoundingClientRect();
+          if (hRect.bottom > 0) offset += hRect.height;
+        }
+      }
+      return offset;
+    };
+
+    const handleScrollAndResize = () => {
+      if (!tableWrapperRef.current || !realTheadRef.current) return;
+      const theadRect = realTheadRef.current.getBoundingClientRect();
+      const wrapperRect = tableWrapperRef.current.getBoundingClientRect();
+      const topOffset = getTopOffset();
+
+      // If the real thead top has scrolled past topOffset AND the table bottom is still visible
+      if (theadRect.top < topOffset && wrapperRect.bottom > topOffset + 70) {
+        const thElements = realTheadRef.current.querySelectorAll('th');
+        const widths = Array.from(thElements).map((th) => th.getBoundingClientRect().width);
+
+        setIsStickyHeaderVisible(true);
+        setStickyTopOffset(topOffset);
+        setTableBounds({
+          left: wrapperRect.left,
+          width: wrapperRect.width,
+          tableWidth: tableRef.current?.offsetWidth || wrapperRect.width,
+        });
+        setColWidths(widths);
+        setTableScrollLeft(tableWrapperRef.current.scrollLeft);
+      } else {
+        setIsStickyHeaderVisible(false);
+      }
+    };
+
+    const handleWrapperScroll = () => {
+      if (tableWrapperRef.current) {
+        setTableScrollLeft(tableWrapperRef.current.scrollLeft);
+      }
+    };
+
+    window.addEventListener('scroll', handleScrollAndResize, { passive: true });
+    window.addEventListener('resize', handleScrollAndResize, { passive: true });
+    const wrapper = tableWrapperRef.current;
+    if (wrapper) {
+      wrapper.addEventListener('scroll', handleWrapperScroll, { passive: true });
+    }
+
+    return () => {
+      window.removeEventListener('scroll', handleScrollAndResize);
+      window.removeEventListener('resize', handleScrollAndResize);
+      if (wrapper) {
+        wrapper.removeEventListener('scroll', handleWrapperScroll);
+      }
+    };
+  }, [orders.length, currentUser?.role]);
 
   useEffect(() => {
     // Only poll if autoRefresh is enabled AND WebSocket is not connected
@@ -2864,7 +2946,91 @@ export default function OrderList() {
         </div>
       </div>
 
-      <div className="flex-1 bg-white overflow-x-auto overflow-y-auto max-h-[calc(100vh-250px)] relative min-h-[300px] border-b border-gray-200">
+      {/* Floating Sticky Table Header */}
+      {isStickyHeaderVisible && (
+        <div
+          className="fixed z-40 bg-[#f8f9fa] shadow-md border-b border-gray-300 overflow-hidden pointer-events-auto"
+          style={{
+            top: `${stickyTopOffset}px`,
+            left: `${tableBounds.left}px`,
+            width: `${tableBounds.width}px`,
+          }}
+        >
+          <table
+            className="text-left text-[13px] border-collapse"
+            style={{
+              width: `${tableBounds.tableWidth}px`,
+              minWidth: `${tableBounds.tableWidth}px`,
+              tableLayout: 'fixed',
+              transform: `translateX(-${tableScrollLeft}px)`,
+            }}
+          >
+            <thead>
+              <tr className="bg-[#f8f9fa] text-gray-700 font-bold border-b border-gray-200">
+                {(currentUser?.role === 'ADMIN' || currentUser?.role === 'DEV' || currentUser?.role === 'COORDINATOR') && (
+                  <th
+                    style={{
+                      width: colWidths[0] ? `${colWidths[0]}px` : '40px',
+                      minWidth: colWidths[0] ? `${colWidths[0]}px` : '40px',
+                      maxWidth: colWidths[0] ? `${colWidths[0]}px` : '40px',
+                      boxSizing: 'border-box',
+                    }}
+                    className="px-4 py-2.5 text-center bg-[#f8f9fa] border-b border-gray-200"
+                  >
+                    <input
+                      type="checkbox"
+                      className="rounded text-blue-600 focus:ring-blue-500 cursor-pointer"
+                      checked={orders.length > 0 && orders.every(o => selectedOrderIds.includes(o.id))}
+                      onChange={(e) => {
+                        if (e.target.checked) {
+                          setSelectedOrderIds(orders.map(o => o.id));
+                        } else {
+                          setSelectedOrderIds([]);
+                        }
+                      }}
+                    />
+                  </th>
+                )}
+                {(() => {
+                  const hasCheckbox = currentUser?.role === 'ADMIN' || currentUser?.role === 'DEV' || currentUser?.role === 'COORDINATOR';
+                  const baseIdx = hasCheckbox ? 1 : 0;
+                  const cols = [
+                    { title: 'Mã đơn', align: 'left' },
+                    { title: 'Khách hàng', align: 'left' },
+                    { title: 'Công việc', align: 'left' },
+                    { title: 'Ghi chú', align: 'left' },
+                    { title: 'Thao tác', align: 'center' },
+                    { title: 'Trạm - KTV', align: 'left' },
+                    { title: 'Thông tin máy', align: 'left' },
+                    { title: 'Tạo bởi - lúc', align: 'left' }
+                  ];
+
+                  return cols.map((c, i) => {
+                    const idx = baseIdx + i;
+                    const w = colWidths[idx];
+                    return (
+                      <th
+                        key={c.title}
+                        style={{
+                          width: w ? `${w}px` : undefined,
+                          minWidth: w ? `${w}px` : undefined,
+                          maxWidth: w ? `${w}px` : undefined,
+                          boxSizing: 'border-box',
+                        }}
+                        className={`px-4 py-2.5 bg-[#f8f9fa] border-b border-gray-200 ${c.align === 'center' ? 'text-center' : ''}`}
+                      >
+                        {c.title}
+                      </th>
+                    );
+                  });
+                })()}
+              </tr>
+            </thead>
+          </table>
+        </div>
+      )}
+
+      <div ref={tableWrapperRef} className="flex-1 bg-white overflow-x-auto relative min-h-[300px] border-b border-gray-200">
         {loading && orders.length === 0 ? (
           <div className="flex justify-center py-12">
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
@@ -2879,8 +3045,8 @@ export default function OrderList() {
             {orders.length === 0 ? (
               <div className="text-center py-12 text-gray-400">Không tìm thấy yêu cầu nào</div>
             ) : (
-              <table className="min-w-[1300px] lg:w-full text-left text-[13px] border-collapse">
-            <thead className="sticky top-0 z-30 shadow-xs bg-[#f8f9fa]">
+              <table ref={tableRef} className="min-w-[1300px] lg:w-full text-left text-[13px] border-collapse">
+            <thead ref={realTheadRef} className="bg-[#f8f9fa] border-b border-gray-200">
               <tr className="bg-[#f8f9fa] text-gray-700 font-bold border-b border-gray-200">
                 {(currentUser?.role === 'ADMIN' || currentUser?.role === 'DEV' || currentUser?.role === 'COORDINATOR') && (
                   <th className="px-4 py-2.5 w-[40px] text-center bg-[#f8f9fa] sticky top-0 z-30 border-b border-gray-200">
@@ -3373,10 +3539,53 @@ export default function OrderList() {
         )}
       </div>
 
-      {/* Pagination */}
-      {totalPages > 1 && (
-        <div className={`flex justify-between items-center px-4 py-3 border-t border-gray-200 text-[13px] text-gray-600 bg-white ${loading ? 'pointer-events-none opacity-50' : ''}`}>
-          <div className="flex items-center gap-1.5">
+      {/* Enhanced Pagination Bar */}
+      <div className={`flex flex-col sm:flex-row justify-between items-center gap-3 px-4 py-3 border-t border-gray-200 text-[13px] text-gray-600 bg-white ${loading ? 'pointer-events-none opacity-50' : ''}`}>
+        {/* Left: Total items & Page size selector */}
+        <div className="flex items-center flex-wrap gap-3">
+          <div className="text-gray-700 font-medium">
+            Hiển thị <span className="font-bold text-gray-900">{totalItems > 0 ? (page - 1) * pageSize + 1 : 0}</span> - <span className="font-bold text-gray-900">{Math.min(page * pageSize, totalItems)}</span> trong <span className="font-bold text-blue-700">{totalItems.toLocaleString('vi-VN')}</span> đơn
+          </div>
+          <div className="flex items-center gap-1.5 text-xs text-gray-500 border-l border-gray-200 pl-3">
+            <span>Cỡ trang:</span>
+            <select
+              value={pageSize}
+              onChange={(e) => {
+                const newSize = parseInt(e.target.value, 10);
+                setPageSize(newSize);
+                setPage(1);
+                setPageInput('1');
+              }}
+              className="border border-gray-300 rounded-md px-2 py-1 text-xs font-semibold text-gray-800 bg-white hover:border-gray-400 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none cursor-pointer transition-colors shadow-2xs"
+            >
+              <option value={50}>50 đơn / trang</option>
+              <option value={100}>100 đơn / trang</option>
+              <option value={200}>200 đơn / trang</option>
+              <option value={500}>500 đơn / trang</option>
+            </select>
+          </div>
+        </div>
+
+        {/* Right: Page Navigation */}
+        <div className="flex items-center gap-2">
+          <button
+            disabled={page === 1}
+            onClick={() => setPage(1)}
+            className="px-2.5 py-1 border border-gray-300 rounded-md text-xs font-medium hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors shadow-2xs"
+            title="Trang đầu tiên"
+          >
+            Đầu
+          </button>
+          <button
+            disabled={page === 1}
+            onClick={() => setPage(p => Math.max(1, p - 1))}
+            className="p-1.5 border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors shadow-2xs"
+            title="Trang trước"
+          >
+            <ChevronLeft size={16} />
+          </button>
+
+          <div className="flex items-center gap-1 text-xs">
             <span>Trang</span>
             <input
               type="text"
@@ -3407,16 +3616,29 @@ export default function OrderList() {
                   setPageInput(String(page));
                 }
               }}
-              className="w-12 text-center border border-gray-300 rounded px-1.5 py-0.5 text-gray-900 font-medium focus:ring-1 focus:ring-blue-500 focus:border-blue-500 outline-none bg-white"
+              className="w-12 text-center border border-gray-300 rounded-md px-1 py-1 text-gray-900 font-bold focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none bg-white shadow-2xs"
             />
-            <span>/ <span className="font-medium text-gray-900">{totalPages}</span></span>
+            <span>/ <span className="font-bold text-gray-800">{totalPages || 1}</span></span>
           </div>
-          <div className="flex gap-2">
-            <button disabled={page === 1} onClick={() => setPage(p => p - 1)} className="p-1.5 border rounded"><ChevronLeft size={16} /></button>
-            <button disabled={page === totalPages} onClick={() => setPage(p => p + 1)} className="p-1.5 border rounded"><ChevronRight size={16} /></button>
-          </div>
+
+          <button
+            disabled={page >= totalPages}
+            onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+            className="p-1.5 border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors shadow-2xs"
+            title="Trang tiếp theo"
+          >
+            <ChevronRight size={16} />
+          </button>
+          <button
+            disabled={page >= totalPages}
+            onClick={() => setPage(totalPages)}
+            className="px-2.5 py-1 border border-gray-300 rounded-md text-xs font-medium hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors shadow-2xs"
+            title="Trang cuối cùng"
+          >
+            Cuối
+          </button>
         </div>
-      )}
+      </div>
 
       {/* ASSIGN MODAL (Truliva Flow) */}
       {assignModal?.isOpen && (
