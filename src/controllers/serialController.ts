@@ -1689,183 +1689,35 @@ export async function activateManual(req: Request, res: Response): Promise<void>
 
 export async function testZnsSend(req: Request, res: Response): Promise<void> {
   try {
-    const { phone, serialNumber, customerName, productName, expiryDate } = req.body;
+    const { phone, serialNumber, customerName, productName, expiryDate, gatewayMode } = req.body;
     if (!phone || !serialNumber) {
       res.status(400).json({ error: 'Thiếu số điện thoại hoặc số Serial thử nghiệm' });
       return;
     }
 
-    const fnsAppId = process.env.FNS_APP_ID || '';
-    const fnsSecretKey = process.env.FNS_SECRET_KEY || '';
-    const templateId = process.env.ZALO_ZNS_TEMPLATE_ID || '617366';
-
-    if (!fnsAppId || !fnsSecretKey) {
-      res.status(400).json({ error: 'Chưa cấu hình cổng FPT FNS Gateway trong file .env' });
-      return;
-    }
-
-    let cleanedPhone = phone.replace(/[^0-9]/g, '');
-    if (cleanedPhone.startsWith('0')) {
-      cleanedPhone = '84' + cleanedPhone.substring(1);
-    }
-
-    const cleanSerial = serialNumber.trim().toUpperCase();
-    const custName = customerName?.trim() || 'Khách Hàng Test';
-    const prodName = productName?.trim() || 'Máy lọc nước Truliva UR61096H';
-    const expDate = expiryDate?.trim() || '20/07/2027';
-
-    const testTemplateData = {
-      // 1. Zalo ZBS Template 617366 exact parameters
-      _TEN_KHACH_HANG_: custName.substring(0, 30),
-      _TEN_SAN_PHAM_: prodName.substring(0, 200),
-      _ID_BAO_HANH_: cleanSerial.substring(0, 30),
-      _NGAY_BAO_HANH_: expDate.substring(0, 30),
-
-      // Template 617874 param
-      _TEN_: custName.substring(0, 30),
-
-      // Aliases with underscore
-      _SO_SERI_: cleanSerial.substring(0, 30),
-      _NGAY_HET_BAO_HANH_: expDate.substring(0, 30),
-
-      // 2. Uppercase without leading/trailing underscore
-      TEN_KHACH_HANG: custName,
-      TEN_SAN_PHAM: prodName,
-      ID_BAO_HANH: cleanSerial,
-      NGAY_BAO_HANH: expDate,
-      SO_SERI: cleanSerial,
-      NGAY_HET_BAO_HANH: expDate,
-
-      // 3. PascalCase / TitleCase format
-      Ten_Khach_Hang: custName,
-      Ten_San_Pham: prodName,
-      Id_Bao_Hanh: cleanSerial,
-      Ngay_Bao_Hanh: expDate,
-      So_Seri: cleanSerial,
-      Ngay_Het_Bao_Hanh: expDate,
-
-      // 4. snake_case vietnamese
-      ten_khach_hang: custName,
-      ten_san_pham: prodName,
-      so_seri: cleanSerial,
-      ngay_het_bao_hanh: expDate,
-
-      // 5. English snake_case
-      customer_name: custName,
-      product_name: prodName,
-      code: cleanSerial,
-      serial_number: cleanSerial,
-      expiry_date: expDate,
-      time: expDate,
-      date: expDate,
-
-      // 6. English uppercase underscore format
-      _CUSTOMER_NAME_: custName,
-      _PRODUCT_NAME_: prodName,
-      _CODE_: cleanSerial,
-      _SERIAL_NUMBER_: cleanSerial,
-      _EXPIRY_DATE_: expDate,
-      _TIME_: expDate
-    };
-
-    const fnsPayload = {
-      phone: cleanedPhone,
-      template_id: templateId,
-      template_data: testTemplateData,
-      ref_id: `TEST-${cleanSerial}-${Date.now()}`
-    };
-
-    let fnsResult: any = null;
-    let fnsError: any = null;
-
-    if (fnsAppId && fnsSecretKey) {
-      try {
-        logger.info('Dev ZNS Test Send requested via FNS', { phone: cleanedPhone, serialNumber: cleanSerial, templateId });
-        const sendRes = await axios.post('https://api-fns.fpt.work/api/send-message', fnsPayload, {
-          headers: {
-            'Content-Type': 'application/json',
-            'app-id': fnsAppId,
-            'secret-key': fnsSecretKey
-          }
-        });
-        fnsResult = sendRes.data;
-      } catch (err: any) {
-        fnsError = err.response?.data || err.message;
+    const result = await sendZnsWarrantyActivation(
+      serialNumber,
+      phone,
+      12,
+      {
+        customerName,
+        productName,
+        expiryDateStr: expiryDate,
+        gatewayMode: gatewayMode || 'AUTO'
       }
-    }
+    );
 
-    // Nếu FNS thành công (code === 1)
-    if (fnsResult && fnsResult.code === 1) {
-      const msgId = fnsResult.data?.message_id;
-      let statusData = null;
-      if (msgId) {
-        await new Promise(resolve => setTimeout(resolve, 1500));
-        try {
-          const checkRes = await axios.post('https://api-fns.fpt.work/api/check-status', {
-            msg_id: msgId
-          }, {
-            headers: {
-              'Content-Type': 'application/json',
-              'app-id': fnsAppId,
-              'secret-key': fnsSecretKey
-            }
-          });
-          statusData = checkRes.data?.data || checkRes.data;
-        } catch (err: any) {
-          statusData = { error: err.message };
-        }
-      }
-
-      res.json({
-        success: true,
-        gateway: 'FPT FNS Gateway',
-        templateId,
-        sendResult: fnsResult,
-        msgId,
-        statusResult: statusData
-      });
-      return;
-    }
-
-    // Khi FNS trả lỗi (Template không đúng / 617366 thuộc ZBS Zalo Direct OpenAPI), thử nghiệm qua Zalo Direct OpenAPI
-    try {
-      const accessToken = await getValidAccessToken();
-      const zaloPayload = {
-        phone: cleanedPhone,
-        template_id: templateId,
-        template_data: testTemplateData,
-        tracking_id: `TEST-${cleanSerial}-${Date.now()}`
-      };
-
-      const zaloRes = await axios.post('https://business.openapi.zalo.me/message/template', zaloPayload, {
-        headers: {
-          'Content-Type': 'application/json',
-          'access_token': accessToken
-        }
-      });
-
-      res.json({
-        success: zaloRes.data.error === 0,
-        gateway: 'Zalo Direct ZBS OpenAPI (Template 617366)',
-        templateId,
-        fnsResult: fnsResult || fnsError,
-        sendResult: zaloRes.data,
-        msgId: zaloRes.data?.data?.message_id || null,
-        statusResult: zaloRes.data
-      });
-    } catch (zaloErr: any) {
-      res.json({
-        success: false,
-        gateway: 'Zalo Direct ZBS OpenAPI (Template 617366)',
-        templateId,
-        fnsResult: fnsResult || fnsError,
-        sendResult: zaloErr.response?.data || { error: zaloErr.message },
-        error: zaloErr.response?.data?.message || zaloErr.message
-      });
-    }
+    res.json({
+      success: true,
+      ...result
+    });
   } catch (error: any) {
     logger.error('Dev ZNS Test Send error', { error: error.message });
-    res.status(500).json({ error: error.response?.data?.message || error.message });
+    res.status(400).json({
+      success: false,
+      error: error.message,
+      details: error.response?.data
+    });
   }
 }
 

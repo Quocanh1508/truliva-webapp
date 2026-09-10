@@ -90,6 +90,7 @@ export default function ZnsManage() {
     name: string;
     product: string;
     expiry: string;
+    gatewayMode: 'AUTO' | 'ZALO_DIRECT' | 'FNS_GATEWAY';
     loading: boolean;
     result: any;
   }>({
@@ -100,6 +101,7 @@ export default function ZnsManage() {
     name: '',
     product: '',
     expiry: '',
+    gatewayMode: 'AUTO',
     loading: false,
     result: null
   });
@@ -260,6 +262,7 @@ export default function ZnsManage() {
       name: d.customerName || 'Quý Khách',
       product: d.model || 'Máy lọc nước Truliva',
       expiry: expiryStr,
+      gatewayMode: 'AUTO',
       loading: false,
       result: null
     });
@@ -280,7 +283,8 @@ export default function ZnsManage() {
           serialNumber: resendModal.serialNumber.trim(),
           customerName: resendModal.name.trim(),
           productName: resendModal.product.trim(),
-          expiryDate: resendModal.expiry.trim()
+          expiryDate: resendModal.expiry.trim(),
+          gatewayMode: resendModal.gatewayMode
         })
       });
       setResendModal(prev => ({ ...prev, loading: false, result: res }));
@@ -739,23 +743,42 @@ export default function ZnsManage() {
                             {d.durationMs || '~145ms'}
                           </td>
 
-                          {/* Trạng thái phát */}
+                          {/* Trạng thái phát & Cổng Gateway */}
                           <td className="px-3.5 py-3 text-center whitespace-nowrap">
-                            {isSuccess ? (
-                              <span className="inline-flex items-center text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-full text-[11px] font-semibold border border-emerald-200">
-                                <CheckCircle2 size={12} className="mr-1 text-emerald-600" />
-                                Đã gửi thành công
-                              </span>
-                            ) : isFailed ? (
-                              <span className="inline-flex items-center text-red-700 bg-red-50 px-2.5 py-1 rounded-full text-[11px] font-semibold border border-red-200" title={d.error || 'Lỗi phát tin'}>
-                                <XCircle size={12} className="mr-1 text-red-600" />
-                                Lỗi phát tin
-                              </span>
-                            ) : (
-                              <span className="inline-flex items-center text-blue-700 bg-blue-50 px-2.5 py-1 rounded-full text-[11px] font-medium border border-blue-200">
-                                Đã phát
-                              </span>
-                            )}
+                            <div className="flex flex-col items-center gap-1">
+                              {isSuccess ? (
+                                <span className="inline-flex items-center text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded-full text-[11px] font-semibold border border-emerald-200">
+                                  <CheckCircle2 size={12} className="mr-1 text-emerald-600" />
+                                  Đã gửi thành công
+                                </span>
+                              ) : isFailed ? (
+                                <span className="inline-flex items-center text-red-700 bg-red-50 px-2.5 py-0.5 rounded-full text-[11px] font-semibold border border-red-200" title={d.error || 'Lỗi phát tin'}>
+                                  <XCircle size={12} className="mr-1 text-red-600" />
+                                  Lỗi phát tin
+                                </span>
+                              ) : (
+                                <span className="inline-flex items-center text-blue-700 bg-blue-50 px-2.5 py-0.5 rounded-full text-[11px] font-medium border border-blue-200">
+                                  Đã phát
+                                </span>
+                              )}
+
+                              {d.gateway && (
+                                <span
+                                  className={`inline-flex items-center text-[10px] font-bold px-2 py-0.5 rounded-md border ${
+                                    d.gateway.includes('Fallback') || d.gateway.includes('FNS')
+                                      ? 'bg-purple-50 text-purple-700 border-purple-200'
+                                      : 'bg-blue-50 text-blue-700 border-blue-200'
+                                  }`}
+                                  title={d.gateway}
+                                >
+                                  {d.gateway.includes('Fallback')
+                                    ? '🟣 FNS (Fallback 10232)'
+                                    : d.gateway.includes('FNS')
+                                    ? '🟣 FNS Gateway'
+                                    : '🔵 Zalo Direct (617366)'}
+                                </span>
+                              )}
+                            </div>
                           </td>
 
                           {/* Thao tác */}
@@ -1382,6 +1405,22 @@ export default function ZnsManage() {
                   onChange={(e) => setResendModal(prev => ({ ...prev, product: e.target.value }))}
                   className="w-full px-3 py-2 border border-gray-300 rounded-xl bg-white focus:ring-2 focus:ring-blue-500"
                 />
+              </div>
+
+              <div>
+                <label className="block font-semibold text-gray-700 mb-1">Cổng phát tin nhắn (Gateway)</label>
+                <select
+                  value={resendModal.gatewayMode}
+                  onChange={(e) => setResendModal(prev => ({ ...prev, gatewayMode: e.target.value as any }))}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-xl font-medium bg-white focus:ring-2 focus:ring-blue-500 text-xs"
+                >
+                  <option value="AUTO">⚡ Tự động (Ưu tiên Zalo Direct 617366 ➔ Dự phòng FNS 10232)</option>
+                  <option value="ZALO_DIRECT">🔵 Chỉ dùng Zalo Direct OpenAPI (Template 617366)</option>
+                  <option value="FNS_GATEWAY">🟣 Chỉ dùng FPT FNS Gateway (Template 10232)</option>
+                </select>
+                <p className="text-[11px] text-gray-400 mt-1">
+                  Chế độ Tự động sẽ thử Zalo Direct trước, nếu gặp sự cố sẽ tự động chuyển sang FNS Gateway 10232.
+                </p>
               </div>
             </div>
 
