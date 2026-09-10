@@ -669,12 +669,12 @@ export default function SerialManage() {
         display: 'flex', flexWrap: 'wrap', gap: 12, marginBottom: 20,
         alignItems: 'center', justifyContent: 'space-between',
       }}>
-        <div style={{ display: 'flex', gap: 8, alignItems: 'center', flex: 1, minWidth: 250 }}>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center', flex: 1, minWidth: 0 }}>
           {/* Search */}
           <div style={{
             display: 'flex', alignItems: 'center', gap: 8,
             background: 'white', border: '1px solid #d1d5db', borderRadius: 8,
-            padding: '8px 12px', flex: 1, maxWidth: 400,
+            padding: '8px 12px', flex: '1 1 200px', minWidth: 180, maxWidth: 340,
           }}>
             <Search size={18} color="#9ca3af" />
             <input
@@ -697,15 +697,15 @@ export default function SerialManage() {
           </div>
 
           {/* Status filter */}
-          <div style={{ position: 'relative' }}>
+          <div style={{ position: 'relative', flexShrink: 0 }}>
             <select
               value={statusFilter}
               onChange={e => { setStatusFilter(e.target.value); setPage(1); }}
               style={{
-                padding: '8px 32px 8px 12px', borderRadius: 8,
+                padding: '8px 28px 8px 12px', borderRadius: 8,
                 border: '1px solid #d1d5db', background: 'white',
-                fontSize: 14, color: '#374151', cursor: 'pointer',
-                appearance: 'none',
+                fontSize: 13, color: '#374151', cursor: 'pointer',
+                appearance: 'none', flexShrink: 0,
               }}
             >
               <option value="">Tất cả trạng thái</option>
@@ -719,17 +719,18 @@ export default function SerialManage() {
           </div>
 
           {/* Batch filter */}
-          <div style={{ position: 'relative' }}>
+          <div style={{ position: 'relative', flexShrink: 0 }}>
             <select
               value={batchFilter}
               onChange={e => { setBatchFilter(e.target.value); setPage(1); }}
               style={{
-                padding: '8px 32px 8px 12px', borderRadius: 8,
+                padding: '8px 28px 8px 12px', borderRadius: 8,
                 border: '1px solid #d1d5db', background: 'white',
-                fontSize: 14, color: '#374151', cursor: 'pointer',
+                fontSize: 13, color: '#374151', cursor: 'pointer',
                 appearance: 'none',
-                maxWidth: 185,
-                textOverflow: 'ellipsis'
+                maxWidth: 175,
+                textOverflow: 'ellipsis',
+                flexShrink: 0,
               }}
             >
               <option value="">Tất cả các lô import</option>
@@ -743,7 +744,7 @@ export default function SerialManage() {
           </div>
 
           {/* Quick Sort selector */}
-          <div style={{ position: 'relative' }}>
+          <div style={{ position: 'relative', flexShrink: 0 }}>
             <select
               value={`${sortBy}:${sortOrder}`}
               onChange={e => {
@@ -753,28 +754,31 @@ export default function SerialManage() {
                 setPage(1);
               }}
               style={{
-                padding: '8px 32px 8px 12px', borderRadius: 8,
+                padding: '8px 28px 8px 12px', borderRadius: 8,
                 border: '1px solid #d1d5db', background: 'white',
-                fontSize: 14, color: '#374151', cursor: 'pointer',
+                fontSize: 13, color: '#374151', cursor: 'pointer',
                 appearance: 'none',
+                maxWidth: 175,
+                textOverflow: 'ellipsis',
+                flexShrink: 0,
               }}
               title="Tiêu chí sắp xếp danh sách"
             >
-              <option value="updatedAt:desc">Mới cập nhật gần nhất</option>
-              <option value="activationDate:desc">Mới kích hoạt gần nhất</option>
-              <option value="warrantyExpiryDate:asc">Sắp hết hạn BH trước</option>
+              <option value="updatedAt:desc">Mới cập nhật</option>
+              <option value="activationDate:desc">Mới kích hoạt</option>
+              <option value="warrantyExpiryDate:asc">Sắp hết hạn BH</option>
               <option value="warrantyExpiryDate:desc">Hết hạn BH xa nhất</option>
-              <option value="serialNumber:asc">Số Serial (A → Z)</option>
-              <option value="serialNumber:desc">Số Serial (Z → A)</option>
-              <option value="createdAt:desc">Ngày nhập kho mới nhất</option>
-              <option value="createdAt:asc">Ngày nhập kho cũ nhất</option>
-              <option value="customerName:asc">Tên khách hàng (A → Z)</option>
+              <option value="serialNumber:asc">Serial (A → Z)</option>
+              <option value="serialNumber:desc">Serial (Z → A)</option>
+              <option value="createdAt:desc">Ngày nhập mới nhất</option>
+              <option value="createdAt:asc">Ngày nhập cũ nhất</option>
+              <option value="customerName:asc">Tên KH (A → Z)</option>
             </select>
             <ArrowUpDown size={14} style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none', color: '#9ca3af' }} />
           </div>
         </div>
 
-        <div style={{ display: 'flex', gap: 8 }}>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center', flexShrink: 0 }}>
           {/* Rollback batch button */}
           <button
             onClick={() => setShowBatchModal(true)}
