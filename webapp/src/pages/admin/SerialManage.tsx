@@ -4,7 +4,7 @@ import { usePermission } from '../../context/PermissionContext';
 import { isValidPhone, PHONE_ERROR_MSG } from '../../utils/phone';
 import ProvinceSelect from '../../components/ProvinceSelect';
 import { isValidProvince } from '../../utils/provinces';
-import { Hash, Upload, Download, Search, X, Clock, ChevronLeft, ChevronRight, AlertTriangle, CheckCircle, User, Phone, MapPin, Wrench, FileText, Filter, RotateCcw, Sparkles, FolderPlus, Database } from 'lucide-react';
+import { Hash, Upload, Download, Search, X, Clock, ChevronLeft, ChevronRight, AlertTriangle, CheckCircle, User, Phone, MapPin, Wrench, FileText, Filter, RotateCcw, Sparkles, FolderPlus, Database, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
 import { useStickyTableHeader } from '../../hooks/useStickyTableHeader';
 
 interface Serial {
@@ -107,16 +107,22 @@ export default function SerialManage() {
   const [batches, setBatches] = useState<{ batchId: string; count: number }[]>([]);
   const [batchFilter, setBatchFilter] = useState(() => getSavedSerialFilter('batchFilter', ''));
 
+  // Sort states
+  const [sortBy, setSortBy] = useState<string>(() => getSavedSerialFilter('sortBy', 'updatedAt'));
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>(() => getSavedSerialFilter('sortOrder', 'desc'));
+
   // Save filters to sessionStorage on change
   useEffect(() => {
     sessionStorage.setItem('truliva_serial_filters', JSON.stringify({
       search,
       statusFilter,
       batchFilter,
+      sortBy,
+      sortOrder,
       page,
       pageSize,
     }));
-  }, [search, statusFilter, batchFilter, page, pageSize]);
+  }, [search, statusFilter, batchFilter, sortBy, sortOrder, page, pageSize]);
 
   // Floating Sticky Table Header Hook
   const {
@@ -365,6 +371,31 @@ export default function SerialManage() {
     }
   };
 
+  const tableColumns = [
+    { label: 'Serial/ Model', sortKey: 'serialNumber' },
+    { label: 'Dòng máy', sortKey: null },
+    { label: 'Thông tin khách hàng', sortKey: 'customerName' },
+    { label: 'Trạng thái', sortKey: null },
+    { label: 'Ngày kích hoạt', sortKey: 'activationDate' },
+    { label: 'Ngày hết hạn bảo hành', sortKey: 'warrantyExpiryDate' },
+  ];
+
+  const handleSortToggle = (field: string) => {
+    if (sortBy === field) {
+      setSortOrder(prev => (prev === 'asc' ? 'desc' : 'asc'));
+    } else {
+      setSortBy(field);
+      if (field === 'warrantyExpiryDate') {
+        setSortOrder('asc');
+      } else if (field === 'serialNumber' || field === 'customerName') {
+        setSortOrder('asc');
+      } else {
+        setSortOrder('desc');
+      }
+    }
+    setPage(1);
+  };
+
   const loadSerials = async () => {
     setLoading(true);
     try {
@@ -374,6 +405,8 @@ export default function SerialManage() {
       if (search) params.set('search', search);
       if (statusFilter) params.set('status', statusFilter);
       if (batchFilter) params.set('batch', batchFilter);
+      if (sortBy) params.set('sortBy', sortBy);
+      if (sortOrder) params.set('sortOrder', sortOrder);
 
       const data = await fetchApi(`/serials?${params.toString()}`);
       setSerials(data.serials || []);
@@ -386,7 +419,7 @@ export default function SerialManage() {
     }
   };
 
-  useEffect(() => { loadSerials(); }, [page, pageSize, search, statusFilter, batchFilter]);
+  useEffect(() => { loadSerials(); }, [page, pageSize, search, statusFilter, batchFilter, sortBy, sortOrder]);
 
   const handleSearch = () => {
     setPage(1);
@@ -708,6 +741,37 @@ export default function SerialManage() {
             </select>
             <Filter size={14} style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none', color: '#9ca3af' }} />
           </div>
+
+          {/* Quick Sort selector */}
+          <div style={{ position: 'relative' }}>
+            <select
+              value={`${sortBy}:${sortOrder}`}
+              onChange={e => {
+                const [field, order] = e.target.value.split(':');
+                setSortBy(field);
+                setSortOrder(order as 'asc' | 'desc');
+                setPage(1);
+              }}
+              style={{
+                padding: '8px 32px 8px 12px', borderRadius: 8,
+                border: '1px solid #d1d5db', background: 'white',
+                fontSize: 14, color: '#374151', cursor: 'pointer',
+                appearance: 'none',
+              }}
+              title="Tiêu chí sắp xếp danh sách"
+            >
+              <option value="updatedAt:desc">Mới cập nhật gần nhất</option>
+              <option value="activationDate:desc">Mới kích hoạt gần nhất</option>
+              <option value="warrantyExpiryDate:asc">Sắp hết hạn BH trước</option>
+              <option value="warrantyExpiryDate:desc">Hết hạn BH xa nhất</option>
+              <option value="serialNumber:asc">Số Serial (A → Z)</option>
+              <option value="serialNumber:desc">Số Serial (Z → A)</option>
+              <option value="createdAt:desc">Ngày nhập kho mới nhất</option>
+              <option value="createdAt:asc">Ngày nhập kho cũ nhất</option>
+              <option value="customerName:asc">Tên khách hàng (A → Z)</option>
+            </select>
+            <ArrowUpDown size={14} style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none', color: '#9ca3af' }} />
+          </div>
         </div>
 
         <div style={{ display: 'flex', gap: 8 }}>
@@ -790,27 +854,44 @@ export default function SerialManage() {
               transform: `translateX(-${tableScrollLeft}px)`,
               borderCollapse: 'collapse',
               fontSize: 14,
-              pointerEvents: 'none',
+              pointerEvents: 'auto',
             }}
           >
             <thead>
               <tr style={{ background: '#f8fafc', borderBottom: '2px solid #e2e8f0' }}>
-                {['Serial/ Model', 'Dòng máy', 'Thông tin khách hàng', 'Trạng thái', 'Ngày kích hoạt', 'Ngày hết hạn bảo hành'].map((h, i) => (
+                {tableColumns.map((col, i) => (
                   <th
-                    key={h}
+                    key={col.label}
+                    onClick={() => col.sortKey && handleSortToggle(col.sortKey)}
                     style={{
                       padding: '12px 16px',
                       textAlign: 'left',
                       fontWeight: 600,
-                      color: '#475569',
+                      color: col.sortKey && sortBy === col.sortKey ? '#1d4ed8' : '#475569',
                       whiteSpace: 'nowrap',
                       background: '#f8fafc',
                       width: colWidths[i] ? `${colWidths[i]}px` : undefined,
                       minWidth: colWidths[i] ? `${colWidths[i]}px` : undefined,
                       maxWidth: colWidths[i] ? `${colWidths[i]}px` : undefined,
+                      cursor: col.sortKey ? 'pointer' : 'default',
+                      userSelect: 'none',
                     }}
+                    title={col.sortKey ? `Bấm để sắp xếp theo ${col.label}` : undefined}
                   >
-                    {h}
+                    <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                      <span>{col.label}</span>
+                      {col.sortKey && (
+                        sortBy === col.sortKey ? (
+                          sortOrder === 'asc' ? (
+                            <ArrowUp size={14} style={{ color: '#2563eb' }} />
+                          ) : (
+                            <ArrowDown size={14} style={{ color: '#2563eb' }} />
+                          )
+                        ) : (
+                          <ArrowUpDown size={13} style={{ color: '#94a3b8', opacity: 0.4 }} />
+                        )
+                      )}
+                    </div>
                   </th>
                 ))}
               </tr>
@@ -835,14 +916,36 @@ export default function SerialManage() {
           <table ref={tableRef} style={{ width: '100%', borderCollapse: 'collapse', fontSize: 14 }}>
             <thead ref={realTheadRef} style={{ position: 'sticky', top: 0, zIndex: 20 }}>
               <tr style={{ background: '#f8fafc', borderBottom: '2px solid #e2e8f0' }}>
-                {['Serial/ Model', 'Dòng máy', 'Thông tin khách hàng', 'Trạng thái', 'Ngày kích hoạt', 'Ngày hết hạn bảo hành'].map(h => (
-                  <th key={h} style={{
-                    padding: '12px 16px', textAlign: 'left',
-                    fontWeight: 600, color: '#475569', whiteSpace: 'nowrap',
-                    position: 'sticky', top: 0, zIndex: 20,
-                    background: '#f8fafc', borderBottom: '2px solid #e2e8f0'
-                  }}>
-                    {h}
+                {tableColumns.map(col => (
+                  <th
+                    key={col.label}
+                    onClick={() => col.sortKey && handleSortToggle(col.sortKey)}
+                    style={{
+                      padding: '12px 16px', textAlign: 'left',
+                      fontWeight: 600,
+                      color: col.sortKey && sortBy === col.sortKey ? '#1d4ed8' : '#475569',
+                      whiteSpace: 'nowrap',
+                      position: 'sticky', top: 0, zIndex: 20,
+                      background: '#f8fafc', borderBottom: '2px solid #e2e8f0',
+                      cursor: col.sortKey ? 'pointer' : 'default',
+                      userSelect: 'none',
+                    }}
+                    title={col.sortKey ? `Bấm để sắp xếp theo ${col.label}` : undefined}
+                  >
+                    <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                      <span>{col.label}</span>
+                      {col.sortKey && (
+                        sortBy === col.sortKey ? (
+                          sortOrder === 'asc' ? (
+                            <ArrowUp size={14} style={{ color: '#2563eb' }} />
+                          ) : (
+                            <ArrowDown size={14} style={{ color: '#2563eb' }} />
+                          )
+                        ) : (
+                          <ArrowUpDown size={13} style={{ color: '#94a3b8', opacity: 0.4 }} />
+                        )
+                      )}
+                    </div>
                   </th>
                 ))}
               </tr>

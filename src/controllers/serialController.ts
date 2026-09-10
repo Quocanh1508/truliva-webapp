@@ -352,6 +352,8 @@ export async function getSerials(req: Request, res: Response): Promise<void> {
     const status = req.query.status as string || '';
     const modelFilter = req.query.model as string || '';
     const batchFilter = req.query.batch as string || '';
+    const sortBy = req.query.sortBy as string || 'updatedAt';
+    const sortOrder = (req.query.sortOrder as string) === 'asc' ? 'asc' : 'desc';
 
     const result = await getSerialsFiltered({
       page,
@@ -359,7 +361,9 @@ export async function getSerials(req: Request, res: Response): Promise<void> {
       search,
       status,
       modelFilter,
-      batchFilter
+      batchFilter,
+      sortBy,
+      sortOrder,
     });
 
     res.json(result);

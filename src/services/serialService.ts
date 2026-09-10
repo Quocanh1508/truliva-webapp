@@ -193,8 +193,10 @@ export async function getSerialsFiltered(params: {
   status?: string;
   modelFilter?: string;
   batchFilter?: string;
+  sortBy?: string;
+  sortOrder?: 'asc' | 'desc';
 }) {
-  const { page, limit, search, status, modelFilter, batchFilter } = params;
+  const { page, limit, search, status, modelFilter, batchFilter, sortBy = 'updatedAt', sortOrder = 'desc' } = params;
   const skip = (page - 1) * limit;
 
   const where: any = {};
@@ -236,10 +238,51 @@ export async function getSerialsFiltered(params: {
     where.importBatchId = batchFilter;
   }
 
+  // Construct dynamic orderBy with tie-breaker and nulls handling
+  const orderDirection: 'asc' | 'desc' = sortOrder === 'asc' ? 'asc' : 'desc';
+  let orderBy: any[];
+
+  switch (sortBy) {
+    case 'serialNumber':
+      orderBy = [{ serialNumber: orderDirection }];
+      break;
+    case 'customerName':
+      orderBy = [
+        { customerName: { sort: orderDirection, nulls: 'last' } },
+        { serialNumber: 'asc' },
+      ];
+      break;
+    case 'activationDate':
+      orderBy = [
+        { activationDate: { sort: orderDirection, nulls: 'last' } },
+        { updatedAt: 'desc' },
+      ];
+      break;
+    case 'warrantyExpiryDate':
+      orderBy = [
+        { warrantyExpiryDate: { sort: orderDirection, nulls: 'last' } },
+        { updatedAt: 'desc' },
+      ];
+      break;
+    case 'createdAt':
+      orderBy = [
+        { createdAt: orderDirection },
+        { serialNumber: 'asc' },
+      ];
+      break;
+    case 'updatedAt':
+    default:
+      orderBy = [
+        { updatedAt: orderDirection },
+        { serialNumber: 'asc' },
+      ];
+      break;
+  }
+
   const [serials, total] = await Promise.all([
     prisma.serial.findMany({
       where,
-      orderBy: { createdAt: 'desc' },
+      orderBy,
       skip,
       take: limit,
       include: {
