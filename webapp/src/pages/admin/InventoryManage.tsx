@@ -3,6 +3,7 @@ import { fetchApi } from '../../api/client';
 import { Warehouse, RefreshCw, Search, AlertTriangle, CheckSquare, Square, Info, Download, ChevronDown, X, Package } from 'lucide-react';
 import CategoryTreeSelect from '../../components/CategoryTreeSelect';
 import { matchesSearchTerm } from '../../utils/text';
+import { useStickyTableHeader } from '../../hooks/useStickyTableHeader';
 
 interface WarehouseData {
   id: string;
@@ -286,6 +287,21 @@ export default function InventoryManage() {
 
     return { comboGroups: groups, standaloneProducts: standalone };
   }, [filteredProducts, products, comboMappings]);
+
+  // Floating Sticky Table Header Hook for Desktop Matrix Table
+  const {
+    tableWrapperRef,
+    tableRef,
+    realTheadRef,
+    isStickyHeaderVisible,
+    stickyTopOffset,
+    tableBounds,
+    colWidths,
+    tableScrollLeft,
+    floatingHeaderTouchProps,
+  } = useStickyTableHeader({
+    dependencies: [warehouses.length, selectedWarehouses.length, comboGroups.length, standaloneProducts.length],
+  });
 
   return (
     <div className="container-fluid p-3 md:p-6">
@@ -663,9 +679,93 @@ export default function InventoryManage() {
             </div>
 
             {/* 💻 DESKTOP MATRIX TABLE VIEW (Hiển thị màn hình máy tính >= 768px) */}
-            <div className="hidden md:block overflow-x-auto overflow-y-auto max-h-[calc(100vh-230px)] relative z-0 rounded-xl border border-slate-200 shadow-sm">
-              <table className="w-full text-left border-collapse table-auto">
-                <thead className="sticky top-0 z-30 shadow-xs">
+            {isStickyHeaderVisible && (
+              <div
+                className="hidden md:block fixed z-40 bg-slate-50 shadow-lg border-b border-slate-300 overflow-hidden pointer-events-auto select-none rounded-t-xl"
+                style={{
+                  top: `${stickyTopOffset}px`,
+                  left: `${tableBounds.left}px`,
+                  width: `${tableBounds.width}px`,
+                }}
+                {...floatingHeaderTouchProps}
+              >
+                <table
+                  className="text-left border-collapse table-auto pointer-events-none"
+                  style={{
+                    transform: `translateX(-${tableScrollLeft}px)`,
+                    width: `${tableRef.current?.getBoundingClientRect().width || tableBounds.width}px`,
+                    minWidth: `${tableRef.current?.getBoundingClientRect().width || tableBounds.width}px`,
+                  }}
+                >
+                  <thead>
+                    <tr className="bg-slate-50 border-b border-slate-200 text-slate-600 text-xs font-bold uppercase tracking-wider">
+                      <th
+                        style={{
+                          width: colWidths[0] ? `${colWidths[0]}px` : undefined,
+                          minWidth: colWidths[0] ? `${colWidths[0]}px` : '240px',
+                          maxWidth: colWidths[0] ? `${colWidths[0]}px` : undefined,
+                        }}
+                        className="px-6 py-4 bg-slate-100 border-r border-b border-slate-200 shadow-[2px_0_5px_rgba(0,0,0,0.05)]"
+                      >
+                        Sản phẩm
+                      </th>
+                      <th
+                        style={{
+                          width: colWidths[1] ? `${colWidths[1]}px` : undefined,
+                          minWidth: colWidths[1] ? `${colWidths[1]}px` : '120px',
+                          maxWidth: colWidths[1] ? `${colWidths[1]}px` : undefined,
+                        }}
+                        className="px-4 py-4 text-center bg-slate-50 border-r border-b border-slate-200"
+                      >
+                        SKU / Danh mục
+                      </th>
+                      {warehouses.filter(w => selectedWarehouses.includes(w.id)).map((w, idx) => (
+                        <th
+                          key={w.id}
+                          style={{
+                            width: colWidths[idx + 2] ? `${colWidths[idx + 2]}px` : undefined,
+                            minWidth: colWidths[idx + 2] ? `${colWidths[idx + 2]}px` : '130px',
+                            maxWidth: colWidths[idx + 2] ? `${colWidths[idx + 2]}px` : '200px',
+                          }}
+                          className="px-4 py-4 text-center bg-slate-50 border-r border-b border-slate-100"
+                        >
+                          <div className="truncate font-semibold text-slate-700" title={w.name}>{w.name}</div>
+                          {w.phone && <div className="text-[10px] text-slate-400 normal-case font-normal mt-0.5">{w.phone}</div>}
+                        </th>
+                      ))}
+                      <th
+                        style={{
+                          width: colWidths[warehouses.filter(w => selectedWarehouses.includes(w.id)).length + 2] ? `${colWidths[warehouses.filter(w => selectedWarehouses.includes(w.id)).length + 2]}px` : undefined,
+                          minWidth: colWidths[warehouses.filter(w => selectedWarehouses.includes(w.id)).length + 2] ? `${colWidths[warehouses.filter(w => selectedWarehouses.includes(w.id)).length + 2]}px` : '120px',
+                          maxWidth: colWidths[warehouses.filter(w => selectedWarehouses.includes(w.id)).length + 2] ? `${colWidths[warehouses.filter(w => selectedWarehouses.includes(w.id)).length + 2]}px` : undefined,
+                        }}
+                        className="px-4 py-4 text-center bg-slate-100 font-bold text-slate-800 border-l border-b border-slate-200"
+                      >
+                        Tổng có thể bán
+                      </th>
+                      <th
+                        style={{
+                          width: colWidths[warehouses.filter(w => selectedWarehouses.includes(w.id)).length + 3] ? `${colWidths[warehouses.filter(w => selectedWarehouses.includes(w.id)).length + 3]}px` : undefined,
+                          minWidth: colWidths[warehouses.filter(w => selectedWarehouses.includes(w.id)).length + 3] ? `${colWidths[warehouses.filter(w => selectedWarehouses.includes(w.id)).length + 3]}px` : '120px',
+                          maxWidth: colWidths[warehouses.filter(w => selectedWarehouses.includes(w.id)).length + 3] ? `${colWidths[warehouses.filter(w => selectedWarehouses.includes(w.id)).length + 3]}px` : undefined,
+                        }}
+                        className="px-4 py-4 text-center bg-slate-50 font-bold text-slate-700 border-l border-b border-slate-200"
+                      >
+                        Tổng tồn thực tế
+                      </th>
+                    </tr>
+                  </thead>
+                </table>
+              </div>
+            )}
+
+            <div
+              ref={tableWrapperRef}
+              className="hidden md:block overflow-x-auto relative z-0 rounded-xl border border-slate-200 shadow-sm bg-white"
+              style={{ WebkitOverflowScrolling: 'touch' }}
+            >
+              <table ref={tableRef} className="w-full text-left border-collapse table-auto">
+                <thead ref={realTheadRef} className="sticky top-0 z-30 shadow-xs">
                   <tr className="bg-slate-50 border-b border-slate-200 text-slate-600 text-xs font-bold uppercase tracking-wider">
                     {/* Cột Tên SP: Vừa sticky left vừa sticky top → z-40 để luôn nổi trên cả row headers và content */}
                     <th className="px-6 py-4 sticky left-0 top-0 bg-slate-100 z-40 border-r border-b border-slate-200 shadow-[2px_0_5px_rgba(0,0,0,0.05)]" style={{ minWidth: '240px' }}>

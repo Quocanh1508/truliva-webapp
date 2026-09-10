@@ -5,6 +5,7 @@ import { useConfirm } from '../../context/ConfirmContext';
 import { useAuth } from '../../context/AuthContext';
 import { usePermission } from '../../context/PermissionContext';
 import ProvinceSelect from '../../components/ProvinceSelect';
+import { useStickyTableHeader } from '../../hooks/useStickyTableHeader';
 import { 
   Calculator, 
   Save, 
@@ -1638,6 +1639,21 @@ export default function SalaryManage() {
     });
   }, [salaries, filteredCases, selectedKtvsFilter, selectedStationsFilter, selectedWorkTypeFilter, selectedServiceTypeFilter, selectedProductFilter, selectedCompletedDateFilter, selectedDistancePresets, searchQuery]);
 
+  // Floating Sticky Table Header Hook
+  const {
+    tableWrapperRef,
+    tableRef,
+    realTheadRef,
+    isStickyHeaderVisible,
+    stickyTopOffset,
+    tableBounds,
+    colWidths,
+    tableScrollLeft,
+    floatingHeaderTouchProps,
+  } = useStickyTableHeader({
+    dependencies: [viewMode, filteredSalaries.length, filteredCases.length, filteredRateMatrix.length],
+  });
+
   // Kiểm tra xem có bất kỳ filter nào đang active
   const isAnyFilterActive = Boolean(
     selectedKtvsFilter.length > 0 ||
@@ -2879,10 +2895,60 @@ export default function SalaryManage() {
               Không tìm thấy thông tin KTV nào phù hợp với bộ lọc hiện tại.
             </div>
           ) : (
-            <div className="overflow-x-auto max-h-[calc(100vh-230px)] overflow-y-auto relative rounded-xl border border-gray-100 shadow-sm">
-              <table className="min-w-[1100px] w-full text-left border-collapse text-xs">
-                <thead className="sticky top-0 z-20 shadow-sm">
-                  <tr className="bg-[#1B3A6B] text-white font-bold">
+            <>
+              {/* Floating Sticky Header for Summary Tab */}
+              {isStickyHeaderVisible && viewMode === 'summary' && (
+                <div
+                  className="fixed z-40 bg-[#1B3A6B] shadow-lg border-b border-blue-950 overflow-hidden pointer-events-auto select-none rounded-t-xl"
+                  style={{
+                    top: `${stickyTopOffset}px`,
+                    left: `${tableBounds.left}px`,
+                    width: `${tableBounds.width}px`,
+                  }}
+                  {...floatingHeaderTouchProps}
+                >
+                  <table
+                    className="text-left text-xs border-collapse"
+                    style={{
+                      width: `${tableBounds.tableWidth}px`,
+                      minWidth: `${tableBounds.tableWidth}px`,
+                      tableLayout: 'fixed',
+                      transform: `translateX(-${tableScrollLeft}px)`,
+                    }}
+                  >
+                    <thead>
+                      <tr className="bg-[#1B3A6B] text-white font-bold">
+                        {['STT', 'Họ tên KTV', 'Số điện thoại', 'Trạm quản lý', 'Số ca hoàn thành', 'Thù lao tự động (VND)', 'Thực nhận (VND)', 'Ghi chú điều chỉnh', 'Thao tác'].map((title, i) => (
+                          <th
+                            key={title}
+                            style={{
+                              width: colWidths[i] ? `${colWidths[i]}px` : undefined,
+                              minWidth: colWidths[i] ? `${colWidths[i]}px` : undefined,
+                              maxWidth: colWidths[i] ? `${colWidths[i]}px` : undefined,
+                              boxSizing: 'border-box',
+                            }}
+                            className={`px-5 py-3.5 bg-[#1B3A6B] text-white font-bold border-b border-blue-900 ${
+                              title === 'STT' || title === 'Số ca hoàn thành' || title === 'Thao tác' ? 'text-center' :
+                              title.includes('(VND)') ? 'text-right' : 'text-left'
+                            }`}
+                          >
+                            {title}
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+                  </table>
+                </div>
+              )}
+
+              <div
+                ref={tableWrapperRef}
+                className="overflow-x-auto relative rounded-xl border border-gray-100 shadow-sm"
+                style={{ WebkitOverflowScrolling: 'touch' }}
+              >
+                <table ref={tableRef} className="min-w-[1100px] w-full text-left border-collapse text-xs">
+                  <thead ref={realTheadRef} className="bg-[#1B3A6B] text-white font-bold">
+                    <tr className="bg-[#1B3A6B] text-white font-bold">
                     <th className="px-5 py-3.5 w-12 text-center bg-[#1B3A6B] sticky top-0 z-20">STT</th>
                     <th className="px-5 py-3.5 bg-[#1B3A6B] sticky top-0 z-20">Họ tên KTV</th>
                     <th className="px-5 py-3.5 w-36 bg-[#1B3A6B] sticky top-0 z-20">Số điện thoại</th>
@@ -2961,8 +3027,9 @@ export default function SalaryManage() {
                 </tbody>
               </table>
             </div>
-          )}
-        </div>
+          </>
+        )}
+      </div>
       )}
 
 
@@ -2998,10 +3065,81 @@ export default function SalaryManage() {
               Không tìm thấy ca dịch vụ nào phù hợp với bộ lọc hiện tại.
             </div>
           ) : (
-            <div className="overflow-x-auto max-h-[calc(100vh-230px)] overflow-y-auto relative rounded-xl border border-gray-100 shadow-sm">
-              <table className="min-w-[1950px] w-full text-left border-collapse text-xs">
-                <thead className="sticky top-0 z-20 shadow-sm">
-                  <tr className="bg-[#1B3A6B] text-white font-bold">
+            <>
+              {/* Floating Sticky Header for Detailed Cases Tab */}
+              {isStickyHeaderVisible && viewMode === 'detail' && (
+                <div
+                  className="fixed z-40 bg-[#1B3A6B] shadow-lg border-b border-blue-950 overflow-hidden pointer-events-auto select-none rounded-t-xl"
+                  style={{
+                    top: `${stickyTopOffset}px`,
+                    left: `${tableBounds.left}px`,
+                    width: `${tableBounds.width}px`,
+                  }}
+                  {...floatingHeaderTouchProps}
+                >
+                  <table
+                    className="text-left text-xs border-collapse"
+                    style={{
+                      width: `${tableBounds.tableWidth}px`,
+                      minWidth: `${tableBounds.tableWidth}px`,
+                      tableLayout: 'fixed',
+                      transform: `translateX(-${tableScrollLeft}px)`,
+                    }}
+                  >
+                    <thead>
+                      <tr className="bg-[#1B3A6B] text-white font-bold">
+                        {[
+                          { title: 'STT', align: 'center' },
+                          { title: 'Ngày hoàn thành', align: 'center' },
+                          { title: 'KTV', align: 'left' },
+                          { title: 'Trạm', align: 'left' },
+                          { title: 'Tên KH', align: 'left' },
+                          { title: 'SĐT KH', align: 'center' },
+                          { title: 'Tỉnh/TP', align: 'left' },
+                          { title: 'Sản phẩm', align: 'left' },
+                          { title: 'Loại công việc', align: 'left' },
+                          { title: 'Ghi chú (Sale)', align: 'left' },
+                          { title: 'Ghi chú KTV', align: 'left' },
+                          { title: 'KC di chuyển (km)', align: 'right' },
+                          { title: 'Bảo hành', align: 'right' },
+                          { title: 'Sửa chữa', align: 'right' },
+                          { title: 'Giao hàng', align: 'right' },
+                          { title: 'Lắp đặt', align: 'right' },
+                          { title: 'Giao lắp', align: 'right' },
+                          { title: 'Thay lọc', align: 'right' },
+                          { title: 'Phí KC', align: 'right' },
+                          { title: 'Phí khác', align: 'right' },
+                          { title: 'Tổng (VND)', align: 'right' },
+                        ].map((col, i) => (
+                          <th
+                            key={col.title}
+                            style={{
+                              width: colWidths[i] ? `${colWidths[i]}px` : undefined,
+                              minWidth: colWidths[i] ? `${colWidths[i]}px` : undefined,
+                              maxWidth: colWidths[i] ? `${colWidths[i]}px` : undefined,
+                              boxSizing: 'border-box',
+                            }}
+                            className={`px-3 py-3 bg-[#1B3A6B] text-white font-bold border-b border-blue-900 ${
+                              col.align === 'center' ? 'text-center' : col.align === 'right' ? 'text-right' : 'text-left'
+                            }`}
+                          >
+                            {col.title}
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+                  </table>
+                </div>
+              )}
+
+              <div
+                ref={tableWrapperRef}
+                className="overflow-x-auto relative rounded-xl border border-gray-100 shadow-sm"
+                style={{ WebkitOverflowScrolling: 'touch' }}
+              >
+                <table ref={tableRef} className="min-w-[1950px] w-full text-left border-collapse text-xs">
+                  <thead ref={realTheadRef} className="bg-[#1B3A6B] text-white font-bold">
+                    <tr className="bg-[#1B3A6B] text-white font-bold">
                     <th className="px-3 py-3 w-10 text-center bg-[#1B3A6B] sticky top-0 z-20">STT</th>
                     <th className="px-3 py-3 w-32 text-center bg-[#1B3A6B] sticky top-0 z-20">Ngày hoàn thành</th>
                     <th className="px-3 py-3 w-36 bg-[#1B3A6B] sticky top-0 z-20">KTV</th>
@@ -3125,6 +3263,7 @@ export default function SalaryManage() {
                 </tfoot>
               </table>
             </div>
+            </>
           )}
         </div>
       )}
@@ -3386,10 +3525,53 @@ export default function SalaryManage() {
               <span className="text-gray-400 text-xs font-semibold">Đang tải danh sách đơn giá KTV...</span>
             </div>
           ) : (
-            <div className="overflow-x-auto max-h-[calc(100vh-250px)] overflow-y-auto relative rounded-xl border border-gray-200 shadow-sm">
-              <table className="w-full text-left text-xs border-collapse">
-                <thead className="sticky top-0 z-20 shadow-sm">
-                  <tr className="bg-[#1B3A6B] text-white text-xs uppercase font-bold tracking-wider">
+            <>
+              {/* Floating Sticky Header for Rate Matrix Tab */}
+              {isStickyHeaderVisible && viewMode === 'rates' && (
+                <div
+                  className="fixed z-40 bg-[#1B3A6B] shadow-lg border-b border-blue-950 overflow-hidden pointer-events-auto select-none rounded-t-xl"
+                  style={{
+                    top: `${stickyTopOffset}px`,
+                    left: `${tableBounds.left}px`,
+                    width: `${tableBounds.width}px`,
+                  }}
+                  {...floatingHeaderTouchProps}
+                >
+                  <table
+                    className="text-left text-xs border-collapse pointer-events-none"
+                    style={{
+                      transform: `translateX(-${tableScrollLeft}px)`,
+                      width: `${tableRef.current?.getBoundingClientRect().width || tableBounds.width}px`,
+                      minWidth: `${tableRef.current?.getBoundingClientRect().width || tableBounds.width}px`,
+                    }}
+                  >
+                    <thead>
+                      <tr className="bg-[#1B3A6B] text-white text-xs uppercase font-bold tracking-wider">
+                        <th style={{ width: colWidths[0] ? `${colWidths[0]}px` : undefined }} className="px-4 py-3 bg-[#1B3A6B] border-b border-blue-900 min-w-[180px]">Kỹ thuật viên</th>
+                        <th style={{ width: colWidths[1] ? `${colWidths[1]}px` : undefined }} className="px-4 py-3 bg-[#1B3A6B] border-b border-blue-900 min-w-[140px]">Trạm quản lý</th>
+                        <th style={{ width: colWidths[2] ? `${colWidths[2]}px` : undefined }} className="px-3 py-3 bg-[#1B3A6B] border-b border-blue-900 text-center min-w-[125px]">Giao hàng</th>
+                        <th style={{ width: colWidths[3] ? `${colWidths[3]}px` : undefined }} className="px-3 py-3 bg-[#1B3A6B] border-b border-blue-900 text-center min-w-[130px]">Bảo hành</th>
+                        <th style={{ width: colWidths[4] ? `${colWidths[4]}px` : undefined }} className="px-3 py-3 bg-[#1B3A6B] border-b border-blue-900 text-center min-w-[130px]">Sửa chữa</th>
+                        <th style={{ width: colWidths[5] ? `${colWidths[5]}px` : undefined }} className="px-3 py-3 bg-[#1B3A6B] border-b border-blue-900 text-center min-w-[125px]">Thay lọc</th>
+                        <th style={{ width: colWidths[6] ? `${colWidths[6]}px` : undefined }} className="px-3 py-3 bg-[#1B3A6B] border-b border-blue-900 text-center min-w-[125px]">Lắp đặt</th>
+                        <th style={{ width: colWidths[7] ? `${colWidths[7]}px` : undefined }} className="px-3 py-3 bg-[#1B3A6B] border-b border-blue-900 text-center min-w-[130px]">Giao + Lắp</th>
+                        <th style={{ width: colWidths[8] ? `${colWidths[8]}px` : undefined }} className="px-3 py-3 bg-[#1B3A6B] border-b border-blue-900 text-center min-w-[160px]">Di chuyển (Thường)</th>
+                        <th style={{ width: colWidths[9] ? `${colWidths[9]}px` : undefined }} className="px-3 py-3 bg-indigo-950 border-b border-indigo-900 text-center min-w-[150px]">Di chuyển (TL & SC)</th>
+                        <th style={{ width: colWidths[10] ? `${colWidths[10]}px` : undefined }} className="px-3 py-3 bg-[#1B3A6B] border-b border-blue-900 text-center min-w-[90px]">Thao tác</th>
+                      </tr>
+                    </thead>
+                  </table>
+                </div>
+              )}
+
+              <div
+                ref={tableWrapperRef}
+                className="overflow-x-auto relative rounded-xl border border-gray-200 shadow-sm bg-white"
+                style={{ WebkitOverflowScrolling: 'touch' }}
+              >
+                <table ref={tableRef} className="w-full text-left text-xs border-collapse">
+                  <thead ref={realTheadRef} className="sticky top-0 z-20 shadow-sm">
+                    <tr className="bg-[#1B3A6B] text-white text-xs uppercase font-bold tracking-wider">
                     <th className="px-4 py-3 bg-[#1B3A6B] sticky top-0 z-20 border-b border-blue-900 min-w-[180px]">Kỹ thuật viên</th>
                     <th className="px-4 py-3 bg-[#1B3A6B] sticky top-0 z-20 border-b border-blue-900 min-w-[140px]">Trạm quản lý</th>
                     
@@ -3786,6 +3968,7 @@ export default function SalaryManage() {
                 </tbody>
               </table>
             </div>
+            </>
           )}
         </div>
       )}

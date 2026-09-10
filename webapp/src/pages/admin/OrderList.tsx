@@ -12,6 +12,7 @@ import { usePermission } from '../../context/PermissionContext';
 import { isValidPhone, PHONE_ERROR_MSG } from '../../utils/phone';
 import ProvinceSelect from '../../components/ProvinceSelect';
 import { isValidProvince } from '../../utils/provinces';
+import { useStickyTableHeader } from '../../hooks/useStickyTableHeader';
 
 
 const ALL_SERVICE_TYPES = Array.from(new Set(Object.values(WORK_TYPE_SERVICES).flat()));
@@ -251,17 +252,20 @@ export default function OrderList() {
   const [totalItems, setTotalItems] = useState(0);
   const [pageInput, setPageInput] = useState('1');
 
-  // Floating Sticky Table Header states & refs
-  const tableWrapperRef = useRef<HTMLDivElement>(null);
-  const tableRef = useRef<HTMLTableElement>(null);
-  const realTheadRef = useRef<HTMLTableSectionElement>(null);
-  const [isStickyHeaderVisible, setIsStickyHeaderVisible] = useState(false);
-  const [stickyTopOffset, setStickyTopOffset] = useState(0);
-  const [tableBounds, setTableBounds] = useState<{ left: number; width: number; tableWidth: number }>({ left: 0, width: 0, tableWidth: 0 });
-  const [colWidths, setColWidths] = useState<number[]>([]);
-  const [tableScrollLeft, setTableScrollLeft] = useState(0);
-  const touchStartX = useRef(0);
-  const touchStartScroll = useRef(0);
+  // Floating Sticky Table Header Hook
+  const {
+    tableWrapperRef,
+    tableRef,
+    realTheadRef,
+    isStickyHeaderVisible,
+    stickyTopOffset,
+    tableBounds,
+    colWidths,
+    tableScrollLeft,
+    floatingHeaderTouchProps,
+  } = useStickyTableHeader({
+    dependencies: [orders.length, currentUser?.role],
+  });
 
   useEffect(() => {
     setPageInput(String(page));
@@ -967,74 +971,6 @@ export default function OrderList() {
     dateType,
     debouncedSearch
   ]);
-
-  // Sync Floating Sticky Header
-  useEffect(() => {
-    const getTopOffset = () => {
-      let offset = 0;
-      // 1. Sandbox banner
-      const banner = document.querySelector('.bg-gradient-to-r.from-amber-500');
-      if (banner) {
-        const bRect = banner.getBoundingClientRect();
-        if (bRect.bottom > 0) offset += bRect.height;
-      }
-      // 2. Mobile app-header (< 1024px)
-      if (window.innerWidth < 1024) {
-        const appHeader = document.querySelector('.app-header');
-        if (appHeader) {
-          const hRect = appHeader.getBoundingClientRect();
-          if (hRect.bottom > 0) offset += hRect.height;
-        }
-      }
-      return offset;
-    };
-
-    const handleScrollAndResize = () => {
-      if (!tableWrapperRef.current || !realTheadRef.current) return;
-      const theadRect = realTheadRef.current.getBoundingClientRect();
-      const wrapperRect = tableWrapperRef.current.getBoundingClientRect();
-      const topOffset = getTopOffset();
-
-      // If the real thead top has scrolled past topOffset AND the table bottom is still visible
-      if (theadRect.top < topOffset && wrapperRect.bottom > topOffset + 70) {
-        const thElements = realTheadRef.current.querySelectorAll('th');
-        const widths = Array.from(thElements).map((th) => th.getBoundingClientRect().width);
-
-        setIsStickyHeaderVisible(true);
-        setStickyTopOffset(topOffset);
-        setTableBounds({
-          left: wrapperRect.left,
-          width: wrapperRect.width,
-          tableWidth: tableRef.current?.offsetWidth || wrapperRect.width,
-        });
-        setColWidths(widths);
-        setTableScrollLeft(tableWrapperRef.current.scrollLeft);
-      } else {
-        setIsStickyHeaderVisible(false);
-      }
-    };
-
-    const handleWrapperScroll = () => {
-      if (tableWrapperRef.current) {
-        setTableScrollLeft(tableWrapperRef.current.scrollLeft);
-      }
-    };
-
-    window.addEventListener('scroll', handleScrollAndResize, { passive: true });
-    window.addEventListener('resize', handleScrollAndResize, { passive: true });
-    const wrapper = tableWrapperRef.current;
-    if (wrapper) {
-      wrapper.addEventListener('scroll', handleWrapperScroll, { passive: true });
-    }
-
-    return () => {
-      window.removeEventListener('scroll', handleScrollAndResize);
-      window.removeEventListener('resize', handleScrollAndResize);
-      if (wrapper) {
-        wrapper.removeEventListener('scroll', handleWrapperScroll);
-      }
-    };
-  }, [orders.length, currentUser?.role]);
 
   useEffect(() => {
     // Only poll if autoRefresh is enabled AND WebSocket is not connected
@@ -2957,16 +2893,7 @@ export default function OrderList() {
             left: `${tableBounds.left}px`,
             width: `${tableBounds.width}px`,
           }}
-          onTouchStart={(e) => {
-            touchStartX.current = e.touches[0].clientX;
-            touchStartScroll.current = tableWrapperRef.current?.scrollLeft || 0;
-          }}
-          onTouchMove={(e) => {
-            const delta = touchStartX.current - e.touches[0].clientX;
-            if (tableWrapperRef.current) {
-              tableWrapperRef.current.scrollLeft = touchStartScroll.current + delta;
-            }
-          }}
+          {...floatingHeaderTouchProps}
         >
           <table
             className="text-left text-[13px] border-collapse"

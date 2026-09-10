@@ -5,6 +5,7 @@ import { isValidPhone, PHONE_ERROR_MSG } from '../../utils/phone';
 import ProvinceSelect from '../../components/ProvinceSelect';
 import { isValidProvince } from '../../utils/provinces';
 import { Hash, Upload, Download, Search, X, Clock, ChevronLeft, ChevronRight, AlertTriangle, CheckCircle, User, Phone, MapPin, Wrench, FileText, Filter, RotateCcw, Sparkles, FolderPlus, Database } from 'lucide-react';
+import { useStickyTableHeader } from '../../hooks/useStickyTableHeader';
 
 interface Serial {
   id: string;
@@ -96,6 +97,7 @@ export default function SerialManage() {
   const [stats, setStats] = useState<SerialStats>({ total: 0, activated: 0, unactivated: 0, confirmed: 0, expired: 0, valid: 0 });
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(() => getSavedSerialFilter('page', 1));
+  const [pageSize, setPageSize] = useState<number>(() => getSavedSerialFilter('pageSize', 50));
   const [totalPages, setTotalPages] = useState(1);
   const [search, setSearch] = useState(() => getSavedSerialFilter('search', ''));
   const [statusFilter, setStatusFilter] = useState(() => getSavedSerialFilter('statusFilter', ''));
@@ -111,9 +113,25 @@ export default function SerialManage() {
       search,
       statusFilter,
       batchFilter,
-      page
+      page,
+      pageSize,
     }));
-  }, [search, statusFilter, batchFilter, page]);
+  }, [search, statusFilter, batchFilter, page, pageSize]);
+
+  // Floating Sticky Table Header Hook
+  const {
+    tableWrapperRef,
+    tableRef,
+    realTheadRef,
+    isStickyHeaderVisible,
+    stickyTopOffset,
+    tableBounds,
+    colWidths,
+    tableScrollLeft,
+    floatingHeaderTouchProps,
+  } = useStickyTableHeader({
+    dependencies: [serials.length, page, pageSize, loading],
+  });
   const [showBatchModal, setShowBatchModal] = useState(false);
   const [rollingBack, setRollingBack] = useState<string | null>(null);
 
@@ -352,7 +370,7 @@ export default function SerialManage() {
     try {
       const params = new URLSearchParams();
       params.set('page', String(page));
-      params.set('limit', '20');
+      params.set('limit', String(pageSize));
       if (search) params.set('search', search);
       if (statusFilter) params.set('status', statusFilter);
       if (batchFilter) params.set('batch', batchFilter);
@@ -368,7 +386,7 @@ export default function SerialManage() {
     }
   };
 
-  useEffect(() => { loadSerials(); }, [page, search, statusFilter, batchFilter]);
+  useEffect(() => { loadSerials(); }, [page, pageSize, search, statusFilter, batchFilter]);
 
   const handleSearch = () => {
     setPage(1);
@@ -755,19 +773,67 @@ export default function SerialManage() {
       </div>
 
       {/* Table */}
+      {isStickyHeaderVisible && (
+        <div
+          className="fixed z-40 bg-[#f8fafc] shadow-lg border-b border-slate-300 overflow-hidden pointer-events-auto select-none rounded-t-xl"
+          style={{
+            top: `${stickyTopOffset}px`,
+            left: `${tableBounds.left}px`,
+            width: `${tableBounds.width}px`,
+          }}
+          {...floatingHeaderTouchProps}
+        >
+          <table
+            style={{
+              width: `${tableRef.current?.getBoundingClientRect().width || tableBounds.width}px`,
+              minWidth: `${tableRef.current?.getBoundingClientRect().width || tableBounds.width}px`,
+              transform: `translateX(-${tableScrollLeft}px)`,
+              borderCollapse: 'collapse',
+              fontSize: 14,
+              pointerEvents: 'none',
+            }}
+          >
+            <thead>
+              <tr style={{ background: '#f8fafc', borderBottom: '2px solid #e2e8f0' }}>
+                {['Serial/ Model', 'Dòng máy', 'Thông tin khách hàng', 'Trạng thái', 'Ngày kích hoạt', 'Ngày hết hạn bảo hành'].map((h, i) => (
+                  <th
+                    key={h}
+                    style={{
+                      padding: '12px 16px',
+                      textAlign: 'left',
+                      fontWeight: 600,
+                      color: '#475569',
+                      whiteSpace: 'nowrap',
+                      background: '#f8fafc',
+                      width: colWidths[i] ? `${colWidths[i]}px` : undefined,
+                      minWidth: colWidths[i] ? `${colWidths[i]}px` : undefined,
+                      maxWidth: colWidths[i] ? `${colWidths[i]}px` : undefined,
+                    }}
+                  >
+                    {h}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+          </table>
+        </div>
+      )}
+
       <div style={{
         background: 'white', borderRadius: 12,
         border: '1px solid #e2e8f0', overflow: 'hidden',
         boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
       }}>
-        <div style={{
-          overflowX: 'auto',
-          overflowY: 'auto',
-          maxHeight: 'calc(100vh - 240px)',
-          position: 'relative'
-        }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 14 }}>
-            <thead style={{ position: 'sticky', top: 0, zIndex: 20 }}>
+        <div
+          ref={tableWrapperRef}
+          style={{
+            overflowX: 'auto',
+            position: 'relative',
+            WebkitOverflowScrolling: 'touch',
+          }}
+        >
+          <table ref={tableRef} style={{ width: '100%', borderCollapse: 'collapse', fontSize: 14 }}>
+            <thead ref={realTheadRef} style={{ position: 'sticky', top: 0, zIndex: 20 }}>
               <tr style={{ background: '#f8fafc', borderBottom: '2px solid #e2e8f0' }}>
                 {['Serial/ Model', 'Dòng máy', 'Thông tin khách hàng', 'Trạng thái', 'Ngày kích hoạt', 'Ngày hết hạn bảo hành'].map(h => (
                   <th key={h} style={{
@@ -996,11 +1062,35 @@ export default function SerialManage() {
         </div>
 
         {/* Pagination */}
-        {totalPages > 1 && (
-          <div style={{
-            display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 12,
-            padding: '16px', borderTop: '1px solid #e2e8f0',
-          }}>
+        <div style={{
+          display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center', gap: 12,
+          padding: '12px 16px', borderTop: '1px solid #e2e8f0', background: '#f8fafc',
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: '#64748b' }}>
+            <span>Hiển thị:</span>
+            <select
+              value={pageSize}
+              onChange={(e) => {
+                setPageSize(Number(e.target.value));
+                setPage(1);
+              }}
+              style={{
+                padding: '4px 8px', borderRadius: 6, border: '1px solid #d1d5db',
+                background: 'white', fontSize: 13, color: '#334155', fontWeight: 600, outline: 'none', cursor: 'pointer'
+              }}
+            >
+              <option value={20}>20 / trang</option>
+              <option value={50}>50 / trang</option>
+              <option value={100}>100 / trang</option>
+            </select>
+            {stats.total > 0 && (
+              <span style={{ marginLeft: 4 }}>
+                (Tổng <strong>{stats.total.toLocaleString('vi-VN')}</strong> serial)
+              </span>
+            )}
+          </div>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <button
               disabled={page <= 1}
               onClick={() => setPage((p: number) => Math.max(1, p - 1))}
@@ -1008,11 +1098,12 @@ export default function SerialManage() {
                 padding: '6px 12px', borderRadius: 6, border: '1px solid #d1d5db',
                 background: page <= 1 ? '#f3f4f6' : 'white', cursor: page <= 1 ? 'default' : 'pointer',
                 color: page <= 1 ? '#9ca3af' : '#374151', display: 'flex', alignItems: 'center', gap: 4,
+                fontSize: 13, fontWeight: 500,
               }}
             >
               <ChevronLeft size={16} /> Trước
             </button>
-            <span style={{ fontSize: 14, color: '#64748b', display: 'flex', alignItems: 'center', gap: 4 }}>
+            <span style={{ fontSize: 13, color: '#64748b', display: 'flex', alignItems: 'center', gap: 4 }}>
               Trang
               <input
                 type="number"
@@ -1025,17 +1116,9 @@ export default function SerialManage() {
                     setPage(val);
                   }
                 }}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
-                    const val = parseInt((e.target as HTMLInputElement).value, 10);
-                    if (!isNaN(val) && val >= 1 && val <= totalPages) {
-                      setPage(val);
-                    }
-                  }
-                }}
                 style={{
-                  width: 52, textAlign: 'center', padding: '4px 6px',
-                  borderRadius: 6, border: '1px solid #d1d5db', fontSize: 14,
+                  width: 48, textAlign: 'center', padding: '3px 6px',
+                  borderRadius: 6, border: '1px solid #d1d5db', fontSize: 13,
                   outline: 'none',
                 }}
               />
@@ -1048,12 +1131,13 @@ export default function SerialManage() {
                 padding: '6px 12px', borderRadius: 6, border: '1px solid #d1d5db',
                 background: page >= totalPages ? '#f3f4f6' : 'white', cursor: page >= totalPages ? 'default' : 'pointer',
                 color: page >= totalPages ? '#9ca3af' : '#374151', display: 'flex', alignItems: 'center', gap: 4,
+                fontSize: 13, fontWeight: 500,
               }}
             >
               Sau <ChevronRight size={16} />
             </button>
           </div>
-        )}
+        </div>
       </div>
 
       {/* ═══════════════════════════════════════════════
