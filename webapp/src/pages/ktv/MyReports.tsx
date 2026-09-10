@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import { fetchApi } from '../../api/client';
 import { 
@@ -310,7 +311,8 @@ export default function MyReports() {
   if (loading) return <div className="text-center py-10"><span className="spinner border-t-[#1B3A6B]"></span></div>;
 
   return (
-    <PullToRefresh onRefresh={handleRefresh}>
+    <>
+      <PullToRefresh onRefresh={handleRefresh}>
       <div className="animate-fade-in max-w-2xl mx-auto px-4 pb-10">
         <h2 className="font-bold text-2xl mb-6 text-[#1B3A6B] flex items-center gap-2">
           <FileText className="w-6 h-6" /> Báo cáo công việc
@@ -967,147 +969,152 @@ export default function MyReports() {
           )}
         </div>
       )}
-
-      {showActivationModal && activationData && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs">
-          <div className="bg-white rounded-2xl max-w-md w-full overflow-hidden shadow-2xl border border-gray-150 animate-slide-up">
-            {activationStep === 1 ? (
-              <>
-                {/* Step 1: Xác nhận thông tin gửi */}
-                <div className="p-5 border-b border-gray-100 flex justify-between items-center bg-gray-50">
-                  <div className="text-left">
-                    <h3 className="font-bold text-gray-800 text-base">Kích Hoạt Bảo Hành</h3>
-                    <p className="text-[11px] text-gray-500 mt-0.5">Xác nhận thông tin gửi tin nhắn Zalo ZNS</p>
-                  </div>
-                  <button 
-                    type="button" 
-                    onClick={() => setShowActivationModal(false)}
-                    className="p-1.5 rounded-lg hover:bg-gray-200 text-gray-400 hover:text-gray-600 transition-colors"
-                  >
-                    <X size={20} />
-                  </button>
-                </div>
-
-                <div className="p-5 overflow-y-auto max-h-[65vh] space-y-4 text-left">
-                  {/* THÔNG TIN SẢN PHẨM Card */}
-                  <div className="border border-blue-100 rounded-xl p-4 bg-blue-50/30 space-y-2 text-left">
-                    <h4 className="text-[10px] font-bold text-gray-400 uppercase tracking-wider border-b border-blue-100/70 pb-1.5">
-                      THÔNG TIN SẢN PHẨM
-                    </h4>
-                    <p className="text-sm font-bold text-gray-800 leading-snug break-words">
-                      {activationData.productName || activationData.model}
-                    </p>
-                    <div className="grid grid-cols-3 gap-1.5 text-xs text-gray-600 pt-1.5 border-t border-blue-100/50 mt-2">
-                      <span className="font-medium text-gray-500">Serial:</span>
-                      <span className="col-span-2 font-mono font-bold text-blue-700">{activationData.serialNumber}</span>
-
-                      {activationData.model && activationData.model !== (activationData.productName || activationData.model) && (
-                        <>
-                          <span className="font-medium text-gray-500">Model:</span>
-                          <span className="col-span-2 font-semibold text-gray-800">{activationData.model}</span>
-                        </>
-                      )}
-
-                      <span className="font-medium text-gray-500">Bảo hành:</span>
-                      <span className="col-span-2 font-semibold text-gray-800">{warrantyDurationText}</span>
-
-                      <span className="font-medium text-gray-500">Đến ngày:</span>
-                      <span className="col-span-2 font-bold text-red-600">{warrantyExpiryDateStr || '---'}</span>
-                    </div>
-                  </div>
-
-                  {/* THÔNG TIN KHÁCH HÀNG Card */}
-                  <div className="border border-gray-100 rounded-xl p-4 space-y-2 bg-white text-left">
-                    <h4 className="text-[10px] font-bold text-gray-400 uppercase tracking-wider border-b border-gray-100 pb-1.5">
-                      THÔNG TIN KHÁCH HÀNG
-                    </h4>
-                    
-                    <div className="grid grid-cols-3 gap-1.5 text-xs text-gray-600">
-                      <span className="font-medium text-gray-500">Họ tên:</span>
-                      <span className="col-span-2 font-semibold text-gray-800">{activationData.customerName || '---'}</span>
-                      
-                      <span className="font-medium text-gray-500">Số điện thoại:</span>
-                      <span className="col-span-2 font-semibold text-gray-800">{activationData.customerPhone || znsPhone || '---'}</span>
-
-                      <span className="font-medium text-gray-500">Địa chỉ:</span>
-                      <span className="col-span-2 text-gray-700 leading-relaxed break-words">{activationData.address || '---'}</span>
-                    </div>
-                  </div>
-
-                  {/* Gửi tin nhắn Input */}
-                  <div className="space-y-1.5 text-left">
-                    <label className="block text-xs font-bold text-gray-600 uppercase">SỐ ĐIỆN THOẠI NHẬN TIN ZALO</label>
-                    <input 
-                      type="tel" 
-                      className="form-input w-full font-semibold text-sm tracking-wider px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500"
-                      value={znsPhone}
-                      onChange={(e) => setZnsPhone(e.target.value)}
-                      placeholder="Nhập số điện thoại nhận ZNS..."
-                    />
-                    <p className="text-[10px] text-gray-400 leading-relaxed mt-1">
-                      ⚠️ KTV có thể thay đổi SĐT này nếu khách hàng dùng số Zalo khác SĐT đăng ký đơn hàng.
-                    </p>
-                  </div>
-                </div>
-
-                <div className="p-4 bg-gray-50 border-t border-gray-100 flex">
-                  <button
-                    type="button"
-                    className="btn btn-primary w-full py-2.5 text-sm bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold flex justify-center items-center gap-1.5 shadow-md"
-                    onClick={handleSendZns}
-                    disabled={znsSending}
-                  >
-                    {znsSending ? (
-                      <>
-                        <Loader2 size={16} className="animate-spin" /> Đang kích hoạt...
-                      </>
-                    ) : (
-                      <>
-                        <ShieldCheck size={18} /> Kích hoạt bảo hành
-                      </>
-                    )}
-                  </button>
-                </div>
-              </>
-            ) : (
-              <>
-                {/* Step 2: Kích hoạt bảo hành thành công! */}
-                <div className="p-6 text-center space-y-4">
-                  <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto text-green-600 shadow-sm">
-                    <CheckCircle size={36} />
-                  </div>
-                  
-                  <div className="space-y-1">
-                    <h3 className="font-bold text-gray-800 text-lg">Kích hoạt bảo hành thành công!</h3>
-                    <p className="text-xs text-gray-500 px-4 leading-relaxed">
-                      Tin nhắn thông báo đã được gửi đến số Zalo:
-                    </p>
-                    <p className="text-base font-bold text-blue-600 tracking-wider mt-1">{znsPhone}</p>
-                  </div>
-
-                  <div className="bg-emerald-50 border border-emerald-100 rounded-xl p-4 text-left text-xs text-emerald-900 leading-relaxed max-w-sm mx-auto space-y-1">
-                    <p className="font-medium">
-                      KTV hướng dẫn khách hàng kiểm tra tin nhắn, Xác nhận kích hoạt bảo hành và Quan tâm Zalo OA <strong>Pure Vita</strong>.
-                    </p>
-                    <p className="font-semibold text-emerald-800 pt-1">Xin cảm ơn!</p>
-                  </div>
-                </div>
-
-                <div className="p-4 bg-gray-50 border-t border-gray-100 flex gap-3">
-                  <button
-                    type="button"
-                    className="btn btn-primary flex-1 py-2 text-sm bg-blue-600 hover:bg-blue-700 text-white rounded-lg"
-                    onClick={() => { setShowActivationModal(false); loadReports(); }}
-                  >
-                    Đóng
-                  </button>
-                </div>
-              </>
-            )}
-          </div>
-        </div>
-      )}
     </div>
     </PullToRefresh>
-  );
+
+    {/* Modal Kích hoạt Bảo hành ZNS */}
+    {showActivationModal && activationData && createPortal(
+      <div className="fixed inset-0 z-[9999] overflow-y-auto bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 sm:p-6">
+        <div 
+          className="bg-white rounded-2xl max-w-md w-full my-auto overflow-hidden shadow-2xl border border-gray-150 flex flex-col max-h-[90vh] animate-slide-up"
+          style={{ borderTop: '5px solid #2563EB' }}
+        >
+          {activationStep === 1 ? (
+            <>
+              {/* Step 1: Xác nhận thông tin gửi */}
+              <div className="p-4 sm:p-5 border-b border-gray-100 flex justify-between items-center bg-gray-50/80 shrink-0">
+                <div className="text-left">
+                  <h3 className="font-bold text-gray-800 text-base">Kích Hoạt Bảo Hành</h3>
+                  <p className="text-[11px] text-gray-500 mt-0.5">Xác nhận thông tin gửi tin nhắn Zalo ZNS</p>
+                </div>
+                <button 
+                  type="button" 
+                  onClick={() => setShowActivationModal(false)}
+                  className="p-1.5 rounded-lg hover:bg-gray-200 text-gray-400 hover:text-gray-600 transition-colors"
+                >
+                  <X size={20} />
+                </button>
+              </div>
+
+              <div className="p-4 sm:p-5 overflow-y-auto flex-1 space-y-4 text-left min-h-0">
+                {/* THÔNG TIN SẢN PHẨM Card */}
+                <div className="border border-blue-100 rounded-xl p-3.5 sm:p-4 bg-blue-50/30 space-y-2 text-left">
+                  <h4 className="text-[10px] font-bold text-gray-400 uppercase tracking-wider border-b border-blue-100/70 pb-1.5">
+                    THÔNG TIN SẢN PHẨM
+                  </h4>
+                  <p className="text-sm font-bold text-gray-800 leading-snug break-words">
+                    {activationData.productName || activationData.model}
+                  </p>
+                  <div className="grid grid-cols-3 gap-1.5 text-xs text-gray-600 pt-1.5 border-t border-blue-100/50 mt-2">
+                    <span className="font-medium text-gray-500">Serial:</span>
+                    <span className="col-span-2 font-mono font-bold text-blue-700 break-all">{activationData.serialNumber}</span>
+
+                    {activationData.model && activationData.model !== (activationData.productName || activationData.model) && (
+                      <>
+                        <span className="font-medium text-gray-500">Model:</span>
+                        <span className="col-span-2 font-semibold text-gray-800">{activationData.model}</span>
+                      </>
+                    )}
+
+                    <span className="font-medium text-gray-500">Bảo hành:</span>
+                    <span className="col-span-2 font-semibold text-gray-800">{warrantyDurationText}</span>
+
+                    <span className="font-medium text-gray-500">Đến ngày:</span>
+                    <span className="col-span-2 font-bold text-red-600">{warrantyExpiryDateStr || '---'}</span>
+                  </div>
+                </div>
+
+                {/* THÔNG TIN KHÁCH HÀNG Card */}
+                <div className="border border-gray-100 rounded-xl p-3.5 sm:p-4 space-y-2 bg-white text-left">
+                  <h4 className="text-[10px] font-bold text-gray-400 uppercase tracking-wider border-b border-gray-100 pb-1.5">
+                    THÔNG TIN KHÁCH HÀNG
+                  </h4>
+                  
+                  <div className="grid grid-cols-3 gap-1.5 text-xs text-gray-600">
+                    <span className="font-medium text-gray-500">Họ tên:</span>
+                    <span className="col-span-2 font-semibold text-gray-800">{activationData.customerName || '---'}</span>
+                    
+                    <span className="font-medium text-gray-500">Số điện thoại:</span>
+                    <span className="col-span-2 font-semibold text-gray-800">{activationData.customerPhone || znsPhone || '---'}</span>
+
+                    <span className="font-medium text-gray-500">Địa chỉ:</span>
+                    <span className="col-span-2 text-gray-700 leading-relaxed break-words">{activationData.address || '---'}</span>
+                  </div>
+                </div>
+
+                {/* Gửi tin nhắn Input */}
+                <div className="space-y-1.5 text-left">
+                  <label className="block text-xs font-bold text-gray-600 uppercase">SỐ ĐIỆN THOẠI NHẬN TIN ZALO</label>
+                  <input 
+                    type="tel" 
+                    className="form-input w-full font-semibold text-sm tracking-wider px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500"
+                    value={znsPhone}
+                    onChange={(e) => setZnsPhone(e.target.value)}
+                    placeholder="Nhập số điện thoại nhận ZNS..."
+                  />
+                  <p className="text-[10px] text-gray-400 leading-relaxed mt-1">
+                    ⚠️ KTV có thể thay đổi SĐT này nếu khách hàng dùng số Zalo khác SĐT đăng ký đơn hàng.
+                  </p>
+                </div>
+              </div>
+
+              <div className="p-4 bg-gray-50 border-t border-gray-100 shrink-0 flex">
+                <button
+                  type="button"
+                  className="btn btn-primary w-full py-2.5 text-sm bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold flex justify-center items-center gap-1.5 shadow-md"
+                  onClick={handleSendZns}
+                  disabled={znsSending}
+                >
+                  {znsSending ? (
+                    <>
+                      <Loader2 size={16} className="animate-spin" /> Đang kích hoạt...
+                    </>
+                  ) : (
+                    <>
+                      <ShieldCheck size={18} /> Kích hoạt bảo hành
+                    </>
+                  )}
+                </button>
+              </div>
+            </>
+          ) : (
+            <>
+              {/* Step 2: Kích hoạt bảo hành thành công! */}
+              <div className="p-6 text-center space-y-4 overflow-y-auto flex-1 min-h-0">
+                <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto text-green-600 shadow-sm shrink-0">
+                  <CheckCircle size={36} />
+                </div>
+                
+                <div className="space-y-1">
+                  <h3 className="font-bold text-gray-800 text-lg">Kích hoạt bảo hành thành công!</h3>
+                  <p className="text-xs text-gray-500 px-4 leading-relaxed">
+                    Tin nhắn thông báo đã được gửi đến số Zalo:
+                  </p>
+                  <p className="text-base font-bold text-blue-600 tracking-wider mt-1">{znsPhone}</p>
+                </div>
+
+                <div className="bg-emerald-50 border border-emerald-100 rounded-xl p-4 text-left text-xs text-emerald-900 leading-relaxed max-w-sm mx-auto space-y-1">
+                  <p className="font-medium">
+                    KTV hướng dẫn khách hàng kiểm tra tin nhắn, Xác nhận kích hoạt bảo hành và Quan tâm Zalo OA <strong>Pure Vita</strong>.
+                  </p>
+                  <p className="font-semibold text-emerald-800 pt-1">Xin cảm ơn!</p>
+                </div>
+              </div>
+
+              <div className="p-4 bg-gray-50 border-t border-gray-100 shrink-0 flex gap-3">
+                <button
+                  type="button"
+                  className="btn btn-primary flex-1 py-2.5 text-sm bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold"
+                  onClick={() => { setShowActivationModal(false); loadReports(); }}
+                >
+                  Đóng
+                </button>
+              </div>
+            </>
+          )}
+        </div>
+      </div>,
+      document.body
+    )}
+  </>);
 }

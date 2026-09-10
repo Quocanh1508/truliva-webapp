@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { fetchApi, getOrders, getFiltersData, getOrderDetails } from '../../api/client';
 import LabeledImageUploader from '../../components/LabeledImageUploader';
@@ -1515,23 +1516,23 @@ export default function ReportForm() {
         )}
 
         {/* Modal Quét Mã Vạch */}
-        {showScanner && (
+        {showScanner && createPortal(
           <div 
-            className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4"
+            className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 sm:p-6 overflow-y-auto"
             onClick={() => setShowScanner(false)}
           >
             <div 
-              className="bg-white rounded-2xl w-full max-w-md overflow-hidden shadow-2xl flex flex-col"
+              className="bg-white rounded-2xl w-full max-w-md overflow-hidden shadow-2xl flex flex-col my-auto animate-slide-up"
               onClick={e => e.stopPropagation()}
             >
-              <div className="p-4 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
+              <div className="p-4 border-b border-gray-100 flex justify-between items-center bg-gray-50/50 shrink-0">
                 <h3 className="font-bold text-gray-800 text-sm">Quét mã vạch sản phẩm</h3>
                 <button 
                   type="button" 
-                  className="text-gray-400 hover:text-gray-600 text-xs font-bold"
+                  className="text-gray-400 hover:text-gray-600 text-xs font-bold p-1 rounded-lg hover:bg-gray-200 transition-colors"
                   onClick={() => setShowScanner(false)}
                 >
-                  Đóng
+                  <X size={18} />
                 </button>
               </div>
               <div className="p-4 flex flex-col items-center justify-center bg-white">
@@ -1545,38 +1546,39 @@ export default function ReportForm() {
                 </p>
               </div>
             </div>
-          </div>
+          </div>,
+          document.body
         )}
 
         {/* Modal Kích hoạt Bảo hành ZNS */}
-        {showActivationModal && activationData && (
+        {showActivationModal && activationData && createPortal(
           <div 
-            className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4"
+            className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 sm:p-6 overflow-y-auto"
           >
             <div 
-              className="bg-white rounded-2xl w-full max-w-md overflow-hidden shadow-2xl flex flex-col"
+              className="bg-white rounded-2xl w-full max-w-md overflow-hidden shadow-2xl flex flex-col max-h-[90vh] my-auto animate-slide-up border border-gray-150"
               style={{ borderTop: '5px solid #2563EB' }}
             >
               {activationStep === 1 ? (
                 <>
                   {/* Step 1: Xác nhận thông tin gửi ZNS */}
-                  <div className="p-5 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
-                    <div>
+                  <div className="p-4 sm:p-5 border-b border-gray-100 flex justify-between items-center bg-gray-50/80 shrink-0">
+                    <div className="text-left">
                       <h3 className="font-bold text-gray-800 text-base">Kích Hoạt Bảo Hành</h3>
                       <p className="text-[11px] text-gray-500 mt-0.5">Xác nhận gửi tin nhắn ZNS cho Khách hàng</p>
                     </div>
                     <button 
                       type="button" 
-                      className="text-gray-400 hover:text-gray-600 text-xs font-bold"
+                      className="p-1.5 rounded-lg hover:bg-gray-200 text-gray-400 hover:text-gray-600 transition-colors"
                       onClick={() => { setShowActivationModal(false); navigate(reportsRedirectPath); }}
                     >
                       <X size={18} />
                     </button>
                   </div>
 
-                  <div className="p-5 overflow-y-auto max-h-[65vh] space-y-4 text-left">
+                  <div className="p-4 sm:p-5 overflow-y-auto flex-1 space-y-4 text-left min-h-0">
                     {/* THÔNG TIN SẢN PHẨM Card */}
-                    <div className="border border-blue-100 rounded-xl p-4 bg-blue-50/30 space-y-2 text-left">
+                    <div className="border border-blue-100 rounded-xl p-3.5 sm:p-4 bg-blue-50/30 space-y-2 text-left">
                       <h4 className="text-[10px] font-bold text-gray-400 uppercase tracking-wider border-b border-blue-100/70 pb-1.5">
                         THÔNG TIN SẢN PHẨM
                       </h4>
@@ -1585,7 +1587,7 @@ export default function ReportForm() {
                       </p>
                       <div className="grid grid-cols-3 gap-1.5 text-xs text-gray-600 pt-1.5 border-t border-blue-100/50 mt-2">
                         <span className="font-medium text-gray-500">Serial:</span>
-                        <span className="col-span-2 font-mono font-bold text-blue-700">{activationData.serialNumber}</span>
+                        <span className="col-span-2 font-mono font-bold text-blue-700 break-all">{activationData.serialNumber}</span>
 
                         {activationData.model && activationData.model !== (activationData.productName || activationData.model) && (
                           <>
@@ -1603,7 +1605,7 @@ export default function ReportForm() {
                     </div>
 
                     {/* THÔNG TIN KHÁCH HÀNG Card */}
-                    <div className="border border-gray-100 rounded-xl p-4 space-y-2 bg-white text-left">
+                    <div className="border border-gray-100 rounded-xl p-3.5 sm:p-4 space-y-2 bg-white text-left">
                       <h4 className="text-[10px] font-bold text-gray-400 uppercase tracking-wider border-b border-gray-100 pb-1.5">
                         THÔNG TIN KHÁCH HÀNG
                       </h4>
@@ -1621,11 +1623,11 @@ export default function ReportForm() {
                     </div>
 
                     {/* Gửi tin nhắn Input */}
-                    <div className="space-y-1.5">
+                    <div className="space-y-1.5 text-left">
                       <label className="block text-xs font-bold text-gray-600 uppercase">SỐ ĐIỆN THOẠI NHẬN TIN ZALO</label>
                       <input 
                         type="tel" 
-                        className="form-input w-full font-semibold text-sm tracking-wider"
+                        className="form-input w-full font-semibold text-sm tracking-wider px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500"
                         value={znsPhone}
                         onChange={(e) => setZnsPhone(e.target.value)}
                         placeholder="Nhập số điện thoại nhận ZNS..."
@@ -1636,7 +1638,7 @@ export default function ReportForm() {
                     </div>
                   </div>
 
-                  <div className="p-4 bg-gray-50 border-t border-gray-100 flex">
+                  <div className="p-4 bg-gray-50 border-t border-gray-100 shrink-0 flex">
                     <button
                       type="button"
                       className="btn btn-primary w-full py-2.5 text-sm flex justify-center items-center gap-1.5 font-bold shadow-md rounded-xl"
@@ -1658,8 +1660,8 @@ export default function ReportForm() {
               ) : (
                 <>
                   {/* Step 2: Kích hoạt bảo hành thành công! */}
-                  <div className="p-6 text-center space-y-4">
-                    <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto text-green-600 shadow-sm">
+                  <div className="p-6 text-center space-y-4 overflow-y-auto flex-1 min-h-0">
+                    <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto text-green-600 shadow-sm shrink-0">
                       <CheckCircle size={36} />
                     </div>
                     
@@ -1679,17 +1681,17 @@ export default function ReportForm() {
                     </div>
                   </div>
 
-                  <div className="p-4 bg-gray-50 border-t border-gray-100 flex gap-3">
+                  <div className="p-4 bg-gray-50 border-t border-gray-100 shrink-0 flex gap-3">
                     <button
                       type="button"
-                      className="btn btn-outline flex-1 py-2 text-sm"
+                      className="btn btn-outline flex-1 py-2.5 text-sm rounded-xl font-medium"
                       onClick={() => { setShowActivationModal(false); navigate(jobsRedirectPath); }}
                     >
                       Danh sách công việc
                     </button>
                     <button
                       type="button"
-                      className="btn btn-primary flex-1 py-2 text-sm"
+                      className="btn btn-primary flex-1 py-2.5 text-sm rounded-xl font-bold"
                       onClick={() => { setShowActivationModal(false); navigate(reportsRedirectPath); }}
                     >
                       Báo cáo của tôi
@@ -1698,7 +1700,8 @@ export default function ReportForm() {
                 </>
               )}
             </div>
-          </div>
+          </div>,
+          document.body
         )}
       </form>
     </div>
