@@ -10,6 +10,13 @@ const SHOP_ID = '1635300067';
  * Đồng bộ lại một đơn hàng sang Pancake POS.
  */
 export async function retryPancakeSync(orderId: string): Promise<void> {
+  // ═══ CHỐT CHẶN SANDBOX: TUYỆT ĐỐI KHÔNG GHI SANG PANCAKE POS ═══
+  const dbUrl = process.env.DATABASE_URL || '';
+  if (dbUrl.includes('sandbox')) {
+    logger.info('[SANDBOX GUARD] Blocked retryPancakeSync - Sandbox environment detected.', { orderId });
+    return;
+  }
+
   const order = await prisma.order.findUnique({
     where: { id: orderId },
     include: { items: true }

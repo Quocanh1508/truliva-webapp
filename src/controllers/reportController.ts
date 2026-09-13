@@ -2160,16 +2160,19 @@ export async function approveReport(req: Request, res: Response): Promise<void> 
       }
     });
 
+    const pancakeOrderCode = report.order?.pancakeOrderId ? (report.order.pancakeOrderId < 0 ? `M${Math.abs(report.order.pancakeOrderId)}` : String(report.order.pancakeOrderId)) : '';
     sendPushNotification(report.ktvUserId, ktvTitle, ktvContent, {
       type: 'REPORT_APPROVED',
       reportId,
-      orderId: report.orderId || ''
+      orderId: report.orderId || '',
+      pancakeOrderId: pancakeOrderCode
     }).catch(err => logger.error('Push notification failed on approval', { error: err.message }));
 
     sendWebPushNotification(report.ktvUserId, ktvTitle, ktvContent, {
       type: 'REPORT_APPROVED',
       reportId,
-      orderId: report.orderId || ''
+      orderId: report.orderId || '',
+      pancakeOrderId: pancakeOrderCode
     }).catch(err => logger.error('Web push notification failed on approval', { error: err.message }));
 
     logger.info('Report approved successfully', { reportId, approvedBy: req.user!.id });
@@ -2272,10 +2275,12 @@ export async function rejectReport(req: Request, res: Response): Promise<void> {
       }
     });
 
+    const pancakeOrderCode = report.order?.pancakeOrderId ? (report.order.pancakeOrderId < 0 ? `M${Math.abs(report.order.pancakeOrderId)}` : String(report.order.pancakeOrderId)) : '';
     sendPushNotification(report.ktvUserId, ktvTitle, ktvContent, {
       type: 'REPORT_REJECTED',
       reportId,
       orderId: report.orderId || '',
+      pancakeOrderId: pancakeOrderCode,
       rejectReason: rejectReason.trim()
     }).catch(err => logger.error('Push notification failed on reject', { error: err.message }));
 
@@ -2283,6 +2288,7 @@ export async function rejectReport(req: Request, res: Response): Promise<void> {
       type: 'REPORT_REJECTED',
       reportId,
       orderId: report.orderId || '',
+      pancakeOrderId: pancakeOrderCode,
       rejectReason: rejectReason.trim()
     }).catch(err => logger.error('Web push notification failed on reject', { error: err.message }));
 

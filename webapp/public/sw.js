@@ -1,5 +1,5 @@
 // Cache-busting version - change this value to force iOS PWA to reload all assets
-const SW_VERSION = '2026-08-05-v3';
+const SW_VERSION = '2026-09-13-v1';
 
 self.addEventListener('install', (event) => {
   console.log(`[SW ${SW_VERSION}] Installing...`);
@@ -38,23 +38,21 @@ self.addEventListener('push', (event) => {
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
   const data = event.notification.data;
+  const searchId = data && (data.pancakeOrderId || data.orderId);
+  const targetUrl = searchId 
+    ? `/ktv/my-orders?search=${searchId}` 
+    : '/ktv/my-orders';
   
   event.waitUntil(
     clients.matchAll({ type: 'window', includeUncontrolled: true }).then((windowClients) => {
-      const targetUrl = data && data.pancakeOrderId 
-        ? `/ktv/my-orders?search=${data.pancakeOrderId}` 
-        : '/ktv/my-orders';
-        
-      // Nếu có sẵn tab webapp đang mở, chuyển hướng nó
-      for (let i = 0; i < windowClients.length; i++) {
-        const client = windowClients[i];
-        if (client.url.includes('/ktv/my-orders') && 'focus' in client) {
-          client.postMessage({ type: 'REDIRECT', url: targetUrl });
-          return client.focus();
-        }
+      // Tìm bất kỳ tab webapp nào đang mở (bất kể đang ở trang nào)
+      const existingClient = windowClients.find(c => 'focus' in c);
+      if (existingClient) {
+        existingClient.postMessage({ type: 'REDIRECT', url: targetUrl });
+        return existingClient.focus();
       }
       
-      // Nếu không, mở tab mới
+      // Nếu không có tab nào mở, mở tab mới
       if (clients.openWindow) {
         return clients.openWindow(targetUrl);
       }

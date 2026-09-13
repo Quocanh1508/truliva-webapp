@@ -1,7 +1,7 @@
-import React, { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useEffect, useState, useRef } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { getOrders, callCustomer, rescheduleOrder } from '../../api/client';
-import { Search, ChevronLeft, ChevronRight, Phone, Calendar, FileText, User, MapPin, Clock, MessageSquare, Wrench, CreditCard } from 'lucide-react';
+import { Search, ChevronLeft, ChevronRight, Phone, Calendar, FileText, User, MapPin, Clock, MessageSquare, Wrench, CreditCard, X } from 'lucide-react';
 import PullToRefresh from '../../components/PullToRefresh';
 import { formatOrderId } from '../../utils/text';
 import { fetchCurrentWeather, type WeatherInfo } from '../../utils/weather';
@@ -9,6 +9,7 @@ import { useAuth } from '../../context/AuthContext';
 
 export default function MyOrders() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { user } = useAuth();
   const [orders, setOrders] = useState<any[]>([]);
   const [weather, setWeather] = useState<WeatherInfo | null>(null);
@@ -16,10 +17,9 @@ export default function MyOrders() {
   const [error, setError] = useState('');
 
   // Filters
-  const [search, setSearch] = useState(() => {
-    const params = new URLSearchParams(window.location.search);
-    return params.get('search') || '';
-  });
+  const searchParam = new URLSearchParams(location.search).get('search') || '';
+  const prevSearchParamRef = useRef(searchParam);
+  const [search, setSearch] = useState(() => searchParam);
   const [sortBy, setSortBy] = useState('appointmentTime');
   const [sortOrder, setSortOrder] = useState('desc');
   
@@ -40,13 +40,14 @@ export default function MyOrders() {
   const [rescheduleReason, setRescheduleReason] = useState('');
   const [resubmitLoading, setResubmitLoading] = useState(false);
 
-  const fetchOrdersData = async (silent = false) => {
+  const fetchOrdersData = async (silent = false, customSearch?: string) => {
     try {
       if (!silent) setLoading(true);
+      const activeSearch = customSearch !== undefined ? customSearch : search;
       const res = await getOrders({
         page,
         limit: 20,
-        search,
+        search: activeSearch,
         sortBy,
         sortOrder
       });
@@ -62,7 +63,7 @@ export default function MyOrders() {
       }
       
       // Cache the default view (first page, empty search)
-      if (!search && page === 1) {
+      if (!activeSearch && page === 1) {
         localStorage.setItem('cached_ktv_orders', JSON.stringify({
           orders: res.orders,
           pagination: res.pagination
@@ -92,6 +93,16 @@ export default function MyOrders() {
     fetchOrdersData();
   }, [page, sortBy, sortOrder]);
 
+  // Tự động tìm kiếm và cập nhật khi KTV nhấn vào thông báo đẩy (URL chứa ?search=...)
+  useEffect(() => {
+    if (searchParam !== prevSearchParamRef.current) {
+      prevSearchParamRef.current = searchParam;
+      setSearch(searchParam);
+      setPage(1);
+      fetchOrdersData(false, searchParam);
+    }
+  }, [searchParam]);
+
   useEffect(() => {
     if (!user) return;
     const loadWeather = async () => {
@@ -120,12 +131,20 @@ export default function MyOrders() {
     };
   }, [page, sortBy, sortOrder, search]);
 
-
-
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
     setPage(1);
     fetchOrdersData();
+  };
+
+  const handleClearSearch = () => {
+    setSearch('');
+    setPage(1);
+    prevSearchParamRef.current = '';
+    fetchOrdersData(false, '');
+    if (location.search) {
+      navigate('/ktv/my-orders', { replace: true });
+    }
   };
 
   const handleCallCustomer = async (orderId: string, phone: string) => {
@@ -244,10 +263,20 @@ export default function MyOrders() {
           <input
             type="text"
             placeholder="Tìm theo mã đơn, khách hàng, SĐT..."
-            className="w-full pl-9 pr-3 py-2 text-[13px] border border-gray-300 rounded-md focus:ring-1 focus:ring-blue-500 focus:border-blue-500 transition-shadow outline-none"
+            className="w-full pl-9 pr-8 py-2 text-[13px] border border-gray-300 rounded-md focus:ring-1 focus:ring-blue-500 focus:border-blue-500 transition-shadow outline-none"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
+          {search && (
+            <button
+              type="button"
+              onClick={handleClearSearch}
+              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 p-0.5 rounded-full"
+              title="Xóa tìm kiếm"
+            >
+              <X size={14} />
+            </button>
+          )}
         </form>
 
         <div className="flex items-center space-x-3">

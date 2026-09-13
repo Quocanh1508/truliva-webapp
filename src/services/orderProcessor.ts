@@ -545,6 +545,13 @@ async function markFailed(rawEventId: string, errorLog: string) {
  * Trả về chuỗi trạng thái đồng bộ: 'SUCCESS' hoặc ném ra lỗi nếu thất bại.
  */
 export async function syncOrderStatusToPancake(pancakeOrderId: number, adminStatus: string): Promise<string> {
+  // ═══ CHỐT CHẶN SANDBOX: TUYỆT ĐỐI KHÔNG GHI SANG PANCAKE POS KHI ĐANG Ở MÔI TRƯỜNG SANDBOX ═══
+  const dbUrl = process.env.DATABASE_URL || '';
+  if (dbUrl.includes('sandbox')) {
+    logger.info('[SANDBOX GUARD] Blocked syncOrderStatusToPancake - Sandbox environment detected. No POS write allowed.', { pancakeOrderId, adminStatus });
+    return 'SUCCESS';
+  }
+
   if (pancakeOrderId < 0) {
     logger.info('Bypassed syncing status change to Pancake POS: manual order', { pancakeOrderId });
     return 'SUCCESS';

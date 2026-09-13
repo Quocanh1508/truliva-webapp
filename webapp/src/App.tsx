@@ -130,8 +130,6 @@ function PushNotificationManager({ children }: { children: React.ReactNode }) {
             return;
           }
 
-          await PushNotifications.register();
-
           // 1. Đăng ký thành công Token
           await PushNotifications.addListener('registration', async (token) => {
             console.log('Push token native success:', token.value);
@@ -157,15 +155,22 @@ function PushNotificationManager({ children }: { children: React.ReactNode }) {
             alert(`${notification.title}\n${notification.body}`);
           });
 
-          // 4. Nhấn chọn thông báo (Background/Màn hình khóa)
+          // 4. Nhấn chọn thông báo (Background/Màn hình khóa/Cold-start)
           await PushNotifications.addListener('pushNotificationActionPerformed', (action) => {
             console.log('Push notification action clicked:', action);
-            const data = action.notification.data;
-            if (data && data.pancakeOrderId) {
-              navigate(`/ktv/my-orders?search=${data.pancakeOrderId}`);
+            const rawData = action.notification.data;
+            const data = typeof rawData === 'string' 
+              ? (() => { try { return JSON.parse(rawData); } catch { return {}; } })() 
+              : (rawData || {});
+            const targetId = data.pancakeOrderId || data.orderId;
+            if (targetId) {
+              navigate(`/ktv/my-orders?search=${targetId}`);
+            } else {
+              navigate('/ktv/my-orders');
             }
           });
 
+          await PushNotifications.register();
         } catch (err) {
           console.error('Error setting up native Push Notifications:', err);
         }
@@ -212,15 +217,19 @@ function PushNotificationManager({ children }: { children: React.ReactNode }) {
 
       // Lắng nghe lệnh điều hướng từ Service Worker
       const handleMessage = (event: MessageEvent) => {
-        if (event.data && event.data.type === 'REDIRECT') {
+        if (event.data && event.data.type === 'REDIRECT' && event.data.url) {
           navigate(event.data.url);
         }
       };
 
-      navigator.serviceWorker.addEventListener('message', handleMessage);
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.addEventListener('message', handleMessage);
+      }
 
       return () => {
-        navigator.serviceWorker.removeEventListener('message', handleMessage);
+        if ('serviceWorker' in navigator) {
+          navigator.serviceWorker.removeEventListener('message', handleMessage);
+        }
       };
     }
   }, [user, navigate]);
