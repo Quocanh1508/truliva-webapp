@@ -2,6 +2,7 @@ import webpush from 'web-push';
 import { Prisma } from '@prisma/client';
 import prisma from '../config/database';
 import logger from '../utils/logger';
+import { isSandboxEnvironment, logSandboxBlockedAction } from '../utils/sandboxGuard';
 
 let isWebPushInitialized = false;
 
@@ -37,6 +38,11 @@ export async function sendWebPushNotification(
   data?: any
 ): Promise<boolean> {
   try {
+    if (isSandboxEnvironment()) {
+      logSandboxBlockedAction('sendWebPushNotification', { userId, title });
+      return true;
+    }
+
     if (!isWebPushInitialized) {
       logger.debug(`Cannot send Web Push to user ${userId}: Web Push service not initialized.`);
       return false;

@@ -1,6 +1,7 @@
 import axios from 'axios';
 import prisma from '../config/database';
 import logger from '../utils/logger';
+import { isSandboxEnvironment, logSandboxBlockedAction } from '../utils/sandboxGuard';
 
 export interface ZnsTemplateData {
   customer_name: string;
@@ -285,6 +286,45 @@ export async function sendZnsWarrantyActivation(
     So_Seri: cleanSerial.substring(0, 30),
     Ngay_Het_Bao_Hanh: expiryDateStr.substring(0, 30)
   };
+
+  // ═══ CHỐT CHẶN SANDBOX: TUYỆT ĐỐI KHÔNG GỬI TIN NHẮN ZNS / FNS THẬT RA BÊN NGOÀI ═══
+  if (isSandboxEnvironment()) {
+    logSandboxBlockedAction('sendZnsWarrantyActivation', {
+      phone: formattedPhone,
+      serialNumber: cleanSerial,
+      customerName,
+      productName,
+      templateId: zaloTemplateId
+    });
+
+    const mockMsgId = `SANDBOX_MOCK_${Date.now()}`;
+    try {
+      await prisma.znsMessageLog.create({
+        data: {
+          messageId: mockMsgId,
+          phone: formattedPhone,
+          serialNumber: cleanSerial,
+          customerName,
+          productName,
+          templateId: zaloTemplateId,
+          status: 'SUCCESS',
+          sentAt: new Date(),
+          durationMs: '1ms',
+          gateway: 'Sandbox Mock (Blocked External Dispatch)',
+          rawData: { simulated: true, environment: 'SANDBOX', note: 'ZNS blocked and simulated in sandbox environment' }
+        }
+      });
+    } catch (dbErr: any) {
+      logger.warn('Failed to write mock ZnsMessageLog in sandbox', { error: dbErr.message });
+    }
+
+    return {
+      success: true,
+      message: '[SANDBOX MOCK] ZNS message simulated successfully (Blocked real external dispatch)',
+      data: { message_id: mockMsgId },
+      trackingId: `${cleanSerial}-${Date.now()}`
+    };
+  }
 
   // Helper hàm gửi tin qua FPT FNS Gateway
   const sendViaFnsGateway = async (isFallback: boolean = false, primaryErrorMsg?: string) => {

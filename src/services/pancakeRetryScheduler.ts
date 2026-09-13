@@ -3,6 +3,7 @@ import prisma from '../config/database';
 import { getComboComponents, ComboComponent } from '../controllers/orderController';
 import { syncOrderStatusToPancake } from './orderProcessor';
 import logger from '../utils/logger';
+import { isSandboxEnvironment, logSandboxBlockedAction } from '../utils/sandboxGuard';
 
 const SHOP_ID = '1635300067';
 
@@ -11,9 +12,8 @@ const SHOP_ID = '1635300067';
  */
 export async function retryPancakeSync(orderId: string): Promise<void> {
   // ═══ CHỐT CHẶN SANDBOX: TUYỆT ĐỐI KHÔNG GHI SANG PANCAKE POS ═══
-  const dbUrl = process.env.DATABASE_URL || '';
-  if (dbUrl.includes('sandbox')) {
-    logger.info('[SANDBOX GUARD] Blocked retryPancakeSync - Sandbox environment detected.', { orderId });
+  if (isSandboxEnvironment()) {
+    logSandboxBlockedAction('retryPancakeSync', { orderId });
     return;
   }
 

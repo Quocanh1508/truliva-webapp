@@ -10,6 +10,7 @@ import ExcelJS from 'exceljs';
 import axios from 'axios';
 import { formatOrderCode, buildReportFilter } from '../services/reportService';
 import { getComboComponents, ComboComponent } from './orderController';
+import { isSandboxEnvironment, logSandboxBlockedAction } from '../utils/sandboxGuard';
 
 export async function createReport(req: Request, res: Response): Promise<void> {
   try {
@@ -509,32 +510,40 @@ export async function createReport(req: Request, res: Response): Promise<void> {
                   };
                 }).filter((p: any) => p.variation_id);
 
-                try {
-                  const updateResponse = await axios.patch(
-                    `https://pos.pages.fm/api/v1/shops/${shopId}/orders/${oldOrder.pancakeOrderId}`,
-                    {
-                      products: pancakeProducts,
-                      warehouse_id: targetWarehouseId || undefined
-                    },
-                    {
-                      params: { api_key: apiKey },
-                      headers: { 'Content-Type': 'application/json' },
-                      timeout: 10000
-                    }
-                  );
+                if (isSandboxEnvironment()) {
+                  logSandboxBlockedAction('patchProductsToPancake (createReport)', {
+                    pancakeOrderId: oldOrder.pancakeOrderId,
+                    productsCount: pancakeProducts.length,
+                    warehouseId: targetWarehouseId
+                  });
+                } else {
+                  try {
+                    const updateResponse = await axios.patch(
+                      `https://pos.pages.fm/api/v1/shops/${shopId}/orders/${oldOrder.pancakeOrderId}`,
+                      {
+                        products: pancakeProducts,
+                        warehouse_id: targetWarehouseId || undefined
+                      },
+                      {
+                        params: { api_key: apiKey },
+                        headers: { 'Content-Type': 'application/json' },
+                        timeout: 10000
+                      }
+                    );
 
-                  if (!updateResponse.data || !updateResponse.data.success) {
-                    logger.error('Failed to patch products on Pancake POS', {
+                    if (!updateResponse.data || !updateResponse.data.success) {
+                      logger.error('Failed to patch products on Pancake POS', {
+                        pancakeOrderId: oldOrder.pancakeOrderId,
+                        response: updateResponse.data
+                      });
+                    }
+                  } catch (syncErr: any) {
+                    logger.error('Error patching products on Pancake POS API', {
                       pancakeOrderId: oldOrder.pancakeOrderId,
-                      response: updateResponse.data
+                      error: syncErr.message,
+                      response: syncErr.response?.data
                     });
                   }
-                } catch (syncErr: any) {
-                  logger.error('Error patching products on Pancake POS API', {
-                    pancakeOrderId: oldOrder.pancakeOrderId,
-                    error: syncErr.message,
-                    response: syncErr.response?.data
-                  });
                 }
               }
             }
@@ -1579,24 +1588,32 @@ export async function updateReport(req: Request, res: Response): Promise<void> {
                 };
               }).filter((p: any) => p.variation_id);
 
-              try {
-                await axios.patch(
-                  `https://pos.pages.fm/api/v1/shops/${shopId}/orders/${oldOrder.pancakeOrderId}`,
-                  {
-                    products: pancakeProducts,
-                    warehouse_id: targetWarehouseId || undefined
-                  },
-                  {
-                    params: { api_key: apiKey },
-                    headers: { 'Content-Type': 'application/json' },
-                    timeout: 10000
-                  }
-                );
-              } catch (syncErr: any) {
-                logger.error('Error patching edited products on Pancake POS API', {
+              if (isSandboxEnvironment()) {
+                logSandboxBlockedAction('patchProductsToPancake (updateReport)', {
                   pancakeOrderId: oldOrder.pancakeOrderId,
-                  error: syncErr.message
+                  productsCount: pancakeProducts.length,
+                  warehouseId: targetWarehouseId
                 });
+              } else {
+                try {
+                  await axios.patch(
+                    `https://pos.pages.fm/api/v1/shops/${shopId}/orders/${oldOrder.pancakeOrderId}`,
+                    {
+                      products: pancakeProducts,
+                      warehouse_id: targetWarehouseId || undefined
+                    },
+                    {
+                      params: { api_key: apiKey },
+                      headers: { 'Content-Type': 'application/json' },
+                      timeout: 10000
+                    }
+                  );
+                } catch (syncErr: any) {
+                  logger.error('Error patching edited products on Pancake POS API', {
+                    pancakeOrderId: oldOrder.pancakeOrderId,
+                    error: syncErr.message
+                  });
+                }
               }
             }
           }
@@ -2024,26 +2041,36 @@ export async function approveReport(req: Request, res: Response): Promise<void> 
             };
           }).filter((p: any) => p.variation_id);
 
-          try {
-            await axios.patch(
-              `https://pos.pages.fm/api/v1/shops/${shopId}/orders/${order.pancakeOrderId}`,
-              {
-                products: pancakeProducts,
-                warehouse_id: order.warehouseId || undefined,
-                discount: totalDiscount,
-                cod: newMoneyToCollect
-              },
-              {
-                params: { api_key: apiKey },
-                headers: { 'Content-Type': 'application/json' },
-                timeout: 10000
-              }
-            );
-          } catch (syncErr: any) {
-            logger.error('Error syncing products to Pancake POS on approval', {
+          if (isSandboxEnvironment()) {
+            logSandboxBlockedAction('patchProductsToPancakeOnApproval (approveReport)', {
               pancakeOrderId: order.pancakeOrderId,
-              error: syncErr.message
+              productsCount: pancakeProducts.length,
+              warehouseId: order.warehouseId,
+              discount: totalDiscount,
+              cod: newMoneyToCollect
             });
+          } else {
+            try {
+              await axios.patch(
+                `https://pos.pages.fm/api/v1/shops/${shopId}/orders/${order.pancakeOrderId}`,
+                {
+                  products: pancakeProducts,
+                  warehouse_id: order.warehouseId || undefined,
+                  discount: totalDiscount,
+                  cod: newMoneyToCollect
+                },
+                {
+                  params: { api_key: apiKey },
+                  headers: { 'Content-Type': 'application/json' },
+                  timeout: 10000
+                }
+              );
+            } catch (syncErr: any) {
+              logger.error('Error syncing products to Pancake POS on approval', {
+                pancakeOrderId: order.pancakeOrderId,
+                error: syncErr.message
+              });
+            }
           }
         }
       }

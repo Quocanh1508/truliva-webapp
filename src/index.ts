@@ -267,17 +267,19 @@ const server = app.listen(PORT, () => {
     logger.error('[ComboService] Failed to initialize combo cache', { error: err.message });
   });
 
-  // Khởi động lập lịch đồng bộ đơn hàng tự động từ Pancake POS
-  startOrderSyncScheduler(5); // Chạy định kỳ mỗi 5 phút
+  // Khởi động lập lịch đồng bộ đơn hàng & sản phẩm từ Pancake POS
+  if (process.env.PANCAKE_SYNC_ENABLED !== 'false') {
+    startOrderSyncScheduler(5); // Chạy định kỳ mỗi 5 phút
+    startProductSyncScheduler(12); // Đồng bộ sản phẩm & tồn kho mỗi 12 tiếng
+  } else {
+    logger.info('[Startup] Pancake POS background sync schedulers disabled via PANCAKE_SYNC_ENABLED=false');
+  }
 
   // [VÔ HIỆU HÓA] Tuân thủ Rule 7 - ZERO HARD-DELETE POLICY: Tuyệt đối không xóa ServiceReport cũ
   // startReportCleanupScheduler();
 
-  // Khởi động lập lịch tự động đồng bộ lại đơn lỗi sang Pancake POS
+  // Khởi động lập lịch tự động đồng bộ lại đơn lỗi sang Pancake POS (đã có Sandbox Guard bên trong)
   startPancakeRetryScheduler(10); // Chạy định kỳ mỗi 10 phút
-
-  // Khởi động lập lịch đồng bộ sản phẩm & tồn kho từ Pancake POS (mỗi 12 tiếng)
-  startProductSyncScheduler(12);
 
   // Khởi động MQTT service kết nối Mosquitto broker cho IoT
   startMqttService();

@@ -3,6 +3,7 @@ import logger from '../utils/logger';
 import axios from 'axios';
 import { syncOrderInventoryState } from './inventoryService';
 import { broadcastEvent } from './websocketService';
+import { isSandboxEnvironment, logSandboxBlockedAction } from '../utils/sandboxGuard';
 
 /**
  * Xử lý event "orders" từ Pancake webhook.
@@ -546,9 +547,8 @@ async function markFailed(rawEventId: string, errorLog: string) {
  */
 export async function syncOrderStatusToPancake(pancakeOrderId: number, adminStatus: string): Promise<string> {
   // ═══ CHỐT CHẶN SANDBOX: TUYỆT ĐỐI KHÔNG GHI SANG PANCAKE POS KHI ĐANG Ở MÔI TRƯỜNG SANDBOX ═══
-  const dbUrl = process.env.DATABASE_URL || '';
-  if (dbUrl.includes('sandbox')) {
-    logger.info('[SANDBOX GUARD] Blocked syncOrderStatusToPancake - Sandbox environment detected. No POS write allowed.', { pancakeOrderId, adminStatus });
+  if (isSandboxEnvironment()) {
+    logSandboxBlockedAction('syncOrderStatusToPancake', { pancakeOrderId, adminStatus });
     return 'SUCCESS';
   }
 

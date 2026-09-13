@@ -11,6 +11,7 @@ import { syncOrderInventoryState } from '../services/inventoryService';
 import { broadcastEvent } from '../services/websocketService';
 import ExcelJS from 'exceljs';
 import axios from 'axios';
+import { isSandboxEnvironment, logSandboxBlockedAction } from '../utils/sandboxGuard';
 
 import { buildOrderFilter } from '../services/orderService';
 
@@ -1834,21 +1835,28 @@ export async function updateOrder(req: Request, res: Response): Promise<void> {
         }
 
         if (shouldSyncWarehouseToPancake && warehouseId) {
-          logger.info('Syncing warehouse change to Pancake POS', { pancakeOrderId: oldOrder.pancakeOrderId, warehouseId });
-          const updateResponse = await axios.patch(
-            `https://pos.pages.fm/api/v1/shops/${shopId}/orders/${oldOrder.pancakeOrderId}`,
-            {
-              warehouse_id: warehouseId
-            },
-            {
-              params: { api_key: apiKey },
-              headers: { 'Content-Type': 'application/json' },
-              timeout: 10000
-            }
-          );
+          if (isSandboxEnvironment()) {
+            logSandboxBlockedAction('syncWarehouseChangeToPancake (updateOrder)', {
+              pancakeOrderId: oldOrder.pancakeOrderId,
+              warehouseId
+            });
+          } else {
+            logger.info('Syncing warehouse change to Pancake POS', { pancakeOrderId: oldOrder.pancakeOrderId, warehouseId });
+            const updateResponse = await axios.patch(
+              `https://pos.pages.fm/api/v1/shops/${shopId}/orders/${oldOrder.pancakeOrderId}`,
+              {
+                warehouse_id: warehouseId
+              },
+              {
+                params: { api_key: apiKey },
+                headers: { 'Content-Type': 'application/json' },
+                timeout: 10000
+              }
+            );
 
-          if (!updateResponse.data || !updateResponse.data.success) {
-            throw new Error(updateResponse.data?.message || 'Yêu cầu đổi kho thất bại trên Pancake POS');
+            if (!updateResponse.data || !updateResponse.data.success) {
+              throw new Error(updateResponse.data?.message || 'Yêu cầu đổi kho thất bại trên Pancake POS');
+            }
           }
         } else {
           logger.info('Bypassed syncing warehouse change to Pancake POS (not deducting inventory)', {
@@ -2437,15 +2445,22 @@ export async function bulkAssignOrders(req: Request, res: Response): Promise<voi
           }
 
           if (shouldSyncWarehouseToPancake && warehouseId && apiKey) {
-            await axios.patch(
-              `https://pos.pages.fm/api/v1/shops/${shopId}/orders/${oldOrder.pancakeOrderId}`,
-              { warehouse_id: warehouseId },
-              {
-                params: { api_key: apiKey },
-                headers: { 'Content-Type': 'application/json' },
-                timeout: 10000
-              }
-            );
+            if (isSandboxEnvironment()) {
+              logSandboxBlockedAction('syncWarehouseChangeToPancake (bulkAssignOrders)', {
+                pancakeOrderId: oldOrder.pancakeOrderId,
+                warehouseId
+              });
+            } else {
+              await axios.patch(
+                `https://pos.pages.fm/api/v1/shops/${shopId}/orders/${oldOrder.pancakeOrderId}`,
+                { warehouse_id: warehouseId },
+                {
+                  params: { api_key: apiKey },
+                  headers: { 'Content-Type': 'application/json' },
+                  timeout: 10000
+                }
+              );
+            }
           }
 
           updateData.warehouseId = warehouseId;
