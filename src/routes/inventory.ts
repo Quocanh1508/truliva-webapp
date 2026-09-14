@@ -90,7 +90,7 @@ router.get('/stock', async (req: Request, res: Response): Promise<void> => {
         sku: p.sku,
         name: p.name,
         category: p.category,
-        imageUrl: p.imageUrl,
+        imageUrl: p.imageUrl || ((p.rawData as any)?.images?.[0]) || null,
         sellingPrice: p.sellingPrice,
         availableStock: p.availableStock ?? 0,
         totalStock: p.totalStock ?? 0,
@@ -167,6 +167,7 @@ router.get('/export', async (req: Request, res: Response): Promise<void> => {
       warehouses, 
       lowStockThreshold: thresholdStr,
       showOnlyLowStock,
+      showOnlyOutOfStock,
       showOnlyInStock 
     } = req.query;
 
@@ -246,21 +247,21 @@ router.get('/export', async (req: Request, res: Response): Promise<void> => {
       }
     }
 
-    // Lọc theo trạng thái Sắp hết hàng
-    if (String(showOnlyLowStock) === 'true') {
+    // Lọc theo trạng thái Hết hàng (lượng tồn <= 0)
+    if (String(showOnlyOutOfStock) === 'true' || String(showOnlyLowStock) === 'true') {
       productsData = productsData.filter(p => 
         selectedWarehouseIds.some(wId => {
           const qty = p.stocks[wId] ?? 0;
-          return qty <= lowStockThreshold;
+          return qty <= 0;
         })
       );
     } 
-    // Lọc theo trạng thái Còn hàng
+    // Lọc theo trạng thái Còn hàng (lượng tồn > 0)
     else if (String(showOnlyInStock) === 'true') {
       productsData = productsData.filter(p => 
         selectedWarehouseIds.some(wId => {
           const qty = p.stocks[wId] ?? 0;
-          return qty > lowStockThreshold;
+          return qty > 0;
         })
       );
     }

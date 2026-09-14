@@ -25,10 +25,28 @@ export async function syncAllProducts(): Promise<void> {
 }
 
 /**
- * Khởi động bộ lập lịch đồng bộ sản phẩm tự động (chạy ngầm mỗi 12 tiếng - 2 lần/ngày).
+ * Lấy giờ hiện tại theo múi giờ Việt Nam (UTC+7)
  */
-export function startProductSyncScheduler(intervalHours: number = 12): void {
-  logger.info(`[ProductSync] Initializing auto products sync scheduler every ${intervalHours} hours...`);
+export function getVietnamHour(): number {
+  const now = new Date();
+  return (now.getUTCHours() + 7) % 24;
+}
+
+/**
+ * Kiểm tra xem hiện tại có thuộc khung giờ hành chính (08:00 - 18:00) không
+ */
+export function isWorkingHours(): boolean {
+  const vnHour = getVietnamHour();
+  return vnHour >= 8 && vnHour < 18;
+}
+
+/**
+ * Khởi động bộ lập lịch đồng bộ sản phẩm tự động:
+ * - Trong giờ hành chính (08:00 - 18:00): Chạy mỗi 30 phút để số liệu tồn kho luôn mới.
+ * - Ngoài giờ hành chính: Chạy mỗi 2 tiếng (120 phút) để tiết kiệm tài nguyên.
+ */
+export function startProductSyncScheduler(workingIntervalMinutes: number = 30, offHoursIntervalMinutes: number = 120): void {
+  logger.info(`[ProductSync] Initializing auto products sync scheduler (${workingIntervalMinutes} mins during 08:00-18:00, ${offHoursIntervalMinutes} mins off-hours)...`);
   
   // Chạy lần đầu tiên sau khi khởi động server 30 giây
   setTimeout(() => {
@@ -38,11 +56,33 @@ export function startProductSyncScheduler(intervalHours: number = 12): void {
     });
   }, 30 * 1000); 
 
-  // Thiết lập interval chạy định kỳ
+  // Bộ định thời kiểm tra mỗi workingIntervalMinutes (mặc định 30 phút)
+  const checkIntervalMs = workingIntervalMinutes * 60 * 1000;
+  const offHoursMultiplier = Math.max(1, Math.round(offHoursIntervalMinutes / workingIntervalMinutes));
+  let offHoursTickCount = 0;
+
   setInterval(() => {
-    logger.info('[ProductSync] Running scheduled products sync...');
-    syncAllProducts().catch(err => {
-      logger.error('[ProductSync] Scheduled auto products sync failed', { error: err.message });
-    });
-  }, intervalHours * 60 * 60 * 1000);
+    const vnHour = getVietnamHour();
+    const inWorkHours = isWorkingHours();
+
+    if (inWorkHours) {
+      logger.info(`[ProductSync] [WorkHours ${vnHour}h] Running scheduled products sync...`);
+      syncAllProducts().catch(err => {
+        logger.error('[ProductSync] Scheduled work-hours products sync failed', { error: err.message });
+      });
+      offHoursTickCount = 0;
+    } else {
+      offHoursTickCount++;
+      if (offHoursTickCount >= offHoursMultiplier) {
+        logger.info(`[ProductSync] [OffHours ${vnHour}h] Running scheduled products sync (${offHoursIntervalMinutes}m interval)...`);
+        syncAllProducts().catch(err => {
+          logger.error('[ProductSync] Scheduled off-hours products sync failed', { error: err.message });
+        });
+        offHoursTickCount = 0;
+      } else {
+        const remainingMins = (offHoursMultiplier - offHoursTickCount) * workingIntervalMinutes;
+        logger.info(`[ProductSync] [OffHours ${vnHour}h] Skipping sync. Next off-hours sync in ~${remainingMins} minutes.`);
+      }
+    }
+  }, checkIntervalMs);
 }

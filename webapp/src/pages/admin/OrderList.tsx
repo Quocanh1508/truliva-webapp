@@ -6,6 +6,7 @@ import { WARRANTY_SERVICE_GROUPS, REPAIR_SERVICE_GROUPS, WORK_TYPE_SERVICES } fr
 import { useConfirm } from '../../context/ConfirmContext';
 import DateRangePicker from '../../components/DateRangePicker';
 import CategoryTreeSelect from '../../components/CategoryTreeSelect';
+import ProductTreeSelect from '../../components/ProductTreeSelect';
 import { formatOrderId } from '../../utils/text';
 import { useAuth } from '../../context/AuthContext';
 import { usePermission } from '../../context/PermissionContext';
@@ -3830,9 +3831,9 @@ export default function OrderList() {
 
                   {/* Search and add product dropdown */}
                   <div className="w-full">
-                    <CategoryTreeSelect
+                    <ProductTreeSelect
                       categories={Array.from(new Set(productsStock.map(p => p.category).filter(Boolean))) as string[]}
-                      products={productsStock.map(p => ({ name: p.name, category: p.category, sku: p.sku }))}
+                      products={productsStock}
                       selected={tempItems.map(item => {
                         const matched = productsStock.find(p => 
                           (item.sku && p.sku === item.sku) ||
@@ -3840,6 +3841,8 @@ export default function OrderList() {
                         );
                         return `PROD:${matched ? matched.name : item.productName}`;
                       })}
+                      selectedWarehouseId={selectedWarehouseId}
+                      warehouses={warehouses}
                       placeholder="-- Chọn/thêm sản phẩm vào đơn --"
                       onChange={(nextSelected) => {
                         const nextProductNames = nextSelected
@@ -4899,10 +4902,12 @@ export default function OrderList() {
                   )}
 
                   <div className="w-full">
-                    <CategoryTreeSelect
+                    <ProductTreeSelect
                       categories={Array.from(new Set(productsStock.map(p => p.category).filter(Boolean))) as string[]}
-                      products={productsStock.map(p => ({ name: p.name, category: p.category, sku: p.sku }))}
+                      products={productsStock}
                       selected={newOrderForm.items.map(item => `PROD:${item.productName}`)}
+                      selectedWarehouseId={selectedWarehouseId}
+                      warehouses={warehouses}
                       placeholder="-- Chọn sản phẩm --"
                       onChange={(nextSelected) => {
                         const nextProductNames = nextSelected

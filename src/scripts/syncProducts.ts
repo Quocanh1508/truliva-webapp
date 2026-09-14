@@ -68,12 +68,16 @@ export async function syncProducts() {
         const isProductHidden = Boolean(productInfo.is_hidden || productInfo.is_removed || productInfo.is_locked);
         const isActive = !(isItemHidden || isProductHidden);
 
+        // Trích xuất URL ảnh sản phẩm từ Pancake (images[] của variation)
+        const imageUrl = (item.images && item.images.length > 0) ? item.images[0] : null;
+
         await prisma.product.upsert({
           where: { pancakeProductId: pancakeProductId },
           update: {
             sku,
             name,
             category: categoryName,
+            imageUrl,
             costPrice,
             sellingPrice,
             availableStock,
@@ -87,6 +91,7 @@ export async function syncProducts() {
             sku,
             name,
             category: categoryName,
+            imageUrl,
             costPrice,
             sellingPrice,
             availableStock,
