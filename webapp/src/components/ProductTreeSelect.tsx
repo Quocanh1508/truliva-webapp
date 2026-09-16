@@ -59,6 +59,7 @@ interface ProductTreeSelectProps {
   selectedWarehouseId?: string;
   warehouses?: Warehouse[];
   placeholder?: string;
+  onOpenChange?: (isOpen: boolean) => void;
 }
 
 // ── Format helpers ──
@@ -75,7 +76,8 @@ export default function ProductTreeSelect({
   onChange,
   selectedWarehouseId = '',
   warehouses = [],
-  placeholder = '-- Chọn sản phẩm --'
+  placeholder = '-- Chọn sản phẩm --',
+  onOpenChange
 }: ProductTreeSelectProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
@@ -84,6 +86,14 @@ export default function ProductTreeSelect({
   const [onlyInStock, setOnlyInStock] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
+
+  // Notify parent component when dropdown opens or closes (for modal auto-expansion)
+  useEffect(() => {
+    onOpenChange?.(isOpen);
+    return () => {
+      onOpenChange?.(false);
+    };
+  }, [isOpen, onOpenChange]);
 
   // Close dropdown on outside click
   useEffect(() => {
@@ -383,12 +393,12 @@ export default function ProductTreeSelect({
             )}
 
             {/* Stock info + Detail toggle */}
-            <div className="flex items-center justify-between gap-1 mt-1">
-              <div className="flex items-center gap-2 text-[11px]">
+            <div className="flex items-center justify-between gap-1 mt-1 flex-wrap sm:flex-nowrap">
+              <div className="flex items-center gap-1.5 text-[11px] flex-wrap">
                 <span className={`px-1.5 py-0.5 rounded border font-bold ${badge.bg}`}>
                   {badge.text}
                 </span>
-                <span className="text-slate-500">
+                <span className="text-slate-500 whitespace-nowrap">
                   {warehouseName}: <span className="font-semibold text-blue-700">{available}</span>
                   <span className="mx-1 text-slate-300">|</span>
                   Tồn TT: <span className="font-semibold text-purple-700">{actual}</span>
@@ -579,8 +589,7 @@ export default function ProductTreeSelect({
       {isOpen && (
         <div
           ref={dropdownRef}
-          className="absolute top-[100%] left-0 z-50 mt-1 bg-white border border-slate-200 rounded-xl shadow-2xl p-3 flex flex-col gap-2.5"
-          style={{ minWidth: '380px', maxWidth: '90vw', width: '100%' }}
+          className="absolute top-[100%] left-0 right-0 z-50 mt-1 bg-white border border-slate-200 rounded-xl shadow-2xl p-3 flex flex-col gap-2.5 w-full"
         >
           {/* Search Bar + In-stock toggle */}
           <div className="flex items-center gap-2">
@@ -630,7 +639,7 @@ export default function ProductTreeSelect({
           </div>
 
           {/* Tree Scrollable Area */}
-          <div className="max-h-72 overflow-y-auto flex flex-col gap-0.5 pr-1 relative">
+          <div className="max-h-72 overflow-y-auto overflow-x-hidden flex flex-col gap-0.5 pr-1 relative">
             {visibleTree.map(node => renderNode(node))}
             {visibleTree.length === 0 && (
               <span className="text-xs text-slate-400 italic p-3 text-center">

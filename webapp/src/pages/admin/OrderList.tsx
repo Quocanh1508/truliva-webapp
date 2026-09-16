@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { getOrders, updateOrder, getKtvUsers, getStations, getOrderAuditLog, syncOrders, syncSingleOrder, getFiltersData, fetchApi, createOrder, searchCustomers, bulkAssignOrders, bulkCancelOrders } from '../../api/client';
-import { Search, ChevronLeft, ChevronRight, History, XCircle, Filter, RefreshCw, FileText, CheckCircle2, ClipboardCheck, Copy, UserPlus, Download, Wrench, Settings, FolderOpen, Building2, MapPin, Users, Calendar, Plus, AlertTriangle, ExternalLink, RotateCcw, Edit3, Tag, Trash2, User } from 'lucide-react';
+import { Search, ChevronLeft, ChevronRight, History, XCircle, Filter, RefreshCw, FileText, CheckCircle2, ClipboardCheck, Copy, UserPlus, Download, Wrench, Settings, FolderOpen, Building2, MapPin, Users, Calendar, Plus, AlertTriangle, ExternalLink, RotateCcw, Edit3, Tag, Trash2, User, Maximize2, Minimize2 } from 'lucide-react';
 import { WARRANTY_SERVICE_GROUPS, REPAIR_SERVICE_GROUPS, WORK_TYPE_SERVICES } from '../../utils/workTypes';
 import { useConfirm } from '../../context/ConfirmContext';
 import DateRangePicker from '../../components/DateRangePicker';
@@ -490,6 +490,15 @@ export default function OrderList() {
     hotlineTicketId: ''
   });
 
+  // Tự động mở rộng Modal khi danh sách chọn sản phẩm ProductTreeSelect mở ra, hoặc người dùng chủ động mở rộng
+  const [isCreateProductSelectOpen, setIsCreateProductSelectOpen] = useState(false);
+  const [isManualCreateModalExpanded, setIsManualCreateModalExpanded] = useState(false);
+  const isCreateModalWide = isCreateProductSelectOpen || isManualCreateModalExpanded;
+
+  const [isAssignProductSelectOpen, setIsAssignProductSelectOpen] = useState(false);
+  const [isAssignModalExpanded, setIsAssignModalExpanded] = useState(false);
+  const isAssignModalWide = isAssignProductSelectOpen || isAssignModalExpanded;
+
   // Tự động mở modal và điền sẵn thông tin khi chuyển từ Hotline Ticket
   useEffect(() => {
     if (location.state?.createFromTicket) {
@@ -780,6 +789,8 @@ export default function OrderList() {
       }
       setShowCreateModal(false);
       setEditingOrderId(null);
+      setIsCreateProductSelectOpen(false);
+      setIsManualCreateModalExpanded(false);
       setPage(1);
       fetchOrdersData();
     } catch (err: any) {
@@ -1550,6 +1561,8 @@ export default function OrderList() {
         promoCode: assignPromoCode || null
       });
       setAssignModal(null);
+      setIsAssignProductSelectOpen(false);
+      setIsAssignModalExpanded(false);
       fetchOrdersData();
     } catch (err: any) {
       alert(err.message);
@@ -3597,40 +3610,68 @@ export default function OrderList() {
 
       {/* ASSIGN MODAL (Truliva Flow) */}
       {assignModal?.isOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-          <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl overflow-hidden flex flex-col max-h-[90vh]">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-2 sm:p-4 backdrop-blur-2xs transition-all duration-300">
+          <div className={`bg-white rounded-xl shadow-2xl w-full overflow-hidden flex flex-col max-h-[92vh] transition-all duration-300 ease-in-out ${
+            isAssignModalWide ? 'max-w-5xl' : 'max-w-2xl'
+          }`}>
             <div className="px-6 py-4 border-b border-gray-200 bg-gray-50 flex justify-between items-center">
-              <h3 className="text-lg font-bold text-gray-900 flex items-center flex-wrap gap-2">
-                <span>Chi tiết & Phân bổ Yêu cầu {formatOrderId(assignModal.order.pancakeOrderId)}</span>
-                {(() => {
-                  const o = assignModal.order;
-                  if (o.orderSource && /shopee|lazada|tiktok|tiki/i.test(o.orderSource)) {
-                    try {
-                      const raw = typeof o.rawData === 'string' ? JSON.parse(o.rawData) : o.rawData;
-                      const originalId = raw?.id;
-                      if (originalId) {
-                        return (
-                          <span 
-                            onClick={() => {
-                              copyToClipboard(String(originalId));
-                              alert(`Đã sao chép mã đơn gốc: ${originalId}`);
-                            }}
-                            className="text-xs font-normal text-gray-500 font-mono bg-gray-100 border border-gray-200 rounded px-2 py-0.5 cursor-pointer hover:text-blue-600 hover:bg-blue-50 transition-colors"
-                            title="Click để sao chép mã đơn gốc từ POS"
-                          >
-                            Mã gốc: {originalId}
-                          </span>
-                        );
-                      }
-                    } catch (e) {}
-                  }
-                  return null;
-                })()}
-              </h3>
-              <button onClick={() => setAssignModal(null)} className="text-gray-400 hover:text-gray-600"><XCircle size={24} /></button>
+              <div className="flex items-center gap-2.5 flex-wrap">
+                <h3 className="text-lg font-bold text-gray-900 flex items-center flex-wrap gap-2">
+                  <span>Chi tiết & Phân bổ Yêu cầu {formatOrderId(assignModal.order.pancakeOrderId)}</span>
+                  {(() => {
+                    const o = assignModal.order;
+                    if (o.orderSource && /shopee|lazada|tiktok|tiki/i.test(o.orderSource)) {
+                      try {
+                        const raw = typeof o.rawData === 'string' ? JSON.parse(o.rawData) : o.rawData;
+                        const originalId = raw?.id;
+                        if (originalId) {
+                          return (
+                            <span 
+                              onClick={() => {
+                                copyToClipboard(String(originalId));
+                                alert(`Đã sao chép mã đơn gốc: ${originalId}`);
+                              }}
+                              className="text-xs font-normal text-gray-500 font-mono bg-gray-100 border border-gray-200 rounded px-2 py-0.5 cursor-pointer hover:text-blue-600 hover:bg-blue-50 transition-colors"
+                              title="Click để sao chép mã đơn gốc từ POS"
+                            >
+                              Mã gốc: {originalId}
+                            </span>
+                          );
+                        }
+                      } catch (e) {}
+                    }
+                    return null;
+                  })()}
+                </h3>
+                {isAssignModalWide && (
+                  <span className="hidden sm:inline-flex items-center gap-1 text-[11px] font-semibold text-blue-700 bg-blue-50 border border-blue-200 px-2 py-0.5 rounded-full animate-fade-in">
+                    <span>✨ Tự động mở rộng</span>
+                  </span>
+                )}
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setIsAssignModalExpanded(!isAssignModalExpanded)}
+                  className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors cursor-pointer"
+                  title={isAssignModalWide ? "Thu nhỏ cửa sổ" : "Mở rộng cửa sổ"}
+                >
+                  {isAssignModalWide ? <Minimize2 size={18} /> : <Maximize2 size={18} />}
+                </button>
+                <button 
+                  onClick={() => { 
+                    setAssignModal(null); 
+                    setIsAssignProductSelectOpen(false); 
+                    setIsAssignModalExpanded(false); 
+                  }} 
+                  className="text-gray-400 hover:text-gray-600 transition-colors p-1 hover:bg-gray-100 rounded-lg"
+                >
+                  <XCircle size={22} />
+                </button>
+              </div>
             </div>
 
-            <div className="p-6 overflow-auto flex-1 grid grid-cols-2 gap-6">
+            <div className="p-6 overflow-y-auto overflow-x-hidden flex-1 grid grid-cols-1 md:grid-cols-2 gap-6">
               {/* Cột trái: Phân loại */}
               <div className="space-y-4">
                 <h4 className="font-semibold text-gray-800 border-b pb-2">1. Phân loại Yêu cầu</h4>
@@ -3855,6 +3896,7 @@ export default function OrderList() {
                       selectedWarehouseId={selectedWarehouseId}
                       warehouses={warehouses}
                       placeholder="-- Chọn/thêm sản phẩm vào đơn --"
+                      onOpenChange={setIsAssignProductSelectOpen}
                       onChange={(nextSelected) => {
                         const nextProductNames = nextSelected
                           .filter(id => id.startsWith('PROD:'))
@@ -4324,7 +4366,16 @@ export default function OrderList() {
             </div>
 
             <div className="px-6 py-4 border-t border-gray-200 bg-gray-50 flex justify-end gap-3">
-              <button onClick={() => setAssignModal(null)} className="px-4 py-2 bg-white border rounded text-gray-700 hover:bg-gray-100">Hủy</button>
+              <button 
+                onClick={() => { 
+                  setAssignModal(null); 
+                  setIsAssignProductSelectOpen(false); 
+                  setIsAssignModalExpanded(false); 
+                }} 
+                className="px-4 py-2 bg-white border rounded text-gray-700 hover:bg-gray-100"
+              >
+                Hủy
+              </button>
               <button onClick={submitAssign} className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">Lưu thông tin & Phân bổ</button>
             </div>
           </div>
@@ -4590,14 +4641,43 @@ export default function OrderList() {
 
       {/* CREATE MANUAL ORDER MODAL */}
       {showCreateModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-          <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl overflow-hidden flex flex-col max-h-[90vh]">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-2 sm:p-4 backdrop-blur-2xs transition-all duration-300">
+          <div className={`bg-white rounded-xl shadow-2xl w-full overflow-hidden flex flex-col max-h-[92vh] transition-all duration-300 ease-in-out ${
+            isCreateModalWide ? 'max-w-5xl' : 'max-w-2xl'
+          }`}>
             <div className="px-6 py-4 border-b border-gray-200 bg-gray-50 flex justify-between items-center">
-              <h3 className="text-lg font-bold text-gray-900">{editingOrderId ? 'Cập nhật ca dịch vụ độc lập' : 'Tạo ca dịch vụ độc lập'}</h3>
-              <button onClick={() => { setShowCreateModal(false); setEditingOrderId(null); }} className="text-gray-400 hover:text-gray-600"><XCircle size={24} /></button>
+              <div className="flex items-center gap-2.5">
+                <h3 className="text-lg font-bold text-gray-900">{editingOrderId ? 'Cập nhật ca dịch vụ độc lập' : 'Tạo ca dịch vụ độc lập'}</h3>
+                {isCreateModalWide && (
+                  <span className="hidden sm:inline-flex items-center gap-1 text-[11px] font-semibold text-blue-700 bg-blue-50 border border-blue-200 px-2 py-0.5 rounded-full animate-fade-in">
+                    <span>✨ Tự động mở rộng</span>
+                  </span>
+                )}
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setIsManualCreateModalExpanded(!isManualCreateModalExpanded)}
+                  className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors cursor-pointer"
+                  title={isCreateModalWide ? "Thu nhỏ cửa sổ" : "Mở rộng cửa sổ"}
+                >
+                  {isCreateModalWide ? <Minimize2 size={18} /> : <Maximize2 size={18} />}
+                </button>
+                <button 
+                  onClick={() => { 
+                    setShowCreateModal(false); 
+                    setEditingOrderId(null); 
+                    setIsCreateProductSelectOpen(false); 
+                    setIsManualCreateModalExpanded(false); 
+                  }} 
+                  className="text-gray-400 hover:text-gray-600 transition-colors p-1 hover:bg-gray-100 rounded-lg"
+                >
+                  <XCircle size={22} />
+                </button>
+              </div>
             </div>
 
-            <div className="p-6 overflow-auto flex-1 grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="p-6 overflow-y-auto overflow-x-hidden flex-1 grid grid-cols-1 md:grid-cols-2 gap-6">
               {/* Cột trái: Khách hàng */}
               <div className="space-y-4">
                 <h4 className="font-semibold text-gray-800 border-b pb-2">1. Thông tin Khách hàng</h4>
@@ -4937,6 +5017,7 @@ export default function OrderList() {
                       selectedWarehouseId={selectedWarehouseId}
                       warehouses={warehouses}
                       placeholder="-- Chọn sản phẩm --"
+                      onOpenChange={setIsCreateProductSelectOpen}
                       onChange={(nextSelected) => {
                         const nextProductNames = nextSelected
                           .filter(id => id.startsWith('PROD:'))
@@ -4998,7 +5079,17 @@ export default function OrderList() {
             </div>
 
             <div className="px-6 py-4 border-t border-gray-200 bg-gray-50 flex justify-end gap-3">
-              <button onClick={() => { setShowCreateModal(false); setEditingOrderId(null); }} className="px-4 py-2 bg-white border rounded text-gray-700 hover:bg-gray-100 text-sm font-semibold transition-colors">Hủy</button>
+              <button 
+                onClick={() => { 
+                  setShowCreateModal(false); 
+                  setEditingOrderId(null); 
+                  setIsCreateProductSelectOpen(false); 
+                  setIsManualCreateModalExpanded(false); 
+                }} 
+                className="px-4 py-2 bg-white border rounded text-gray-700 hover:bg-gray-100 text-sm font-semibold transition-colors"
+              >
+                Hủy
+              </button>
               <button onClick={submitCreateManualOrder} className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm font-semibold shadow-sm transition-colors">{editingOrderId ? 'Cập nhật' : 'Tạo ca dịch vụ'}</button>
             </div>
           </div>
