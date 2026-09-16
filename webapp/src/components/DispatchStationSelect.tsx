@@ -197,27 +197,27 @@ export const DispatchStationSelect: React.FC<DispatchStationSelectProps> = ({
       return {
         badge: 'bg-emerald-50 text-emerald-700 border-emerald-200',
         dot: 'bg-emerald-500',
-        text: 'Rảnh (0 đơn)'
+        text: 'Sẵn sàng'
       };
     }
     if (count <= 2) {
       return {
         badge: 'bg-blue-50 text-blue-700 border-blue-200',
         dot: 'bg-blue-500',
-        text: `Tải nhẹ (${count} đơn)`
+        text: `Tải nhẹ (${count})`
       };
     }
     if (count <= 4) {
       return {
         badge: 'bg-amber-50 text-amber-700 border-amber-200',
         dot: 'bg-amber-500',
-        text: `Tải TB (${count} đơn)`
+        text: `Tải TB (${count})`
       };
     }
     return {
       badge: 'bg-rose-50 text-rose-700 border-rose-200',
       dot: 'bg-rose-500',
-      text: `Tải cao (${count} đơn)`
+      text: `Tải cao (${count})`
     };
   };
 
@@ -674,36 +674,34 @@ export const DispatchStationSelect: React.FC<DispatchStationSelectProps> = ({
                       <div className={`w-8 h-8 rounded-lg flex items-center justify-center font-bold text-xs shrink-0 ${
                         isSelected 
                           ? 'bg-emerald-600 text-white' 
-                          : isSuggested 
-                          ? 'bg-blue-600 text-white' 
                           : 'bg-slate-100 text-slate-700'
                       }`}>
                         {k.fullName ? k.fullName.charAt(0).toUpperCase() : 'K'}
                       </div>
                       <div className="min-w-0 flex-1">
-                        <div className="flex items-center gap-2">
-                          <span className="font-bold text-slate-900 truncate">
+                        <div className="flex items-center gap-1.5 min-w-0">
+                          <span className="font-bold text-slate-900 text-xs truncate" title={k.fullName}>
                             {k.fullName}
                           </span>
                           {isSuggested && (
-                            <span className="text-[9px] bg-blue-100 text-blue-700 font-bold px-1.5 py-0.2 rounded shrink-0 flex items-center gap-0.5">
-                              <Sparkles size={10} /> Đề xuất rảnh nhất
+                            <span className="text-[9px] bg-blue-50 text-blue-700 border border-blue-200 font-semibold px-1.5 py-0.2 rounded shrink-0 whitespace-nowrap flex items-center gap-0.5">
+                              <Sparkles size={9} /> Ưu tiên
                             </span>
                           )}
                         </div>
-                        <div className="flex items-center gap-2 text-[11px] text-slate-500 mt-0.5">
-                          {k.phoneNumber && <span>{k.phoneNumber}</span>}
-                          <span>•</span>
+                        <div className="flex items-center gap-1.5 text-[11px] text-slate-500 mt-0.5 whitespace-nowrap">
+                          {k.phoneNumber && <span className="font-mono">{k.phoneNumber}</span>}
+                          {k.phoneNumber && <span>•</span>}
                           <span className="font-medium text-slate-600">
-                            {k.pendingOrderCount || 0} đơn đang làm
+                            {(k.pendingOrderCount || 0) === 0 ? '0 đơn' : `${k.pendingOrderCount} đơn`}
                           </span>
                         </div>
                       </div>
                     </div>
 
-                    <div className="flex items-center gap-2 shrink-0">
-                      <span className={`inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full border ${w.badge}`}>
-                        <span className={`w-1.5 h-1.5 rounded-full ${w.dot}`} />
+                    <div className="flex items-center gap-1.5 shrink-0 ml-1">
+                      <span className={`inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full border whitespace-nowrap ${w.badge}`}>
+                        <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${w.dot}`} />
                         <span>{w.text}</span>
                       </span>
                       {isSelected && <Check className="h-4 w-4 text-emerald-600 shrink-0" />}
