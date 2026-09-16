@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { Building2, MapPin, User, Search, X, ChevronDown, Check, Sparkles, AlertTriangle, ShieldCheck, Clock } from 'lucide-react';
+import { Building2, MapPin, User, Search, X, ChevronDown, Check, Sparkles, AlertTriangle, Clock } from 'lucide-react';
 import { matchesSearchTerm } from '../utils/text';
 
 export interface MainStationItem {
@@ -131,23 +131,19 @@ export const DispatchStationSelect: React.FC<DispatchStationSelectProps> = ({
     return stations.filter(s => matchesSearchTerm(s.name, mainSearch));
   }, [stations, mainSearch]);
 
-  // Process Tech Stations (Priority Hubs + Alphabetical)
-  const { topHubs, otherTechStations, filteredTechStations } = useMemo(() => {
-    if (!currentMain || !currentMain.techStations) {
-      return { topHubs: [], otherTechStations: [], filteredTechStations: [] };
-    }
+  // Process Tech Stations (Priority Hubs first + Alphabetical, uniform styling)
+  const sortedTechStations = useMemo(() => {
+    if (!currentMain || !currentMain.techStations) return [];
 
     const allTech = [...currentMain.techStations];
 
     if (techSearch.trim()) {
-      const filtered = allTech.filter(t => matchesSearchTerm(t.name, techSearch));
-      return { topHubs: [], otherTechStations: [], filteredTechStations: filtered };
+      return allTech.filter(t => matchesSearchTerm(t.name, techSearch));
     }
 
     const isTruliva = currentMain.name?.toLowerCase() === 'truliva';
     if (!isTruliva) {
-      const sorted = allTech.sort((a, b) => a.name.localeCompare(b.name, 'vi', { sensitivity: 'base' }));
-      return { topHubs: [], otherTechStations: sorted, filteredTechStations: sorted };
+      return allTech.sort((a, b) => a.name.localeCompare(b.name, 'vi', { sensitivity: 'base' }));
     }
 
     const hubs: TechStationItem[] = [];
@@ -176,7 +172,7 @@ export const DispatchStationSelect: React.FC<DispatchStationSelectProps> = ({
 
     others.sort((a, b) => a.name.localeCompare(b.name, 'vi', { sensitivity: 'base' }));
 
-    return { topHubs: hubs, otherTechStations: others, filteredTechStations: allTech };
+    return [...hubs, ...others];
   }, [currentMain, techSearch]);
 
   // Sorted & Filtered KTVs (least busy first, suggested KTV on top)
@@ -285,11 +281,6 @@ export const DispatchStationSelect: React.FC<DispatchStationSelectProps> = ({
             <Building2 className="w-3.5 h-3.5 text-[#1B3A6B]" />
             <span>Trạm chính *</span>
           </label>
-          {currentMain && (
-            <span className="text-[10px] font-semibold text-blue-700 bg-blue-50 border border-blue-200 px-1.5 py-0.5 rounded">
-              {currentMain.name?.toLowerCase() === 'truliva' ? 'Chính hãng Truliva' : 'Đối tác trạm'}
-            </span>
-          )}
         </div>
 
         <button
@@ -377,7 +368,6 @@ export const DispatchStationSelect: React.FC<DispatchStationSelectProps> = ({
             <div className="overflow-y-auto p-1.5 space-y-0.5">
               {filteredMainStations.map(s => {
                 const isSelected = s.id === selectedMainId;
-                const isTruliva = s.name?.toLowerCase() === 'truliva';
                 return (
                   <div
                     key={s.id}
@@ -394,17 +384,10 @@ export const DispatchStationSelect: React.FC<DispatchStationSelectProps> = ({
                     }`}
                   >
                     <div className="flex items-center gap-2 min-w-0">
-                      <div className={`w-6 h-6 rounded-md flex items-center justify-center shrink-0 ${
-                        isTruliva ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-600'
-                      }`}>
-                        {isTruliva ? <ShieldCheck size={14} /> : <Building2 size={13} />}
+                      <div className="w-6 h-6 rounded-md flex items-center justify-center shrink-0 bg-slate-100 text-slate-600">
+                        <Building2 size={13} />
                       </div>
                       <span className="truncate">{s.name}</span>
-                      {isTruliva && (
-                        <span className="text-[9px] bg-blue-100 text-blue-700 px-1 py-0.2 rounded font-semibold shrink-0">
-                          Chính hãng
-                        </span>
-                      )}
                     </div>
                     <div className="flex items-center gap-2 shrink-0">
                       {s.techStations && (
@@ -525,117 +508,35 @@ export const DispatchStationSelect: React.FC<DispatchStationSelectProps> = ({
               </div>
             </div>
 
-            <div className="overflow-y-auto p-1.5 space-y-2">
-              {/* Nếu có kết quả search */}
-              {techSearch.trim() ? (
-                <div className="space-y-0.5">
-                  <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400 px-2 py-1">
-                    Kết quả tìm kiếm ({filteredTechStations.length})
+            <div className="overflow-y-auto p-1.5 space-y-0.5">
+              {sortedTechStations.map(t => {
+                const isSelected = t.id === selectedTechId;
+                return (
+                  <div
+                    key={t.id}
+                    onClick={() => {
+                      onTechChange(t.id);
+                      onKtvChange('');
+                      setIsTechOpen(false);
+                    }}
+                    className={`flex items-center justify-between p-2 rounded-lg cursor-pointer transition-colors text-xs select-none ${
+                      isSelected
+                        ? 'bg-indigo-50 text-indigo-900 font-bold border border-indigo-200'
+                        : 'hover:bg-slate-50 text-slate-800 border border-transparent'
+                    }`}
+                  >
+                    <div className="flex items-center gap-2 truncate">
+                      <MapPin size={13} className={isSelected ? 'text-indigo-600' : 'text-slate-400'} />
+                      <span className="truncate">{t.name}</span>
+                    </div>
+                    {isSelected && <Check className="h-4 w-4 text-indigo-600 shrink-0" />}
                   </div>
-                  {filteredTechStations.map(t => {
-                    const isSelected = t.id === selectedTechId;
-                    return (
-                      <div
-                        key={t.id}
-                        onClick={() => {
-                          onTechChange(t.id);
-                          onKtvChange('');
-                          setIsTechOpen(false);
-                        }}
-                        className={`flex items-center justify-between p-2 rounded-lg cursor-pointer transition-colors text-xs select-none ${
-                          isSelected
-                            ? 'bg-indigo-50 text-indigo-900 font-bold border border-indigo-200'
-                            : 'hover:bg-slate-50 text-slate-800 border border-transparent'
-                        }`}
-                      >
-                        <div className="flex items-center gap-2 truncate">
-                          <MapPin size={13} className={isSelected ? 'text-indigo-600' : 'text-slate-400'} />
-                          <span className="truncate">{t.name}</span>
-                        </div>
-                        {isSelected && <Check className="h-4 w-4 text-indigo-600 shrink-0" />}
-                      </div>
-                    );
-                  })}
-                  {filteredTechStations.length === 0 && (
-                    <div className="p-4 text-center text-xs text-slate-400 italic">
-                      Không tìm thấy trạm nào khớp với "{techSearch}"
-                    </div>
-                  )}
+                );
+              })}
+              {sortedTechStations.length === 0 && (
+                <div className="p-4 text-center text-xs text-slate-400 italic">
+                  Không tìm thấy trạm nào khớp với "{techSearch}"
                 </div>
-              ) : (
-                <>
-                  {/* Khu vực trọng điểm (Top Hubs) */}
-                  {topHubs.length > 0 && (
-                    <div className="space-y-0.5">
-                      <div className="text-[10px] font-bold uppercase tracking-wider text-indigo-600 px-2 py-0.5 flex items-center gap-1">
-                        <Sparkles size={11} />
-                        <span>Khu vực trọng điểm</span>
-                      </div>
-                      {topHubs.map(t => {
-                        const isSelected = t.id === selectedTechId;
-                        return (
-                          <div
-                            key={t.id}
-                            onClick={() => {
-                              onTechChange(t.id);
-                              onKtvChange('');
-                              setIsTechOpen(false);
-                            }}
-                            className={`flex items-center justify-between p-2 rounded-lg cursor-pointer transition-colors text-xs select-none ${
-                              isSelected
-                                ? 'bg-indigo-50 text-indigo-900 font-bold border border-indigo-200'
-                                : 'bg-indigo-50/30 hover:bg-indigo-50/70 text-slate-800 border border-indigo-100/60'
-                            }`}
-                          >
-                            <div className="flex items-center gap-2 truncate">
-                              <MapPin size={13} className="text-indigo-600 shrink-0" />
-                              <span className="truncate font-semibold">{t.name}</span>
-                            </div>
-                            <div className="flex items-center gap-1.5 shrink-0">
-                              <span className="text-[9px] bg-indigo-100 text-indigo-700 px-1.5 py-0.2 rounded font-bold">
-                                Trọng điểm
-                              </span>
-                              {isSelected && <Check className="h-4 w-4 text-indigo-600" />}
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  )}
-
-                  {/* Các trạm / tỉnh thành khác */}
-                  {otherTechStations.length > 0 && (
-                    <div className="space-y-0.5 pt-1 border-t border-slate-100">
-                      <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400 px-2 py-0.5">
-                        Các tỉnh thành & Trạm khác ({otherTechStations.length})
-                      </div>
-                      {otherTechStations.map(t => {
-                        const isSelected = t.id === selectedTechId;
-                        return (
-                          <div
-                            key={t.id}
-                            onClick={() => {
-                              onTechChange(t.id);
-                              onKtvChange('');
-                              setIsTechOpen(false);
-                            }}
-                            className={`flex items-center justify-between p-2 rounded-lg cursor-pointer transition-colors text-xs select-none ${
-                              isSelected
-                                ? 'bg-indigo-50 text-indigo-900 font-bold border border-indigo-200'
-                                : 'hover:bg-slate-50 text-slate-800 border border-transparent'
-                            }`}
-                          >
-                            <div className="flex items-center gap-2 truncate">
-                              <MapPin size={13} className={isSelected ? 'text-indigo-600' : 'text-slate-400'} />
-                              <span className="truncate">{t.name}</span>
-                            </div>
-                            {isSelected && <Check className="h-4 w-4 text-indigo-600 shrink-0" />}
-                          </div>
-                        );
-                      })}
-                    </div>
-                  )}
-                </>
               )}
             </div>
           </div>
