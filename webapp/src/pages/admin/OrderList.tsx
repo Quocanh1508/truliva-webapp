@@ -3643,11 +3643,6 @@ export default function OrderList() {
                     return null;
                   })()}
                 </h3>
-                {isAssignModalWide && (
-                  <span className="hidden sm:inline-flex items-center gap-1 text-[11px] font-semibold text-blue-700 bg-blue-50 border border-blue-200 px-2 py-0.5 rounded-full animate-fade-in">
-                    <span>✨ Tự động mở rộng</span>
-                  </span>
-                )}
               </div>
               <div className="flex items-center gap-2">
                 <button
@@ -4648,11 +4643,6 @@ export default function OrderList() {
             <div className="px-6 py-4 border-b border-gray-200 bg-gray-50 flex justify-between items-center">
               <div className="flex items-center gap-2.5">
                 <h3 className="text-lg font-bold text-gray-900">{editingOrderId ? 'Cập nhật ca dịch vụ độc lập' : 'Tạo ca dịch vụ độc lập'}</h3>
-                {isCreateModalWide && (
-                  <span className="hidden sm:inline-flex items-center gap-1 text-[11px] font-semibold text-blue-700 bg-blue-50 border border-blue-200 px-2 py-0.5 rounded-full animate-fade-in">
-                    <span>✨ Tự động mở rộng</span>
-                  </span>
-                )}
               </div>
               <div className="flex items-center gap-2">
                 <button
