@@ -15,6 +15,7 @@ import ProvinceSelect from '../../components/ProvinceSelect';
 import { isValidProvince } from '../../utils/provinces';
 import { useStickyTableHeader } from '../../hooks/useStickyTableHeader';
 import { SalesKtvSelect } from '../../components/SalesKtvSelect';
+import { DispatchStationSelect } from '../../components/DispatchStationSelect';
 
 
 const ALL_SERVICE_TYPES = Array.from(new Set(Object.values(WORK_TYPE_SERVICES).flat()));
@@ -4210,153 +4211,56 @@ export default function OrderList() {
               </div>
 
               {/* Cột phải: Phân bổ */}
-              <div className="space-y-4">
+              <div className="space-y-4 pb-28">
                 <h4 className="font-semibold text-gray-800 border-b pb-2">2. Phân bổ Kỹ thuật viên</h4>
 
-                {/* Gợi ý phân bổ thông minh */}
-                {(suggestedMain || suggestedTech) && (
-                  <div className="p-3 bg-blue-50 border border-blue-200 rounded-md text-sm space-y-2 col-span-2">
-                    <div className="flex items-center space-x-1 text-blue-800 font-semibold">
-                      <span>💡 Gợi ý phân bổ thông minh:</span>
+                <DispatchStationSelect
+                  stations={stations}
+                  selectedMainId={selectedMain}
+                  onMainChange={(id) => {
+                    setSelectedMain(id);
+                    setSelectedTech('');
+                    setSelectedKtv('');
+                  }}
+                  selectedTechId={selectedTech}
+                  onTechChange={(id) => {
+                    setSelectedTech(id);
+                    setSelectedKtv('');
+                  }}
+                  ktvs={ktvs}
+                  selectedKtvId={selectedKtv}
+                  onKtvChange={setSelectedKtv}
+                  suggestedMain={suggestedMain}
+                  suggestedTech={suggestedTech}
+                  suggestedKtv={suggestedKtv}
+                  onApplySuggestions={() => {
+                    if (suggestedMain) setSelectedMain(suggestedMain.id);
+                    if (suggestedTech) {
+                      setSelectedTech(suggestedTech.id);
+                      if (suggestedKtv) {
+                        setKtvs([suggestedKtv]);
+                        setSelectedKtv(suggestedKtv.id);
+                      }
+                    }
+                  }}
+                >
+                  {/* KTV Bán Hàng (Hưởng hoa hồng) */}
+                  <div className="bg-emerald-50/50 p-3 rounded-xl border border-emerald-200/80 shadow-xs">
+                    <div className="flex items-center justify-between mb-1.5">
+                      <label className="block text-xs font-bold text-emerald-950 flex items-center gap-1.5">
+                        <span>🏷️ Tên KTV bán hàng (Hưởng hoa hồng)</span>
+                      </label>
+                      <span className="text-[10px] text-emerald-700 bg-emerald-100/70 px-1.5 py-0.5 rounded-md font-medium">
+                        Cố định • Không đổi khi sửa trạm/kho
+                      </span>
                     </div>
-                    <div className="text-gray-700 text-xs leading-relaxed">
-                      {suggestedMain && (
-                        <div>
-                          • Trạm chính gợi ý: <b>{suggestedMain.name}</b>
-                        </div>
-                      )}
-                      {suggestedTech && (
-                        <div>
-                          • Trạm kỹ thuật gợi ý: <b>{suggestedTech.name}</b>
-                        </div>
-                      )}
-                      {suggestedKtv && (
-                        <div>
-                          • KTV rảnh nhất khu vực: <b>{suggestedKtv.fullName}</b> ({suggestedKtv.pendingOrderCount || 0} đơn đang xử lý)
-                        </div>
-                      )}
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        if (suggestedMain) setSelectedMain(suggestedMain.id);
-                        if (suggestedTech) {
-                          setSelectedTech(suggestedTech.id);
-                          if (suggestedKtv) {
-                            setKtvs([suggestedKtv]);
-                            setSelectedKtv(suggestedKtv.id);
-                          }
-                        }
-                      }}
-                      className="w-full mt-1 bg-blue-600 text-white text-xs py-1.5 px-3 rounded hover:bg-blue-700 font-semibold transition-colors focus:outline-none"
-                    >
-                      Áp dụng gợi ý trạm & KTV
-                    </button>
+                    <SalesKtvSelect
+                      value={selectedSalesKtv}
+                      onChange={setSelectedSalesKtv}
+                      ktvs={allKtvs}
+                    />
                   </div>
-                )}
-
-                {/* KTV Bán Hàng (Hưởng hoa hồng) */}
-                <div className="bg-emerald-50/50 p-3 rounded-xl border border-emerald-200/80 shadow-xs">
-                  <div className="flex items-center justify-between mb-1.5">
-                    <label className="block text-xs font-bold text-emerald-950 flex items-center gap-1.5">
-                      <span>🏷️ Tên KTV bán hàng (Hưởng hoa hồng)</span>
-                    </label>
-                    <span className="text-[10px] text-emerald-700 bg-emerald-100/70 px-1.5 py-0.5 rounded-md font-medium">
-                      Cố định • Không đổi khi sửa trạm/kho
-                    </span>
-                  </div>
-                  <SalesKtvSelect
-                    value={selectedSalesKtv}
-                    onChange={setSelectedSalesKtv}
-                    ktvs={allKtvs}
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm text-gray-600 mb-1">Trạm chính</label>
-                  <select className="w-full border rounded p-2 text-sm outline-none focus:border-blue-500" value={selectedMain} onChange={e => { setSelectedMain(e.target.value); setSelectedTech(''); setSelectedKtv(''); }}>
-                    <option value="">-- Chọn Trạm chính --</option>
-                    {stations.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-sm text-gray-600 mb-1">Trạm kỹ thuật</label>
-                  <select className="w-full border rounded p-2 text-sm outline-none focus:border-blue-500" value={selectedTech} onChange={e => { setSelectedTech(e.target.value); setSelectedKtv(''); }} disabled={!selectedMain}>
-                    <option value="">-- Chọn Trạm Kỹ thuật --</option>
-                    {(() => {
-                      const currentMain = stations.find(s => s.id === selectedMain);
-                      if (!currentMain || !currentMain.techStations) return null;
-                      const isTruliva = currentMain.name?.toLowerCase() === 'truliva';
-                      const sortedTechStations = [...currentMain.techStations].sort((a, b) => {
-                        if (isTruliva) {
-                          const getPriority = (name: string) => {
-                            const n = name.toLowerCase();
-                            if (n.includes('hồ chí minh') || n.includes('hcm')) return 1;
-                            if (n.includes('hà nội')) return 2;
-                            if (n.includes('đà nẵng')) return 3;
-                            return 999;
-                          };
-                          const pA = getPriority(a.name);
-                          const pB = getPriority(b.name);
-                          if (pA !== pB) return pA - pB;
-                        }
-                        return a.name.localeCompare(b.name, 'vi', { sensitivity: 'base' });
-                      });
-                      return sortedTechStations.map((t: any) => (
-                        <option key={t.id} value={t.id}>{t.name}</option>
-                      ));
-                    })()}
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-sm text-gray-600 mb-1">Kỹ thuật viên</label>
-                  <select className="w-full border rounded p-2 text-sm outline-none focus:border-blue-500" value={selectedKtv} onChange={e => setSelectedKtv(e.target.value)} disabled={!selectedTech}>
-                    <option value="">-- Chọn KTV --</option>
-                    {(() => {
-                      const sortedKtvsForSelection = [...ktvs].sort((a: any, b: any) => {
-                        if (suggestedKtv && a.id === suggestedKtv.id) return -1;
-                        if (suggestedKtv && b.id === suggestedKtv.id) return 1;
-                        return (a.pendingOrderCount || 0) - (b.pendingOrderCount || 0);
-                      });
-                      return sortedKtvsForSelection.map((k: any) => {
-                        const isSuggested = suggestedKtv && k.id === suggestedKtv.id;
-                        return (
-                          <option key={k.id} value={k.id}>
-                            {isSuggested ? '⭐ Đề xuất: ' : ''}{k.fullName} — {k.pendingOrderCount || 0} đơn đang xử lý
-                          </option>
-                        );
-                      });
-                    })()}
-                  </select>
-                </div>
-
-                {/* Workload indicator */}
-                {selectedKtv && (() => {
-                  const ktv = ktvs.find((k: any) => k.id === selectedKtv);
-                  if (!ktv) return null;
-                  const count = ktv.pendingOrderCount || 0;
-                  const isHigh = count >= 5;
-                  const isMedium = count >= 3 && count < 5;
-                  return (
-                    <div className={`p-3 rounded text-sm mt-2 border ${isHigh ? 'bg-red-50 border-red-200 text-red-700' : isMedium ? 'bg-amber-50 border-amber-200 text-amber-700' : 'bg-green-50 border-green-200 text-green-700'}`}>
-                      <div className="font-semibold mb-1">
-                        {isHigh ? '⚠️ Tải cao' : isMedium ? '⚡ Tải trung bình' : '✅ Tải nhẹ'}
-                      </div>
-                      <div>
-                        <b>{ktv.fullName}</b> hiện đang có <b>{count}</b> đơn chưa hoàn thành.
-                        {isHigh && ' Cân nhắc giao cho KTV khác.'}
-                      </div>
-                    </div>
-                  );
-                })()}
-
-                {selectedKtv && ktvs.some((k: any) => k.id === selectedKtv) && (
-                  <div className="p-3 bg-green-50 border border-green-200 text-green-800 rounded text-sm mt-2">
-                    Đơn sẽ được chuyển sang trạng thái <b>"Đã phân công"</b> khi lưu.
-                  </div>
-                )}
+                </DispatchStationSelect>
               </div>
             </div>
 
