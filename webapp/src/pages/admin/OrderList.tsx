@@ -16,6 +16,7 @@ import { isValidProvince } from '../../utils/provinces';
 import { useStickyTableHeader } from '../../hooks/useStickyTableHeader';
 import { SalesKtvSelect } from '../../components/SalesKtvSelect';
 import { DispatchStationSelect } from '../../components/DispatchStationSelect';
+import { OrderClassificationSection } from '../../components/OrderClassificationSection';
 
 
 const ALL_SERVICE_TYPES = Array.from(new Set(Object.values(WORK_TYPE_SERVICES).flat()));
@@ -417,7 +418,6 @@ export default function OrderList() {
   const [workType, setWorkType] = useState('');
   const [serviceType, setServiceType] = useState('');
   const [assignPromoCode, setAssignPromoCode] = useState('');
-  const [showServiceDropdown, setShowServiceDropdown] = useState(false);
   const [warehouses, setWarehouses] = useState<any[]>([]);
   const [productsStock, setProductsStock] = useState<any[]>([]);
   const [selectedWarehouseId, setSelectedWarehouseId] = useState<string>('');
@@ -3670,146 +3670,27 @@ export default function OrderList() {
             <div className="p-6 overflow-y-auto overflow-x-hidden flex-1 grid grid-cols-1 md:grid-cols-2 gap-6">
               {/* Cột trái: Phân loại */}
               <div className="space-y-4">
-                <h4 className="font-semibold text-gray-800 border-b pb-2">1. Phân loại Yêu cầu</h4>
+                <h4 className="font-semibold text-gray-800 border-b pb-2 flex items-center gap-2">
+                  <FileText className="w-4 h-4 text-[#1B3A6B]" />
+                  <span>1. Phân loại Yêu cầu</span>
+                </h4>
 
-                <div>
-                  <label className="block text-sm text-gray-600 mb-1">Loại công việc *</label>
-                  <select className="w-full border rounded p-2 text-sm outline-none focus:border-blue-500" value={workType} onChange={e => {
-                    const wt = e.target.value;
-                    setWorkType(wt);
-                    // Auto-fill serviceType for single-service work types
-                    const noServiceTypes = ['Giao hàng và Lắp đặt', 'Lắp đặt', 'Giao hàng', 'Thay lọc'];
-                    if (noServiceTypes.includes(wt)) {
-                      setServiceType('Công việc đã bao gồm dịch vụ');
-                    } else {
-                      setServiceType('');
-                    }
-                  }}>
-                    <option value="">-- Chọn loại --</option>
-                    <option value="Giao hàng và Lắp đặt">Giao hàng và Lắp đặt</option>
-                    <option value="Lắp đặt">Lắp đặt</option>
-                    <option value="Giao hàng">Giao hàng</option>
-                    <option value="Thay lọc">Thay lọc</option>
-                    <option value="Bảo hành">Bảo hành</option>
-                    <option value="Sửa chữa">Sửa chữa</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-sm text-gray-600 mb-1">Loại dịch vụ chi tiết *</label>
-                  {['Giao hàng và Lắp đặt', 'Lắp đặt', 'Giao hàng', 'Thay lọc'].includes(workType) ? (
-                    <input type="text" className="w-full border rounded p-2 text-sm outline-none bg-gray-50 text-gray-500" value="Công việc đã bao gồm dịch vụ" readOnly />
-                  ) : (workType === 'Bảo hành' || workType === 'Sửa chữa') ? (
-                    <div className="relative">
-                      <input 
-                        type="text"
-                        className="w-full border rounded p-2 text-sm outline-none focus:border-blue-500 text-gray-800 bg-white"
-                        placeholder="Gõ để tìm kiếm & chọn dịch vụ..."
-                        value={serviceType}
-                        onChange={e => setServiceType(e.target.value)}
-                        onFocus={() => setShowServiceDropdown(true)}
-                        onBlur={() => setTimeout(() => setShowServiceDropdown(false), 200)}
-                      />
-                      <div className="absolute right-2 top-2.5 text-gray-400 pointer-events-none">
-                        <Search size={16} />
-                      </div>
-                      {showServiceDropdown && (
-                        <div className="absolute left-0 right-0 z-50 mt-1 bg-white border border-gray-200 rounded-md shadow-lg max-h-60 overflow-y-auto">
-                          {(() => {
-                            const options = workType === 'Bảo hành' 
-                              ? Object.values(WARRANTY_SERVICE_GROUPS).flat() 
-                              : Object.values(REPAIR_SERVICE_GROUPS).flat();
-                            const query = removeAccents(serviceType || '');
-                            const filteredOptions = options.filter(opt => 
-                              removeAccents(opt).includes(query)
-                            );
-
-                            if (filteredOptions.length === 0) {
-                              return <div className="px-3 py-2 text-sm text-gray-400 italic">Không tìm thấy dịch vụ nào</div>;
-                            }
-
-                            const groups = workType === 'Bảo hành' ? WARRANTY_SERVICE_GROUPS : REPAIR_SERVICE_GROUPS;
-                            return Object.entries(groups).map(([groupName, services]) => {
-                              const matchingServices = services.filter(s => filteredOptions.includes(s));
-                              if (matchingServices.length === 0) return null;
-                              return (
-                                <div key={groupName} className="border-b border-gray-100 last:border-0">
-                                  <div className="px-3 py-1 text-xs font-semibold text-gray-500 bg-gray-50">
-                                    {groupName}
-                                  </div>
-                                  <div className="divide-y divide-gray-50">
-                                    {matchingServices.map(s => (
-                                      <button
-                                        key={s}
-                                        type="button"
-                                        className="w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-blue-50 hover:text-blue-700 transition-colors"
-                                        onClick={() => {
-                                          setServiceType(s);
-                                          setShowServiceDropdown(false);
-                                        }}
-                                      >
-                                        {s}
-                                      </button>
-                                    ))}
-                                  </div>
-                                </div>
-                              );
-                            });
-                          })()}
-                        </div>
-                      )}
-                    </div>
-                  ) : (
-                    <input type="text" className="w-full border rounded p-2 text-sm outline-none bg-gray-100 text-gray-400 cursor-not-allowed" value="Vui lòng chọn loại công việc trước" disabled />
-                  )}
-                </div>
-
-                <div>
-                  <label className="block text-sm text-gray-600 mb-1">Thời gian hẹn khách *</label>
-                  <div className="grid grid-cols-2 gap-2">
-                    <div>
-                      <input 
-                        type="date" 
-                        className="w-full border rounded p-2 text-sm outline-none focus:border-blue-500 text-gray-800 bg-white" 
-                        value={appointmentDate} 
-                        min={todayStr}
-                        onChange={e => {
-                          setAppointmentDate(e.target.value);
-                          setAppointmentTime('08:30');
-                        }} 
-                      />
-                    </div>
-                    <div>
-                      <input 
-                        type="time" 
-                        className="w-full border rounded p-2 text-sm outline-none focus:border-blue-500 text-gray-800 bg-white" 
-                        value={appointmentTime} 
-                        onChange={e => setAppointmentTime(e.target.value)} 
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-sm text-gray-600 mb-1">Lý do hẹn lại (nếu có)</label>
-                  <textarea rows={2} className="w-full border rounded p-2 text-sm outline-none focus:border-blue-500" value={rescheduleReason} onChange={e => setRescheduleReason(e.target.value)} placeholder="Khách bận, KTV kẹt lịch..."></textarea>
-                </div>
-
-                <div>
-                  <label className="block text-sm text-gray-600 mb-1">Chương trình khuyến mãi bảo hành (Mã khuyến mãi)</label>
-                  <select
-                    className="w-full border rounded p-2 text-sm outline-none focus:border-blue-500 text-gray-800 bg-white font-medium cursor-pointer"
-                    value={assignPromoCode}
-                    onChange={e => setAssignPromoCode(e.target.value)}
-                  >
-                    <option value="">Không áp dụng</option>
-                    {promosList.filter(p => !p.isLocked || p.code === assignPromoCode).map(p => (
-                      <option key={p.id} value={p.code}>
-                        {p.code} (+{p.promoMonths} tháng bảo hành)
-                      </option>
-                    ))}
-                  </select>
-                </div>
+                <OrderClassificationSection
+                  workType={workType}
+                  onWorkTypeChange={setWorkType}
+                  serviceType={serviceType}
+                  onServiceTypeChange={setServiceType}
+                  appointmentDate={appointmentDate}
+                  onAppointmentDateChange={setAppointmentDate}
+                  appointmentTime={appointmentTime}
+                  onAppointmentTimeChange={setAppointmentTime}
+                  todayStr={todayStr}
+                  rescheduleReason={rescheduleReason}
+                  onRescheduleReasonChange={setRescheduleReason}
+                  assignPromoCode={assignPromoCode}
+                  onAssignPromoCodeChange={setAssignPromoCode}
+                  promosList={promosList}
+                />
 
                 {/* Giao diện thêm/chọn lại sản phẩm */}
                 <div className="border-t pt-4 mt-4 space-y-2">
