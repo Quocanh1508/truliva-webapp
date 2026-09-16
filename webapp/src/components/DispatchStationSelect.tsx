@@ -652,7 +652,6 @@ export const DispatchStationSelect: React.FC<DispatchStationSelectProps> = ({
             <div className="overflow-y-auto p-1.5 space-y-1">
               {filteredKtvs.map(k => {
                 const isSelected = k.id === selectedKtvId;
-                const isSuggested = suggestedKtv && k.id === suggestedKtv.id;
                 const w = getWorkloadInfo(k.pendingOrderCount || 0);
 
                 return (
@@ -665,8 +664,6 @@ export const DispatchStationSelect: React.FC<DispatchStationSelectProps> = ({
                     className={`flex items-center justify-between p-2.5 rounded-xl cursor-pointer transition-colors text-xs select-none border ${
                       isSelected
                         ? 'bg-emerald-50 text-emerald-950 font-bold border-emerald-200 shadow-2xs'
-                        : isSuggested
-                        ? 'bg-blue-50/60 hover:bg-blue-50 text-slate-800 border-blue-200/80'
                         : 'hover:bg-slate-50 text-slate-800 border-slate-100'
                     }`}
                   >
@@ -679,15 +676,8 @@ export const DispatchStationSelect: React.FC<DispatchStationSelectProps> = ({
                         {k.fullName ? k.fullName.charAt(0).toUpperCase() : 'K'}
                       </div>
                       <div className="min-w-0 flex-1">
-                        <div className="flex items-center gap-1.5 min-w-0">
-                          <span className="font-bold text-slate-900 text-xs truncate" title={k.fullName}>
-                            {k.fullName}
-                          </span>
-                          {isSuggested && (
-                            <span className="text-[9px] bg-blue-50 text-blue-700 border border-blue-200 font-semibold px-1.5 py-0.2 rounded shrink-0 whitespace-nowrap flex items-center gap-0.5">
-                              <Sparkles size={9} /> Ưu tiên
-                            </span>
-                          )}
+                        <div className="font-bold text-slate-900 text-xs truncate" title={k.fullName}>
+                          {k.fullName}
                         </div>
                         <div className="flex items-center gap-1.5 text-[11px] text-slate-500 mt-0.5 whitespace-nowrap">
                           {k.phoneNumber && <span className="font-mono">{k.phoneNumber}</span>}
