@@ -161,6 +161,11 @@ router.get('/export', async (req: Request, res: Response): Promise<void> => {
       return;
     }
 
+    if (userDb.role === 'KTV') {
+      res.status(403).json({ error: 'Kỹ thuật viên không có quyền xuất file Excel tồn kho.' });
+      return;
+    }
+
     const { 
       search, 
       categories, 
@@ -213,18 +218,10 @@ router.get('/export', async (req: Request, res: Response): Promise<void> => {
 
     // 4. Xác định các kho hàng cần xuất cột
     let selectedWarehouseIds: string[] = [];
-    if (userDb.role === 'KTV') {
-      if (!userDb.warehouseId) {
-        res.status(400).json({ error: 'Bạn không trực thuộc quản lý kho nào, nếu có sai sót hãy liên hệ admin.' });
-        return;
-      }
-      selectedWarehouseIds = [userDb.warehouseId];
+    if (warehouses) {
+      selectedWarehouseIds = String(warehouses).split(',').map(s => s.trim()).filter(Boolean);
     } else {
-      if (warehouses) {
-        selectedWarehouseIds = String(warehouses).split(',').map(s => s.trim()).filter(Boolean);
-      } else {
-        selectedWarehouseIds = allWarehouses.map((w: any) => String(w.id));
-      }
+      selectedWarehouseIds = allWarehouses.map((w: any) => String(w.id));
     }
 
     const exportWarehouses = allWarehouses.filter((w: any) => selectedWarehouseIds.includes(String(w.id)));
@@ -491,6 +488,365 @@ router.get('/my-stock', async (req: Request, res: Response): Promise<void> => {
   } catch (error: any) {
     logger.error('Get KTV inventory stock error', { error: error.message });
     res.status(500).json({ error: 'Lỗi lấy thông tin tồn kho của KTV' });
+  }
+});
+
+/**
+ * GET /api/inventory/analytics
+ * Lấy báo cáo Xuất - Nhập - Tồn từ Pancake POS (Hỗ trợ lọc theo kho và khoảng thời gian)
+ */
+router.get('/analytics', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const apiKey = process.env.PANCAKE_API_KEY;
+    if (!apiKey) {
+      res.status(500).json({ error: 'Missing PANCAKE_API_KEY in server environment' });
+      return;
+    }
+
+    const role = req.user?.role;
+    let targetWarehouseIds: string[] | undefined = undefined;
+
+    // Nếu là KTV, chỉ cho phép xem kho của mình
+    if (role === 'KTV') {
+      const userDb = await prisma.user.findUnique({
+        where: { id: req.user!.id },
+        select: { warehouseId: true }
+      });
+      if (!userDb?.warehouseId) {
+        res.status(403).json({ error: 'Tài khoản KTV chưa được gắn kho hàng quản lý.' });
+        return;
+      }
+      targetWarehouseIds = [userDb.warehouseId];
+    } else {
+      if (req.query.warehouse_ids) {
+        const list = String(req.query.warehouse_ids).split(',').map(s => s.trim()).filter(Boolean);
+        if (list.length > 0 && !list.includes('all')) {
+          targetWarehouseIds = list;
+        }
+      } else if (req.query.warehouse_id && req.query.warehouse_id !== 'all') {
+        targetWarehouseIds = [String(req.query.warehouse_id)];
+      }
+    }
+
+    const startTime = (req.query.start_date || req.query.start_time) ? Number(req.query.start_date || req.query.start_time) : undefined;
+    const endTime = (req.query.end_date || req.query.end_time) ? Number(req.query.end_date || req.query.end_time) : undefined;
+
+    // 1. Lấy danh sách kho
+    const warehouses = await fetchPancakeWarehouses();
+
+    // 2. Gọi song song: Danh sách tồn kho theo sản phẩm, tổng hợp Xuất/Nhập, và tổng tồn
+    const [analyticsItemsRes, totalImportExportRes, totalInventoryRes, dbProducts] = await Promise.all([
+      axios.get(`https://pos.pages.fm/api/v1/shops/${SHOP_ID}/inventory_analytics/inventory`, {
+        params: {
+          api_key: apiKey,
+          warehouse_ids: targetWarehouseIds,
+          start_date: startTime,
+          end_date: endTime,
+          start_time: startTime,
+          end_time: endTime,
+          page_size: 200,
+          page_number: 1
+        },
+        timeout: 15000
+      }).catch(err => {
+        logger.error('Error fetching inventory_analytics/inventory', { error: err.message });
+        return { data: { data: [], success: false } };
+      }),
+      axios.get(`https://pos.pages.fm/api/v1/shops/${SHOP_ID}/inventory_analytics/total_import_export`, {
+        params: {
+          api_key: apiKey,
+          warehouse_ids: targetWarehouseIds,
+          start_date: startTime,
+          end_date: endTime,
+          start_time: startTime,
+          end_time: endTime
+        },
+        timeout: 10000
+      }).catch(err => {
+        logger.error('Error fetching inventory_analytics/total_import_export', { error: err.message });
+        return { data: { data: {} } };
+      }),
+      axios.get(`https://pos.pages.fm/api/v1/shops/${SHOP_ID}/inventory_analytics/total_inventory`, {
+        params: {
+          api_key: apiKey,
+          warehouse_ids: targetWarehouseIds,
+          start_date: startTime,
+          end_date: endTime,
+          start_time: startTime,
+          end_time: endTime
+        },
+        timeout: 10000
+      }).catch(err => {
+        logger.error('Error fetching inventory_analytics/total_inventory', { error: err.message });
+        return { data: { data: {} } };
+      }),
+      prisma.product.findMany({
+        where: { isActive: true },
+        select: {
+          id: true,
+          pancakeProductId: true,
+          sku: true,
+          name: true,
+          category: true,
+          imageUrl: true,
+          costPrice: true,
+          sellingPrice: true,
+          rawData: true
+        }
+      })
+    ]);
+
+    const rawItems: any[] = analyticsItemsRes.data?.data || [];
+    const summaryData: any = totalImportExportRes.data?.data || {};
+    const totalInvData: any = totalInventoryRes.data?.data || {};
+
+    // Map dbProducts by pancakeProductId & SKU for fast lookup
+    const dbProductMap = new Map<string, any>();
+    const dbSkuMap = new Map<string, any>();
+    dbProducts.forEach(p => {
+      if (p.pancakeProductId) dbProductMap.set(p.pancakeProductId, p);
+      if (p.sku) dbSkuMap.set(p.sku.toLowerCase(), p);
+      dbSkuMap.set(p.name.toLowerCase(), p);
+    });
+
+    // Enrich items
+    const enrichedItems = rawItems.map((item: any) => {
+      const variation = item.variation || {};
+      const product = variation.product || {};
+      const pancakeVariationId = String(variation.id || item.id || '');
+      const sku = String(variation.custom_id || variation.display_id || product.custom_id || '');
+      const name = String(product.name || variation.name || 'Sản phẩm không tên');
+
+      const matchedDb = dbProductMap.get(pancakeVariationId) || dbSkuMap.get(sku.toLowerCase()) || dbSkuMap.get(name.toLowerCase());
+
+      const imageUrl = matchedDb?.imageUrl 
+        || ((matchedDb?.rawData as any)?.images?.[0]) 
+        || variation.images?.[0] 
+        || product.images?.[0] 
+        || null;
+
+      const isKTV = role === 'KTV';
+      const category = matchedDb?.category || 'Chưa phân loại';
+      const sellingPrice = isKTV ? 0 : (matchedDb?.sellingPrice || variation.retail_price || 0);
+      const costPrice = isKTV ? 0 : (matchedDb?.costPrice || variation.last_imported_price || 0);
+
+      const totalImport = Math.max(0, Number(item.total_import) || 0);
+      const totalExport = Math.abs(Number(item.total_export) || 0);
+      const beginInventory = Math.max(0, Number(item.begin_inventory) || 0);
+      const endInventory = Math.max(0, Number(item.end_inventory) || 0);
+
+      return {
+        id: matchedDb?.id || pancakeVariationId,
+        pancakeProductId: pancakeVariationId,
+        name,
+        sku,
+        category,
+        imageUrl,
+        sellingPrice: isKTV ? 0 : sellingPrice,
+        costPrice: isKTV ? 0 : costPrice,
+        begin_inventory: beginInventory,
+        begin_inventory_value: isKTV ? 0 : Math.max(0, Number(item.begin_inventory_value) || 0),
+        total_import: totalImport,
+        total_import_value: isKTV ? 0 : Math.max(0, Number(item.total_import_value) || 0),
+        purchase_import: isKTV ? 0 : Math.max(0, Number(item.purchase_import) || 0),
+        transfer_import: isKTV ? 0 : Math.max(0, Number(item.transfer_import) || 0),
+        return_import: isKTV ? 0 : Math.max(0, Number(item.return_import) || 0),
+        stocktaking_import: isKTV ? 0 : Math.max(0, Number(item.stocktaking_import) || 0),
+        total_export: totalExport,
+        total_export_value: isKTV ? 0 : Math.abs(Number(item.total_export_value) || 0),
+        sell_export: isKTV ? 0 : Math.abs(Number(item.sell_export) || 0),
+        transfer_export: isKTV ? 0 : Math.abs(Number(item.transfer_export) || 0),
+        purchase_export: isKTV ? 0 : Math.abs(Number(item.purchase_export) || 0),
+        stocktaking_export: isKTV ? 0 : Math.abs(Number(item.stocktaking_export) || 0),
+        end_inventory: endInventory,
+        end_inventory_value: isKTV ? 0 : Math.max(0, Number(item.end_inventory_value) || 0)
+      };
+    });
+
+    // Summary numbers: tính toán an toàn từ API kết hợp enriched items để không bao giờ có số âm
+    let sumBegin = 0;
+    let sumBeginVal = 0;
+    let sumEnd = 0;
+    let sumEndVal = 0;
+    enrichedItems.forEach(it => {
+      sumBegin += it.begin_inventory;
+      sumBeginVal += it.begin_inventory_value;
+      sumEnd += it.end_inventory;
+      sumEndVal += it.end_inventory_value;
+    });
+
+    const isKTV = role === 'KTV';
+    const totalImport = Math.max(0, Number(summaryData.total_import) || 0);
+    const totalExport = Math.abs(Number(summaryData.total_export) || 0);
+    const endInventory = Number(totalInvData.end_inventory) > 0 ? Number(totalInvData.end_inventory) : sumEnd;
+    const endInventoryValue = Number(totalInvData.end_inventory_value) > 0 ? Number(totalInvData.end_inventory_value) : sumEndVal;
+    const beginInventory = sumBegin > 0 ? sumBegin : Math.max(0, endInventory - totalImport + totalExport);
+    const beginInventoryValue = sumBeginVal > 0 ? sumBeginVal : Math.max(0, endInventoryValue - (Number(summaryData.total_import_value) || 0) + Math.abs(Number(summaryData.total_export_value) || 0));
+
+    const summary = {
+      begin_inventory: beginInventory,
+      begin_inventory_value: isKTV ? 0 : beginInventoryValue,
+      total_import: totalImport,
+      total_import_value: isKTV ? 0 : Math.max(0, Number(summaryData.total_import_value) || 0),
+      purchase_import: isKTV ? 0 : Math.max(0, Number(summaryData.purchase_import) || 0),
+      transfer_import: isKTV ? 0 : Math.max(0, Number(summaryData.transfer_import) || 0),
+      return_import: isKTV ? 0 : Math.max(0, Number(summaryData.return_import) || 0),
+      stocktaking_import: isKTV ? 0 : Math.max(0, Number(summaryData.stocktaking_import) || 0),
+      total_export: totalExport,
+      total_export_value: isKTV ? 0 : Math.abs(Number(summaryData.total_export_value) || 0),
+      sell_export: isKTV ? 0 : Math.abs(Number(summaryData.sell_export) || 0),
+      transfer_export: isKTV ? 0 : Math.abs(Number(summaryData.transfer_export) || 0),
+      purchase_export: isKTV ? 0 : Math.abs(Number(summaryData.purchase_export) || 0),
+      stocktaking_export: isKTV ? 0 : Math.abs(Number(summaryData.stocktaking_export) || 0),
+      end_inventory: endInventory,
+      end_inventory_value: isKTV ? 0 : endInventoryValue
+    };
+
+    const returnedWarehouses = isKTV
+      ? warehouses.filter((w: any) => targetWarehouseIds?.includes(String(w.id)))
+      : warehouses;
+
+    res.json({
+      summary,
+      items: enrichedItems,
+      warehouses: returnedWarehouses.map((w: any) => ({
+        id: w.id,
+        name: w.name,
+        address: w.address,
+        fullAddress: w.full_address,
+        phone: w.phone_number
+      })),
+      categories: Array.from(new Set(enrichedItems.map(i => i.category).filter(Boolean)))
+    });
+  } catch (error: any) {
+    logger.error('Inventory analytics error', { error: error.message });
+    res.status(500).json({ error: error.message || 'Lỗi lấy báo cáo xuất nhập kho từ Pancake POS' });
+  }
+});
+
+/**
+ * GET /api/inventory/analytics/export
+ * Xuất file Excel báo cáo Xuất - Nhập - Tồn kho
+ */
+router.get('/analytics/export', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const apiKey = process.env.PANCAKE_API_KEY;
+    if (!apiKey) {
+      res.status(500).json({ error: 'Missing PANCAKE_API_KEY in server environment' });
+      return;
+    }
+
+    const role = req.user?.role;
+    if (role === 'KTV') {
+      res.status(403).json({ error: 'Kỹ thuật viên không có quyền xuất file Excel báo cáo kho.' });
+      return;
+    }
+
+    let targetWarehouseIds: string[] | undefined = undefined;
+    if (req.query.warehouse_ids) {
+        const list = String(req.query.warehouse_ids).split(',').map(s => s.trim()).filter(Boolean);
+        if (list.length > 0 && !list.includes('all')) {
+          targetWarehouseIds = list;
+        }
+      } else if (req.query.warehouse_id && req.query.warehouse_id !== 'all') {
+        targetWarehouseIds = [String(req.query.warehouse_id)];
+      }
+    const startTime = (req.query.start_date || req.query.start_time) ? Number(req.query.start_date || req.query.start_time) : undefined;
+    const endTime = (req.query.end_date || req.query.end_time) ? Number(req.query.end_date || req.query.end_time) : undefined;
+
+    const [analyticsRes, warehouses] = await Promise.all([
+      axios.get(`https://pos.pages.fm/api/v1/shops/${SHOP_ID}/inventory_analytics/inventory`, {
+        params: {
+          api_key: apiKey,
+          warehouse_ids: targetWarehouseIds,
+          start_date: startTime,
+          end_date: endTime,
+          start_time: startTime,
+          end_time: endTime,
+          page_size: 200
+        },
+        timeout: 15000
+      }),
+      fetchPancakeWarehouses()
+    ]);
+
+    const items: any[] = analyticsRes.data?.data || [];
+    const currentWhName = targetWarehouseIds && targetWarehouseIds.length === 1
+      ? warehouses.find((w: any) => String(w.id) === String(targetWarehouseIds[0]))?.name || 'Kho đã chọn'
+      : (targetWarehouseIds && targetWarehouseIds.length > 1 ? `${targetWarehouseIds.length} kho đã chọn` : 'Tất cả kho hàng');
+
+    const workbook = new ExcelJS.Workbook();
+    const worksheet = workbook.addWorksheet('Xuat_Nhap_Ton');
+
+    // Title
+    worksheet.mergeCells('A1:L1');
+    const titleCell = worksheet.getCell('A1');
+    titleCell.value = `BÁO CÁO XUẤT - NHẬP - TỒN KHO (${currentWhName.toUpperCase()})`;
+    titleCell.font = { name: 'Arial', size: 14, bold: true, color: { argb: 'FFFFFFFF' } };
+    titleCell.alignment = { horizontal: 'center', vertical: 'middle' };
+    titleCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1B3A6B' } };
+    worksheet.getRow(1).height = 35;
+
+      const headers = [
+        'STT', 'Mã SKU', 'Tên sản phẩm', 'Tồn đầu kỳ', 
+        'Tổng Nhập', 'Nhập mua NCC', 'Nhập chuyển kho', 'Khách trả hàng',
+        'Tổng Xuất', 'Xuất bán/KTV', 'Xuất chuyển kho', 'Tồn cuối kỳ'
+      ];
+      worksheet.getRow(3).values = headers;
+      worksheet.getRow(3).font = { name: 'Arial', size: 10, bold: true, color: { argb: 'FFFFFFFF' } };
+      worksheet.getRow(3).alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
+      worksheet.getRow(3).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF2563EB' } };
+      worksheet.getRow(3).height = 28;
+
+      items.forEach((item, index) => {
+        const v = item.variation || {};
+        const p = v.product || {};
+        const row = worksheet.addRow([
+          index + 1,
+          v.custom_id || v.display_id || '',
+          p.name || v.name || '',
+          Math.max(0, Number(item.begin_inventory) || 0),
+          Math.max(0, Number(item.total_import) || 0),
+          Math.max(0, Number(item.purchase_import) || 0),
+          Math.max(0, Number(item.transfer_import) || 0),
+          Math.max(0, Number(item.return_import) || 0),
+          Math.abs(Number(item.total_export) || 0),
+          Math.abs(Number(item.sell_export) || 0),
+          Math.abs(Number(item.transfer_export) || 0),
+          Math.max(0, Number(item.end_inventory) || 0)
+        ]);
+
+        row.alignment = { vertical: 'middle' };
+        row.getCell(1).alignment = { horizontal: 'center' };
+        row.getCell(2).alignment = { horizontal: 'center' };
+        for (let c = 4; c <= 12; c++) {
+          row.getCell(c).alignment = { horizontal: 'right' };
+          row.getCell(c).numFmt = '#,##0';
+        }
+      });
+
+      worksheet.columns = [
+        { width: 6 },  // STT
+        { width: 16 }, // SKU
+        { width: 38 }, // Tên
+        { width: 14 }, // Tồn đầu
+        { width: 14 }, // Tổng nhập
+        { width: 14 }, // Mua NCC
+        { width: 14 }, // Chuyển kho đến
+        { width: 14 }, // Khách trả
+        { width: 14 }, // Tổng xuất
+        { width: 14 }, // Xuất bán
+        { width: 14 }, // Chuyển kho đi
+        { width: 14 }, // Tồn cuối
+      ];
+
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', `attachment; filename="Xuat_Nhap_Ton_${Date.now()}.xlsx"`);
+    await workbook.xlsx.write(res);
+    res.end();
+  } catch (error: any) {
+    logger.error('Export inventory analytics error', { error: error.message });
+    res.status(500).json({ error: error.message || 'Lỗi xuất báo cáo Excel' });
   }
 });
 

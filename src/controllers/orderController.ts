@@ -466,6 +466,10 @@ export async function getOrders(req: Request, res: Response): Promise<void> {
         appointmentTime: true,
         adminStatus: true,
         assignedKtvId: true,
+        salesKtvId: true,
+        salesCommission: true,
+        customSalesCommission: true,
+        salesCommissionNote: true,
         workType: true,
         serviceType: true,
         mainStationId: true,
@@ -598,6 +602,23 @@ export async function getOrders(req: Request, res: Response): Promise<void> {
           select: {
             id: true,
             fullName: true,
+            techStation: {
+              select: {
+                name: true,
+                mainStation: {
+                  select: {
+                    name: true,
+                  }
+                }
+              }
+            }
+          }
+        },
+        salesKtv: {
+          select: {
+            id: true,
+            fullName: true,
+            phoneNumber: true,
             techStation: {
               select: {
                 name: true,
@@ -1560,6 +1581,13 @@ export async function getOrderById(req: Request, res: Response): Promise<void> {
             fullName: true
           }
         },
+        salesKtv: {
+          select: {
+            id: true,
+            fullName: true,
+            phoneNumber: true
+          }
+        },
         mainStation: true,
         techStation: true,
         serials: true
@@ -1723,7 +1751,7 @@ export async function updateOrder(req: Request, res: Response): Promise<void> {
 
     const id = req.params.id as string;
     const {
-      adminStatus, appointmentTime, assignedKtvId,
+      adminStatus, appointmentTime, assignedKtvId, salesKtvId,
       workType, serviceType, mainStationId, techStationId,
       rescheduleReason, cancelReason, note, warehouseId,
       items, customerName, customerPhone, address, province, moneyToCollect,
@@ -1935,6 +1963,11 @@ export async function updateOrder(req: Request, res: Response): Promise<void> {
     if (assignedKtvId !== undefined) {
       const val = assignedKtvId || null;
       track('assignedKtvId', val);
+    }
+
+    if (salesKtvId !== undefined) {
+      const val = salesKtvId || null;
+      track('salesKtvId', val);
     }
 
     if (appointmentTime !== undefined) {

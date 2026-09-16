@@ -242,6 +242,10 @@ interface SalaryData {
   adjustmentNote: string;
   status: 'DRAFT' | 'FINAL';
   cases: CaseDetail[];
+  salesCommission?: number;
+  salesCommissionOrdersCount?: number;
+  salesCommissionCalculated?: number;
+  totalIncome?: number;
 }
 
 export default function SalaryManage() {
@@ -281,8 +285,8 @@ export default function SalaryManage() {
   const [exporting, setExporting] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
-  // View Mode: 'summary' (Tổng hợp KTV), 'detail' (Chi tiết từng ca) or 'rates' (Ma trận đơn giá KTV)
-  const [viewMode, setViewMode] = useState<'summary' | 'detail' | 'rates'>(initial?.viewMode || 'summary');
+  // View Mode: 'summary' (Tổng hợp KTV), 'detail' (Chi tiết từng ca), 'rates' (Ma trận đơn giá) or 'commissions' (Hoa hồng bán hàng)
+  const [viewMode, setViewMode] = useState<'summary' | 'detail' | 'rates' | 'commissions'>(initial?.viewMode || 'summary');
 
   // Rates Matrix State
   const [rateMatrix, setRateMatrix] = useState<KtvRateRow[]>([]);
@@ -313,6 +317,123 @@ export default function SalaryManage() {
     currentInput: string;
     applyFilteredOnly: boolean;
   } | null>(null);
+
+  // ── States Quản Lý Hoa Hồng Bán Hàng ──
+  const [commissionsData, setCommissionsData] = useState<{
+    commissions: any[];
+    ktvSummaries: Record<string, any>;
+    stats: any;
+  }>({ commissions: [], ktvSummaries: {}, stats: {} });
+  const [commissionsLoading, setCommissionsLoading] = useState(false);
+  const [commissionSearchQuery, setCommissionSearchQuery] = useState('');
+  const [selectedCommissionKtvFilter, setSelectedCommissionKtvFilter] = useState('');
+  const [commissionEditModal, setCommissionEditModal] = useState<{
+    isOpen: boolean;
+    order: any;
+    customDeviceRevenue: string;
+    customDeviceDiscount: string;
+    customDeviceRate: string;
+    customFilterRevenue: string;
+    customFilterDiscount: string;
+    customFilterRate: string;
+    customLapDatCost: string;
+    customSalesCommission: string;
+    note: string;
+    saving: boolean;
+  } | null>(null);
+
+  const filteredCommissions = useMemo(() => {
+    return (commissionsData.commissions || []).filter((comm: any) => {
+      if (selectedCommissionKtvFilter && comm.salesKtv?.id !== selectedCommissionKtvFilter) {
+        return false;
+      }
+      if (!commissionSearchQuery) return true;
+      const q = commissionSearchQuery.toLowerCase().trim();
+      const orderCode = (comm.orderCode || '').toLowerCase();
+      const customerName = (comm.customerName || '').toLowerCase();
+      const customerPhone = (comm.customerPhone || '').toLowerCase();
+      const ktvName = (comm.salesKtv?.fullName || '').toLowerCase();
+      const ktvPhone = (comm.salesKtv?.phoneNumber || '').toLowerCase();
+      return (
+        orderCode.includes(q) ||
+        customerName.includes(q) ||
+        customerPhone.includes(q) ||
+        ktvName.includes(q) ||
+        ktvPhone.includes(q)
+      );
+    });
+  }, [commissionsData.commissions, selectedCommissionKtvFilter, commissionSearchQuery]);
+
+  const fetchCommissions = async (silent = false) => {
+    if (!silent) setCommissionsLoading(true);
+    try {
+      const data = await fetchApi(`/salaries/commissions?month=${encodeURIComponent(selectedMonth)}`);
+      setCommissionsData({
+        commissions: data.commissions || [],
+        ktvSummaries: data.ktvSummaries || {},
+        stats: data.stats || {}
+      });
+    } catch (err: any) {
+      console.error('Error fetching commissions:', err);
+    } finally {
+      if (!silent) setCommissionsLoading(false);
+    }
+  };
+
+  const openCommissionEditModal = (comm: any) => {
+    const adj = comm.commissionAdjustments || {};
+    setCommissionEditModal({
+      isOpen: true,
+      order: comm,
+      customDeviceRevenue: String(adj.customDeviceRevenue !== undefined ? adj.customDeviceRevenue : comm.deviceRevenue || 0),
+      customDeviceDiscount: String(adj.customDeviceDiscount !== undefined ? adj.customDeviceDiscount : comm.deviceDiscount || 0),
+      customDeviceRate: String(adj.customDeviceRate !== undefined ? adj.customDeviceRate : 0.15),
+      customFilterRevenue: String(adj.customFilterRevenue !== undefined ? adj.customFilterRevenue : comm.filterRevenue || 0),
+      customFilterDiscount: String(adj.customFilterDiscount !== undefined ? adj.customFilterDiscount : comm.filterDiscount || 0),
+      customFilterRate: String(adj.customFilterRate !== undefined ? adj.customFilterRate : 0.10),
+      customLapDatCost: String(adj.customDeliveryInstallCost !== undefined 
+        ? adj.customDeliveryInstallCost 
+        : (adj.customLapDatCost !== undefined 
+          ? adj.customLapDatCost 
+          : (comm.hasDevice ? (comm.deliveryInstallCostDeducted ?? comm.lapDatCostDeducted ?? 120000) : 0))),
+      customSalesCommission: String(comm.customSalesCommission !== null && comm.customSalesCommission !== undefined ? comm.customSalesCommission : comm.calculatedCommission || 0),
+      note: comm.salesCommissionNote || adj.note || '',
+      saving: false
+    });
+  };
+
+  const handleSaveCommissionAdjustment = async () => {
+    if (!commissionEditModal) return;
+    setCommissionEditModal(prev => prev ? { ...prev, saving: true } : null);
+    try {
+      await fetchApi('/salaries/commissions/adjust', {
+        method: 'POST',
+        body: JSON.stringify({
+          orderId: commissionEditModal.order.orderId,
+          customSalesCommission: parseFloat(commissionEditModal.customSalesCommission) || 0,
+          commissionAdjustments: {
+            customDeviceRevenue: parseFloat(commissionEditModal.customDeviceRevenue) || 0,
+            customDeviceDiscount: parseFloat(commissionEditModal.customDeviceDiscount) || 0,
+            customDeviceRate: parseFloat(commissionEditModal.customDeviceRate) || 0.15,
+            customFilterRevenue: parseFloat(commissionEditModal.customFilterRevenue) || 0,
+            customFilterDiscount: parseFloat(commissionEditModal.customFilterDiscount) || 0,
+            customFilterRate: parseFloat(commissionEditModal.customFilterRate) || 0.10,
+            customLapDatCost: parseFloat(commissionEditModal.customLapDatCost) || 0,
+            customDeliveryInstallCost: parseFloat(commissionEditModal.customLapDatCost) || 0,
+            note: commissionEditModal.note
+          },
+          salesCommissionNote: commissionEditModal.note
+        })
+      });
+      setMessage({ type: 'success', text: 'Cập nhật điều chỉnh hoa hồng thành công!' });
+      setCommissionEditModal(null);
+      fetchCommissions(true);
+      fetchSalaries(true);
+    } catch (err: any) {
+      alert(err.message || 'Lỗi lưu điều chỉnh hoa hồng');
+      setCommissionEditModal(prev => prev ? { ...prev, saving: false } : null);
+    }
+  };
 
   const getRateVal = (item: any, fallback: number): number => {
     if (item === null || item === undefined) return fallback;
@@ -365,6 +486,8 @@ export default function SalaryManage() {
   useEffect(() => {
     if (viewMode === 'rates') {
       fetchRateMatrix();
+    } else if (viewMode === 'commissions') {
+      fetchCommissions();
     } else {
       fetchSalaries(true);
     }
@@ -893,11 +1016,14 @@ export default function SalaryManage() {
       // Lần mount đầu tiên: chỉ fetch data, KHÔNG reset filters (đã khôi phục từ sessionStorage)
       isInitialMount.current = false;
       fetchSalaries();
+      fetchCommissions(true);
       return;
     }
     // User chủ động đổi tháng → reset tất cả filters
     setSelectedKtvsFilter([]);
     setKtvSearchQuery('');
+    fetchSalaries();
+    fetchCommissions();
     setSelectedStationsFilter([]);
     setSelectedWorkTypeFilter('');
     setSelectedServiceTypeFilter('');
@@ -1684,8 +1810,9 @@ export default function SalaryManage() {
     setProductSearchQuery('');
   };
 
-  const formatMoney = (val: number) => {
-    return val.toLocaleString('vi-VN') + ' đ';
+  const formatMoney = (val: number | null | undefined) => {
+    const num = typeof val === 'number' && !isNaN(val) ? val : (Number(val) || 0);
+    return num.toLocaleString('vi-VN') + ' đ';
   };
 
   // Quick stats
@@ -1871,6 +1998,21 @@ export default function SalaryManage() {
                 <span>⚙️ Ma Trận Đơn Giá KTV</span>
               </button>
             )}
+
+            <button
+              onClick={() => {
+                setViewMode('commissions');
+                if (commissionsData.commissions.length === 0) fetchCommissions();
+              }}
+              className={`px-4 py-2 rounded-lg text-xs font-bold transition flex items-center gap-2 cursor-pointer ${
+                viewMode === 'commissions' 
+                  ? 'bg-white text-emerald-800 shadow-sm' 
+                  : 'text-gray-600 hover:text-gray-900'
+              }`}
+            >
+              <Package className="h-4 w-4 text-emerald-600" />
+              <span>🏷️ Hoa Hồng Bán Hàng ({commissionsData.commissions.length})</span>
+            </button>
           </div>
 
           {/* Action Buttons */}
@@ -2918,7 +3060,7 @@ export default function SalaryManage() {
                   >
                     <thead>
                       <tr className="bg-[#1B3A6B] text-white font-bold">
-                        {['STT', 'Họ tên KTV', 'Số điện thoại', 'Trạm quản lý', 'Số ca hoàn thành', 'Thù lao tự động (VND)', 'Thực nhận (VND)', 'Ghi chú điều chỉnh', 'Thao tác'].map((title, i) => (
+                        {['STT', 'Họ tên KTV', 'Số điện thoại', 'Trạm quản lý', 'Số ca hoàn thành', 'Thù lao tự động (VND)', 'Thực nhận (VND)', 'Hoa hồng bán hàng (VND)', 'Tổng thu nhập (VND)', 'Ghi chú điều chỉnh', 'Thao tác'].map((title, i) => (
                           <th
                             key={title}
                             style={{
@@ -2956,6 +3098,8 @@ export default function SalaryManage() {
                     <th className="px-5 py-3.5 w-28 text-center bg-[#1B3A6B] sticky top-0 z-20">Số ca hoàn thành</th>
                     <th className="px-5 py-3.5 w-44 text-right bg-[#1B3A6B] sticky top-0 z-20">Thù lao tự động (VND)</th>
                     <th className="px-5 py-3.5 w-48 text-right bg-[#1B3A6B] sticky top-0 z-20">Thực nhận (VND)</th>
+                    <th className="px-5 py-3.5 w-44 text-right bg-[#1B3A6B] sticky top-0 z-20 text-emerald-300">Hoa hồng bán hàng (VND)</th>
+                    <th className="px-5 py-3.5 w-48 text-right bg-[#1B3A6B] sticky top-0 z-20 text-amber-300">Tổng thu nhập (VND)</th>
                     <th className="px-5 py-3.5 min-w-[200px] bg-[#1B3A6B] sticky top-0 z-20">Ghi chú điều chỉnh</th>
                     <th className="px-5 py-3.5 w-28 text-center bg-[#1B3A6B] sticky top-0 z-20">Thao tác</th>
                   </tr>
@@ -2988,7 +3132,7 @@ export default function SalaryManage() {
                           <div className="relative">
                             <input
                               type="text"
-                              value={item.adjustedCost.toLocaleString('vi-VN')}
+                              value={(item.adjustedCost !== undefined && item.adjustedCost !== null ? item.adjustedCost : (item.calculatedCost || 0)).toLocaleString('vi-VN')}
                               onChange={(e) => handleAdjustCostChange(item.userId, e.target.value)}
                               disabled={isMonthLocked || !isAdmin}
                               className={`w-full px-3 py-1.5 text-right font-extrabold text-xs border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${
@@ -2998,6 +3142,15 @@ export default function SalaryManage() {
                               } disabled:bg-gray-50 disabled:text-gray-400 disabled:border-gray-200`}
                             />
                           </div>
+                        </td>
+                        <td className="px-5 py-3.5 text-right font-bold text-emerald-700">
+                          {formatMoney(item.salesCommission || 0)}
+                          {item.salesCommissionOrdersCount ? (
+                            <span className="block text-[10px] text-gray-400 font-normal">({item.salesCommissionOrdersCount} đơn)</span>
+                          ) : null}
+                        </td>
+                        <td className="px-5 py-3.5 text-right font-black text-amber-900 bg-amber-50/30">
+                          {formatMoney(item.totalIncome || ((item.adjustedCost !== undefined && item.adjustedCost !== null ? item.adjustedCost : item.calculatedCost) + (item.salesCommission || 0)))}
                         </td>
                         <td className="px-5 py-3.5">
                           <input
@@ -3973,6 +4126,293 @@ export default function SalaryManage() {
         </div>
       )}
 
+      {/* Giao Diện Quản Lý Hoa Hồng Bán Hàng */}
+      {viewMode === 'commissions' && (
+        <div className="space-y-6">
+          {/* Stats Cards */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="bg-gradient-to-br from-[#1B3A6B] to-[#2563EB] text-white rounded-2xl p-5 shadow-sm border border-blue-900/20">
+              <div className="flex items-center justify-between text-blue-100 text-xs font-semibold mb-2">
+                <span>Tổng Hoa Hồng Bán Hàng</span>
+                <span className="p-1.5 bg-white/10 rounded-lg">🏷️</span>
+              </div>
+              <div className="text-2xl font-black tracking-tight text-white mb-1">
+                {formatMoney(commissionsData.stats?.totalCommission || 0)}
+              </div>
+              <div className="text-xs text-blue-200">
+                {commissionsData.stats?.totalOrders || 0} đơn hàng hoàn thành
+              </div>
+            </div>
+
+            <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
+              <div className="flex items-center justify-between text-gray-500 text-xs font-semibold mb-2">
+                <span>Hoa Hồng Thiết Bị (Máy)</span>
+                <span className="p-1.5 bg-emerald-50 text-emerald-600 rounded-lg font-bold">15%</span>
+              </div>
+              <div className="text-2xl font-black tracking-tight text-emerald-700 mb-1">
+                {formatMoney(commissionsData.stats?.totalDeviceCommission || 0)}
+              </div>
+              <div className="text-xs text-gray-400">
+                Đã trừ chi phí ca giao hàng & lắp đặt của KTV bán
+              </div>
+            </div>
+
+            <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
+              <div className="flex items-center justify-between text-gray-500 text-xs font-semibold mb-2">
+                <span>Hoa Hồng Lõi / Phụ Tùng</span>
+                <span className="p-1.5 bg-blue-50 text-blue-600 rounded-lg font-bold">10%</span>
+              </div>
+              <div className="text-2xl font-black tracking-tight text-blue-700 mb-1">
+                {formatMoney(commissionsData.stats?.totalFilterCommission || 0)}
+              </div>
+              <div className="text-xs text-gray-400">
+                10% doanh thu thuần sau VAT 8%
+              </div>
+            </div>
+
+            <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
+              <div className="flex items-center justify-between text-gray-500 text-xs font-semibold mb-2">
+                <span>KTV Được Hưởng Hoa Hồng</span>
+                <span className="p-1.5 bg-amber-50 text-amber-600 rounded-lg">👥</span>
+              </div>
+              <div className="text-2xl font-black tracking-tight text-amber-800 mb-1">
+                {commissionsData.stats?.totalSalesKtvs || 0} <span className="text-sm font-bold text-gray-500">KTV</span>
+              </div>
+              <div className="text-xs text-gray-400">
+                Tháng {selectedMonth}
+              </div>
+            </div>
+          </div>
+
+          {/* Filter Bar */}
+          <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100 flex flex-wrap items-center justify-between gap-4">
+            <div className="flex flex-wrap items-center gap-3 flex-1 min-w-[280px]">
+              {/* Search */}
+              <div className="relative flex-1 min-w-[240px]">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                <input
+                  type="text"
+                  placeholder="Tìm mã đơn, tên/SĐT khách, tên/SĐT KTV..."
+                  value={commissionSearchQuery}
+                  onChange={e => setCommissionSearchQuery(e.target.value)}
+                  className="w-full pl-9 pr-3 py-2 text-xs border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                />
+              </div>
+
+              {/* Filter by KTV */}
+              <div className="w-56">
+                <select
+                  value={selectedCommissionKtvFilter}
+                  onChange={e => setSelectedCommissionKtvFilter(e.target.value)}
+                  className="w-full py-2 px-3 text-xs border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:outline-none bg-white font-medium text-gray-700"
+                >
+                  <option value="">Tất cả KTV bán hàng ({Object.keys(commissionsData.ktvSummaries || {}).length})</option>
+                  {Object.entries(commissionsData.ktvSummaries || {}).map(([ktvId, summary]: [string, any]) => (
+                    <option key={ktvId} value={ktvId}>
+                      {summary.ktvName} ({summary.orderCount || summary.totalOrders || 0} đơn - {formatMoney(summary.totalCommission ?? summary.totalFinalCommission ?? 0)})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Refresh Button */}
+              <button
+                onClick={() => fetchCommissions()}
+                disabled={commissionsLoading}
+                className="px-3 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition cursor-pointer"
+                title="Tải lại danh sách"
+              >
+                <RefreshCw className={`h-3.5 w-3.5 ${commissionsLoading ? 'animate-spin' : ''}`} />
+                <span>Làm mới</span>
+              </button>
+            </div>
+
+            <div className="text-xs text-gray-500 font-medium">
+              Hiển thị <span className="font-bold text-gray-800">{filteredCommissions.length}</span> / {commissionsData.commissions.length} đơn hàng
+            </div>
+          </div>
+
+          {/* Table Container */}
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+            {commissionsLoading ? (
+              <div className="p-12 text-center text-gray-400 flex flex-col items-center justify-center gap-3">
+                <Loader2 className="h-8 w-8 animate-spin text-emerald-600" />
+                <span className="text-xs font-medium">Đang tính toán hoa hồng bán hàng cho KTV...</span>
+              </div>
+            ) : filteredCommissions.length === 0 ? (
+              <div className="p-12 text-center text-gray-400">
+                <Package className="h-10 w-10 mx-auto text-gray-300 mb-2" />
+                <p className="text-sm font-semibold text-gray-600">Không tìm thấy đơn hàng bán nào trong tháng {selectedMonth}</p>
+                <p className="text-xs text-gray-400 mt-1">Đơn hàng cần có KTV bán hàng được chỉ định và trạng thái hoàn thành trong tháng.</p>
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-xs text-left border-collapse">
+                  <thead>
+                    <tr className="bg-[#1B3A6B] text-white font-bold">
+                      <th className="px-4 py-3.5 w-12 text-center">STT</th>
+                      <th className="px-4 py-3.5 min-w-[130px]">Mã đơn / Ngày HT</th>
+                      <th className="px-4 py-3.5 min-w-[150px]">Khách hàng</th>
+                      <th className="px-4 py-3.5 min-w-[160px]">KTV Bán hàng</th>
+                      <th className="px-4 py-3.5 min-w-[140px]">KTV Lắp đặt</th>
+                      <th className="px-4 py-3.5 min-w-[150px] text-right">Doanh số Máy</th>
+                      <th className="px-4 py-3.5 min-w-[130px] text-right">Trừ ca GH & LĐ</th>
+                      <th className="px-4 py-3.5 min-w-[150px] text-right">Doanh số Lõi/PK</th>
+                      <th className="px-4 py-3.5 min-w-[130px] text-right">HH Tự động</th>
+                      <th className="px-4 py-3.5 min-w-[140px] text-right bg-blue-900 text-emerald-300">HH Thực nhận</th>
+                      <th className="px-4 py-3.5 min-w-[140px]">Ghi chú</th>
+                      <th className="px-4 py-3.5 w-24 text-center">Thao tác</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100">
+                    {filteredCommissions.map((comm: any, idx: number) => {
+                      const completedDateStr = comm.completedDate 
+                        ? new Date(comm.completedDate).toLocaleDateString('vi-VN') 
+                        : '-';
+                      const isSameKtv = comm.salesKtv?.id && comm.assignedKtv?.id && comm.salesKtv.id === comm.assignedKtv.id;
+
+                      return (
+                        <tr key={comm.orderId} className="hover:bg-blue-50/30 transition">
+                          <td className="px-4 py-3 text-center text-gray-500 font-medium">{idx + 1}</td>
+                          
+                          {/* Mã đơn & Ngày hoàn thành */}
+                          <td className="px-4 py-3">
+                            <div className="font-bold text-[#1B3A6B]">{comm.orderCode}</div>
+                            <div className="text-[11px] text-gray-500 mt-0.5">{completedDateStr}</div>
+                          </td>
+
+                          {/* Khách hàng */}
+                          <td className="px-4 py-3">
+                            <div className="font-semibold text-gray-800">{comm.customerName || 'Khách vãng lai'}</div>
+                            <div className="text-[11px] text-gray-500">{comm.customerPhone || '-'}</div>
+                          </td>
+
+                          {/* KTV Bán Hàng */}
+                          <td className="px-4 py-3">
+                            {comm.salesKtv ? (
+                              <div>
+                                <span className="font-bold text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200/60 inline-block">
+                                  {comm.salesKtv.fullName}
+                                </span>
+                                <div className="text-[10px] text-gray-500 mt-0.5">
+                                  {comm.salesKtv.phoneNumber} {comm.salesKtv.techStation?.name ? `• Trạm ${comm.salesKtv.techStation.name}` : ''}
+                                </div>
+                              </div>
+                            ) : (
+                              <span className="text-gray-400 italic">Chưa chọn</span>
+                            )}
+                          </td>
+
+                          {/* KTV Lắp Đặt */}
+                          <td className="px-4 py-3">
+                            {comm.assignedKtv ? (
+                              <div>
+                                <div className="font-medium text-gray-700">{comm.assignedKtv.fullName}</div>
+                                {isSameKtv ? (
+                                  <span className="text-[10px] text-blue-600 bg-blue-50 px-1 py-0.2 rounded font-semibold">Bán & Lắp</span>
+                                ) : (
+                                  <span className="text-[10px] text-gray-400">Lắp đặt khác người bán</span>
+                                )}
+                              </div>
+                            ) : (
+                              <span className="text-gray-400 italic">Chưa phân KTV</span>
+                            )}
+                          </td>
+
+                          {/* Doanh số Máy */}
+                          <td className="px-4 py-3 text-right">
+                            {comm.hasDevice ? (
+                              <div>
+                                <div className="font-bold text-gray-800">{formatMoney(comm.deviceRevenue - comm.deviceDiscount)}</div>
+                                <div className="text-[10px] text-gray-400">
+                                  Thuần: {formatMoney(Math.round((comm.deviceRevenue - comm.deviceDiscount) / 1.08))}
+                                </div>
+                                <div className="text-[10px] text-emerald-600 font-medium">
+                                  15%: {formatMoney(comm.deviceCommissionPreLapDat)}
+                                </div>
+                              </div>
+                            ) : (
+                              <span className="text-gray-300">-</span>
+                            )}
+                          </td>
+
+                          {/* Trừ ca lắp đặt */}
+                          <td className="px-4 py-3 text-right">
+                            {comm.hasDevice && comm.lapDatCostDeducted > 0 ? (
+                              <div>
+                                <div className="font-bold text-rose-600">-{formatMoney(comm.lapDatCostDeducted)}</div>
+                                <div className="text-[10px] text-gray-400 font-medium" title={comm.deliveryInstallRateSource || comm.lapDatRateSource || ''}>
+                                  {(comm.deliveryInstallRateSource || comm.lapDatRateSource || '').includes('KTV') ? 'Đơn giá KTV' : (comm.deliveryInstallRateSource || comm.lapDatRateSource || '').includes('Trạm') ? 'Đơn giá Trạm' : 'Chuẩn (120k)'}
+                                </div>
+                              </div>
+                            ) : comm.hasDevice ? (
+                              <span className="text-gray-400">0đ</span>
+                            ) : (
+                              <span className="text-gray-300">-</span>
+                            )}
+                          </td>
+
+                          {/* Doanh số Lõi/Phụ tùng */}
+                          <td className="px-4 py-3 text-right">
+                            {(comm.filterRevenue - comm.filterDiscount) > 0 ? (
+                              <div>
+                                <div className="font-bold text-gray-800">{formatMoney(comm.filterRevenue - comm.filterDiscount)}</div>
+                                <div className="text-[10px] text-gray-400">
+                                  Thuần: {formatMoney(Math.round((comm.filterRevenue - comm.filterDiscount) / 1.08))}
+                                </div>
+                                <div className="text-[10px] text-blue-600 font-medium">
+                                  10%: {formatMoney(comm.filterCommission)}
+                                </div>
+                              </div>
+                            ) : (
+                              <span className="text-gray-300">-</span>
+                            )}
+                          </td>
+
+                          {/* HH Tự động */}
+                          <td className="px-4 py-3 text-right text-gray-600 font-semibold">
+                            {formatMoney(comm.calculatedCommission)}
+                          </td>
+
+                          {/* HH Thực nhận */}
+                          <td className="px-4 py-3 text-right bg-emerald-50/40">
+                            <div className="font-black text-sm text-emerald-800">
+                              {formatMoney(comm.finalCommission)}
+                            </div>
+                            {comm.isCustom && (
+                              <span className="inline-block mt-0.5 text-[9px] font-bold text-amber-700 bg-amber-100 px-1.5 py-0.2 rounded">
+                                Admin ghi đè
+                              </span>
+                            )}
+                          </td>
+
+                          {/* Ghi chú */}
+                          <td className="px-4 py-3 text-gray-500 text-[11px] max-w-[150px] truncate" title={comm.salesCommissionNote || ''}>
+                            {comm.salesCommissionNote || '-'}
+                          </td>
+
+                          {/* Thao tác */}
+                          <td className="px-4 py-3 text-center">
+                            <button
+                              onClick={() => openCommissionEditModal(comm)}
+                              className="px-2.5 py-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 rounded-lg text-xs font-bold transition flex items-center justify-center gap-1 mx-auto cursor-pointer"
+                              title="Điều chỉnh hoa hồng đơn này"
+                            >
+                              <Sliders className="h-3.5 w-3.5" />
+                              <span>Sửa</span>
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Modal Áp Dụng Đơn Giá Hàng Loạt Cho Cột */}
       {columnApplyModal && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
@@ -4229,6 +4669,285 @@ export default function SalaryManage() {
               </button>
             </div>
 
+          </div>
+        </div>
+      )}
+
+      {/* Modal Điều Chỉnh Hoa Hồng Bán Hàng Của Admin */}
+      {commissionEditModal && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl w-full max-w-2xl shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200 flex flex-col max-h-[90vh]">
+            {/* Modal Header */}
+            <div className="bg-[#1B3A6B] text-white p-4 flex items-center justify-between">
+              <div>
+                <h3 className="font-bold text-base flex items-center gap-2">
+                  <span>🏷️ Điều Chỉnh Hoa Hồng - Đơn #{commissionEditModal.order.orderCode}</span>
+                </h3>
+                <p className="text-xs text-blue-200 mt-0.5">
+                  KTV Bán hàng: <strong className="text-white">{commissionEditModal.order.salesKtv?.fullName}</strong> ({commissionEditModal.order.salesKtv?.phoneNumber})
+                </p>
+              </div>
+              <button
+                onClick={() => setCommissionEditModal(null)}
+                className="p-1.5 hover:bg-white/10 rounded-lg transition text-blue-200 hover:text-white"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div className="p-5 space-y-4 overflow-y-auto flex-1 text-xs">
+              {/* Info bar */}
+              <div className="bg-gray-50 p-3 rounded-xl border border-gray-200 flex items-center justify-between flex-wrap gap-2 text-gray-700">
+                <div>
+                  <span className="text-gray-500">Khách hàng:</span> <strong className="text-gray-900">{commissionEditModal.order.customerName || 'Khách vãng lai'}</strong> - {commissionEditModal.order.customerPhone || ''}
+                </div>
+                <div>
+                  <span className="text-gray-500">KTV Lắp đặt:</span> <strong className="text-gray-900">{commissionEditModal.order.assignedKtv?.fullName || 'Chưa phân'}</strong>
+                </div>
+              </div>
+
+              {/* Items preview */}
+              {commissionEditModal.order.items && commissionEditModal.order.items.length > 0 && (
+                <div>
+                  <div className="font-bold text-gray-700 mb-1.5">Sản phẩm trong đơn:</div>
+                  <div className="flex flex-wrap gap-1.5">
+                    {commissionEditModal.order.items.map((it: any, idx: number) => (
+                      <span key={idx} className={`px-2 py-1 rounded text-[11px] font-medium border ${it.isDevice ? 'bg-emerald-50 text-emerald-800 border-emerald-200' : 'bg-blue-50 text-blue-800 border-blue-200'}`}>
+                        {it.productName} (x{it.quantity}) - {formatMoney(it.finalPrice)} [{it.isDevice ? 'Thiết bị' : 'Lõi/PK'}]
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Section 1: Device */}
+              <div className="bg-emerald-50/50 p-4 rounded-xl border border-emerald-200/80 space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="font-bold text-emerald-900 flex items-center gap-1.5">
+                    <span>1. Nhóm Thiết Bị (Device)</span>
+                    <span className="bg-emerald-200 text-emerald-800 text-[10px] px-1.5 py-0.5 rounded font-bold">15%</span>
+                  </span>
+                  <span className="text-gray-500 text-[11px]">
+                    Công thức: (DT - Giảm)/1.08 * Tỷ lệ - Trừ ca lắp
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                  <div>
+                    <label className="block text-gray-600 font-medium mb-1">Doanh thu Máy (VND)</label>
+                    <input
+                      type="number"
+                      value={commissionEditModal.customDeviceRevenue}
+                      onChange={e => setCommissionEditModal(prev => prev ? { ...prev, customDeviceRevenue: e.target.value } : null)}
+                      className="w-full p-2 border rounded-lg text-right font-bold bg-white text-gray-800 focus:ring-1 focus:ring-emerald-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-gray-600 font-medium mb-1">Giảm giá Máy (VND)</label>
+                    <input
+                      type="number"
+                      value={commissionEditModal.customDeviceDiscount}
+                      onChange={e => setCommissionEditModal(prev => prev ? { ...prev, customDeviceDiscount: e.target.value } : null)}
+                      className="w-full p-2 border rounded-lg text-right font-bold bg-white text-gray-800 focus:ring-1 focus:ring-emerald-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-gray-600 font-medium mb-1">Tỷ lệ hoa hồng</label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      value={commissionEditModal.customDeviceRate}
+                      onChange={e => setCommissionEditModal(prev => prev ? { ...prev, customDeviceRate: e.target.value } : null)}
+                      className="w-full p-2 border rounded-lg text-right font-bold bg-white text-gray-800 focus:ring-1 focus:ring-emerald-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-gray-600 font-medium mb-1">Trừ ca Giao hàng & Lắp đặt (VND)</label>
+                    <input
+                      type="number"
+                      value={commissionEditModal.customLapDatCost}
+                      onChange={e => setCommissionEditModal(prev => prev ? { ...prev, customLapDatCost: e.target.value } : null)}
+                      className="w-full p-2 border rounded-lg text-right font-bold bg-white text-rose-700 focus:ring-1 focus:ring-emerald-500"
+                    />
+                  </div>
+                </div>
+
+                {/* Sub-calculation Preview */}
+                {(() => {
+                  const rev = parseFloat(commissionEditModal.customDeviceRevenue) || 0;
+                  const disc = parseFloat(commissionEditModal.customDeviceDiscount) || 0;
+                  const rate = parseFloat(commissionEditModal.customDeviceRate) || 0;
+                  const lapCost = parseFloat(commissionEditModal.customLapDatCost) || 0;
+                  const net = Math.max(0, rev - disc);
+                  const subComm = net > 0 ? Math.max(0, Math.round((net / 1.08) * rate) - lapCost) : 0;
+                  return (
+                    <div className="text-[11px] text-emerald-800 font-medium bg-emerald-100/50 px-3 py-1.5 rounded-lg flex items-center justify-between">
+                      <span>Thuần: {formatMoney(Math.round(net / 1.08))} | Hoa hồng trước trừ: {formatMoney(Math.round((net / 1.08) * rate))}</span>
+                      <span>= <strong>{formatMoney(subComm)}</strong></span>
+                    </div>
+                  );
+                })()}
+              </div>
+
+              {/* Section 2: Filter & Spare part */}
+              <div className="bg-blue-50/50 p-4 rounded-xl border border-blue-200/80 space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="font-bold text-blue-900 flex items-center gap-1.5">
+                    <span>2. Nhóm Lõi Lọc & Phụ Tùng (Filter & Spare parts)</span>
+                    <span className="bg-blue-200 text-blue-800 text-[10px] px-1.5 py-0.5 rounded font-bold">10%</span>
+                  </span>
+                  <span className="text-gray-500 text-[11px]">
+                    Công thức: (DT - Giảm)/1.08 * Tỷ lệ
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                  <div>
+                    <label className="block text-gray-600 font-medium mb-1">Doanh thu Lõi/PK (VND)</label>
+                    <input
+                      type="number"
+                      value={commissionEditModal.customFilterRevenue}
+                      onChange={e => setCommissionEditModal(prev => prev ? { ...prev, customFilterRevenue: e.target.value } : null)}
+                      className="w-full p-2 border rounded-lg text-right font-bold bg-white text-gray-800 focus:ring-1 focus:ring-blue-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-gray-600 font-medium mb-1">Giảm giá Lõi/PK (VND)</label>
+                    <input
+                      type="number"
+                      value={commissionEditModal.customFilterDiscount}
+                      onChange={e => setCommissionEditModal(prev => prev ? { ...prev, customFilterDiscount: e.target.value } : null)}
+                      className="w-full p-2 border rounded-lg text-right font-bold bg-white text-gray-800 focus:ring-1 focus:ring-blue-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-gray-600 font-medium mb-1">Tỷ lệ hoa hồng</label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      value={commissionEditModal.customFilterRate}
+                      onChange={e => setCommissionEditModal(prev => prev ? { ...prev, customFilterRate: e.target.value } : null)}
+                      className="w-full p-2 border rounded-lg text-right font-bold bg-white text-gray-800 focus:ring-1 focus:ring-blue-500"
+                    />
+                  </div>
+                </div>
+
+                {/* Sub-calculation Preview */}
+                {(() => {
+                  const rev = parseFloat(commissionEditModal.customFilterRevenue) || 0;
+                  const disc = parseFloat(commissionEditModal.customFilterDiscount) || 0;
+                  const rate = parseFloat(commissionEditModal.customFilterRate) || 0;
+                  const net = Math.max(0, rev - disc);
+                  const subComm = net > 0 ? Math.max(0, Math.round((net / 1.08) * rate)) : 0;
+                  return (
+                    <div className="text-[11px] text-blue-800 font-medium bg-blue-100/50 px-3 py-1.5 rounded-lg flex items-center justify-between">
+                      <span>Thuần: {formatMoney(Math.round(net / 1.08))}</span>
+                      <span>= <strong>{formatMoney(subComm)}</strong></span>
+                    </div>
+                  );
+                })()}
+              </div>
+
+              {/* Section 3: Final Override Amount */}
+              <div className="bg-amber-50/70 p-4 rounded-xl border border-amber-200 space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="font-bold text-amber-900">3. Số Tiền Hoa Hồng Chốt Thực Nhận (VND)</span>
+                  {(() => {
+                    const dRev = parseFloat(commissionEditModal.customDeviceRevenue) || 0;
+                    const dDisc = parseFloat(commissionEditModal.customDeviceDiscount) || 0;
+                    const dRate = parseFloat(commissionEditModal.customDeviceRate) || 0;
+                    const lapCost = parseFloat(commissionEditModal.customLapDatCost) || 0;
+                    const dNet = Math.max(0, dRev - dDisc);
+                    const dComm = dNet > 0 ? Math.max(0, Math.round((dNet / 1.08) * dRate) - lapCost) : 0;
+
+                    const fRev = parseFloat(commissionEditModal.customFilterRevenue) || 0;
+                    const fDisc = parseFloat(commissionEditModal.customFilterDiscount) || 0;
+                    const fRate = parseFloat(commissionEditModal.customFilterRate) || 0;
+                    const fNet = Math.max(0, fRev - fDisc);
+                    const fComm = fNet > 0 ? Math.max(0, Math.round((fNet / 1.08) * fRate)) : 0;
+
+                    const autoTotal = dComm + fComm;
+
+                    return (
+                      <button
+                        type="button"
+                        onClick={() => setCommissionEditModal(prev => prev ? { ...prev, customSalesCommission: String(autoTotal) } : null)}
+                        className="text-[11px] text-blue-600 hover:text-blue-800 font-bold underline cursor-pointer"
+                      >
+                        Áp dụng kết quả tính ({formatMoney(autoTotal)})
+                      </button>
+                    );
+                  })()}
+                </div>
+
+                <div className="flex items-center gap-3">
+                  <input
+                    type="number"
+                    value={commissionEditModal.customSalesCommission}
+                    onChange={e => setCommissionEditModal(prev => prev ? { ...prev, customSalesCommission: e.target.value } : null)}
+                    className="flex-1 p-2.5 border border-amber-300 rounded-xl text-lg font-black text-right text-amber-900 bg-white focus:ring-2 focus:ring-amber-500"
+                    placeholder="Nhập số tiền hoa hồng chốt..."
+                  />
+                </div>
+              </div>
+
+              {/* Section 4: Note */}
+              <div>
+                <label className="block text-gray-700 font-bold mb-1">Ghi chú điều chỉnh của Admin</label>
+                <textarea
+                  rows={2}
+                  value={commissionEditModal.note}
+                  onChange={e => setCommissionEditModal(prev => prev ? { ...prev, note: e.target.value } : null)}
+                  className="w-full p-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 text-xs"
+                  placeholder="Lý do điều chỉnh hoặc chi tiết bù trừ..."
+                />
+              </div>
+            </div>
+
+            {/* Modal Footer */}
+            <div className="bg-gray-50 p-4 border-t border-gray-100 flex items-center justify-between">
+              <button
+                type="button"
+                onClick={() => {
+                  const orig = commissionEditModal.order;
+                  setCommissionEditModal(prev => prev ? {
+                    ...prev,
+                    customDeviceRevenue: String(orig.deviceRevenue || 0),
+                    customDeviceDiscount: String(orig.deviceDiscount || 0),
+                    customDeviceRate: '0.15',
+                    customFilterRevenue: String(orig.filterRevenue || 0),
+                    customFilterDiscount: String(orig.filterDiscount || 0),
+                    customFilterRate: '0.10',
+                    customLapDatCost: String(orig.hasDevice ? (orig.deliveryInstallCostDeducted ?? orig.lapDatCostDeducted ?? 120000) : 0),
+                    customSalesCommission: String(orig.calculatedCommission || 0),
+                    note: ''
+                  } : null);
+                }}
+                className="px-3 py-2 text-gray-600 hover:text-gray-900 text-xs font-semibold cursor-pointer"
+              >
+                Khôi phục mặc định
+              </button>
+
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setCommissionEditModal(null)}
+                  className="px-4 py-2 bg-white hover:bg-gray-100 border border-gray-200 text-gray-700 font-bold rounded-xl text-xs transition cursor-pointer"
+                >
+                  Hủy
+                </button>
+                <button
+                  type="button"
+                  onClick={handleSaveCommissionAdjustment}
+                  disabled={commissionEditModal.saving}
+                  className="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl text-xs transition flex items-center gap-1.5 shadow-sm cursor-pointer"
+                >
+                  {commissionEditModal.saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+                  <span>Lưu điều chỉnh</span>
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}

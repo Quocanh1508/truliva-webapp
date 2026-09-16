@@ -14,6 +14,7 @@ import { isValidPhone, PHONE_ERROR_MSG } from '../../utils/phone';
 import ProvinceSelect from '../../components/ProvinceSelect';
 import { isValidProvince } from '../../utils/provinces';
 import { useStickyTableHeader } from '../../hooks/useStickyTableHeader';
+import { SalesKtvSelect } from '../../components/SalesKtvSelect';
 
 
 const ALL_SERVICE_TYPES = Array.from(new Set(Object.values(WORK_TYPE_SERVICES).flat()));
@@ -408,6 +409,7 @@ export default function OrderList() {
   const [selectedMain, setSelectedMain] = useState('');
   const [selectedTech, setSelectedTech] = useState('');
   const [selectedKtv, setSelectedKtv] = useState('');
+  const [selectedSalesKtv, setSelectedSalesKtv] = useState('');
   const [appointmentDate, setAppointmentDate] = useState('');
   const [appointmentTime, setAppointmentTime] = useState('08:30');
   const [rescheduleReason, setRescheduleReason] = useState('');
@@ -1288,6 +1290,7 @@ export default function OrderList() {
     setSelectedMain(initialMain);
     setSelectedTech(initialTech);
     setSelectedKtv(initialKtv);
+    setSelectedSalesKtv(order.salesKtvId || '');
 
     // Convert UTC to local input format
     let appDateStr = '';
@@ -1536,6 +1539,7 @@ export default function OrderList() {
         mainStationId: selectedMain || null,
         techStationId: selectedTech || null,
         assignedKtvId: selectedKtv || null,
+        salesKtvId: selectedSalesKtv || null,
         appointmentTime: appointmentDateObj.toISOString(),
         rescheduleReason: rescheduleReason || null,
         workType: workType || null,
@@ -3355,6 +3359,13 @@ export default function OrderList() {
                       <div className="font-bold text-gray-800 text-[12px]">{mainStationName || 'Chưa phân trạm chính'}</div>
                       {techStationName && <div className="text-[11px] text-gray-600 font-medium">{techStationName}</div>}
                       <div className="text-gray-500 text-[11px] mt-0.5">KTV: <span className="font-semibold text-gray-700">{ktvName}</span></div>
+                      {order.salesKtv && (
+                        <div className="mt-1">
+                          <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-800 bg-emerald-50 border border-emerald-200/80 rounded px-1.5 py-0.5" title={`KTV bán hàng: ${order.salesKtv.fullName}`}>
+                            🏷️ Bán: {order.salesKtv.fullName}
+                          </span>
+                        </div>
+                      )}
 
                       {order.ktvCalledAt && (
                         <div className="text-[10px] text-emerald-600 bg-emerald-50 border border-emerald-200 px-1 py-0.2 rounded mt-1 inline-block font-medium">
@@ -4206,6 +4217,23 @@ export default function OrderList() {
                     </button>
                   </div>
                 )}
+
+                {/* KTV Bán Hàng (Hưởng hoa hồng) */}
+                <div className="bg-emerald-50/50 p-3 rounded-xl border border-emerald-200/80 shadow-xs">
+                  <div className="flex items-center justify-between mb-1.5">
+                    <label className="block text-xs font-bold text-emerald-950 flex items-center gap-1.5">
+                      <span>🏷️ Tên KTV bán hàng (Hưởng hoa hồng)</span>
+                    </label>
+                    <span className="text-[10px] text-emerald-700 bg-emerald-100/70 px-1.5 py-0.5 rounded-md font-medium">
+                      Cố định • Không đổi khi sửa trạm/kho
+                    </span>
+                  </div>
+                  <SalesKtvSelect
+                    value={selectedSalesKtv}
+                    onChange={setSelectedSalesKtv}
+                    ktvs={allKtvs}
+                  />
+                </div>
 
                 <div>
                   <label className="block text-sm text-gray-600 mb-1">Trạm chính</label>

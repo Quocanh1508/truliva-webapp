@@ -8,6 +8,7 @@ import {
   getRateType,
   checkIsOfficialTrulivaKtv
 } from '../services/salaryService';
+import { computeCommissionsForMonth } from '../services/commissionService';
 
 /**
  * GET /api/salaries/calculate
@@ -16,8 +17,32 @@ import {
 export async function getCalculatedSalaries(req: Request, res: Response): Promise<void> {
   try {
     const month = (req.query.month as string) || `${new Date().getMonth() + 1}/${new Date().getFullYear()}`;
-    const result = await computeFullSalariesForMonth(month);
-    res.json({ month, salaries: result, data: result });
+    const [salaryResult, commissionResult] = await Promise.all([
+      computeFullSalariesForMonth(month),
+      computeCommissionsForMonth(month)
+    ]);
+
+    const commissionsByKtv = commissionResult.ktvSummaries || {};
+    const mergedSalaries = salaryResult.map((ktv: any) => {
+      const comm = commissionsByKtv[ktv.userId];
+      const salesCommission = comm ? comm.totalFinalCommission : 0;
+      const salesCommissionOrdersCount = comm ? comm.totalOrders : 0;
+      const salesCommissionCalculated = comm ? comm.totalCalculatedCommission : 0;
+      return {
+        ...ktv,
+        salesCommission,
+        salesCommissionOrdersCount,
+        salesCommissionCalculated,
+        totalIncome: (ktv.adjustedCost !== undefined && ktv.adjustedCost !== null ? ktv.adjustedCost : ktv.calculatedCost) + salesCommission
+      };
+    });
+
+    res.json({
+      month,
+      salaries: mergedSalaries,
+      data: mergedSalaries,
+      commissionStats: commissionResult.stats
+    });
   } catch (error: any) {
     logger.error('Error calculating salaries', { error: error.message, stack: error.stack });
     res.status(500).json({ error: 'Lỗi khi tính thù lao KTV' });
@@ -1117,5 +1142,80 @@ export async function lockSalaryMonth(req: Request, res: Response): Promise<void
     res.status(500).json({ error: 'Lỗi khi chốt bảng thù lao' });
   }
 }
+
+/**
+ * GET /api/salaries/commissions
+ * Lấy danh sách hoa hồng bán hàng KTV theo tháng
+ */
+export async function getCommissions(req: Request, res: Response): Promise<void> {
+  try {
+    const month = (req.query.month as string) || `${new Date().getMonth() + 1}/${new Date().getFullYear()}`;
+    const ktvId = req.query.ktvId as string | undefined;
+    const result = await computeCommissionsForMonth(month, ktvId);
+    res.json(result);
+  } catch (error: any) {
+    logger.error('Error getting commissions', { error: error.message, stack: error.stack });
+    res.status(500).json({ error: 'Lỗi lấy dữ liệu hoa hồng bán hàng' });
+  }
+}
+
+/**
+ * POST /api/salaries/commissions/adjust
+ * Admin điều chỉnh thông tin chi phí / hoa hồng cho đơn hàng
+ */
+export async function adjustOrderCommission(req: Request, res: Response): Promise<void> {
+  try {
+    const { orderId, customSalesCommission, commissionAdjustments, salesCommissionNote } = req.body;
+    if (!orderId) {
+      res.status(400).json({ error: 'Thiếu orderId' });
+      return;
+    }
+
+    const existingOrder = await prisma.order.findUnique({
+      where: { id: orderId }
+    });
+    if (!existingOrder) {
+      res.status(404).json({ error: 'Không tìm thấy đơn hàng' });
+      return;
+    }
+
+    const updateData: any = {};
+    if (customSalesCommission !== undefined) {
+      updateData.customSalesCommission = customSalesCommission !== null ? Number(customSalesCommission) : null;
+    }
+    if (commissionAdjustments !== undefined) {
+      updateData.commissionAdjustments = commissionAdjustments;
+    }
+    if (salesCommissionNote !== undefined) {
+      updateData.salesCommissionNote = salesCommissionNote;
+    }
+
+    const updatedOrder = await prisma.order.update({
+      where: { id: orderId },
+      data: updateData
+    });
+
+    await prisma.auditLog.create({
+      data: {
+        entityType: 'Order',
+        entityId: orderId,
+        action: 'adjust_commission',
+        changes: {
+          customSalesCommission,
+          commissionAdjustments,
+          salesCommissionNote
+        },
+        userId: req.user?.id || 'admin',
+        userName: req.user?.fullName || 'Admin'
+      }
+    });
+
+    res.json({ success: true, order: updatedOrder });
+  } catch (error: any) {
+    logger.error('Error adjusting commission', { error: error.message, stack: error.stack });
+    res.status(500).json({ error: 'Lỗi điều chỉnh hoa hồng đơn hàng' });
+  }
+}
+
 
 

@@ -11,7 +11,9 @@ import {
   resetKtvRates,
   updateBaseCost,
   addCustomCase,
-  deleteCustomCase
+  deleteCustomCase,
+  getCommissions,
+  adjustOrderCommission
 } from '../controllers/salaryController';
 
 const router = Router();
@@ -19,6 +21,8 @@ const router = Router();
 router.use(requireAuth);
 
 router.get('/calculate', requireAdmin, getCalculatedSalaries);
+router.get('/commissions', requireAdmin, getCommissions);
+router.post('/commissions/adjust', requireAdmin, adjustOrderCommission);
 router.post('/save', requireAdmin, saveSalaryDraft);
 router.post('/lock', requireAdmin, lockSalaryMonth);
 router.post('/adjust', requireAdmin, adjustSalary);

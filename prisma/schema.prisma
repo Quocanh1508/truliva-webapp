@@ -100,13 +100,21 @@ model Order {
   checkoutLink        String?   @map("checkout_link")             // Link thanh toán cho khách (derived from tracking_link)
   promoCode           String?   @map("promo_code")                // Mã khuyến mãi bảo hành áp dụng cho đơn hàng
   rawData             Json?     @map("raw_data")
+  // ── Hoa hồng KTV Bán hàng ──
+  salesKtvId              String?   @map("sales_ktv_id")              // KTV bán hàng
+  salesCommission         Float?    @map("sales_commission")          // Tiền hoa hồng hệ thống tự tính
+  customSalesCommission   Float?    @map("custom_sales_commission")   // Tiền hoa hồng Admin điều chỉnh
+  commissionAdjustments   Json?     @map("commission_adjustments")    // Chi tiết điều chỉnh: { customRevenue, customDiscount, customLapDatCost, customRateDevice, customRateFilter, ... }
+  salesCommissionNote     String?   @map("sales_commission_note")     // Ghi chú điều chỉnh hoa hồng
+  salesCommissionStatus   String?   @default("PENDING") @map("sales_commission_status") // PENDING, APPROVED, PAID, CANCELLED
   createdAt           DateTime  @default(now()) @map("created_at")
   updatedAt           DateTime  @updatedAt @map("updated_at")
 
   // Relations
   customer            Customer?     @relation(fields: [customerId], references: [id])
   items               OrderItem[]
-  assignedKtv         User?         @relation(fields: [assignedKtvId], references: [id])
+  assignedKtv         User?         @relation("AssignedKtvOrders", fields: [assignedKtvId], references: [id])
+  salesKtv            User?         @relation("SalesKtvOrders", fields: [salesKtvId], references: [id])
   mainStation         MainStation?  @relation(fields: [mainStationId], references: [id])
   techStation         TechStation?  @relation(fields: [techStationId], references: [id])
   serviceReports      ServiceReport[]
@@ -115,6 +123,7 @@ model Order {
 
   @@map("orders")
   @@index([assignedKtvId, adminStatus])
+  @@index([salesKtvId, adminStatus])
   @@index([createdAt])
   @@index([appointmentTime])
 }
@@ -248,8 +257,9 @@ model User {
 
   serviceReports  ServiceReport[] @relation("KtvUserReports")
   reportedReports ServiceReport[] @relation("ReportedByUserReports")
-  assignedOrders  Order[]
-  techStation     TechStation?  @relation(fields: [techStationId], references: [id])
+  assignedOrders  Order[]         @relation("AssignedKtvOrders")
+  soldOrders      Order[]         @relation("SalesKtvOrders")
+  techStation     TechStation?    @relation(fields: [techStationId], references: [id])
   feedbacks       Feedback[]
   notifications   Notification[]
   importedSerials Serial[]
