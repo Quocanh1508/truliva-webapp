@@ -172,6 +172,7 @@ export async function checkSerialPublicInfo(serialNumber: string, orderId?: stri
   return {
     serialNumber: serial.serialNumber,
     model: serial.model,
+    productLine: serial.productLine,
     status: serial.status,
     isActivated,
     standardMonths,

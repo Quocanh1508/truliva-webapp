@@ -68,13 +68,6 @@ const WORK_TYPE_CONFIGS: Record<string, { label: string; icon: React.FC<any>; co
   }
 };
 
-const RESCHEDULE_QUICK_TAGS = [
-  'Khách bận dời lịch',
-  'KTV kẹt ca trước',
-  'Khách chưa nhận được máy',
-  'KTV xin hẹn ca chiều',
-  'Khách yêu cầu hẹn lại'
-];
 
 const TIME_PRESETS = [
   { label: '08:30 (Sáng)', time: '08:30' },
@@ -174,10 +167,10 @@ export const OrderClassificationSection: React.FC<OrderClassificationSectionProp
             setIsServiceDropdownOpen(false);
             setIsPromoOpen(false);
           }}
-          className={`w-full text-left transition-all duration-150 flex items-center justify-between gap-2 p-2.5 rounded-xl border bg-white cursor-pointer shadow-xs ${
+          className={`w-full text-left transition-all duration-150 flex items-center justify-between gap-2 p-2.5 rounded-xl border-2 border-solid bg-white cursor-pointer shadow-xs ${
             isWorkTypeOpen
-              ? 'border-blue-500 ring-2 ring-blue-500/20'
-              : 'border-slate-300 hover:border-blue-400'
+              ? 'border-blue-600 ring-2 ring-blue-500/20'
+              : 'border-slate-300 hover:border-blue-500'
           }`}
         >
           {currentWorkTypeConfig ? (
@@ -277,7 +270,7 @@ export const OrderClassificationSection: React.FC<OrderClassificationSectionProp
                 }}
                 onFocus={() => setIsServiceDropdownOpen(true)}
                 placeholder="Gõ để tìm kiếm & chọn dịch vụ..."
-                className="w-full pl-8 pr-7 py-2.5 text-xs bg-white border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 text-slate-800 font-medium shadow-xs"
+                className="w-full pl-8 pr-7 py-2.5 text-xs bg-white border-2 border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 text-slate-800 font-medium shadow-xs"
               />
               <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 pointer-events-none" />
               {serviceType && (
@@ -332,7 +325,7 @@ export const OrderClassificationSection: React.FC<OrderClassificationSectionProp
             )}
           </div>
         ) : (
-          <div className="flex items-center gap-2 p-2.5 rounded-xl bg-slate-50 border border-dashed border-slate-200 text-xs text-slate-400">
+          <div className="flex items-center gap-2 p-2.5 rounded-xl bg-slate-50 border-2 border-dashed border-slate-200 text-xs text-slate-400">
             <AlertCircle size={15} />
             <span>Vui lòng chọn loại công việc ở trên trước</span>
           </div>
@@ -359,7 +352,7 @@ export const OrderClassificationSection: React.FC<OrderClassificationSectionProp
                 onAppointmentDateChange(e.target.value);
                 if (!appointmentTime) onAppointmentTimeChange('08:30');
               }}
-              className="w-full p-2.5 bg-white border border-slate-300 rounded-xl text-xs font-semibold text-slate-800 shadow-xs focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all cursor-pointer"
+              className="w-full p-2.5 bg-white border-2 border-slate-300 rounded-xl text-xs font-semibold text-slate-800 shadow-xs focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 outline-none transition-all cursor-pointer"
             />
           </div>
           <div>
@@ -368,7 +361,7 @@ export const OrderClassificationSection: React.FC<OrderClassificationSectionProp
               type="time"
               value={appointmentTime}
               onChange={e => onAppointmentTimeChange(e.target.value)}
-              className="w-full p-2.5 bg-white border border-slate-300 rounded-xl text-xs font-semibold text-slate-800 shadow-xs focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all cursor-pointer"
+              className="w-full p-2.5 bg-white border-2 border-slate-300 rounded-xl text-xs font-semibold text-slate-800 shadow-xs focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 outline-none transition-all cursor-pointer"
             />
           </div>
         </div>
@@ -408,26 +401,8 @@ export const OrderClassificationSection: React.FC<OrderClassificationSectionProp
           value={rescheduleReason}
           onChange={e => onRescheduleReasonChange(e.target.value)}
           placeholder="Khách bận, KTV kẹt lịch..."
-          className="w-full p-2.5 bg-white border border-slate-300 rounded-xl text-xs text-slate-800 placeholder:text-slate-400 shadow-xs focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all resize-none"
+          className="w-full p-2.5 bg-white border-2 border-slate-300 rounded-xl text-xs text-slate-800 placeholder:text-slate-400 shadow-xs focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 outline-none transition-all resize-none"
         />
-
-        {/* Quick Reason Tag Chips */}
-        <div className="flex items-center gap-1.5 flex-wrap mt-1">
-          <span className="text-[10px] text-slate-400 font-medium">Gợi ý:</span>
-          {RESCHEDULE_QUICK_TAGS.map(tag => (
-            <button
-              key={tag}
-              type="button"
-              onClick={() => {
-                if (!rescheduleReason) onRescheduleReasonChange(tag);
-                else if (!rescheduleReason.includes(tag)) onRescheduleReasonChange(`${rescheduleReason}, ${tag}`);
-              }}
-              className="px-2 py-0.5 rounded-md text-[10px] font-medium bg-amber-50/60 hover:bg-amber-100 text-amber-800 border border-amber-200/80 transition-all cursor-pointer"
-            >
-              {tag}
-            </button>
-          ))}
-        </div>
       </div>
 
       {/* ── 5. CHƯƠNG TRÌNH KHUYẾN MÃI BẢO HÀNH ── */}
@@ -451,10 +426,10 @@ export const OrderClassificationSection: React.FC<OrderClassificationSectionProp
             setIsWorkTypeOpen(false);
             setIsServiceDropdownOpen(false);
           }}
-          className={`w-full text-left transition-all duration-150 flex items-center justify-between gap-2 p-2.5 rounded-xl border bg-white cursor-pointer shadow-xs ${
+          className={`w-full text-left transition-all duration-150 flex items-center justify-between gap-2 p-2.5 rounded-xl border-2 border-solid bg-white cursor-pointer shadow-xs ${
             isPromoOpen
-              ? 'border-purple-500 ring-2 ring-purple-500/20'
-              : 'border-slate-300 hover:border-purple-400'
+              ? 'border-purple-600 ring-2 ring-purple-500/20'
+              : 'border-slate-300 hover:border-purple-500'
           }`}
         >
           {assignPromoCode ? (

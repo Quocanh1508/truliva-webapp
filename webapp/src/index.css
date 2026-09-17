@@ -37,7 +37,8 @@ a {
 button {
   cursor: pointer;
   font-family: inherit;
-  border: none;
+  border-style: solid;
+  border-width: 0;
   outline: none;
 }
 

@@ -95,10 +95,10 @@ export const SalesKtvSelect: React.FC<SalesKtvSelectProps> = ({
         type="button"
         disabled={disabled}
         onClick={() => !disabled && setIsOpen(!isOpen)}
-        className={`w-full text-left transition-all duration-150 flex items-center justify-between gap-2 p-2.5 rounded-xl border bg-white cursor-pointer shadow-xs ${
+        className={`w-full text-left transition-all duration-150 flex items-center justify-between gap-2 p-2.5 rounded-xl border-2 border-solid bg-white cursor-pointer shadow-xs ${
           isOpen
-            ? 'border-emerald-500 ring-2 ring-emerald-500/20'
-            : 'border-emerald-300/90 hover:border-emerald-400'
+            ? 'border-emerald-600 ring-2 ring-emerald-500/20'
+            : 'border-emerald-300 hover:border-emerald-500'
         } ${disabled ? 'opacity-60 cursor-not-allowed bg-gray-50' : ''}`}
       >
         {selectedKtv ? (

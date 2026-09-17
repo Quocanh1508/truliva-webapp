@@ -242,29 +242,23 @@ export const DispatchStationSelect: React.FC<DispatchStationSelectProps> = ({
             )}
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-1.5 text-xs text-slate-700">
+          <div className="flex flex-wrap items-center gap-2 text-xs">
             {suggestedMain && (
-              <div className="flex items-center gap-1.5 bg-white/80 px-2.5 py-1.5 rounded-lg border border-blue-100">
-                <Building2 className="h-3.5 w-3.5 text-blue-600 shrink-0" />
-                <span className="truncate">
-                  Trạm: <b>{suggestedMain.name}</b>
-                </span>
+              <div className="inline-flex items-center gap-2 bg-white px-3 py-1.5 rounded-xl border border-blue-200 shadow-2xs text-slate-800" title={`Trạm chính: ${suggestedMain.name}`}>
+                <Building2 className="h-4 w-4 text-blue-600 shrink-0" />
+                <span>Trạm: <strong className="font-bold text-slate-900">{suggestedMain.name}</strong></span>
               </div>
             )}
             {suggestedTech && (
-              <div className="flex items-center gap-1.5 bg-white/80 px-2.5 py-1.5 rounded-lg border border-indigo-100">
-                <MapPin className="h-3.5 w-3.5 text-indigo-600 shrink-0" />
-                <span className="truncate">
-                  Khu vực: <b>{suggestedTech.name}</b>
-                </span>
+              <div className="inline-flex items-center gap-2 bg-white px-3 py-1.5 rounded-xl border border-indigo-200 shadow-2xs text-slate-800" title={`Trạm kỹ thuật / Khu vực: ${suggestedTech.name}`}>
+                <MapPin className="h-4 w-4 text-indigo-600 shrink-0" />
+                <span>Khu vực: <strong className="font-bold text-slate-900">{suggestedTech.name}</strong></span>
               </div>
             )}
             {suggestedKtv && (
-              <div className="flex items-center gap-1.5 bg-white/80 px-2.5 py-1.5 rounded-lg border border-emerald-100">
-                <User className="h-3.5 w-3.5 text-emerald-600 shrink-0" />
-                <span className="truncate">
-                  KTV: <b>{suggestedKtv.fullName}</b> ({suggestedKtv.pendingOrderCount || 0} đơn)
-                </span>
+              <div className="inline-flex items-center gap-2 bg-white px-3 py-1.5 rounded-xl border border-emerald-200 shadow-2xs text-slate-800" title={`Kỹ thuật viên: ${suggestedKtv.fullName} (${suggestedKtv.pendingOrderCount || 0} đơn)`}>
+                <User className="h-4 w-4 text-emerald-600 shrink-0" />
+                <span>KTV: <strong className="font-bold text-slate-900">{suggestedKtv.fullName}</strong> <span className="text-slate-500 font-normal">({suggestedKtv.pendingOrderCount || 0} đơn)</span></span>
               </div>
             )}
           </div>
@@ -293,10 +287,10 @@ export const DispatchStationSelect: React.FC<DispatchStationSelectProps> = ({
               setIsKtvOpen(false);
             }
           }}
-          className={`w-full text-left transition-all duration-150 flex items-center justify-between gap-2 p-2.5 rounded-xl border bg-white cursor-pointer shadow-xs ${
+          className={`w-full text-left transition-all duration-150 flex items-center justify-between gap-2 p-2.5 rounded-xl border-2 border-solid bg-white cursor-pointer shadow-xs ${
             isMainOpen
-              ? 'border-blue-500 ring-2 ring-blue-500/20'
-              : 'border-slate-300 hover:border-blue-400'
+              ? 'border-blue-600 ring-2 ring-blue-500/20'
+              : 'border-slate-300 hover:border-blue-500'
           } ${disabled ? 'opacity-60 cursor-not-allowed bg-slate-50' : ''}`}
         >
           {currentMain ? (
@@ -434,10 +428,10 @@ export const DispatchStationSelect: React.FC<DispatchStationSelectProps> = ({
               setIsKtvOpen(false);
             }
           }}
-          className={`w-full text-left transition-all duration-150 flex items-center justify-between gap-2 p-2.5 rounded-xl border bg-white cursor-pointer shadow-xs ${
+          className={`w-full text-left transition-all duration-150 flex items-center justify-between gap-2 p-2.5 rounded-xl border-2 border-solid bg-white cursor-pointer shadow-xs ${
             isTechOpen
-              ? 'border-indigo-500 ring-2 ring-indigo-500/20'
-              : 'border-slate-300 hover:border-indigo-400'
+              ? 'border-indigo-600 ring-2 ring-indigo-500/20'
+              : 'border-slate-300 hover:border-indigo-500'
           } ${disabled || !selectedMainId ? 'opacity-60 cursor-not-allowed bg-slate-50' : ''}`}
         >
           {currentTech ? (
@@ -571,10 +565,10 @@ export const DispatchStationSelect: React.FC<DispatchStationSelectProps> = ({
               setIsTechOpen(false);
             }
           }}
-          className={`w-full text-left transition-all duration-150 flex items-center justify-between gap-2 p-2.5 rounded-xl border bg-white cursor-pointer shadow-xs ${
+          className={`w-full text-left transition-all duration-150 flex items-center justify-between gap-2 p-2.5 rounded-xl border-2 border-solid bg-white cursor-pointer shadow-xs ${
             isKtvOpen
-              ? 'border-emerald-500 ring-2 ring-emerald-500/20'
-              : 'border-slate-300 hover:border-emerald-400'
+              ? 'border-emerald-600 ring-2 ring-emerald-500/20'
+              : 'border-slate-300 hover:border-emerald-500'
           } ${disabled || !selectedTechId ? 'opacity-60 cursor-not-allowed bg-slate-50' : ''}`}
         >
           {currentKtv ? (

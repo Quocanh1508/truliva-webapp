@@ -1195,10 +1195,33 @@ export async function createPublicTechSupportTicket(req: Request, res: Response)
 //  GET /api/hotlines/public/devices - Cây danh mục Sản phẩm/Thiết bị Public (Không gồm lõi lọc/linh kiện)
 // ═══════════════════════════════════════════════════
 
+const DEVICE_FALLBACK_IMAGES: Record<string, string> = {
+  'Máy lọc không khí Airplus KJ260': 'https://content.pancake.vn/2-2603/2026/3/9/f96594a1e3dd08a58b3390bd37876600d47f363d.jpg',
+  'Máy lọc không khí Xiaomi Smart Air Purifier 4 Compact': 'https://i02.appmifile.com/mi-com-product/fly-birds/m/xiaomi-smart-air-purifier-4-compact/3d38a4f14d88ba3c0d860fccc54981f7.jpg',
+  'Máy lọc nước Classic': 'https://cdn11.dienmaycholon.vn/filewebdmclnew/DMCL21/Picture/Apro/Apro_product_30948/may-loc-nuoc-un_main_322_450.png.webp',
+  'Máy lọc nước Delica UR5440': 'https://cdn11.dienmaycholon.vn/filewebdmclnew/DMCL21/Picture/Apro/Apro_product_31119/may-loc-nuoc-pureit-delica-ur5440-main-31119.png',
+  'Máy lọc nước Delica UR5640': 'https://cdn11.dienmaycholon.vn/filewebdmclnew/DMCL21/Picture/Apro/Apro_product_31112/may-loc-nuoc-pureit-delica-ur5640-main-322306.png',
+  'Máy lọc nước Delica UR5840': 'https://unileverpureit.vn/wp-content/uploads/2022/06/May-loc-nuoc-Pureit-am-tu-bep-Delica-UR5840.png',
+  'Máy lọc nước Lavita CR5240': 'https://unileverpureit.vn/wp-content/uploads/2022/05/May-Loc-Nuoc-Nong-Thong-Minh-Lavita.png',
+  'Máy lọc nước Tanka UR3140': 'https://cdn.nguyenkimmall.com/images/detailed/755/10050105-may-loc-nuoc-pureit-tanka-ur3140-1.jpg',
+  'Máy lọc nước Truliva Lavita CR-ZX5170': 'https://content.pancake.vn/2-2607/2026/7/23/f2755c464585f26f476a0e62259bb2038516a0c8.jpg',
+  'Máy lọc nước Truliva Lavita CR3170': 'https://unileverpureit.vn/wp-content/uploads/2022/05/May-Loc-Nuoc-Nong-Thong-Minh-Lavita.png',
+  'Máy lọc nước Truliva UR3626': 'https://content.pancake.vn/2-2604/2026/4/17/39b464f0b25d284c24511736754af7f0f9339b0b.png',
+  'Máy lọc nước Truliva UR3626 + Vòi nóng': 'https://content.pancake.vn/2-2604/2026/4/17/39b464f0b25d284c24511736754af7f0f9339b0b.png',
+  'Máy lọc nước Truliva UR3626 + Vòi đen nước thường': 'https://content.pancake.vn/2-2604/2026/4/17/39b464f0b25d284c24511736754af7f0f9339b0b.png',
+  'Máy lọc nước Truliva UR5676': 'https://content.pancake.vn/2-2608/2026/8/14/f99da1a9790fb3c91658f5acd4338f31f3ad9736.png',
+  'Máy lọc nước Truliva UR5840': 'https://content.pancake.vn/2-2604/2026/4/17/12da1b6fe07886ae1e01f897cf3f18375fde6c31.png',
+  'Máy lọc nước Truliva UR61096H': 'https://content.pancake.vn/2-2604/2026/4/17/15147a0a3a011bb424fde9a88fdbdca7ef7df60e.png',
+  'Máy lọc nước Ultima Black': 'https://pureitvietnam.com/wp-content/uploads/2023/06/May-loc-nuoc-Pureit-Ultima-10-copy.jpg',
+  'Máy nóng lạnh Truliva Lavita YDZ-5301D': 'https://content.pancake.vn/2-2607/2026/7/23/11e26595dc23bc9b76a55a930c9b6de05c900202.jpg',
+  'Máy nóng lạnh treo tường Truliva W6412': 'https://content.pancake.vn/2-2604/2026/4/17/12395203216b3f5f40e9e820494a84df72826289.png',
+  'Máy rửa rau Truliva QY/F-I20': 'https://content.pancake.vn/2-2607/2026/7/1/f4a302dfebe14b2447b0bf91d7d9443e75a4138e.jpg',
+};
+
 export async function getPublicSupportDevices(req: Request, res: Response) {
   try {
     const allProducts = await prisma.product.findMany({
-      select: { name: true, category: true, sku: true },
+      select: { name: true, category: true, sku: true, imageUrl: true, rawData: true },
       orderBy: { name: 'asc' }
     });
 
@@ -1216,7 +1239,7 @@ export async function getPublicSupportDevices(req: Request, res: Response) {
       const catLower = (p.category || '').toLowerCase();
 
       if (catLower.includes('lõi') || catLower.includes('loi') || catLower.includes('spare') || catLower.includes('phụ kiện') || catLower.includes('phu kien')) return false;
-      if (nameLower.includes('lõi lọc') || nameLower.includes('loi loc') || nameLower.includes('thay lõi') || nameLower.includes('cto') || nameLower.includes('pp 5m')) return false;
+      if (nameLower.startsWith('lõi') || nameLower.includes('lõi lọc') || nameLower.includes('loi loc') || nameLower.includes('thay lõi') || nameLower.includes('cto') || nameLower.includes('pp 5m')) return false;
 
       for (const prefix of EXCLUDE_PREFIXES) {
         if (nameStr.startsWith(prefix)) return false;
@@ -1234,17 +1257,27 @@ export async function getPublicSupportDevices(req: Request, res: Response) {
       'Thiết bị khác'
     ];
 
-    const productsList = filteredProducts.map(p => ({
-      name: p.name.trim(),
-      category: p.category || 'Device',
-      sku: p.sku || ''
-    }));
+    const productsList = filteredProducts.map(p => {
+      const raw = (p.rawData as any) || {};
+      let img = p.imageUrl || raw.images?.[0] || raw.avatar_url || raw.image || raw.variations?.[0]?.images?.[0] || raw.product?.image || raw.product?.images?.[0];
+      const trimmedName = p.name.trim();
+      if (!img && DEVICE_FALLBACK_IMAGES[trimmedName]) {
+        img = DEVICE_FALLBACK_IMAGES[trimmedName];
+      }
+      return {
+        name: trimmedName,
+        category: p.category || 'Device',
+        sku: p.sku || '',
+        imageUrl: img || null
+      };
+    });
 
     // Thêm tùy chọn "Thiết bị khác"
     productsList.push({
       name: 'Thiết bị khác',
       category: 'Thiết bị khác',
-      sku: 'OTHER'
+      sku: 'OTHER',
+      imageUrl: null
     });
 
     return res.json({

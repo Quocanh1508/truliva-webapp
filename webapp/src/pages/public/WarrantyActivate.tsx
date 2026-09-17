@@ -1,9 +1,204 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { ShieldCheck, ArrowRight, UploadCloud, CheckCircle, CheckCircle2, AlertTriangle, Smartphone, User, MapPin, Loader2, Sparkles, ChevronLeft, ChevronRight, PhoneCall, Wrench, Send, Search, ChevronDown, Sun, Moon, Monitor } from 'lucide-react';
 import { API_URL } from '../../api/client';
 import { isValidPhone, PHONE_ERROR_MSG } from '../../utils/phone';
 import { HOTLINE_SERVICE_REQUEST_TYPES } from '../../utils/workTypes';
+import { ProductVisualSelect, type ProductVisualItem } from '../../components/ProductVisualSelect';
+
+const DEFAULT_SUPPORT_DEVICES: ProductVisualItem[] = [
+  {
+    name: 'Máy lọc nước Truliva UR61096H',
+    category: 'Water UTS Device',
+    sku: '104321-0002',
+    imageUrl: 'https://content.pancake.vn/2-2604/2026/4/17/15147a0a3a011bb424fde9a88fdbdca7ef7df60e.png'
+  },
+  {
+    name: 'Máy lọc nước Truliva UR5840',
+    category: 'Water UTS Device',
+    sku: '104201-0003',
+    imageUrl: 'https://content.pancake.vn/2-2604/2026/4/17/12da1b6fe07886ae1e01f897cf3f18375fde6c31.png'
+  },
+  {
+    name: 'Máy lọc nước Truliva UR5676',
+    category: 'Water UTS Device',
+    sku: '104222-0002',
+    imageUrl: 'https://content.pancake.vn/2-2608/2026/8/14/f99da1a9790fb3c91658f5acd4338f31f3ad9736.png'
+  },
+  {
+    name: 'Máy lọc nước Truliva UR3626',
+    category: 'Water UTS Device',
+    sku: '104338-0002',
+    imageUrl: 'https://content.pancake.vn/2-2604/2026/4/17/39b464f0b25d284c24511736754af7f0f9339b0b.png'
+  },
+  {
+    name: 'Máy lọc nước Truliva Lavita CR-ZX5170',
+    category: 'Water CT Device',
+    sku: '101175-0002',
+    imageUrl: 'https://content.pancake.vn/2-2607/2026/7/23/f2755c464585f26f476a0e62259bb2038516a0c8.jpg'
+  },
+  {
+    name: 'Máy nóng lạnh Truliva Lavita YDZ-5301D',
+    category: 'Water CT Device',
+    sku: '102172-0001',
+    imageUrl: 'https://content.pancake.vn/2-2607/2026/7/23/11e26595dc23bc9b76a55a930c9b6de05c900202.jpg'
+  },
+  {
+    name: 'Máy nóng lạnh treo tường Truliva W6412',
+    category: 'Water WM Device',
+    sku: '103057-001',
+    imageUrl: 'https://content.pancake.vn/2-2604/2026/4/17/12395203216b3f5f40e9e820494a84df72826289.png'
+  },
+  {
+    name: 'Máy lọc không khí Airplus KJ260',
+    category: 'Air CT Device',
+    sku: '194001-0144',
+    imageUrl: 'https://content.pancake.vn/2-2603/2026/3/9/f96594a1e3dd08a58b3390bd37876600d47f363d.jpg'
+  },
+  {
+    name: 'Máy rửa rau Truliva QY/F-I20',
+    category: 'Device',
+    sku: '133013-0001',
+    imageUrl: 'https://content.pancake.vn/2-2607/2026/7/1/f4a302dfebe14b2447b0bf91d7d9443e75a4138e.jpg'
+  },
+  {
+    name: 'Máy lọc nước Delica UR5440',
+    category: 'Water UTS Device',
+    sku: '68720542',
+    imageUrl: 'https://cdn11.dienmaycholon.vn/filewebdmclnew/DMCL21/Picture/Apro/Apro_product_31119/may-loc-nuoc-pureit-delica-ur5440-main-31119.png'
+  },
+  {
+    name: 'Máy lọc nước Delica UR5640',
+    category: 'Water UTS Device',
+    sku: '68342070',
+    imageUrl: 'https://cdn11.dienmaycholon.vn/filewebdmclnew/DMCL21/Picture/Apro/Apro_product_31112/may-loc-nuoc-pureit-delica-ur5640-main-322306.png'
+  },
+  {
+    name: 'Máy lọc nước Delica UR5840',
+    category: 'Water UTS Device',
+    sku: '69568170',
+    imageUrl: 'https://unileverpureit.vn/wp-content/uploads/2022/06/May-loc-nuoc-Pureit-am-tu-bep-Delica-UR5840.png'
+  },
+  {
+    name: 'Máy lọc nước Lavita CR5240',
+    category: 'Water CT Device',
+    sku: '68464824',
+    imageUrl: 'https://unileverpureit.vn/wp-content/uploads/2022/05/May-Loc-Nuoc-Nong-Thong-Minh-Lavita.png'
+  },
+  {
+    name: 'Máy lọc nước Tanka UR3140',
+    category: 'Water UTS Device',
+    sku: '68720541',
+    imageUrl: 'https://cdn.nguyenkimmall.com/images/detailed/755/10050105-may-loc-nuoc-pureit-tanka-ur3140-1.jpg'
+  },
+  {
+    name: 'Máy lọc nước Classic',
+    category: 'Device',
+    sku: '68457573',
+    imageUrl: 'https://cdn11.dienmaycholon.vn/filewebdmclnew/DMCL21/Picture/Apro/Apro_product_30948/may-loc-nuoc-un_main_322_450.png.webp'
+  },
+  {
+    name: 'Máy lọc nước Ultima Black',
+    category: 'Device',
+    sku: '67370949',
+    imageUrl: 'https://pureitvietnam.com/wp-content/uploads/2023/06/May-loc-nuoc-Pureit-Ultima-10-copy.jpg'
+  },
+  {
+    name: 'Máy lọc không khí Xiaomi Smart Air Purifier 4 Compact',
+    category: 'Air CT Device',
+    sku: '14131212',
+    imageUrl: 'https://i02.appmifile.com/mi-com-product/fly-birds/m/xiaomi-smart-air-purifier-4-compact/3d38a4f14d88ba3c0d860fccc54981f7.jpg'
+  },
+  {
+    name: 'Bộ lọc sơ cấp Truliva P1011',
+    category: 'Prefilter',
+    sku: '112053-0001',
+    imageUrl: 'https://content.pancake.vn/2-2604/2026/4/17/15147a0a3a011bb424fde9a88fdbdca7ef7df60e.png'
+  }
+];
+
+// Helper đối chiếu Tên Model / Dòng máy để lấy Ảnh và Tên đầy đủ
+export const getProductVisualByModelOrName = (
+  model?: string | null,
+  productLine?: string | null
+): { name: string; imageUrl: string | null } => {
+  if (!model && !productLine) return { name: '', imageUrl: null };
+  const target = `${productLine || ''} ${model || ''}`.toLowerCase();
+
+  // 1. Tìm chính xác hoặc tương đối trong danh mục thiết bị chuẩn
+  for (const item of DEFAULT_SUPPORT_DEVICES) {
+    const itemName = item.name.toLowerCase();
+    if (model && itemName.includes(model.toLowerCase())) {
+      return { name: item.name, imageUrl: item.imageUrl || null };
+    }
+    if (target.includes(itemName) || itemName.includes(target)) {
+      return { name: item.name, imageUrl: item.imageUrl || null };
+    }
+  }
+
+  // 2. Tìm theo mã model đặc thù
+  if (target.includes('5840')) {
+    const found = DEFAULT_SUPPORT_DEVICES.find(d => d.name.includes('UR5840'));
+    if (found) return { name: found.name, imageUrl: found.imageUrl || null };
+  }
+  if (target.includes('5440')) {
+    const found = DEFAULT_SUPPORT_DEVICES.find(d => d.name.includes('UR5440'));
+    if (found) return { name: found.name, imageUrl: found.imageUrl || null };
+  }
+  if (target.includes('5640')) {
+    const found = DEFAULT_SUPPORT_DEVICES.find(d => d.name.includes('UR5640'));
+    if (found) return { name: found.name, imageUrl: found.imageUrl || null };
+  }
+  if (target.includes('3140') || target.includes('tanka')) {
+    const found = DEFAULT_SUPPORT_DEVICES.find(d => d.name.includes('UR3140') || d.name.includes('Tanka'));
+    if (found) return { name: found.name, imageUrl: found.imageUrl || null };
+  }
+  if (target.includes('5240') || target.includes('lavita')) {
+    const found = DEFAULT_SUPPORT_DEVICES.find(d => d.name.includes('CR5240') || d.name.includes('Lavita'));
+    if (found) return { name: found.name, imageUrl: found.imageUrl || null };
+  }
+  if (target.includes('ux5010') || target.includes('ultima') || target.includes('5010')) {
+    const found = DEFAULT_SUPPORT_DEVICES.find(d => d.name.includes('Ultima'));
+    if (found) return { name: found.name, imageUrl: found.imageUrl || null };
+  }
+  if (target.includes('61096')) {
+    const found = DEFAULT_SUPPORT_DEVICES.find(d => d.name.includes('UR61096H'));
+    if (found) return { name: found.name, imageUrl: found.imageUrl || null };
+  }
+  if (target.includes('3626')) {
+    const found = DEFAULT_SUPPORT_DEVICES.find(d => d.name.includes('UR3626'));
+    if (found) return { name: found.name, imageUrl: found.imageUrl || null };
+  }
+  if (target.includes('5676')) {
+    const found = DEFAULT_SUPPORT_DEVICES.find(d => d.name.includes('UR5676'));
+    if (found) return { name: found.name, imageUrl: found.imageUrl || null };
+  }
+  if (target.includes('p1011') || target.includes('1011')) {
+    const found = DEFAULT_SUPPORT_DEVICES.find(d => d.name.includes('P1011'));
+    if (found) return { name: found.name, imageUrl: found.imageUrl || null };
+  }
+  if (target.includes('w6412') || target.includes('6412')) {
+    const found = DEFAULT_SUPPORT_DEVICES.find(d => d.name.includes('W6412'));
+    if (found) return { name: found.name, imageUrl: found.imageUrl || null };
+  }
+  if (target.includes('i20') || target.includes('rửa rau') || target.includes('qy/f-i20')) {
+    const found = DEFAULT_SUPPORT_DEVICES.find(d => d.name.includes('QY/F-I20'));
+    if (found) return { name: found.name, imageUrl: found.imageUrl || null };
+  }
+  if (target.includes('kj260') || target.includes('260')) {
+    const found = DEFAULT_SUPPORT_DEVICES.find(d => d.name.includes('KJ260'));
+    if (found) return { name: found.name, imageUrl: found.imageUrl || null };
+  }
+  if (target.includes('classic')) {
+    const found = DEFAULT_SUPPORT_DEVICES.find(d => d.name.includes('Classic'));
+    if (found) return { name: found.name, imageUrl: found.imageUrl || null };
+  }
+
+  return {
+    name: productLine || (model ? `Máy lọc nước ${model}` : ''),
+    imageUrl: null
+  };
+};
 
 // Định dạng hiển thị Số Serial dạng: XXXX XXX XXX XXXXX
 const formatSerialNumber = (value: string): string => {
@@ -44,6 +239,9 @@ const ORDERED_VIETNAM_PROVINCES = [...PRIORITY_PROVINCES, ...OTHER_PROVINCES];
 interface ProductInfo {
   serialNumber: string;
   model: string;
+  productLine?: string;
+  displayName?: string;
+  imageUrl?: string | null;
   standardMonths: number;
   totalMonths: number;
   status: string;
@@ -178,6 +376,9 @@ function GenericSearchableSelect({
 interface SerialValidation {
   status: 'IDLE' | 'CHECKING' | 'VALID' | 'ACTIVATED' | 'NOT_FOUND' | 'ERROR';
   model?: string;
+  productLine?: string;
+  displayName?: string;
+  imageUrl?: string | null;
   totalMonths?: number;
   expiryDate?: string;
   message?: string;
@@ -343,6 +544,24 @@ export default function WarrantyActivate() {
     }
   }, [step, deviceTreeData.categories.length]);
 
+  const visualSupportProducts: ProductVisualItem[] = useMemo(() => {
+    if (deviceTreeData.products.length > 0) {
+      return deviceTreeData.products
+        .filter((p: any) => {
+          const nameStr = typeof p === 'string' ? p : p.name;
+          const lower = (nameStr || '').toLowerCase();
+          return !lower.includes('lõi') && !lower.includes('loi') && !lower.includes('linh kiện') && !lower.includes('phụ kiện') && !lower.includes('bộ dụng cụ') && !lower.includes('chảo') && !lower.includes('cảm biến') && !lower.includes('bộ lọc') && !lower.includes('bo loc');
+        })
+        .map((p: any) => ({
+          name: typeof p === 'string' ? p : p.name,
+          category: typeof p === 'object' ? p.category : 'Thiết bị',
+          sku: typeof p === 'object' ? p.sku : '',
+          imageUrl: typeof p === 'object' ? p.imageUrl : null
+        }));
+    }
+    return DEFAULT_SUPPORT_DEVICES;
+  }, [deviceTreeData.products]);
+
   const handleSubmitSupport = async (e: React.FormEvent) => {
     e.preventDefault();
      const cleanPhone = supportPhone.replace(/[^0-9]/g, '');
@@ -439,6 +658,10 @@ export default function WarrantyActivate() {
           return;
         }
 
+        const visual = getProductVisualByModelOrName(data.model, data.productLine);
+        const resolvedImageUrl = data.imageUrl || visual.imageUrl || null;
+        const resolvedDisplayName = visual.name || data.productLine || data.model;
+
         if (data.isActivated || data.status === 'Đã kích hoạt' || data.status === 'KH xác nhận') {
           let expiryText = '';
           if (data.warrantyExpiryDate) {
@@ -448,6 +671,9 @@ export default function WarrantyActivate() {
           setSerialValidation({
             status: 'ACTIVATED',
             model: data.model,
+            productLine: data.productLine,
+            displayName: resolvedDisplayName,
+            imageUrl: resolvedImageUrl,
             expiryDate: expiryText,
             message: 'Số Serial này đã được kích hoạt bảo hành trước đó.'
           });
@@ -460,12 +686,18 @@ export default function WarrantyActivate() {
         setSerialValidation({
           status: 'VALID',
           model: data.model,
+          productLine: data.productLine,
+          displayName: resolvedDisplayName,
+          imageUrl: resolvedImageUrl,
           totalMonths,
           message: 'Số Serial hợp lệ'
         });
         setProductInfo({
           serialNumber: data.serialNumber,
           model: data.model,
+          productLine: data.productLine,
+          displayName: resolvedDisplayName,
+          imageUrl: resolvedImageUrl,
           standardMonths: data.standardMonths,
           totalMonths,
           status: data.status,
@@ -1021,63 +1253,26 @@ export default function WarrantyActivate() {
                 </div>
               </div>
 
-              {/* Sản phẩm + Serial */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className={`block text-xs font-bold uppercase tracking-wider mb-1 ${isDark ? 'text-slate-300' : 'text-gray-700'}`}>Sản phẩm *</label>
-                  <GenericSearchableSelect
-                    items={
-                      deviceTreeData.products.length > 0
-                        ? Array.from(new Set(deviceTreeData.products.map((p: any) => typeof p === 'string' ? p : p.name)))
-                            .filter((name: string) => {
-                              const lower = name.toLowerCase();
-                              return !lower.includes('lõi') && !lower.includes('loi') && !lower.includes('linh kiện') && !lower.includes('phụ kiện') && !lower.includes('bộ dụng cụ') && !lower.includes('chảo') && !lower.includes('cảm biến') && !lower.includes('bộ lọc') && !lower.includes('bo loc');
-                            })
-                        : [
-                            'Máy lọc nước Truliva UR61096H',
-                            'Máy lọc nước Truliva UR5840',
-                            'Máy lọc nước Delica UR5440',
-                            'Máy lọc nước Delica UR5640',
-                            'Máy lọc nước Delica UR5840',
-                            'Máy lọc nước Lavita CR5240',
-                            'Máy lọc nước Tanka UR3140',
-                            'Máy lọc nước Truliva Lavita CR-ZX5170',
-                            'Máy lọc nước Truliva UR3626',
-                            'Máy lọc nước Truliva UR5676',
-                            'Máy lọc nước Ultima Black',
-                            'Máy nóng lạnh Truliva Lavita YDZ-5301D',
-                            'Máy nóng lạnh treo tường Truliva W6412',
-                            'Máy rửa rau Truliva QY/F-I20',
-                            'Máy lọc không khí Airplus KJ260',
-                            'Máy lọc không khí Xiaomi Smart Air Purifier 4 Compact'
-                          ]
+              {/* Sản phẩm (Full width) */}
+              <div>
+                <label className={`block text-xs font-bold uppercase tracking-wider mb-1.5 ${isDark ? 'text-slate-300' : 'text-gray-700'}`}>Sản phẩm *</label>
+                <ProductVisualSelect
+                  products={visualSupportProducts}
+                  value={supportProduct}
+                  onChange={(val) => {
+                    setSupportProduct(val);
+                    if (val !== 'Sản phẩm khác' && val !== 'Thiết bị khác') {
+                      setCustomSupportProduct('');
                     }
-                    value={supportProduct}
-                    onChange={(val) => {
-                      setSupportProduct(val);
-                      if (val !== 'Sản phẩm khác' && val !== 'Thiết bị khác') {
-                        setCustomSupportProduct('');
-                      }
-                    }}
-                    placeholder="-- Chọn Sản phẩm --"
-                    searchPlaceholder="Tìm sản phẩm (VD: Delica, Lavita, UR5840...)"
-                    allowCustomOther={true}
-                    otherLabel="+ Sản phẩm khác"
-                    onSelectOther={() => setCustomSupportProduct('')}
-                  />
-                  {(supportProduct === 'Sản phẩm khác' || supportProduct === 'Thiết bị khác') && (
-                    <input
-                      type="text"
-                      placeholder="Nhập tên sản phẩm cụ thể..."
-                      value={customSupportProduct}
-                      onChange={e => setCustomSupportProduct(e.target.value)}
-                      className={`w-full mt-2 px-3.5 py-2.5 border rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-200 ${
-                        isDark ? 'bg-white/10 border-white/20 text-white placeholder:text-slate-400' : 'bg-white border-gray-300 text-slate-800'
-                      }`}
-                      required
-                    />
-                  )}
-                </div>
+                  }}
+                  customValue={customSupportProduct}
+                  onCustomChange={setCustomSupportProduct}
+                  isDark={isDark}
+                />
+              </div>
+
+              {/* Serial + Yêu cầu dịch vụ */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className={`block text-xs font-bold uppercase tracking-wider mb-1 ${isDark ? 'text-slate-300' : 'text-gray-700'}`}>Số Serial (nếu có)</label>
                   <input
@@ -1090,24 +1285,22 @@ export default function WarrantyActivate() {
                     }`}
                   />
                 </div>
-              </div>
-
-              {/* Yêu cầu dịch vụ */}
-              <div>
-                <label className={`block text-xs font-bold uppercase tracking-wider mb-1 ${isDark ? 'text-slate-300' : 'text-gray-700'}`}>Yêu cầu dịch vụ *</label>
-                <select
-                  value={supportServiceType}
-                  onChange={e => setSupportServiceType(e.target.value)}
-                  className={`w-full px-3.5 py-2.5 border rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-200 ${
-                    isDark ? 'bg-[#152B4D] border-white/20 text-white' : 'bg-white border-gray-300 text-slate-800'
-                  }`}
-                  required
-                >
-                  <option value="">-- Chọn yêu cầu dịch vụ --</option>
-                  {HOTLINE_SERVICE_REQUEST_TYPES.map(st => (
-                    <option key={st} value={st}>{st}</option>
-                  ))}
-                </select>
+                <div>
+                  <label className={`block text-xs font-bold uppercase tracking-wider mb-1 ${isDark ? 'text-slate-300' : 'text-gray-700'}`}>Yêu cầu dịch vụ *</label>
+                  <select
+                    value={supportServiceType}
+                    onChange={e => setSupportServiceType(e.target.value)}
+                    className={`w-full px-3.5 py-2.5 border rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-200 ${
+                      isDark ? 'bg-[#152B4D] border-white/20 text-white' : 'bg-white border-gray-300 text-slate-800'
+                    }`}
+                    required
+                  >
+                    <option value="">-- Chọn yêu cầu dịch vụ --</option>
+                    {HOTLINE_SERVICE_REQUEST_TYPES.map(st => (
+                      <option key={st} value={st}>{st}</option>
+                    ))}
+                  </select>
+                </div>
               </div>
 
               {/* Nội dung cần hỗ trợ */}
@@ -1355,44 +1548,99 @@ export default function WarrantyActivate() {
 
                 {/* 3. Trạng thái ĐÃ KÍCH HOẠT BẢO HÀNH */}
                 {serialValidation.status === 'ACTIVATED' && (
-                  <div className="mt-3 bg-amber-50 border border-amber-200 text-amber-900 text-xs p-4 rounded-xl flex items-start gap-3 animate-fade-in">
-                    <AlertTriangle size={20} className="shrink-0 text-amber-600 mt-0.5" />
-                    <div className="space-y-1.5">
-                      <p className="font-bold text-sm text-amber-900">Số Serial đã được kích hoạt bảo hành</p>
-                      <p className="text-gray-700 leading-relaxed">
-                        Thiết bị <strong className="text-gray-900">{serialValidation.model}</strong> với số Serial này đã được kích hoạt bảo hành trước đó
-                        {serialValidation.expiryDate ? ` (Hạn bảo hành đến: ${serialValidation.expiryDate})` : ''}.
-                      </p>
-                      <p className="text-gray-600 text-[11px] leading-relaxed">
-                        Nếu có sai sót hoặc bạn là chủ sở hữu mới cần hỗ trợ, vui lòng liên hệ trực tiếp:
-                      </p>
-                      <div className="pt-1.5">
-                        <a
-                          href="tel:1900638463"
-                          className="inline-flex items-center gap-1.5 bg-amber-600 hover:bg-amber-700 text-white font-bold px-3.5 py-1.5 rounded-lg text-xs transition shadow-sm"
-                        >
-                          <PhoneCall size={14} /> Gọi Hotline: 1900 63 84 63
-                        </a>
+                  <div className="mt-3 bg-amber-50 border border-amber-200 text-amber-900 text-xs p-4 rounded-2xl animate-fade-in space-y-3 shadow-xs">
+                    <div className="flex items-start gap-3">
+                      {/* Product Thumbnail if available */}
+                      {serialValidation.imageUrl ? (
+                        <div className="w-16 h-16 bg-white rounded-xl p-1.5 flex items-center justify-center shrink-0 border border-amber-200/80 shadow-xs overflow-hidden">
+                          <img 
+                            src={serialValidation.imageUrl} 
+                            alt={serialValidation.displayName || serialValidation.model} 
+                            className="max-w-full max-h-full object-contain" 
+                          />
+                        </div>
+                      ) : (
+                        <div className="w-12 h-12 bg-amber-100 rounded-xl flex items-center justify-center shrink-0 text-amber-700">
+                          <AlertTriangle size={24} />
+                        </div>
+                      )}
+                      <div className="space-y-1 min-w-0 flex-1">
+                        <div className="flex items-center gap-1.5 text-amber-800 font-bold text-[11px] uppercase tracking-wider">
+                          <AlertTriangle size={14} className="shrink-0 text-amber-600" />
+                          <span>Đã kích hoạt bảo hành</span>
+                        </div>
+                        <p className="font-bold text-sm text-gray-900 leading-snug break-words">
+                          {serialValidation.displayName || serialValidation.productLine || serialValidation.model}
+                        </p>
+                        <p className="text-gray-600 text-[11px]">
+                          Model: <span className="font-mono font-semibold text-gray-800">{serialValidation.model}</span>
+                          {serialValidation.expiryDate && (
+                            <span className="ml-2 text-rose-700 font-semibold">• Hạn đến: {serialValidation.expiryDate}</span>
+                          )}
+                        </p>
                       </div>
+                    </div>
+
+                    <div className="pt-2 border-t border-amber-200/60 flex items-center justify-between">
+                      <p className="text-gray-600 text-[11px]">
+                        Cần hỗ trợ tra cứu thông tin?
+                      </p>
+                      <a
+                        href="tel:1900638463"
+                        className="inline-flex items-center gap-1.5 bg-amber-600 hover:bg-amber-700 text-white font-bold px-3 py-1.5 rounded-lg text-xs transition shadow-xs"
+                      >
+                        <PhoneCall size={13} /> Hotline 1900 63 84 63
+                      </a>
                     </div>
                   </div>
                 )}
 
                 {/* 4. Trạng thái HỢP LỆ & CHƯA KÍCH HOẠT */}
                 {serialValidation.status === 'VALID' && (
-                  <div className={`mt-3 border text-xs p-3.5 rounded-xl flex items-center justify-between animate-fade-in shadow-sm ${
-                    isDark ? 'bg-emerald-950/40 border-emerald-500/30 text-emerald-200' : 'bg-emerald-50 border-emerald-200 text-emerald-900'
+                  <div className={`mt-3 border text-xs p-3.5 rounded-2xl flex items-center gap-3.5 animate-fade-in shadow-sm ${
+                    isDark 
+                      ? 'bg-emerald-950/40 border-emerald-500/30 text-emerald-200' 
+                      : 'bg-emerald-50/90 border-emerald-200 text-emerald-950'
                   }`}>
-                    <div className="flex items-center gap-2">
-                      <CheckCircle2 size={18} className="shrink-0 text-emerald-500" />
-                      <div>
-                        <p className={`font-bold ${isDark ? 'text-white' : 'text-emerald-900'}`}>{serialValidation.model}</p>
-                        <p className={`text-[11px] ${isDark ? 'text-slate-300' : 'text-gray-600'}`}>Bảo hành tiêu chuẩn: <strong>{serialValidation.totalMonths} tháng</strong></p>
+                    {/* Thumbnail Image */}
+                    {serialValidation.imageUrl ? (
+                      <div className={`w-16 h-16 sm:w-20 sm:h-20 rounded-xl p-1.5 flex items-center justify-center shrink-0 border shadow-xs overflow-hidden ${
+                        isDark ? 'bg-slate-900 border-emerald-500/30' : 'bg-white border-emerald-200/70'
+                      }`}>
+                        <img 
+                          src={serialValidation.imageUrl} 
+                          alt={serialValidation.displayName || serialValidation.model} 
+                          className="max-w-full max-h-full object-contain" 
+                        />
                       </div>
+                    ) : (
+                      <div className={`w-14 h-14 rounded-xl flex items-center justify-center shrink-0 ${
+                        isDark ? 'bg-emerald-900/60 text-emerald-400' : 'bg-emerald-100 text-emerald-700'
+                      }`}>
+                        <ShieldCheck size={28} />
+                      </div>
+                    )}
+
+                    {/* Details */}
+                    <div className="flex-1 min-w-0 space-y-1">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="inline-flex items-center gap-1 bg-emerald-500 text-slate-950 font-bold px-2 py-0.5 rounded text-[10px] uppercase tracking-wider">
+                          <CheckCircle2 size={12} className="text-slate-950" />
+                          Hợp lệ
+                        </span>
+                        <span className={`text-[11px] font-bold ${isDark ? 'text-cyan-300' : 'text-blue-700'}`}>
+                          Bảo hành: {serialValidation.totalMonths} tháng
+                        </span>
+                      </div>
+                      
+                      <h4 className={`font-bold text-sm leading-snug break-words ${isDark ? 'text-white' : 'text-gray-900'}`}>
+                        {serialValidation.displayName || serialValidation.productLine || serialValidation.model}
+                      </h4>
+
+                      <p className={`text-[11px] font-mono ${isDark ? 'text-slate-300' : 'text-gray-600'}`}>
+                        Model: <span className="font-semibold">{serialValidation.model}</span>
+                      </p>
                     </div>
-                    <span className="bg-emerald-500 text-slate-950 font-bold px-2 py-0.5 rounded text-[10px] uppercase">
-                      Hợp lệ
-                    </span>
                   </div>
                 )}
               </div>
@@ -1571,31 +1819,68 @@ export default function WarrantyActivate() {
             </div>
 
             {/* Display Product Info Card */}
-            <div className={`border rounded-xl p-4 ${
-              isDark ? 'bg-white/5 border-white/10' : 'bg-gradient-to-r from-blue-50 to-sky-50/50 border-blue-100'
+            <div className={`border rounded-2xl p-4 shadow-sm ${
+              isDark ? 'bg-white/5 border-white/10' : 'bg-gradient-to-r from-blue-50/80 to-sky-50/50 border-blue-100'
             }`}>
-              <span className={`text-[10px] font-bold px-2 py-0.5 rounded border uppercase tracking-wider ${
-                isDark ? 'text-cyan-300 bg-cyan-950/40 border-cyan-500/30' : 'text-blue-600 bg-blue-100 border-blue-200/50'
-              }`}>
-                Thông tin thiết bị
-              </span>
-              <h3 className={`font-bold text-base mt-2 ${isDark ? 'text-white' : 'text-gray-800'}`}>{productInfo.model}</h3>
-              <div className={`mt-2 space-y-1.5 text-xs font-medium ${isDark ? 'text-slate-300' : 'text-gray-600'}`}>
-                <div className="flex justify-between">
-                  <span className="text-gray-400">Số Serial:</span>
-                  <span className={`font-mono font-bold ${isDark ? 'text-white' : 'text-gray-700'}`}>{productInfo.serialNumber}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-400">Thời gian bảo hành:</span>
-                  {productInfo.status === 'Đã kích hoạt' || productInfo.status === 'KH xác nhận' ? (
-                    <span className="text-rose-500 font-bold">
-                      Đến ngày {productInfo.warrantyExpiryDate ? new Date(productInfo.warrantyExpiryDate).toLocaleDateString('vi-VN') : '—'}
-                    </span>
-                  ) : (
-                    <span className={`font-bold ${isDark ? 'text-cyan-400' : 'text-blue-600'}`}>
-                      {productInfo.totalMonths || productInfo.standardMonths || 12} tháng
-                    </span>
-                  )}
+              <div className="flex items-center justify-between mb-3">
+                <span className={`text-[10px] font-bold px-2 py-0.5 rounded border uppercase tracking-wider ${
+                  isDark ? 'text-cyan-300 bg-cyan-950/40 border-cyan-500/30' : 'text-blue-600 bg-blue-100 border-blue-200/50'
+                }`}>
+                  Thông tin thiết bị
+                </span>
+                <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-600 bg-emerald-50 dark:bg-emerald-950/40 px-2 py-0.5 rounded-full border border-emerald-200 dark:border-emerald-800">
+                  <CheckCircle2 size={12} /> Serial hợp lệ
+                </span>
+              </div>
+
+              <div className="flex items-center gap-3.5">
+                {/* Product Thumbnail */}
+                {productInfo.imageUrl ? (
+                  <div className={`w-20 h-20 sm:w-24 sm:h-24 rounded-xl p-2 flex items-center justify-center shrink-0 border shadow-xs overflow-hidden ${
+                    isDark ? 'bg-slate-900 border-white/10' : 'bg-white border-blue-100'
+                  }`}>
+                    <img 
+                      src={productInfo.imageUrl} 
+                      alt={productInfo.displayName || productInfo.model} 
+                      className="max-w-full max-h-full object-contain" 
+                    />
+                  </div>
+                ) : (
+                  <div className={`w-16 h-16 rounded-xl flex items-center justify-center shrink-0 ${
+                    isDark ? 'bg-blue-950 border border-cyan-500/20 text-cyan-400' : 'bg-blue-100 text-blue-700'
+                  }`}>
+                    <ShieldCheck size={32} />
+                  </div>
+                )}
+
+                {/* Information */}
+                <div className="flex-1 min-w-0 space-y-1.5">
+                  <h3 className={`font-bold text-sm sm:text-base leading-snug break-words ${isDark ? 'text-white' : 'text-gray-900'}`}>
+                    {productInfo.displayName || productInfo.productLine || productInfo.model}
+                  </h3>
+
+                  <div className={`space-y-1 text-xs font-medium ${isDark ? 'text-slate-300' : 'text-gray-600'}`}>
+                    <div className="flex justify-between items-center">
+                      <span className="text-gray-400">Model:</span>
+                      <span className={`font-mono font-bold ${isDark ? 'text-slate-200' : 'text-gray-800'}`}>{productInfo.model}</span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-gray-400">Số Serial:</span>
+                      <span className={`font-mono font-bold ${isDark ? 'text-cyan-300' : 'text-blue-700'}`}>{formatSerialNumber(productInfo.serialNumber)}</span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-gray-400">Bảo hành:</span>
+                      {productInfo.status === 'Đã kích hoạt' || productInfo.status === 'KH xác nhận' ? (
+                        <span className="text-rose-500 font-bold">
+                          Đến ngày {productInfo.warrantyExpiryDate ? new Date(productInfo.warrantyExpiryDate).toLocaleDateString('vi-VN') : '—'}
+                        </span>
+                      ) : (
+                        <span className={`font-bold ${isDark ? 'text-cyan-400' : 'text-blue-600'}`}>
+                          {productInfo.totalMonths || productInfo.standardMonths || 12} tháng
+                        </span>
+                      )}
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
