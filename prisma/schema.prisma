@@ -237,6 +237,7 @@ model User {
   fullName        String       @map("full_name")
   role            UserRole     @default(KTV)
   phoneNumber     String?      @map("phone_number")
+  avatar          String?      @map("avatar")
   techStationId   String?      @map("tech_station_id")  // KTV thuộc trạm kỹ thuật nào
   isActive        Boolean      @default(true) @map("is_active")
   address         String?

@@ -23,7 +23,8 @@ import {
   FileText,
   Scale
 } from 'lucide-react';
-import { openWebview, openChat } from 'zmp-sdk/apis';
+import { openWebview, openChat, getUserInfo } from 'zmp-sdk/apis';
+import { fetchZaloApi, setSafeStorage } from '../../api/client';
 import { getCustomerRank, MemberTier, RANK_CONFIGS, NEXT_TIER_ORDER } from '../../utils/memberRank';
 import CustomerVoucherModal from '../../components/CustomerVoucherModal';
 import CustomerHistoryModal from '../../components/CustomerHistoryModal';
@@ -100,14 +101,41 @@ export default function CustomerProfile({
     setShowLegalModal(true);
   };
 
+  const [syncing, setSyncing] = useState(false);
+  const handleSyncZaloProfile = async () => {
+    setSyncing(true);
+    try {
+      const info: any = await getUserInfo({ avatarType: 'normal', autoRequestPermission: true });
+      const u = info?.userInfo || info?.data || info;
+      if (u && (u.name || u.avatar)) {
+        const res = await fetchZaloApi('/zalo-miniapp/profile/sync', {
+          method: 'POST',
+          body: JSON.stringify({ name: u.name, avatar: u.avatar })
+        });
+        if (res && res.success && res.user) {
+          setSafeStorage('zalo_user_cache', JSON.stringify(res.user));
+          window.location.reload();
+        }
+      }
+    } catch (err: any) {
+      console.warn('Sync profile error:', err);
+    } finally {
+      setSyncing(false);
+    }
+  };
+
   return (
     <div className="pb-28 bg-slate-50 min-h-screen font-sans">
       {/* 1. Header Profile Card with Persona 3 Reload Ocean Waves */}
       <P3ROceanHeader className="p-5 pt-5 pb-10">
         <div className="max-w-md mx-auto space-y-4">
           <div className="flex items-center space-x-4">
-            <div className="relative">
-              <div className={`w-16 h-16 rounded-full bg-[#0B2545] border-2 ring-2 flex items-center justify-center text-white font-black text-xl overflow-hidden transition-all ${rank.ringColor}`}>
+            <div 
+              onClick={handleSyncZaloProfile}
+              title="Nhấn để đồng bộ avatar và tên từ Zalo"
+              className="relative cursor-pointer group"
+            >
+              <div className={`w-16 h-16 rounded-full bg-[#0B2545] border-2 ring-2 flex items-center justify-center text-white font-black text-xl overflow-hidden transition-all group-hover:opacity-90 ${rank.ringColor}`}>
                 {user?.avatar ? (
                   <img src={user.avatar} alt="Avatar" className="w-full h-full object-cover" />
                 ) : (
@@ -121,11 +149,21 @@ export default function CustomerProfile({
             </div>
             
             <div className="flex-1 min-w-0">
-              <h1 className="text-lg font-black text-white truncate drop-shadow-sm">{userName}</h1>
+              <div className="flex items-center space-x-2">
+                <h1 className="text-lg font-black text-white truncate drop-shadow-sm">{userName}</h1>
+              </div>
               <p className="text-xs text-sky-200 flex items-center mt-0.5 font-medium">
                 <Phone size={12} className="mr-1 flex-shrink-0 text-[#00D2FF]" />
                 {userPhone}
               </p>
+              
+              <button 
+                onClick={handleSyncZaloProfile}
+                disabled={syncing}
+                className="text-[10px] text-cyan-300 hover:text-white underline mt-1 block cursor-pointer transition-colors"
+              >
+                {syncing ? 'Đang đồng bộ Zalo...' : 'Đồng bộ tên & avatar Zalo'}
+              </button>
               
               {/* Dynamic Rank Badge */}
               <button 

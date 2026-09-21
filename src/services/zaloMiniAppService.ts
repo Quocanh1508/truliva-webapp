@@ -136,22 +136,30 @@ export async function authenticateZaloMiniAppUser(
     }
   }
 
-  // Cập nhật tên thật từ Zalo nếu tài khoản đang mang tên mặc định hoặc tên mặc định ban đầu "Admin Truliva"
-  if (user && zaloProfile?.name) {
-    const isPlaceholder = !user.fullName || 
-      user.fullName === 'Admin Truliva' || 
-      user.fullName.startsWith('Khách hàng') || 
-      user.fullName === 'Khách Hàng Zalo' || 
-      user.fullName.startsWith('zalo_');
+  // Cập nhật tên thật và Avatar từ Zalo nếu có
+  if (user) {
+    const updateData: any = {};
+    if (zaloProfile?.name) {
+      const isPlaceholder = !user.fullName || 
+        user.fullName === 'Admin Truliva' || 
+        user.fullName.startsWith('Khách hàng') || 
+        user.fullName === 'Khách Hàng Zalo' || 
+        user.fullName.startsWith('zalo_');
 
-    if (isPlaceholder) {
+      if (isPlaceholder) {
+        updateData.fullName = zaloProfile.name;
+      }
+    }
+    if (zaloProfile?.avatar && user.avatar !== zaloProfile.avatar) {
+      updateData.avatar = zaloProfile.avatar;
+    }
+
+    if (Object.keys(updateData).length > 0) {
       user = await prisma.user.update({
         where: { id: user.id },
-        data: {
-          fullName: zaloProfile.name
-        }
+        data: updateData
       });
-      logger.info('Updated user fullName to real Zalo name', { userId: user.id, newName: zaloProfile.name });
+      logger.info('Updated user profile with real Zalo data', { userId: user.id, updateData });
     }
   }
 
@@ -179,6 +187,7 @@ export async function authenticateZaloMiniAppUser(
         passwordHash: '$2b$10$ZaloMiniAppUserDefaultPasswordHashFallback',
         fullName: customerName,
         phoneNumber: cleanPhone,
+        avatar: zaloProfile?.avatar || null,
         role: 'STAFF' as any,
         group: 'CUSTOMER',
         isActive: true
@@ -186,7 +195,7 @@ export async function authenticateZaloMiniAppUser(
     });
 
     isNewUser = true;
-    logger.info('Created new Zalo Mini App Customer user', { userId: user.id, phone: cleanPhone, name: customerName });
+    logger.info('Created new Zalo Mini App Customer user', { userId: user.id, phone: cleanPhone, name: customerName, hasAvatar: !!zaloProfile?.avatar });
   }
 
   // 3. Tạo JWT Token đăng nhập hệ thống Truliva (giới hạn an toàn 14 ngày)
@@ -211,7 +220,7 @@ export async function authenticateZaloMiniAppUser(
       fullName: zaloProfile?.name || user.fullName,
       phoneNumber: user.phoneNumber || cleanPhone,
       role: user.role,
-      avatar: zaloProfile?.avatar || null
+      avatar: user.avatar || zaloProfile?.avatar || null
     },
     isNewUser
   };

@@ -61,6 +61,7 @@ router.get('/profile', requireAuth, async (req: Request, res: Response): Promise
         username: true,
         fullName: true,
         phoneNumber: true,
+        avatar: true,
         role: true,
         group: true,
         techStationId: true,
@@ -73,6 +74,55 @@ router.get('/profile', requireAuth, async (req: Request, res: Response): Promise
     res.json({
       success: true,
       user: fullUser
+    });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/**
+ * POST /api/zalo-miniapp/profile/sync
+ * Đồng bộ tên thật & avatar từ Zalo Mini App SDK lên tài khoản Truliva
+ */
+router.post('/profile/sync', requireAuth, async (req: Request, res: Response): Promise<void> => {
+  try {
+    const userId = req.user?.id;
+    if (!userId) {
+      res.status(401).json({ error: 'Chưa đăng nhập' });
+      return;
+    }
+
+    const { name, avatar } = req.body;
+    const updateData: any = {};
+    if (name && typeof name === 'string' && name.trim()) {
+      updateData.fullName = name.trim();
+    }
+    if (avatar && typeof avatar === 'string' && avatar.trim()) {
+      updateData.avatar = avatar.trim();
+    }
+
+    if (Object.keys(updateData).length === 0) {
+      res.json({ success: true, message: 'Không có dữ liệu mới cần cập nhật' });
+      return;
+    }
+
+    const updated = await prisma.user.update({
+      where: { id: userId },
+      data: updateData,
+      select: {
+        id: true,
+        username: true,
+        fullName: true,
+        phoneNumber: true,
+        avatar: true,
+        role: true,
+        group: true
+      }
+    });
+
+    res.json({
+      success: true,
+      user: updated
     });
   } catch (error: any) {
     res.status(500).json({ error: error.message });

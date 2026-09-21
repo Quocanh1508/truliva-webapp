@@ -94,23 +94,12 @@ export default function IndexPage() {
     setLoading(true);
     setError(null);
     try {
-      // 1. Lấy Phone Token
-      const data: any = await getPhoneNumber({});
-      
-      // 2. Lấy Access Token
-      let userAccessToken = '';
-      try {
-        userAccessToken = await getAccessToken({});
-      } catch (tokenErr) {
-        console.warn('Could not get Zalo access token:', tokenErr);
-      }
-
-      // 3. Lấy Tên & Avatar thật từ Zalo
+      // 1. Lấy Tên & Avatar thật từ Zalo (BẮT BUỘC autoRequestPermission: true theo NĐ 13/2023/NĐ-CP)
       let zaloProfile: { id?: string; name?: string; avatar?: string } = {};
       try {
-        const info: any = await getUserInfo({ avatarType: 'normal' });
-        if (info && (info.userInfo || info.data)) {
-          const userObj = info.userInfo || info.data;
+        const info: any = await getUserInfo({ avatarType: 'normal', autoRequestPermission: true });
+        const userObj = info?.userInfo || info?.data || info;
+        if (userObj && (userObj.name || userObj.avatar)) {
           zaloProfile = {
             id: userObj.id,
             name: userObj.name,
@@ -119,6 +108,17 @@ export default function IndexPage() {
         }
       } catch (profileErr) {
         console.warn('Could not get Zalo user profile:', profileErr);
+      }
+
+      // 2. Lấy Phone Token từ Zalo SDK
+      const data: any = await getPhoneNumber({});
+      
+      // 3. Lấy Access Token
+      let userAccessToken = '';
+      try {
+        userAccessToken = await getAccessToken({});
+      } catch (tokenErr) {
+        console.warn('Could not get Zalo access token:', tokenErr);
       }
 
       if (data && data.token) {
@@ -176,15 +176,34 @@ export default function IndexPage() {
       } catch (e) {}
     }
 
-    // 2. Đồng bộ phiên mới nhất từ Server
+    // 2. Đồng bộ phiên mới nhất từ Server & làm mới Avatar từ Zalo
     const savedToken = getSafeStorage('zalo_session_token');
     if (savedToken) {
       fetchZaloApi('/zalo-miniapp/profile')
-        .then(res => {
+        .then(async res => {
           if (res.success && res.user) {
-            setUser(res.user);
-            setSafeStorage('zalo_user_cache', JSON.stringify(res.user));
-            loadUserContent(res.user);
+            let activeUser = res.user;
+
+            // Nếu user trên DB chưa có avatar, thử lấy âm thầm từ Zalo SDK nếu đã được cấp quyền trước đó
+            try {
+              const info: any = await getUserInfo({ avatarType: 'normal', autoRequestPermission: false });
+              const u = info?.userInfo || info?.data;
+              if (u && (u.avatar || u.name)) {
+                if ((u.avatar && u.avatar !== activeUser.avatar) || (u.name && (!activeUser.fullName || activeUser.fullName.startsWith('Khách hàng')))) {
+                  const syncRes = await fetchZaloApi('/zalo-miniapp/profile/sync', {
+                    method: 'POST',
+                    body: JSON.stringify({ name: u.name, avatar: u.avatar })
+                  });
+                  if (syncRes && syncRes.success && syncRes.user) {
+                    activeUser = { ...activeUser, ...syncRes.user };
+                  }
+                }
+              }
+            } catch (_) {}
+
+            setUser(activeUser);
+            setSafeStorage('zalo_user_cache', JSON.stringify(activeUser));
+            loadUserContent(activeUser);
           }
         })
         .catch(err => {
@@ -292,7 +311,17 @@ export default function IndexPage() {
                   className="flex-1 bg-white/10 border border-white/20 rounded-xl px-3 py-2 text-xs text-white placeholder-slate-400 focus:outline-none focus:border-[#00D2FF]"
                 />
                 <button
-                  onClick={() => authenticateWithToken(testPhone)}
+                  onClick={async () => {
+                    let zaloProfile: any = undefined;
+                    try {
+                      const info: any = await getUserInfo({ avatarType: 'normal', autoRequestPermission: true });
+                      const u = info?.userInfo || info?.data || info;
+                      if (u && (u.name || u.avatar)) {
+                        zaloProfile = { id: u.id, name: u.name, avatar: u.avatar };
+                      }
+                    } catch (_) {}
+                    authenticateWithToken(testPhone, undefined, zaloProfile);
+                  }}
                   className="px-4 py-2 bg-[#0284C7] hover:bg-[#00D2FF] hover:text-[#061226] text-white font-bold rounded-xl text-xs transition-colors cursor-pointer"
                 >
                   Vào
