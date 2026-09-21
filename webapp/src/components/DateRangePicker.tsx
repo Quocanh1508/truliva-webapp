@@ -22,7 +22,7 @@ export default function DateRangePicker({
   endDate,
   onChange,
   placeholder = 'Bắt đầu - kết thúc',
-  align = 'right',
+  align = 'left',
   className = ''
 }: DateRangePickerProps) {
   const [isOpen, setIsOpen] = useState(false);

@@ -184,7 +184,7 @@ export default function LegalPagesModal({ isOpen, onClose, initialType = 'TERMS'
                   </div>
                   <div className="flex items-center gap-2 text-gray-700">
                     <MapPin className="w-4 h-4 text-rose-600 shrink-0" />
-                    <span>Trụ sở: 107/52/19 Nguyễn Văn Khối, P.11, Q.Gò Vấp, TP.HCM</span>
+                    <span>Trụ sở chính: 65 Đường 42-AP, Phường An Phú, TP. Thủ Đức, TP. Hồ Chí Minh</span>
                   </div>
                 </div>
               )}

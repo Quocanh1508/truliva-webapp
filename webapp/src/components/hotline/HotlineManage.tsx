@@ -8,7 +8,7 @@ import {
   Search, Plus, UserPlus, ArrowRightCircle, ShoppingCart, Phone, MapPin, User,
   Clock, Loader2, ChevronLeft, ChevronRight, X, Wrench, Package,
   PhoneCall, Copy, CheckCircle2, Filter, Layers, Settings, Building2, Users,
-  Calendar, XCircle, Download
+  Calendar, XCircle, Download, Check, ChevronDown, UserCheck
 } from 'lucide-react';
 import HotlineTicketModal from './HotlineTicketModal';
 import DateRangePicker from '../DateRangePicker';
@@ -35,6 +35,7 @@ interface HotlineTicket {
   updatedAt?: string;
   contactTime?: string;
   targetTeam: string;
+  handlerUserId?: string;
   createdBy?: { id: string; fullName: string; email?: string; role: string };
   handlerUser?: { id: string; fullName: string; email?: string; role: string } | null;
   convertedOrder?: { id: string; pancakeOrderId: number; billFullName?: string; adminStatus?: string } | null;
@@ -212,21 +213,38 @@ export default function HotlineManage() {
       .catch((err) => console.error('Lỗi tải danh mục bộ lọc hotline:', err));
   }, []);
 
+  // Assign modal states & refs
+  const [assignTeam, setAssignTeam] = useState('');
+  const [assignHandlerId, setAssignHandlerId] = useState('');
+  const [handlers, setHandlers] = useState<any[]>([]);
+  const [loadingHandlers, setLoadingHandlers] = useState(false);
+  const [isHandlerDropdownOpen, setIsHandlerDropdownOpen] = useState(false);
+  const [handlerSearchText, setHandlerSearchText] = useState('');
+  const [assigning, setAssigning] = useState(false);
+  const handlerDropdownRef = useRef<HTMLDivElement>(null);
+
   // Click outside to close dropdown popover
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
         setActiveDropdown(null);
       }
+      if (handlerDropdownRef.current && !handlerDropdownRef.current.contains(event.target as Node)) {
+        setIsHandlerDropdownOpen(false);
+      }
     }
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  // ESC Key listener for Assign Modal
+  // ESC Key listener for Assign Modal & Popovers
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
+        if (isHandlerDropdownOpen) {
+          setIsHandlerDropdownOpen(false);
+          return;
+        }
         if (showAssignModal) {
           setShowAssignModal(false);
           setSelectedTicket(null);
@@ -238,7 +256,7 @@ export default function HotlineManage() {
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [showAssignModal, activeDropdown]);
+  }, [showAssignModal, activeDropdown, isHandlerDropdownOpen]);
 
   const handleCopyPhone = (phoneStr: string, e: React.MouseEvent) => {
     e.stopPropagation();
@@ -264,11 +282,13 @@ export default function HotlineManage() {
     document.body.removeChild(el);
   };
 
-  // Assign modal states
-  const [assignTeam, setAssignTeam] = useState('');
-  const [assignHandlerId, setAssignHandlerId] = useState('');
-  const [handlers, setHandlers] = useState<any[]>([]);
-  const [assigning, setAssigning] = useState(false);
+  // Helper avatar initials
+  const getInitials = (name: string) => {
+    if (!name) return 'U';
+    const parts = name.trim().split(/\s+/);
+    if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+    return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+  };
 
   // ── Fetch tickets ──
   const fetchTickets = useCallback(async (silent = false) => {
@@ -446,13 +466,32 @@ export default function HotlineManage() {
 
   // ── Fetch handlers for assign modal ──
   const fetchHandlers = async (team: string) => {
+    if (!team) {
+      setHandlers([]);
+      return;
+    }
+    setLoadingHandlers(true);
     try {
       const data = await fetchApi(`/hotlines/handlers?team=${encodeURIComponent(team)}`);
-      setHandlers(data || []);
+      setHandlers(Array.isArray(data) ? data : []);
     } catch (err) {
       console.error('Lỗi tải DS handlers:', err);
       setHandlers([]);
+    } finally {
+      setLoadingHandlers(false);
     }
+  };
+
+  // ── Open Assign Modal with full ticket context & load handlers ──
+  const openAssignModal = (ticket: HotlineTicket) => {
+    setSelectedTicket(ticket);
+    const team = ticket.targetTeam || 'Hotline';
+    setAssignTeam(team);
+    setAssignHandlerId(ticket.handlerUserId || ticket.handlerUser?.id || '');
+    setIsHandlerDropdownOpen(false);
+    setHandlerSearchText('');
+    setShowAssignModal(true);
+    fetchHandlers(team);
   };
 
   // ── Quick Action: Phân bổ ──
@@ -469,7 +508,8 @@ export default function HotlineManage() {
       });
       setShowAssignModal(false);
       setSelectedTicket(null);
-      fetchTickets();
+      setIsHandlerDropdownOpen(false);
+      fetchTickets(true);
     } catch (err: any) {
       alert(err.message || 'Lỗi khi phân bổ');
     } finally {
@@ -479,23 +519,27 @@ export default function HotlineManage() {
 
   // ── Quick Action: Chuyển sang Ca dịch vụ ──
   const handleConvertToOrder = (ticket: HotlineTicket) => {
+    const formattedTicket = {
+      id: ticket.id,
+      ticketCode: ticket.ticketCode,
+      customerName: ticket.customerName,
+      customerPhone: ticket.customerPhone,
+      secondaryPhones: ticket.secondaryPhones,
+      address: ticket.address,
+      provinceName: ticket.provinceName,
+      productName: ticket.productName,
+      serialNumber: ticket.serialNumber,
+      customerSupportDetail: ticket.customerSupportDetail,
+      workType: ticket.phase3RequestType || ticket.serviceRequestType || 'Sửa chữa',
+      serviceType: ticket.phase3ServiceType || ticket.customerSupportDetail || '',
+      note: (ticket.consultationNote || ticket.customerSupportDetail || `[Tạo từ Ticket Hotline ${ticket.ticketCode}]`).trim()
+    };
+
     navigate('/admin/orders', {
       state: {
-        autoOpenCreateModal: true,
-        hotlineTicket: {
-          id: ticket.id,
-          ticketCode: ticket.ticketCode,
-          customerName: ticket.customerName,
-          customerPhone: ticket.customerPhone,
-          address: ticket.address,
-          provinceName: ticket.provinceName,
-          productName: ticket.productName,
-          serialNumber: ticket.serialNumber,
-          customerSupportDetail: ticket.customerSupportDetail,
-          workType: ticket.serviceRequestType || 'Sửa chữa',
-          serviceType: ticket.customerSupportDetail || '',
-          note: `[Tạo từ Ticket Hotline ${ticket.ticketCode}] ${ticket.customerSupportDetail || ''}`
-        }
+        createFromTicket: formattedTicket,
+        hotlineTicket: formattedTicket,
+        autoOpenCreateModal: true
       }
     });
   };
@@ -1827,7 +1871,7 @@ export default function HotlineManage() {
                         <div className="flex items-center justify-center gap-2">
                           <button
                             title="Phân bổ"
-                            onClick={(e) => { e.stopPropagation(); setSelectedTicket(ticket); setAssignTeam(ticket.targetTeam || ''); setShowAssignModal(true); }}
+                            onClick={(e) => { e.stopPropagation(); openAssignModal(ticket); }}
                             className="p-1.5 rounded-lg text-blue-500 hover:bg-blue-100 transition-all"
                           >
                             <UserPlus size={18} />
@@ -1990,58 +2034,347 @@ export default function HotlineManage() {
            ASSIGN MODAL (Phân bổ)
          ══════════════════════════════════════════════════ */}
       {showAssignModal && selectedTicket && createPortal(
-        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 backdrop-blur-sm">
-          <div className="bg-white rounded-2xl w-full max-w-md shadow-2xl overflow-hidden">
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 animate-in fade-in duration-200">
+          <div className="bg-white rounded-2xl w-full max-w-lg shadow-2xl overflow-hidden border border-slate-100 flex flex-col animate-in zoom-in-95 duration-150">
             {/* Header */}
-            <div className="bg-[#00A3FF] px-6 py-4">
-              <h3 className="text-white font-bold text-lg">Phân bổ</h3>
-            </div>
-            <div className="p-6 space-y-5">
-              {/* Team */}
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-1.5">Team nhận yêu cầu *</label>
-                <select
-                  value={assignTeam}
-                  onChange={(e) => { setAssignTeam(e.target.value); setAssignHandlerId(''); if (e.target.value) fetchHandlers(e.target.value); }}
-                  className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-200 focus:border-blue-400 outline-none"
-                >
-                  <option value="">Chọn team...</option>
-                  <option value="Hotline">Hotline</option>
-                  <option value="Coordinator">Coordinator</option>
-                  <option value="Admin">Admin</option>
-                </select>
+            <div className="bg-gradient-to-r from-[#1B3A6B] via-[#0A4B8F] to-[#00A3FF] px-6 py-4 flex justify-between items-center text-white shadow-sm">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-xl bg-white/15 backdrop-blur-xs flex items-center justify-center text-cyan-300 shadow-inner">
+                  <UserCheck size={20} />
+                </div>
+                <div>
+                  <h3 className="text-white font-bold text-base leading-tight">Phân bổ xử lý yêu cầu</h3>
+                  <p className="text-[11px] text-cyan-100 font-mono mt-0.5">
+                    Mã phiếu: #{selectedTicket.ticketCode || selectedTicket.id.slice(0, 8)}
+                  </p>
+                </div>
               </div>
-              {/* Người xử lý yêu cầu */}
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-1.5">Người xử lý yêu cầu</label>
-                <select
-                  value={assignHandlerId}
-                  onChange={(e) => setAssignHandlerId(e.target.value)}
-                  className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-200 focus:border-blue-400 outline-none"
-                  disabled={!assignTeam}
-                >
-                  <option value="">Chọn người xử lý...</option>
-                  {handlers.map(h => (
-                    <option key={h.id} value={h.id}>{h.fullName} | {h.email || h.phoneNumber || ''}</option>
-                  ))}
-                </select>
-              </div>
-            </div>
-            {/* Footer */}
-            <div className="flex justify-end gap-3 px-6 py-4 border-t border-gray-200 bg-gray-50">
               <button
-                onClick={() => { setShowAssignModal(false); setSelectedTicket(null); }}
-                className="px-5 py-2.5 text-sm font-medium text-gray-600 bg-white border border-gray-300 rounded-lg hover:bg-gray-100 transition-all"
+                type="button"
+                onClick={() => { setShowAssignModal(false); setSelectedTicket(null); setIsHandlerDropdownOpen(false); }}
+                className="p-1.5 rounded-xl text-white/80 hover:text-white hover:bg-white/20 transition-colors cursor-pointer"
+                title="Đóng (ESC)"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-5 overflow-y-auto max-h-[calc(85vh-130px)]">
+              {/* Ticket Context Quick Summary */}
+              <div className="p-3.5 bg-slate-50 border border-slate-200/80 rounded-xl space-y-2 text-xs">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-1.5 text-slate-800 font-semibold truncate">
+                    <User size={13} className="text-[#00A3FF] shrink-0" />
+                    <span className="truncate">{selectedTicket.customerName}</span>
+                    <span className="text-slate-400 font-normal shrink-0">•</span>
+                    <span className="font-mono text-blue-600 flex items-center gap-1 shrink-0">
+                      <Phone size={11} /> {selectedTicket.customerPhone}
+                    </span>
+                  </div>
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-amber-50 text-amber-700 border border-amber-200 shrink-0">
+                    {selectedTicket.status}
+                  </span>
+                </div>
+                <div className="flex items-center gap-3 text-slate-500 text-[11px] flex-wrap">
+                  <div className="flex items-center gap-1">
+                    <MapPin size={11} className="text-rose-500 shrink-0" />
+                    <span className="truncate max-w-[220px]">
+                      {selectedTicket.address ? `${selectedTicket.address}, ` : ''}{selectedTicket.provinceName}
+                    </span>
+                  </div>
+                  {selectedTicket.serviceRequestType && (
+                    <div className="flex items-center gap-1 text-slate-600 font-medium">
+                      <Wrench size={11} className="text-blue-500 shrink-0" />
+                      <span>{selectedTicket.serviceRequestType}</span>
+                    </div>
+                  )}
+                  {selectedTicket.productName && (
+                    <div className="flex items-center gap-1 text-slate-500">
+                      <Package size={11} className="text-emerald-500 shrink-0" />
+                      <span className="truncate max-w-[150px]">{selectedTicket.productName}</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* 1. Chọn Team */}
+              <div>
+                <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-2">
+                  1. Chọn Team nhận yêu cầu <span className="text-rose-500">*</span>
+                </label>
+                <div className="grid grid-cols-2 gap-2.5">
+                  {[
+                    { id: 'Hotline', name: 'Hotline', roleLabel: 'Chăm sóc & Tiếp nhận', icon: PhoneCall },
+                    { id: 'Coordinator', name: 'Điều phối', roleLabel: 'Quản lý lịch & Trạm', icon: Layers },
+                    { id: 'Admin', name: 'Admin', roleLabel: 'Ban Quản trị', icon: Building2 },
+                    { id: 'Kỹ thuật', name: 'Kỹ thuật', roleLabel: 'KTV hiện trường', icon: Wrench },
+                  ].map(team => {
+                    const isSelected = assignTeam === team.id;
+                    const Icon = team.icon;
+                    return (
+                      <button
+                        key={team.id}
+                        type="button"
+                        onClick={() => {
+                          setAssignTeam(team.id);
+                          setAssignHandlerId('');
+                          setIsHandlerDropdownOpen(false);
+                          fetchHandlers(team.id);
+                        }}
+                        className={`p-3 rounded-xl border text-left transition-all flex items-start gap-2.5 cursor-pointer ${
+                          isSelected
+                            ? 'border-[#00A3FF] bg-sky-50/70 text-[#1B3A6B] ring-2 ring-[#00A3FF]/20 shadow-xs'
+                            : 'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50/80 text-slate-700'
+                        }`}
+                      >
+                        <div className={`p-1.5 rounded-lg shrink-0 ${isSelected ? 'bg-[#00A3FF] text-white' : 'bg-slate-100 text-slate-500'}`}>
+                          <Icon size={16} />
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center justify-between">
+                            <span className="font-bold text-xs">{team.name}</span>
+                            {isSelected && <Check size={14} className="text-[#00A3FF]" />}
+                          </div>
+                          <p className="text-[10px] text-slate-400 truncate mt-0.5">{team.roleLabel}</p>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* 2. Chọn Người xử lý */}
+              <div className="relative" ref={handlerDropdownRef}>
+                <div className="flex items-center justify-between mb-2">
+                  <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider">
+                    2. Người xử lý yêu cầu
+                  </label>
+                  {loadingHandlers ? (
+                    <span className="text-[11px] text-blue-600 flex items-center gap-1 font-medium">
+                      <Loader2 size={12} className="animate-spin" /> Đang tải nhân sự...
+                    </span>
+                  ) : handlers.length > 0 ? (
+                    <span className="text-[11px] text-slate-500">
+                      {handlers.length} nhân sự sẵn sàng
+                    </span>
+                  ) : null}
+                </div>
+
+                {/* Selected Trigger Button */}
+                {(() => {
+                  const selectedHandlerObj = handlers.find(h => h.id === assignHandlerId) || 
+                    (selectedTicket.handlerUser?.id === assignHandlerId ? selectedTicket.handlerUser : null);
+
+                  return (
+                    <div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (!assignTeam) return;
+                          setIsHandlerDropdownOpen(!isHandlerDropdownOpen);
+                          setHandlerSearchText('');
+                        }}
+                        disabled={loadingHandlers || !assignTeam}
+                        className={`w-full px-3.5 py-2.5 rounded-xl border text-sm text-left flex items-center justify-between transition-all cursor-pointer ${
+                          !assignTeam 
+                            ? 'bg-slate-100 border-slate-200 text-slate-400 cursor-not-allowed'
+                            : isHandlerDropdownOpen
+                              ? 'border-[#00A3FF] ring-2 ring-[#00A3FF]/20 bg-white shadow-xs'
+                              : 'border-slate-200 bg-white hover:border-slate-300'
+                        }`}
+                      >
+                        {loadingHandlers ? (
+                          <div className="flex items-center gap-2 text-slate-400 text-xs">
+                            <Loader2 size={14} className="animate-spin text-blue-500" />
+                            <span>Đang kiểm tra nhân sự team {assignTeam}...</span>
+                          </div>
+                        ) : selectedHandlerObj ? (
+                          <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                            <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-[#1B3A6B] to-[#00A3FF] text-white text-xs font-bold flex items-center justify-center shrink-0 shadow-xs">
+                              {getInitials(selectedHandlerObj.fullName)}
+                            </div>
+                            <div className="min-w-0 flex-1">
+                              <div className="flex items-center gap-1.5">
+                                <span className="font-semibold text-slate-800 text-xs truncate">{selectedHandlerObj.fullName}</span>
+                                <span className="text-[9px] font-bold px-1.5 py-0.2 rounded bg-blue-50 text-blue-700 border border-blue-200 shrink-0">
+                                  {selectedHandlerObj.role}
+                                </span>
+                              </div>
+                              <span className="text-[10px] text-slate-400 truncate block">
+                                {selectedHandlerObj.email || selectedHandlerObj.phoneNumber || 'Không có email'}
+                              </span>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-2 text-slate-500 text-xs">
+                            <Users size={14} className="text-slate-400" />
+                            <span>
+                              {handlers.length === 0 
+                                ? '— Hộp thư chung (Chưa có nhân sự cụ thể) —' 
+                                : 'Chọn người xử lý cụ thể trong team...'}
+                            </span>
+                          </div>
+                        )}
+
+                        <div className="flex items-center gap-1.5 shrink-0 text-slate-400 ml-2">
+                          {selectedHandlerObj && (
+                            <span
+                              onClick={(e) => { e.stopPropagation(); setAssignHandlerId(''); }}
+                              className="hover:text-rose-500 hover:bg-rose-50 p-1 rounded-md transition-colors"
+                              title="Bỏ chọn người xử lý (chuyển về team chung)"
+                            >
+                              <X size={13} />
+                            </span>
+                          )}
+                          <ChevronDown size={16} className={`transition-transform duration-200 ${isHandlerDropdownOpen ? 'rotate-180 text-[#00A3FF]' : ''}`} />
+                        </div>
+                      </button>
+
+                      {/* Dropdown Popover */}
+                      {isHandlerDropdownOpen && (
+                        <div className="absolute left-0 right-0 top-full mt-1.5 z-50 bg-white border border-slate-200 rounded-xl shadow-2xl overflow-hidden animate-in fade-in slide-in-from-top-1 duration-150">
+                          {/* Search bar inside dropdown if more than 3 handlers */}
+                          {handlers.length > 3 && (
+                            <div className="p-2 border-b border-slate-100 bg-slate-50/70">
+                              <div className="relative">
+                                <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                                <input
+                                  type="text"
+                                  value={handlerSearchText}
+                                  onChange={(e) => setHandlerSearchText(e.target.value)}
+                                  placeholder="Tìm theo tên, email, SĐT..."
+                                  className="w-full pl-8 pr-3 py-1.5 text-xs bg-white border border-slate-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-[#00A3FF] focus:border-[#00A3FF]"
+                                  autoFocus
+                                />
+                              </div>
+                            </div>
+                          )}
+
+                          <div className="max-h-52 overflow-y-auto divide-y divide-slate-100 p-1">
+                            {/* Option 0: General Team Queue */}
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setAssignHandlerId('');
+                                setIsHandlerDropdownOpen(false);
+                              }}
+                              className={`w-full p-2.5 rounded-lg text-left text-xs transition-colors flex items-center justify-between cursor-pointer ${
+                                !assignHandlerId
+                                  ? 'bg-sky-50 text-[#1B3A6B] font-bold'
+                                  : 'hover:bg-slate-50 text-slate-700'
+                              }`}
+                            >
+                              <div className="flex items-center gap-2">
+                                <div className="w-6 h-6 rounded-md bg-slate-100 text-slate-600 flex items-center justify-center text-[10px] font-bold">
+                                  <Users size={12} />
+                                </div>
+                                <div>
+                                  <p className="font-semibold text-xs leading-tight">Hộp thư chung của Team</p>
+                                  <p className="text-[10px] text-slate-400 font-normal mt-0.5">Không gán đích danh cá nhân</p>
+                                </div>
+                              </div>
+                              {!assignHandlerId && <Check size={14} className="text-[#00A3FF]" />}
+                            </button>
+
+                            {/* Handlers List */}
+                            {handlers
+                              .filter(h => {
+                                if (!handlerSearchText.trim()) return true;
+                                const q = handlerSearchText.toLowerCase();
+                                return (h.fullName && h.fullName.toLowerCase().includes(q)) ||
+                                  (h.email && h.email.toLowerCase().includes(q)) ||
+                                  (h.phoneNumber && h.phoneNumber.includes(q)) ||
+                                  (h.role && h.role.toLowerCase().includes(q));
+                              })
+                              .map(h => {
+                                const isSelected = assignHandlerId === h.id;
+                                return (
+                                  <button
+                                    key={h.id}
+                                    type="button"
+                                    onClick={() => {
+                                      setAssignHandlerId(h.id);
+                                      setIsHandlerDropdownOpen(false);
+                                    }}
+                                    className={`w-full p-2.5 rounded-lg text-left text-xs transition-colors flex items-center justify-between cursor-pointer ${
+                                      isSelected
+                                        ? 'bg-sky-50 text-[#1B3A6B] font-bold'
+                                        : 'hover:bg-slate-50 text-slate-700'
+                                    }`}
+                                  >
+                                    <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                                      <div className={`w-7 h-7 rounded-lg text-white text-[11px] font-bold flex items-center justify-center shrink-0 ${
+                                        isSelected ? 'bg-[#00A3FF]' : 'bg-gradient-to-br from-slate-600 to-slate-800'
+                                      }`}>
+                                        {getInitials(h.fullName)}
+                                      </div>
+                                      <div className="min-w-0 flex-1">
+                                        <div className="flex items-center gap-1.5">
+                                          <span className="font-semibold text-xs truncate">{h.fullName}</span>
+                                          <span className="text-[9px] font-bold px-1.5 py-0.2 rounded bg-slate-100 text-slate-600 border border-slate-200 shrink-0">
+                                            {h.role}
+                                          </span>
+                                        </div>
+                                        <p className="text-[10px] text-slate-400 truncate">
+                                          {h.email || h.phoneNumber || 'Không có email'}
+                                        </p>
+                                      </div>
+                                    </div>
+                                    {isSelected && <Check size={14} className="text-[#00A3FF] shrink-0 ml-2" />}
+                                  </button>
+                                );
+                              })}
+
+                            {handlers.length > 0 && handlers.filter(h => {
+                              if (!handlerSearchText.trim()) return true;
+                              const q = handlerSearchText.toLowerCase();
+                              return (h.fullName && h.fullName.toLowerCase().includes(q)) ||
+                                (h.email && h.email.toLowerCase().includes(q)) ||
+                                (h.phoneNumber && h.phoneNumber.includes(q));
+                            }).length === 0 && (
+                              <div className="p-4 text-center text-xs text-slate-400">
+                                Không tìm thấy nhân sự phù hợp với từ khóa
+                              </div>
+                            )}
+
+                            {handlers.length === 0 && !loadingHandlers && (
+                              <div className="p-3 text-center text-xs text-slate-400">
+                                Team này hiện chưa có tài khoản cá nhân. Phiếu sẽ được đưa vào hộp thư chung của team.
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()}
+
+                {/* Helpful note */}
+                {handlers.length === 0 && !loadingHandlers && assignTeam && (
+                  <p className="text-[11px] text-amber-700 bg-amber-50/70 border border-amber-200/60 rounded-lg p-2.5 mt-2">
+                    💡 Hiện chưa có nhân sự cụ thể thuộc <strong>Team {assignTeam}</strong>. Khi lưu, yêu cầu sẽ được chuyển đến hộp thư chung của team.
+                  </p>
+                )}
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="flex justify-end gap-3 px-6 py-4 border-t border-slate-100 bg-slate-50/80">
+              <button
+                type="button"
+                onClick={() => { setShowAssignModal(false); setSelectedTicket(null); setIsHandlerDropdownOpen(false); }}
+                className="px-4 py-2.5 text-xs font-bold uppercase tracking-wider text-slate-600 bg-white border border-slate-200 rounded-xl hover:bg-slate-100 transition-all cursor-pointer shadow-xs"
               >
                 Đóng lại
               </button>
               <button
+                type="button"
                 onClick={handleAssign}
                 disabled={!assignTeam || assigning}
-                className="px-5 py-2.5 text-sm font-medium text-white bg-[#00A3FF] rounded-lg hover:bg-[#0090E0] disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center gap-2"
+                className="px-5 py-2.5 text-xs font-bold uppercase tracking-wider text-white bg-[#1B3A6B] hover:bg-[#2A518E] rounded-xl shadow-md transition-all active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 cursor-pointer"
               >
-                {assigning && <Loader2 size={14} className="animate-spin" />}
-                Phân bổ
+                {assigning ? <Loader2 size={14} className="animate-spin" /> : <UserCheck size={14} />}
+                Xác nhận phân bổ
               </button>
             </div>
           </div>

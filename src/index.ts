@@ -269,7 +269,7 @@ const server = app.listen(PORT, () => {
 
   // Khởi động lập lịch đồng bộ đơn hàng & sản phẩm từ Pancake POS
   if (process.env.PANCAKE_SYNC_ENABLED !== 'false') {
-    startOrderSyncScheduler(5); // Chạy định kỳ mỗi 5 phút
+    startOrderSyncScheduler(2); // Đồng bộ toàn diện mỗi 2 phút, Fast Draft loop chạy mỗi 20 giây
     startProductSyncScheduler(30, 120); // Đồng bộ sản phẩm & tồn kho mỗi 30 phút (giờ hành chính 8h-18h) và 2 tiếng (ngoài giờ)
   } else {
     logger.info('[Startup] Pancake POS background sync schedulers disabled via PANCAKE_SYNC_ENABLED=false');

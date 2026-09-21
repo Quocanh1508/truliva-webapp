@@ -571,20 +571,21 @@ export default function HotlineTicketModal({ ticket, isOpen, onClose, onSaved, u
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 mb-1">Team xử lý yêu cầu *</label>
                   <select value={formData.targetTeam} onChange={(e) => { updateForm('targetTeam', e.target.value); updateForm('handlerUserId', ''); }}
-                    className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-200">
-                    <option value="">Chọn team...</option>
-                    <option value="Hotline">Hotline</option>
-                    <option value="Coordinator">Coordinator</option>
-                    <option value="Admin">Admin</option>
+                    className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-200 bg-white text-gray-800">
+                    <option value="" className="bg-white text-gray-800">Chọn team...</option>
+                    <option value="Hotline" className="bg-white text-gray-800">Hotline (CSKH)</option>
+                    <option value="Coordinator" className="bg-white text-gray-800">Coordinator (Điều phối)</option>
+                    <option value="Admin" className="bg-white text-gray-800">Admin (Quản trị)</option>
+                    <option value="Kỹ thuật" className="bg-white text-gray-800">Kỹ thuật (KTV)</option>
                   </select>
                 </div>
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 mb-1">Người xử lý yêu cầu</label>
                   <select value={formData.handlerUserId} onChange={(e) => updateForm('handlerUserId', e.target.value)}
                     disabled={!formData.targetTeam}
-                    className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-200 disabled:bg-gray-100">
-                    <option value="">Chọn người xử lý...</option>
-                    {handlers.map(h => <option key={h.id} value={h.id}>{h.fullName} | {h.email || ''}</option>)}
+                    className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-200 disabled:bg-gray-100 disabled:opacity-60 bg-white text-gray-800">
+                    <option value="" className="bg-white text-gray-800">Chọn người xử lý...</option>
+                    {handlers.map(h => <option key={h.id} value={h.id} className="bg-white text-gray-800">{h.fullName} | {h.email || h.phoneNumber || ''}</option>)}
                   </select>
                 </div>
               </div>

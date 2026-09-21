@@ -586,21 +586,69 @@ export async function sendZnsWarrantyActivation(
   throw primaryError;
 }
 
+// ══════════════════════════════════════════════════════════════════════════
+//  ZALO OA ARTICLES ENGINE (CACHE & BATCH PAGINATION)
+// ══════════════════════════════════════════════════════════════════════════
+let cachedArticlesList: { timestamp: number; data: any[] } | null = null;
+const ARTICLES_CACHE_TTL = 5 * 60 * 1000; // Cache 5 phút
+
+const articleDetailCache = new Map<string, { timestamp: number; data: any }>();
+const ARTICLE_DETAIL_CACHE_TTL = 15 * 60 * 1000; // Cache chi tiết 15 phút
+
 /**
  * Lấy danh sách bài viết truyền thông công khai từ Zalo OA của Truliva
+ * Zalo OpenAPI giới hạn tối đa 10 bài/lần gọi (/article/getslice), nên sử dụng batching song song để lấy đầy đủ.
  */
-export async function getZaloOaArticles(): Promise<any[]> {
+export async function getZaloOaArticles(offset: number = 0, limit: number = 50): Promise<any[]> {
+  const now = Date.now();
+
+  // 1. Kiểm tra bộ nhớ cache danh sách
+  if (cachedArticlesList && (now - cachedArticlesList.timestamp) < ARTICLES_CACHE_TTL) {
+    const list = cachedArticlesList.data;
+    return list.slice(offset, offset + limit);
+  }
+
   try {
     const accessToken = await getValidAccessToken();
-    const response = await axios.get('https://openapi.zalo.me/v2.0/article/getslice?offset=0&limit=10&type=normal', {
-      headers: {
-        'access_token': accessToken
-      }
+
+    // 2. Gọi batch đầu tiên (offset=0, limit=10) để đọc total thực tế từ Zalo OA
+    const firstRes = await axios.get('https://openapi.zalo.me/v2.0/article/getslice?offset=0&limit=10&type=normal', {
+      headers: { 'access_token': accessToken },
+      timeout: 8000
     });
 
-    const data = response.data;
-    if (data.error === 0 && data.data && data.data.medias && data.data.medias.length > 0) {
-      return data.data.medias.map((m: any) => {
+    const firstData = firstRes.data;
+    if (firstData.error === 0 && firstData.data && Array.isArray(firstData.data.medias)) {
+      const total = typeof firstData.data.total === 'number' ? firstData.data.total : firstData.data.medias.length;
+      let allRawMedias = [...firstData.data.medias];
+
+      // 3. Nếu tổng số bài > 10, chạy batching song song (mỗi batch tối đa 10)
+      const maxToFetch = Math.min(total, 60); // Lấy tối đa 60 bài gần nhất
+      const batchPromises: Promise<any[]>[] = [];
+
+      for (let batchOffset = 10; batchOffset < maxToFetch; batchOffset += 10) {
+        const batchLimit = Math.min(10, maxToFetch - batchOffset);
+        batchPromises.push(
+          axios.get(`https://openapi.zalo.me/v2.0/article/getslice?offset=${batchOffset}&limit=${batchLimit}&type=normal`, {
+            headers: { 'access_token': accessToken },
+            timeout: 8000
+          }).then(r => (r.data && r.data.error === 0 && r.data.data?.medias) ? r.data.data.medias : [])
+            .catch(err => {
+              logger.warn(`Failed fetching Zalo OA article batch at offset ${batchOffset}`, { error: err.message });
+              return [];
+            })
+        );
+      }
+
+      if (batchPromises.length > 0) {
+        const batchResults = await Promise.all(batchPromises);
+        batchResults.forEach(batch => {
+          allRawMedias = allRawMedias.concat(batch);
+        });
+      }
+
+      // 4. Map chuẩn hóa dữ liệu bài viết
+      const mappedArticles = allRawMedias.map((m: any) => {
         const timestamp = m.create_date || m.created_time;
         const dateStr = timestamp 
           ? new Date(Number(timestamp)).toLocaleDateString('vi-VN')
@@ -612,16 +660,106 @@ export async function getZaloOaArticles(): Promise<any[]> {
           views: m.total_view || 0,
           image: m.thumb || m.cover?.photo_url || 'https://images.unsplash.com/photo-1548839140-29a749e1bc4e?w=500&auto=format&fit=crop&q=60',
           summary: m.description || m.summary || '',
-          url: m.link_view || m.url || `https://oa.zalo.me/detail/article/${m.id}`
+          url: m.link_view || m.url || `https://post.oa.zalo.me/d/3870382725035413507?id=${m.id}&pageId=3870382725035413507`
         };
       });
+
+      // 5. Lưu vào cache bộ nhớ
+      cachedArticlesList = {
+        timestamp: now,
+        data: mappedArticles
+      };
+
+      logger.info(`Fetched and cached ${mappedArticles.length}/${total} articles from Zalo OA`);
+      return mappedArticles.slice(offset, offset + limit);
+    } else {
+      logger.warn('Zalo OA getslice returned non-zero error or missing medias', { response: firstData });
     }
   } catch (err: any) {
-    logger.warn('Could not fetch articles directly from Zalo OA API, returning curated Truliva articles', { error: err.message });
+    logger.warn('Could not fetch articles directly from Zalo OA API, falling back', { error: err.message });
   }
 
-  // Curated Approved Communication Templates from Truliva Zalo OA
-  return [
+  // Nếu có cache cũ đã hết hạn, vẫn ưu tiên trả về cache cũ hơn là hardcoded
+  if (cachedArticlesList && cachedArticlesList.data.length > 0) {
+    return cachedArticlesList.data.slice(offset, offset + limit);
+  }
+
+  return CURATED_TRULIVA_ARTICLES;
+}
+
+/**
+ * Lấy chi tiết nội dung bài viết từ Zalo OA theo ID (hỗ trợ cache chi tiết)
+ */
+export async function getZaloOaArticleDetail(articleId: string): Promise<any> {
+  const now = Date.now();
+
+  // 1. Kiểm tra cache bài viết chi tiết
+  const cached = articleDetailCache.get(articleId);
+  if (cached && (now - cached.timestamp) < ARTICLE_DETAIL_CACHE_TTL) {
+    return cached.data;
+  }
+
+  try {
+    const accessToken = await getValidAccessToken();
+    const response = await axios.get(`https://openapi.zalo.me/v2.0/article/getdetail?id=${encodeURIComponent(articleId)}`, {
+      headers: {
+        'access_token': accessToken
+      },
+      timeout: 8000
+    });
+
+    const data = response.data;
+    if (data.error === 0 && data.data) {
+      const art = data.data;
+      const timestamp = art.create_date || art.created_time;
+      const dateStr = timestamp 
+        ? new Date(Number(timestamp)).toLocaleDateString('vi-VN')
+        : '';
+      const detail = {
+        id: art.id,
+        title: art.title,
+        date: dateStr,
+        views: art.total_view || 0,
+        image: art.cover?.photo_url || art.thumb || '',
+        summary: art.description || '',
+        body: art.body || [],
+        actionLink: art.action_link || null,
+        linkView: art.link_view || `https://post.oa.zalo.me/d/3870382725035413507?id=${art.id}&pageId=3870382725035413507`
+      };
+
+      // Lưu vào cache
+      articleDetailCache.set(articleId, {
+        timestamp: now,
+        data: detail
+      });
+
+      return detail;
+    }
+  } catch (err: any) {
+    logger.warn('Could not fetch article detail from Zalo OA API', { articleId, error: err.message });
+  }
+
+  // Fallback từ danh sách curated
+  const curated = CURATED_TRULIVA_ARTICLES.find(a => a.id === articleId);
+  if (curated) {
+    return {
+      id: curated.id,
+      title: curated.title,
+      date: curated.date,
+      views: curated.views,
+      image: curated.image,
+      summary: curated.summary,
+      content: curated.content,
+      body: (curated.content || []).map((c: string) => ({ type: 'text', content: `<p>${c}</p>` })),
+      linkView: curated.url || ''
+    };
+  }
+
+  return null;
+}
+
+
+export const CURATED_TRULIVA_ARTICLES = [
     {
       id: 'zns-602994',
       templateId: '602994',
@@ -715,4 +853,4 @@ export async function getZaloOaArticles(): Promise<any[]> {
       url: ''
     }
   ];
-}
+

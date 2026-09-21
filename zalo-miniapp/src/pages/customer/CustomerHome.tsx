@@ -97,7 +97,7 @@ export default function CustomerHome({ user, onOpenScanner, onOpenWarranty, onGo
   const [legalDocType, setLegalDocType] = useState<LegalDocType>('TERMS');
 
   React.useEffect(() => {
-    fetchZaloApi('/zalo-miniapp/articles')
+    fetchZaloApi('/zalo-miniapp/articles?limit=60')
       .then(res => {
         if (res && res.success && res.articles && res.articles.length > 0) {
           setNewsList(res.articles);
@@ -328,9 +328,6 @@ export default function CustomerHome({ user, onOpenScanner, onOpenWarranty, onGo
                   className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300 opacity-95"
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-[#061226]/80 via-transparent to-transparent opacity-60"></div>
-                <div className="absolute top-2 left-2 p3r-slanted-badge bg-[#00D2FF] text-[#061226] text-[8px] font-black px-2 py-0.5 uppercase tracking-wider shadow-xs">
-                  <span>TRULIVA</span>
-                </div>
               </div>
 
               <div className="p-3 space-y-2 flex-1 flex flex-col justify-between">

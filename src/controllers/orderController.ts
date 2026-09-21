@@ -4,7 +4,7 @@ import logger from '../utils/logger';
 import { requireAuth, requireAdmin } from '../middleware/authSession';
 import { Prisma } from '@prisma/client';
 import { syncOrderStatusToPancake, processOrderEvent } from '../services/orderProcessor';
-import { syncRecentOrders } from '../services/orderSyncScheduler';
+import { syncRecentOrders, reconcileDraftOrders } from '../services/orderSyncScheduler';
 import { sendPushNotification } from '../services/notificationService';
 import { sendWebPushNotification } from '../services/webPushService';
 import { syncOrderInventoryState } from '../services/inventoryService';
@@ -2295,8 +2295,15 @@ export async function syncOrders(req: Request, res: Response): Promise<void> {
     }
 
     logger.info('Manual orders sync initiated by user', { userId: req.user?.id, role });
-    const count = await syncRecentOrders(50);
-    res.json({ success: true, message: `Đồng bộ thành công ${count} đơn hàng gần đây từ Pancake.` });
+    const [count, reconciledCount] = await Promise.all([
+      syncRecentOrders(30),
+      reconcileDraftOrders(30)
+    ]);
+    broadcastEvent('ORDER_UPDATED', { action: 'manual_sync', count, reconciledCount });
+    res.json({ 
+      success: true, 
+      message: `Đồng bộ thành công ${count} đơn hàng gần đây và cập nhật trạng thái ${reconciledCount} đơn vừa xác nhận từ Pancake.` 
+    });
   } catch (error: any) {
     logger.error('Manual orders sync failed', { error: error.message });
     res.status(500).json({ error: error.message || 'Lỗi đồng bộ đơn hàng từ Pancake' });

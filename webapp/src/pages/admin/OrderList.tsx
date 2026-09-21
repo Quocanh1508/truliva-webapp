@@ -169,6 +169,22 @@ const ROW_STATUS_OPTIONS = [
   { value: 'đã đổi', label: 'Đã đổi' },
 ];
 
+// Helper to load saved filters from sessionStorage
+function getSavedFilter<T = any>(key: string, defaultValue: T): T {
+  try {
+    const saved = sessionStorage.getItem('truliva_order_filters');
+    if (saved) {
+      const parsed = JSON.parse(saved);
+      if (parsed[key] !== undefined) {
+        return parsed[key];
+      }
+    }
+  } catch (e) {
+    console.error('Error parsing saved filters:', e);
+  }
+  return defaultValue;
+}
+
 export default function OrderList() {
   const location = useLocation();
   const { confirm } = useConfirm();
@@ -196,29 +212,13 @@ export default function OrderList() {
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
   const [_error, setError] = useState('');
-  const [autoRefresh, setAutoRefresh] = useState(false);
+  const [autoRefresh, setAutoRefresh] = useState<boolean>(() => getSavedFilter('autoRefresh', true));
   const [wsConnected, setWsConnected] = useState(false);
 
   // Track whether user is actively interacting (filtering/searching) to pause real-time updates
   const isUserInteractingRef = useRef(false);
   const wsDebounceTimerRef = useRef<any>(null);
   const ordersFingerprint = useRef<string>('');
-
-  // Helper to load saved filters from sessionStorage
-  const getSavedFilter = (key: string, defaultValue: any) => {
-    try {
-      const saved = sessionStorage.getItem('truliva_order_filters');
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (parsed[key] !== undefined) {
-          return parsed[key];
-        }
-      }
-    } catch (e) {
-      console.error('Error parsing saved filters:', e);
-    }
-    return defaultValue;
-  };
 
   // Filters
 
@@ -323,6 +323,7 @@ export default function OrderList() {
       filterTechStationIds,
       filterProvinces,
       filterCreators,
+      autoRefresh,
       page,
       pageSize
     };
@@ -347,6 +348,7 @@ export default function OrderList() {
     filterTechStationIds,
     filterProvinces,
     filterCreators,
+    autoRefresh,
     page,
     pageSize
   ]);
@@ -499,13 +501,14 @@ export default function OrderList() {
   const [isAssignProductSelectOpen, setIsAssignProductSelectOpen] = useState(false);
   const [isAssignModalExpanded, setIsAssignModalExpanded] = useState(false);
   const isAssignModalWide = isAssignProductSelectOpen || isAssignModalExpanded;
+  const skipFetchRef = useRef(false);
 
   // Tự động mở modal và điền sẵn thông tin khi chuyển từ Hotline Ticket
   useEffect(() => {
-    if (location.state?.createFromTicket) {
-      const ticket = location.state.createFromTicket;
-      const reqType = ticket.phase3RequestType || ticket.serviceRequestType || '';
-      const srvType = ticket.phase3ServiceType || '';
+    const ticket = location.state?.createFromTicket || location.state?.hotlineTicket;
+    if (ticket) {
+      const reqType = ticket.phase3RequestType || ticket.serviceRequestType || ticket.workType || '';
+      const srvType = ticket.phase3ServiceType || ticket.serviceType || '';
 
       const ticketAddress = ticket.address || ticket.customerAddress || '';
       const ticketProvince = ticket.provinceName || ticket.province || '';
@@ -520,13 +523,13 @@ export default function OrderList() {
         customerPhone: ticket.customerPhone || '',
         address: ticketAddress,
         province: ticketProvince,
-        workType: reqType,
+        workType: reqType || 'Sửa chữa',
         serviceType: srvType || (['Giao hàng và Lắp đặt', 'Lắp đặt', 'Giao hàng', 'Thay lọc', 'Thay lõi lọc'].includes(reqType) ? 'Công việc đã bao gồm dịch vụ' : ''),
         appointmentDate: '',
         appointmentTime: '08:30',
         items: ticketProduct ? [{ productName: ticketProduct, sku: null, quantity: 1, price: 0 }] : [],
         moneyToCollect: 0,
-        note: (ticket.consultationNote || ticket.customerSupportDetail || '').trim(),
+        note: (ticket.consultationNote || ticket.customerSupportDetail || ticket.note || (ticket.ticketCode ? `[Tạo từ Ticket Hotline ${ticket.ticketCode}]` : '')).trim(),
         promoCode: '',
         hotlineTicketId: ticket.id
       });
@@ -569,7 +572,6 @@ export default function OrderList() {
   }, []);
 
   const [customerSuggestions, setCustomerSuggestions] = useState<any[]>([]);
-  const skipFetchRef = useRef(false);
 
   useEffect(() => {
     const phone = newOrderForm.customerPhone.trim();

@@ -264,18 +264,48 @@ router.get('/service-history', requireAuth, async (req: Request, res: Response):
 
 /**
  * GET /api/zalo-miniapp/articles
- * Lấy danh sách bài viết truyền thông công khai từ Zalo OA cho Mini App
+ * Lấy danh sách bài viết truyền thông công khai từ Zalo OA cho Mini App (hỗ trợ tối đa 50 bài)
  */
-router.get('/articles', async (_req: Request, res: Response): Promise<void> => {
+router.get('/articles', async (req: Request, res: Response): Promise<void> => {
   try {
+    const offset = Math.max(0, parseInt(req.query.offset as string) || 0);
+    const limit = Math.min(100, Math.max(1, parseInt(req.query.limit as string) || 60));
     const { getZaloOaArticles } = await import('../services/zaloService');
-    const articles = await getZaloOaArticles();
+    const articles = await getZaloOaArticles(offset, limit);
     res.json({
       success: true,
+      count: articles.length,
       articles
     });
   } catch (error: any) {
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * GET /api/zalo-miniapp/articles/:id
+ * Lấy chi tiết nội dung bài viết từ Zalo OA cho Mini App
+ */
+router.get('/articles/:id', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { id } = req.params;
+    if (!id) {
+      res.status(400).json({ success: false, error: 'Thiếu ID bài viết' });
+      return;
+    }
+    const articleId = String(id);
+    const { getZaloOaArticleDetail } = await import('../services/zaloService');
+    const article = await getZaloOaArticleDetail(articleId);
+    if (!article) {
+      res.status(404).json({ success: false, error: 'Không tìm thấy bài viết' });
+      return;
+    }
+    res.json({
+      success: true,
+      article
+    });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message });
   }
 });
 

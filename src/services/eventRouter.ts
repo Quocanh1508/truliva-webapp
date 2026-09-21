@@ -139,18 +139,29 @@ async function handleOrderStockUpdateEvent(rawEventId: string, payload: any): Pr
 
   try {
     logger.info('Running order sync fallback via stock update event', { rawEventId, orderId });
-    const response = await axios.get(`https://pos.pages.fm/api/v1/shops/${shopId}/orders/${orderId}`, {
-      params: { api_key: apiKey },
-      timeout: 10000 // 10 giây timeout
-    });
+    let response;
+    try {
+      response = await axios.get(`https://pos.pages.fm/api/v1/shops/${shopId}/orders/${orderId}`, {
+        params: { api_key: apiKey },
+        timeout: 15000 // Tăng timeout lên 15 giây
+      });
+    } catch (fetchErr: any) {
+      // Retry 1 lần sau 1.5s nếu bị timeout hoặc lỗi mạng
+      logger.warn('Initial order fetch failed in stock update, retrying in 1.5s...', { orderId, error: fetchErr.message });
+      await new Promise(r => setTimeout(r, 1500));
+      response = await axios.get(`https://pos.pages.fm/api/v1/shops/${shopId}/orders/${orderId}`, {
+        params: { api_key: apiKey },
+        timeout: 15000
+      });
+    }
 
-    if (response.data && response.data.success && response.data.data) {
+    if (response && response.data && response.data.success && response.data.data) {
       const orderPayload = response.data.data;
-      logger.info('Fetched latest order details, processing order update', { orderId });
+      logger.info('Fetched latest order details, processing order update', { orderId, status: orderPayload.status });
       // Tái sử dụng hàm processOrderEvent để cập nhật trạng thái đơn hàng
       await processOrderEvent(rawEventId, orderPayload);
     } else {
-      logger.warn('Failed to fetch order details from Pancake POS API', { orderId, data: response.data });
+      logger.warn('Failed to fetch order details from Pancake POS API', { orderId, data: response?.data });
       await prisma.webhookRawEvent.update({
         where: { id: rawEventId },
         data: { status: 'FAILED', errorLog: 'Pancake API returned success: false' },
