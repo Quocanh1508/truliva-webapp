@@ -125,10 +125,19 @@ export const DispatchStationSelect: React.FC<DispatchStationSelectProps> = ({
     return ktvs.find(k => k.id === selectedKtvId) || null;
   }, [ktvs, selectedKtvId]);
 
-  // Filtered Main Stations
+  // Filtered Main Stations (Đưa Truliva lên đầu tiên)
   const filteredMainStations = useMemo(() => {
-    if (!mainSearch.trim()) return stations;
-    return stations.filter(s => matchesSearchTerm(s.name, mainSearch));
+    let list = [...stations];
+    if (mainSearch.trim()) {
+      list = list.filter(s => matchesSearchTerm(s.name, mainSearch));
+    }
+    return list.sort((a, b) => {
+      const isATruliva = a.name?.trim().toLowerCase().includes('truliva');
+      const isBTruliva = b.name?.trim().toLowerCase().includes('truliva');
+      if (isATruliva && !isBTruliva) return -1;
+      if (!isATruliva && isBTruliva) return 1;
+      return 0;
+    });
   }, [stations, mainSearch]);
 
   // Process Tech Stations (Priority Hubs first + Alphabetical, uniform styling)

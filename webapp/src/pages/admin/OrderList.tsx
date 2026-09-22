@@ -1040,7 +1040,16 @@ export default function OrderList() {
   ]);
 
   useEffect(() => {
-    getStations().then(data => setStations(data)).catch(console.error);
+    getStations().then(data => {
+      const sorted = Array.isArray(data) ? [...data].sort((a, b) => {
+        const isATruliva = a.name?.trim().toLowerCase().includes('truliva');
+        const isBTruliva = b.name?.trim().toLowerCase().includes('truliva');
+        if (isATruliva && !isBTruliva) return -1;
+        if (!isATruliva && isBTruliva) return 1;
+        return 0;
+      }) : [];
+      setStations(sorted);
+    }).catch(console.error);
     getKtvUsers().then(data => setAllKtvs(data)).catch(console.error);
     getFiltersData().then(data => setDbFilterOptions(data)).catch(console.error);
   }, []);
