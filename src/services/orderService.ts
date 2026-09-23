@@ -29,19 +29,18 @@ export async function buildOrderFilter(user: any): Promise<Prisma.OrderWhereInpu
 
   // SALER or STAFF (e.g., Marketing group)
   if (role === 'SALER' || role === 'STAFF') {
-    const creatorName = pancakeAccountName || '';
+    const creatorName = (pancakeAccountName || '').trim();
     const orConditions: Prisma.OrderWhereInput[] = [];
-    orConditions.push(
-      { rawData: { path: ['creator', 'id'], equals: user.id } }
-    );
 
     if (creatorName) {
+      // Use string_contains instead of equals to handle trailing spaces from Pancake API
       orConditions.push(
-        { rawData: { path: ['creator', 'name'], equals: creatorName } },
-        { rawData: { path: ['assigning_seller', 'name'], equals: creatorName } },
-        { rawData: { path: ['assigning_care', 'name'], equals: creatorName } }
+        { rawData: { path: ['creator', 'name'], string_contains: creatorName } },
+        { rawData: { path: ['assigning_seller', 'name'], string_contains: creatorName } },
+        { rawData: { path: ['assigning_care', 'name'], string_contains: creatorName } }
       );
     }
+
 
     const createdManualLogs = await prisma.auditLog.findMany({
       where: {
@@ -86,18 +85,21 @@ export async function buildOrderFilter(user: any): Promise<Prisma.OrderWhereInpu
 
     const orConditions: Prisma.OrderWhereInput[] = [];
     groupUsers.forEach(u => {
-      const cName = u.pancakeAccountName || '';
-      orConditions.push(
-        { rawData: { path: ['creator', 'id'], equals: u.id } }
-      );
+      const cName = (u.pancakeAccountName || '').trim();
       if (cName) {
+        // Use string_contains instead of equals to handle trailing spaces from Pancake API
         orConditions.push(
-          { rawData: { path: ['creator', 'name'], equals: cName } },
-          { rawData: { path: ['assigning_seller', 'name'], equals: cName } },
-          { rawData: { path: ['assigning_care', 'name'], equals: cName } }
+          { rawData: { path: ['creator', 'name'], string_contains: cName } },
+          { rawData: { path: ['assigning_seller', 'name'], string_contains: cName } },
+          { rawData: { path: ['assigning_care', 'name'], string_contains: cName } }
         );
       }
     });
+
+    // Match orders by orderSource matching the supervisor's group
+    orConditions.push(
+      { orderSource: { equals: group, mode: 'insensitive' } }
+    );
 
     const groupUserIds = groupUsers.map(u => u.id);
     const createdManualLogs = await prisma.auditLog.findMany({
