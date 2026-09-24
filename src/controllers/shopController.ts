@@ -368,14 +368,16 @@ export async function createShopOrder(req: Request, res: Response): Promise<void
     // 6. Tạo thông tin Chuyển khoản VietQR nếu chọn hình thức chuyển khoản
     let vietQrInfo = null;
     if (paymentMethod.toUpperCase() === 'VIETQR') {
-      const bankCode = process.env.BANK_CODE || 'MB';
-      const accountNumber = process.env.BANK_ACCOUNT_NUMBER || '0915185982';
-      const accountName = process.env.BANK_ACCOUNT_NAME || 'CONG TY TRULIVA';
+      const bankCode = process.env.BANK_CODE || 'TCB';
+      const bankName = process.env.BANK_NAME || 'Techcombank';
+      const accountNumber = process.env.BANK_ACCOUNT_NUMBER || '8318892577';
+      const accountName = process.env.BANK_ACCOUNT_NAME || 'CT TNHH TM VA DV PURE VITA';
       const memo = orderCode;
       const qrUrl = `https://img.vietqr.io/image/${bankCode}-${accountNumber}-compact2.png?amount=${finalAmount}&addInfo=${encodeURIComponent(memo)}&accountName=${encodeURIComponent(accountName)}`;
 
       vietQrInfo = {
         bankCode,
+        bankName,
         accountNumber,
         accountName,
         amount: finalAmount,
@@ -497,3 +499,232 @@ export async function getShopOrderDetail(req: Request, res: Response): Promise<v
     res.status(500).json({ success: false, error: 'Lỗi khi tải chi tiết đơn hàng' });
   }
 }
+
+/**
+ * POST /api/zalo-miniapp/shop/payment/webhook
+ * Webhook nhận thông báo chuyển khoản Techcombank (Hỗ trợ SePAY, PayOS, Casso hoặc Open Banking)
+ */
+export async function handlePaymentWebhook(req: Request, res: Response): Promise<void> {
+  try {
+    const payload = req.body || {};
+    logger.info('Received Payment Webhook notification', { payload });
+
+    // Hỗ trợ đa dạng cấu trúc Webhook (SePAY, PayOS, Casso, Banking Push Notification)
+    const content = String(
+      payload.content || 
+      payload.description || 
+      payload.data?.description || 
+      payload.transferContent || 
+      payload.msg || 
+      ''
+    );
+
+    const transferAmount = Number(
+      payload.transferAmount || 
+      payload.amount || 
+      payload.data?.amount || 
+      0
+    );
+
+    // Trích xuất mã đơn hàng TRU-... từ nội dung chuyển khoản
+    const match = content.match(/TRU[-_]?[0-9A-Z-]+/i) || content.match(/TRU\s*[0-9A-Z-]+/i);
+    let extractedOrderCode = match ? match[0].replace(/\s+/g, '-').toUpperCase() : '';
+
+    if (!extractedOrderCode && payload.orderCode) {
+      extractedOrderCode = String(payload.orderCode).toUpperCase();
+    }
+
+    if (!extractedOrderCode) {
+      logger.warn('Payment webhook received without matching TRU order code', { content });
+      res.status(200).json({ success: false, message: 'Nội dung chuyển khoản không chứa mã đơn TRU' });
+      return;
+    }
+
+    // Tìm đơn hàng trong DB
+    const shopOrder = await prisma.shopOrder.findFirst({
+      where: {
+        OR: [
+          { orderCode: extractedOrderCode },
+          { orderCode: { contains: extractedOrderCode, mode: 'insensitive' } }
+        ]
+      }
+    });
+
+    if (!shopOrder) {
+      logger.warn('ShopOrder not found for code', { extractedOrderCode });
+      res.status(200).json({ success: false, message: `Không tìm thấy đơn hàng ${extractedOrderCode}` });
+      return;
+    }
+
+    // Cập nhật trạng thái thanh toán thành công
+    const updated = await prisma.shopOrder.update({
+      where: { id: shopOrder.id },
+      data: {
+        paymentStatus: 'PAID',
+        paymentMethod: 'VIETQR'
+      }
+    });
+
+    // Cập nhật đơn điều phối KTV nội bộ nếu có
+    if (shopOrder.internalOrderId) {
+      try {
+        const timeStr = new Date().toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' });
+        const existingOrder = await prisma.order.findUnique({
+          where: { id: shopOrder.internalOrderId },
+          select: { note: true, moneyToCollect: true }
+        });
+        await prisma.order.update({
+          where: { id: shopOrder.internalOrderId },
+          data: {
+            moneyToCollect: 0, // Đã thanh toán chuyển khoản, KTV không cần thu tiền mặt nữa
+            note: `${existingOrder?.note || ''} | [ĐÃ THANH TOÁN TECHCOMBANK: ${(transferAmount || shopOrder.finalAmount).toLocaleString('vi-VN')}đ lúc ${timeStr}]`
+          }
+        });
+      } catch (err: any) {
+        logger.warn('Could not update internal order with payment note', { error: err.message });
+      }
+    }
+
+    logger.info('ShopOrder marked as PAID via Techcombank Webhook', {
+      orderCode: shopOrder.orderCode,
+      amount: transferAmount || shopOrder.finalAmount
+    });
+
+    res.json({
+      success: true,
+      message: `Đã xác nhận thanh toán thành công cho đơn hàng ${shopOrder.orderCode}`,
+      orderCode: shopOrder.orderCode
+    });
+  } catch (error: any) {
+    logger.error('Error handling payment webhook', { error: error.message });
+    res.status(500).json({ success: false, error: error.message });
+  }
+}
+
+/**
+ * POST /api/zalo-miniapp/shop/orders/:orderCodeOrId/switch-to-cod
+ * Chuyển phương thức thanh toán của đơn hàng sang COD (khi khách đổi ý hoặc không tiện chuyển khoản)
+ */
+export async function switchOrderToCod(req: Request, res: Response): Promise<void> {
+  try {
+    const orderCodeOrId = String(req.params.orderCodeOrId || '').trim();
+    if (!orderCodeOrId) {
+      res.status(400).json({ success: false, error: 'Thiếu mã đơn hàng' });
+      return;
+    }
+
+    const order = await prisma.shopOrder.findFirst({
+      where: {
+        OR: [
+          { orderCode: orderCodeOrId },
+          { id: orderCodeOrId }
+        ]
+      }
+    });
+
+    if (!order) {
+      res.status(404).json({ success: false, error: 'Không tìm thấy đơn hàng' });
+      return;
+    }
+
+    if (order.paymentStatus === 'PAID') {
+      res.status(400).json({ success: false, error: 'Đơn hàng đã được thanh toán, không thể chuyển sang COD' });
+      return;
+    }
+
+    const updated = await prisma.shopOrder.update({
+      where: { id: order.id },
+      data: {
+        paymentMethod: 'COD'
+      }
+    });
+
+    if (order.internalOrderId) {
+      try {
+        await prisma.order.update({
+          where: { id: order.internalOrderId },
+          data: {
+            moneyToCollect: order.finalAmount,
+            note: `[ĐƠN ZALO MINI APP - ĐỔI SANG COD] Khách hàng chọn thanh toán khi nhận hàng & lắp đặt (COD)`
+          }
+        });
+      } catch (err: any) {
+        logger.warn('Could not update internal order for switch-to-cod', { error: err.message });
+      }
+    }
+
+    logger.info('ShopOrder switched to COD', { orderCode: order.orderCode });
+
+    res.json({
+      success: true,
+      message: 'Đã chuyển sang thanh toán khi nhận hàng (COD) thành công',
+      order: updated
+    });
+  } catch (error: any) {
+    logger.error('Error switching shop order to COD', { error: error.message });
+    res.status(500).json({ success: false, error: 'Lỗi khi chuyển sang COD' });
+  }
+}
+
+/**
+ * POST /api/zalo-miniapp/shop/orders/:orderCodeOrId/confirm-payment
+ * Xác nhận thanh toán thành công thủ công (Hỗ trợ Admin / Sandbox Testing)
+ */
+export async function confirmShopOrderPayment(req: Request, res: Response): Promise<void> {
+  try {
+    const orderCodeOrId = String(req.params.orderCodeOrId || '').trim();
+    if (!orderCodeOrId) {
+      res.status(400).json({ success: false, error: 'Thiếu mã đơn hàng' });
+      return;
+    }
+
+    const order = await prisma.shopOrder.findFirst({
+      where: {
+        OR: [
+          { orderCode: orderCodeOrId },
+          { id: orderCodeOrId }
+        ]
+      }
+    });
+
+    if (!order) {
+      res.status(404).json({ success: false, error: 'Không tìm thấy đơn hàng' });
+      return;
+    }
+
+    const updated = await prisma.shopOrder.update({
+      where: { id: order.id },
+      data: {
+        paymentStatus: 'PAID',
+        paymentMethod: 'VIETQR'
+      }
+    });
+
+    if (order.internalOrderId) {
+      try {
+        const timeStr = new Date().toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' });
+        await prisma.order.update({
+          where: { id: order.internalOrderId },
+          data: {
+            moneyToCollect: 0,
+            note: `[ĐƠN ZALO MINI APP - ĐÃ XÁC NHẬN THANH TOÁN] ${order.finalAmount.toLocaleString('vi-VN')}đ lúc ${timeStr}`
+          }
+        });
+      } catch (err: any) {
+        logger.warn('Could not update internal order for confirm-payment', { error: err.message });
+      }
+    }
+
+    logger.info('ShopOrder confirmed as PAID manually/test', { orderCode: order.orderCode });
+
+    res.json({
+      success: true,
+      message: 'Đã xác nhận thanh toán thành công',
+      order: updated
+    });
+  } catch (error: any) {
+    logger.error('Error confirming shop order payment', { error: error.message });
+    res.status(500).json({ success: false, error: 'Lỗi khi xác nhận thanh toán' });
+  }
+}
+

@@ -369,7 +369,10 @@ import {
   getLegalDocumentByType,
   createShopOrder,
   getMyShopOrders,
-  getShopOrderDetail
+  getShopOrderDetail,
+  handlePaymentWebhook,
+  switchOrderToCod,
+  confirmShopOrderPayment
 } from '../controllers/shopController';
 
 router.get('/shop/products', getShopProducts);
@@ -379,6 +382,9 @@ router.get('/shop/legal-docs/:type', getLegalDocumentByType);
 router.post('/shop/orders', createShopOrder);
 router.get('/shop/my-orders', getMyShopOrders);
 router.get('/shop/orders/:orderCodeOrId', getShopOrderDetail);
+router.post('/shop/orders/:orderCodeOrId/switch-to-cod', switchOrderToCod);
+router.post('/shop/orders/:orderCodeOrId/confirm-payment', confirmShopOrderPayment);
+router.post('/shop/payment/webhook', handlePaymentWebhook);
 
 export default router;
 

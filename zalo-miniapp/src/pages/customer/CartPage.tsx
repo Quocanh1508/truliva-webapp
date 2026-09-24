@@ -260,9 +260,9 @@ export default function CartPage({ onBack, onGoToCheckout, onExploreProducts }: 
       </div>
 
       {/* Sticky Bottom Action Bar */}
-      <div className="fixed bottom-0 left-0 right-0 z-40 bg-white border-t border-gray-200 px-4 py-3 shadow-2xl flex items-center justify-between">
+      <div className="fixed bottom-0 left-0 right-0 z-50 bg-white/98 backdrop-blur-md border-t border-slate-200 px-4 pt-3 pb-[max(14px,env(safe-area-inset-bottom))] shadow-[0_-6px_25px_rgba(0,0,0,0.08)] flex items-center justify-between">
         <div>
-          <div className="text-[11px] text-gray-400 font-medium">Tổng thanh toán:</div>
+          <div className="text-[11px] text-gray-500 font-medium">Tổng thanh toán:</div>
           <div className="text-lg font-black text-rose-600 leading-tight">
             {formatVND(finalAmount)}
           </div>
@@ -270,10 +270,10 @@ export default function CartPage({ onBack, onGoToCheckout, onExploreProducts }: 
 
         <button
           onClick={() => onGoToCheckout(appliedVoucher || undefined)}
-          className="h-11 px-6 rounded-xl bg-gradient-to-r from-[#1B3A6B] to-[#00A3FF] text-white font-extrabold text-xs flex items-center gap-1.5 shadow-md shadow-blue-900/20 active:scale-98 transition"
+          className="h-12 px-6 rounded-xl bg-gradient-to-r from-[#1B3A6B] to-[#00A3FF] text-white font-black text-sm flex items-center gap-2 shadow-lg shadow-blue-900/25 active:scale-98 transition cursor-pointer"
         >
           <span>Tiến hành Đặt hàng</span>
-          <ChevronRight className="w-4 h-4" />
+          <ChevronRight className="w-4 h-4 stroke-[3]" />
         </button>
       </div>
     </div>

@@ -13,7 +13,8 @@ import {
   ExternalLink,
   ChevronRight,
   QrCode,
-  Banknote
+  Banknote,
+  ArrowRight
 } from 'lucide-react';
 import { useCart } from '../../context/CartContext';
 import { fetchZaloApi } from '../../api/client';
@@ -407,9 +408,9 @@ export default function CheckoutPage({ user, voucherCode, onBack, onOrderSuccess
         )}
 
         {/* Sticky Submit Button */}
-        <div className="fixed bottom-0 left-0 right-0 z-40 bg-white border-t border-gray-200 px-4 py-3 shadow-2xl flex items-center justify-between gap-3">
+        <div className="fixed bottom-0 left-0 right-0 z-50 bg-white/98 backdrop-blur-md border-t border-slate-200 px-4 pt-3 pb-[max(14px,env(safe-area-inset-bottom))] shadow-[0_-6px_25px_rgba(0,0,0,0.08)] flex items-center justify-between gap-3">
           <div>
-            <div className="text-[11px] text-gray-400 font-medium">Tổng tiền:</div>
+            <div className="text-[11px] text-gray-500 font-medium">Tổng tiền:</div>
             <div className="text-base font-black text-rose-600 leading-tight">
               {formatVND(finalAmount)}
             </div>
@@ -418,16 +419,21 @@ export default function CheckoutPage({ user, voucherCode, onBack, onOrderSuccess
           <button
             type="submit"
             disabled={submitting || !termsAccepted || !privacyAccepted}
-            className={`h-11 px-6 rounded-xl font-extrabold text-xs flex items-center gap-2 transition shadow-md ${
+            className={`h-12 px-6 rounded-xl font-black text-sm flex items-center gap-2 transition shadow-lg ${
               submitting || !termsAccepted || !privacyAccepted
-                ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                : 'bg-gradient-to-r from-[#1B3A6B] to-[#00A3FF] text-white shadow-blue-900/20 active:scale-98'
+                ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                : 'bg-gradient-to-r from-[#1B3A6B] to-[#00A3FF] text-white shadow-blue-900/25 active:scale-98 cursor-pointer'
             }`}
           >
             {submitting ? (
               <>
                 <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
                 <span>Đang xử lý...</span>
+              </>
+            ) : paymentMethod === 'VIETQR' ? (
+              <>
+                <span>Tiến hành Thanh toán</span>
+                <ArrowRight className="w-4 h-4" />
               </>
             ) : (
               <>

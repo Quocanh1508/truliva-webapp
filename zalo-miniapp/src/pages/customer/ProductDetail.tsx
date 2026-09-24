@@ -13,8 +13,11 @@ import {
   Minus,
   Sparkles,
   PhoneCall,
-  Info
+  Info,
+  ExternalLink,
+  X
 } from 'lucide-react';
+import { openWebview } from 'zmp-sdk/apis';
 import { useCart } from '../../context/CartContext';
 import LegalPagesModal, { LegalDocType } from '../../components/LegalPagesModal';
 
@@ -29,12 +32,13 @@ export default function ProductDetail({ product, onBack, onGoToCart, onBuyNow }:
   const [quantity, setQuantity] = useState(1);
   const [selectedImgIdx, setSelectedImgIdx] = useState(0);
   const [showSuccessToast, setShowSuccessToast] = useState(false);
+  const [showCartModal, setShowCartModal] = useState(false);
 
   // Legal Modal
   const [showLegalModal, setShowLegalModal] = useState(false);
   const [legalDocType, setLegalDocType] = useState<LegalDocType>('WARRANTY');
 
-  const { addToCart, totalItemsCount } = useCart();
+  const { addToCart, totalItemsCount, totalAmount } = useCart();
 
   if (!product) return null;
 
@@ -52,8 +56,7 @@ export default function ProductDetail({ product, onBack, onGoToCart, onBuyNow }:
 
   const handleAddToCart = () => {
     addToCart(product, quantity);
-    setShowSuccessToast(true);
-    setTimeout(() => setShowSuccessToast(false), 2000);
+    setShowCartModal(true);
   };
 
   const specs = product.specifications || {};
@@ -262,13 +265,32 @@ export default function ProductDetail({ product, onBack, onGoToCart, onBuyNow }:
         </div>
       )}
 
+      {/* Official Website Link */}
+      {specs?.productUrl && (
+        <div className="bg-white p-4 mt-2 border-y border-gray-100">
+          <button
+            onClick={() => {
+              try {
+                openWebview({ url: specs.productUrl });
+              } catch {
+                window.open(specs.productUrl, '_blank');
+              }
+            }}
+            className="w-full py-2.5 px-4 bg-sky-50 hover:bg-sky-100 text-[#0284C7] rounded-xl text-xs font-bold flex items-center justify-center gap-2 transition border border-sky-200 active:scale-98 cursor-pointer"
+          >
+            <ExternalLink className="w-4 h-4 text-[#0284C7]" />
+            <span>Xem sản phẩm trên website trulivavietnam.com</span>
+          </button>
+        </div>
+      )}
+
       {/* Bottom Sticky Purchase Bar */}
-      <div className="fixed bottom-0 left-0 right-0 z-40 bg-white border-t border-gray-200 px-4 py-3 shadow-2xl flex items-center gap-3">
+      <div className="fixed bottom-0 left-0 right-0 z-50 bg-white/98 backdrop-blur-md border-t border-slate-200 px-4 pt-3 pb-[max(14px,env(safe-area-inset-bottom))] shadow-[0_-6px_25px_rgba(0,0,0,0.08)] flex items-center gap-3">
         {/* Quantity Controls */}
         <div className="flex items-center border border-gray-200 rounded-xl bg-gray-50 p-1">
           <button
             onClick={() => setQuantity(Math.max(1, quantity - 1))}
-            className="w-8 h-8 rounded-lg bg-white flex items-center justify-center text-gray-600 shadow-2xs active:scale-95 transition"
+            className="w-8 h-8 rounded-lg bg-white flex items-center justify-center text-gray-600 shadow-2xs active:scale-95 transition cursor-pointer"
           >
             <Minus className="w-3.5 h-3.5" />
           </button>
@@ -277,7 +299,7 @@ export default function ProductDetail({ product, onBack, onGoToCart, onBuyNow }:
           </span>
           <button
             onClick={() => setQuantity(quantity + 1)}
-            className="w-8 h-8 rounded-lg bg-white flex items-center justify-center text-gray-600 shadow-2xs active:scale-95 transition"
+            className="w-8 h-8 rounded-lg bg-white flex items-center justify-center text-gray-600 shadow-2xs active:scale-95 transition cursor-pointer"
           >
             <Plus className="w-3.5 h-3.5" />
           </button>
@@ -286,7 +308,7 @@ export default function ProductDetail({ product, onBack, onGoToCart, onBuyNow }:
         {/* Add to Cart Button */}
         <button
           onClick={handleAddToCart}
-          className="flex-1 h-11 rounded-xl bg-blue-50 text-[#1B3A6B] border border-blue-200 font-bold text-xs flex items-center justify-center gap-1.5 active:scale-98 transition shadow-xs"
+          className="flex-1 h-12 rounded-xl bg-blue-50 text-[#1B3A6B] border border-blue-200 font-bold text-xs flex items-center justify-center gap-1.5 active:scale-98 transition shadow-xs cursor-pointer"
         >
           <ShoppingCart className="w-4 h-4" />
           <span>Thêm vào giỏ</span>
@@ -295,10 +317,10 @@ export default function ProductDetail({ product, onBack, onGoToCart, onBuyNow }:
         {/* Buy Now Button */}
         <button
           onClick={() => onBuyNow(product, quantity)}
-          className="flex-1 h-11 rounded-xl bg-gradient-to-r from-[#1B3A6B] to-[#00A3FF] text-white font-extrabold text-xs flex items-center justify-center gap-1.5 active:scale-98 transition shadow-md shadow-blue-900/20"
+          className="flex-1 h-12 rounded-xl bg-gradient-to-r from-[#1B3A6B] to-[#00A3FF] text-white font-black text-xs flex items-center justify-center gap-1.5 active:scale-98 transition shadow-md shadow-blue-900/20 cursor-pointer"
         >
           <span>Mua ngay</span>
-          <ChevronRight className="w-4 h-4" />
+          <ChevronRight className="w-4 h-4 stroke-[2.5]" />
         </button>
       </div>
 
@@ -307,6 +329,77 @@ export default function ProductDetail({ product, onBack, onGoToCart, onBuyNow }:
         <div className="fixed top-16 left-1/2 -translate-x-1/2 z-50 px-4 py-2.5 rounded-2xl bg-gray-900/90 text-white text-xs font-bold shadow-xl backdrop-blur-md flex items-center gap-2 animate-slide-down">
           <Check className="w-4 h-4 text-emerald-400" />
           <span>Đã thêm vào giỏ hàng thành công!</span>
+        </div>
+      )}
+
+      {/* Added to Cart Success Bottom Sheet Modal */}
+      {showCartModal && (
+        <div 
+          className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-end justify-center p-0 animate-fade-in"
+          onClick={() => setShowCartModal(false)}
+        >
+          <div 
+            className="w-full max-w-md bg-white rounded-t-3xl p-5 space-y-4 shadow-2xl animate-slide-up border-t border-sky-100"
+            onClick={e => e.stopPropagation()}
+          >
+            {/* Modal Header */}
+            <div className="flex items-center justify-between pb-3 border-b border-gray-100">
+              <div className="flex items-center gap-2 text-emerald-600 font-extrabold text-sm">
+                <div className="w-7 h-7 rounded-full bg-emerald-50 flex items-center justify-center">
+                  <Check className="w-4 h-4 text-emerald-600" />
+                </div>
+                <span>Đã thêm vào giỏ hàng thành công!</span>
+              </div>
+              <button 
+                onClick={() => setShowCartModal(false)}
+                className="w-8 h-8 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center text-gray-500 transition cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Added Product Preview */}
+            <div className="flex items-center gap-3 bg-slate-50 p-3 rounded-2xl border border-gray-100">
+              <div className="w-14 h-14 rounded-xl overflow-hidden bg-white border border-gray-200 shrink-0">
+                <img src={images[0]} alt={product.name} className="w-full h-full object-cover" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <h4 className="font-bold text-xs text-gray-900 truncate">{product.name}</h4>
+                <div className="flex items-center justify-between mt-1 text-xs">
+                  <span className="text-gray-500 text-[11px]">Số lượng: x{quantity}</span>
+                  <span className="font-extrabold text-rose-600">{formatVND(product.price * quantity)}</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Cart Status Summary */}
+            <div className="flex items-center justify-between text-xs px-1 text-gray-600">
+              <span>Giỏ hàng hiện có: <strong className="text-gray-900">{totalItemsCount} sản phẩm</strong></span>
+              <span>Tạm tính: <strong className="text-rose-600 font-bold">{formatVND(totalAmount)}</strong></span>
+            </div>
+
+            {/* Action Buttons */}
+            <div className="space-y-2 pt-1">
+              <button
+                onClick={() => {
+                  setShowCartModal(false);
+                  onGoToCart();
+                }}
+                className="w-full py-3.5 px-4 rounded-xl bg-gradient-to-r from-[#1B3A6B] to-[#00A3FF] hover:from-[#152e55] hover:to-[#0284C7] text-white font-extrabold text-xs flex items-center justify-center gap-2 shadow-lg shadow-blue-900/20 active:scale-98 transition cursor-pointer"
+              >
+                <ShoppingCart className="w-4 h-4" />
+                <span>Xem Giỏ Hàng & Thanh Toán Ngay</span>
+                <ChevronRight className="w-4 h-4" />
+              </button>
+
+              <button
+                onClick={() => setShowCartModal(false)}
+                className="w-full py-2.5 px-4 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold text-xs transition active:scale-98 cursor-pointer"
+              >
+                Tiếp tục xem sản phẩm
+              </button>
+            </div>
+          </div>
         </div>
       )}
 

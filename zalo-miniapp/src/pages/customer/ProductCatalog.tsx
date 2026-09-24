@@ -26,8 +26,9 @@ interface ProductCatalogProps {
 const CATEGORIES = [
   { key: 'ALL', label: 'Tất cả' },
   { key: 'WATER_PURIFIER', label: 'Máy lọc nước' },
-  { key: 'FILTER_CARTRIDGE', label: 'Bộ lõi lọc' },
-  { key: 'FAUCET_FILTER', label: 'Lọc tại vòi' }
+  { key: 'FILTER_CARTRIDGE', label: 'Lõi lọc nước' },
+  { key: 'FAUCET_FILTER', label: 'Lọc tại vòi' },
+  { key: 'ACCESSORY', label: 'Thiết bị khác' }
 ];
 
 export default function ProductCatalog({ onSelectProduct, onGoToCart }: ProductCatalogProps) {

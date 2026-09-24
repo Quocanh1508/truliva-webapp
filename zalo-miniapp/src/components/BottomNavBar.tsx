@@ -1,6 +1,7 @@
 import React from 'react';
 import { Home, Store, MessageCircle, User } from 'lucide-react';
 import { openChat } from 'zmp-sdk/apis';
+import { useCart } from '../context/CartContext';
 
 export type MainTabType = 'home' | 'shop' | 'chat' | 'profile';
 
@@ -10,6 +11,7 @@ interface BottomNavBarProps {
 }
 
 export default function BottomNavBar({ activeTab, onChangeTab }: BottomNavBarProps) {
+  const { totalItemsCount } = useCart();
   const handleOpenOaChat = async () => {
     try {
       await openChat({
@@ -61,6 +63,11 @@ export default function BottomNavBar({ activeTab, onChangeTab }: BottomNavBarPro
               : 'text-slate-400'
           }`}>
             <Store size={19} strokeWidth={activeTab === 'shop' ? 2.5 : 2} />
+            {totalItemsCount > 0 && (
+              <span className="absolute -top-1 -right-0.5 min-w-[17px] h-4 bg-rose-500 text-white rounded-full text-[9px] font-black px-1 flex items-center justify-center shadow-xs border-2 border-white animate-pulse">
+                {totalItemsCount > 99 ? '99+' : totalItemsCount}
+              </span>
+            )}
           </div>
           <span className="text-[10px] mt-0.5 tracking-tight">Cửa hàng</span>
         </button>

@@ -501,8 +501,11 @@ export default function IndexPage() {
         </>
       )}
 
-      {/* Bottom Navigation Bar */}
-      {!loading && (
+      {/* Bottom Navigation Bar: Chỉ hiển thị ở các tab chính, ẩn khi vào Giỏ hàng, Chi tiết, Thanh toán... */}
+      {!loading && user?.role !== 'KTV' && !(
+        (activeTab === 'shop' && shopSubView !== 'catalog') ||
+        (activeTab === 'profile' && shopSubView === 'my_orders')
+      ) && (
         <BottomNavBar 
           activeTab={activeTab} 
           onChangeTab={handleTabChange} 
