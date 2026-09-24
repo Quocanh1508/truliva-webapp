@@ -103,11 +103,26 @@ export function requireAdmin(req: Request, res: Response, next: NextFunction): v
 import { getDefaultPermission, SYSTEM_FEATURES } from '../config/permissions';
 import { UserRole } from '@prisma/client';
 
-export async function checkDynamicPermission(role: string, featureKey: string, group?: string | null): Promise<boolean> {
+export async function checkDynamicPermission(role: string, featureKey: string, group?: string | null, userId?: string): Promise<boolean> {
   const feat = SYSTEM_FEATURES.find(f => f.key === featureKey);
   // Admin luôn có tất cả quyền thông thường (trừ devOnly cần được cấp trong phân quyền)
   if (role === 'ADMIN' && !feat?.devOnly) return true;
   try {
+    // 0. Kiểm tra quyền riêng cấp cá nhân (User-Level Override) — ưu tiên cao nhất
+    if (userId) {
+      const userPerm = await prisma.userPermission.findUnique({
+        where: {
+          userId_featureKey: {
+            userId,
+            featureKey
+          }
+        }
+      });
+      if (userPerm !== null && userPerm !== undefined) {
+        return userPerm.isAllowed;
+      }
+    }
+
     const grp = (group || '').trim();
     // 1. Kiểm tra cấu hình riêng của Group nếu có
     if (grp) {
@@ -152,7 +167,7 @@ export function requirePermission(featureKey: string) {
       res.status(401).json({ error: 'Chưa đăng nhập' });
       return;
     }
-    const isAllowed = await checkDynamicPermission(role, featureKey, group);
+    const isAllowed = await checkDynamicPermission(role, featureKey, group, req.user?.id);
     if (!isAllowed) {
       res.status(403).json({ error: 'Tài khoản của bạn không có quyền thực hiện thao tác này' });
       return;

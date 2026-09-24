@@ -70,7 +70,7 @@ export default function HotlineTicketModal({ ticket, isOpen, onClose, onSaved, u
   }, []);
 
   const searchPhoneSuggestions = useCallback(async (phone: string) => {
-    if (phone.length < 5) {
+    if (!hasPermission('HOTLINE_SEARCH_CUSTOMER') || phone.length < 5) {
       setPhoneSuggestions([]);
       setShowPhoneSuggestions(false);
       return;

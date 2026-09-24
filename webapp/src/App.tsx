@@ -376,6 +376,8 @@ export default function App() {
                 {/* All Office/Administrative Routes */}
                 <Route element={<ProtectedRoute allowedRoles={['ADMIN', 'COORDINATOR', 'SALE_SUPERVISOR', 'SALER', 'HOTLINE', 'STAFF']} featureKey="ORDER_VIEW" />}>
                   <Route path="/admin/orders" element={<OrderList />} />
+                </Route>
+                <Route element={<ProtectedRoute allowedRoles={['ADMIN', 'COORDINATOR', 'SALE_SUPERVISOR', 'SALER', 'HOTLINE', 'STAFF']} featureKey="HOTLINE_TICKET_VIEW" />}>
                   <Route path="/admin/hotlines" element={<HotlineManagePage />} />
                 </Route>
                 <Route element={<ProtectedRoute allowedRoles={['ADMIN', 'COORDINATOR', 'SALE_SUPERVISOR', 'SALER', 'HOTLINE', 'STAFF']} featureKey="REPORT_VIEW" />}>

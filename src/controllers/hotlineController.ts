@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import ExcelJS from 'exceljs';
 import prisma from '../config/database';
 import { broadcastEvent } from '../services/websocketService';
+import { checkDynamicPermission } from '../middleware/authSession';
 
 // ═══════════════════════════════════════════════════
 //  HOTLINE TICKET STATUSES
@@ -18,6 +19,19 @@ const HOTLINE_STATUSES = [
 ];
 
 // ═══════════════════════════════════════════════════
+//  HOTLINE ROLE HELPER
+// ═══════════════════════════════════════════════════
+
+/**
+ * Kiểm tra vai trò có toàn quyền xem tất cả ticket Hotline không.
+ * Chỉ có Hotline, Coordinator, Admin, Dev được xem tất cả ticket.
+ * Các vai trò khác (Sales, Sales Supervisor, Staff...) chỉ xem được ticket do chính mình tạo.
+ */
+export function isHotlineSuperUser(role?: string): boolean {
+  return ['HOTLINE', 'COORDINATOR', 'ADMIN', 'DEV'].includes(role || '');
+}
+
+// ═══════════════════════════════════════════════════
 //  PHASE 1: Tìm kiếm lịch sử khách hàng
 // ═══════════════════════════════════════════════════
 
@@ -27,6 +41,19 @@ const HOTLINE_STATUSES = [
  */
 export async function searchCustomerHistory(req: Request, res: Response) {
   try {
+    const user = (req as any).user;
+    if (!user) {
+      return res.status(401).json({ error: 'Chưa đăng nhập' });
+    }
+
+    const canSearch = await checkDynamicPermission(user.role, 'HOTLINE_SEARCH_CUSTOMER', user.group, user.id);
+    if (!canSearch) {
+      return res.status(403).json({ error: 'Tài khoản của bạn không có quyền tra cứu lịch sử khách hàng' });
+    }
+
+    const isSuper = isHotlineSuperUser(user?.role);
+    const hotlineScopeWhere = !isSuper && user?.id ? { createdById: user.id } : {};
+
     const queryParam = (req.query.q || req.query.query || req.query.search || req.query.phone || req.query.serial || '').toString().trim();
     
     if (!queryParam || queryParam.length < 2) {
@@ -76,6 +103,7 @@ export async function searchCustomerHistory(req: Request, res: Response) {
       }),
       prisma.hotlineTicket.findMany({
         where: {
+          ...hotlineScopeWhere,
           OR: [
             { ticketCode: { contains: queryParam, mode: 'insensitive' } },
             { customerPhone: { contains: queryParam } },
@@ -197,6 +225,7 @@ export async function searchCustomerHistory(req: Request, res: Response) {
       // D. Yêu cầu Hotline (Hotline Tickets)
       prisma.hotlineTicket.findMany({
         where: {
+          ...hotlineScopeWhere,
           OR: [
             { customerPhone: { in: matchedPhones.length > 0 ? matchedPhones : undefined } },
             { secondaryPhones: { contains: queryParam } },
@@ -250,6 +279,18 @@ export async function searchCustomerHistory(req: Request, res: Response) {
 
 export async function getHotlineFilterOptions(req: Request, res: Response) {
   try {
+    const user = (req as any).user;
+    const isSuper = isHotlineSuperUser(user?.role);
+    const scopeWhere = !isSuper && user?.id ? { createdById: user.id } : {};
+
+    const creatorsPromise = (!isSuper && user?.id)
+      ? Promise.resolve([{ id: user.id, fullName: user.fullName || user.username, email: user.email, role: user.role }])
+      : prisma.user.findMany({
+          where: { hotlineTicketsCreated: { some: {} } },
+          select: { id: true, fullName: true, email: true, role: true },
+          orderBy: { fullName: 'asc' }
+        });
+
     const [
       dbStatuses,
       dbServiceRequestTypes,
@@ -261,17 +302,13 @@ export async function getHotlineFilterOptions(req: Request, res: Response) {
       handlers,
       products
     ] = await Promise.all([
-      prisma.hotlineTicket.findMany({ select: { status: true }, distinct: ['status'] }),
-      prisma.hotlineTicket.findMany({ select: { serviceRequestType: true }, distinct: ['serviceRequestType'] }),
-      prisma.hotlineTicket.findMany({ select: { productName: true }, distinct: ['productName'] }),
-      prisma.hotlineTicket.findMany({ where: { phase3RequestType: { not: null } }, select: { phase3RequestType: true }, distinct: ['phase3RequestType'] }),
-      prisma.hotlineTicket.findMany({ where: { phase3ServiceType: { not: null } }, select: { phase3ServiceType: true }, distinct: ['phase3ServiceType'] }),
-      prisma.hotlineTicket.findMany({ select: { targetTeam: true }, distinct: ['targetTeam'] }),
-      prisma.user.findMany({
-        where: { hotlineTicketsCreated: { some: {} } },
-        select: { id: true, fullName: true, email: true, role: true },
-        orderBy: { fullName: 'asc' }
-      }),
+      prisma.hotlineTicket.findMany({ where: scopeWhere, select: { status: true }, distinct: ['status'] }),
+      prisma.hotlineTicket.findMany({ where: scopeWhere, select: { serviceRequestType: true }, distinct: ['serviceRequestType'] }),
+      prisma.hotlineTicket.findMany({ where: scopeWhere, select: { productName: true }, distinct: ['productName'] }),
+      prisma.hotlineTicket.findMany({ where: { phase3RequestType: { not: null }, ...scopeWhere }, select: { phase3RequestType: true }, distinct: ['phase3RequestType'] }),
+      prisma.hotlineTicket.findMany({ where: { phase3ServiceType: { not: null }, ...scopeWhere }, select: { phase3ServiceType: true }, distinct: ['phase3ServiceType'] }),
+      prisma.hotlineTicket.findMany({ where: scopeWhere, select: { targetTeam: true }, distinct: ['targetTeam'] }),
+      creatorsPromise,
       prisma.user.findMany({
         where: {
           OR: [
@@ -369,6 +406,12 @@ export async function getHotlineFilterOptions(req: Request, res: Response) {
  */
 export async function getHotlineTickets(req: Request, res: Response) {
   try {
+    const user = (req as any).user;
+    if (!user) {
+      return res.status(401).json({ error: 'Chưa đăng nhập' });
+    }
+    const isSuper = isHotlineSuperUser(user.role);
+
     const { 
       status, 
       statuses,
@@ -442,7 +485,10 @@ export async function getHotlineTickets(req: Request, res: Response) {
     }
 
     // 6. Người gửi yêu cầu (creatorIds)
-    if (creatorIds) {
+    // Phân quyền: Sales, Sales Supervisor, Staff chỉ xem ticket do chính mình tạo
+    if (!isSuper) {
+      conditions.push({ createdById: user.id });
+    } else if (creatorIds) {
       const list = typeof creatorIds === 'string' ? creatorIds.split(',') : (Array.isArray(creatorIds) ? creatorIds as string[] : []);
       if (list.length > 0) {
         conditions.push({ createdById: { in: list } });
@@ -540,6 +586,7 @@ export async function getHotlineTickets(req: Request, res: Response) {
     }
 
     const where = conditions.length > 0 ? { AND: conditions } : {};
+    const baseCountWhere = !isSuper ? { createdById: user.id } : {};
 
     // Parallel: fetch tickets + count + status badges
     const [tickets, totalCount, statusCounts] = await Promise.all([
@@ -557,6 +604,7 @@ export async function getHotlineTickets(req: Request, res: Response) {
       prisma.hotlineTicket.count({ where }),
       prisma.hotlineTicket.groupBy({
         by: ['status'],
+        where: baseCountWhere,
         _count: { status: true }
       })
     ]);
@@ -679,6 +727,9 @@ export async function createHotlineTicket(req: Request, res: Response) {
 
 export async function getHotlineTicketById(req: Request, res: Response) {
   try {
+    const user = (req as any).user;
+    if (!user) return res.status(401).json({ error: 'Chưa đăng nhập' });
+
     const id = req.params.id as string;
     const ticket = await prisma.hotlineTicket.findUnique({
       where: { id },
@@ -692,6 +743,12 @@ export async function getHotlineTicketById(req: Request, res: Response) {
     });
 
     if (!ticket) return res.status(404).json({ error: 'Không tìm thấy phiếu yêu cầu hotline' });
+
+    // Kiểm tra quyền hạn: Sales, Sales Supervisor, Staff chỉ được xem phiếu do chính mình tạo
+    if (!isHotlineSuperUser(user.role) && ticket.createdById !== user.id) {
+      return res.status(403).json({ error: 'Bạn chỉ có quyền xem phiếu yêu cầu hotline do chính mình tạo' });
+    }
+
     return res.json(ticket);
   } catch (error: any) {
     console.error('[getHotlineTicketById] Error:', error);
@@ -711,6 +768,11 @@ export async function updateHotlineTicket(req: Request, res: Response) {
     const id = req.params.id as string;
     const existing = await prisma.hotlineTicket.findUnique({ where: { id } });
     if (!existing) return res.status(404).json({ error: 'Không tìm thấy phiếu' });
+
+    // Kiểm tra quyền hạn: Sales, Sales Supervisor, Staff chỉ được chỉnh sửa phiếu do chính mình tạo
+    if (!isHotlineSuperUser(user.role) && existing.createdById !== user.id) {
+      return res.status(403).json({ error: 'Bạn chỉ có quyền chỉnh sửa phiếu yêu cầu hotline do chính mình tạo' });
+    }
 
     const {
       customerName, customerPhone, secondaryPhones, email, dateOfBirth,
@@ -1299,6 +1361,13 @@ export async function getPublicSupportDevices(req: Request, res: Response) {
  */
 export async function exportHotlineTickets(req: Request, res: Response): Promise<void> {
   try {
+    const user = (req as any).user;
+    if (!user) {
+      res.status(401).json({ error: 'Chưa đăng nhập' });
+      return;
+    }
+    const isSuper = isHotlineSuperUser(user.role);
+
     const { 
       status, 
       statuses,
@@ -1365,7 +1434,10 @@ export async function exportHotlineTickets(req: Request, res: Response): Promise
     }
 
     // 6. Người gửi yêu cầu
-    if (creatorIds) {
+    // Phân quyền: Sales, Sales Supervisor, Staff chỉ xuất ticket do chính mình tạo
+    if (!isSuper) {
+      conditions.push({ createdById: user.id });
+    } else if (creatorIds) {
       const list = typeof creatorIds === 'string' ? creatorIds.split(',') : (Array.isArray(creatorIds) ? creatorIds as string[] : []);
       if (list.length > 0) {
         conditions.push({ createdById: { in: list } });

@@ -120,9 +120,19 @@ export default function HotlineManage() {
   const { user } = useAuth();
   const { hasPermission } = usePermission();
   const navigate = useNavigate();
+
+  // Phân quyền Hotline: Hotline, Coordinator, Admin, Dev được xem tất cả; các vai trò khác chỉ xem đơn tự tạo
+  const isSuperHotlineUser = ['HOTLINE', 'COORDINATOR', 'ADMIN', 'DEV'].includes(user?.role || '');
   
   // Tab chính: 'tickets' (Yêu cầu Hotline) hoặc 'history' (Tìm kiếm lịch sử KH)
   const [activeMainTab, setActiveMainTab] = useState<'tickets' | 'history'>('tickets');
+
+  // Đảm bảo không ở tab history nếu không có quyền tra cứu
+  useEffect(() => {
+    if (!hasPermission('HOTLINE_SEARCH_CUSTOMER') && activeMainTab === 'history') {
+      setActiveMainTab('tickets');
+    }
+  }, [hasPermission, activeMainTab]);
 
   // Hotline tickets state
   const [tickets, setTickets] = useState<HotlineTicket[]>([]);
@@ -636,16 +646,18 @@ export default function HotlineManage() {
           >
             <PhoneCall size={16} /> Danh sách Yêu cầu Hotline
           </button>
-          <button
-            onClick={() => setActiveMainTab('history')}
-            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-bold transition-all ${
-              activeMainTab === 'history'
-                ? 'bg-white text-[#1B3A6B] shadow-sm'
-                : 'text-gray-500 hover:text-gray-800'
-            }`}
-          >
-            <Search size={16} /> Tra cứu Lịch sử Khách hàng
-          </button>
+          {hasPermission('HOTLINE_SEARCH_CUSTOMER') && (
+            <button
+              onClick={() => setActiveMainTab('history')}
+              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-bold transition-all ${
+                activeMainTab === 'history'
+                  ? 'bg-white text-[#1B3A6B] shadow-sm'
+                  : 'text-gray-500 hover:text-gray-800'
+              }`}
+            >
+              <Search size={16} /> Tra cứu Lịch sử Khách hàng
+            </button>
+          )}
         </div>
 
         {activeMainTab === 'tickets' && (
@@ -660,12 +672,14 @@ export default function HotlineManage() {
                 <span>Xuất Excel</span>
               </button>
             )}
-            <button
-              onClick={() => { setSelectedTicket(null); setShowCreateModal(true); }}
-              className="flex items-center gap-2 px-4 py-2.5 bg-[#00A3FF] hover:bg-[#0090E0] text-white rounded-xl font-semibold text-sm shadow-sm transition-all cursor-pointer"
-            >
-              <Plus size={18} /> Thêm mới Ticket
-            </button>
+            {hasPermission('HOTLINE_TICKET_CREATE') && (
+              <button
+                onClick={() => { setSelectedTicket(null); setShowCreateModal(true); }}
+                className="flex items-center gap-2 px-4 py-2.5 bg-[#00A3FF] hover:bg-[#0090E0] text-white rounded-xl font-semibold text-sm shadow-sm transition-all cursor-pointer"
+              >
+                <Plus size={18} /> Thêm mới Ticket
+              </button>
+            )}
           </div>
         )}
       </div>
@@ -673,7 +687,7 @@ export default function HotlineManage() {
       {/* ═══════════════════════════════════════════════════
            TAB 1: TÌM KIẾM LỊCH SỬ KHÁCH HÀNG
          ═══════════════════════════════════════════════════ */}
-      {activeMainTab === 'history' && (
+      {activeMainTab === 'history' && hasPermission('HOTLINE_SEARCH_CUSTOMER') && (
         <div className="space-y-6">
           {/* Header & Search Bar */}
           <div className="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm space-y-4">
@@ -1007,6 +1021,12 @@ export default function HotlineManage() {
 
             {/* Action Buttons */}
             <div className="flex items-center gap-2">
+              {!isSuperHotlineUser && (
+                <div className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-50 text-amber-800 border border-amber-200/90 rounded-lg text-xs font-medium shrink-0">
+                  <User size={13} className="text-amber-600" />
+                  <span>Chỉ hiển thị đơn bạn tự tạo</span>
+                </div>
+              )}
               <button
                 onClick={() => { setPage(1); fetchTickets(); }}
                 className="px-4 py-2 bg-[#00A3FF] text-white rounded-lg text-xs font-semibold hover:bg-[#0090E0] transition-all shadow-sm cursor-pointer"
@@ -1134,21 +1154,23 @@ export default function HotlineManage() {
                           )}
                         </button>
 
-                        {/* 6. Người gửi yêu cầu */}
-                        <button
-                          className="w-full flex items-center justify-between px-3.5 py-2 hover:bg-gray-50 text-rose-700 font-medium transition-colors text-xs"
-                          onClick={() => toggleDropdown('creatorIds')}
-                        >
-                          <div className="flex items-center gap-2">
-                            <User size={14} className="text-rose-500" />
-                            <span>6. Người gửi yêu cầu</span>
-                          </div>
-                          {filterCreatorIds.length > 0 && (
-                            <span className="text-[10px] bg-rose-100 text-rose-700 px-1.5 py-0.5 rounded-full font-bold">
-                              {filterCreatorIds.length}
-                            </span>
-                          )}
-                        </button>
+                        {/* 6. Người gửi yêu cầu - chỉ dành cho Hotline Coordinator / Admin / Dev */}
+                        {isSuperHotlineUser && (
+                          <button
+                            className="w-full flex items-center justify-between px-3.5 py-2 hover:bg-gray-50 text-rose-700 font-medium transition-colors text-xs"
+                            onClick={() => toggleDropdown('creatorIds')}
+                          >
+                            <div className="flex items-center gap-2">
+                              <User size={14} className="text-rose-500" />
+                              <span>6. Người gửi yêu cầu</span>
+                            </div>
+                            {filterCreatorIds.length > 0 && (
+                              <span className="text-[10px] bg-rose-100 text-rose-700 px-1.5 py-0.5 rounded-full font-bold">
+                                {filterCreatorIds.length}
+                              </span>
+                            )}
+                          </button>
+                        )}
 
                         {/* 7. Thời gian gửi yêu cầu */}
                         <button

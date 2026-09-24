@@ -884,6 +884,55 @@ export default function OrderList() {
     showCreateModal, assignModal, cancelModal, activeDropdown
   ]);
 
+  // ESC Key listener to exit Assign Modal, Popovers, etc.
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        if (isAssignProductSelectOpen) {
+          setIsAssignProductSelectOpen(false);
+          return;
+        }
+        if (syncWarningModal?.isOpen) {
+          setSyncWarningModal(null);
+          return;
+        }
+        if (auditModal?.isOpen) {
+          setAuditModal(null);
+          return;
+        }
+        if (cancelModal?.isOpen) {
+          setCancelModal(null);
+          return;
+        }
+        if (showCreateModal) {
+          setShowCreateModal(false);
+          return;
+        }
+        if (assignModal?.isOpen) {
+          setAssignModal(null);
+          setIsAssignModalExpanded(false);
+          setIsAssignProductSelectOpen(false);
+          return;
+        }
+        if (activeDropdown !== null) {
+          setActiveDropdown(null);
+          return;
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [
+    isAssignProductSelectOpen,
+    syncWarningModal,
+    auditModal,
+    cancelModal,
+    showCreateModal,
+    assignModal,
+    activeDropdown
+  ]);
+
   // WebSocket connection & real-time sync
   useEffect(() => {
     if (!canUseAutoRefresh) return;
@@ -1247,7 +1296,8 @@ export default function OrderList() {
         techStationId: null,
         assignedKtvId: null,
         appointmentTime: null,
-        rescheduleReason: null
+        rescheduleReason: null,
+        isExplicitUnassign: true
       });
       if (res && res.warning) {
         setSyncWarningModal({
@@ -1288,7 +1338,17 @@ export default function OrderList() {
     }
   };
 
-  const openAssignModal = (order: any) => {
+  const openAssignModal = async (initialOrder: any) => {
+    let order = initialOrder;
+    try {
+      const freshRes = await fetchApi(`/orders/${initialOrder.id}`);
+      if (freshRes?.order) {
+        order = freshRes.order;
+      }
+    } catch (e) {
+      console.warn('Could not fetch fresh order for assign modal, fallback to current state', e);
+    }
+
     let initialMain = order.mainStationId || '';
     let initialTech = order.techStationId || '';
     const initialKtv = order.assignedKtvId || '';
@@ -1550,28 +1610,52 @@ export default function OrderList() {
           || warehouses.find(w => removeAccents(w.name).toLowerCase().includes(cleanInput));
         if (matched) {
           finalWarehouseId = matched.id;
-        } else {
+        } else if (!selectedWarehouseId) {
           alert(`Kho hàng "${warehouseSearch}" không tồn tại trong hệ thống. Vui lòng chọn một kho hàng hợp lệ trong danh sách.`);
           return;
         }
-      } else {
-        finalWarehouseId = null;
       }
 
-      await updateOrder(assignModal.orderId, {
-        mainStationId: selectedMain || null,
-        techStationId: selectedTech || null,
-        assignedKtvId: selectedKtv || null,
-        salesKtvId: selectedSalesKtv || null,
-        appointmentTime: appointmentDateObj.toISOString(),
-        rescheduleReason: rescheduleReason || null,
+      const hasAssignPermission = ['ADMIN', 'COORDINATOR', 'DEV'].includes(currentUser?.role || '');
+
+      const payload: any = {
         workType: workType || null,
         serviceType: serviceType || null,
-        adminStatus: selectedKtv ? 'đang thực hiện' : 'chờ xử lý', // auto update status
-        warehouseId: finalWarehouseId,
+        appointmentTime: appointmentDateObj.toISOString(),
+        rescheduleReason: rescheduleReason || null,
         items: cleanTempItems,
         promoCode: assignPromoCode || null
-      });
+      };
+
+      if (hasAssignPermission) {
+        payload.mainStationId = selectedMain || null;
+        payload.techStationId = selectedTech || null;
+        payload.assignedKtvId = selectedKtv || null;
+        payload.salesKtvId = selectedSalesKtv || null;
+        payload.adminStatus = selectedKtv ? 'đang thực hiện' : 'chờ xử lý';
+        payload.warehouseId = finalWarehouseId;
+        // Nếu trước đó đơn đã có KTV và ĐPV cố tình gỡ KTV:
+        if (assignModal.order.assignedKtvId && !selectedKtv) {
+          payload.isExplicitUnassign = true;
+        }
+      } else {
+        // Tài khoản không có quyền phân bổ KTV (Sale / Hotline / Staff) chỉ sửa dịch vụ/sản phẩm:
+        // Bảo tồn nguyên vẹn KTV, Trạm, Kho và trạng thái ĐPV đã gán
+        if (assignModal.order.assignedKtvId) {
+          payload.assignedKtvId = assignModal.order.assignedKtvId;
+          payload.mainStationId = assignModal.order.mainStationId;
+          payload.techStationId = assignModal.order.techStationId;
+          payload.adminStatus = assignModal.order.adminStatus;
+          payload.warehouseId = assignModal.order.warehouseId;
+        } else {
+          payload.warehouseId = finalWarehouseId;
+        }
+        if (selectedSalesKtv) {
+          payload.salesKtvId = selectedSalesKtv;
+        }
+      }
+
+      await updateOrder(assignModal.orderId, payload);
       setAssignModal(null);
       setIsAssignProductSelectOpen(false);
       setIsAssignModalExpanded(false);

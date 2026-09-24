@@ -87,6 +87,31 @@ router.get('/', requireAuth, async (req: Request, res: Response): Promise<void> 
     });
     const customGroupKeysSet = Array.from(new Set(customGroupKeys));
 
+    // 5. Phát hiện tính năng mới chưa được Admin review
+    // Logic: Feature có addedAt !== 'v1.0' và chưa có bất kỳ RolePermission nào trong DB
+    const allDbFeatureKeys = new Set(dbPermissions.map(p => p.featureKey));
+    const newFeatureKeys = SYSTEM_FEATURES
+      .filter(f => f.addedAt !== 'v1.0' && !allDbFeatureKeys.has(f.key))
+      .map(f => f.key);
+
+    // 6. Lấy tất cả User-Level Permission Overrides
+    const userPermissions = await prisma.userPermission.findMany({
+      include: { user: { select: { id: true, username: true, fullName: true, role: true, group: true } } }
+    });
+
+    // Tạo userPermMatrix: { userId: { featureKey: isAllowed } }
+    const userPermMatrix: Record<string, Record<string, boolean>> = {};
+    userPermissions.forEach((up: any) => {
+      if (!userPermMatrix[up.userId]) userPermMatrix[up.userId] = {};
+      userPermMatrix[up.userId][up.featureKey] = up.isAllowed;
+    });
+
+    // Danh sách users đã có cấu hình riêng
+    const usersWithOverrides = Object.keys(userPermMatrix).map(uid => {
+      const up = userPermissions.find((p: any) => p.userId === uid);
+      return up?.user || null;
+    }).filter(Boolean);
+
     res.json({
       success: true,
       modules: SYSTEM_MODULES,
@@ -95,7 +120,10 @@ router.get('/', requireAuth, async (req: Request, res: Response): Promise<void> 
       groups: allGroups,
       matrix,
       groupMatrix,
-      customGroupKeys: customGroupKeysSet
+      customGroupKeys: customGroupKeysSet,
+      newFeatureKeys,
+      userPermMatrix,
+      usersWithOverrides
     });
   } catch (error: any) {
     logger.error('Failed to get permissions matrix', { error: error.message });
@@ -186,6 +214,76 @@ router.post('/update', requireAuth, requireAdmin, async (req: Request, res: Resp
   } catch (error: any) {
     logger.error('Failed to update permission', { error: error.message });
     res.status(500).json({ error: 'Lỗi máy chủ khi cập nhật phân quyền' });
+  }
+});
+
+/**
+ * POST /api/permissions/user-update
+ * Cập nhật quyền cấp cá nhân cho 1 user (Chỉ Admin)
+ */
+router.post('/user-update', requireAuth, requireAdmin, async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { userId, featureKey, isAllowed, action } = req.body;
+
+    // Reset toàn bộ quyền riêng của user về Role/Group default
+    if (action === 'reset_user' && userId) {
+      await prisma.userPermission.deleteMany({ where: { userId } });
+      logger.info('Reset user permissions to role default', { userId, updatedBy: req.user?.username });
+      res.json({ success: true, message: 'Đã xóa toàn bộ quyền riêng của user' });
+      return;
+    }
+
+    if (!userId || !featureKey) {
+      res.status(400).json({ error: 'Thiếu thông tin userId hoặc featureKey' });
+      return;
+    }
+
+    const updated = await prisma.userPermission.upsert({
+      where: {
+        userId_featureKey: { userId, featureKey }
+      },
+      update: { isAllowed: Boolean(isAllowed) },
+      create: { userId, featureKey, isAllowed: Boolean(isAllowed) }
+    });
+
+    logger.info('Updated user permission', { userId, featureKey, isAllowed, updatedBy: req.user?.username });
+    res.json({ success: true, permission: updated });
+  } catch (error: any) {
+    logger.error('Failed to update user permission', { error: error.message });
+    res.status(500).json({ error: 'Lỗi khi cập nhật quyền cá nhân' });
+  }
+});
+
+/**
+ * GET /api/permissions/users-search?q=xxx
+ * Tìm kiếm users để thêm vào phân quyền cá nhân (Chỉ Admin)
+ */
+router.get('/users-search', requireAuth, requireAdmin, async (req: Request, res: Response): Promise<void> => {
+  try {
+    const q = String(req.query.q || '').trim();
+    if (!q || q.length < 2) {
+      res.json({ users: [] });
+      return;
+    }
+
+    const users = await prisma.user.findMany({
+      where: {
+        isActive: true,
+        NOT: { username: { startsWith: 'zalo_' } },
+        OR: [
+          { fullName: { contains: q, mode: 'insensitive' } },
+          { username: { contains: q, mode: 'insensitive' } },
+          { email: { contains: q, mode: 'insensitive' } }
+        ]
+      },
+      select: { id: true, username: true, fullName: true, role: true, group: true },
+      take: 20
+    });
+
+    res.json({ users });
+  } catch (error: any) {
+    logger.error('Failed to search users for permissions', { error: error.message });
+    res.status(500).json({ error: 'Lỗi tìm kiếm nhân viên' });
   }
 });
 

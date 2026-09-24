@@ -311,14 +311,24 @@ export async function processOrderEvent(rawEventId: string | null, payload: any)
       rawData: payload,
     };
 
-    // Bảo vệ warehouseId và warehouseInfo cục bộ cho các đơn thuộc diện không trừ kho
-    if (existingOrder && !payload.warehouse_id) {
+    // Bảo vệ warehouseId và warehouseInfo khi đơn đã được phân bổ trên Truliva
+    if (existingOrder && existingOrder.warehouseId) {
       const isInstallation = existingOrder.workType === 'Lắp đặt';
       const originallyHasProducts = existingOrder.items && existingOrder.items.length > 0;
+      const isAssigned = Boolean(existingOrder.assignedKtvId);
+      const isProgressing = existingOrder.adminStatus === 'đang thực hiện' || existingOrder.adminStatus === 'hoàn thành';
 
-      if (isInstallation || !originallyHasProducts) {
+      // Nếu đơn đã phân công KTV, đang thực hiện/hoàn thành, hoặc đơn lắp đặt/không trừ kho,
+      // hoặc payload từ Pancake không có warehouse_id:
+      // Giữ nguyên warehouseId và warehouseInfo đã phân bổ trên Truliva!
+      if (isAssigned || isProgressing || isInstallation || !originallyHasProducts || !payload.warehouse_id) {
         orderData.warehouseId = existingOrder.warehouseId;
         orderData.warehouseInfo = existingOrder.warehouseInfo;
+        logger.info('Preserved Truliva assigned warehouse from being overwritten by Pancake webhook', {
+          pancakeOrderId: systemId,
+          trulivaWarehouseId: existingOrder.warehouseId,
+          pancakePayloadWarehouseId: payload.warehouse_id
+        });
       }
     }
 

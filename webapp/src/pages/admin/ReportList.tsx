@@ -1277,6 +1277,43 @@ export default function ReportList() {
     setEditImagePreviews([]);
   };
 
+  // ESC Key listener to close Image popup, Report detail modal, and dialogs
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        // Priority 1: Close Image Popup if open
+        if (openPopupId !== null) {
+          setOpenPopupId(null);
+          return;
+        }
+        // Priority 2: Close Activation Modal if open
+        if (showActivationModal) {
+          setShowActivationModal(false);
+          return;
+        }
+        // Priority 3: Close Delete Modal if open
+        if (deleteModal?.isOpen) {
+          setDeleteModal(null);
+          return;
+        }
+        // Priority 4: Close Advanced Filter dropdown/panel if open
+        if (showFilters) {
+          setShowFilters(false);
+          return;
+        }
+        // Priority 5: Close Report Detail Modal if open
+        if (selectedDetailReport) {
+          cancelEditing();
+          setSelectedDetailReport(null);
+          return;
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [openPopupId, showActivationModal, deleteModal, showFilters, selectedDetailReport]);
+
   const handleEditField = (field: string, value: any) => {
     setEditData((prev: any) => ({ ...prev, [field]: value }));
   };

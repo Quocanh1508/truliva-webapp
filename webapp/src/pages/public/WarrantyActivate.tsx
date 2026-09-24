@@ -853,38 +853,42 @@ export default function WarrantyActivate() {
           </>
         )}
 
-        {/* Header Bar */}
-        <header className={`flex items-center justify-between px-5 py-3.5 sm:py-4 backdrop-blur-md border-b relative z-20 transition-colors duration-300 ${
+        {/* Header Bar: Minimalist with Logo and single-line Hotline */}
+        <header className={`flex items-center justify-between px-4 sm:px-6 py-3 sm:py-3.5 backdrop-blur-md border-b relative z-20 transition-colors duration-300 ${
           isDark 
             ? 'bg-[#061226]/90 border-white/10' 
             : 'bg-white/85 border-blue-100/80 shadow-xs'
         }`}>
-          <div className="flex items-center space-x-2">
+          <div className="flex items-center">
             <img 
               src="/logo.png?v=3" 
               alt="Truliva" 
-              className="h-10 object-contain"
+              className="h-8 sm:h-9 object-contain"
               style={{ filter: isDark ? 'drop-shadow(1px 0 0 #ffffff) drop-shadow(-1px 0 0 #ffffff) drop-shadow(0 1px 0 #ffffff) drop-shadow(0 -1px 0 #ffffff)' : 'none' }}
             />
           </div>
-          <div className="flex items-center gap-2 sm:gap-3">
-            {renderThemeSwitcher()}
+          <div className="flex items-center">
             <a 
               href="tel:1900638463" 
-              className={`flex items-center gap-1.5 px-3 sm:px-3.5 py-1.5 rounded-full text-xs font-bold transition-all border shadow-xs ${
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold transition-all border shadow-xs whitespace-nowrap shrink-0 ${
                 isDark 
                   ? 'bg-[#0F2F59] hover:bg-[#153E75] text-white border-cyan-400/30 shadow-[0_0_12px_rgba(0,210,255,0.2)]'
                   : 'bg-blue-50 hover:bg-blue-100 text-[#1B3A6B] border-blue-200 shadow-sm'
               }`}
             >
-              <PhoneCall size={14} className={isDark ? "text-[#00D2FF]" : "text-[#00A3FF]"} />
-              <span className="font-mono tracking-tight">1900 63 84 63</span>
+              <PhoneCall size={14} className={`shrink-0 ${isDark ? "text-[#00D2FF]" : "text-[#00A3FF]"}`} />
+              <span className="font-mono tracking-tight whitespace-nowrap">1900 63 84 63</span>
             </a>
           </div>
         </header>
 
+        {/* Góc nhỏ chỉnh Dark/Light Mode bên dưới header */}
+        <div className="w-full max-w-md mx-auto px-4 pt-2.5 sm:pt-3 flex justify-end relative z-10">
+          {renderThemeSwitcher()}
+        </div>
+
         {/* Main Content */}
-        <div className="flex-1 flex flex-col justify-center px-4 py-8 sm:py-12 max-w-md mx-auto w-full relative z-10">
+        <div className="flex-1 flex flex-col justify-center px-4 pt-2 pb-8 sm:pb-12 max-w-md mx-auto w-full relative z-10">
           <div className={`backdrop-blur-2xl rounded-3xl p-5 sm:p-7 border space-y-6 transition-all duration-300 ${
             isDark
               ? 'bg-white/[0.05] shadow-[0_20px_50px_rgba(0,0,0,0.5)] border-white/10'
@@ -1125,7 +1129,7 @@ export default function WarrantyActivate() {
           ? 'bg-gradient-to-b from-[#061226] via-[#0B2545] to-[#061226] text-white'
           : 'bg-gradient-to-b from-[#EBF3FC] via-[#F4F8FD] to-[#E5EFFB] text-slate-800'
       }`}>
-        <header className={`flex items-center justify-between px-6 py-4 sm:py-5 border-b backdrop-blur-md transition-colors duration-300 ${
+        <header className={`flex items-center justify-between px-4 sm:px-6 py-3 sm:py-3.5 border-b backdrop-blur-md transition-colors duration-300 ${
           isDark ? 'border-white/10 bg-[#061226]/90' : 'border-blue-100 bg-white/85 shadow-xs'
         }`}>
           <button onClick={() => setStep(0)} className={`flex items-center gap-1.5 text-sm font-semibold transition cursor-pointer ${
@@ -1134,17 +1138,20 @@ export default function WarrantyActivate() {
             <ChevronLeft size={20} />
             <span>Trang chủ</span>
           </button>
-          <div className="flex items-center gap-3">
-            {renderThemeSwitcher()}
-            <img 
-              src="/logo.png?v=3" 
-              alt="Truliva" 
-              style={{ height: '40px', objectFit: 'contain', filter: isDark ? 'drop-shadow(1px 0 0 #ffffff) drop-shadow(-1px 0 0 #ffffff) drop-shadow(0 1px 0 #ffffff) drop-shadow(0 -1px 0 #ffffff)' : 'none' }}
-            />
-          </div>
+          <img 
+            src="/logo.png?v=3" 
+            alt="Truliva" 
+            className="h-8 sm:h-9 object-contain"
+            style={{ filter: isDark ? 'drop-shadow(1px 0 0 #ffffff) drop-shadow(-1px 0 0 #ffffff) drop-shadow(0 1px 0 #ffffff) drop-shadow(0 -1px 0 #ffffff)' : 'none' }}
+          />
         </header>
 
-        <div className="flex-1 flex flex-col items-center justify-center p-4 py-8">
+        {/* Góc nhỏ chỉnh Dark/Light Mode bên dưới header */}
+        <div className="w-full max-w-lg mx-auto px-4 pt-2.5 sm:pt-3 flex justify-end relative z-10">
+          {renderThemeSwitcher()}
+        </div>
+
+        <div className="flex-1 flex flex-col items-center justify-center p-4 pt-2 pb-8">
           <div className={`w-full max-w-lg rounded-2xl shadow-2xl overflow-hidden transition-all duration-300 ${
             isDark
               ? 'bg-[#0B1E38]/95 backdrop-blur-xl border border-cyan-500/20 text-white'
@@ -1353,7 +1360,7 @@ export default function WarrantyActivate() {
           ? 'bg-gradient-to-b from-[#061226] via-[#0B2545] to-[#061226] text-white'
           : 'bg-gradient-to-b from-[#EBF3FC] via-[#F4F8FD] to-[#E5EFFB] text-slate-800'
       }`}>
-        <header className={`flex items-center justify-between px-6 py-4 sm:py-5 border-b backdrop-blur-md transition-colors duration-300 ${
+        <header className={`flex items-center justify-between px-4 sm:px-6 py-3 sm:py-3.5 border-b backdrop-blur-md transition-colors duration-300 ${
           isDark ? 'border-white/10 bg-[#061226]/90' : 'border-blue-100 bg-white/85 shadow-xs'
         }`}>
           <button onClick={() => setStep(0)} className={`flex items-center gap-1.5 text-sm font-semibold transition cursor-pointer ${
@@ -1362,17 +1369,20 @@ export default function WarrantyActivate() {
             <ChevronLeft size={20} />
             <span>Trang chủ</span>
           </button>
-          <div className="flex items-center gap-3">
-            {renderThemeSwitcher()}
-            <img 
-              src="/logo.png?v=3" 
-              alt="Truliva" 
-              style={{ height: '40px', objectFit: 'contain', filter: isDark ? 'drop-shadow(1px 0 0 #ffffff) drop-shadow(-1px 0 0 #ffffff) drop-shadow(0 1px 0 #ffffff) drop-shadow(0 -1px 0 #ffffff)' : 'none' }}
-            />
-          </div>
+          <img 
+            src="/logo.png?v=3" 
+            alt="Truliva" 
+            className="h-8 sm:h-9 object-contain"
+            style={{ filter: isDark ? 'drop-shadow(1px 0 0 #ffffff) drop-shadow(-1px 0 0 #ffffff) drop-shadow(0 1px 0 #ffffff) drop-shadow(0 -1px 0 #ffffff)' : 'none' }}
+          />
         </header>
 
-        <div className="flex-1 flex flex-col items-center justify-center p-4 py-8">
+        {/* Góc nhỏ chỉnh Dark/Light Mode bên dưới header */}
+        <div className="w-full max-w-md mx-auto px-4 pt-2.5 sm:pt-3 flex justify-end relative z-10">
+          {renderThemeSwitcher()}
+        </div>
+
+        <div className="flex-1 flex flex-col items-center justify-center p-4 pt-2 pb-8">
           <div className={`rounded-2xl shadow-2xl p-8 max-w-md w-full text-center space-y-5 animate-fade-in border transition-all duration-300 ${
             isDark
               ? 'bg-[#0B1E38]/95 backdrop-blur-xl border-cyan-500/20 text-white'
@@ -1424,7 +1434,7 @@ export default function WarrantyActivate() {
     }`}>
       
       {/* Header Bar đồng bộ chuẩn UI */}
-      <header className={`flex items-center justify-between px-6 py-4 sm:py-5 border-b backdrop-blur-md transition-colors duration-300 ${
+      <header className={`flex items-center justify-between px-4 sm:px-6 py-3 sm:py-3.5 border-b backdrop-blur-md transition-colors duration-300 ${
         isDark ? 'border-white/10 bg-[#061226]/90' : 'border-blue-100 bg-white/85 shadow-xs'
       }`}>
         <button
@@ -1439,18 +1449,21 @@ export default function WarrantyActivate() {
           <ChevronLeft size={20} />
           <span>{step === 2 ? 'Quay lại' : 'Trang chủ'}</span>
         </button>
-        <div className="flex items-center gap-3">
-          {renderThemeSwitcher()}
-          <img 
-            src="/logo.png?v=3" 
-            alt="Truliva" 
-            style={{ height: '40px', objectFit: 'contain', filter: isDark ? 'drop-shadow(1px 0 0 #ffffff) drop-shadow(-1px 0 0 #ffffff) drop-shadow(0 1px 0 #ffffff) drop-shadow(0 -1px 0 #ffffff)' : 'none' }}
-          />
-        </div>
+        <img 
+          src="/logo.png?v=3" 
+          alt="Truliva" 
+          className="h-8 sm:h-9 object-contain"
+          style={{ filter: isDark ? 'drop-shadow(1px 0 0 #ffffff) drop-shadow(-1px 0 0 #ffffff) drop-shadow(0 1px 0 #ffffff) drop-shadow(0 -1px 0 #ffffff)' : 'none' }}
+        />
       </header>
 
+      {/* Góc nhỏ chỉnh Dark/Light Mode bên dưới header */}
+      <div className="w-full max-w-lg mx-auto px-4 pt-2.5 sm:pt-3 flex justify-end relative z-10">
+        {renderThemeSwitcher()}
+      </div>
+
       {/* Main Container */}
-      <div className="flex-1 flex flex-col items-center justify-center p-4 py-8">
+      <div className="flex-1 flex flex-col items-center justify-center p-4 pt-2 pb-8">
         <div className={`w-full max-w-lg rounded-2xl shadow-2xl overflow-hidden p-6 relative z-10 border transition-all duration-300 ${
           isDark
             ? 'bg-[#0B1E38]/95 backdrop-blur-xl border-cyan-500/20 text-white'

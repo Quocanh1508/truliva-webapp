@@ -1755,7 +1755,7 @@ export async function updateOrder(req: Request, res: Response): Promise<void> {
       workType, serviceType, mainStationId, techStationId,
       rescheduleReason, cancelReason, note, warehouseId,
       items, customerName, customerPhone, address, province, moneyToCollect,
-      promoCode
+      promoCode, isExplicitUnassign
     } = req.body;
 
     // Lấy order hiện tại để so sánh cho audit và đồng bộ kho
@@ -1803,8 +1803,60 @@ export async function updateOrder(req: Request, res: Response): Promise<void> {
       }
     }
 
+    const hasAssignPermission = role === 'ADMIN' || role === 'DEV' || role === 'COORDINATOR';
+
+    // ── KTV Assignment Protection Guard ──
+    let effectiveAssignedKtvId = assignedKtvId;
+    let effectiveMainStationId = mainStationId;
+    let effectiveTechStationId = techStationId;
+    let effectiveAdminStatus = adminStatus;
+    let effectiveWarehouseId = warehouseId;
+
+    if (oldOrder.assignedKtvId) {
+      // Đơn hàng ĐÃ CÓ KTV:
+      if (!hasAssignPermission) {
+        // User không có quyền ĐPV/Admin (ví dụ Sale, Hotline, Staff):
+        // Tuyệt đối không cho phép gỡ hoặc đổi KTV, Trạm, Kho đã phân bổ
+        effectiveAssignedKtvId = oldOrder.assignedKtvId;
+        effectiveMainStationId = oldOrder.mainStationId;
+        effectiveTechStationId = oldOrder.techStationId;
+        if (effectiveAdminStatus === 'chờ xử lý') {
+          effectiveAdminStatus = oldOrder.adminStatus;
+        }
+        if (oldOrder.warehouseId && effectiveWarehouseId !== oldOrder.warehouseId) {
+          logger.info('Protected assigned warehouse from being changed by non-coordinator role', {
+            orderId: id,
+            role,
+            preservedWarehouseId: oldOrder.warehouseId,
+            requestedWarehouseId: effectiveWarehouseId
+          });
+          effectiveWarehouseId = oldOrder.warehouseId;
+        }
+      } else {
+        // User có quyền ADMIN / DEV / COORDINATOR:
+        // Nếu payload gửi assignedKtvId rỗng/null nhưng KHÔNG có cờ isExplicitUnassign = true
+        // (xảy ra khi modal submit thiếu KTV hoặc form stale state):
+        if (!assignedKtvId && !isExplicitUnassign) {
+          effectiveAssignedKtvId = oldOrder.assignedKtvId;
+          effectiveMainStationId = mainStationId !== undefined ? mainStationId : oldOrder.mainStationId;
+          effectiveTechStationId = techStationId !== undefined ? techStationId : oldOrder.techStationId;
+          if (effectiveAdminStatus === 'chờ xử lý') {
+            effectiveAdminStatus = oldOrder.adminStatus;
+          }
+        }
+      }
+    } else {
+      // Đơn hàng CHƯA CÓ KTV:
+      // User không có quyền phân bổ mà cố tình gửi assignedKtvId
+      if (!hasAssignPermission && assignedKtvId) {
+        effectiveAssignedKtvId = null;
+        effectiveMainStationId = null;
+        effectiveTechStationId = null;
+      }
+    }
+
     // Validation: Require workType and serviceType if KTV is being assigned or already assigned
-    const finalKtvId = assignedKtvId !== undefined ? assignedKtvId : oldOrder.assignedKtvId;
+    const finalKtvId = effectiveAssignedKtvId !== undefined ? effectiveAssignedKtvId : oldOrder.assignedKtvId;
     const finalWorkType = workType !== undefined ? workType : oldOrder.workType;
     const finalServiceType = serviceType !== undefined ? serviceType : oldOrder.serviceType;
 
@@ -1822,7 +1874,7 @@ export async function updateOrder(req: Request, res: Response): Promise<void> {
     const updateData: any = {};
     const changes: any[] = [];
 
-    if (warehouseId !== undefined && warehouseId !== oldOrder.warehouseId) {
+    if (effectiveWarehouseId !== undefined && effectiveWarehouseId !== oldOrder.warehouseId) {
       const apiKey = process.env.PANCAKE_API_KEY;
       const shopId = '1635300067';
       if (!apiKey) {
@@ -1843,7 +1895,6 @@ export async function updateOrder(req: Request, res: Response): Promise<void> {
         }
       }
 
-      const isManualOrder = oldOrder.pancakeOrderId < 0;
       const shouldSyncWarehouseToPancake = !isInstallation && originallyHasProducts && !isManualOrder;
 
       try {
@@ -1854,7 +1905,7 @@ export async function updateOrder(req: Request, res: Response): Promise<void> {
             timeout: 5000
           });
           const whs = whResponse.data?.data || whResponse.data?.warehouses || [];
-          const matchedWh = whs.find((w: any) => String(w.id) === String(warehouseId));
+          const matchedWh = whs.find((w: any) => String(w.id) === String(effectiveWarehouseId));
           if (matchedWh) {
             warehouseName = matchedWh.name;
           }
@@ -1862,18 +1913,18 @@ export async function updateOrder(req: Request, res: Response): Promise<void> {
           logger.warn('Failed to fetch warehouse name from Pancake POS API, using default name', whErr);
         }
 
-        if (shouldSyncWarehouseToPancake && warehouseId) {
+        if (shouldSyncWarehouseToPancake && effectiveWarehouseId) {
           if (isSandboxEnvironment()) {
             logSandboxBlockedAction('syncWarehouseChangeToPancake (updateOrder)', {
               pancakeOrderId: oldOrder.pancakeOrderId,
-              warehouseId
+              warehouseId: effectiveWarehouseId
             });
           } else {
-            logger.info('Syncing warehouse change to Pancake POS', { pancakeOrderId: oldOrder.pancakeOrderId, warehouseId });
+            logger.info('Syncing warehouse change to Pancake POS', { pancakeOrderId: oldOrder.pancakeOrderId, warehouseId: effectiveWarehouseId });
             const updateResponse = await axios.patch(
               `https://pos.pages.fm/api/v1/shops/${shopId}/orders/${oldOrder.pancakeOrderId}`,
               {
-                warehouse_id: warehouseId
+                warehouse_id: effectiveWarehouseId
               },
               {
                 params: { api_key: apiKey },
@@ -1889,16 +1940,16 @@ export async function updateOrder(req: Request, res: Response): Promise<void> {
         } else {
           logger.info('Bypassed syncing warehouse change to Pancake POS (not deducting inventory)', {
             pancakeOrderId: oldOrder.pancakeOrderId,
-            warehouseId,
+            warehouseId: effectiveWarehouseId,
             reason: isInstallation ? 'Installation order' : (isManualOrder ? 'Manual order' : 'No original products')
           });
         }
 
-        updateData.warehouseId = warehouseId;
-        updateData.warehouseInfo = { id: warehouseId, name: warehouseName };
+        updateData.warehouseId = effectiveWarehouseId;
+        updateData.warehouseInfo = { id: effectiveWarehouseId, name: warehouseName };
         updateData.pancakeSyncStatus = 'SUCCESS';
 
-        changes.push({ field: 'warehouseId', from: oldOrder.warehouseId, to: warehouseId });
+        changes.push({ field: 'warehouseId', from: oldOrder.warehouseId, to: effectiveWarehouseId });
         changes.push({ field: 'warehouseInfo', from: oldOrder.warehouseInfo, to: updateData.warehouseInfo });
       } catch (err: any) {
         logger.error('Failed to sync warehouse update to Pancake POS API', { error: err.message });
@@ -1909,8 +1960,8 @@ export async function updateOrder(req: Request, res: Response): Promise<void> {
     }
 
     // Auto update adminStatus if KTV is assigned and status is currently 'chờ xử lý'
-    const finalKtv = assignedKtvId !== undefined ? (assignedKtvId || null) : oldOrder.assignedKtvId;
-    let targetAdminStatus = adminStatus;
+    const finalKtv = effectiveAssignedKtvId !== undefined ? (effectiveAssignedKtvId || null) : oldOrder.assignedKtvId;
+    let targetAdminStatus = effectiveAdminStatus;
     if (finalKtv && (!targetAdminStatus || targetAdminStatus === 'chờ xử lý') && (!oldOrder.adminStatus || oldOrder.adminStatus === 'chờ xử lý')) {
       targetAdminStatus = 'đang thực hiện';
     } else if (!finalKtv && (targetAdminStatus === 'đang thực hiện' || (!targetAdminStatus && oldOrder.adminStatus === 'đang thực hiện'))) {
@@ -1953,15 +2004,15 @@ export async function updateOrder(req: Request, res: Response): Promise<void> {
     track('adminStatus', targetAdminStatus);
     track('workType', workType);
     track('serviceType', serviceType);
-    track('mainStationId', mainStationId || null);
-    track('techStationId', techStationId || null);
+    track('mainStationId', effectiveMainStationId !== undefined ? (effectiveMainStationId || null) : oldOrder.mainStationId);
+    track('techStationId', effectiveTechStationId !== undefined ? (effectiveTechStationId || null) : oldOrder.techStationId);
     track('rescheduleReason', rescheduleReason);
     track('cancelReason', cancelReason);
     track('note', note);
     track('promoCode', promoCode || null);
 
-    if (assignedKtvId !== undefined) {
-      const val = assignedKtvId || null;
+    if (effectiveAssignedKtvId !== undefined) {
+      const val = effectiveAssignedKtvId || null;
       track('assignedKtvId', val);
     }
 

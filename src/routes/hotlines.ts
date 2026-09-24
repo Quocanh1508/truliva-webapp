@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { requireAuth } from '../middleware/authSession';
+import { requireAuth, requirePermission } from '../middleware/authSession';
 import {
   searchCustomerHistory,
   getHotlineTickets,
@@ -26,7 +26,7 @@ router.get('/public/devices', getPublicSupportDevices);
 router.use(requireAuth);
 
 // Phase 1: Tra cứu lịch sử KH
-router.get('/search-customer', searchCustomerHistory);
+router.get('/search-customer', requirePermission('HOTLINE_SEARCH_CUSTOMER'), searchCustomerHistory);
 
 // Dropdown danh sách người xử lý (HOTLINE/ADMIN/COORDINATOR)
 router.get('/handlers', getHotlineHandlers);

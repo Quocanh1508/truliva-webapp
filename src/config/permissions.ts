@@ -9,6 +9,8 @@ export interface SystemFeature {
   defaultRoles: UserRole[];
   /** Nếu true, chỉ hiển thị cho DEV và tự động bật cho role DEV. Không hiện trong ma trận phân quyền Admin. */
   devOnly?: boolean;
+  /** Ngày tính năng được thêm vào hệ thống. Dùng để phát hiện tính năng mới chưa review. Format: 'YYYY-MM-DD' hoặc 'v1.0' cho tính năng gốc. */
+  addedAt: string;
 }
 
 export const SYSTEM_MODULES = [
@@ -44,7 +46,8 @@ export const SYSTEM_FEATURES: SystemFeature[] = [
     moduleName: '📋 Quản lý Đơn hàng',
     name: 'Xem danh sách ca dịch vụ',
     description: 'Quyền xem danh sách đơn hàng và thông tin ca dịch vụ',
-    defaultRoles: ['ADMIN', 'DEV', 'COORDINATOR', 'HOTLINE', 'SALE_SUPERVISOR', 'SALER', 'STAFF']
+    defaultRoles: ['ADMIN', 'DEV', 'COORDINATOR', 'HOTLINE', 'SALE_SUPERVISOR', 'SALER', 'STAFF'],
+    addedAt: 'v1.0'
   },
   {
     key: 'ORDER_CREATE',
@@ -52,7 +55,8 @@ export const SYSTEM_FEATURES: SystemFeature[] = [
     moduleName: '📋 Quản lý Đơn hàng',
     name: 'Tạo ca dịch vụ thủ công',
     description: 'Tạo mới ca dịch vụ tự tạo/độc lập',
-    defaultRoles: ['ADMIN', 'DEV', 'COORDINATOR', 'HOTLINE', 'SALE_SUPERVISOR', 'SALER', 'STAFF']
+    defaultRoles: ['ADMIN', 'DEV', 'COORDINATOR', 'HOTLINE', 'SALE_SUPERVISOR', 'SALER', 'STAFF'],
+    addedAt: 'v1.0'
   },
   {
     key: 'ORDER_ASSIGN_KTV',
@@ -60,7 +64,8 @@ export const SYSTEM_FEATURES: SystemFeature[] = [
     moduleName: '📋 Quản lý Đơn hàng',
     name: 'Phân công KTV & Phân bổ hàng loạt',
     description: 'Gán KTV, hẹn lịch và phân bổ ca dịch vụ',
-    defaultRoles: ['ADMIN', 'DEV', 'COORDINATOR']
+    defaultRoles: ['ADMIN', 'DEV', 'COORDINATOR'],
+    addedAt: 'v1.0'
   },
   {
     key: 'ORDER_EDIT_MANUAL',
@@ -68,7 +73,8 @@ export const SYSTEM_FEATURES: SystemFeature[] = [
     moduleName: '📋 Quản lý Đơn hàng',
     name: 'Chỉnh sửa ca dịch vụ tự tạo',
     description: 'Chỉnh sửa thông tin các ca tự tạo',
-    defaultRoles: ['ADMIN', 'DEV', 'COORDINATOR']
+    defaultRoles: ['ADMIN', 'DEV', 'COORDINATOR'],
+    addedAt: 'v1.0'
   },
   {
     key: 'ORDER_CANCEL',
@@ -76,7 +82,8 @@ export const SYSTEM_FEATURES: SystemFeature[] = [
     moduleName: '📋 Quản lý Đơn hàng',
     name: 'Hủy đơn & Hủy đơn hàng loạt',
     description: 'Thao tác hủy đơn và hoàn kho linh kiện',
-    defaultRoles: ['ADMIN', 'DEV', 'COORDINATOR']
+    defaultRoles: ['ADMIN', 'DEV', 'COORDINATOR'],
+    addedAt: 'v1.0'
   },
   {
     key: 'ORDER_SYNC_PANCAKE',
@@ -84,7 +91,8 @@ export const SYSTEM_FEATURES: SystemFeature[] = [
     moduleName: '📋 Quản lý Đơn hàng',
     name: 'Đồng bộ đơn hàng loạt từ Pancake POS (50 đơn)',
     description: 'Nút đồng bộ 50 đơn hàng mới nhất trực tiếp từ Pancake POS',
-    defaultRoles: ['ADMIN', 'DEV', 'COORDINATOR', 'HOTLINE', 'SALE_SUPERVISOR', 'SALER', 'STAFF']
+    defaultRoles: ['ADMIN', 'DEV', 'COORDINATOR', 'HOTLINE', 'SALE_SUPERVISOR', 'SALER', 'STAFF'],
+    addedAt: 'v1.0'
   },
   {
     key: 'ORDER_SYNC_SINGLE',
@@ -92,7 +100,8 @@ export const SYSTEM_FEATURES: SystemFeature[] = [
     moduleName: '📋 Quản lý Đơn hàng',
     name: 'Đồng bộ ca đơn lẻ từ Pancake POS',
     description: 'Nút đồng bộ dữ liệu riêng từng ca dịch vụ từ Pancake POS',
-    defaultRoles: ['ADMIN', 'DEV', 'COORDINATOR', 'HOTLINE', 'SALE_SUPERVISOR', 'SALER']
+    defaultRoles: ['ADMIN', 'DEV', 'COORDINATOR', 'HOTLINE', 'SALE_SUPERVISOR', 'SALER'],
+    addedAt: 'v1.0'
   },
   {
     key: 'ORDER_REOPEN',
@@ -100,7 +109,8 @@ export const SYSTEM_FEATURES: SystemFeature[] = [
     moduleName: '📋 Quản lý Đơn hàng',
     name: 'Mở lại đơn hàng (Khôi phục ca)',
     description: 'Khôi phục đơn đã hủy hoặc hoàn thành về Chờ xử lý và xóa phân bổ trạm/KTV',
-    defaultRoles: ['ADMIN', 'DEV', 'COORDINATOR']
+    defaultRoles: ['ADMIN', 'DEV', 'COORDINATOR'],
+    addedAt: 'v1.0'
   },
   {
     key: 'ORDER_AUDIT_LOG',
@@ -108,7 +118,8 @@ export const SYSTEM_FEATURES: SystemFeature[] = [
     moduleName: '📋 Quản lý Đơn hàng',
     name: 'Xem nhật ký lịch sử thay đổi ca',
     description: 'Xem chi tiết lịch sử cập nhật, phân công, đổi trạng thái của ca dịch vụ',
-    defaultRoles: ['ADMIN', 'DEV', 'COORDINATOR', 'HOTLINE', 'SALE_SUPERVISOR', 'SALER', 'STAFF']
+    defaultRoles: ['ADMIN', 'DEV', 'COORDINATOR', 'HOTLINE', 'SALE_SUPERVISOR', 'SALER', 'STAFF'],
+    addedAt: 'v1.0'
   },
   {
     key: 'ORDER_COMPLETE_MANUAL',
@@ -116,7 +127,8 @@ export const SYSTEM_FEATURES: SystemFeature[] = [
     moduleName: '📋 Quản lý Đơn hàng',
     name: 'Báo hoàn thành ca thủ công',
     description: 'Đánh dấu ca dịch vụ đã hoàn thành',
-    defaultRoles: ['ADMIN', 'DEV', 'COORDINATOR', 'SALER', 'STAFF']
+    defaultRoles: ['ADMIN', 'DEV', 'COORDINATOR', 'SALER', 'STAFF'],
+    addedAt: 'v1.0'
   },
   {
     key: 'ORDER_EXPORT_EXCEL',
@@ -124,7 +136,8 @@ export const SYSTEM_FEATURES: SystemFeature[] = [
     moduleName: '📋 Quản lý Đơn hàng',
     name: 'Xuất Excel danh sách đơn hàng',
     description: 'Tải file Excel danh sách ca dịch vụ',
-    defaultRoles: ['ADMIN', 'DEV', 'COORDINATOR', 'STAFF']
+    defaultRoles: ['ADMIN', 'DEV', 'COORDINATOR', 'STAFF'],
+    addedAt: 'v1.0'
   },
   {
     key: 'ORDER_AUTO_REFRESH',
@@ -132,7 +145,8 @@ export const SYSTEM_FEATURES: SystemFeature[] = [
     moduleName: '📋 Quản lý Đơn hàng',
     name: 'Tự động tải lại trang (Auto Refresh)',
     description: 'Bật chế độ tự động làm mới danh sách đơn',
-    defaultRoles: ['ADMIN', 'DEV', 'COORDINATOR']
+    defaultRoles: ['ADMIN', 'DEV', 'COORDINATOR'],
+    addedAt: 'v1.0'
   },
 
   // 1.5 Quản lý Yêu Cầu Hotline
@@ -142,7 +156,17 @@ export const SYSTEM_FEATURES: SystemFeature[] = [
     moduleName: '📞 Quản lý Yêu Cầu Hotline',
     name: 'Xem danh sách Yêu cầu Hotline',
     description: 'Quyền xem danh sách phiếu yêu cầu hotline từ khách hàng',
-    defaultRoles: ['ADMIN', 'COORDINATOR', 'HOTLINE', 'SALE_SUPERVISOR', 'SALER', 'STAFF']
+    defaultRoles: ['ADMIN', 'COORDINATOR', 'HOTLINE', 'SALE_SUPERVISOR', 'SALER', 'STAFF'],
+    addedAt: 'v1.0'
+  },
+  {
+    key: 'HOTLINE_SEARCH_CUSTOMER',
+    module: 'hotline',
+    moduleName: '📞 Quản lý Yêu Cầu Hotline',
+    name: 'Tra cứu Lịch sử Khách hàng',
+    description: 'Tra cứu toàn bộ thông tin tương tác, đơn hàng, serial và cuộc gọi của khách hàng',
+    defaultRoles: ['ADMIN', 'DEV', 'COORDINATOR', 'HOTLINE'],
+    addedAt: 'v1.1'
   },
   {
     key: 'HOTLINE_TICKET_CREATE',
@@ -150,7 +174,8 @@ export const SYSTEM_FEATURES: SystemFeature[] = [
     moduleName: '📞 Quản lý Yêu Cầu Hotline',
     name: 'Tạo phiếu Yêu cầu Hotline (Phase 2)',
     description: 'Tạo mới phiếu yêu cầu hỗ trợ/tư vấn từ khách hàng',
-    defaultRoles: ['ADMIN', 'COORDINATOR', 'HOTLINE', 'SALE_SUPERVISOR', 'SALER', 'STAFF']
+    defaultRoles: ['ADMIN', 'COORDINATOR', 'HOTLINE', 'SALE_SUPERVISOR', 'SALER', 'STAFF'],
+    addedAt: 'v1.0'
   },
   {
     key: 'HOTLINE_TICKET_VERIFY',
@@ -158,7 +183,8 @@ export const SYSTEM_FEATURES: SystemFeature[] = [
     moduleName: '📞 Quản lý Yêu Cầu Hotline',
     name: 'Phê duyệt & Xử lý yêu cầu (Phase 3)',
     description: 'Phân bổ, xác thực, chuyển ca dịch vụ hoặc trả về Phase 2',
-    defaultRoles: ['ADMIN', 'COORDINATOR', 'HOTLINE']
+    defaultRoles: ['ADMIN', 'COORDINATOR', 'HOTLINE'],
+    addedAt: 'v1.0'
   },
   {
     key: 'HOTLINE_EXPORT_EXCEL',
@@ -166,7 +192,8 @@ export const SYSTEM_FEATURES: SystemFeature[] = [
     moduleName: '📞 Quản lý Yêu Cầu Hotline',
     name: 'Xuất Excel danh sách Yêu cầu Hotline',
     description: 'Tải file Excel danh sách phiếu yêu cầu hotline theo bộ lọc',
-    defaultRoles: ['ADMIN', 'COORDINATOR', 'HOTLINE', 'STAFF']
+    defaultRoles: ['ADMIN', 'COORDINATOR', 'HOTLINE', 'STAFF'],
+    addedAt: 'v1.0'
   },
 
   // 2. Quản lý Serial & Bảo hành
@@ -176,7 +203,8 @@ export const SYSTEM_FEATURES: SystemFeature[] = [
     moduleName: '🏷️ Quản lý Serial & Bảo hành',
     name: 'Xem danh sách & Tra cứu Serial',
     description: 'Xem thông tin serial, hạn bảo hành, thông tin khách hàng',
-    defaultRoles: ['ADMIN', 'DEV', 'COORDINATOR', 'HOTLINE', 'STAFF']
+    defaultRoles: ['ADMIN', 'DEV', 'COORDINATOR', 'HOTLINE', 'STAFF'],
+    addedAt: 'v1.0'
   },
   {
     key: 'SERIAL_EDIT',
@@ -184,7 +212,8 @@ export const SYSTEM_FEATURES: SystemFeature[] = [
     moduleName: '🏷️ Quản lý Serial & Bảo hành',
     name: 'Chỉnh sửa thông tin Serial',
     description: 'Cập nhật trạng thái, ngày kích hoạt, thông tin bảo hành',
-    defaultRoles: ['ADMIN', 'DEV', 'COORDINATOR', 'HOTLINE', 'STAFF']
+    defaultRoles: ['ADMIN', 'DEV', 'COORDINATOR', 'HOTLINE', 'STAFF'],
+    addedAt: 'v1.0'
   },
   {
     key: 'SERIAL_EXPORT_EXCEL',
@@ -192,7 +221,8 @@ export const SYSTEM_FEATURES: SystemFeature[] = [
     moduleName: '🏷️ Quản lý Serial & Bảo hành',
     name: 'Xuất Excel Quản lý Serial',
     description: 'Tải file Excel danh sách Serial sản phẩm',
-    defaultRoles: ['ADMIN', 'DEV']
+    defaultRoles: ['ADMIN', 'DEV'],
+    addedAt: 'v1.0'
   },
   {
     key: 'SERIAL_IMPORT_EXCEL',
@@ -200,7 +230,8 @@ export const SYSTEM_FEATURES: SystemFeature[] = [
     moduleName: '🏷️ Quản lý Serial & Bảo hành',
     name: 'Import lô Serial từ file Excel',
     description: 'Tải lên lô Serial mới từ file Excel',
-    defaultRoles: ['ADMIN', 'DEV']
+    defaultRoles: ['ADMIN', 'DEV'],
+    addedAt: 'v1.0'
   },
 
   // 3. Quản lý Báo cáo Kỹ thuật
@@ -210,7 +241,8 @@ export const SYSTEM_FEATURES: SystemFeature[] = [
     moduleName: '📝 Quản lý Báo cáo',
     name: 'Xem danh sách báo cáo nghiệm thu',
     description: 'Xem thông tin nghiệm thu, hình ảnh và linh kiện KTV thay',
-    defaultRoles: ['ADMIN', 'DEV', 'COORDINATOR', 'HOTLINE', 'STAFF']
+    defaultRoles: ['ADMIN', 'DEV', 'COORDINATOR', 'HOTLINE', 'STAFF'],
+    addedAt: 'v1.0'
   },
   {
     key: 'REPORT_CREATE',
@@ -218,7 +250,8 @@ export const SYSTEM_FEATURES: SystemFeature[] = [
     moduleName: '📝 Quản lý Báo cáo',
     name: 'Tạo & Nộp Báo cáo nghiệm thu ca',
     description: 'Gửi báo cáo hoàn thành ca, upload ảnh nghiệm thu & linh kiện đã thay',
-    defaultRoles: ['ADMIN', 'DEV', 'COORDINATOR', 'SALER', 'KTV']
+    defaultRoles: ['ADMIN', 'DEV', 'COORDINATOR', 'SALER', 'KTV'],
+    addedAt: 'v1.0'
   },
   {
     key: 'REPORT_APPROVE_REJECT',
@@ -226,7 +259,8 @@ export const SYSTEM_FEATURES: SystemFeature[] = [
     moduleName: '📝 Quản lý Báo cáo',
     name: 'Duyệt / Từ chối Báo cáo KTV',
     description: 'Phê duyệt hoặc từ chối báo cáo nghiệm thu ca',
-    defaultRoles: ['ADMIN', 'DEV', 'COORDINATOR', 'STAFF']
+    defaultRoles: ['ADMIN', 'DEV', 'COORDINATOR', 'STAFF'],
+    addedAt: 'v1.0'
   },
   {
     key: 'REPORT_EDIT_DELETE',
@@ -234,7 +268,8 @@ export const SYSTEM_FEATURES: SystemFeature[] = [
     moduleName: '📝 Quản lý Báo cáo',
     name: 'Chỉnh sửa / Xóa Báo cáo',
     description: 'Sửa thông tin linh kiện/giá tiền hoặc xóa báo cáo',
-    defaultRoles: ['ADMIN', 'DEV', 'COORDINATOR']
+    defaultRoles: ['ADMIN', 'DEV', 'COORDINATOR'],
+    addedAt: 'v1.0'
   },
   {
     key: 'REPORT_EXPORT_EXCEL',
@@ -242,7 +277,8 @@ export const SYSTEM_FEATURES: SystemFeature[] = [
     moduleName: '📝 Quản lý Báo cáo',
     name: 'Xuất Excel Báo cáo kỹ thuật',
     description: 'Tải dữ liệu báo cáo nghiệm thu dạng Excel',
-    defaultRoles: ['ADMIN', 'DEV', 'COORDINATOR', 'STAFF']
+    defaultRoles: ['ADMIN', 'DEV', 'COORDINATOR', 'STAFF'],
+    addedAt: 'v1.0'
   },
 
   // 4. Quản lý Lương & Chi phí KTV
@@ -252,7 +288,8 @@ export const SYSTEM_FEATURES: SystemFeature[] = [
     moduleName: '💰 Quản lý Lương & Chi phí',
     name: 'Xem bảng tính lương KTV',
     description: 'Xem chi tiết bảng lương, công ca và thưởng phạt KTV',
-    defaultRoles: ['ADMIN', 'DEV', 'COORDINATOR']
+    defaultRoles: ['ADMIN', 'DEV', 'COORDINATOR'],
+    addedAt: 'v1.0'
   },
   {
     key: 'SALARY_UPDATE_COST',
@@ -260,7 +297,8 @@ export const SYSTEM_FEATURES: SystemFeature[] = [
     moduleName: '💰 Quản lý Lương & Chi phí',
     name: 'Chỉnh sửa đơn giá cơ bản / chi phí ca',
     description: 'Điều chỉnh đơn giá công ca và phí linh kiện',
-    defaultRoles: ['ADMIN']
+    defaultRoles: ['ADMIN'],
+    addedAt: 'v1.0'
   },
   {
     key: 'SALARY_ADD_CUSTOM_CASE',
@@ -268,7 +306,8 @@ export const SYSTEM_FEATURES: SystemFeature[] = [
     moduleName: '💰 Quản lý Lương & Chi phí',
     name: 'Thêm ca thủ công / phí bổ sung',
     description: 'Thêm ca điều chỉnh hoặc phụ phí vào bảng lương',
-    defaultRoles: ['ADMIN']
+    defaultRoles: ['ADMIN'],
+    addedAt: 'v1.0'
   },
   {
     key: 'SALARY_LOCK_MONTH',
@@ -276,7 +315,8 @@ export const SYSTEM_FEATURES: SystemFeature[] = [
     moduleName: '💰 Quản lý Lương & Chi phí',
     name: 'Khóa / Mở khóa sổ lương tháng',
     description: 'Chốt bảng lương tháng ngăn chỉnh sửa',
-    defaultRoles: ['ADMIN']
+    defaultRoles: ['ADMIN'],
+    addedAt: 'v1.0'
   },
   {
     key: 'SALARY_EXPORT_EXCEL',
@@ -284,7 +324,8 @@ export const SYSTEM_FEATURES: SystemFeature[] = [
     moduleName: '💰 Quản lý Lương & Chi phí',
     name: 'Xuất Excel Bảng tính lương KTV',
     description: 'Tải file Excel chi tiết bảng tính lương, phụ cấp & công ca KTV',
-    defaultRoles: ['ADMIN', 'DEV', 'COORDINATOR']
+    defaultRoles: ['ADMIN', 'DEV', 'COORDINATOR'],
+    addedAt: 'v1.0'
   },
 
   // 5. Quản lý Kho & Vật tư
@@ -294,7 +335,8 @@ export const SYSTEM_FEATURES: SystemFeature[] = [
     moduleName: '📦 Quản lý Kho & Vật tư',
     name: 'Xem danh sách kho & tồn kho',
     description: 'Xem tồn kho thực tế tại kho chính và trạm',
-    defaultRoles: ['ADMIN', 'DEV', 'COORDINATOR']
+    defaultRoles: ['ADMIN', 'DEV', 'COORDINATOR'],
+    addedAt: 'v1.0'
   },
   {
     key: 'INVENTORY_MANAGE_WAREHOUSE',
@@ -302,7 +344,8 @@ export const SYSTEM_FEATURES: SystemFeature[] = [
     moduleName: '📦 Quản lý Kho & Vật tư',
     name: 'Tạo mới & chỉnh sửa kho hàng',
     description: 'Quản lý thông tin và cấu hình các kho',
-    defaultRoles: ['ADMIN']
+    defaultRoles: ['ADMIN'],
+    addedAt: 'v1.0'
   },
   {
     key: 'INVENTORY_TRANSFER',
@@ -310,7 +353,8 @@ export const SYSTEM_FEATURES: SystemFeature[] = [
     moduleName: '📦 Quản lý Kho & Vật tư',
     name: 'Nhập / Xuất / Điều chuyển vật tư',
     description: 'Thao tác điều chuyển vật tư linh kiện giữa các kho',
-    defaultRoles: ['ADMIN', 'COORDINATOR']
+    defaultRoles: ['ADMIN', 'COORDINATOR'],
+    addedAt: 'v1.0'
   },
   {
     key: 'INVENTORY_SYNC_POS',
@@ -318,7 +362,8 @@ export const SYSTEM_FEATURES: SystemFeature[] = [
     moduleName: '📦 Quản lý Kho & Vật tư',
     name: 'Đồng bộ sản phẩm active từ POS',
     description: 'Đồng bộ danh mục sản phẩm active và thông tin tồn kho từ Pancake POS',
-    defaultRoles: ['ADMIN', 'DEV', 'COORDINATOR']
+    defaultRoles: ['ADMIN', 'DEV', 'COORDINATOR'],
+    addedAt: 'v1.0'
   },
 
   // 6. Quản lý Hệ thống & Nhân sự
@@ -328,7 +373,8 @@ export const SYSTEM_FEATURES: SystemFeature[] = [
     moduleName: '⚙️ Quản lý Hệ thống',
     name: 'Quản lý tài khoản người dùng',
     description: 'Tạo mới, sửa, đổi mật khẩu và vai trò người dùng',
-    defaultRoles: ['ADMIN']
+    defaultRoles: ['ADMIN'],
+    addedAt: 'v1.0'
   },
   {
     key: 'USER_PERMISSIONS_MATRIX',
@@ -336,7 +382,8 @@ export const SYSTEM_FEATURES: SystemFeature[] = [
     moduleName: '⚙️ Quản lý Hệ thống',
     name: 'Quản lý Ma trận Phân quyền',
     description: 'Xem và bật/tắt ma trận phân quyền động cho các Role',
-    defaultRoles: ['ADMIN']
+    defaultRoles: ['ADMIN'],
+    addedAt: 'v1.0'
   },
   {
     key: 'USER_EXPORT_EXCEL',
@@ -344,7 +391,8 @@ export const SYSTEM_FEATURES: SystemFeature[] = [
     moduleName: '⚙️ Quản lý Hệ thống',
     name: 'Xuất Excel Danh sách Nhân sự / KTV',
     description: 'Tải file Excel thông tin chi tiết danh sách tài khoản nhân viên & KTV',
-    defaultRoles: ['ADMIN', 'DEV']
+    defaultRoles: ['ADMIN', 'DEV'],
+    addedAt: 'v1.0'
   },
   {
     key: 'STATION_MANAGE',
@@ -352,7 +400,8 @@ export const SYSTEM_FEATURES: SystemFeature[] = [
     moduleName: '⚙️ Quản lý Hệ thống',
     name: 'Quản lý Trạm Kỹ thuật',
     description: 'Tạo và quản lý các Trạm chính & Trạm kỹ thuật',
-    defaultRoles: ['ADMIN', 'COORDINATOR']
+    defaultRoles: ['ADMIN', 'COORDINATOR'],
+    addedAt: 'v1.0'
   },
   {
     key: 'PROMO_MANAGE',
@@ -360,7 +409,8 @@ export const SYSTEM_FEATURES: SystemFeature[] = [
     moduleName: '⚙️ Quản lý Hệ thống',
     name: 'Quản lý Mã giảm giá / Voucher',
     description: 'Tạo và quản lý các mã khuyến mãi dịch vụ',
-    defaultRoles: ['ADMIN', 'DEV']
+    defaultRoles: ['ADMIN', 'DEV'],
+    addedAt: 'v1.0'
   },
   {
     key: 'FEEDBACK_VIEW',
@@ -368,7 +418,8 @@ export const SYSTEM_FEATURES: SystemFeature[] = [
     moduleName: '⚙️ Quản lý Hệ thống',
     name: 'Xem phản hồi & góp ý hệ thống',
     description: 'Xem danh sách góp ý lỗi và đóng góp ý kiến',
-    defaultRoles: ['ADMIN', 'DEV']
+    defaultRoles: ['ADMIN', 'DEV'],
+    addedAt: 'v1.0'
   },
 
   // 7. Công cụ Nhà phát triển (Dev Only) — Tự động bật cho DEV, ẩn khỏi ma trận Admin
@@ -379,7 +430,8 @@ export const SYSTEM_FEATURES: SystemFeature[] = [
     name: 'Quản lý & Bắn ZNS thủ công',
     description: 'Gửi tin nhắn Zalo ZNS thủ công, tra cứu template và kiểm tra trạng thái gửi',
     defaultRoles: ['DEV'],
-    devOnly: true
+    devOnly: true,
+    addedAt: 'v1.0'
   },
   {
     key: 'DEV_SYSTEM_MAP',
@@ -388,7 +440,8 @@ export const SYSTEM_FEATURES: SystemFeature[] = [
     name: 'Sơ đồ hệ thống & Cấu trúc mã nguồn',
     description: 'Xem sơ đồ mạng lưới trạm, giám sát sức khỏe live, quy trình SOP và cấu trúc codebase',
     defaultRoles: ['DEV'],
-    devOnly: true
+    devOnly: true,
+    addedAt: 'v1.0'
   },
   {
     key: 'DEV_FEEDBACK_MANAGE',
@@ -397,7 +450,8 @@ export const SYSTEM_FEATURES: SystemFeature[] = [
     name: 'Quản lý phản hồi người dùng (Dev)',
     description: 'Xem, phân loại và xử lý phản hồi lỗi & góp ý từ người dùng hệ thống',
     defaultRoles: ['DEV'],
-    devOnly: true
+    devOnly: true,
+    addedAt: 'v1.0'
   }
 ];
 
