@@ -273,9 +273,10 @@ export default function CustomerHome({ user, onOpenScanner, onOpenWarranty, onGo
           </div>
           <button 
             onClick={onOpenScanner}
-            className="p3r-slanted-badge bg-gradient-to-r from-[#1B3A6B] to-[#0284C7] hover:from-[#0284C7] hover:to-[#00D2FF] text-white px-4 py-2.5 text-xs font-black uppercase tracking-wider shadow-sm active:scale-95 transition-all cursor-pointer flex items-center space-x-1"
+            className="shrink-0 w-14 h-16 rounded-2xl bg-gradient-to-b from-[#1B3A6B] to-[#0284C7] hover:from-[#0284C7] hover:to-[#00D2FF] text-white flex flex-col items-center justify-center text-center shadow-md shadow-blue-900/15 border border-sky-300/30 active:scale-95 transition-all cursor-pointer"
           >
-            <span>QUÉT MÃ</span>
+            <span className="text-[11px] font-black tracking-wider uppercase leading-tight">QUÉT</span>
+            <span className="text-[11px] font-black tracking-wider uppercase leading-tight mt-0.5">MÃ</span>
           </button>
         </div>
       </div>
