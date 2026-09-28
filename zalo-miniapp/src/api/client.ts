@@ -1,4 +1,5 @@
-export const API_BASE_URL = 'https://trulivaofficial.com/api';
+// Môi trường Sandbox độc lập qua cổng chuẩn HTTPS 443 (Tránh Zalo WebView chặn cổng lạ và bảo vệ 100% DB Production)
+export const API_BASE_URL = 'https://trulivaofficial.com/sandbox-api';
 
 export function getSafeStorage(key: string): string | null {
   try {
