@@ -137,6 +137,14 @@ export async function getOrders(req: Request, res: Response): Promise<void> {
       } else {
         conditions.push({ adminStatus: status as string });
       }
+    } else {
+      // Mặc định: Loại trừ hoàn toàn các đơn có trạng thái "đã ẩn"
+      conditions.push({
+        OR: [
+          { adminStatus: { not: 'đã ẩn' } },
+          { adminStatus: null }
+        ]
+      });
     }
 
     if (assignedKtvIds) {
@@ -427,7 +435,14 @@ export async function getOrders(req: Request, res: Response): Promise<void> {
     }
 
     // Build statsWhere ignoring adminStatus filter to show counts of all statuses matching other active filters
+    // Tuyệt đối loại trừ các đơn "đã ẩn" khỏi mọi thống kê stats
     const statsConditions = conditions.filter(cond => !('adminStatus' in cond));
+    statsConditions.push({
+      OR: [
+        { adminStatus: { not: 'đã ẩn' } },
+        { adminStatus: null }
+      ]
+    });
     const statsWhere: Prisma.OrderWhereInput = statsConditions.length > 0 ? { AND: statsConditions } : {};
 
     const isKtv = req.user?.role === 'KTV';
@@ -666,6 +681,7 @@ export async function getOrders(req: Request, res: Response): Promise<void> {
     const returnExchangeStatuses = ['đang hoàn', 'đã hoàn', 'đang đổi', 'đã đổi', 'hoàn một phần'];
 
     statsResult.forEach(item => {
+      if (item.adminStatus === 'đã ẩn') return;
       const count = item._count;
       totalStatsCount += count;
       if (item.adminStatus === 'chờ xử lý' || !item.adminStatus) {
@@ -1038,6 +1054,14 @@ export async function exportOrdersExcel(req: Request, res: Response): Promise<vo
       } else {
         conditions.push({ adminStatus: status as string });
       }
+    } else {
+      // Mặc định: Loại trừ hoàn toàn các đơn có trạng thái "đã ẩn"
+      conditions.push({
+        OR: [
+          { adminStatus: { not: 'đã ẩn' } },
+          { adminStatus: null }
+        ]
+      });
     }
 
     if (assignedKtvIds) {

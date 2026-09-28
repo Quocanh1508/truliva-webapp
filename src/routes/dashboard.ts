@@ -44,10 +44,20 @@ router.get('/stats', async (req: Request, res: Response): Promise<void> => {
     const isIncludeEcom = includeEcom === 'true' || revenueScope === 'all' || !revenueScope;
 
     const validOrderFilter: Prisma.OrderWhereInput = {
-      OR: [
-        { statusCode: { not: 0 } },
-        { statusCode: null },
-        { pancakeOrderId: { lt: 0 } }
+      AND: [
+        {
+          OR: [
+            { statusCode: { not: 0 } },
+            { statusCode: null },
+            { pancakeOrderId: { lt: 0 } }
+          ]
+        },
+        {
+          OR: [
+            { adminStatus: { not: 'đã ẩn' } },
+            { adminStatus: null }
+          ]
+        }
       ]
     };
 
@@ -225,6 +235,7 @@ router.get('/stats', async (req: Request, res: Response): Promise<void> => {
 
     filteredOrders.forEach(o => {
       const status = o.adminStatus;
+      if (status === 'đã ẩn') return; // Bỏ qua hoàn toàn đơn đã ẩn
       if (status === 'đang thực hiện') {
         assigned++;
       } else if (status === 'hoàn thành') {
