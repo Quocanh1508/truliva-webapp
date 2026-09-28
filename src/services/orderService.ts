@@ -136,3 +136,28 @@ export async function buildOrderFilter(user: any): Promise<Prisma.OrderWhereInpu
 
   return { id: 'none' };
 }
+
+/**
+ * Lấy mã đơn hàng thủ công (pancakeOrderId âm) tiếp theo:
+ * Bỏ qua dải số âm timestamp ngẫu nhiên (< -1,000,000) đã phát sinh trước đó
+ * để đảm bảo chuỗi tăng tuần tự tự nhiên (M1, M2, ... M439, M440, M441...).
+ */
+export async function getNextManualOrderId(txPrisma?: any): Promise<number> {
+  const client = txPrisma || prisma;
+  const minOrder = await client.order.findFirst({
+    where: {
+      pancakeOrderId: {
+        lt: 0,
+        gt: -1000000
+      }
+    },
+    orderBy: { pancakeOrderId: 'asc' },
+    select: { pancakeOrderId: true }
+  });
+
+  if (minOrder && typeof minOrder.pancakeOrderId === 'number' && minOrder.pancakeOrderId < 0) {
+    return minOrder.pancakeOrderId - 1;
+  }
+  return -1;
+}
+

@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import prisma from '../config/database';
 import logger from '../utils/logger';
+import { getNextManualOrderId } from '../services/orderService';
 
 // ══════════════════════════════════════════════════════════════════════════
 //  Shop & Legal Compliance Controller for Zalo Mini App
@@ -333,7 +334,7 @@ export async function createShopOrder(req: Request, res: Response): Promise<void
       // 5.4 Tự động tạo Ca Dịch Vụ Nội Bộ (Internal Order) trên Web Admin để Điều phối viên phân KTV
       try {
         const fullItemsText = validatedItems.map(i => `${i.productName} (x${i.quantity})`).join(', ');
-        const internalPancakeId = -Math.floor(Date.now() / 1000);
+        const internalPancakeId = await getNextManualOrderId(tx);
         const internalOrder = await tx.order.create({
           data: {
             pancakeOrderId: internalPancakeId,

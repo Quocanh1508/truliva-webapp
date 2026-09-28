@@ -13,7 +13,7 @@ import ExcelJS from 'exceljs';
 import axios from 'axios';
 import { isSandboxEnvironment, logSandboxBlockedAction } from '../utils/sandboxGuard';
 
-import { buildOrderFilter } from '../services/orderService';
+import { buildOrderFilter, getNextManualOrderId } from '../services/orderService';
 
 // ── Combo types & functions: Import & Re-export từ ComboService (Dynamic DB-driven) ──
 import { 
@@ -834,22 +834,13 @@ export async function createManualOrder(req: Request, res: Response): Promise<vo
     // Đơn hàng thủ công (tạo từ Admin trong Truliva) được gán ID ÂM (-1, -2, -3, ...
     // để đảm bảo không bao giờ bị trùng với ID của Pancake POS.
     //
-    // Quy tắc tự tăng: Tìm đơn thủ công có ID âm NHỎ NHẤT hiện tại (ví dụ: -5),
-    // rồi lấy giá trị = ID_nhỏ_nhất - 1 (tức là -6) cho đơn mới tiếp theo.
+    // Quy tắc tự tăng: Tìm đơn thủ công có ID âm NHỎ NHẤT hiện tại trong dải tuần tự (>-1,000,000)
+    // rồi lấy giá trị = ID_nhỏ_nhất - 1 cho đơn mới tiếp theo.
     //
     // Trên UI, các ID âm này được format hiển thị bằng helper formatOrderId():
     //   -1 → "M1", -2 → "M2", ... (tiền tố "M" = Manual)
     // ─────────────────────────────────────────────────────────────────────────────
-    const minOrder = await prisma.order.findFirst({
-      where: { pancakeOrderId: { lt: 0 } },
-      orderBy: { pancakeOrderId: 'asc' }, // 'asc' → số âm nhỏ nhất lên đầu
-      select: { pancakeOrderId: true }
-    });
-
-    let nextManualId = -1; // ID mặc định cho đơn thủ công đầu tiên
-    if (minOrder && minOrder.pancakeOrderId < 0) {
-      nextManualId = minOrder.pancakeOrderId - 1; // Tiếp tục giảm dần: -1, -2, -3...
-    }
+    const nextManualId = await getNextManualOrderId();
 
     // 3. Tạo Order
     const apptDate = appointmentTime ? new Date(appointmentTime) : null;
