@@ -1,5 +1,4 @@
-// Môi trường Sandbox kiểm thử (Cổng 8443 / truliva-sandbox)
-export const API_BASE_URL = 'https://trulivaofficial.com:8443/api';
+export const API_BASE_URL = 'https://trulivaofficial.com/api';
 
 export function getSafeStorage(key: string): string | null {
   try {
