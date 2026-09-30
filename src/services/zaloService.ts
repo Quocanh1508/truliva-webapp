@@ -586,6 +586,198 @@ export async function sendZnsWarrantyActivation(
   throw primaryError;
 }
 
+/**
+ * Gửi tin nhắn FNS xác nhận hoàn thành dịch vụ (Template 10233 - Thay lọc / Bảo hành / Sửa chữa)
+ * Template content:
+ * "XÁC NHẬN HOÀN THÀNH DỊCH VỤ
+ *  Xin chào <Ten_Khach_Hang>,
+ *  Cảm ơn bạn đã sử dụng dịch vụ của Pure Vita. Mã dịch vụ <Ma_Dich_Vu> với tổng chi phí là <Tong_Tien_Thu> vnd. Nếu bạn gặp sự cố hay cần hỗ trợ, vui lòng liên hệ ngay với chúng tôi. Chúc bạn một ngày vui vẻ!"
+ */
+export async function sendFnsServiceCompletion(params: {
+  recipientPhone: string;
+  customerName?: string;
+  serviceCode: string;
+  totalCollected: number | string;
+  serialNumber?: string;
+  orderId?: string;
+  workType?: string;
+  allowRealSend?: boolean;
+}): Promise<any> {
+  const {
+    recipientPhone,
+    customerName = 'Quý Khách',
+    serviceCode,
+    totalCollected,
+    serialNumber = 'N/A',
+    orderId,
+    workType = 'Dịch vụ',
+    allowRealSend = false
+  } = params;
+
+  const formattedPhone = formatZaloPhone(recipientPhone.trim());
+  const fnsTemplateId = Number(process.env.FNS_TEMPLATE_ID_DICH_VU || '10233');
+  const fnsAppId = process.env.FNS_APP_ID || '';
+  const fnsSecretKey = process.env.FNS_SECRET_KEY || '';
+
+  // Định dạng số tiền:
+  // Chú ý: Tham số Tong_Tien_Thu của Template 10233 được Zalo ZNS khai báo kiểu NUMBER/PRICE.
+  // Zalo ZNS bắt buộc truyền số nguyên không có dấu chấm (ví dụ: 1405000), nếu có dấu chấm Zalo sẽ từ chối gửi với mã lỗi -1124.
+  const numAmount = typeof totalCollected === 'string'
+    ? parseFloat(totalCollected.replace(/[^0-9.-]/g, '')) || 0
+    : (Number(totalCollected) || 0);
+  const cleanNumericAmount = Math.max(0, Math.round(numAmount));
+  const formattedMoney = new Intl.NumberFormat('vi-VN').format(cleanNumericAmount);
+
+  const fnsTemplateData = {
+    Ten_Khach_Hang: customerName.substring(0, 30),
+    Ma_Dich_Vu: String(serviceCode).substring(0, 30),
+    Tong_Tien_Thu: cleanNumericAmount
+  };
+
+  // ═══ CHỐT CHẶN SANDBOX: CHẶN GỬI THẬT NGOẠI TRỪ KHI ĐƯỢC CHỈ ĐỊNH ═══
+  const shouldBlockExternal = isSandboxEnvironment() && !allowRealSend && process.env.ALLOW_REAL_FNS_IN_SANDBOX !== 'true';
+  if (shouldBlockExternal) {
+    logSandboxBlockedAction('sendFnsServiceCompletion (Template 10233)', {
+      phone: formattedPhone,
+      customerName,
+      serviceCode,
+      formattedMoney,
+      workType
+    });
+
+    const mockMsgId = `SANDBOX_MOCK_FNS_${Date.now()}`;
+    try {
+      await prisma.znsMessageLog.create({
+        data: {
+          messageId: mockMsgId,
+          phone: formattedPhone,
+          serialNumber: serialNumber || null,
+          customerName,
+          productName: `Dịch vụ ${workType}: ${serviceCode}`,
+          templateId: String(fnsTemplateId),
+          status: 'SUCCESS',
+          sentAt: new Date(),
+          durationMs: '1ms',
+          gateway: 'Sandbox Mock (FNS Template 10233)',
+          orderNumber: serviceCode,
+          rawData: {
+            simulated: true,
+            environment: 'SANDBOX',
+            template_id: fnsTemplateId,
+            template_data: fnsTemplateData,
+            note: 'FNS 10233 blocked and simulated in sandbox environment'
+          }
+        }
+      });
+    } catch (dbErr: any) {
+      logger.warn('Failed to write mock ZnsMessageLog for FNS 10233 in sandbox', { error: dbErr.message });
+    }
+
+    return {
+      success: true,
+      message: '[SANDBOX MOCK] Tin nhắn FNS Template 10233 mô phỏng thành công (Chặn gửi thật trên Sandbox)',
+      data: { message_id: mockMsgId, template_data: fnsTemplateData },
+      serviceCode,
+      totalCollected: formattedMoney,
+      gateway: 'Sandbox Mock (FNS Template 10233)'
+    };
+  }
+
+  // ═══ GỬI THẬT QUA FPT FNS GATEWAY ═══
+  if (!fnsAppId || !fnsSecretKey) {
+    throw new Error('Chưa cấu hình cổng FPT FNS Gateway (FNS_APP_ID / FNS_SECRET_KEY) trong file .env');
+  }
+
+  const fnsPayload = {
+    phone: formattedPhone,
+    template_id: fnsTemplateId,
+    template_data: fnsTemplateData,
+    ref_id: `SRV-${serviceCode}-${Date.now()}`
+  };
+
+  logger.info('Sending FNS service completion message (Template 10233)', {
+    phone: formattedPhone,
+    serviceCode,
+    formattedMoney,
+    templateId: fnsTemplateId
+  });
+
+  const startTimeFns = Date.now();
+  try {
+    const response = await axios.post('https://api-fns.fpt.work/api/send-message', fnsPayload, {
+      headers: {
+        'Content-Type': 'application/json',
+        'app-id': fnsAppId,
+        'secret-key': fnsSecretKey
+      },
+      timeout: 10000
+    });
+
+    const data = response.data;
+    if (data.code !== 1) {
+      throw new Error(`FNS API Error: ${data.message || 'Mã lỗi FNS không thành công'} (Code: ${data.code})`);
+    }
+
+    const durationMs = Date.now() - startTimeFns;
+    const gatewayName = 'FPT FNS Gateway (Template 10233)';
+
+    try {
+      await prisma.znsMessageLog.create({
+        data: {
+          messageId: data.data?.message_id || null,
+          phone: formattedPhone,
+          serialNumber: serialNumber || null,
+          customerName,
+          productName: `Dịch vụ ${workType}: ${serviceCode}`,
+          templateId: String(fnsTemplateId),
+          status: 'SUCCESS',
+          durationMs: `${durationMs}ms`,
+          gateway: gatewayName,
+          orderNumber: serviceCode,
+          sentAt: new Date(),
+          rawData: {
+            fnsData: data,
+            template_data: fnsTemplateData,
+            workType
+          }
+        }
+      });
+    } catch (dbErr: any) {
+      logger.warn('Failed to save ZnsMessageLog to DB for FNS 10233', { error: dbErr.message });
+    }
+
+    return {
+      ...data,
+      gateway: gatewayName,
+      templateId: fnsTemplateId,
+      serviceCode,
+      totalCollected: formattedMoney
+    };
+  } catch (err: any) {
+    const durationMs = Date.now() - startTimeFns;
+    try {
+      await prisma.znsMessageLog.create({
+        data: {
+          phone: formattedPhone,
+          serialNumber: serialNumber || null,
+          customerName,
+          productName: `Dịch vụ ${workType}: ${serviceCode}`,
+          templateId: String(fnsTemplateId),
+          status: 'FAILED',
+          error: err.message,
+          durationMs: `${durationMs}ms`,
+          gateway: 'FPT FNS Gateway (Template 10233)',
+          orderNumber: serviceCode,
+          sentAt: new Date(),
+          rawData: { error: err.message, details: err.response?.data }
+        }
+      });
+    } catch (dbErr: any) {}
+    throw err;
+  }
+}
+
+
 // ══════════════════════════════════════════════════════════════════════════
 //  ZALO OA ARTICLES ENGINE (CACHE & BATCH PAGINATION)
 // ══════════════════════════════════════════════════════════════════════════

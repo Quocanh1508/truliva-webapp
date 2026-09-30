@@ -349,8 +349,12 @@ export const OrderClassificationSection: React.FC<OrderClassificationSectionProp
               value={appointmentDate}
               min={todayStr}
               onChange={e => {
-                onAppointmentDateChange(e.target.value);
-                if (!appointmentTime) onAppointmentTimeChange('08:30');
+                const newDate = e.target.value;
+                onAppointmentDateChange(newDate);
+                // Khi đổi sang ngày khác → luôn reset giờ hẹn về mặc định 08:30
+                if (newDate !== appointmentDate) {
+                  onAppointmentTimeChange('08:30');
+                }
               }}
               className="w-full p-2.5 bg-white border-2 border-slate-300 rounded-xl text-xs font-semibold text-slate-800 shadow-xs focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 outline-none transition-all cursor-pointer"
             />

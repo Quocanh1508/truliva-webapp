@@ -15,7 +15,13 @@ import {
   parseExcelDate
 } from '../services/serialService';
 import { activateSerialWarranty } from '../services/warrantyService';
-import { getZaloConfig, exchangeAuthorizationCode, sendZnsWarrantyActivation, getValidAccessToken } from '../services/zaloService';
+import { 
+  getZaloConfig, 
+  exchangeAuthorizationCode, 
+  sendZnsWarrantyActivation, 
+  sendFnsServiceCompletion,
+  getValidAccessToken 
+} from '../services/zaloService';
 import { sendPushNotification } from '../services/notificationService';
 import { sendWebPushNotification } from '../services/webPushService';
 
@@ -1590,11 +1596,100 @@ export async function activateZns(req: Request, res: Response): Promise<void> {
       warrantyMonths, 
       workType, 
       expiryDateStr, 
-      customerName 
+      customerName,
+      orderId,
+      serviceCode,
+      totalCollected,
+      allowRealSend
     } = req.body;
 
-    if (!serialNumber || !recipientPhone) {
-      res.status(400).json({ error: 'Thiếu số Serial hoặc Số điện thoại nhận ZNS' });
+    if (!recipientPhone) {
+      res.status(400).json({ error: 'Thiếu Số điện thoại nhận ZNS/FNS' });
+      return;
+    }
+
+    const workTypeClean = (workType || '').trim().toLowerCase();
+    const isServiceJob = ['thay lọc', 'bảo hành', 'sửa chữa'].includes(workTypeClean);
+
+    // ─────────────────────────────────────────────────────────────
+    // 1. NẾU LÀ CA DỊCH VỤ (THAY LỌC, BẢO HÀNH, SỬA CHỮA) -> FNS 10233
+    // ─────────────────────────────────────────────────────────────
+    if (isServiceJob) {
+      let resolvedServiceCode = (serviceCode || '').trim();
+      let resolvedTotalCollected = totalCollected;
+      let finalCustomerName = customerName?.trim();
+      let order: any = null;
+
+      if (orderId) {
+        order = await prisma.order.findUnique({
+          where: { id: orderId },
+          select: {
+            id: true,
+            pancakeOrderId: true,
+            totalPrice: true,
+            billFullName: true,
+            billPhoneNumber: true,
+            serviceReports: {
+              select: { actualAmount: true },
+              orderBy: { createdAt: 'desc' },
+              take: 1
+            }
+          }
+        });
+      }
+
+      if (!resolvedServiceCode && order) {
+        if (order.pancakeOrderId !== null && order.pancakeOrderId !== undefined) {
+          resolvedServiceCode = order.pancakeOrderId < 0 
+            ? `M${Math.abs(order.pancakeOrderId)}` 
+            : String(order.pancakeOrderId);
+        } else {
+          resolvedServiceCode = order.id.slice(-6).toUpperCase();
+        }
+      }
+
+      if (!resolvedServiceCode) {
+        resolvedServiceCode = serialNumber ? cleanSerialNumber(serialNumber) : 'SRV';
+      }
+
+      if (resolvedTotalCollected === undefined || resolvedTotalCollected === null || resolvedTotalCollected === '') {
+        const lastReportAmount = order?.serviceReports?.[0]?.actualAmount;
+        resolvedTotalCollected = lastReportAmount !== undefined && lastReportAmount !== null 
+          ? lastReportAmount 
+          : (order?.totalPrice || 0);
+      }
+
+      if (!finalCustomerName) {
+        finalCustomerName = order?.billFullName || 'Quý Khách';
+      }
+
+      const fnsResult = await sendFnsServiceCompletion({
+        recipientPhone: recipientPhone.trim(),
+        customerName: finalCustomerName,
+        serviceCode: resolvedServiceCode,
+        totalCollected: resolvedTotalCollected,
+        serialNumber: serialNumber ? cleanSerialNumber(serialNumber) : undefined,
+        orderId,
+        workType: workType || 'Dịch vụ',
+        allowRealSend: Boolean(allowRealSend)
+      });
+
+      res.json({
+        success: true,
+        message: `Đã phát tin nhắn FNS (Mẫu 10233 - Dịch vụ ${workType || 'SC/BH/Thay lọc'}) thành công!`,
+        result: fnsResult,
+        templateId: 10233,
+        serviceCode: resolvedServiceCode,
+        totalCollected: resolvedTotalCollected
+      });
+      return;
+    }
+
+    // ─────────────────────────────────────────────────────────────
+    // 2. NGƯỢC LẠI: CA LẮP ĐẶT THIẾT BỊ MÁY (TEMPLATE 617366 / FNS 10232)
+    // ─────────────────────────────────────────────────────────────
+    if (!serialNumber) {
+      res.status(400).json({ error: 'Thiếu số Serial đối với ca Lắp đặt thiết bị máy' });
       return;
     }
 
@@ -1603,19 +1698,16 @@ export async function activateZns(req: Request, res: Response): Promise<void> {
       where: { serialNumber: cleanSerial }
     });
 
-    const isFilterJob = (workType?.trim().toLowerCase() === 'thay lọc') || (warrantyMonths === 3);
     const isUR5840 = (existingSerial?.model || '').toUpperCase().includes('UR5840') || 
                      (existingSerial?.productLine || '').toUpperCase().includes('UR5840');
     const defaultMonths = isUR5840 ? 24 : 12;
-    const monthsToApply = isFilterJob ? 3 : (Number(warrantyMonths) || defaultMonths);
+    const monthsToApply = Number(warrantyMonths) || defaultMonths;
     const finalCustomerName = customerName?.trim() || existingSerial?.customerName || 'Quý Khách';
-    const finalProductName = productName?.trim() || existingSerial?.productLine || existingSerial?.model || (isFilterJob ? 'Lõi lọc nước Truliva' : 'Máy lọc nước Truliva');
+    const finalProductName = productName?.trim() || existingSerial?.productLine || existingSerial?.model || 'Máy lọc nước Truliva';
 
     const startDate = new Date();
 
-    // CHỈ kích hoạt/cập nhật thời hạn bảo hành máy chính thức trong DB nếu là ca Lắp đặt thiết bị máy
-    // Đối với ca Thay lọc, bảo hành lõi 3 tháng chỉ gửi thông báo ZNS cho khách, KHÔNG ghi đè làm giảm thời hạn bảo hành gốc của máy trong DB
-    if (existingSerial && !isFilterJob) {
+    if (existingSerial) {
       await activateSerialWarranty(
         cleanSerial,
         existingSerial?.orderId || null,
@@ -1693,9 +1785,46 @@ export async function activateManual(req: Request, res: Response): Promise<void>
 
 export async function testZnsSend(req: Request, res: Response): Promise<void> {
   try {
-    const { phone, serialNumber, customerName, productName, expiryDate, gatewayMode } = req.body;
-    if (!phone || !serialNumber) {
-      res.status(400).json({ error: 'Thiếu số điện thoại hoặc số Serial thử nghiệm' });
+    const { 
+      phone, 
+      serialNumber, 
+      customerName, 
+      productName, 
+      expiryDate, 
+      gatewayMode, 
+      templateId, 
+      serviceCode, 
+      totalCollected, 
+      workType, 
+      allowRealSend 
+    } = req.body;
+
+    if (!phone) {
+      res.status(400).json({ error: 'Thiếu số điện thoại thử nghiệm' });
+      return;
+    }
+
+    // Nếu chỉ định Template 10233 hoặc loại công việc dịch vụ
+    if (templateId === '10233' || templateId === 10233) {
+      const result = await sendFnsServiceCompletion({
+        recipientPhone: phone,
+        customerName: customerName || 'Khách Hàng Test',
+        serviceCode: serviceCode || '5343',
+        totalCollected: totalCollected !== undefined ? totalCollected : 150000,
+        serialNumber: serialNumber || 'TEST_SN',
+        workType: workType || 'Thay lọc',
+        allowRealSend: Boolean(allowRealSend)
+      });
+      res.json({
+        success: true,
+        templateId: 10233,
+        ...result
+      });
+      return;
+    }
+
+    if (!serialNumber) {
+      res.status(400).json({ error: 'Thiếu số Serial thử nghiệm cho mẫu kích hoạt bảo hành' });
       return;
     }
 

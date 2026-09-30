@@ -667,12 +667,15 @@ export default function ReportForm() {
           warrantyMonths: activationData.workType?.trim().toLowerCase() === 'thay lọc' ? 3 : (activationData.totalMonths || 12),
           workType: activationData.workType,
           customerName: activationData.customerName,
-          expiryDateStr: warrantyExpiryDateStr
+          expiryDateStr: warrantyExpiryDateStr,
+          orderId: activationData.orderId,
+          serviceCode: activationData.serviceCode,
+          totalCollected: activationData.totalCollected
         })
       });
       setActivationStep(2);
     } catch (err: any) {
-      alert(err.message || 'Lỗi khi gửi yêu cầu kích hoạt ZNS. Hệ thống vẫn lưu báo cáo, Admin sẽ kích hoạt bảo hành sau.');
+      alert(err.message || 'Lỗi khi gửi yêu cầu gửi tin nhắn Zalo. Hệ thống vẫn lưu báo cáo.');
       setShowActivationModal(false);
       navigate(reportsRedirectPath);
     } finally {
@@ -681,14 +684,39 @@ export default function ReportForm() {
   };
 
   const triggerActivationModal = (payload: any) => {
-    const isFilterJob = payload.workType?.trim().toLowerCase() === 'thay lọc';
+    const workTypeLower = (payload.workType || '').trim().toLowerCase();
+    const isServiceJob = ['thay lọc', 'bảo hành', 'sửa chữa'].includes(workTypeLower);
+    const isFilterJob = workTypeLower === 'thay lọc';
+
     let modelName = 'Máy lọc nước Truliva';
     if (isFilterJob) {
       const filterNames = selectedItems.filter((i: any) => i.productName).map((i: any) => i.productName).join(', ');
       modelName = filterNames || 'Lõi lọc nước Truliva';
+    } else if (['bảo hành', 'sửa chữa'].includes(workTypeLower)) {
+      const itemNames = selectedItems.filter((i: any) => i.productName).map((i: any) => i.productName).join(', ');
+      modelName = itemNames || (payload.workType ? `Dịch vụ ${payload.workType}` : 'Dịch vụ kỹ thuật');
     } else if (selectedItems.length > 0) {
       modelName = selectedItems[0].productName;
     }
+
+    const currentOrder = orders.find(o => o.id === (payload.orderId || selectedOrderId));
+    let serviceCodeStr = '';
+    if (currentOrder) {
+      if (currentOrder.pancakeOrderId !== null && currentOrder.pancakeOrderId !== undefined) {
+        serviceCodeStr = currentOrder.pancakeOrderId < 0 
+          ? `M${Math.abs(currentOrder.pancakeOrderId)}` 
+          : String(currentOrder.pancakeOrderId);
+      } else {
+        serviceCodeStr = currentOrder.id ? currentOrder.id.slice(-6).toUpperCase() : '';
+      }
+    }
+    if (!serviceCodeStr && (payload.orderId || selectedOrderId)) {
+      serviceCodeStr = (payload.orderId || selectedOrderId).slice(-6).toUpperCase();
+    }
+
+    const totalCollectedVal = payload.actualAmount !== undefined && payload.actualAmount !== '' 
+      ? Number(payload.actualAmount) 
+      : (currentOrder?.totalPrice || 0);
 
     setActivationData({
       serialNumber: payload.serialNumber,
@@ -697,21 +725,20 @@ export default function ReportForm() {
       address: payload.address,
       model: modelName,
       productName: modelName,
-      workType: payload.workType
+      workType: payload.workType,
+      orderId: payload.orderId || selectedOrderId,
+      serviceCode: serviceCodeStr,
+      totalCollected: totalCollectedVal,
+      isServiceJob
     });
     setZnsPhone(payload.customerPhone);
     setActivationStep(1);
     setShowActivationModal(true);
     setLoading(false);
 
-    if (isFilterJob) {
-      setWarrantyDurationText('3 tháng (Bảo hành thay lõi lọc)');
-      const exp = new Date();
-      exp.setMonth(exp.getMonth() + 3);
-      const day = String(exp.getDate()).padStart(2, '0');
-      const month = String(exp.getMonth() + 1).padStart(2, '0');
-      const year = exp.getFullYear();
-      setWarrantyExpiryDateStr(`${day}/${month}/${year}`);
+    if (isServiceJob) {
+      setWarrantyDurationText(payload.workType || 'Dịch vụ');
+      setWarrantyExpiryDateStr('');
     } else {
       const initExp = new Date();
       initExp.setMonth(initExp.getMonth() + 12);
@@ -840,8 +867,8 @@ export default function ReportForm() {
           method: 'PUT',
           body: JSON.stringify(payload)
         });
-        const isActivationJob = ['lắp đặt', 'giao hàng và lắp đặt', 'thay lọc'].includes(payload.workType?.trim().toLowerCase() || '');
-        if (isActivationJob) {
+        const isZnsJob = ['lắp đặt', 'giao hàng và lắp đặt', 'thay lọc', 'bảo hành', 'sửa chữa'].includes(payload.workType?.trim().toLowerCase() || '');
+        if (isZnsJob) {
           triggerActivationModal(payload);
         } else {
           navigate(reportsRedirectPath);
@@ -860,8 +887,8 @@ export default function ReportForm() {
         method: 'POST',
         body: JSON.stringify(payload)
       });
-      const isActivationJob = ['lắp đặt', 'giao hàng và lắp đặt', 'thay lọc'].includes(payload.workType?.trim().toLowerCase() || '');
-      if (isActivationJob) {
+      const isZnsJob = ['lắp đặt', 'giao hàng và lắp đặt', 'thay lọc', 'bảo hành', 'sửa chữa'].includes(payload.workType?.trim().toLowerCase() || '');
+      if (isZnsJob) {
         triggerActivationModal(payload);
       } else {
         navigate(reportsRedirectPath);
@@ -1561,11 +1588,17 @@ export default function ReportForm() {
             >
               {activationStep === 1 ? (
                 <>
-                  {/* Step 1: Xác nhận thông tin gửi ZNS */}
+                  {/* Step 1: Xác nhận thông tin gửi ZNS / FNS */}
                   <div className="p-4 sm:p-5 border-b border-gray-100 flex justify-between items-center bg-gray-50/80 shrink-0">
                     <div className="text-left">
-                      <h3 className="font-bold text-gray-800 text-base">Kích Hoạt Bảo Hành</h3>
-                      <p className="text-[11px] text-gray-500 mt-0.5">Xác nhận gửi tin nhắn ZNS cho Khách hàng</p>
+                      <h3 className="font-bold text-gray-800 text-base">
+                        {activationData.isServiceJob ? 'Xác Nhận Hoàn Thành Dịch Vụ' : 'Kích Hoạt Bảo Hành'}
+                      </h3>
+                      <p className="text-[11px] text-gray-500 mt-0.5">
+                        {activationData.isServiceJob 
+                          ? `Xác nhận gửi tin nhắn Zalo cho Khách hàng (Mẫu FNS 10233)`
+                          : 'Xác nhận gửi tin nhắn ZNS cho Khách hàng'}
+                      </p>
                     </div>
                     <button 
                       type="button" 
@@ -1577,32 +1610,70 @@ export default function ReportForm() {
                   </div>
 
                   <div className="p-4 sm:p-5 overflow-y-auto flex-1 space-y-4 text-left min-h-0">
-                    {/* THÔNG TIN SẢN PHẨM Card */}
-                    <div className="border border-blue-100 rounded-xl p-3.5 sm:p-4 bg-blue-50/30 space-y-2 text-left">
-                      <h4 className="text-[10px] font-bold text-gray-400 uppercase tracking-wider border-b border-blue-100/70 pb-1.5">
-                        THÔNG TIN SẢN PHẨM
-                      </h4>
-                      <p className="text-sm font-bold text-gray-800 leading-snug break-words">
-                        {activationData.productName || activationData.model}
-                      </p>
-                      <div className="grid grid-cols-3 gap-1.5 text-xs text-gray-600 pt-1.5 border-t border-blue-100/50 mt-2">
-                        <span className="font-medium text-gray-500">Serial:</span>
-                        <span className="col-span-2 font-mono font-bold text-blue-700 break-all">{activationData.serialNumber}</span>
+                    {/* THÔNG TIN DỊCH VỤ HOẶC SẢN PHẨM Card */}
+                    {activationData.isServiceJob ? (
+                      <div className="border border-blue-100 rounded-xl p-3.5 sm:p-4 bg-blue-50/30 space-y-2 text-left">
+                        <div className="flex items-center justify-between border-b border-blue-100/70 pb-1.5">
+                          <h4 className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">
+                            THÔNG TIN DỊCH VỤ HOÀN THÀNH
+                          </h4>
+                          <span className="text-[10px] font-bold text-blue-700 bg-blue-100 px-2 py-0.5 rounded-full">
+                            FNS 10233
+                          </span>
+                        </div>
+                        <div className="grid grid-cols-3 gap-1.5 text-xs text-gray-600 pt-1">
+                          <span className="font-medium text-gray-500">Mã dịch vụ:</span>
+                          <span className="col-span-2 font-mono font-bold text-blue-700 text-sm tracking-wider">
+                            {activationData.serviceCode || '---'}
+                          </span>
 
-                        {activationData.model && activationData.model !== (activationData.productName || activationData.model) && (
-                          <>
-                            <span className="font-medium text-gray-500">Model:</span>
-                            <span className="col-span-2 font-semibold text-gray-800">{activationData.model}</span>
-                          </>
-                        )}
+                          <span className="font-medium text-gray-500">Loại ca:</span>
+                          <span className="col-span-2 font-semibold text-gray-800">
+                            {activationData.workType}
+                          </span>
 
-                        <span className="font-medium text-gray-500">Bảo hành:</span>
-                        <span className="col-span-2 font-semibold text-gray-800">{warrantyDurationText}</span>
+                          <span className="font-medium text-gray-500">Tổng tiền thu:</span>
+                          <span className="col-span-2 font-bold text-emerald-600 text-sm">
+                            {new Intl.NumberFormat('vi-VN').format(activationData.totalCollected || 0)} đ
+                          </span>
 
-                        <span className="font-medium text-gray-500">Đến ngày:</span>
-                        <span className="col-span-2 font-bold text-red-600">{warrantyExpiryDateStr || '---'}</span>
+                          {activationData.productName && (
+                            <>
+                              <span className="font-medium text-gray-500">Linh kiện/máy:</span>
+                              <span className="col-span-2 text-gray-700 font-medium leading-relaxed break-words">
+                                {activationData.productName}
+                              </span>
+                            </>
+                          )}
+                        </div>
                       </div>
-                    </div>
+                    ) : (
+                      <div className="border border-blue-100 rounded-xl p-3.5 sm:p-4 bg-blue-50/30 space-y-2 text-left">
+                        <h4 className="text-[10px] font-bold text-gray-400 uppercase tracking-wider border-b border-blue-100/70 pb-1.5">
+                          THÔNG TIN SẢN PHẨM
+                        </h4>
+                        <p className="text-sm font-bold text-gray-800 leading-snug break-words">
+                          {activationData.productName || activationData.model}
+                        </p>
+                        <div className="grid grid-cols-3 gap-1.5 text-xs text-gray-600 pt-1.5 border-t border-blue-100/50 mt-2">
+                          <span className="font-medium text-gray-500">Serial:</span>
+                          <span className="col-span-2 font-mono font-bold text-blue-700 break-all">{activationData.serialNumber}</span>
+
+                          {activationData.model && activationData.model !== (activationData.productName || activationData.model) && (
+                            <>
+                              <span className="font-medium text-gray-500">Model:</span>
+                              <span className="col-span-2 font-semibold text-gray-800">{activationData.model}</span>
+                            </>
+                          )}
+
+                          <span className="font-medium text-gray-500">Bảo hành:</span>
+                          <span className="col-span-2 font-semibold text-gray-800">{warrantyDurationText}</span>
+
+                          <span className="font-medium text-gray-500">Đến ngày:</span>
+                          <span className="col-span-2 font-bold text-red-600">{warrantyExpiryDateStr || '---'}</span>
+                        </div>
+                      </div>
+                    )}
 
                     {/* THÔNG TIN KHÁCH HÀNG Card */}
                     <div className="border border-gray-100 rounded-xl p-3.5 sm:p-4 space-y-2 bg-white text-left">
@@ -1630,7 +1701,7 @@ export default function ReportForm() {
                         className="form-input w-full font-semibold text-sm tracking-wider px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500"
                         value={znsPhone}
                         onChange={(e) => setZnsPhone(e.target.value)}
-                        placeholder="Nhập số điện thoại nhận ZNS..."
+                        placeholder="Nhập số điện thoại nhận Zalo..."
                       />
                       <p className="text-[10px] text-gray-400 leading-relaxed mt-1">
                         ⚠️ KTV có thể thay đổi SĐT này nếu khách hàng dùng số Zalo khác SĐT đăng ký đơn hàng.
@@ -1647,11 +1718,19 @@ export default function ReportForm() {
                     >
                       {znsSending ? (
                         <>
-                          <Loader2 size={16} className="animate-spin" /> Đang kích hoạt...
+                          <Loader2 size={16} className="animate-spin" /> Đang phát tin...
                         </>
                       ) : (
                         <>
-                          <ShieldCheck size={18} /> Kích hoạt bảo hành
+                          {activationData.isServiceJob ? (
+                            <>
+                              <Send size={18} /> Xác nhận & Gửi tin nhắn Zalo
+                            </>
+                          ) : (
+                            <>
+                              <ShieldCheck size={18} /> Kích hoạt bảo hành
+                            </>
+                          )}
                         </>
                       )}
                     </button>
@@ -1659,23 +1738,27 @@ export default function ReportForm() {
                 </>
               ) : (
                 <>
-                  {/* Step 2: Kích hoạt bảo hành thành công! */}
+                  {/* Step 2: Gửi tin nhắn thành công! */}
                   <div className="p-6 text-center space-y-4 overflow-y-auto flex-1 min-h-0">
                     <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto text-green-600 shadow-sm shrink-0">
                       <CheckCircle size={36} />
                     </div>
                     
                     <div className="space-y-1">
-                      <h3 className="font-bold text-gray-800 text-lg">Kích hoạt bảo hành thành công!</h3>
+                      <h3 className="font-bold text-gray-800 text-lg">
+                        {activationData.isServiceJob ? 'Gửi tin nhắn dịch vụ thành công!' : 'Kích hoạt bảo hành thành công!'}
+                      </h3>
                       <p className="text-xs text-gray-500 px-4 leading-relaxed">
-                        Tin nhắn thông báo đã được gửi đến số Zalo:
+                        {activationData.isServiceJob 
+                          ? `Tin nhắn xác nhận hoàn thành dịch vụ (Mã ${activationData.serviceCode || ''}) đã gửi đến Zalo:`
+                          : 'Tin nhắn thông báo kích hoạt bảo hành đã được gửi đến số Zalo:'}
                       </p>
                       <p className="text-base font-bold text-blue-600 tracking-wider mt-1">{znsPhone}</p>
                     </div>
 
                     <div className="bg-emerald-50 border border-emerald-100 rounded-xl p-4 text-left text-xs text-emerald-900 leading-relaxed max-w-sm mx-auto space-y-1">
                       <p className="font-medium">
-                        KTV hướng dẫn khách hàng kiểm tra tin nhắn, Xác nhận kích hoạt bảo hành và Quan tâm Zalo OA <strong>Pure Vita</strong>.
+                        KTV hướng dẫn khách hàng kiểm tra tin nhắn Zalo từ OA <strong>Pure Vita</strong>.
                       </p>
                       <p className="font-semibold text-emerald-800 pt-1">Xin cảm ơn!</p>
                     </div>
