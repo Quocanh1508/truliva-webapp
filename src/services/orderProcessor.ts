@@ -447,7 +447,7 @@ export async function processOrderEvent(rawEventId: string | null, payload: any)
             productName: name,
             sku: sku || null,
             quantity: item.quantity ?? 1,
-            price: isWarrantyOrder ? 0 : (item.price ?? item.product_price ?? null),
+            price: isWarrantyOrder ? 0 : (item.variation_info?.retail_price ?? item.variation_info?.exact_price ?? item.price ?? item.product_price ?? null),
             discount: item.discount ?? 0,
             variationInfo: item.variation_info || item.variations || null,
             rawData: item,
