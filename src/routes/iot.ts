@@ -229,15 +229,16 @@ router.post('/devices', requireAuth, requireAdmin, async (req: Request, res: Res
 
 /**
  * POST /api/iot/devices/:serialNumber/command
- * Gửi lệnh xuống ESP32 qua MQTT
+ * Gửi lệnh xuống ESP32 qua MQTT (reboot, set_interval, ping, ota)
  */
 router.post('/devices/:serialNumber/command', requireAuth, requireAdmin, async (req: Request, res: Response): Promise<void> => {
   try {
     const serialNumber = req.params.serialNumber as string;
-    const { command, params } = req.body;
+    const { command, cmd, params, ...rest } = req.body;
+    const targetCommand = command || cmd;
 
-    if (!command) {
-      res.status(400).json({ error: 'Thiếu command' });
+    if (!targetCommand) {
+      res.status(400).json({ error: 'Thiếu command (hoặc cmd)' });
       return;
     }
 
@@ -250,10 +251,11 @@ router.post('/devices/:serialNumber/command', requireAuth, requireAdmin, async (
       return;
     }
 
-    const success = publishCommand(serialNumber, command, params || {});
+    const mergedParams = { ...(params || {}), ...rest };
+    const success = publishCommand(serialNumber, targetCommand, mergedParams);
 
     if (success) {
-      res.json({ message: `Lệnh "${command}" đã gửi tới ${serialNumber}` });
+      res.json({ message: `Lệnh "${targetCommand}" đã gửi tới ${serialNumber}`, command: targetCommand, params: mergedParams });
     } else {
       res.status(503).json({ error: 'MQTT chưa kết nối, không thể gửi lệnh' });
     }
@@ -288,7 +290,7 @@ router.patch('/alerts/:id/resolve', requireAuth, requireAdmin, async (req: Reque
 
 /**
  * DELETE /api/iot/devices/:serialNumber
- * Xóa thiết bị IoT (và toàn bộ telemetry + alerts)
+ * Lưu trữ và hủy kích hoạt thiết bị IoT (TUÂN THỦ NGUYÊN TẮC ZERO HARD-DELETE)
  */
 router.delete('/devices/:serialNumber', requireAuth, requireAdmin, async (req: Request, res: Response): Promise<void> => {
   try {
@@ -303,15 +305,28 @@ router.delete('/devices/:serialNumber', requireAuth, requireAdmin, async (req: R
       return;
     }
 
-    // Delete telemetry and alerts first (cascade not in Prisma by default)
-    await prisma.iotTelemetry.deleteMany({ where: { deviceId: device.id } });
-    await prisma.iotAlert.deleteMany({ where: { deviceId: device.id } });
-    await prisma.iotDevice.delete({ where: { id: device.id } });
+    // Soft-archive device (tuân thủ Rule 7: Zero Hard-Delete Policy)
+    const currentConfig = (typeof device.configJson === 'object' && device.configJson !== null)
+      ? (device.configJson as Record<string, any>)
+      : {};
 
-    res.json({ message: `Đã xóa thiết bị ${serialNumber}` });
+    await prisma.iotDevice.update({
+      where: { id: device.id },
+      data: {
+        isOnline: false,
+        configJson: {
+          ...currentConfig,
+          isArchived: true,
+          archivedAt: new Date().toISOString(),
+          archivedBy: (req as any).user?.username || 'admin'
+        }
+      }
+    });
+
+    res.json({ message: `Đã lưu trữ và ngắt kích hoạt thiết bị ${serialNumber}` });
   } catch (error: any) {
-    logger.error('IoT API: Delete device error', { error: error.message });
-    res.status(500).json({ error: 'Lỗi khi xóa thiết bị' });
+    logger.error('IoT API: Archive device error', { error: error.message });
+    res.status(500).json({ error: 'Lỗi khi xử lý thiết bị' });
   }
 });
 

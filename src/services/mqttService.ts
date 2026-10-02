@@ -8,6 +8,7 @@ const MQTT_USERNAME = process.env.MQTT_USERNAME || 'truliva_backend';
 const MQTT_PASSWORD = process.env.MQTT_PASSWORD || 'TrulivaM0tt@2026';
 const TELEMETRY_TOPIC = 'truliva/devices/+/telemetry';
 const STATUS_TOPIC = 'truliva/devices/+/status';
+const RESPONSE_TOPIC = 'truliva/devices/+/command/response';
 
 // ── Alert Thresholds ──
 const ALERT_THRESHOLDS = {
@@ -32,7 +33,7 @@ function parsePumpStatus(pump: number | string | undefined): string {
 
 // ── Extract serial number from MQTT topic ──
 function extractSerialFromTopic(topic: string): string | null {
-  // topic format: truliva/devices/<SERIAL>/telemetry
+  // topic format: truliva/devices/<SERIAL>/...
   const parts = topic.split('/');
   if (parts.length >= 4 && parts[0] === 'truliva' && parts[1] === 'devices') {
     return parts[2];
@@ -56,12 +57,8 @@ async function handleTelemetryMessage(topic: string, payload: Buffer) {
     return;
   }
 
-  // Validate serial matches between topic and payload
-  const payloadSerial = data.sn || data.serialNumber;
-  if (!payloadSerial) {
-    logger.warn('MQTT: Missing serial number in payload', { topic });
-    return;
-  }
+  // Validate serial matches between topic and payload (fallback to topicSerial)
+  const payloadSerial = data.sn || data.serialNumber || topicSerial;
   if (payloadSerial !== topicSerial) {
     logger.warn('MQTT: Serial mismatch between topic and payload', {
       topicSerial,
@@ -76,18 +73,20 @@ async function handleTelemetryMessage(topic: string, payload: Buffer) {
       where: { serialNumber: topicSerial }
     });
 
+    const firmwareVer = data.fw || null;
+
     if (!device) {
       // Auto-register new device
       device = await prisma.iotDevice.create({
         data: {
           serialNumber: topicSerial,
           mqttUsername: topicSerial,
-          firmwareVersion: data.fw || null,
+          firmwareVersion: firmwareVer,
           lastSeenAt: new Date(),
           isOnline: true,
         }
       });
-      logger.info('MQTT: Auto-registered new IoT device', { serial: topicSerial });
+      logger.info('MQTT: Auto-registered new IoT device', { serial: topicSerial, fw: firmwareVer });
     } else {
       // Update device status
       await prisma.iotDevice.update({
@@ -95,32 +94,41 @@ async function handleTelemetryMessage(topic: string, payload: Buffer) {
         data: {
           lastSeenAt: new Date(),
           isOnline: true,
-          firmwareVersion: data.fw || device.firmwareVersion,
+          firmwareVersion: firmwareVer || device.firmwareVersion,
         }
       });
     }
 
     // 2. Store telemetry data
-    const pumpStatus = parsePumpStatus(data.pump);
+    // Map both camelCase (from ESP32 firmware 1.2.0+) and snake_case (legacy)
+    const tdsIn = data.tdsIn != null ? Number(data.tdsIn) : (data.tds_in != null ? Number(data.tds_in) : null);
+    const tdsOut = data.tdsOut != null ? Number(data.tdsOut) : (data.tds_out != null ? Number(data.tds_out) : null);
+    const flow = data.flowRate != null ? Number(data.flowRate) : (data.flow != null ? Number(data.flow) : null);
+    const pressure = data.pressure != null ? Number(data.pressure) : null;
+    const pumpStatus = data.pumpStatus != null ? String(data.pumpStatus) : parsePumpStatus(data.pump);
+    const errorCode = data.err != null
+      ? Number(data.err)
+      : (Array.isArray(data.errorCodes) && data.errorCodes.length > 0 ? Number(data.errorCodes[0]) : 0);
+
     await prisma.iotTelemetry.create({
       data: {
         deviceId: device.id,
-        tdsIn: data.tds_in != null ? Number(data.tds_in) : null,
-        tdsOut: data.tds_out != null ? Number(data.tds_out) : null,
-        waterFlowLpm: data.flow != null ? Number(data.flow) : null,
+        tdsIn,
+        tdsOut,
+        waterFlowLpm: flow,
         totalLiters: data.total_l != null ? Number(data.total_l) : null,
-        waterPressure: data.pressure != null ? Number(data.pressure) : null,
+        waterPressure: pressure,
         pumpStatus: pumpStatus !== 'UNKNOWN' ? pumpStatus : null,
-        errorCode: data.err != null ? Number(data.err) : 0,
+        errorCode,
         rawPayload: data,
         recordedAt: data.ts ? new Date(data.ts * 1000) : new Date(),
       }
     });
 
     // 3. Check alert thresholds
-    await checkAlerts(device.id, topicSerial, data, pumpStatus);
+    await checkAlerts(device.id, topicSerial, data, pumpStatus, tdsOut);
 
-    logger.debug('MQTT: Telemetry stored', { serial: topicSerial, tdsIn: data.tds_in, tdsOut: data.tds_out });
+    logger.debug('MQTT: Telemetry stored', { serial: topicSerial, tdsIn, tdsOut, ppc: data.ppc, ro: data.ro, cto: data.cto });
   } catch (error: any) {
     logger.error('MQTT: Error processing telemetry', {
       serial: topicSerial,
@@ -130,8 +138,13 @@ async function handleTelemetryMessage(topic: string, payload: Buffer) {
 }
 
 // ── Check alert conditions ──
-async function checkAlerts(deviceId: string, serial: string, data: any, pumpStatus: string) {
-  const tdsOut = data.tds_out != null ? Number(data.tds_out) : null;
+async function checkAlerts(
+  deviceId: string,
+  serial: string,
+  data: any,
+  pumpStatus: string,
+  tdsOut: number | null
+) {
   const alerts: { type: string; severity: string; message: string }[] = [];
 
   // TDS Critical
@@ -148,6 +161,42 @@ async function checkAlerts(deviceId: string, serial: string, data: any, pumpStat
       type: 'TDS_HIGH',
       severity: 'WARNING',
       message: `⚠️ TDS đầu ra cao: ${tdsOut} ppm (Máy ${serial}). Nên kiểm tra lõi lọc.`
+    });
+  }
+
+  // Filter 1: PPC replacement alert
+  if (data.ppc_replace === true) {
+    alerts.push({
+      type: 'FILTER_PPC_REPLACE',
+      severity: 'WARNING',
+      message: `⚠️ Máy ${serial}: Lõi lọc thô PPC đã hết hạn (${data.ppc ?? 0}%). Cần thay lõi!`
+    });
+  }
+
+  // Filter 2: RO membrane replacement alert
+  if (data.ro_replace === true) {
+    alerts.push({
+      type: 'FILTER_RO_REPLACE',
+      severity: 'CRITICAL',
+      message: `⚠️ Máy ${serial}: Màng lọc RO đã hết hạn (${data.ro ?? 0}%). Cần thay màng RO!`
+    });
+  }
+
+  // Filter 3: CTO carbon replacement alert
+  if (data.cto_replace === true) {
+    alerts.push({
+      type: 'FILTER_CTO_REPLACE',
+      severity: 'WARNING',
+      message: `⚠️ Máy ${serial}: Lõi than CTO đã hết hạn (${data.cto ?? 0}%). Cần thay lõi CTO!`
+    });
+  }
+
+  // UART connection lost between ESP32 and Water Purifier mainboard
+  if (data.uart_ok === false) {
+    alerts.push({
+      type: 'UART_ERROR',
+      severity: 'WARNING',
+      message: `⚠️ Máy ${serial}: Mất kết nối UART giữa ESP32 và bo điều khiển máy lọc.`
     });
   }
 
@@ -244,6 +293,77 @@ async function handleStatusMessage(topic: string, payload: Buffer) {
   }
 }
 
+// ── Handle command response from device (OTA, ping, set_interval, reboot) ──
+async function handleCommandResponse(topic: string, payload: Buffer) {
+  const serial = extractSerialFromTopic(topic);
+  if (!serial) return;
+
+  try {
+    const data = JSON.parse(payload.toString());
+    logger.info('MQTT: Command response received', { serial, data });
+
+    const device = await prisma.iotDevice.findUnique({
+      where: { serialNumber: serial }
+    });
+    if (!device) return;
+
+    const currentConfig = (typeof device.configJson === 'object' && device.configJson !== null)
+      ? (device.configJson as Record<string, any>)
+      : {};
+
+    const updatedConfig: Record<string, any> = {
+      ...currentConfig,
+      lastCommandResponse: data,
+      lastCommandResponseAt: new Date().toISOString()
+    };
+
+    // Process OTA command response
+    if (data.cmd === 'ota') {
+      updatedConfig.otaStatus = data.status;
+      updatedConfig.otaProgress = data.progress ?? 0;
+      if (data.version) updatedConfig.otaVersion = data.version;
+
+      // When OTA successfully completed, update firmware version in DB
+      if (data.status === 'completed' && data.version) {
+        await prisma.iotDevice.update({
+          where: { id: device.id },
+          data: {
+            firmwareVersion: data.version,
+            configJson: updatedConfig
+          }
+        });
+        logger.info(`MQTT: Device ${serial} upgraded firmware to ${data.version} successfully`);
+        return;
+      }
+
+      // If OTA rolled back
+      if (data.status === 'rolled_back') {
+        await prisma.iotAlert.create({
+          data: {
+            deviceId: device.id,
+            alertType: 'OTA_ROLLBACK',
+            severity: 'WARNING',
+            message: `⚠️ Máy ${serial} đã tự động rollback về firmware cũ (${data.error || 'chưa rõ lý do'})`,
+            payload: data
+          }
+        });
+      }
+    }
+
+    // Process set_interval response
+    if (data.cmd === 'set_interval' && data.ok && data.interval) {
+      updatedConfig.interval = data.interval;
+    }
+
+    await prisma.iotDevice.update({
+      where: { id: device.id },
+      data: { configJson: updatedConfig }
+    });
+  } catch (err: any) {
+    logger.warn('MQTT: Invalid command response payload', { topic, error: err.message });
+  }
+}
+
 // ── Publish command to device ──
 export function publishCommand(serialNumber: string, command: string, params: any = {}) {
   if (!mqttClient || !mqttClient.connected) {
@@ -252,13 +372,24 @@ export function publishCommand(serialNumber: string, command: string, params: an
   }
 
   const topic = `truliva/devices/${serialNumber}/command`;
-  const payload = JSON.stringify({ cmd: command, params });
+  const requestId = params.id || `req-${Date.now()}`;
 
-  mqttClient.publish(topic, payload, { qos: 1 }, (err) => {
+  // Flatten payload per partner specification:
+  // {"cmd": "<tên lệnh>", "id": "<mã yêu cầu, tùy chọn>", ...tham số}
+  const payloadObj: any = {
+    cmd: command,
+    id: requestId,
+    ...params
+  };
+
+  const payload = JSON.stringify(payloadObj);
+
+  // QoS 1, retain: false per specification (device ignores retained commands)
+  mqttClient.publish(topic, payload, { qos: 1, retain: false }, (err) => {
     if (err) {
       logger.error('MQTT: Failed to publish command', { serial: serialNumber, error: err.message });
     } else {
-      logger.info('MQTT: Command published', { serial: serialNumber, command });
+      logger.info('MQTT: Command published', { serial: serialNumber, command, requestId });
     }
   });
   return true;
@@ -329,7 +460,7 @@ export function startMqttService() {
   mqttClient.on('connect', () => {
     logger.info('MQTT: Connected to broker successfully');
 
-    // Subscribe to telemetry and status topics
+    // Subscribe to telemetry, status, and command response topics
     mqttClient!.subscribe(TELEMETRY_TOPIC, { qos: 1 }, (err) => {
       if (err) {
         logger.error('MQTT: Failed to subscribe to telemetry', { error: err.message });
@@ -345,6 +476,14 @@ export function startMqttService() {
         logger.info('MQTT: Subscribed to', { topic: STATUS_TOPIC });
       }
     });
+
+    mqttClient!.subscribe(RESPONSE_TOPIC, { qos: 1 }, (err) => {
+      if (err) {
+        logger.error('MQTT: Failed to subscribe to command response', { error: err.message });
+      } else {
+        logger.info('MQTT: Subscribed to', { topic: RESPONSE_TOPIC });
+      }
+    });
   });
 
   mqttClient.on('message', (topic: string, payload: Buffer) => {
@@ -355,6 +494,10 @@ export function startMqttService() {
     } else if (topic.endsWith('/status')) {
       handleStatusMessage(topic, payload).catch(err => {
         logger.error('MQTT: Unhandled error in status handler', { error: err.message });
+      });
+    } else if (topic.endsWith('/command/response')) {
+      handleCommandResponse(topic, payload).catch(err => {
+        logger.error('MQTT: Unhandled error in command response handler', { error: err.message });
       });
     }
   });
