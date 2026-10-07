@@ -6,6 +6,7 @@ import axios from 'axios';
 import fs from 'fs';
 import path from 'path';
 import { requireAuth, requireDev } from '../middleware/authSession';
+import pancakeCircuitBreaker from '../services/pancakeCircuitBreaker';
 
 const router = Router();
 
@@ -113,7 +114,13 @@ router.get('/system-health', requireAuth, requireDev, async (req: Request, res: 
           uptime: Math.round(serverUptime) 
         },
         database: { status: dbStatus, pingMs: dbPingMs, error: dbError },
-        pancake: { status: pancakeStatus, pingMs: pancakePingMs, error: pancakeError, shopId },
+        pancake: { 
+          status: pancakeStatus, 
+          pingMs: pancakePingMs, 
+          error: pancakeError, 
+          shopId,
+          circuitBreaker: pancakeCircuitBreaker.getStatus()
+        },
         firebase: { status: fcmStatus, error: fcmError, provider: hasJson ? 'Service Account File' : 'Environment Variables' }
       },
       webhooks: recentWebhooks,
@@ -175,6 +182,30 @@ router.get('/check-nga', async (req: Request, res: Response) => {
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
+});
+
+/**
+ * GET /api/dev/circuit-breaker
+ * Xem chi tiết trạng thái Circuit Breaker
+ */
+router.get('/circuit-breaker', requireAuth, requireDev, (req: Request, res: Response) => {
+  res.json({
+    success: true,
+    circuitBreaker: pancakeCircuitBreaker.getStatus()
+  });
+});
+
+/**
+ * POST /api/dev/circuit-breaker/reset
+ * Reset cầu chì về trạng thái Healthy
+ */
+router.post('/circuit-breaker/reset', requireAuth, requireDev, (req: Request, res: Response) => {
+  pancakeCircuitBreaker.reset();
+  res.json({
+    success: true,
+    message: 'Đã reset Circuit Breaker về trạng thái Healthy!',
+    circuitBreaker: pancakeCircuitBreaker.getStatus()
+  });
 });
 
 export default router;

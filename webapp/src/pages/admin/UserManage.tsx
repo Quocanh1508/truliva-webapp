@@ -2,11 +2,45 @@ import React, { useEffect, useState, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { fetchApi, getStations } from '../../api/client';
 import { isValidPhone, PHONE_ERROR_MSG } from '../../utils/phone';
-import { UserPlus, Lock, Unlock, Search, Filter, X, Pencil, Download, Shield, Users } from 'lucide-react';
+import { 
+  UserPlus, Lock, Unlock, Search, Filter, X, Pencil, Download, Shield, Users, 
+  RefreshCw, ShieldCheck, Loader2, Phone, Mail, User, Building2, Package 
+} from 'lucide-react';
 import { useConfirm } from '../../context/ConfirmContext';
 import { matchesSearchTerm } from '../../utils/text';
 import { useAuth, type UserRole } from '../../context/AuthContext';
 import PermissionMatrix from '../../components/PermissionMatrix';
+
+// Helper to get avatar initials
+function getInitials(name: string): string {
+  if (!name) return '??';
+  const parts = name.trim().split(/\s+/);
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  return (parts[parts.length - 2][0] + parts[parts.length - 1][0]).toUpperCase();
+}
+
+// Helper to get role badge style (Professional & Clean, No Emojis)
+function getRoleBadge(role: string) {
+  switch (role) {
+    case 'ADMIN':
+      return { label: 'ADMIN', className: 'bg-rose-50 text-rose-700 border-rose-200' };
+    case 'COORDINATOR':
+      return { label: 'COORDINATOR', className: 'bg-purple-50 text-purple-700 border-purple-200' };
+    case 'SALE_SUPERVISOR':
+      return { label: 'SALE SUPERVISOR', className: 'bg-amber-50 text-amber-700 border-amber-200' };
+    case 'SALER':
+      return { label: 'SALER', className: 'bg-emerald-50 text-emerald-700 border-emerald-200' };
+    case 'HOTLINE':
+      return { label: 'HOTLINE', className: 'bg-pink-50 text-pink-700 border-pink-200' };
+    case 'STAFF':
+      return { label: 'STAFF', className: 'bg-teal-50 text-teal-700 border-teal-200' };
+    case 'DEV':
+      return { label: 'DEV', className: 'bg-indigo-50 text-indigo-700 border-indigo-200' };
+    case 'KTV':
+    default:
+      return { label: role || 'KTV', className: 'bg-blue-50 text-blue-700 border-blue-200' };
+  }
+}
 
 // Helper to sort tech stations: TP.Hồ Chí Minh, Hà Nội, Đà Nẵng first, then A-Z
 function getSortedTechStations(main: any) {
@@ -98,6 +132,10 @@ export default function UserManage() {
   const [bankAccount, setBankAccount] = useState('');
   const [bankName, setBankName] = useState('');
   const [email, setEmail] = useState('');
+  const [originalUser, setOriginalUser] = useState<any>(null);
+  const [scopeModalOpen, setScopeModalOpen] = useState(false);
+  const [applyScopeChoice, setApplyScopeChoice] = useState<'OVERWRITE' | 'FUTURE_ONLY'>('OVERWRITE');
+  const [submittingScope, setSubmittingScope] = useState(false);
 
   const [error, setError] = useState('');
 
@@ -125,13 +163,14 @@ export default function UserManage() {
     setPancakeAccountName('');
     setIsActive(true);
     setActiveTab('basic');
-    setError('');
+    setOriginalUser(null);
     setModalOpen(true);
   };
 
   const openEditModal = (user: any) => {
     setModalMode('edit');
     setEditingUserId(user.id);
+    setOriginalUser(user);
     setUsername(user.username || '');
     setPassword(''); // Trống khi sửa đổi
     setFullName(user.fullName || '');
@@ -254,19 +293,19 @@ export default function UserManage() {
     setFilterStatus('all');
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const executeSave = async (scope: 'OVERWRITE' | 'FUTURE_ONLY' = 'OVERWRITE') => {
+    setSubmittingScope(true);
     setError('');
-    if (phone && !isValidPhone(phone, true)) {
-      setError(PHONE_ERROR_MSG);
-      return;
-    }
     try {
       if (modalMode === 'create') {
         await fetchApi('/users', {
           method: 'POST',
           body: JSON.stringify({
-            username, password, fullName, phoneNumber: phone, role, techStationId,
+            username: username.trim(),
+            password,
+            fullName: fullName.trim(),
+            phoneNumber: phone ? phone.trim() : null,
+            role, techStationId,
             address, cccdNumber, cccdDate, cccdPlace, bankAccount, bankName, email,
             warehouseId, warehouseName, group, pancakeAccountName
           })
@@ -275,17 +314,50 @@ export default function UserManage() {
         await fetchApi(`/users/${editingUserId}`, {
           method: 'PUT',
           body: JSON.stringify({
-            fullName, phoneNumber: phone, role, techStationId, isActive,
+            username: username.trim(),
+            fullName: fullName.trim(),
+            phoneNumber: phone ? phone.trim() : null,
+            role, techStationId, isActive,
             password: password.trim() || undefined,
             address, cccdNumber, cccdDate, cccdPlace, bankAccount, bankName, email,
-            warehouseId, warehouseName, group, pancakeAccountName
+            warehouseId, warehouseName, group, pancakeAccountName,
+            applyScope: scope
           })
         });
       }
+      setScopeModalOpen(false);
       setModalOpen(false);
       loadUsers();
     } catch (err: any) {
-      setError(err.message);
+      setError(err.message || 'Lỗi cập nhật');
+    } finally {
+      setSubmittingScope(false);
+    }
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError('');
+    if (phone && !isValidPhone(phone, true)) {
+      setError(PHONE_ERROR_MSG);
+      return;
+    }
+
+    if (modalMode === 'create') {
+      await executeSave('OVERWRITE');
+      return;
+    }
+
+    // Kiểm tra xem có thay đổi thông tin định danh (Username hoặc Họ tên) không
+    const isIdentityChanged = 
+      (username.trim().toLowerCase() !== (originalUser?.username || '').trim().toLowerCase()) ||
+      (fullName.trim() !== (originalUser?.fullName || '').trim());
+
+    if (isIdentityChanged) {
+      setApplyScopeChoice('OVERWRITE');
+      setScopeModalOpen(true);
+    } else {
+      await executeSave('OVERWRITE');
     }
   };
 
@@ -343,16 +415,29 @@ export default function UserManage() {
   };
 
   return (
-    <div className="animate-fade-in space-y-6">
-      <div className="flex justify-between items-center">
-        <h2 className="font-bold text-2xl text-[#1B3A6B]">Quản Lý Nhân Viên & Phân Quyền</h2>
+    <div className="animate-fade-in space-y-5">
+      {/* ── Page Header ── */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-1">
+        <div>
+          <h2 className="font-bold text-2xl text-[#1B3A6B] tracking-tight">Quản Lý Nhân Viên & Phân Quyền</h2>
+          <p className="text-xs text-slate-500 mt-1 font-medium">Danh sách nhân sự, phân bổ trạm công tác, kho hàng POS và ma trận phân quyền hệ thống</p>
+        </div>
         {mainTab === 'users' && (
-          <div className="flex items-center gap-2">
-            <button className="btn btn-outline flex items-center gap-2" onClick={handleExportExcel} title="Xuất file Excel theo bộ lọc">
-              <Download size={18} /> Xuất Excel
+          <div className="flex items-center gap-2.5">
+            <button 
+              className="px-3.5 py-2 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold shadow-2xs hover:border-slate-300 transition-all flex items-center gap-2 cursor-pointer" 
+              onClick={handleExportExcel} 
+              title="Xuất file Excel theo bộ lọc"
+            >
+              <Download size={15} className="text-slate-500" />
+              <span>Xuất Excel</span>
             </button>
-            <button className="btn btn-primary flex items-center gap-2" onClick={openCreateModal}>
-              <UserPlus size={18} /> Thêm KTV
+            <button 
+              className="px-4 py-2 rounded-xl bg-[#1B3A6B] hover:bg-[#234b88] text-white text-xs font-semibold shadow-xs transition-all flex items-center gap-2 cursor-pointer active:scale-[0.98]" 
+              onClick={openCreateModal}
+            >
+              <UserPlus size={15} />
+              <span>Thêm KTV</span>
             </button>
           </div>
         )}
@@ -360,27 +445,27 @@ export default function UserManage() {
 
       {/* ── Main Tab Navigation Bar ── */}
       {currentUser?.role === 'ADMIN' && (
-        <div className="flex border border-gray-200/80 mb-2 gap-1.5 bg-slate-100/70 p-1.5 rounded-2xl w-fit shadow-inner">
+        <div className="flex border border-slate-200/90 mb-2 gap-1 bg-slate-100/80 p-1 rounded-xl w-fit shadow-inner">
           <button
             onClick={() => setMainTab('users')}
-            className={`px-5 py-2 rounded-xl font-bold text-xs flex items-center gap-2 transition-all cursor-pointer ${
+            className={`px-4 py-2 rounded-lg font-bold text-xs flex items-center gap-2 transition-all cursor-pointer ${
               mainTab === 'users'
-                ? 'bg-white text-[#1B3A6B] shadow-sm'
-                : 'text-gray-500 hover:text-gray-800 hover:bg-white/50'
+                ? 'bg-white text-[#1B3A6B] shadow-xs'
+                : 'text-slate-500 hover:text-slate-800 hover:bg-white/50'
             }`}
           >
-            <Users size={16} />
+            <Users size={15} />
             <span>Danh Sách Nhân Viên</span>
           </button>
           <button
             onClick={() => setMainTab('permissions')}
-            className={`px-5 py-2 rounded-xl font-bold text-xs flex items-center gap-2 transition-all cursor-pointer ${
+            className={`px-4 py-2 rounded-lg font-bold text-xs flex items-center gap-2 transition-all cursor-pointer ${
               mainTab === 'permissions'
-                ? 'bg-white text-purple-700 shadow-sm'
-                : 'text-gray-500 hover:text-gray-800 hover:bg-white/50'
+                ? 'bg-white text-purple-700 shadow-xs'
+                : 'text-slate-500 hover:text-slate-800 hover:bg-white/50'
             }`}
           >
-            <Shield size={16} />
+            <Shield size={15} />
             <span>Phân Bổ Quyền (Matrix)</span>
           </button>
         </div>
@@ -392,43 +477,53 @@ export default function UserManage() {
         <>
 
       {/* ── Filter Bar ── */}
-      <div className="card mb-6" style={{ padding: '16px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
-          <Filter size={18} style={{ color: '#1B3A6B' }} />
-          <span style={{ fontWeight: 600, color: '#1B3A6B', fontSize: '14px' }}>Bộ lọc</span>
-          {hasFilters && (
-            <button
-              onClick={clearFilters}
-              style={{
-                marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '4px',
-                padding: '4px 10px', borderRadius: '6px', fontSize: '12px', fontWeight: 500,
-                color: '#dc2626', backgroundColor: '#fef2f2', border: '1px solid #fecaca', cursor: 'pointer'
-              }}
-            >
-              <X size={14} /> Xóa bộ lọc
-            </button>
-          )}
+      <div className="bg-white rounded-2xl border border-slate-200/90 shadow-2xs p-4 sm:p-5 mb-5">
+        <div className="flex items-center justify-between gap-3 mb-3.5">
+          <div className="flex items-center gap-2">
+            <Filter size={16} className="text-[#1B3A6B]" />
+            <span className="font-bold text-[#1B3A6B] text-sm tracking-tight">Bộ Lọc Tìm Kiếm</span>
+          </div>
+          <div className="flex items-center gap-2.5">
+            <span className="text-xs text-slate-500 bg-slate-50 border border-slate-200/70 px-2.5 py-1 rounded-lg font-medium">
+              Hiển thị <strong className="text-slate-800 font-bold">{filteredUsers.length}</strong> / {users.length} nhân viên
+            </span>
+            {hasFilters && (
+              <button
+                onClick={clearFilters}
+                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold text-rose-600 bg-rose-50 hover:bg-rose-100 border border-rose-200 transition-colors cursor-pointer"
+              >
+                <X size={13} /> Xóa bộ lọc
+              </button>
+            )}
+          </div>
         </div>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '12px' }}>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
           {/* Search */}
-          <div style={{ position: 'relative' }}>
-            <Search size={16} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: '#9ca3af' }} />
+          <div className="relative">
+            <Search size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
             <input
               type="text"
-              className="form-input"
+              className="form-input w-full pl-9 pr-8 text-xs py-2 rounded-xl border border-slate-200 focus:border-[#1B3A6B] focus:ring-1 focus:ring-[#1B3A6B] transition-all"
               placeholder="Tìm theo tên, SĐT, username..."
               value={searchText}
               onChange={e => setSearchText(e.target.value)}
-              style={{ paddingLeft: '34px', fontSize: '13px' }}
             />
+            {searchText && (
+              <button
+                type="button"
+                onClick={() => setSearchText('')}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-0.5 cursor-pointer"
+              >
+                <X size={13} />
+              </button>
+            )}
           </div>
 
           {/* Main Station */}
           <select
-            className="form-input bg-white"
+            className="form-input bg-white text-xs py-2 px-3 rounded-xl border border-slate-200 text-slate-700 font-medium focus:border-[#1B3A6B] focus:ring-1 focus:ring-[#1B3A6B] cursor-pointer"
             value={filterMainStation}
             onChange={e => { setFilterMainStation(e.target.value); setFilterTechStation(''); }}
-            style={{ fontSize: '13px' }}
           >
             <option value="">Tất cả trạm chính</option>
             {stations.map((main: any) => (
@@ -438,10 +533,9 @@ export default function UserManage() {
 
           {/* Tech Station */}
           <select
-            className="form-input bg-white"
+            className="form-input bg-white text-xs py-2 px-3 rounded-xl border border-slate-200 text-slate-700 font-medium focus:border-[#1B3A6B] focus:ring-1 focus:ring-[#1B3A6B] cursor-pointer"
             value={filterTechStation}
             onChange={e => setFilterTechStation(e.target.value)}
-            style={{ fontSize: '13px' }}
           >
             <option value="">Tất cả trạm kỹ thuật</option>
             {filteredTechStations.map(ts => (
@@ -451,20 +545,14 @@ export default function UserManage() {
 
           {/* Status */}
           <select
-            className="form-input bg-white"
+            className="form-input bg-white text-xs py-2 px-3 rounded-xl border border-slate-200 text-slate-700 font-medium focus:border-[#1B3A6B] focus:ring-1 focus:ring-[#1B3A6B] cursor-pointer"
             value={filterStatus}
             onChange={e => setFilterStatus(e.target.value as any)}
-            style={{ fontSize: '13px' }}
           >
             <option value="all">Tất cả trạng thái</option>
             <option value="active">Hoạt động</option>
             <option value="inactive">Đã khóa</option>
           </select>
-        </div>
-
-        {/* Result count */}
-        <div style={{ marginTop: '10px', fontSize: '13px', color: 'var(--text-muted)' }}>
-          Hiển thị <strong>{filteredUsers.length}</strong> / {users.length} nhân viên
         </div>
       </div>
 
@@ -557,7 +645,6 @@ export default function UserManage() {
                       className="form-input"
                       value={username}
                       onChange={e => setUsername(e.target.value)}
-                      disabled={modalMode === 'edit'}
                       required
                     />
                   </div>
@@ -751,87 +838,267 @@ export default function UserManage() {
         document.body
       )}
 
+      {/* Scope Confirmation Modal (OVERWRITE vs FUTURE_ONLY) */}
+      {scopeModalOpen && createPortal(
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center z-[70] p-4 animate-fade-in">
+          <div className="bg-white rounded-2xl shadow-2xl border border-gray-100 max-w-lg w-full overflow-hidden flex flex-col animate-scale-up text-left">
+            {/* Header */}
+            <div className="px-6 py-5 bg-gradient-to-r from-[#1B3A6B] to-[#2563EB] text-white flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center border border-white/20">
+                  <ShieldCheck size={22} className="text-white" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-base leading-tight">Xác nhận phạm vi thay đổi</h3>
+                  <p className="text-xs text-blue-100 mt-0.5">Lựa chọn cách hệ thống đồng bộ dữ liệu lịch sử</p>
+                </div>
+              </div>
+              <button 
+                type="button" 
+                onClick={() => setScopeModalOpen(false)}
+                className="text-white/80 hover:text-white p-1 rounded-lg hover:bg-white/10 transition-colors cursor-pointer"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            {/* Comparison Box */}
+            <div className="p-6 space-y-4">
+              <div className="bg-slate-50 border border-slate-200 rounded-xl p-3.5 text-xs text-gray-700 flex flex-col gap-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-gray-500 font-medium">Thông tin ban đầu:</span>
+                  <span className="font-bold text-gray-800">{originalUser?.fullName} <span className="font-mono text-gray-500">(@{originalUser?.username})</span></span>
+                </div>
+                <div className="h-px bg-slate-200" />
+                <div className="flex items-center justify-between">
+                  <span className="text-blue-600 font-semibold">Thay đổi thành:</span>
+                  <span className="font-bold text-blue-700">{fullName} <span className="font-mono text-blue-600">(@{username})</span></span>
+                </div>
+              </div>
+
+              <div className="text-xs font-semibold text-gray-700">Vui lòng chọn 1 trong 2 phương án bên dưới:</div>
+
+              {/* 2 Options Cards */}
+              <div className="space-y-3">
+                {/* Option 1: OVERWRITE */}
+                <label 
+                  onClick={() => setApplyScopeChoice('OVERWRITE')}
+                  className={`flex items-start gap-3 p-3.5 rounded-xl border-2 transition-all cursor-pointer ${
+                    applyScopeChoice === 'OVERWRITE'
+                      ? 'border-[#2563EB] bg-blue-50/50 shadow-xs'
+                      : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
+                  }`}
+                >
+                  <input
+                    type="radio"
+                    name="applyScope"
+                    checked={applyScopeChoice === 'OVERWRITE'}
+                    onChange={() => setApplyScopeChoice('OVERWRITE')}
+                    className="mt-0.5 accent-[#2563EB]"
+                  />
+                  <div className="flex-1 text-left">
+                    <div className="flex items-center gap-1.5 font-bold text-xs text-gray-900">
+                      <RefreshCw size={14} className="text-blue-600" />
+                      <span>Cập nhật đè lên toàn bộ lịch sử (Overwrite)</span>
+                    </div>
+                    <p className="text-[11px] text-gray-600 mt-1 leading-relaxed">
+                      Đổi trực tiếp trên tài khoản này. Toàn bộ đơn hàng, báo cáo dịch vụ và lịch sử làm việc từ trước tới nay sẽ tự động hiển thị theo thông tin mới.
+                    </p>
+                    <span className="inline-block mt-1 text-[10px] font-semibold text-amber-700 bg-amber-50 px-2 py-0.5 rounded border border-amber-200">
+                      Phù hợp khi: Sửa lỗi chính tả tên hoặc bàn giao toàn bộ lịch sử cho người mới
+                    </span>
+                  </div>
+                </label>
+
+                {/* Option 2: FUTURE_ONLY */}
+                <label 
+                  onClick={() => setApplyScopeChoice('FUTURE_ONLY')}
+                  className={`flex items-start gap-3 p-3.5 rounded-xl border-2 transition-all cursor-pointer ${
+                    applyScopeChoice === 'FUTURE_ONLY'
+                      ? 'border-[#1B3A6B] bg-indigo-50/50 shadow-xs'
+                      : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
+                  }`}
+                >
+                  <input
+                    type="radio"
+                    name="applyScope"
+                    checked={applyScopeChoice === 'FUTURE_ONLY'}
+                    onChange={() => setApplyScopeChoice('FUTURE_ONLY')}
+                    className="mt-0.5 accent-[#1B3A6B]"
+                  />
+                  <div className="flex-1 text-left">
+                    <div className="flex items-center gap-1.5 font-bold text-xs text-gray-900">
+                      <ShieldCheck size={14} className="text-[#1B3A6B]" />
+                      <span>Chỉ áp dụng cho các dữ liệu về sau (Tách dữ liệu)</span>
+                    </div>
+                    <p className="text-[11px] text-gray-600 mt-1 leading-relaxed">
+                      Bảo toàn nguyên vẹn lịch sử & tài khoản cũ của <strong>{originalUser?.fullName}</strong>. Hệ thống sẽ tạo tài khoản KTV mới cho <strong>{fullName}</strong> và chuyển giao các đơn đang thực hiện sang nhân sự mới.
+                    </p>
+                    <span className="inline-block mt-1 text-[10px] font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
+                      Phù hợp khi: Thay KTV mới nhưng muốn giữ đúng sổ sách, báo cáo cũ của người trước
+                    </span>
+                  </div>
+                </label>
+              </div>
+
+              {error && <div className="alert alert-error text-xs py-2">{error}</div>}
+            </div>
+
+            {/* Footer */}
+            <div className="px-6 py-4 bg-gray-50 border-t border-gray-100 flex items-center justify-end gap-2.5">
+              <button 
+                type="button" 
+                disabled={submittingScope}
+                onClick={() => setScopeModalOpen(false)} 
+                className="btn btn-outline text-xs px-4 py-2"
+              >
+                Hủy
+              </button>
+              <button 
+                type="button" 
+                disabled={submittingScope}
+                onClick={() => executeSave(applyScopeChoice)} 
+                className="btn btn-primary text-xs px-5 py-2 flex items-center gap-2"
+              >
+                {submittingScope ? (
+                  <>
+                    <Loader2 size={14} className="animate-spin" />
+                    <span>Đang xử lý...</span>
+                  </>
+                ) : (
+                  <span>Xác nhận & Áp dụng</span>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
+
       {loading ? (
-        <div className="text-center py-10"><span className="spinner border-t-[#1B3A6B]"></span></div>
+        <div className="text-center py-16 bg-white rounded-2xl border border-slate-200/80 shadow-2xs">
+          <Loader2 size={32} className="animate-spin text-[#1B3A6B] mx-auto mb-2.5" />
+          <p className="text-xs font-semibold text-slate-500">Đang tải danh sách nhân viên...</p>
+        </div>
       ) : (
-        <div className="flex flex-col gap-4">
+        <div className="flex flex-col gap-3.5">
           {filteredUsers.length === 0 ? (
-            <div className="text-center py-12 text-gray-500 bg-white rounded-xl border border-gray-200">
-              {hasFilters ? 'Không tìm thấy kỹ thuật viên phù hợp với bộ lọc.' : 'Chưa có kỹ thuật viên nào.'}
+            <div className="text-center py-16 px-4 bg-white rounded-2xl border border-slate-200/80 shadow-2xs">
+              <Users size={36} className="text-slate-300 mx-auto mb-3" />
+              <h4 className="text-sm font-bold text-slate-700">Không tìm thấy nhân viên</h4>
+              <p className="text-xs text-slate-500 mt-1 max-w-sm mx-auto">
+                {hasFilters ? 'Không có nhân sự nào khớp với điều kiện lọc hiện tại. Thử xóa hoặc thay đổi bộ lọc.' : 'Chưa có nhân viên nào trong hệ thống.'}
+              </p>
+              {hasFilters && (
+                <button 
+                  onClick={clearFilters}
+                  className="mt-4 px-3.5 py-1.5 rounded-lg text-xs font-semibold text-[#1B3A6B] bg-slate-100 hover:bg-slate-200 transition-colors inline-flex items-center gap-1.5 cursor-pointer"
+                >
+                  <X size={13} /> Xóa bộ lọc
+                </button>
+              )}
             </div>
           ) : (
             filteredUsers.map(u => (
               <div 
                 key={u.id} 
-                className="bg-white rounded-xl border border-gray-200 shadow-xs p-4 hover:shadow-md hover:border-blue-200 transition-all duration-200 flex flex-col gap-3.5 text-left animate-fade-in"
+                className="bg-white rounded-2xl border border-slate-200/90 shadow-2xs hover:shadow-md hover:border-blue-200 transition-all duration-200 p-4 sm:p-5 flex flex-col gap-4 text-left group"
               >
-                {/* Top Row: Basic Info & Metadata */}
-                <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 pb-3 border-b border-gray-100">
-                  {/* Left: Name, Role, SĐT, Username */}
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <h4 className="font-bold text-gray-900 text-base leading-snug">{u.fullName}</h4>
-                      <span className={`px-2 py-0.5 text-[10px] rounded-md font-bold uppercase ${
-                        u.role === 'ADMIN' ? 'bg-red-100 text-red-700' :
-                        u.role === 'COORDINATOR' ? 'bg-purple-100 text-purple-700' :
-                        u.role === 'SALE_SUPERVISOR' ? 'bg-amber-100 text-amber-700' :
-                        u.role === 'SALER' ? 'bg-green-100 text-green-700' :
-                        u.role === 'HOTLINE' ? 'bg-pink-100 text-pink-700' :
-                        u.role === 'STAFF' ? 'bg-teal-100 text-teal-700' :
-                        'bg-blue-100 text-blue-700'
-                      }`}>
-                        {u.role}
-                      </span>
-                      
-                      {/* Status dot */}
-                      <span className="relative flex h-2 w-2" title={u.isActive ? "Hoạt động" : "Đã khóa"}>
-                        {u.isActive ? (
-                          <>
-                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
-                            <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
-                          </>
-                        ) : (
-                          <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500"></span>
-                        )}
-                      </span>
+                {/* Top Row: Avatar, Main Info & Metrics */}
+                <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+                  {/* Left: Avatar + Identity */}
+                  <div className="flex items-start gap-3.5 min-w-0 flex-1">
+                    <div className="w-11 h-11 rounded-xl bg-slate-100 text-[#1B3A6B] font-bold text-xs flex items-center justify-center border border-slate-200/80 shrink-0 shadow-2xs group-hover:bg-blue-50 group-hover:text-blue-700 transition-colors">
+                      {getInitials(u.fullName)}
                     </div>
-                    
-                    <div className="flex items-center gap-x-4 gap-y-1 mt-2 flex-wrap text-xs text-gray-500">
-                      <div>SĐT: <strong className="text-gray-700 font-semibold">{u.phoneNumber || 'Không có SĐT'}</strong></div>
-                      {u.email && <div>Email: <strong className="text-gray-700 font-semibold">{u.email}</strong></div>}
-                      <div>Username: <span className="font-mono bg-slate-100 px-1.5 py-0.5 rounded text-[11px] font-semibold text-gray-700 select-all">{u.username}</span></div>
+
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <h4 className="font-bold text-slate-900 text-base leading-snug group-hover:text-[#1B3A6B] transition-colors">
+                          {u.fullName}
+                        </h4>
+                        {(() => {
+                          const rBadge = getRoleBadge(u.role);
+                          return (
+                            <span className={`px-2 py-0.5 text-[10px] rounded-md font-bold uppercase tracking-wide border ${rBadge.className}`}>
+                              {rBadge.label}
+                            </span>
+                          );
+                        })()}
+                        
+                        {u.isActive ? (
+                          <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[11px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                            Hoạt động
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[11px] font-semibold bg-slate-100 text-slate-600 border border-slate-200">
+                            <span className="w-1.5 h-1.5 rounded-full bg-slate-400"></span>
+                            Đã khóa
+                          </span>
+                        )}
+                      </div>
+                      
+                      {/* Contact info chips */}
+                      <div className="flex items-center gap-x-4 gap-y-1.5 mt-2 flex-wrap text-xs text-slate-600">
+                        <div className="flex items-center gap-1.5">
+                          <Phone size={13} className="text-slate-400 shrink-0" />
+                          {u.phoneNumber ? (
+                            <a href={`tel:${u.phoneNumber}`} className="font-semibold text-slate-700 hover:text-blue-600 hover:underline">
+                              {u.phoneNumber}
+                            </a>
+                          ) : (
+                            <span className="text-slate-400 italic">Chưa có SĐT</span>
+                          )}
+                        </div>
+                        {u.email && (
+                          <div className="flex items-center gap-1.5">
+                            <Mail size={13} className="text-slate-400 shrink-0" />
+                            <span className="font-medium text-slate-700 truncate max-w-[220px]" title={u.email}>{u.email}</span>
+                          </div>
+                        )}
+                        <div className="flex items-center gap-1.5">
+                          <User size={13} className="text-slate-400 shrink-0" />
+                          <span className="font-mono bg-slate-100 px-1.5 py-0.5 rounded text-[11px] font-semibold text-slate-700 select-all border border-slate-200/60">
+                            {u.username}
+                          </span>
+                        </div>
+                      </div>
                     </div>
                   </div>
 
-                  {/* Right: Group, reports count, pancake account */}
-                  <div className="flex items-center gap-5 flex-wrap text-xs">
-                    <div>
-                      <span className="text-gray-400 block text-[9px] uppercase font-bold tracking-wider">Nhóm</span>
-                      <span className="font-semibold text-gray-800">{u.group || '---'}</span>
+                  {/* Right: Metrics stats cluster */}
+                  <div className="flex items-center gap-2 self-start lg:self-center flex-wrap">
+                    <div className="px-3 py-1.5 rounded-xl bg-slate-50 border border-slate-200/70 text-right min-w-[80px]">
+                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Nhóm</span>
+                      <span className="text-xs font-semibold text-slate-800">{u.group || '---'}</span>
                     </div>
-                    <div>
-                      <span className="text-gray-400 block text-[9px] uppercase font-bold tracking-wider">Báo cáo</span>
-                      <span className="font-bold text-gray-900">{u._count.serviceReports} báo cáo</span>
+                    <div className="px-3 py-1.5 rounded-xl bg-slate-50 border border-slate-200/70 text-right min-w-[90px]">
+                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Báo cáo</span>
+                      <span className="text-xs font-bold text-slate-900">{u._count?.serviceReports || 0} ca</span>
                     </div>
-                    <div>
-                      <span className="text-gray-400 block text-[9px] uppercase font-bold tracking-wider">Account Pancake</span>
-                      <span className="font-semibold text-gray-800">{u.pancakeAccountName || '---'}</span>
+                    <div className="px-3 py-1.5 rounded-xl bg-slate-50 border border-slate-200/70 text-right min-w-[110px]">
+                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Account POS</span>
+                      <span className="text-xs font-semibold text-slate-800 truncate block max-w-[120px]" title={u.pancakeAccountName || '---'}>
+                        {u.pancakeAccountName || '---'}
+                      </span>
                     </div>
                   </div>
                 </div>
 
-                {/* Bottom Row: Station & Warehouse selection & actions */}
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+                {/* Bottom Row: Station selection, Warehouse badge, and Action buttons */}
+                <div className="pt-3 border-t border-slate-100 flex flex-col md:flex-row md:items-center justify-between gap-3 text-xs">
                   {/* Left: Station & Warehouse */}
-                  <div className="flex flex-col sm:flex-row sm:items-center gap-4 flex-1">
+                  <div className="flex flex-col sm:flex-row sm:items-center gap-3 md:gap-4 flex-1">
                     {/* Trạm trực thuộc */}
                     <div className="flex items-center gap-2">
-                      <span className="text-gray-400 font-semibold shrink-0">Trạm trực thuộc:</span>
+                      <Building2 size={14} className="text-slate-400 shrink-0" />
+                      <span className="text-slate-500 font-semibold shrink-0">Trạm trực thuộc:</span>
                       {u.role !== 'KTV' ? (
-                        <span className="text-gray-400 italic">Không áp dụng trạm</span>
+                        <span className="text-slate-400 italic">Không áp dụng trạm</span>
                       ) : (
                         <select 
-                          className="form-input bg-white text-xs py-1.5 px-3 h-auto w-full sm:w-[280px] border-gray-200 focus:border-blue-500 rounded-lg cursor-pointer"
+                          className="form-input bg-white text-xs py-1.5 px-3 h-auto w-full sm:w-[280px] border-slate-200 focus:border-[#1B3A6B] rounded-lg cursor-pointer font-medium text-slate-800 shadow-2xs"
                           value={u.techStationId || ''}
                           onChange={(e) => handleChangeStation(u.id, e.target.value)}
                         >
@@ -847,42 +1114,43 @@ export default function UserManage() {
                       )}
                     </div>
 
-                    {/* Kho hàng */}
+                    {/* Kho Pancake POS */}
                     {u.warehouseName && (
                       <div className="flex items-center gap-1.5">
-                        <span className="text-gray-400 font-semibold shrink-0">Kho Pancake POS:</span>
-                        <span className="inline-flex items-center gap-1 text-[11px] text-blue-700 font-bold bg-blue-50 border border-blue-100 px-2.5 py-1 rounded-lg">
-                          📦 {u.warehouseName}
+                        <span className="inline-flex items-center gap-1.5 text-xs text-blue-800 font-semibold bg-blue-50/80 border border-blue-200/80 px-2.5 py-1 rounded-lg">
+                          <Package size={13} className="text-blue-600" />
+                          <span className="text-slate-500 font-normal">Kho POS:</span>
+                          <span>{u.warehouseName}</span>
                         </span>
                       </div>
                     )}
                   </div>
 
                   {/* Right: Actions */}
-                  <div className="flex items-center justify-end gap-1.5 shrink-0 border-t sm:border-t-0 pt-2 sm:pt-0">
-                    {u.role !== 'ADMIN' && (
-                      <>
-                        <button 
-                          onClick={() => openEditModal(u)}
-                          className="p-2 rounded-lg text-blue-600 hover:bg-blue-50 border border-gray-200 hover:border-blue-300 transition-colors flex items-center justify-center"
-                          title="Chỉnh sửa thông tin"
-                        >
-                          <Pencil size={15} />
-                        </button>
-                        <button 
-                          onClick={() => toggleActive(u.id, u.isActive)}
-                          className={`p-2 rounded-lg border border-gray-200 transition-colors flex items-center justify-center ${
-                            u.isActive 
-                              ? 'text-red-600 hover:bg-red-50 hover:border-red-300' 
-                              : 'text-green-600 hover:bg-green-50 hover:border-green-300'
-                          }`}
-                          title={u.isActive ? "Khóa tài khoản" : "Mở khóa tài khoản"}
-                        >
-                          {u.isActive ? <Lock size={15} /> : <Unlock size={15} />}
-                        </button>
-                      </>
-                    )}
-                  </div>
+                  {u.role !== 'ADMIN' && (
+                    <div className="flex items-center justify-end gap-2 shrink-0 border-t md:border-t-0 pt-2 md:pt-0">
+                      <button 
+                        onClick={() => openEditModal(u)}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-700 hover:text-blue-700 bg-white hover:bg-blue-50 border border-slate-200 hover:border-blue-300 transition-all cursor-pointer shadow-2xs"
+                        title="Chỉnh sửa thông tin"
+                      >
+                        <Pencil size={13} className="text-slate-500" />
+                        <span>Sửa</span>
+                      </button>
+                      <button 
+                        onClick={() => toggleActive(u.id, u.isActive)}
+                        className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer shadow-2xs ${
+                          u.isActive 
+                            ? 'text-rose-700 hover:text-rose-800 bg-white hover:bg-rose-50 border border-slate-200 hover:border-rose-300' 
+                            : 'text-emerald-700 hover:text-emerald-800 bg-white hover:bg-emerald-50 border border-slate-200 hover:border-emerald-300'
+                        }`}
+                        title={u.isActive ? "Khóa tài khoản" : "Mở khóa tài khoản"}
+                      >
+                        {u.isActive ? <Lock size={13} /> : <Unlock size={13} />}
+                        <span>{u.isActive ? 'Khóa' : 'Mở khóa'}</span>
+                      </button>
+                    </div>
+                  )}
                 </div>
               </div>
             ))

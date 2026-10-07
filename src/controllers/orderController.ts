@@ -12,6 +12,8 @@ import { broadcastEvent } from '../services/websocketService';
 import ExcelJS from 'exceljs';
 import axios from 'axios';
 import { isSandboxEnvironment, logSandboxBlockedAction } from '../utils/sandboxGuard';
+import { PANCAKE_API_BASE } from '../config/pancake';
+import pancakeCircuitBreaker from '../services/pancakeCircuitBreaker';
 
 import { buildOrderFilter, getNextManualOrderId } from '../services/orderService';
 
@@ -25,6 +27,95 @@ import {
 export { ComboComponent, ComboDefinition, getComboComponents, getComboMappingsForInventory };
 
 
+
+/**
+ * Enrich imageUrl cho order items:
+ * 1. Ưu tiên 1: Lấy trực tiếp từ item.variationInfo?.images?.[0] hoặc item.rawData?.variation_info?.images?.[0]
+ * 2. Ưu tiên 2: Lookup bảng Product theo SKU (lấy p.imageUrl hoặc p.rawData?.images?.[0])
+ * 3. Ưu tiên 3: Lookup bảng Product theo tên sản phẩm
+ */
+export async function enrichOrderItemsWithImages(orders: any[]): Promise<void> {
+  if (!orders || orders.length === 0) return;
+
+  const skusToLookup = new Set<string>();
+  const namesToLookup = new Set<string>();
+
+  // Pass 1: Lấy ảnh trực tiếp từ item nếu có
+  orders.forEach((order: any) => {
+    (order.items || []).forEach((item: any) => {
+      const varInfo = item.variationInfo as any;
+      const raw = item.rawData as any;
+      const directImg = 
+        varInfo?.images?.[0] || 
+        raw?.variation_info?.images?.[0] || 
+        raw?.images?.[0] || 
+        null;
+
+      if (directImg) {
+        item.imageUrl = directImg;
+      } else {
+        if (item.sku) skusToLookup.add(item.sku);
+        if (item.productName) namesToLookup.add(item.productName.trim());
+      }
+    });
+  });
+
+  if (skusToLookup.size === 0 && namesToLookup.size === 0) {
+    return;
+  }
+
+  const productConditions: Prisma.ProductWhereInput[] = [];
+  if (skusToLookup.size > 0) {
+    productConditions.push({ sku: { in: Array.from(skusToLookup) } });
+  }
+  if (namesToLookup.size > 0) {
+    productConditions.push({ name: { in: Array.from(namesToLookup), mode: 'insensitive' } });
+  }
+
+  try {
+    const productRecords = await prisma.product.findMany({
+      where: { OR: productConditions },
+      select: { sku: true, name: true, imageUrl: true, rawData: true }
+    });
+
+    const skuImageMap = new Map<string, string>();
+    const nameImageMap = new Map<string, string>();
+
+    productRecords.forEach(p => {
+      const raw = p.rawData as any;
+      const img = 
+        p.imageUrl || 
+        raw?.images?.[0] || 
+        raw?.variation_info?.images?.[0] || 
+        raw?.product?.images?.[0] || 
+        null;
+
+      if (img) {
+        if (p.sku) skuImageMap.set(p.sku, img);
+        if (p.name) nameImageMap.set(p.name.trim().toLowerCase(), img);
+      }
+    });
+
+    // Pass 2: Gắn ảnh cho các item chưa có ảnh
+    orders.forEach((order: any) => {
+      (order.items || []).forEach((item: any) => {
+        if (!item.imageUrl) {
+          let foundImg: string | null = null;
+          if (item.sku && skuImageMap.has(item.sku)) {
+            foundImg = skuImageMap.get(item.sku) || null;
+          }
+          if (!foundImg && item.productName) {
+            const normalizedName = item.productName.trim().toLowerCase();
+            foundImg = nameImageMap.get(normalizedName) || null;
+          }
+          item.imageUrl = foundImg;
+        }
+      });
+    });
+  } catch (err: any) {
+    logger.warn('Lỗi enrichOrderItemsWithImages', { error: err.message });
+  }
+}
 
 /**
  * GET /api/orders
@@ -733,6 +824,9 @@ export async function getOrders(req: Request, res: Response): Promise<void> {
         });
       });
     }
+
+    // ── Enrich ảnh sản phẩm cho order items ──
+    await enrichOrderItemsWithImages(orders);
 
     res.json({
       orders,
@@ -1614,6 +1708,8 @@ export async function getOrderById(req: Request, res: Response): Promise<void> {
       return;
     }
 
+    await enrichOrderItemsWithImages([order]);
+
     res.json(order);
   } catch (error: any) {
     logger.error('Get order detail error', { id: req.params.id, error: error.message });
@@ -1915,7 +2011,7 @@ export async function updateOrder(req: Request, res: Response): Promise<void> {
       try {
         let warehouseName = 'Kho hàng';
         try {
-          const whResponse = await axios.get(`https://pos.pages.fm/api/v1/shops/${shopId}/warehouses`, {
+          const whResponse = await axios.get(`${PANCAKE_API_BASE}/api/v1/shops/${shopId}/warehouses`, {
             params: { api_key: apiKey },
             timeout: 5000
           });
@@ -1937,7 +2033,7 @@ export async function updateOrder(req: Request, res: Response): Promise<void> {
           } else {
             logger.info('Syncing warehouse change to Pancake POS', { pancakeOrderId: oldOrder.pancakeOrderId, warehouseId: effectiveWarehouseId });
             const updateResponse = await axios.patch(
-              `https://pos.pages.fm/api/v1/shops/${shopId}/orders/${oldOrder.pancakeOrderId}`,
+              `${PANCAKE_API_BASE}/api/v1/shops/${shopId}/orders/${oldOrder.pancakeOrderId}`,
               {
                 warehouse_id: effectiveWarehouseId
               },
@@ -2317,7 +2413,7 @@ export async function syncSingleOrder(req: Request, res: Response): Promise<void
       return;
     }
 
-    const response = await axios.get(`https://pos.pages.fm/api/v1/shops/${shopId}/orders/${order.pancakeOrderId}`, {
+    const response = await axios.get(`${PANCAKE_API_BASE}/api/v1/shops/${shopId}/orders/${order.pancakeOrderId}`, {
       params: { api_key: apiKey },
       timeout: 10000
     });
@@ -2341,7 +2437,11 @@ export async function syncSingleOrder(req: Request, res: Response): Promise<void
     }
   } catch (error: any) {
     logger.error('Manual single order sync failed', { orderId: req.params.id, error: error.message });
-    res.status(500).json({ error: 'Lỗi khi đồng bộ đơn hàng: ' + error.message });
+    const isPancakeKeyError = error.response?.status === 403 || error.response?.data?.error_code === 105;
+    const errorMsg = isPancakeKeyError
+      ? 'API Key của Pancake POS đã hết hạn hoặc không hợp lệ (mã lỗi 105). Vui lòng cấu hình lại PANCAKE_API_KEY trong file .env trên máy chủ.'
+      : error.message;
+    res.status(500).json({ error: 'Lỗi khi đồng bộ đơn hàng: ' + errorMsg });
   }
 }
 
@@ -2360,6 +2460,22 @@ export async function syncOrders(req: Request, res: Response): Promise<void> {
       return;
     }
 
+    // 🛡️ Kiểm tra trạng thái Cầu chì tự ngắt Circuit Breaker
+    const cbStatus = pancakeCircuitBreaker.getStatus();
+    if (cbStatus.isLocked) {
+      res.status(423).json({ 
+        error: 'Cầu chì bảo vệ Pancake POS đang KHÓA HẲN (do xác thực thất bại liên tiếp). Vui lòng cập nhật PANCAKE_API_KEY mới trong .env hoặc Reset cầu chì trước khi đồng bộ.' 
+      });
+      return;
+    }
+    const cbCheck = pancakeCircuitBreaker.canExecute();
+    if (!cbCheck.allowed) {
+      res.status(429).json({
+        error: `Hệ thống đang trong thời gian giãn cách thử lại (${cbCheck.waitSeconds}s còn lại). Vui lòng chờ trước khi đồng bộ tiếp.`
+      });
+      return;
+    }
+
     logger.info('Manual orders sync initiated by user', { userId: req.user?.id, role });
     const [count, reconciledCount] = await Promise.all([
       syncRecentOrders(30),
@@ -2372,7 +2488,11 @@ export async function syncOrders(req: Request, res: Response): Promise<void> {
     });
   } catch (error: any) {
     logger.error('Manual orders sync failed', { error: error.message });
-    res.status(500).json({ error: error.message || 'Lỗi đồng bộ đơn hàng từ Pancake' });
+    const isPancakeKeyError = error.response?.status === 403 || error.response?.data?.error_code === 105;
+    const errorMsg = isPancakeKeyError
+      ? 'API Key của Pancake POS đã hết hạn hoặc không hợp lệ (mã lỗi 105). Vui lòng cấu hình lại PANCAKE_API_KEY trong file .env trên máy chủ.'
+      : (error.message || 'Lỗi đồng bộ đơn hàng từ Pancake');
+    res.status(500).json({ error: errorMsg });
   }
 }
 
@@ -2457,7 +2577,7 @@ export async function bulkAssignOrders(req: Request, res: Response): Promise<voi
     const shopId = '1635300067';
     if (warehouseId && apiKey) {
       try {
-        const whResponse = await axios.get(`https://pos.pages.fm/api/v1/shops/${shopId}/warehouses`, {
+        const whResponse = await axios.get(`${PANCAKE_API_BASE}/api/v1/shops/${shopId}/warehouses`, {
           params: { api_key: apiKey },
           timeout: 5000
         });
@@ -2558,7 +2678,7 @@ export async function bulkAssignOrders(req: Request, res: Response): Promise<voi
               });
             } else {
               await axios.patch(
-                `https://pos.pages.fm/api/v1/shops/${shopId}/orders/${oldOrder.pancakeOrderId}`,
+                `${PANCAKE_API_BASE}/api/v1/shops/${shopId}/orders/${oldOrder.pancakeOrderId}`,
                 { warehouse_id: warehouseId },
                 {
                   params: { api_key: apiKey },

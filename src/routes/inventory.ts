@@ -6,6 +6,7 @@ import logger from '../utils/logger';
 import { requireAuth, requireAdmin, requireCoordinatorOrAdmin } from '../middleware/authSession';
 import { syncProducts } from '../scripts/syncProducts';
 import { getComboMappingsForInventory } from '../controllers/orderController';
+import { PANCAKE_API_BASE } from '../config/pancake';
 
 const router = Router();
 const SHOP_ID = '1635300067';
@@ -23,7 +24,7 @@ async function fetchPancakeWarehouses(): Promise<any[]> {
   }
 
   try {
-    const response = await axios.get(`https://pos.pages.fm/api/v1/shops/${SHOP_ID}/warehouses`, {
+    const response = await axios.get(`${PANCAKE_API_BASE}/api/v1/shops/${SHOP_ID}/warehouses`, {
       params: { api_key: apiKey },
       timeout: 10000
     });
@@ -536,7 +537,7 @@ router.get('/analytics', async (req: Request, res: Response): Promise<void> => {
 
     // 2. Gọi song song: Danh sách tồn kho theo sản phẩm, tổng hợp Xuất/Nhập, và tổng tồn
     const [analyticsItemsRes, totalImportExportRes, totalInventoryRes, dbProducts] = await Promise.all([
-      axios.get(`https://pos.pages.fm/api/v1/shops/${SHOP_ID}/inventory_analytics/inventory`, {
+      axios.get(`${PANCAKE_API_BASE}/api/v1/shops/${SHOP_ID}/inventory_analytics/inventory`, {
         params: {
           api_key: apiKey,
           warehouse_ids: targetWarehouseIds,
@@ -552,7 +553,7 @@ router.get('/analytics', async (req: Request, res: Response): Promise<void> => {
         logger.error('Error fetching inventory_analytics/inventory', { error: err.message });
         return { data: { data: [], success: false } };
       }),
-      axios.get(`https://pos.pages.fm/api/v1/shops/${SHOP_ID}/inventory_analytics/total_import_export`, {
+      axios.get(`${PANCAKE_API_BASE}/api/v1/shops/${SHOP_ID}/inventory_analytics/total_import_export`, {
         params: {
           api_key: apiKey,
           warehouse_ids: targetWarehouseIds,
@@ -566,7 +567,7 @@ router.get('/analytics', async (req: Request, res: Response): Promise<void> => {
         logger.error('Error fetching inventory_analytics/total_import_export', { error: err.message });
         return { data: { data: {} } };
       }),
-      axios.get(`https://pos.pages.fm/api/v1/shops/${SHOP_ID}/inventory_analytics/total_inventory`, {
+      axios.get(`${PANCAKE_API_BASE}/api/v1/shops/${SHOP_ID}/inventory_analytics/total_inventory`, {
         params: {
           api_key: apiKey,
           warehouse_ids: targetWarehouseIds,
@@ -755,7 +756,7 @@ router.get('/analytics/export', async (req: Request, res: Response): Promise<voi
     const endTime = (req.query.end_date || req.query.end_time) ? Number(req.query.end_date || req.query.end_time) : undefined;
 
     const [analyticsRes, warehouses] = await Promise.all([
-      axios.get(`https://pos.pages.fm/api/v1/shops/${SHOP_ID}/inventory_analytics/inventory`, {
+      axios.get(`${PANCAKE_API_BASE}/api/v1/shops/${SHOP_ID}/inventory_analytics/inventory`, {
         params: {
           api_key: apiKey,
           warehouse_ids: targetWarehouseIds,

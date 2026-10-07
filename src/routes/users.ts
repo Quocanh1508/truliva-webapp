@@ -1,6 +1,7 @@
 import { Router, Request, Response } from 'express';
 import bcrypt from 'bcryptjs';
 import ExcelJS from 'exceljs';
+import { UserRole } from '@prisma/client';
 import prisma from '../config/database';
 import logger from '../utils/logger';
 import { requireAuth, requireCoordinatorOrAdmin } from '../middleware/authSession';
@@ -400,14 +401,34 @@ router.put('/:id', async (req: Request, res: Response): Promise<void> => {
   try {
     const id = req.params.id as string;
     const { 
-      fullName, phoneNumber, password, isActive, role, techStationId,
+      username, fullName, phoneNumber, password, isActive, role, techStationId,
       address, cccdNumber, cccdDate, cccdPlace, bankAccount, bankName, email,
-      warehouseId, warehouseName, group, pancakeAccountName
+      warehouseId, warehouseName, group, pancakeAccountName,
+      applyScope // 'OVERWRITE' | 'FUTURE_ONLY'
     } = req.body;
 
     const targetUser = await prisma.user.findUnique({
       where: { id },
-      select: { id: true, role: true }
+      select: {
+        id: true,
+        username: true,
+        fullName: true,
+        role: true,
+        passwordHash: true,
+        phoneNumber: true,
+        techStationId: true,
+        warehouseId: true,
+        warehouseName: true,
+        group: true,
+        pancakeAccountName: true,
+        address: true,
+        cccdNumber: true,
+        cccdDate: true,
+        cccdPlace: true,
+        bankAccount: true,
+        bankName: true,
+        email: true
+      }
     });
 
     if (!targetUser) {
@@ -430,23 +451,138 @@ router.put('/:id', async (req: Request, res: Response): Promise<void> => {
       return;
     }
 
-    const updateData: any = {};
-    if (fullName !== undefined) updateData.fullName = fullName;
-    if (phoneNumber !== undefined) updateData.phoneNumber = phoneNumber;
-    if (isActive !== undefined) updateData.isActive = isActive;
-    
-    if (role !== undefined) {
-      const validRoles = ['KTV', 'ADMIN', 'DEV', 'SALE_SUPERVISOR', 'SALER', 'HOTLINE', 'COORDINATOR', 'STAFF'];
-      const finalRole = validRoles.includes(role) ? role : 'KTV';
-      const targetNewRank = ROLE_RANKS[finalRole] || 0;
+    const validRoles = ['KTV', 'ADMIN', 'DEV', 'SALE_SUPERVISOR', 'SALER', 'HOTLINE', 'COORDINATOR', 'STAFF'];
+    const finalRole = role !== undefined ? (validRoles.includes(role) ? (role as UserRole) : 'KTV') : targetUser.role;
+    const targetNewRank = ROLE_RANKS[finalRole] || 0;
 
-      if (targetNewRank > creatorRank) {
-        res.status(403).json({ error: `Bạn không có quyền chuyển đổi vai trò sang ${finalRole}` });
+    if (targetNewRank > creatorRank) {
+      res.status(403).json({ error: `Bạn không có quyền chuyển đổi vai trò sang ${finalRole}` });
+      return;
+    }
+
+    // ─────────────────────────────────────────────────────────────
+    // TRƯỜNG HỢP 1: TÁCH DỮ LIỆU - CHỈ ÁP DỤNG TỪ NAY VỀ SAU
+    // (Bảo toàn nguyên vẹn user cũ & lịch sử cũ, tạo nhân sự mới)
+    // ─────────────────────────────────────────────────────────────
+    if (applyScope === 'FUTURE_ONLY') {
+      const newUsername = String(username || phoneNumber || '').toLowerCase().trim();
+      if (!newUsername) {
+        res.status(400).json({ error: 'Username đăng nhập cho nhân sự mới không được để trống' });
         return;
       }
-      updateData.role = finalRole;
+
+      // Check username exists
+      const existing = await prisma.user.findFirst({
+        where: { username: newUsername }
+      });
+      if (existing) {
+        res.status(409).json({ error: `Username "${newUsername}" đã tồn tại bởi tài khoản khác` });
+        return;
+      }
+
+      let newPasswordHash = targetUser.passwordHash;
+      if (password && password.trim()) {
+        if (password.length < 4) {
+          res.status(400).json({ error: 'Mật khẩu phải có ít nhất 4 ký tự' });
+          return;
+        }
+        newPasswordHash = await bcrypt.hash(password, 10);
+      } else {
+        newPasswordHash = await bcrypt.hash('Truliva@2025', 10);
+      }
+
+      const newUser = await prisma.user.create({
+        data: {
+          username: newUsername,
+          fullName: (fullName || targetUser.fullName).trim(),
+          phoneNumber: phoneNumber ? phoneNumber.trim() : null,
+          passwordHash: newPasswordHash,
+          role: finalRole,
+          techStationId: techStationId !== undefined ? (techStationId || null) : targetUser.techStationId,
+          address: address !== undefined ? (address || null) : targetUser.address,
+          cccdNumber: cccdNumber !== undefined ? (cccdNumber || null) : targetUser.cccdNumber,
+          cccdDate: cccdDate !== undefined ? (cccdDate || null) : targetUser.cccdDate,
+          cccdPlace: cccdPlace !== undefined ? (cccdPlace || null) : targetUser.cccdPlace,
+          bankAccount: bankAccount !== undefined ? (bankAccount || null) : targetUser.bankAccount,
+          bankName: bankName !== undefined ? (bankName || null) : targetUser.bankName,
+          email: email !== undefined ? (email || null) : targetUser.email,
+          warehouseId: warehouseId !== undefined ? (warehouseId || null) : targetUser.warehouseId,
+          warehouseName: warehouseName !== undefined ? (warehouseName || null) : targetUser.warehouseName,
+          group: group !== undefined ? (group || null) : targetUser.group,
+          pancakeAccountName: pancakeAccountName !== undefined ? (pancakeAccountName || null) : targetUser.pancakeAccountName,
+          isActive: true,
+        }
+      });
+      const newUserId: string = newUser.id;
+
+      // Kế thừa đơn giá KTV riêng (ktvServiceRates) từ người cũ sang người mới
+      const oldRates = await prisma.ktvServiceRate.findMany({
+        where: { userId: targetUser.id }
+      });
+      if (oldRates.length > 0) {
+        for (const r of oldRates) {
+          await prisma.ktvServiceRate.create({
+            data: {
+              userId: newUserId,
+              workType: r.workType,
+              rate: r.rate
+            }
+          }).catch(() => null);
+        }
+      }
+
+      // Chuyển giao các đơn chưa hoàn thành (chờ xử lý, đang thực hiện) sang nhân sự mới
+      const transferredOrders = await prisma.order.updateMany({
+        where: {
+          assignedKtvId: targetUser.id,
+          adminStatus: { in: ['chờ xử lý', 'đang thực hiện'] }
+        },
+        data: {
+          assignedKtvId: newUserId
+        }
+      });
+
+      // Ghi AuditLog
+      await prisma.auditLog.create({
+        data: {
+          entityType: 'User',
+          entityId: newUserId,
+          action: 'created',
+          changes: {
+            mode: 'FUTURE_ONLY_SUCCESSOR',
+            transferredFromUserId: targetUser.id,
+            transferredFromUserName: targetUser.fullName,
+            transferredOrdersCount: transferredOrders.count
+          },
+          userId: req.user!.id,
+          userName: req.user!.username || 'ADMIN'
+        }
+      });
+
+      logger.info('User split successor created (FUTURE_ONLY)', {
+        oldUserId: targetUser.id,
+        newUserId: newUser.id,
+        transferredOrders: transferredOrders.count,
+        by: req.user?.id
+      });
+
+      res.status(201).json({
+        user: newUser,
+        mode: 'FUTURE_ONLY',
+        transferredOrdersCount: transferredOrders.count,
+        message: `Đã tạo nhân sự mới "${newUser.fullName}" và bảo lưu nguyên vẹn lịch sử cũ của "${targetUser.fullName}". Đã chuyển ${transferredOrders.count} đơn đang thực hiện sang người mới.`
+      });
+      return;
     }
-    
+
+    // ─────────────────────────────────────────────────────────────
+    // TRƯỜNG HỢP 2: OVERWRITE (MẶC ĐỊNH HOẶC CHỌN GHI ĐÈ LỊCH SỬ)
+    // ─────────────────────────────────────────────────────────────
+    const updateData: any = {};
+    if (fullName !== undefined) updateData.fullName = fullName.trim();
+    if (phoneNumber !== undefined) updateData.phoneNumber = phoneNumber.trim() || null;
+    if (isActive !== undefined) updateData.isActive = isActive;
+    if (role !== undefined) updateData.role = finalRole;
     if (techStationId !== undefined) updateData.techStationId = techStationId || null;
     
     if (address !== undefined) updateData.address = address || null;
@@ -461,6 +597,27 @@ router.put('/:id', async (req: Request, res: Response): Promise<void> => {
     if (group !== undefined) updateData.group = group || null;
     if (pancakeAccountName !== undefined) updateData.pancakeAccountName = pancakeAccountName || null;
 
+    if (username !== undefined) {
+      const cleanUsername = String(username).toLowerCase().trim();
+      if (!cleanUsername) {
+        res.status(400).json({ error: 'Username không được để trống' });
+        return;
+      }
+      if (cleanUsername !== targetUser.username.toLowerCase()) {
+        const existing = await prisma.user.findFirst({
+          where: {
+            id: { not: id },
+            username: cleanUsername
+          }
+        });
+        if (existing) {
+          res.status(409).json({ error: `Username "${cleanUsername}" đã được sử dụng bởi tài khoản khác` });
+          return;
+        }
+        updateData.username = cleanUsername;
+      }
+    }
+
     if (password) {
       if (password.length < 4) {
         res.status(400).json({ error: 'Mật khẩu phải có ít nhất 4 ký tự' });
@@ -469,7 +626,7 @@ router.put('/:id', async (req: Request, res: Response): Promise<void> => {
       updateData.passwordHash = await bcrypt.hash(password, 10);
     }
 
-    const user = await prisma.user.update({
+    const updatedUser = await prisma.user.update({
       where: { id },
       data: updateData,
       select: {
@@ -494,8 +651,32 @@ router.put('/:id', async (req: Request, res: Response): Promise<void> => {
       } as any,
     });
 
-    logger.info('User updated', { userId: id, by: req.user?.id });
-    res.json({ user });
+    // Ghi AuditLog
+    await prisma.auditLog.create({
+      data: {
+        entityType: 'User',
+        entityId: id,
+        action: 'updated',
+        changes: {
+          mode: 'OVERWRITE',
+          from: {
+            fullName: targetUser.fullName,
+            username: targetUser.username,
+            phoneNumber: targetUser.phoneNumber
+          },
+          to: {
+            fullName: updatedUser.fullName,
+            username: updatedUser.username,
+            phoneNumber: updatedUser.phoneNumber
+          }
+        },
+        userId: req.user!.id,
+        userName: req.user!.username || 'ADMIN'
+      }
+    });
+
+    logger.info('User updated (OVERWRITE)', { userId: id, by: req.user?.id });
+    res.json({ user: updatedUser, mode: 'OVERWRITE' });
   } catch (error: any) {
     logger.error('Update user error', { error: error.message });
     res.status(500).json({ error: 'Lỗi cập nhật' });

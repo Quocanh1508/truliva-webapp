@@ -20,7 +20,7 @@ export async function syncProducts() {
 
     // Kéo toàn bộ sản phẩm (mỗi trang 100 cái)
     while (hasMore) {
-      const response = await axios.get(`https://pos.pages.fm/api/v1/shops/${SHOP_ID}/products/variations`, {
+      const response = await axios.get(`https://pos.pancake.vn/api/v1/shops/${SHOP_ID}/products/variations`, {
         params: { api_key: API_KEY, page_size: 100, page: page }
       });
 

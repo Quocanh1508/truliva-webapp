@@ -2,6 +2,9 @@ import axios from 'axios';
 import prisma from '../config/database';
 import { processOrderEvent } from './orderProcessor';
 import logger from '../utils/logger';
+import { PANCAKE_API_BASE } from '../config/pancake';
+import pancakeCircuitBreaker from './pancakeCircuitBreaker';
+import { isSandboxEnvironment } from '../utils/sandboxGuard';
 
 const SHOP_ID = '1635300067';
 
@@ -17,6 +20,14 @@ export async function syncRecentOrders(pageSize: number = 50): Promise<number> {
     logger.info('[RecentOrdersSync] Previous sync still in progress, skipping tick');
     return 0;
   }
+
+  // 🛡️ Kiểm tra Cầu chì tự ngắt Circuit Breaker
+  const cbCheck = pancakeCircuitBreaker.canExecute();
+  if (!cbCheck.allowed) {
+    logger.warn(`[RecentOrdersSync] Circuit Breaker blocked sync: ${cbCheck.reason}`);
+    return 0;
+  }
+
   isSyncingRecent = true;
 
   const apiKey = process.env.PANCAKE_API_KEY;
@@ -34,7 +45,7 @@ export async function syncRecentOrders(pageSize: number = 50): Promise<number> {
     let syncCount = 0;
 
     for (let page = 1; page <= maxPages; page++) {
-      const response = await axios.get(`https://pos.pages.fm/api/v1/shops/${SHOP_ID}/orders`, {
+      const response = await axios.get(`${PANCAKE_API_BASE}/api/v1/shops/${SHOP_ID}/orders`, {
         params: { 
           api_key: apiKey, 
           page_size: perPage, 
@@ -46,6 +57,9 @@ export async function syncRecentOrders(pageSize: number = 50): Promise<number> {
       if (!response.data || !response.data.success || !Array.isArray(response.data.data)) {
         continue;
       }
+
+      // Ghi nhận thành công để reset Cầu chì
+      pancakeCircuitBreaker.recordSuccess();
 
       const orders = response.data.data;
       for (const orderPayload of orders) {
@@ -65,6 +79,13 @@ export async function syncRecentOrders(pageSize: number = 50): Promise<number> {
     logger.info(`Completed sync of ${syncCount} recent orders.`);
     return syncCount;
   } catch (error: any) {
+    if (error.response?.status === 403 || error.response?.data?.error_code === 105) {
+      await pancakeCircuitBreaker.recordFailure(error);
+      logger.error('syncRecentOrders failed: PANCAKE_API_KEY is invalid or expired (code 105)', { error: error.message });
+      const customErr: any = new Error('API Key của Pancake POS đã hết hạn hoặc không hợp lệ (mã lỗi 105). Vui lòng cấu hình lại PANCAKE_API_KEY trong file .env trên máy chủ.');
+      customErr.response = error.response;
+      throw customErr;
+    }
     logger.error('syncRecentOrders failed', { error: error.message });
     throw error;
   } finally {
@@ -81,6 +102,13 @@ export async function reconcileDraftOrders(limit: number = 20): Promise<number> 
   if (isReconciling) {
     return 0; // Đang chạy tick trước, tránh chạy chồng chéo
   }
+
+  // 🛡️ Kiểm tra Cầu chì tự ngắt Circuit Breaker
+  const cbCheck = pancakeCircuitBreaker.canExecute();
+  if (!cbCheck.allowed) {
+    return 0;
+  }
+
   isReconciling = true;
 
   const apiKey = process.env.PANCAKE_API_KEY;
@@ -115,13 +143,19 @@ export async function reconcileDraftOrders(limit: number = 20): Promise<number> 
     let reconciledCount = 0;
 
     for (const order of draftOrders) {
+      // Dừng ngay nếu cầu chì vừa bị ngắt bởi một request trước đó
+      if (!pancakeCircuitBreaker.canExecute().allowed) {
+        break;
+      }
+
       try {
-        const response = await axios.get(`https://pos.pages.fm/api/v1/shops/${SHOP_ID}/orders/${order.pancakeOrderId}`, {
+        const response = await axios.get(`${PANCAKE_API_BASE}/api/v1/shops/${SHOP_ID}/orders/${order.pancakeOrderId}`, {
           params: { api_key: apiKey },
           timeout: 8000
         });
 
         if (response.data?.success && response.data?.data) {
+          pancakeCircuitBreaker.recordSuccess();
           const payload = response.data.data;
           // Nếu trên POS trạng thái đã khác 0 (đã xác nhận hoặc chuyển trạng thái)
           if (payload.status !== 0) {
@@ -131,6 +165,11 @@ export async function reconcileDraftOrders(limit: number = 20): Promise<number> 
           }
         }
       } catch (err: any) {
+        if (err.response?.status === 403 || err.response?.data?.error_code === 105) {
+          await pancakeCircuitBreaker.recordFailure(err);
+          logger.error('[DraftReconciliation] PANCAKE_API_KEY is invalid or expired (code 105). Circuit breaker engaged.');
+          break;
+        }
         logger.warn(`[DraftReconciliation] Failed to check order #${order.pancakeOrderId}`, { error: err.message });
       }
       // Dừng 50ms giữa các request để giữ tải mạng êm dịu
@@ -151,13 +190,14 @@ export async function reconcileDraftOrders(limit: number = 20): Promise<number> 
 
 /**
  * Khởi tạo bộ lập lịch đồng bộ đơn hàng tự động (chạy ngầm).
- * - Fast Draft Reconciliation: mỗi 20 giây (tự động phát hiện đơn vừa xác nhận trên POS)
+ * - Fast Draft Reconciliation: mỗi 45 giây (tự động phát hiện đơn vừa xác nhận trên POS)
  * - Full Orders Sync: mỗi 2 phút (quét đối soát định kỳ toàn diện)
  */
 export function startOrderSyncScheduler(intervalMinutes: number = 2): void {
-  logger.info(`Initializing auto orders sync scheduler: full sync every ${intervalMinutes}m, fast draft reconciliation every 20s...`);
+  const isSandbox = isSandboxEnvironment();
+  logger.info(`Initializing auto orders sync scheduler: full sync every ${intervalMinutes}m, sandboxMode: ${isSandbox}...`);
   
-  // Chạy ngay lập tức khi khởi động server sau 3 giây
+  // Chạy ngay lập tức khi khởi động server sau 5 giây
   setTimeout(() => {
     logger.info('[OrderSyncScheduler] Running initial startup orders sync...');
     syncRecentOrders(50)
@@ -165,14 +205,20 @@ export function startOrderSyncScheduler(intervalMinutes: number = 2): void {
       .catch(err => {
         logger.error('[OrderSyncScheduler] Initial auto orders sync failed', { error: err.message });
       });
-  }, 3000);
+  }, 5000);
 
-  // 1. Vòng lặp siêu nhẹ kiểm tra đơn nháp (mỗi 20 giây) - Tự động phát hiện đơn vừa được xác nhận trên POS
-  setInterval(() => {
-    reconcileDraftOrders(20).catch(err => {
-      logger.error('[OrderSyncScheduler] Fast draft reconciliation loop failed', { error: err.message });
-    });
-  }, 20 * 1000);
+  // 1. Vòng lặp kiểm tra đơn nháp - Tự động phát hiện đơn vừa được xác nhận trên POS
+  // 🛡️ Trên Sandbox: Vô hiệu hóa vòng lặp siêu nhanh để bảo vệ uy tín IP VPS
+  if (isSandbox) {
+    logger.info('[OrderSyncScheduler] 🛡️ Sandbox protection: Fast draft loop disabled. Full sync will run on schedule.');
+  } else {
+    // Trên Production: Quét mỗi 45 giây (vừa êm ái vừa bảo đảm thời gian thực)
+    setInterval(() => {
+      reconcileDraftOrders(20).catch(err => {
+        logger.error('[OrderSyncScheduler] Fast draft reconciliation loop failed', { error: err.message });
+      });
+    }, 45 * 1000);
+  }
 
   // 2. Thiết lập interval định kỳ đồng bộ đối soát (mỗi 2 phút)
   setInterval(() => {

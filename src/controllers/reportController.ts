@@ -11,6 +11,7 @@ import axios from 'axios';
 import { formatOrderCode, buildReportFilter } from '../services/reportService';
 import { getComboComponents, ComboComponent } from './orderController';
 import { isSandboxEnvironment, logSandboxBlockedAction } from '../utils/sandboxGuard';
+import { PANCAKE_API_BASE } from '../config/pancake';
 
 export async function createReport(req: Request, res: Response): Promise<void> {
   try {
@@ -519,7 +520,7 @@ export async function createReport(req: Request, res: Response): Promise<void> {
                 } else {
                   try {
                     const updateResponse = await axios.patch(
-                      `https://pos.pages.fm/api/v1/shops/${shopId}/orders/${oldOrder.pancakeOrderId}`,
+                      `${PANCAKE_API_BASE}/api/v1/shops/${shopId}/orders/${oldOrder.pancakeOrderId}`,
                       {
                         products: pancakeProducts,
                         warehouse_id: targetWarehouseId || undefined
@@ -1597,7 +1598,7 @@ export async function updateReport(req: Request, res: Response): Promise<void> {
               } else {
                 try {
                   await axios.patch(
-                    `https://pos.pages.fm/api/v1/shops/${shopId}/orders/${oldOrder.pancakeOrderId}`,
+                    `${PANCAKE_API_BASE}/api/v1/shops/${shopId}/orders/${oldOrder.pancakeOrderId}`,
                     {
                       products: pancakeProducts,
                       warehouse_id: targetWarehouseId || undefined
@@ -2052,7 +2053,7 @@ export async function approveReport(req: Request, res: Response): Promise<void> 
           } else {
             try {
               await axios.patch(
-                `https://pos.pages.fm/api/v1/shops/${shopId}/orders/${order.pancakeOrderId}`,
+                `${PANCAKE_API_BASE}/api/v1/shops/${shopId}/orders/${order.pancakeOrderId}`,
                 {
                   products: pancakeProducts,
                   warehouse_id: order.warehouseId || undefined,

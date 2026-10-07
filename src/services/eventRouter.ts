@@ -3,6 +3,7 @@ import prisma from '../config/database';
 import { processCustomerEvent } from './customerProcessor';
 import { processOrderEvent } from './orderProcessor';
 import logger from '../utils/logger';
+import { PANCAKE_API_BASE } from '../config/pancake';
 
 /**
  * Event Router — Bộ điều phối sự kiện.
@@ -141,7 +142,7 @@ async function handleOrderStockUpdateEvent(rawEventId: string, payload: any): Pr
     logger.info('Running order sync fallback via stock update event', { rawEventId, orderId });
     let response;
     try {
-      response = await axios.get(`https://pos.pages.fm/api/v1/shops/${shopId}/orders/${orderId}`, {
+      response = await axios.get(`${PANCAKE_API_BASE}/api/v1/shops/${shopId}/orders/${orderId}`, {
         params: { api_key: apiKey },
         timeout: 15000 // Tăng timeout lên 15 giây
       });
@@ -149,7 +150,7 @@ async function handleOrderStockUpdateEvent(rawEventId: string, payload: any): Pr
       // Retry 1 lần sau 1.5s nếu bị timeout hoặc lỗi mạng
       logger.warn('Initial order fetch failed in stock update, retrying in 1.5s...', { orderId, error: fetchErr.message });
       await new Promise(r => setTimeout(r, 1500));
-      response = await axios.get(`https://pos.pages.fm/api/v1/shops/${shopId}/orders/${orderId}`, {
+      response = await axios.get(`${PANCAKE_API_BASE}/api/v1/shops/${shopId}/orders/${orderId}`, {
         params: { api_key: apiKey },
         timeout: 15000
       });

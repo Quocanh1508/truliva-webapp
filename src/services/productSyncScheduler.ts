@@ -1,5 +1,6 @@
 import { syncProducts } from '../scripts/syncProducts';
 import logger from '../utils/logger';
+import pancakeCircuitBreaker from './pancakeCircuitBreaker';
 
 let isRunning = false;
 
@@ -9,6 +10,13 @@ let isRunning = false;
 export async function syncAllProducts(): Promise<void> {
   if (isRunning) {
     logger.info('[ProductSync] Sync process is already running, skipping...');
+    return;
+  }
+
+  // 🛡️ Kiểm tra Cầu chì tự ngắt Circuit Breaker
+  const cbCheck = pancakeCircuitBreaker.canExecute();
+  if (!cbCheck.allowed) {
+    logger.warn(`[ProductSync] Circuit Breaker blocked product sync: ${cbCheck.reason}`);
     return;
   }
 

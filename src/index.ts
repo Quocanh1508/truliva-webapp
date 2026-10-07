@@ -1,6 +1,6 @@
 import dotenv from 'dotenv';
 // ── Load biến môi trường ──
-dotenv.config(); // Load environment variables
+dotenv.config({ override: true }); // Load environment variables with override enabled
 
 import express from 'express';
 import helmet from 'helmet';

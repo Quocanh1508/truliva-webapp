@@ -4,6 +4,8 @@ import { getComboComponents, ComboComponent } from '../controllers/orderControll
 import { syncOrderStatusToPancake } from './orderProcessor';
 import logger from '../utils/logger';
 import { isSandboxEnvironment, logSandboxBlockedAction } from '../utils/sandboxGuard';
+import { PANCAKE_API_BASE } from '../config/pancake';
+import pancakeCircuitBreaker from './pancakeCircuitBreaker';
 
 const SHOP_ID = '1635300067';
 
@@ -14,6 +16,13 @@ export async function retryPancakeSync(orderId: string): Promise<void> {
   // ═══ CHỐT CHẶN SANDBOX: TUYỆT ĐỐI KHÔNG GHI SANG PANCAKE POS ═══
   if (isSandboxEnvironment()) {
     logSandboxBlockedAction('retryPancakeSync', { orderId });
+    return;
+  }
+
+  // 🛡️ Kiểm tra Cầu chì tự ngắt Circuit Breaker
+  const cbCheck = pancakeCircuitBreaker.canExecute();
+  if (!cbCheck.allowed) {
+    logger.warn(`[RetrySync] Circuit Breaker blocked retry: ${cbCheck.reason}`);
     return;
   }
 
@@ -77,7 +86,7 @@ export async function retryPancakeSync(orderId: string): Promise<void> {
     if (pancakeProducts.length > 0) {
       logger.info(`[RetrySync] Syncing products and warehouse to Pancake POS for order ${order.pancakeOrderId}`);
       const updateResponse = await axios.patch(
-        `https://pos.pages.fm/api/v1/shops/${SHOP_ID}/orders/${order.pancakeOrderId}`,
+        `${PANCAKE_API_BASE}/api/v1/shops/${SHOP_ID}/orders/${order.pancakeOrderId}`,
         {
           products: pancakeProducts,
           warehouse_id: order.warehouseId || undefined

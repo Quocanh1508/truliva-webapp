@@ -4,6 +4,7 @@ import axios from 'axios';
 import { syncOrderInventoryState } from './inventoryService';
 import { broadcastEvent } from './websocketService';
 import { isSandboxEnvironment, logSandboxBlockedAction } from '../utils/sandboxGuard';
+import { PANCAKE_API_BASE } from '../config/pancake';
 
 /**
  * Xử lý event "orders" từ Pancake webhook.
@@ -151,6 +152,7 @@ export async function processOrderEvent(rawEventId: string | null, payload: any)
         warehouseId: true,
         warehouseInfo: true,
         workType: true,
+        checkoutLink: true,
         items: {
           select: {
             productName: true,
@@ -294,9 +296,11 @@ export async function processOrderEvent(rawEventId: string | null, payload: any)
       })(),
       orderSourceId: payload.marketplace_id ? String(payload.marketplace_id) : null,
       orderLink: payload.order_link || null,
-      checkoutLink: payload.tracking_link
-        ? payload.tracking_link.replace('/tracking?', '/payment?')
-        : null,
+      checkoutLink: payload.payment_link || (payload.tracking_link
+        ? (payload.tracking_link.includes('/tracking?')
+            ? payload.tracking_link.replace('/tracking?', '/payment?')
+            : payload.tracking_link)
+        : null) || (existingOrder?.checkoutLink ?? null),
       shippingAddress: payload.shipping_address || null,
       warehouseInfo: payload.warehouse_info || null,
       warehouseId: payload.warehouse_id ? String(payload.warehouse_id) : null,
@@ -589,7 +593,7 @@ export async function syncOrderStatusToPancake(pancakeOrderId: number, adminStat
 
   logger.info('Syncing status change to Pancake POS API', { pancakeOrderId, adminStatus, statusIdToSync });
   const updateResponse = await axios.patch(
-    `https://pos.pages.fm/api/v1/shops/${shopId}/orders/${pancakeOrderId}`,
+    `${PANCAKE_API_BASE}/api/v1/shops/${shopId}/orders/${pancakeOrderId}`,
     {
       status: statusIdToSync
     },
