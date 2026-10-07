@@ -16,6 +16,7 @@ import { PANCAKE_API_BASE } from '../config/pancake';
 import pancakeCircuitBreaker from '../services/pancakeCircuitBreaker';
 
 import { buildOrderFilter, getNextManualOrderId } from '../services/orderService';
+import { normalizeProvince, getProvinceSearchVariants, PANCAKE_PROVINCES } from '../utils/provinces';
 
 // ── Combo types & functions: Import & Re-export từ ComboService (Dynamic DB-driven) ──
 import { 
@@ -370,15 +371,24 @@ export async function getOrders(req: Request, res: Response): Promise<void> {
     if (provinces) {
       const list = typeof provinces === 'string' ? provinces.split(',') : (Array.isArray(provinces) ? provinces as string[] : []);
       if (list.length > 0) {
-        const orConds: Prisma.OrderWhereInput[] = list.map(prov => ({
-          OR: [
-            { customer: { provinceName: { contains: prov, mode: 'insensitive' } } },
-            { shippingAddress: { path: ['province'], equals: prov } },
-            { shippingAddress: { path: ['city'], equals: prov } },
-            { shippingAddress: { path: ['province_name'], equals: prov } }
-          ]
-        }));
-        conditions.push({ OR: orConds });
+        const orConds: Prisma.OrderWhereInput[] = [];
+        for (const prov of list) {
+          const norm = normalizeProvince(prov) || prov.trim();
+          const variants = getProvinceSearchVariants(norm);
+          for (const v of variants) {
+            orConds.push({
+              OR: [
+                { customer: { provinceName: { contains: v, mode: 'insensitive' } } },
+                { shippingAddress: { path: ['province'], equals: v } },
+                { shippingAddress: { path: ['city'], equals: v } },
+                { shippingAddress: { path: ['province_name'], equals: v } }
+              ]
+            });
+          }
+        }
+        if (orConds.length > 0) {
+          conditions.push({ OR: orConds });
+        }
       }
     }
 
@@ -889,6 +899,7 @@ export async function createManualOrder(req: Request, res: Response): Promise<vo
     // 1. Tìm hoặc tạo Customer
     let customerId: string;
     const cleanPhone = customerPhone.trim();
+    const normProvince = province ? (normalizeProvince(province) || province.trim()) : null;
     const existingCustomer = await prisma.customer.findFirst({
       where: { phoneNumber: cleanPhone }
     });
@@ -901,8 +912,8 @@ export async function createManualOrder(req: Request, res: Response): Promise<vo
         updateData.address = address;
         updateData.fullAddress = address;
       }
-      if (province && !existingCustomer.provinceName) {
-        updateData.provinceName = province;
+      if (normProvince && !existingCustomer.provinceName) {
+        updateData.provinceName = normProvince;
       }
       if (Object.keys(updateData).length > 0) {
         await prisma.customer.update({
@@ -917,7 +928,7 @@ export async function createManualOrder(req: Request, res: Response): Promise<vo
           phoneNumber: cleanPhone,
           address: address || null,
           fullAddress: address || null,
-          provinceName: province || null
+          provinceName: normProvince || null
         }
       });
       customerId = newCustomer.id;
@@ -925,7 +936,7 @@ export async function createManualOrder(req: Request, res: Response): Promise<vo
 
     // ── NGHIỆP VỤ: Hệ thống ID cho đơn hàng thủ công ───────────────────────────
     // Đơn hàng từ Pancake POS luôn có pancakeOrderId là số DƯƠNG (1, 2, 3, ...).
-    // Đơn hàng thủ công (tạo từ Admin trong Truliva) được gán ID ÂM (-1, -2, -3, ...
+    // Đơn hàng thủ công (tạo từ Admin trong Truliva) được gán ID ÂM (-1, -2, -3, ...)
     // để đảm bảo không bao giờ bị trùng với ID của Pancake POS.
     //
     // Quy tắc tự tăng: Tìm đơn thủ công có ID âm NHỎ NHẤT hiện tại trong dải tuần tự (>-1,000,000)
@@ -955,7 +966,11 @@ export async function createManualOrder(req: Request, res: Response): Promise<vo
         serviceType: serviceType || null,
         appointmentTime: apptDate,
         note: note || null,
-        shippingAddress: address ? { full_address: address } : undefined,
+        shippingAddress: (address || normProvince) ? {
+          full_address: address || '',
+          province_name: normProvince || '',
+          province: normProvince || ''
+        } : undefined,
         billFullName: customerName,
         billPhoneNumber: cleanPhone,
         pancakeCreatedAt: new Date(),
@@ -1265,15 +1280,24 @@ export async function exportOrdersExcel(req: Request, res: Response): Promise<vo
     if (provinces) {
       const list = typeof provinces === 'string' ? provinces.split(',') : (Array.isArray(provinces) ? provinces as string[] : []);
       if (list.length > 0) {
-        const orConds: Prisma.OrderWhereInput[] = list.map(prov => ({
-          OR: [
-            { customer: { provinceName: { contains: prov, mode: 'insensitive' } } },
-            { shippingAddress: { path: ['province'], equals: prov } },
-            { shippingAddress: { path: ['city'], equals: prov } },
-            { shippingAddress: { path: ['province_name'], equals: prov } }
-          ]
-        }));
-        conditions.push({ OR: orConds });
+        const orConds: Prisma.OrderWhereInput[] = [];
+        for (const prov of list) {
+          const norm = normalizeProvince(prov) || prov.trim();
+          const variants = getProvinceSearchVariants(norm);
+          for (const v of variants) {
+            orConds.push({
+              OR: [
+                { customer: { provinceName: { contains: v, mode: 'insensitive' } } },
+                { shippingAddress: { path: ['province'], equals: v } },
+                { shippingAddress: { path: ['city'], equals: v } },
+                { shippingAddress: { path: ['province_name'], equals: v } }
+              ]
+            });
+          }
+        }
+        if (orConds.length > 0) {
+          conditions.push({ OR: orConds });
+        }
       }
     }
 
@@ -1608,7 +1632,14 @@ export async function getFilterOptions(req: Request, res: Response): Promise<voi
 
     const categories = Array.from(new Set(products.map(p => p.category).filter(Boolean))) as string[];
     const productNames = Array.from(new Set(products.map(p => p.name).filter(Boolean))) as string[];
-    const provinces = Array.from(new Set(customers.map(c => c.provinceName).filter(Boolean))) as string[];
+    const rawProvinces = customers
+      .map(c => normalizeProvince(c.provinceName) || c.provinceName?.trim())
+      .filter(Boolean) as string[];
+    const uniqueProvinces = new Set(rawProvinces);
+    const provinces = PANCAKE_PROVINCES.filter(p => uniqueProvinces.has(p));
+    for (const p of uniqueProvinces) {
+      if (!provinces.includes(p)) provinces.push(p);
+    }
     const creators = [
       'Hệ thống (Shopee, Lazada, Tiktok, Tiki)',
       ...Array.from(new Set(rawCreators.map(c => c.name).filter(Boolean)))
@@ -2147,6 +2178,7 @@ export async function updateOrder(req: Request, res: Response): Promise<void> {
         const nameToUse = customerName !== undefined ? customerName.trim() : oldOrder.billFullName;
         
         let customerId = oldOrder.customerId;
+        const normProvince = province !== undefined ? (province ? (normalizeProvince(province) || province.trim()) : '') : undefined;
         if (phoneToUse) {
           const existingCustomer = await prisma.customer.findFirst({
             where: { phoneNumber: phoneToUse }
@@ -2158,8 +2190,8 @@ export async function updateOrder(req: Request, res: Response): Promise<void> {
               customerUpdate.address = address;
               customerUpdate.fullAddress = address;
             }
-            if (province && !existingCustomer.provinceName) {
-              customerUpdate.provinceName = province;
+            if (normProvince !== undefined) {
+              customerUpdate.provinceName = normProvince || null;
             }
             if (Object.keys(customerUpdate).length > 0) {
               await prisma.customer.update({
@@ -2174,7 +2206,7 @@ export async function updateOrder(req: Request, res: Response): Promise<void> {
                 phoneNumber: phoneToUse,
                 address: address || null,
                 fullAddress: address || null,
-                provinceName: province || null
+                provinceName: normProvince || null
               }
             });
             customerId = newCustomer.id;
@@ -2196,10 +2228,13 @@ export async function updateOrder(req: Request, res: Response): Promise<void> {
       }
 
       if (address !== undefined || province !== undefined) {
+        const normProvince = province !== undefined ? (province ? (normalizeProvince(province) || province.trim()) : '') : undefined;
         const currentAddr = oldOrder.shippingAddress as any;
+        const targetProv = normProvince !== undefined ? normProvince : (currentAddr?.province_name || currentAddr?.province || '');
         const newAddr = {
           full_address: address !== undefined ? address : (currentAddr?.full_address || ''),
-          province_name: province !== undefined ? province : (currentAddr?.province_name || ''),
+          province_name: targetProv,
+          province: targetProv,
           district_name: currentAddr?.district_name || ''
         };
         updateData.shippingAddress = newAddr;

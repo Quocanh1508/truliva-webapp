@@ -1,4 +1,5 @@
 import prisma from '../config/database';
+import { normalizeProvince, getProvinceSearchVariants } from '../utils/provinces';
 
 export function formatOrderCode(pancakeOrderId: number | null | undefined): string {
   if (pancakeOrderId === undefined || pancakeOrderId === null) return '';
@@ -205,7 +206,16 @@ export async function buildReportFilter(query: any, user: any): Promise<any> {
     }
   }
 
-  if (province) where.province = { contains: province as string, mode: 'insensitive' };
+  if (province) {
+    const list = (province as string).split(',').map((s: string) => s.trim()).filter(Boolean);
+    const variants = list.flatMap(p => {
+      const norm = normalizeProvince(p) || p;
+      return getProvinceSearchVariants(norm);
+    });
+    if (variants.length > 0) {
+      where.OR = variants.map(v => ({ province: { contains: v, mode: 'insensitive' } }));
+    }
+  }
   
   // When searching, bypass category, station, and date filters so that stale filters in sessionStorage don't hide the search result
   if (!search) {

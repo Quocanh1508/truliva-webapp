@@ -5,6 +5,7 @@ import { syncOrderInventoryState } from './inventoryService';
 import { broadcastEvent } from './websocketService';
 import { isSandboxEnvironment, logSandboxBlockedAction } from '../utils/sandboxGuard';
 import { PANCAKE_API_BASE } from '../config/pancake';
+import { normalizeProvince } from '../utils/provinces';
 
 /**
  * Xử lý event "orders" từ Pancake webhook.
@@ -59,17 +60,25 @@ export async function processOrderEvent(rawEventId: string | null, payload: any)
       if (existingCustomer) {
         customerId = existingCustomer.id;
 
+        const updateCustData: any = {};
         // Cập nhật tên nếu trước đó bị che (Shopee che tên)
         if (billName && !existingCustomer.fullName.includes('*')) {
           // Không ghi đè tên đã rõ bằng tên bị che
         } else if (billName && !billName.includes('*')) {
+          updateCustData.fullName = billName;
+        }
+        if (!existingCustomer.provinceName && shippingAddr.province_name) {
+          updateCustData.provinceName = normalizeProvince(shippingAddr.province_name) || shippingAddr.province_name;
+        }
+        if (Object.keys(updateCustData).length > 0) {
           await prisma.customer.update({
             where: { id: existingCustomer.id },
-            data: { fullName: billName },
+            data: updateCustData,
           });
         }
       } else {
         // Tạo customer mới từ thông tin đơn hàng
+        const normProv = shippingAddr.province_name ? (normalizeProvince(shippingAddr.province_name) || shippingAddr.province_name) : null;
         const newCustomer = await prisma.customer.create({
           data: {
             fullName: billName || 'Không rõ',
@@ -79,7 +88,7 @@ export async function processOrderEvent(rawEventId: string | null, payload: any)
             provinceId: shippingAddr.province_id || null,
             districtId: shippingAddr.district_id || null,
             communeId: shippingAddr.commune_id || null,
-            provinceName: shippingAddr.province_name || null,
+            provinceName: normProv,
             districtName: shippingAddr.district_name || null,
             communeName: shippingAddr.commune_name || shippingAddr.commnue_name || null,
             source: payload.order_sources_name || null,

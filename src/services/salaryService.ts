@@ -234,7 +234,7 @@ export function calculateReportCost(
     } else if (rateType === 'suaChua' && customKtvRatesMap && customKtvRatesMap.has('baoHanh') && customKtvRatesMap.get('baoHanh') !== undefined && customKtvRatesMap.get('baoHanh') !== null) {
       baseCost = customKtvRatesMap.get('baoHanh')!;
     } else if (stationRate) {
-      if (stationRate.province === 'TP.HCM' && rateType === 'giaoHangLapDat' && notes.includes('giao lắp')) {
+      if ((stationRate.province === 'TP.HCM' || stationRate.province === 'Hồ Chí Minh' || stationRate.province === 'TP Hồ Chí Minh') && rateType === 'giaoHangLapDat' && notes.includes('giao lắp')) {
         baseCost = 250000;
       } else {
         const specificRate = stationRate.rates[rateType] ?? (rateType === 'suaChua' ? stationRate.rates['baoHanh'] : null);

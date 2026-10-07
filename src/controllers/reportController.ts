@@ -12,6 +12,7 @@ import { formatOrderCode, buildReportFilter } from '../services/reportService';
 import { getComboComponents, ComboComponent } from './orderController';
 import { isSandboxEnvironment, logSandboxBlockedAction } from '../utils/sandboxGuard';
 import { PANCAKE_API_BASE } from '../config/pancake';
+import { normalizeProvince, PANCAKE_PROVINCES } from '../utils/provinces';
 
 export async function createReport(req: Request, res: Response): Promise<void> {
   try {
@@ -241,7 +242,7 @@ export async function createReport(req: Request, res: Response): Promise<void> {
         reportedById,
         customerName,
         customerPhone,
-        province: province || 'N/A',
+        province: (province ? (normalizeProvince(province) || province) : 'N/A'),
         products: finalProducts,
         serviceType: serviceType || 'N/A',
         imageUrls: imageUrls || [],
@@ -311,9 +312,11 @@ export async function createReport(req: Request, res: Response): Promise<void> {
       try {
         if (oldOrder) {
           const currentShippingAddress = (oldOrder.shippingAddress as any) || {};
+          const normProv = province ? (normalizeProvince(province) || province) : currentShippingAddress.province_name;
           const updatedShippingAddress = {
             ...currentShippingAddress,
-            province_name: province || currentShippingAddress.province_name,
+            province_name: normProv,
+            province: normProv,
             full_address: address || currentShippingAddress.full_address,
           };
 
@@ -985,6 +988,13 @@ export async function getFilterOptions(req: Request, res: Response): Promise<voi
       prisma.serviceReport.findMany({ select: { province: true }, distinct: ['province'] })
     ]);
 
+    const rawProvinces = provinces.map((p: any) => normalizeProvince(p.province) || p.province?.trim()).filter(Boolean) as string[];
+    const uniqueProvinces = new Set(rawProvinces);
+    const sortedProvinces = PANCAKE_PROVINCES.filter(p => uniqueProvinces.has(p));
+    for (const p of uniqueProvinces) {
+      if (!sortedProvinces.includes(p)) sortedProvinces.push(p);
+    }
+
     res.json({
       workTypes: workTypes.map((w: any) => w.workType).filter(Boolean),
       serviceTypes: serviceTypes.map((s: any) => s.serviceType).filter(Boolean),
@@ -994,7 +1004,7 @@ export async function getFilterOptions(req: Request, res: Response): Promise<voi
       mainStations,
       techStations,
       ktvs,
-      provinces: provinces.map((p: any) => p.province).filter(Boolean)
+      provinces: sortedProvinces
     });
   } catch (error: any) {
     logger.error('Get filter options error', { error: error.message });
@@ -1461,7 +1471,7 @@ export async function updateReport(req: Request, res: Response): Promise<void> {
 
     if (customerName !== undefined) updateData.customerName = customerName;
     if (customerPhone !== undefined) updateData.customerPhone = customerPhone;
-    if (province !== undefined) updateData.province = province;
+    if (province !== undefined) updateData.province = province ? (normalizeProvince(province) || province) : '';
     if (address !== undefined) updateData.address = address;
     if (finalProducts !== undefined) updateData.products = finalProducts;
     if (serviceType !== undefined) updateData.serviceType = serviceType;

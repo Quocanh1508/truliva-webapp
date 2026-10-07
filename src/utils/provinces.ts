@@ -165,7 +165,7 @@ const PROVINCE_ALIASES: Record<string, string> = {
 export function normalizeProvince(input: string | null | undefined): string | null {
   if (!input || !input.trim()) return null;
   const trimmed = input.trim();
-  
+
   // 1. Khớp chính xác
   const exact = PANCAKE_PROVINCES.find(p => p.toLowerCase() === trimmed.toLowerCase());
   if (exact) return exact;
@@ -197,6 +197,7 @@ export function isValidProvince(input: string | null | undefined): boolean {
 
 /**
  * Lấy các biến thể tìm kiếm của một Tỉnh/TP để phục vụ truy vấn linh hoạt
+ * Đảm bảo tìm 'Hồ Chí Minh' sẽ khớp cả 'TP Hồ Chí Minh', 'TP. Hồ Chí Minh'...
  */
 export function getProvinceSearchVariants(province: string): string[] {
   const norm = normalizeProvince(province) || province.trim();

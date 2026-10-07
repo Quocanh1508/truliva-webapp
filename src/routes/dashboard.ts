@@ -3,8 +3,43 @@ import { Prisma } from '@prisma/client';
 import prisma from '../config/database';
 import logger from '../utils/logger';
 import { requireAuth, requireDashboardAccess } from '../middleware/authSession';
+import { normalizeProvince, getProvinceSearchVariants } from '../utils/provinces';
 
 const router = Router();
+
+function removeAccents(str: string): string {
+  if (!str) return '';
+  return str
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/đ/g, 'd')
+    .replace(/Đ/g, 'D')
+    .toLowerCase()
+    .trim();
+}
+
+function parseMultiValue(param: any): string[] {
+  if (!param) return [];
+  return String(param).split(',').map(s => s.trim()).filter(Boolean);
+}
+
+function getSearchProvinces(param: any): string[] {
+  const provinces = parseMultiValue(param);
+  if (provinces.length === 0) return [];
+  return provinces.flatMap(p => {
+    const norm = normalizeProvince(p) || p;
+    return getProvinceSearchVariants(norm).map(v => removeAccents(v));
+  });
+}
+
+function matchOrderProvince(order: any, searchProvinces: string[]): boolean {
+  if (!searchProvinces || searchProvinces.length === 0) return true;
+  const provRaw = order.customer?.provinceName || (order.shippingAddress as any)?.province_name || '';
+  const normProv = normalizeProvince(provRaw) || provRaw;
+  const provAcc = removeAccents(normProv);
+  const provRawAcc = removeAccents(provRaw);
+  return searchProvinces.some(sp => provAcc.includes(sp) || provRawAcc.includes(sp));
+}
 
 const nonEcomFilter: Prisma.OrderWhereInput = {
   OR: [
@@ -122,7 +157,7 @@ router.get('/stats', async (req: Request, res: Response): Promise<void> => {
 
     const density: Record<string, number> = {};
     customers.forEach(c => {
-      let p = c.provinceName || '';
+      let p = c.provinceName ? (normalizeProvince(c.provinceName) || c.provinceName) : '';
       // Clean up common prefixes to match map data
       p = p.replace(/^(Tỉnh |Thành phố |TP\.?\s*)/i, '').trim();
       density[p] = (density[p] || 0) + c._count.orders;
@@ -182,13 +217,9 @@ router.get('/stats', async (req: Request, res: Response): Promise<void> => {
     });
 
     // Lọc theo tỉnh thành trong bộ nhớ (hỗ trợ đa chọn)
-    const provinces = parseMultiValue(province);
-    if (provinces.length > 0) {
-      const searchProvinces = provinces.map(p => removeAccents(p));
-      orders = orders.filter(order => {
-        const provName = removeAccents(order.customer?.provinceName || (order.shippingAddress as any)?.province_name || '');
-        return searchProvinces.some(sp => provName.includes(sp));
-      });
+    const searchProvinces = getSearchProvinces(province);
+    if (searchProvinces.length > 0) {
+      orders = orders.filter(order => matchOrderProvince(order, searchProvinces));
     }
 
     // Lọc theo trạm chính / trạm kỹ thuật trong bộ nhớ (hỗ trợ đa chọn)
@@ -268,21 +299,6 @@ router.get('/stats', async (req: Request, res: Response): Promise<void> => {
   }
 });
 
-function removeAccents(str: string): string {
-  if (!str) return '';
-  return str
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .replace(/đ/g, 'd')
-    .replace(/Đ/g, 'D')
-    .toLowerCase()
-    .trim();
-}
-
-function parseMultiValue(param: any): string[] {
-  if (!param) return [];
-  return String(param).split(',').map(s => s.trim()).filter(Boolean);
-}
 
 /**
  * GET /api/dashboard/dispatch-analysis
@@ -392,13 +408,9 @@ router.get('/dispatch-analysis', async (req: Request, res: Response): Promise<vo
     });
 
     // Lọc theo province (tỉnh/thành phố) bằng JS ở bộ nhớ (hỗ trợ đa chọn)
-    const provinces = parseMultiValue(province);
-    if (provinces.length > 0) {
-      const searchProvinces = provinces.map(p => removeAccents(p));
-      orders = orders.filter(order => {
-        const provName = removeAccents(order.customer?.provinceName || (order.shippingAddress as any)?.province_name || '');
-        return searchProvinces.some(sp => provName.includes(sp));
-      });
+    const searchProvinces = getSearchProvinces(province);
+    if (searchProvinces.length > 0) {
+      orders = orders.filter(order => matchOrderProvince(order, searchProvinces));
     }
 
     const now = new Date();
@@ -778,12 +790,14 @@ router.get('/product-quality', async (req: Request, res: Response): Promise<void
     });
 
     // Lọc theo province (tỉnh/thành phố) bằng JS ở bộ nhớ (hỗ trợ đa chọn)
-    const provinces = parseMultiValue(province);
-    if (provinces.length > 0) {
-      const searchProvinces = provinces.map(p => removeAccents(p));
+    const searchProvinces = getSearchProvinces(province);
+    if (searchProvinces.length > 0) {
       reports = reports.filter(r => {
-        const provName = removeAccents(r.province || '');
-        return searchProvinces.some(sp => provName.includes(sp));
+        const provRaw = r.province || '';
+        const normProv = normalizeProvince(provRaw) || provRaw;
+        const provName = removeAccents(normProv);
+        const provRawName = removeAccents(provRaw);
+        return searchProvinces.some(sp => provName.includes(sp) || provRawName.includes(sp));
       });
     }
 
@@ -1171,13 +1185,9 @@ router.get('/revenue', async (req: Request, res: Response): Promise<void> => {
     const filterMemory = async (orderList: typeof currOrders) => {
       let filtered = orderList;
 
-      const provinces = parseMulti(province);
-      if (provinces.length > 0) {
-        const searchProvinces = provinces.map(p => removeAcc(p));
-        filtered = filtered.filter(order => {
-          const provName = removeAcc(order.customer?.provinceName || (order.shippingAddress as any)?.province_name || '');
-          return searchProvinces.some(sp => provName.includes(sp));
-        });
+      const searchProvinces = getSearchProvinces(province);
+      if (searchProvinces.length > 0) {
+        filtered = filtered.filter(order => matchOrderProvince(order, searchProvinces));
       }
 
       const mainStationIds = parseMulti(mainStationId);

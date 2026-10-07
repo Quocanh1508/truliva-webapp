@@ -1,5 +1,6 @@
 import prisma from '../config/database';
 import logger from '../utils/logger';
+import { normalizeProvince } from '../utils/provinces';
 
 /**
  * Xử lý event "customers" từ Pancake webhook.
@@ -22,7 +23,8 @@ export async function processCustomerEvent(rawEventId: string, payload: any): Pr
     const provinceId = shippingAddr.province_id || null;
     const districtId = shippingAddr.district_id || null;
     const communeId = shippingAddr.commune_id || null;
-    const provinceName = shippingAddr.province_name || null;
+    const rawProvName = shippingAddr.province_name || null;
+    const provinceName = rawProvName ? (normalizeProvince(rawProvName) || rawProvName) : null;
     const districtName = shippingAddr.district_name || null;
     const communeName = shippingAddr.commune_name || shippingAddr.commnue_name || null;
 
