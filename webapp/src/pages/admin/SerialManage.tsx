@@ -226,6 +226,29 @@ export default function SerialManage() {
     loadBatches();
   }, []);
 
+  // ESC Key listener: Thoát cửa sổ Chi tiết serial hoặc Import/Batch modal không lưu
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        if (selectedSerial) {
+          setSelectedSerial(null);
+          return;
+        }
+        if (showImportModal && !importing) {
+          setShowImportModal(false);
+          setImportResult(null);
+          return;
+        }
+        if (showBatchModal) {
+          setShowBatchModal(false);
+          return;
+        }
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [selectedSerial, showImportModal, importing, showBatchModal]);
+
   const calculateExpiryDate = (activationDateStr: string | null, modelName: string, selectedPromoCodeStr: string | null) => {
     if (!activationDateStr) return null;
 
@@ -340,7 +363,7 @@ export default function SerialManage() {
     
     setSubmittingApprove(true);
     try {
-      const res = await fetchApi(`/serials/${selectedSerial.id}`, {
+      await fetchApi(`/serials/${selectedSerial.id}`, {
         method: 'PATCH',
         body: JSON.stringify({
           serialNumber: selectedSerial.serialNumber,
@@ -361,7 +384,7 @@ export default function SerialManage() {
       });
       
       alert('Cập nhật thông tin Serial thành công!');
-      setSelectedSerial(res.serial);
+      setSelectedSerial(null);
       loadSerials();
     } catch (err: any) {
       console.error(err);
@@ -962,9 +985,8 @@ export default function SerialManage() {
               ) : serials.map(s => (
                 <React.Fragment key={s.id}>
                   <tr
-                    onClick={() => openDetail(s, false)}
                     style={{
-                      borderBottom: 'none', cursor: 'pointer',
+                      borderBottom: 'none',
                       transition: 'background 0.15s',
                     }}
                     onMouseEnter={e => (e.currentTarget.style.background = '#f8fafc')}
@@ -1730,6 +1752,16 @@ export default function SerialManage() {
                 </div>
                 
                 <div style={{ display: 'flex', gap: 10 }}>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedSerial(null)}
+                    style={{
+                      padding: '8px 16px', background: '#f1f5f9', color: '#475569', border: '1px solid #cbd5e1',
+                      borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: 'pointer'
+                    }}
+                  >
+                    Hủy (ESC)
+                  </button>
                   <button
                     onClick={handleSaveSerialDetails}
                     disabled={submittingApprove}
