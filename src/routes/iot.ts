@@ -197,13 +197,13 @@ router.post('/devices', requireAuth, requireAdmin, async (req: Request, res: Res
     if (mqttPassword) {
       await new Promise<void>((resolve, reject) => {
         exec(
-          `mosquitto_passwd -b /etc/mosquitto/passwd "${serialNumber}" "${mqttPassword}"`,
+          `mosquitto_passwd -b /etc/mosquitto/passwd "${serialNumber}" "${mqttPassword}" && (systemctl reload mosquitto || kill -HUP $(pidof mosquitto) || true)`,
           (error) => {
             if (error) {
               logger.error('IoT API: Failed to create MQTT user', { serial: serialNumber, error: error.message });
               reject(error);
             } else {
-              logger.info('IoT API: MQTT user created', { serial: serialNumber });
+              logger.info('IoT API: MQTT user created & broker reloaded', { serial: serialNumber });
               resolve();
             }
           }

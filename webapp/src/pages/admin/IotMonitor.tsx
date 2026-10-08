@@ -26,6 +26,7 @@ import {
   Tooltip,
   CartesianGrid,
 } from 'recharts';
+import { fetchApi } from '../../api/client';
 
 interface Telemetry {
   id: string;
@@ -103,20 +104,13 @@ export default function IotMonitor() {
     else setRefreshing(true);
 
     try {
-      const [devicesRes, alertsRes] = await Promise.all([
-        fetch('/api/iot/devices', { headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } }),
-        fetch('/api/iot/alerts?resolved=false', { headers: { Authorization: `Bearer ${localStorage.getItem('token')}` } })
+      const [devicesData, alertData] = await Promise.all([
+        fetchApi('/iot/devices'),
+        fetchApi('/iot/alerts?resolved=false')
       ]);
 
-      if (devicesRes.ok) {
-        const data = await devicesRes.json();
-        setDevices(data.devices || []);
-      }
-
-      if (alertsRes.ok) {
-        const alertData = await alertsRes.json();
-        setAlerts(alertData.alerts || []);
-      }
+      setDevices(devicesData?.devices || []);
+      setAlerts(alertData?.alerts || []);
     } catch (error) {
       console.error('Error fetching IoT data:', error);
     } finally {
@@ -127,8 +121,8 @@ export default function IotMonitor() {
 
   useEffect(() => {
     fetchData();
-    // Auto refresh every 30 seconds
-    const timer = setInterval(() => fetchData(true), 30000);
+    // Auto refresh every 10 seconds for real-time monitoring
+    const timer = setInterval(() => fetchData(true), 10000);
     return () => clearInterval(timer);
   }, [fetchData]);
 
@@ -137,17 +131,12 @@ export default function IotMonitor() {
     setSelectedDevice(device);
     setLoadingTelemetry(true);
     try {
-      const res = await fetch(`/api/iot/devices/${device.serialNumber}/telemetry?limit=50`, {
-        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
-      });
-      if (res.ok) {
-        const data = await res.json();
-        // Sort ascending for chart
-        const sorted = (data.telemetry || []).sort(
-          (a: Telemetry, b: Telemetry) => new Date(a.recordedAt).getTime() - new Date(b.recordedAt).getTime()
-        );
-        setDeviceTelemetry(sorted);
-      }
+      const data = await fetchApi(`/iot/devices/${device.serialNumber}/telemetry?limit=50`);
+      // Sort ascending for chart
+      const sorted = (data?.telemetry || []).sort(
+        (a: Telemetry, b: Telemetry) => new Date(a.recordedAt).getTime() - new Date(b.recordedAt).getTime()
+      );
+      setDeviceTelemetry(sorted);
     } catch (e) {
       console.error('Failed to load telemetry:', e);
     } finally {
@@ -163,27 +152,18 @@ export default function IotMonitor() {
     setSubmittingAdd(true);
     setAddResult(null);
     try {
-      const res = await fetch('/api/iot/devices', {
+      const data = await fetchApi('/iot/devices', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${localStorage.getItem('token')}`
-        },
         body: JSON.stringify({
           serialNumber: newSerial.trim().toUpperCase(),
           mqttPassword: newPassword.trim() || undefined
         })
       });
 
-      const data = await res.json();
-      if (res.ok) {
-        setAddResult(data);
-        fetchData(true);
-      } else {
-        alert(data.error || 'Lỗi khi đăng ký thiết bị');
-      }
-    } catch (error) {
-      alert('Lỗi kết nối server');
+      setAddResult(data);
+      fetchData(true);
+    } catch (error: any) {
+      alert(error.message || 'Lỗi khi đăng ký thiết bị');
     } finally {
       setSubmittingAdd(false);
     }
@@ -199,24 +179,15 @@ export default function IotMonitor() {
         params = { interval_s: Number(commandParam) || 300 };
       }
 
-      const res = await fetch(`/api/iot/devices/${commandDevice.serialNumber}/command`, {
+      const data = await fetchApi(`/iot/devices/${commandDevice.serialNumber}/command`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${localStorage.getItem('token')}`
-        },
         body: JSON.stringify({ command: selectedCommand, params })
       });
 
-      const data = await res.json();
-      if (res.ok) {
-        alert(`✅ ${data.message}`);
-        setShowCommandModal(false);
-      } else {
-        alert(`❌ ${data.error}`);
-      }
-    } catch (e) {
-      alert('Lỗi khi gửi lệnh');
+      alert(`✅ ${data?.message || 'Lệnh đã được gửi thành công'}`);
+      setShowCommandModal(false);
+    } catch (e: any) {
+      alert(`❌ ${e.message || 'Lỗi khi gửi lệnh'}`);
     } finally {
       setSendingCommand(false);
     }
@@ -225,14 +196,11 @@ export default function IotMonitor() {
   // Resolve alert
   const handleResolveAlert = async (alertId: string) => {
     try {
-      const res = await fetch(`/api/iot/alerts/${alertId}/resolve`, {
-        method: 'PATCH',
-        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
+      await fetchApi(`/iot/alerts/${alertId}/resolve`, {
+        method: 'PATCH'
       });
-      if (res.ok) {
-        setAlerts((prev) => prev.filter((a) => a.id !== alertId));
-        fetchData(true);
-      }
+      setAlerts((prev) => prev.filter((a) => a.id !== alertId));
+      fetchData(true);
     } catch (e) {
       console.error('Resolve alert error:', e);
     }

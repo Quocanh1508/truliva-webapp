@@ -217,7 +217,7 @@ export default function InventoryManage() {
       }
 
       const queryStr = params.toString() ? `?${params.toString()}` : '';
-      const token = localStorage.getItem('token');
+      const token = localStorage.getItem('session_token') || localStorage.getItem('token');
       const response = await fetch(`/api/inventory/analytics/export${queryStr}`, {
         headers: {
           'Authorization': `Bearer ${token}`
