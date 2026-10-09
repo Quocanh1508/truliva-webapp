@@ -24,6 +24,7 @@ import {
 } from '../services/zaloService';
 import { sendPushNotification } from '../services/notificationService';
 import { sendWebPushNotification } from '../services/webPushService';
+import { PANCAKE_PROVINCES } from '../utils/provinces';
 
 export async function uploadInvoiceResponse(req: Request, res: Response): Promise<void> {
   try {
@@ -937,6 +938,269 @@ export async function importSerials(req: Request, res: Response): Promise<void> 
   }
 }
 
+/**
+ * GET /api/serials/models
+ * Lấy danh sách Model & Dòng máy thiết bị
+ */
+export async function getMachineModels(req: Request, res: Response): Promise<void> {
+  try {
+    const { activeOnly, search } = req.query;
+    const where: any = {};
+
+    if (activeOnly === 'true') {
+      where.isActive = true;
+    }
+
+    if (search && typeof search === 'string' && search.trim()) {
+      const term = search.trim();
+      where.OR = [
+        { model: { contains: term, mode: 'insensitive' } },
+        { productLine: { contains: term, mode: 'insensitive' } },
+        { description: { contains: term, mode: 'insensitive' } }
+      ];
+    }
+
+    const models = await prisma.machineModel.findMany({
+      where,
+      orderBy: [
+        { sortOrder: 'asc' },
+        { model: 'asc' }
+      ]
+    });
+
+    res.json({
+      success: true,
+      models,
+      total: models.length
+    });
+  } catch (error: any) {
+    logger.error('Lỗi lấy danh sách MachineModel', { error: error.message });
+    res.status(500).json({ error: 'Lỗi khi lấy danh sách model máy' });
+  }
+}
+
+/**
+ * POST /api/serials/models
+ * Khai báo Model & Dòng máy mới
+ */
+export async function createMachineModel(req: Request, res: Response): Promise<void> {
+  try {
+    const { model, productLine, description, sortOrder } = req.body;
+
+    if (!model || !String(model).trim()) {
+      res.status(400).json({ error: 'Mã Model không được để trống' });
+      return;
+    }
+
+    if (!productLine || !String(productLine).trim()) {
+      res.status(400).json({ error: 'Tên Dòng máy không được để trống' });
+      return;
+    }
+
+    const cleanedModel = String(model).trim();
+    const cleanedProductLine = String(productLine).trim();
+
+    // Kiểm tra xem model đã tồn tại chưa
+    const existing = await prisma.machineModel.findUnique({
+      where: { model: cleanedModel }
+    });
+
+    if (existing) {
+      if (!existing.isActive) {
+        // Tái kích hoạt lại model nếu trước đó đã bị ẩn
+        const reactivated = await prisma.machineModel.update({
+          where: { id: existing.id },
+          data: {
+            isActive: true,
+            productLine: cleanedProductLine,
+            description: description ? String(description).trim() : existing.description,
+            sortOrder: sortOrder !== undefined ? Number(sortOrder) : existing.sortOrder
+          }
+        });
+
+        if (req.user) {
+          await prisma.auditLog.create({
+            data: {
+              entityType: 'MachineModel',
+              entityId: reactivated.id,
+              action: 'reactivated',
+              changes: { model: cleanedModel, productLine: cleanedProductLine },
+              userId: req.user.id,
+              userName: req.user.fullName
+            }
+          });
+        }
+
+        res.json({
+          success: true,
+          message: `Model "${cleanedModel}" đã được kích hoạt lại thành công`,
+          model: reactivated
+        });
+        return;
+      }
+
+      res.status(400).json({ error: `Model "${cleanedModel}" đã tồn tại trên hệ thống` });
+      return;
+    }
+
+    const newModel = await prisma.machineModel.create({
+      data: {
+        model: cleanedModel,
+        productLine: cleanedProductLine,
+        description: description ? String(description).trim() : null,
+        isActive: true,
+        sortOrder: sortOrder !== undefined ? Number(sortOrder) : 0
+      }
+    });
+
+    if (req.user) {
+      await prisma.auditLog.create({
+        data: {
+          entityType: 'MachineModel',
+          entityId: newModel.id,
+          action: 'created',
+          changes: { model: cleanedModel, productLine: cleanedProductLine },
+          userId: req.user.id,
+          userName: req.user.fullName
+        }
+      });
+    }
+
+    res.status(201).json({
+      success: true,
+      message: 'Khai báo model máy thành công',
+      model: newModel
+    });
+  } catch (error: any) {
+    logger.error('Lỗi tạo MachineModel', { error: error.message });
+    res.status(500).json({ error: 'Lỗi khi khai báo model máy mới' });
+  }
+}
+
+/**
+ * PUT /api/serials/models/:id
+ * Cập nhật Model & Dòng máy
+ */
+export async function updateMachineModel(req: Request, res: Response): Promise<void> {
+  try {
+    const id = req.params.id as string;
+    const { model, productLine, description, isActive, sortOrder } = req.body;
+
+    const existing = await prisma.machineModel.findUnique({
+      where: { id }
+    });
+
+    if (!existing) {
+      res.status(404).json({ error: 'Không tìm thấy model máy cần sửa' });
+      return;
+    }
+
+    const updateData: any = {};
+
+    if (model && String(model).trim() !== existing.model) {
+      const cleanedModel = String(model).trim();
+      const duplicate = await prisma.machineModel.findUnique({
+        where: { model: cleanedModel }
+      });
+      if (duplicate && duplicate.id !== id) {
+        res.status(400).json({ error: `Mã Model "${cleanedModel}" đã được sử dụng bởi một mục khác` });
+        return;
+      }
+      updateData.model = cleanedModel;
+    }
+
+    if (productLine !== undefined) {
+      updateData.productLine = String(productLine).trim();
+    }
+
+    if (description !== undefined) {
+      updateData.description = description ? String(description).trim() : null;
+    }
+
+    if (isActive !== undefined) {
+      updateData.isActive = Boolean(isActive);
+    }
+
+    if (sortOrder !== undefined) {
+      updateData.sortOrder = Number(sortOrder) || 0;
+    }
+
+    const updated = await prisma.machineModel.update({
+      where: { id },
+      data: updateData
+    });
+
+    if (req.user) {
+      await prisma.auditLog.create({
+        data: {
+          entityType: 'MachineModel',
+          entityId: id,
+          action: 'updated',
+          changes: { before: existing, after: updateData },
+          userId: req.user.id,
+          userName: req.user.fullName
+        }
+      });
+    }
+
+    res.json({
+      success: true,
+      message: 'Cập nhật model máy thành công',
+      model: updated
+    });
+  } catch (error: any) {
+    logger.error('Lỗi cập nhật MachineModel', { error: error.message });
+    res.status(500).json({ error: 'Lỗi khi cập nhật model máy' });
+  }
+}
+
+/**
+ * DELETE /api/serials/models/:id
+ * Ẩn Model máy (Soft delete tuân thủ Rule 7)
+ */
+export async function deleteMachineModel(req: Request, res: Response): Promise<void> {
+  try {
+    const id = req.params.id as string;
+
+    const existing = await prisma.machineModel.findUnique({
+      where: { id }
+    });
+
+    if (!existing) {
+      res.status(404).json({ error: 'Không tìm thấy model máy' });
+      return;
+    }
+
+    // Soft delete: chuyển isActive = false
+    const updated = await prisma.machineModel.update({
+      where: { id },
+      data: { isActive: false }
+    });
+
+    if (req.user) {
+      await prisma.auditLog.create({
+        data: {
+          entityType: 'MachineModel',
+          entityId: id,
+          action: 'deactivated',
+          changes: { reason: 'Soft delete machine model', model: existing.model },
+          userId: req.user.id,
+          userName: req.user.fullName
+        }
+      });
+    }
+
+    res.json({
+      success: true,
+      message: `Đã ẩn model "${existing.model}" thành công`,
+      model: updated
+    });
+  } catch (error: any) {
+    logger.error('Lỗi ẩn MachineModel', { error: error.message });
+    res.status(500).json({ error: 'Lỗi khi ẩn model máy' });
+  }
+}
+
 export async function getImportTemplate(req: Request, res: Response): Promise<void> {
   try {
     const workbook = new ExcelJS.Workbook();
@@ -944,36 +1208,41 @@ export async function getImportTemplate(req: Request, res: Response): Promise<vo
     const lookupSheet = workbook.addWorksheet('LookupData');
     lookupSheet.state = 'hidden';
 
-    const models = [
-      'CR5240', 'UR3140', 'UR5440', 'UR5640', 'UR5840', 'UX5010', 'KJ260',
-      'UR61096H', 'QY/F-I20', 'UR5676', 'P1011', 'W6412', 'UR3626', 'Không rõ dòng máy'
-    ];
+    // 1. Tự động lấy danh sách Model & Dòng máy từ CSDL
+    const dbMachineModels = await prisma.machineModel.findMany({
+      where: { isActive: true },
+      orderBy: [{ sortOrder: 'asc' }, { model: 'asc' }]
+    });
 
-    const productLines = [
-      'Máy lọc nước Lavita CR5240',
-      'Máy lọc nước Tanka UR3140',
-      'Máy lọc nước Delica UR5440',
-      'Máy lọc nước Delica UR5640',
-      'Máy lọc nước Delica UR5840',
-      'Lọc trong suốt âm tủ bếp-UX5010',
-      'Máy lọc không khí Airplus KJ260',
-      'Máy lọc nước Truliva UR5840',
-      'Máy lọc nước Truliva UR61096H',
-      'Máy rửa rau Truliva QY/F-I20',
-      'Máy lọc nước Truliva UR5676',
-      'Bộ lọc sơ cấp Truliva P1011',
-      'Máy nóng lạnh treo tường Truliva W6412',
-      'Máy lọc nước Truliva UR3626',
-      'Không rõ dòng máy'
-    ];
+    let models = dbMachineModels.map(m => m.model);
+    let productLines = dbMachineModels.map(m => m.productLine);
+
+    if (models.length === 0) {
+      models = [
+        'CR5240', 'UR3140', 'UR5440', 'UR5640', 'UR5840', 'UX5010', 'KJ260',
+        'UR61096H', 'QY/F-I20', 'UR5676', 'P1011', 'W6412', 'UR3626', 'Không rõ dòng máy'
+      ];
+      productLines = [
+        'Máy lọc nước Lavita CR5240',
+        'Máy lọc nước Tanka UR3140',
+        'Máy lọc nước Delica UR5440',
+        'Máy lọc nước Delica UR5640',
+        'Máy lọc nước Delica UR5840',
+        'Lọc trong suốt âm tủ bếp-UX5010',
+        'Máy lọc không khí Airplus KJ260',
+        'Máy lọc nước Truliva UR5840',
+        'Máy lọc nước Truliva UR61096H',
+        'Máy rửa rau Truliva QY/F-I20',
+        'Máy lọc nước Truliva UR5676',
+        'Bộ lọc sơ cấp Truliva P1011',
+        'Máy nóng lạnh treo tường Truliva W6412',
+        'Máy lọc nước Truliva UR3626',
+        'Không rõ dòng máy'
+      ];
+    }
 
     const statuses = ['Chưa kích hoạt', 'Đã kích hoạt', 'KH xác nhận', 'Hủy'];
-
-    const provinces = [
-      'TP. Hồ Chí Minh', 'TP. Hà Nội', 'Đồng Nai', 'Bình Dương', 'Bà Rịa-Vũng Tàu',
-      'Long An', 'Tiền Giang', 'Bến Tre', 'Vĩnh Long', 'TP. Cần Thơ', 'TP. Đà Nẵng',
-      'Hưng Yên', 'Khác'
-    ];
+    const provinces = PANCAKE_PROVINCES;
 
     models.forEach((m, idx) => { lookupSheet.getCell(`A${idx + 1}`).value = m; });
     productLines.forEach((p, idx) => { lookupSheet.getCell(`B${idx + 1}`).value = p; });
@@ -1004,8 +1273,8 @@ export async function getImportTemplate(req: Request, res: Response): Promise<vo
 
     worksheet.addRow({
       serialNumber: '892820072100002',
-      model: 'UR5440',
-      productLine: 'Máy lọc nước Delica UR5440',
+      model: models[0] || 'UR5840',
+      productLine: productLines[0] || 'Máy lọc nước Delica UR5840',
       status: 'Đã kích hoạt',
       activationDate: '15/07/2024 15:30:01',
       warrantyExpiryDate: '15/07/2026 15:30:01',
@@ -1013,7 +1282,7 @@ export async function getImportTemplate(req: Request, res: Response): Promise<vo
       customerName: 'Anh Việt',
       customerPhone: '0876984987',
       address: '38 Bờ Bao Tân Thắng, Sơn Kỳ, Tân Phú',
-      province: 'TP. Hồ Chí Minh',
+      province: 'Hồ Chí Minh',
     });
 
     const modelFormula = `LookupData!$A$1:$A$${models.length}`;
@@ -1026,17 +1295,19 @@ export async function getImportTemplate(req: Request, res: Response): Promise<vo
         type: 'list',
         allowBlank: true,
         formulae: [modelFormula],
-        showErrorMessage: true,
-        errorTitle: 'Lỗi nhập liệu',
-        error: 'Vui lòng chọn model từ danh sách có sẵn.'
+        showErrorMessage: false, // Cho phép gõ model mới ngoài list mà không bị Excel chặn!
+        showInputMessage: true,
+        promptTitle: 'Model máy',
+        prompt: 'Chọn model từ danh sách hoặc tự gõ model mới.'
       };
       worksheet.getCell(`C${i}`).dataValidation = {
         type: 'list',
         allowBlank: true,
         formulae: [productLineFormula],
-        showErrorMessage: true,
-        errorTitle: 'Lỗi nhập liệu',
-        error: 'Vui lòng chọn dòng máy từ danh sách có sẵn.'
+        showErrorMessage: false,
+        showInputMessage: true,
+        promptTitle: 'Dòng máy',
+        prompt: 'Chọn dòng máy hoặc tự gõ tên dòng máy tương ứng.'
       };
       worksheet.getCell(`D${i}`).dataValidation = {
         type: 'list',

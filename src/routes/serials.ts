@@ -30,7 +30,11 @@ import {
   testZnsSend,
   checkZnsStatus,
   getZnsLogs,
-  updateZnsLog
+  updateZnsLog,
+  getMachineModels,
+  createMachineModel,
+  updateMachineModel,
+  deleteMachineModel
 } from '../controllers/serialController';
 
 cloudinary.config({
@@ -119,6 +123,10 @@ router.post('/import', requireSerialAccess, (req, res, next) => {
   });
 }, importSerials);
 router.get('/import-template', requireSerialAccess, getImportTemplate);
+router.get('/models', requireSerialAccess, getMachineModels);
+router.post('/models', requireSerialAccess, createMachineModel);
+router.put('/models/:id', requireSerialAccess, updateMachineModel);
+router.delete('/models/:id', requireSerialAccess, deleteMachineModel);
 router.get('/export', exportSerials);
 router.get('/policies', requireSerialAccess, getWarrantyPolicies);
 router.get('/:id', requireSerialAccess, getSerialDetail);

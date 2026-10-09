@@ -4,7 +4,7 @@ import { usePermission } from '../../context/PermissionContext';
 import { isValidPhone, PHONE_ERROR_MSG } from '../../utils/phone';
 import ProvinceSelect from '../../components/ProvinceSelect';
 import { isValidProvince } from '../../utils/provinces';
-import { Hash, Upload, Download, Search, X, Clock, ChevronLeft, ChevronRight, AlertTriangle, CheckCircle, User, Phone, MapPin, Wrench, FileText, Filter, RotateCcw, Sparkles, FolderPlus, Database, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
+import { Hash, Upload, Download, Search, X, Clock, ChevronLeft, ChevronRight, AlertTriangle, CheckCircle, User, Phone, MapPin, Wrench, FileText, Filter, RotateCcw, Sparkles, FolderPlus, Database, ArrowUpDown, ArrowUp, ArrowDown, Layers, Plus, Edit2, Eye, EyeOff, Loader2, Check } from 'lucide-react';
 import { useStickyTableHeader } from '../../hooks/useStickyTableHeader';
 
 interface Serial {
@@ -74,6 +74,17 @@ interface ImportSummary {
 interface ImportError {
   row: number;
   error: string;
+}
+
+interface MachineModelItem {
+  id: string;
+  model: string;
+  productLine: string;
+  description: string | null;
+  isActive: boolean;
+  sortOrder: number;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export default function SerialManage() {
@@ -160,6 +171,20 @@ export default function SerialManage() {
   const [selectedPromoCode, setSelectedPromoCode] = useState('');
   const [submittingApprove, setSubmittingApprove] = useState(false);
 
+  // Machine Model states
+  const [showModelModal, setShowModelModal] = useState(false);
+  const [machineModels, setMachineModels] = useState<MachineModelItem[]>([]);
+  const [loadingModels, setLoadingModels] = useState(false);
+  const [modelSearch, setModelSearch] = useState('');
+  const [editingModelId, setEditingModelId] = useState<string | null>(null);
+  const [formModelCode, setFormModelCode] = useState('');
+  const [formProductLine, setFormProductLine] = useState('');
+  const [formDescription, setFormDescription] = useState('');
+  const [formSortOrder, setFormSortOrder] = useState<number>(0);
+  const [submittingModel, setSubmittingModel] = useState(false);
+  const [modelFormError, setModelFormError] = useState('');
+  const [modelSuccessMsg, setModelSuccessMsg] = useState('');
+
   // Zalo OA state
   const [zaloStatus, setZaloStatus] = useState<any>(null);
 
@@ -181,6 +206,121 @@ export default function SerialManage() {
     } catch (err) {
       console.error('Lỗi tải trạng thái Zalo:', err);
     }
+  };
+
+  const loadMachineModels = async () => {
+    setLoadingModels(true);
+    try {
+      const data = await fetchApi('/serials/models');
+      if (data && data.success) {
+        setMachineModels(data.models || []);
+      }
+    } catch (err: any) {
+      console.error('Lỗi tải danh sách model:', err);
+    } finally {
+      setLoadingModels(false);
+    }
+  };
+
+  const resetModelForm = () => {
+    setEditingModelId(null);
+    setFormModelCode('');
+    setFormProductLine('');
+    setFormDescription('');
+    setFormSortOrder(0);
+    setModelFormError('');
+  };
+
+  const handleSaveModel = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setModelFormError('');
+    setModelSuccessMsg('');
+
+    if (!formModelCode.trim()) {
+      setModelFormError('Vui lòng nhập Mã Model');
+      return;
+    }
+    if (!formProductLine.trim()) {
+      setModelFormError('Vui lòng nhập Tên Dòng máy');
+      return;
+    }
+
+    setSubmittingModel(true);
+    try {
+      if (editingModelId) {
+        const res = await fetchApi(`/serials/models/${editingModelId}`, {
+          method: 'PUT',
+          body: JSON.stringify({
+            model: formModelCode.trim().toUpperCase(),
+            productLine: formProductLine.trim(),
+            description: formDescription.trim() || null,
+            sortOrder: Number(formSortOrder) || 0,
+          }),
+        });
+        if (res && res.success) {
+          setModelSuccessMsg(`Đã cập nhật model ${formModelCode.trim().toUpperCase()} thành công!`);
+          resetModelForm();
+          await loadMachineModels();
+        } else {
+          setModelFormError(res?.error || 'Không thể cập nhật model');
+        }
+      } else {
+        const res = await fetchApi('/serials/models', {
+          method: 'POST',
+          body: JSON.stringify({
+            model: formModelCode.trim().toUpperCase(),
+            productLine: formProductLine.trim(),
+            description: formDescription.trim() || null,
+            sortOrder: Number(formSortOrder) || 0,
+          }),
+        });
+        if (res && res.success) {
+          setModelSuccessMsg(`Đã thêm model ${formModelCode.trim().toUpperCase()} thành công! Dropdown Excel mẫu đã tự động cập nhật.`);
+          resetModelForm();
+          await loadMachineModels();
+        } else {
+          setModelFormError(res?.error || 'Không thể tạo model');
+        }
+      }
+    } catch (err: any) {
+      setModelFormError(err.message || 'Lỗi khi lưu model');
+    } finally {
+      setSubmittingModel(false);
+    }
+  };
+
+  const handleToggleActiveModel = async (item: MachineModelItem) => {
+    try {
+      if (item.isActive) {
+        if (!confirm(`Bạn có chắc muốn ẩn model "${item.model}"? Model này sẽ không còn hiển thị trong dropdown file Excel mẫu.`)) {
+          return;
+        }
+        const res = await fetchApi(`/serials/models/${item.id}`, { method: 'DELETE' });
+        if (res && res.success) {
+          await loadMachineModels();
+        }
+      } else {
+        const res = await fetchApi(`/serials/models/${item.id}`, {
+          method: 'PUT',
+          body: JSON.stringify({ isActive: true }),
+        });
+        if (res && res.success) {
+          await loadMachineModels();
+        }
+      }
+    } catch (err: any) {
+      alert('Lỗi cập nhật trạng thái model: ' + err.message);
+    }
+  };
+
+  const handleStartEditModel = (item: MachineModelItem) => {
+    setEditingModelId(item.id);
+    setFormModelCode(item.model);
+    setFormProductLine(item.productLine);
+    setFormDescription(item.description || '');
+    setFormSortOrder(item.sortOrder || 0);
+    setModelFormError('');
+    setModelSuccessMsg('');
   };
 
   const handleConnectZalo = () => {
@@ -816,6 +956,28 @@ export default function SerialManage() {
             <RotateCcw size={16} /> Lịch sử Lô
           </button>
 
+          {/* Quản lý Model button */}
+          {hasPermission('SERIAL_IMPORT_EXCEL') && (
+            <button
+              onClick={() => {
+                setShowModelModal(true);
+                loadMachineModels();
+              }}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 6,
+                padding: '8px 16px', borderRadius: 8,
+                background: '#1B3A6B', color: 'white', border: 'none',
+                fontSize: 14, fontWeight: 600, cursor: 'pointer',
+                transition: 'background-color 0.2s',
+              }}
+              onMouseOver={e => e.currentTarget.style.background = '#2A518E'}
+              onMouseOut={e => e.currentTarget.style.background = '#1B3A6B'}
+              title="Khai báo và quản lý danh sách Model máy để đồng bộ dropdown Excel"
+            >
+              <Layers size={16} /> Quản lý Model
+            </button>
+          )}
+
           {/* Import button */}
           {hasPermission('SERIAL_IMPORT_EXCEL') && (
             <button
@@ -1293,10 +1455,10 @@ export default function SerialManage() {
               </button>
             </div>
 
-            {/* Template download link */}
+            {/* Template download link & Model declaration helper */}
             <div style={{
               background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 10,
-              padding: '10px 14px', marginBottom: 18, display: 'flex',
+              padding: '10px 14px', marginBottom: 10, display: 'flex',
               alignItems: 'center', justifyContent: 'space-between', fontSize: 13
             }}>
               <span style={{ color: '#166534', fontWeight: 500 }}>Chưa có file Excel mẫu nhập liệu?</span>
@@ -1312,6 +1474,34 @@ export default function SerialManage() {
                 onMouseOut={e => e.currentTarget.style.background = '#16a34a'}
               >
                 <Download size={14} /> Tải file mẫu
+              </button>
+            </div>
+
+            <div style={{
+              background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: 10,
+              padding: '10px 14px', marginBottom: 18, display: 'flex',
+              alignItems: 'center', justifyContent: 'space-between', fontSize: 13
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: '#1e40af' }}>
+                <Layers size={15} />
+                <span>Model mới chưa có trong dropdown?</span>
+              </div>
+              <button
+                onClick={() => {
+                  setShowImportModal(false);
+                  setShowModelModal(true);
+                  loadMachineModels();
+                }}
+                style={{
+                  background: '#1B3A6B', color: 'white', border: 'none',
+                  borderRadius: 6, padding: '6px 12px', fontWeight: 600,
+                  cursor: 'pointer', display: 'inline-flex', alignItems: 'center',
+                  gap: 6, fontSize: 12, transition: 'background-color 0.2s'
+                }}
+                onMouseOver={e => e.currentTarget.style.background = '#2A518E'}
+                onMouseOut={e => e.currentTarget.style.background = '#1B3A6B'}
+              >
+                <Plus size={14} /> Khai báo Model
               </button>
             </div>
 
@@ -1971,6 +2161,376 @@ export default function SerialManage() {
                 }}
                 onMouseOver={e => e.currentTarget.style.background = '#e2e8f0'}
                 onMouseOut={e => e.currentTarget.style.background = '#f1f5f9'}
+              >
+                Đóng
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ═══════════════════════════════════════════════
+          Machine Model Management Modal
+         ═══════════════════════════════════════════════ */}
+      {showModelModal && (
+        <div
+          style={{
+            position: 'fixed', inset: 0, zIndex: 50,
+            backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex',
+            alignItems: 'center', justifyContent: 'center', padding: 20,
+            backdropFilter: 'blur(2px)',
+          }}
+          onClick={() => {
+            if (!submittingModel) {
+              setShowModelModal(false);
+              resetModelForm();
+            }
+          }}
+        >
+          <div
+            onClick={e => e.stopPropagation()}
+            style={{
+              background: 'white', borderRadius: 16, width: '100%', maxWidth: 760,
+              maxHeight: '90vh', display: 'flex', flexDirection: 'column',
+              boxShadow: '0 20px 60px rgba(0,0,0,0.2)', borderTop: '4px solid #1B3A6B',
+              overflow: 'hidden',
+            }}
+          >
+            {/* Modal Header */}
+            <div style={{
+              padding: '20px 24px', borderBottom: '1px solid #e2e8f0',
+              display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start',
+              background: '#f8fafc',
+            }}>
+              <div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <div style={{
+                    width: 36, height: 36, borderRadius: 10, background: '#e0e7ff',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#1B3A6B'
+                  }}>
+                    <Layers size={20} />
+                  </div>
+                  <div>
+                    <h2 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: '#1e293b' }}>
+                      Khai Báo & Quản Lý Model Máy
+                    </h2>
+                    <p style={{ margin: '2px 0 0', fontSize: 13, color: '#64748b' }}>
+                      Các model kích hoạt sẽ tự động cập nhật vào danh sách chọn (Dropdown) của file Excel mẫu khi tải về.
+                    </p>
+                  </div>
+                </div>
+              </div>
+              <button
+                onClick={() => {
+                  if (!submittingModel) {
+                    setShowModelModal(false);
+                    resetModelForm();
+                  }
+                }}
+                style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4, borderRadius: 6, color: '#64748b' }}
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            {/* Modal Content Scrollable */}
+            <div style={{ padding: '20px 24px', overflowY: 'auto', flex: 1, display: 'flex', flexDirection: 'column', gap: 16 }}>
+              {/* Alert Messages */}
+              {modelSuccessMsg && (
+                <div style={{
+                  background: '#f0fdf4', border: '1px solid #bbf7d0', color: '#166534',
+                  padding: '10px 14px', borderRadius: 8, fontSize: 13, display: 'flex', alignItems: 'center', gap: 8
+                }}>
+                  <CheckCircle size={16} />
+                  <span>{modelSuccessMsg}</span>
+                </div>
+              )}
+              {modelFormError && (
+                <div style={{
+                  background: '#fef2f2', border: '1px solid #fecaca', color: '#991b1b',
+                  padding: '10px 14px', borderRadius: 8, fontSize: 13, display: 'flex', alignItems: 'center', gap: 8
+                }}>
+                  <AlertTriangle size={16} />
+                  <span>{modelFormError}</span>
+                </div>
+              )}
+
+              {/* Form Input Card */}
+              <form onSubmit={handleSaveModel} style={{
+                background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 12, padding: '16px 18px',
+              }}>
+                <div style={{ fontSize: 13, fontWeight: 700, color: '#334155', marginBottom: 12, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <span>{editingModelId ? 'Chỉnh sửa Model' : 'Khai báo Model mới'}</span>
+                  {editingModelId && (
+                    <button
+                      type="button"
+                      onClick={resetModelForm}
+                      style={{ background: 'none', border: 'none', color: '#64748b', fontSize: 12, cursor: 'pointer', textDecoration: 'underline' }}
+                    >
+                      Hủy chế độ sửa (Tạo mới)
+                    </button>
+                  )}
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.5fr', gap: 12, marginBottom: 12 }}>
+                  <div>
+                    <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#475569', marginBottom: 4 }}>
+                      Mã Model <span style={{ color: '#ef4444' }}>*</span>
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="VD: UR9000, CR5240..."
+                      value={formModelCode}
+                      onChange={e => setFormModelCode(e.target.value.toUpperCase())}
+                      disabled={submittingModel}
+                      style={{
+                        width: '100%', padding: '8px 12px', borderRadius: 8,
+                        border: '1px solid #cbd5e1', fontSize: 13, outline: 'none',
+                        fontFamily: 'monospace', fontWeight: 600, color: '#1B3A6B',
+                        background: 'white', boxSizing: 'border-box'
+                      }}
+                    />
+                  </div>
+                  <div>
+                    <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#475569', marginBottom: 4 }}>
+                      Tên Dòng Máy <span style={{ color: '#ef4444' }}>*</span>
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="VD: Máy lọc nước Delica UR9000"
+                      value={formProductLine}
+                      onChange={e => setFormProductLine(e.target.value)}
+                      disabled={submittingModel}
+                      style={{
+                        width: '100%', padding: '8px 12px', borderRadius: 8,
+                        border: '1px solid #cbd5e1', fontSize: 13, outline: 'none',
+                        background: 'white', boxSizing: 'border-box'
+                      }}
+                    />
+                  </div>
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '2fr 100px auto', gap: 12, alignItems: 'flex-end' }}>
+                  <div>
+                    <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#475569', marginBottom: 4 }}>
+                      Ghi Chú (Tùy chọn)
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="Ghi chú thêm về dòng máy..."
+                      value={formDescription}
+                      onChange={e => setFormDescription(e.target.value)}
+                      disabled={submittingModel}
+                      style={{
+                        width: '100%', padding: '8px 12px', borderRadius: 8,
+                        border: '1px solid #cbd5e1', fontSize: 13, outline: 'none',
+                        background: 'white', boxSizing: 'border-box'
+                      }}
+                    />
+                  </div>
+                  <div>
+                    <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#475569', marginBottom: 4 }}>
+                      Thứ tự
+                    </label>
+                    <input
+                      type="number"
+                      min={0}
+                      value={formSortOrder}
+                      onChange={e => setFormSortOrder(parseInt(e.target.value) || 0)}
+                      disabled={submittingModel}
+                      style={{
+                        width: '100%', padding: '8px 12px', borderRadius: 8,
+                        border: '1px solid #cbd5e1', fontSize: 13, outline: 'none',
+                        background: 'white', boxSizing: 'border-box'
+                      }}
+                    />
+                  </div>
+                  <div>
+                    <button
+                      type="submit"
+                      disabled={submittingModel}
+                      style={{
+                        display: 'flex', alignItems: 'center', gap: 6,
+                        padding: '9px 18px', borderRadius: 8,
+                        background: '#1B3A6B', color: 'white', border: 'none',
+                        fontSize: 13, fontWeight: 600, cursor: submittingModel ? 'not-allowed' : 'pointer',
+                        transition: 'background-color 0.2s', whiteSpace: 'nowrap',
+                      }}
+                      onMouseOver={e => !submittingModel && (e.currentTarget.style.background = '#2A518E')}
+                      onMouseOut={e => !submittingModel && (e.currentTarget.style.background = '#1B3A6B')}
+                    >
+                      {submittingModel ? (
+                        <>
+                          <Loader2 size={15} className="animate-spin" /> Đang lưu...
+                        </>
+                      ) : editingModelId ? (
+                        <>
+                          <Check size={15} /> Lưu Cập Nhật
+                        </>
+                      ) : (
+                        <>
+                          <Plus size={15} /> Thêm Model
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </div>
+              </form>
+
+              {/* Models List Header & Filter */}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 4 }}>
+                <div style={{ fontSize: 13, fontWeight: 700, color: '#1e293b' }}>
+                  Danh Sách Model Hiện Có ({machineModels.filter(m => !modelSearch || m.model.toLowerCase().includes(modelSearch.toLowerCase()) || m.productLine.toLowerCase().includes(modelSearch.toLowerCase())).length})
+                </div>
+                <div style={{ position: 'relative', width: 220 }}>
+                  <Search size={14} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }} />
+                  <input
+                    type="text"
+                    placeholder="Tìm theo mã hoặc dòng..."
+                    value={modelSearch}
+                    onChange={e => setModelSearch(e.target.value)}
+                    style={{
+                      width: '100%', padding: '6px 10px 6px 30px', borderRadius: 6,
+                      border: '1px solid #cbd5e1', fontSize: 12, outline: 'none',
+                      background: 'white', boxSizing: 'border-box'
+                    }}
+                  />
+                </div>
+              </div>
+
+              {/* Models Table */}
+              <div style={{ border: '1px solid #e2e8f0', borderRadius: 10, overflow: 'hidden' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+                  <thead>
+                    <tr style={{ background: '#f8fafc', borderBottom: '1px solid #e2e8f0', textAlign: 'left', color: '#475569', fontSize: 12, fontWeight: 600 }}>
+                      <th style={{ padding: '10px 14px' }}>Mã Model</th>
+                      <th style={{ padding: '10px 14px' }}>Tên Dòng Máy</th>
+                      <th style={{ padding: '10px 14px', width: 70, textAlign: 'center' }}>Thứ tự</th>
+                      <th style={{ padding: '10px 14px', width: 110, textAlign: 'center' }}>Trạng thái</th>
+                      <th style={{ padding: '10px 14px', width: 130, textAlign: 'right' }}>Thao tác</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {loadingModels ? (
+                      <tr>
+                        <td colSpan={5} style={{ padding: '30px', textAlign: 'center', color: '#64748b' }}>
+                          <Loader2 size={20} className="animate-spin" style={{ display: 'inline-block', marginBottom: 6 }} />
+                          <div>Đang tải danh sách model...</div>
+                        </td>
+                      </tr>
+                    ) : machineModels.length === 0 ? (
+                      <tr>
+                        <td colSpan={5} style={{ padding: '30px', textAlign: 'center', color: '#94a3b8' }}>
+                          Chưa có model nào. Hãy nhập thông tin phía trên để thêm model đầu tiên!
+                        </td>
+                      </tr>
+                    ) : (
+                      machineModels
+                        .filter(m => !modelSearch || m.model.toLowerCase().includes(modelSearch.toLowerCase()) || m.productLine.toLowerCase().includes(modelSearch.toLowerCase()))
+                        .map(m => (
+                          <tr key={m.id} style={{ borderBottom: '1px solid #f1f5f9', background: editingModelId === m.id ? '#eff6ff' : 'white' }}>
+                            <td style={{ padding: '10px 14px' }}>
+                              <span style={{
+                                fontWeight: 700, color: '#1B3A6B', fontFamily: 'monospace',
+                                fontSize: 13, background: '#f1f5f9', padding: '2px 8px', borderRadius: 6
+                              }}>
+                                {m.model}
+                              </span>
+                            </td>
+                            <td style={{ padding: '10px 14px', color: '#334155', fontWeight: 500 }}>
+                              {m.productLine}
+                              {m.description && (
+                                <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 2 }}>{m.description}</div>
+                              )}
+                            </td>
+                            <td style={{ padding: '10px 14px', textAlign: 'center', color: '#64748b', fontSize: 12 }}>
+                              {m.sortOrder}
+                            </td>
+                            <td style={{ padding: '10px 14px', textAlign: 'center' }}>
+                              {m.isActive ? (
+                                <span style={{
+                                  display: 'inline-block', padding: '2px 8px', borderRadius: 6,
+                                  background: '#ecfdf5', color: '#047857', border: '1px solid #a7f3d0',
+                                  fontSize: 11, fontWeight: 600
+                                }}>
+                                  Đang dùng
+                                </span>
+                              ) : (
+                                <span style={{
+                                  display: 'inline-block', padding: '2px 8px', borderRadius: 6,
+                                  background: '#f1f5f9', color: '#64748b', border: '1px solid #cbd5e1',
+                                  fontSize: 11, fontWeight: 600
+                                }}>
+                                  Đã ẩn
+                                </span>
+                              )}
+                            </td>
+                            <td style={{ padding: '10px 14px', textAlign: 'right' }}>
+                              <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
+                                <button
+                                  onClick={() => handleStartEditModel(m)}
+                                  title="Chỉnh sửa model"
+                                  style={{
+                                    display: 'inline-flex', alignItems: 'center', gap: 4,
+                                    padding: '4px 8px', borderRadius: 6,
+                                    background: '#eff6ff', color: '#1d4ed8', border: '1px solid #bfdbfe',
+                                    fontSize: 12, fontWeight: 500, cursor: 'pointer',
+                                  }}
+                                >
+                                  <Edit2 size={12} /> Sửa
+                                </button>
+                                <button
+                                  onClick={() => handleToggleActiveModel(m)}
+                                  title={m.isActive ? 'Ẩn model khỏi template Excel' : 'Kích hoạt lại model'}
+                                  style={{
+                                    display: 'inline-flex', alignItems: 'center', gap: 4,
+                                    padding: '4px 8px', borderRadius: 6,
+                                    background: m.isActive ? '#fff1f2' : '#f0fdf4',
+                                    color: m.isActive ? '#be123c' : '#15803d',
+                                    border: m.isActive ? '1px solid #fecdd3' : '1px solid #bbf7d0',
+                                    fontSize: 12, fontWeight: 500, cursor: 'pointer',
+                                  }}
+                                >
+                                  {m.isActive ? (
+                                    <>
+                                      <EyeOff size={12} /> Ẩn
+                                    </>
+                                  ) : (
+                                    <>
+                                      <Eye size={12} /> Hiện
+                                    </>
+                                  )}
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            {/* Modal Footer */}
+            <div style={{
+              padding: '14px 24px', background: '#f8fafc', borderTop: '1px solid #e2e8f0',
+              display: 'flex', justifyContent: 'space-between', alignItems: 'center'
+            }}>
+              <span style={{ fontSize: 12, color: '#64748b' }}>
+                💡 File Excel mẫu khi tải về sẽ tự động đồng bộ danh sách các model đang kích hoạt ở trên.
+              </span>
+              <button
+                onClick={() => {
+                  setShowModelModal(false);
+                  resetModelForm();
+                }}
+                style={{
+                  padding: '8px 20px', background: 'white', color: '#334155',
+                  border: '1px solid #cbd5e1', borderRadius: 8, fontSize: 13, fontWeight: 600,
+                  cursor: 'pointer', transition: 'background-color 0.2s'
+                }}
+                onMouseOver={e => e.currentTarget.style.background = '#f1f5f9'}
+                onMouseOut={e => e.currentTarget.style.background = 'white'}
               >
                 Đóng
               </button>

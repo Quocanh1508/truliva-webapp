@@ -459,6 +459,20 @@ model WarrantyPolicy {
   @@map("warranty_policies")
 }
 
+// ── Danh mục Model & Dòng máy thiết bị ──
+model MachineModel {
+  id          String   @id @default(uuid())
+  model       String   @unique                                // Mã Model (VD: UR5840, CR5240, TRU-9000)
+  productLine String   @map("product_line")                   // Tên Dòng máy (VD: Máy lọc nước Delica UR5840)
+  description String?                                         // Ghi chú / mô tả thêm
+  isActive    Boolean  @default(true) @map("is_active")        // Trạng thái hoạt động (Soft delete)
+  sortOrder   Int      @default(0) @map("sort_order")          // Thứ tự ưu tiên hiển thị
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@map("machine_models")
+}
+
 // ── Bảng bảng lương chi tiết của từng KTV/Trạm theo tháng ──
 model SalaryRecord {
   id              String   @id @default(uuid())
