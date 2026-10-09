@@ -179,8 +179,6 @@ export default function SerialManage() {
   const [editingModelId, setEditingModelId] = useState<string | null>(null);
   const [formModelCode, setFormModelCode] = useState('');
   const [formProductLine, setFormProductLine] = useState('');
-  const [formDescription, setFormDescription] = useState('');
-  const [formSortOrder, setFormSortOrder] = useState<number>(0);
   const [submittingModel, setSubmittingModel] = useState(false);
   const [modelFormError, setModelFormError] = useState('');
   const [modelSuccessMsg, setModelSuccessMsg] = useState('');
@@ -226,8 +224,6 @@ export default function SerialManage() {
     setEditingModelId(null);
     setFormModelCode('');
     setFormProductLine('');
-    setFormDescription('');
-    setFormSortOrder(0);
     setModelFormError('');
   };
 
@@ -253,8 +249,6 @@ export default function SerialManage() {
           body: JSON.stringify({
             model: formModelCode.trim().toUpperCase(),
             productLine: formProductLine.trim(),
-            description: formDescription.trim() || null,
-            sortOrder: Number(formSortOrder) || 0,
           }),
         });
         if (res && res.success) {
@@ -270,8 +264,6 @@ export default function SerialManage() {
           body: JSON.stringify({
             model: formModelCode.trim().toUpperCase(),
             productLine: formProductLine.trim(),
-            description: formDescription.trim() || null,
-            sortOrder: Number(formSortOrder) || 0,
           }),
         });
         if (res && res.success) {
@@ -317,8 +309,6 @@ export default function SerialManage() {
     setEditingModelId(item.id);
     setFormModelCode(item.model);
     setFormProductLine(item.productLine);
-    setFormDescription(item.description || '');
-    setFormSortOrder(item.sortOrder || 0);
     setModelFormError('');
     setModelSuccessMsg('');
   };
@@ -2255,11 +2245,12 @@ export default function SerialManage() {
                 </div>
               )}
 
-              {/* Form Input Card */}
+              {/* Form Input Card - Only 2 fields: Mã Model & Tên Dòng Máy */}
               <form onSubmit={handleSaveModel} style={{
                 background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 12, padding: '16px 18px',
+                flexShrink: 0,
               }}>
-                <div style={{ fontSize: 13, fontWeight: 700, color: '#334155', marginBottom: 12, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <div style={{ fontSize: 13, fontWeight: 700, color: '#334155', marginBottom: 10, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                   <span>{editingModelId ? 'Chỉnh sửa Model' : 'Khai báo Model mới'}</span>
                   {editingModelId && (
                     <button
@@ -2272,7 +2263,7 @@ export default function SerialManage() {
                   )}
                 </div>
 
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.5fr', gap: 12, marginBottom: 12 }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 2fr auto', gap: 12, alignItems: 'flex-end' }}>
                   <div>
                     <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#475569', marginBottom: 4 }}>
                       Mã Model <span style={{ color: '#ef4444' }}>*</span>
@@ -2284,7 +2275,7 @@ export default function SerialManage() {
                       onChange={e => setFormModelCode(e.target.value.toUpperCase())}
                       disabled={submittingModel}
                       style={{
-                        width: '100%', padding: '8px 12px', borderRadius: 8,
+                        width: '100%', padding: '9px 12px', borderRadius: 8,
                         border: '1px solid #cbd5e1', fontSize: 13, outline: 'none',
                         fontFamily: 'monospace', fontWeight: 600, color: '#1B3A6B',
                         background: 'white', boxSizing: 'border-box'
@@ -2302,44 +2293,7 @@ export default function SerialManage() {
                       onChange={e => setFormProductLine(e.target.value)}
                       disabled={submittingModel}
                       style={{
-                        width: '100%', padding: '8px 12px', borderRadius: 8,
-                        border: '1px solid #cbd5e1', fontSize: 13, outline: 'none',
-                        background: 'white', boxSizing: 'border-box'
-                      }}
-                    />
-                  </div>
-                </div>
-
-                <div style={{ display: 'grid', gridTemplateColumns: '2fr 100px auto', gap: 12, alignItems: 'flex-end' }}>
-                  <div>
-                    <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#475569', marginBottom: 4 }}>
-                      Ghi Chú (Tùy chọn)
-                    </label>
-                    <input
-                      type="text"
-                      placeholder="Ghi chú thêm về dòng máy..."
-                      value={formDescription}
-                      onChange={e => setFormDescription(e.target.value)}
-                      disabled={submittingModel}
-                      style={{
-                        width: '100%', padding: '8px 12px', borderRadius: 8,
-                        border: '1px solid #cbd5e1', fontSize: 13, outline: 'none',
-                        background: 'white', boxSizing: 'border-box'
-                      }}
-                    />
-                  </div>
-                  <div>
-                    <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: '#475569', marginBottom: 4 }}>
-                      Thứ tự
-                    </label>
-                    <input
-                      type="number"
-                      min={0}
-                      value={formSortOrder}
-                      onChange={e => setFormSortOrder(parseInt(e.target.value) || 0)}
-                      disabled={submittingModel}
-                      style={{
-                        width: '100%', padding: '8px 12px', borderRadius: 8,
+                        width: '100%', padding: '9px 12px', borderRadius: 8,
                         border: '1px solid #cbd5e1', fontSize: 13, outline: 'none',
                         background: 'white', boxSizing: 'border-box'
                       }}
@@ -2351,7 +2305,7 @@ export default function SerialManage() {
                       disabled={submittingModel}
                       style={{
                         display: 'flex', alignItems: 'center', gap: 6,
-                        padding: '9px 18px', borderRadius: 8,
+                        padding: '10px 18px', borderRadius: 8,
                         background: '#1B3A6B', color: 'white', border: 'none',
                         fontSize: 13, fontWeight: 600, cursor: submittingModel ? 'not-allowed' : 'pointer',
                         transition: 'background-color 0.2s', whiteSpace: 'nowrap',
@@ -2378,11 +2332,11 @@ export default function SerialManage() {
               </form>
 
               {/* Models List Header & Filter */}
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 4 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexShrink: 0 }}>
                 <div style={{ fontSize: 13, fontWeight: 700, color: '#1e293b' }}>
                   Danh Sách Model Hiện Có ({machineModels.filter(m => !modelSearch || m.model.toLowerCase().includes(modelSearch.toLowerCase()) || m.productLine.toLowerCase().includes(modelSearch.toLowerCase())).length})
                 </div>
-                <div style={{ position: 'relative', width: 220 }}>
+                <div style={{ position: 'relative', width: 240 }}>
                   <Search size={14} style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }} />
                   <input
                     type="text"
@@ -2398,14 +2352,18 @@ export default function SerialManage() {
                 </div>
               </div>
 
-              {/* Models Table */}
-              <div style={{ border: '1px solid #e2e8f0', borderRadius: 10, overflow: 'hidden' }}>
+              {/* Models Table with Dedicated Scrollable Viewport & Sticky Header */}
+              <div style={{
+                border: '1px solid #e2e8f0', borderRadius: 10,
+                maxHeight: '360px', overflowY: 'auto',
+                boxShadow: 'inset 0 1px 2px rgba(0,0,0,0.03)',
+                background: 'white', flex: 1, minHeight: '180px'
+              }}>
                 <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
-                  <thead>
-                    <tr style={{ background: '#f8fafc', borderBottom: '1px solid #e2e8f0', textAlign: 'left', color: '#475569', fontSize: 12, fontWeight: 600 }}>
+                  <thead style={{ position: 'sticky', top: 0, zIndex: 10, background: '#f8fafc', boxShadow: '0 1px 2px rgba(0,0,0,0.05)' }}>
+                    <tr style={{ borderBottom: '1px solid #e2e8f0', textAlign: 'left', color: '#475569', fontSize: 12, fontWeight: 600 }}>
                       <th style={{ padding: '10px 14px' }}>Mã Model</th>
                       <th style={{ padding: '10px 14px' }}>Tên Dòng Máy</th>
-                      <th style={{ padding: '10px 14px', width: 70, textAlign: 'center' }}>Thứ tự</th>
                       <th style={{ padding: '10px 14px', width: 110, textAlign: 'center' }}>Trạng thái</th>
                       <th style={{ padding: '10px 14px', width: 130, textAlign: 'right' }}>Thao tác</th>
                     </tr>
@@ -2413,14 +2371,14 @@ export default function SerialManage() {
                   <tbody>
                     {loadingModels ? (
                       <tr>
-                        <td colSpan={5} style={{ padding: '30px', textAlign: 'center', color: '#64748b' }}>
+                        <td colSpan={4} style={{ padding: '30px', textAlign: 'center', color: '#64748b' }}>
                           <Loader2 size={20} className="animate-spin" style={{ display: 'inline-block', marginBottom: 6 }} />
                           <div>Đang tải danh sách model...</div>
                         </td>
                       </tr>
                     ) : machineModels.length === 0 ? (
                       <tr>
-                        <td colSpan={5} style={{ padding: '30px', textAlign: 'center', color: '#94a3b8' }}>
+                        <td colSpan={4} style={{ padding: '30px', textAlign: 'center', color: '#94a3b8' }}>
                           Chưa có model nào. Hãy nhập thông tin phía trên để thêm model đầu tiên!
                         </td>
                       </tr>
@@ -2442,9 +2400,6 @@ export default function SerialManage() {
                               {m.description && (
                                 <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 2 }}>{m.description}</div>
                               )}
-                            </td>
-                            <td style={{ padding: '10px 14px', textAlign: 'center', color: '#64748b', fontSize: 12 }}>
-                              {m.sortOrder}
                             </td>
                             <td style={{ padding: '10px 14px', textAlign: 'center' }}>
                               {m.isActive ? (

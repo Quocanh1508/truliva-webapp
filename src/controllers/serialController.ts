@@ -963,7 +963,6 @@ export async function getMachineModels(req: Request, res: Response): Promise<voi
     const models = await prisma.machineModel.findMany({
       where,
       orderBy: [
-        { sortOrder: 'asc' },
         { model: 'asc' }
       ]
     });
