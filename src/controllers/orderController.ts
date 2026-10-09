@@ -2230,7 +2230,8 @@ export async function updateOrder(req: Request, res: Response): Promise<void> {
       if (address !== undefined || province !== undefined) {
         const normProvince = province !== undefined ? (province ? (normalizeProvince(province) || province.trim()) : '') : undefined;
         const currentAddr = oldOrder.shippingAddress as any;
-        const targetProv = normProvince !== undefined ? normProvince : (currentAddr?.province_name || currentAddr?.province || '');
+        const rawFallbackProv = currentAddr?.province_name || currentAddr?.province || '';
+        const targetProv = normProvince !== undefined ? normProvince : (normalizeProvince(rawFallbackProv) || rawFallbackProv);
         const newAddr = {
           full_address: address !== undefined ? address : (currentAddr?.full_address || ''),
           province_name: targetProv,

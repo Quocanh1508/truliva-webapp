@@ -310,7 +310,17 @@ export async function processOrderEvent(rawEventId: string | null, payload: any)
             ? payload.tracking_link.replace('/tracking?', '/payment?')
             : payload.tracking_link)
         : null) || (existingOrder?.checkoutLink ?? null),
-      shippingAddress: payload.shipping_address || null,
+      shippingAddress: (() => {
+        if (!payload.shipping_address) return null;
+        const sa = { ...payload.shipping_address };
+        if (sa.province_name) {
+          sa.province_name = normalizeProvince(sa.province_name) || sa.province_name;
+        }
+        if (sa.province) {
+          sa.province = normalizeProvince(sa.province) || sa.province;
+        }
+        return sa;
+      })(),
       warehouseInfo: payload.warehouse_info || null,
       warehouseId: payload.warehouse_id ? String(payload.warehouse_id) : null,
       billFullName: billName,

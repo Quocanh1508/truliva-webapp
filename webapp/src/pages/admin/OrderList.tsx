@@ -12,7 +12,7 @@ import { useAuth } from '../../context/AuthContext';
 import { usePermission } from '../../context/PermissionContext';
 import { isValidPhone, PHONE_ERROR_MSG } from '../../utils/phone';
 import ProvinceSelect from '../../components/ProvinceSelect';
-import { isValidProvince } from '../../utils/provinces';
+import { isValidProvince, normalizeProvince } from '../../utils/provinces';
 import { useStickyTableHeader } from '../../hooks/useStickyTableHeader';
 import { SalesKtvSelect } from '../../components/SalesKtvSelect';
 import { DispatchStationSelect } from '../../components/DispatchStationSelect';
@@ -678,7 +678,10 @@ export default function OrderList() {
       customerName: order.billFullName || '',
       customerPhone: order.billPhoneNumber || '',
       address: order.shippingAddress?.full_address || order.customer?.fullAddress || '',
-      province: order.shippingAddress?.province_name || order.customer?.provinceName || '',
+      province: (() => {
+        const rawP = order.shippingAddress?.province_name || order.customer?.provinceName || '';
+        return normalizeProvince(rawP) || rawP;
+      })(),
       workType: order.workType || '',
       serviceType: order.serviceType || '',
       appointmentDate: appDateStr,
@@ -3135,13 +3138,14 @@ export default function OrderList() {
               {orders.map((order, idx) => {
                 const customerName = order.billFullName || order.customer?.fullName || 'Khách lẻ';
                 const phone = order.billPhoneNumber || order.customer?.phoneNumber || '';
-                const provinceName = 
+                const rawProvince = 
                   order.shippingAddress?.province_name || 
                   order.shippingAddress?.province || 
                   order.customer?.provinceName || 
                   order.customer?.province || 
                   (typeof order.rawData === 'string' ? JSON.parse(order.rawData)?.shipping_address?.province_name : order.rawData?.shipping_address?.province_name) ||
                   '';
+                const provinceName = normalizeProvince(rawProvince) || rawProvince;
                 const ktvName = order.assignedKtv?.fullName || 'Chưa gán';
                 const mainStationName = order.mainStation?.name
                   || order.assignedKtv?.techStation?.mainStation?.name

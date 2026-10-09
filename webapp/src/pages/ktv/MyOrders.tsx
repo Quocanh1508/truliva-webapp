@@ -6,6 +6,7 @@ import PullToRefresh from '../../components/PullToRefresh';
 import { formatOrderId } from '../../utils/text';
 import { fetchCurrentWeather, type WeatherInfo } from '../../utils/weather';
 import { useAuth } from '../../context/AuthContext';
+import { normalizeProvince } from '../../utils/provinces';
 
 export default function MyOrders() {
   const navigate = useNavigate();
@@ -661,13 +662,14 @@ export default function MyOrders() {
         const detailCustomerName = selectedOrderDetail.billFullName || selectedOrderDetail.customer?.fullName || 'Khách lẻ';
         const detailPhone = selectedOrderDetail.billPhoneNumber || selectedOrderDetail.customer?.phoneNumber || '';
         const detailAddress = selectedOrderDetail.shippingAddress?.full_address || selectedOrderDetail.customer?.fullAddress || 'Đang cập nhật';
-        const detailProvince = 
+        const rawDetailProvince = 
           selectedOrderDetail.shippingAddress?.province_name || 
           selectedOrderDetail.shippingAddress?.province || 
           selectedOrderDetail.customer?.provinceName || 
           selectedOrderDetail.customer?.province || 
           (typeof selectedOrderDetail.rawData === 'string' ? JSON.parse(selectedOrderDetail.rawData)?.shipping_address?.province_name : selectedOrderDetail.rawData?.shipping_address?.province_name) ||
           '';
+        const detailProvince = normalizeProvince(rawDetailProvince) || rawDetailProvince;
 
         // Tính toán trạng thái hẹn chuẩn xác (giờ/phút/giây trong ngày, số ngày nếu qua ngày)
         const detailTimeStatus = getAppointmentStatus(selectedOrderDetail.appointmentTime, now);

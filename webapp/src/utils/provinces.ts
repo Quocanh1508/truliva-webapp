@@ -143,6 +143,19 @@ const PROVINCE_ALIASES: Record<string, string> = {
   'thanh hóa': 'Thanh Hóa',
   'thanh hoá': 'Thanh Hóa',
   'thanh hoa': 'Thanh Hóa',
+  'tỉnh thanh hóa': 'Thanh Hóa',
+  'tỉnh thanh hoá': 'Thanh Hóa',
+  'tp thanh hóa': 'Thanh Hóa',
+  'tp thanh hoá': 'Thanh Hóa',
+  'thành phố thanh hóa': 'Thanh Hóa',
+  'thành phố thanh hoá': 'Thanh Hóa',
+
+  // Hòa Bình
+  'hòa bình': 'Hòa Bình',
+  'hoà bình': 'Hòa Bình',
+  'hoa binh': 'Hòa Bình',
+  'tỉnh hòa bình': 'Hòa Bình',
+  'tỉnh hoà bình': 'Hòa Bình',
 
   // Đắk Lắk & Đắk Nông
   'đắk lắk': 'Đắk Lắk',

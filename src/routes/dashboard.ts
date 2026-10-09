@@ -464,7 +464,8 @@ router.get('/dispatch-analysis', async (req: Request, res: Response): Promise<vo
       }
       
       // Chuẩn hóa tên tỉnh thành
-      let provName = order.customer?.provinceName || (order.shippingAddress as any)?.province_name || 'Khác';
+      const rawProvString = order.customer?.provinceName || (order.shippingAddress as any)?.province_name || 'Khác';
+      let provName = normalizeProvince(rawProvString) || rawProvString;
       provName = provName.replace(/^(Tỉnh |Thành phố |TP\.?\s*)/i, '').trim();
 
       // Determine mapped main station name

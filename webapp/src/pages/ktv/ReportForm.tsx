@@ -11,6 +11,7 @@ import { enqueueReport } from '../../utils/offlineStorage';
 import CategoryTreeSelect from '../../components/CategoryTreeSelect';
 
 import { getImageSlots, WARRANTY_SERVICE_GROUPS, REPAIR_SERVICE_GROUPS, WORK_TYPE_SERVICES } from '../../utils/workTypes';
+import { normalizeProvince } from '../../utils/provinces';
 
 // ── Nguồn nước options ──
 const WATER_SOURCES = [
@@ -522,7 +523,8 @@ export default function ReportForm() {
   const prefillOrderInfo = (order: any) => {
     setCustomerName(order.billFullName || order.customer?.fullName || '');
     setCustomerPhone(order.billPhoneNumber || order.customer?.phoneNumber || '');
-    setProvince(order.shippingAddress?.province_name || order.customer?.provinceName || '');
+    const rawProv = order.shippingAddress?.province_name || order.customer?.provinceName || '';
+    setProvince(normalizeProvince(rawProv) || rawProv);
     const fullAddr = order.shippingAddress?.full_address || order.customer?.fullAddress || '';
     setAddress(fullAddr);
     if (order.workType) {
