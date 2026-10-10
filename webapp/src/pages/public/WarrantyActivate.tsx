@@ -201,23 +201,27 @@ export const getProductVisualByModelOrName = (
   };
 };
 
-// Định dạng hiển thị Số Serial dạng: XXXX XXX XXX XXXXX
+// Định dạng hiển thị Số Serial (hỗ trợ dòng 15 ký tự và các dòng mới lên đến 20-30 ký tự)
 const formatSerialNumber = (value: string): string => {
-  const clean = value.replace(/[^a-zA-Z0-9]/g, '').substring(0, 15);
-  let formatted = '';
-  if (clean.length > 0) {
-    formatted += clean.substring(0, 4);
+  const clean = value.replace(/[^a-zA-Z0-9]/g, '').substring(0, 30).toUpperCase();
+  if (clean.length <= 15) {
+    let formatted = '';
+    if (clean.length > 0) {
+      formatted += clean.substring(0, 4);
+    }
+    if (clean.length > 4) {
+      formatted += ' ' + clean.substring(4, 7);
+    }
+    if (clean.length > 7) {
+      formatted += ' ' + clean.substring(7, 10);
+    }
+    if (clean.length > 10) {
+      formatted += ' ' + clean.substring(10, 15);
+    }
+    return formatted.trim();
   }
-  if (clean.length > 4) {
-    formatted += ' ' + clean.substring(4, 7);
-  }
-  if (clean.length > 7) {
-    formatted += ' ' + clean.substring(7, 10);
-  }
-  if (clean.length > 10) {
-    formatted += ' ' + clean.substring(10, 15);
-  }
-  return formatted.trim();
+  // Đối với các serial dài > 15 ký tự (như dòng 20 ký tự: 01902A77926031000715): chia nhóm 4 ký tự
+  return (clean.match(/.{1,4}/g) || []).join(' ');
 };
 
 const ORDERED_VIETNAM_PROVINCES = PANCAKE_PROVINCES;
@@ -619,10 +623,10 @@ export default function WarrantyActivate() {
     }
   }, [serialFromUrl]);
 
-  // Validate serial when input reaches 15 chars (without prefilling any personal data)
+  // Validate serial when input reaches at least 10 chars (without prefilling any personal data)
   useEffect(() => {
     const cleanSerial = serialInput.replace(/[^a-zA-Z0-9]/g, '');
-    if (cleanSerial.length !== 15) {
+    if (cleanSerial.length < 10) {
       setSerialValidation({ status: 'IDLE' });
       setProductInfo(null);
       return;
@@ -732,8 +736,8 @@ export default function WarrantyActivate() {
     e.preventDefault();
     const cleanSerial = serialInput.replace(/[^a-zA-Z0-9]/g, '');
 
-    if (!cleanSerial || cleanSerial.length !== 15) {
-      setSubmitError('Số Serial bắt buộc phải gồm đúng 15 ký tự chữ và số.');
+    if (!cleanSerial || cleanSerial.length < 10) {
+      setSubmitError('Vui lòng nhập đầy đủ số Serial in trên tem máy.');
       return;
     }
     if (serialValidation.status === 'ACTIVATED') {
@@ -1270,7 +1274,7 @@ export default function WarrantyActivate() {
                   <label className={`block text-xs font-bold uppercase tracking-wider mb-1 ${isDark ? 'text-slate-300' : 'text-gray-700'}`}>Số Serial (nếu có)</label>
                   <input
                     type="text"
-                    placeholder="VD: 185826042700121"
+                    placeholder="VD: 185826042700121 hoặc 01902A77926031000715"
                     value={supportSerial}
                     onChange={e => setSupportSerial(e.target.value)}
                     className={`w-full px-3.5 py-2.5 border rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-200 font-mono ${
@@ -1501,7 +1505,7 @@ export default function WarrantyActivate() {
                   <input
                     type="text"
                     required
-                    placeholder="Mẫu: 1858 260 207 *****"
+                    placeholder="Mẫu: 1858 260 207 ***** hoặc 0190 2A77 9260 *****"
                     value={serialInput}
                     onChange={(e) => setSerialInput(formatSerialNumber(e.target.value))}
                     className={`w-full border rounded-xl px-4 py-2.5 text-sm outline-none font-mono font-bold tracking-wider transition-all ${
@@ -1517,10 +1521,10 @@ export default function WarrantyActivate() {
                   )}
                 </div>
 
-                {/* 1. Trạng thái IDLE / Chưa nhập đủ 15 ký tự */}
-                {serialValidation.status === 'IDLE' && serialInput.replace(/[^a-zA-Z0-9]/g, '').length < 15 && (
+                {/* 1. Trạng thái IDLE / Chưa nhập đủ 10 ký tự */}
+                {serialValidation.status === 'IDLE' && serialInput.replace(/[^a-zA-Z0-9]/g, '').length < 10 && (
                   <p className={`text-[11px] mt-1.5 ${isDark ? 'text-slate-400' : 'text-gray-400'}`}>
-                    * Nhập đủ 15 ký tự chữ và số trên tem máy để kiểm tra
+                    * Nhập số Serial in trên tem máy để kiểm tra (tối thiểu 10 ký tự)
                   </p>
                 )}
 
@@ -1531,7 +1535,7 @@ export default function WarrantyActivate() {
                     <div className="space-y-1">
                       <p className="font-bold text-rose-900">Số Serial không tồn tại trong hệ thống</p>
                       <p className="text-gray-600 leading-relaxed">
-                        Vui lòng kiểm tra lại dãy 15 ký tự trên tem dán hoặc liên hệ hotline để được hỗ trợ.
+                        Vui lòng kiểm tra lại số Serial trên tem dán máy hoặc liên hệ hotline để được hỗ trợ.
                       </p>
                       <div className="pt-1">
                         <a

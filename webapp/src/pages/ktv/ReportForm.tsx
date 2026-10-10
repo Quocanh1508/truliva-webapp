@@ -102,6 +102,15 @@ export default function ReportForm() {
   const [serialChecking, setSerialChecking] = useState(false);
   const [serialInfo, setSerialInfo] = useState<any>(null);
   const [serialWarning, setSerialWarning] = useState('');
+  const serialCheckTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (serialCheckTimeoutRef.current) {
+        clearTimeout(serialCheckTimeoutRef.current);
+      }
+    };
+  }, []);
 
   // ── States Kích hoạt bảo hành qua ZNS ──
   const [showActivationModal, setShowActivationModal] = useState(false);
@@ -343,23 +352,27 @@ export default function ReportForm() {
     setSelectedItems(prev => prev.filter(item => item.productName !== productName));
   };
 
-  // Định dạng hiển thị Số Serial dạng: XXXX XXX XXX XXXXX
+  // Định dạng hiển thị Số Serial (hỗ trợ dòng 15 ký tự và các dòng mới lên đến 20-30 ký tự)
   const formatSerialNumber = (value: string): string => {
-    const clean = value.replace(/[^a-zA-Z0-9]/g, '').substring(0, 15);
-    let formatted = '';
-    if (clean.length > 0) {
-      formatted += clean.substring(0, 4);
+    const clean = value.replace(/[^a-zA-Z0-9]/g, '').substring(0, 30).toUpperCase();
+    if (clean.length <= 15) {
+      let formatted = '';
+      if (clean.length > 0) {
+        formatted += clean.substring(0, 4);
+      }
+      if (clean.length > 4) {
+        formatted += ' ' + clean.substring(4, 7);
+      }
+      if (clean.length > 7) {
+        formatted += ' ' + clean.substring(7, 10);
+      }
+      if (clean.length > 10) {
+        formatted += ' ' + clean.substring(10, 15);
+      }
+      return formatted.trim();
     }
-    if (clean.length > 4) {
-      formatted += ' ' + clean.substring(4, 7);
-    }
-    if (clean.length > 7) {
-      formatted += ' ' + clean.substring(7, 10);
-    }
-    if (clean.length > 10) {
-      formatted += ' ' + clean.substring(10, 15);
-    }
-    return formatted.trim();
+    // Đối với các serial dài > 15 ký tự (như dòng 20 ký tự: 01902A77926031000715): chia nhóm 4 ký tự
+    return (clean.match(/.{1,4}/g) || []).join(' ');
   };
 
   const checkSerial = async (serial: string) => {
@@ -825,7 +838,7 @@ export default function ReportForm() {
         products: legacyProducts,
         serviceType: selectedServices.join(', '),
         workType,
-        serialNumber: serialNumber || 'XXXXX',
+        serialNumber: serialNumber ? serialNumber.replace(/[^a-zA-Z0-9]/g, '').toUpperCase() : 'XXXXX',
         distanceKm,
         actualAmount,
         waterSource: needsTechnicalFields(workType) ? defaultWaterSource : null,
@@ -1348,20 +1361,35 @@ export default function ReportForm() {
                     <input
                       type="text"
                       className={`form-input pr-10 font-mono tracking-wider ${serialWarning ? 'border-amber-400 bg-amber-50/20' : ''}`}
-                      placeholder="Mẫu: 1858 260 207 *****"
+                      placeholder="Mẫu: 1858 260 207 ***** hoặc 0190 2A77 9260 *****"
                       value={serialNumber}
                       onChange={e => {
                         const formatted = formatSerialNumber(e.target.value);
                         setSerialNumber(formatted);
                         const clean = formatted.replace(/[^a-zA-Z0-9]/g, '');
-                        if (clean.length === 15) {
-                          checkSerial(formatted);
-                        } else {
+
+                        if (serialCheckTimeoutRef.current) {
+                          clearTimeout(serialCheckTimeoutRef.current);
+                        }
+
+                        if (clean.length < 10) {
                           setSerialInfo(null);
                           setSerialWarning('');
+                        } else {
+                          serialCheckTimeoutRef.current = setTimeout(() => {
+                            checkSerial(formatted);
+                          }, 400);
                         }
                       }}
-                      onBlur={() => checkSerial(serialNumber)}
+                      onBlur={() => {
+                        if (serialCheckTimeoutRef.current) {
+                          clearTimeout(serialCheckTimeoutRef.current);
+                        }
+                        const clean = serialNumber.replace(/[^a-zA-Z0-9]/g, '');
+                        if (clean.length >= 10) {
+                          checkSerial(serialNumber);
+                        }
+                      }}
                       required
                     />
                     {serialChecking && (
