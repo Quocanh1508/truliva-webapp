@@ -142,13 +142,14 @@ router.post(
         return;
       }
 
-      const urls: string[] = [];
-      for (const file of files) {
+      const uploadPromises = files.map(async (file) => {
         if (file.buffer) {
-          const url = await uploadBuffer(file.buffer, file.originalname, 'truliva_reports');
-          urls.push(url);
+          return await uploadBuffer(file.buffer, file.originalname, 'truliva_reports');
         }
-      }
+        return null;
+      });
+      const results = await Promise.all(uploadPromises);
+      const urls = results.filter((u): u is string => u !== null);
 
       res.json({ urls });
     } catch (error: any) {

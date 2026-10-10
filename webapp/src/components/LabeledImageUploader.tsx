@@ -231,7 +231,7 @@ export default function LabeledImageUploader({ imageSlots, workType, onUploadSuc
 
     setIsUploading(true);
     setError('');
-    setUploadProgressText('');
+    setUploadProgressText('Đang tải đồng loạt các ảnh...');
 
     try {
       const finalUrls: (string | null)[] = [...slotPreviews];
@@ -239,51 +239,58 @@ export default function LabeledImageUploader({ imageSlots, workType, onUploadSuc
         .map((_, i) => i)
         .filter(i => !!slotFiles[i]);
 
-      for (let stepIdx = 0; stepIdx < indicesToUpload.length; stepIdx++) {
-        const slotIdx = indicesToUpload[stepIdx];
-        const file = slotFiles[slotIdx]!;
-        const slotLabel = imageSlots[slotIdx].label;
+      if (indicesToUpload.length === 0) {
+        const urls = finalUrls.filter((u): u is string => u !== null);
+        onUploadSuccess(urls, files);
+        return;
+      }
 
-        setUploadProgressText(`Đang tải ảnh ${stepIdx + 1}/${indicesToUpload.length} (${slotLabel})...`);
+      setUploadProgressText(`Đang tải đồng loạt ${indicesToUpload.length} ảnh...`);
 
-        let uploadedUrl: string | null = null;
-        let lastErr: any = null;
+      // Gửi đồng loạt tất cả các ảnh cùng lúc bằng Promise.all để tối đa hóa tốc độ
+      await Promise.all(
+        indicesToUpload.map(async (slotIdx) => {
+          const file = slotFiles[slotIdx]!;
+          const slotLabel = imageSlots[slotIdx].label;
 
-        // Thử upload ảnh tối đa 2 lần để tránh rớt mạng di động 4G/3G
-        for (let attempt = 1; attempt <= 2; attempt++) {
-          try {
-            const uploaded = await uploadImages([file]);
-            if (uploaded && uploaded[0]) {
-              uploadedUrl = uploaded[0];
-              break;
-            }
-          } catch (e: any) {
-            lastErr = e;
-            if (attempt < 2) {
-              await new Promise(r => setTimeout(r, 1000));
+          let uploadedUrl: string | null = null;
+          let lastErr: any = null;
+
+          // Thử upload tối đa 2 lần nếu sóng 4G/3G có gián đoạn
+          for (let attempt = 1; attempt <= 2; attempt++) {
+            try {
+              const uploaded = await uploadImages([file]);
+              if (uploaded && uploaded[0]) {
+                uploadedUrl = uploaded[0];
+                break;
+              }
+            } catch (e: any) {
+              lastErr = e;
+              if (attempt < 2) {
+                await new Promise(r => setTimeout(r, 600));
+              }
             }
           }
-        }
 
-        if (!uploadedUrl) {
-          throw lastErr || new Error(`Không thể tải ảnh cho mục "${slotLabel}". Vui lòng thử lại.`);
-        }
+          if (!uploadedUrl) {
+            throw lastErr || new Error(`Không thể tải ảnh cho mục "${slotLabel}". Vui lòng thử lại.`);
+          }
 
-        finalUrls[slotIdx] = uploadedUrl;
+          finalUrls[slotIdx] = uploadedUrl;
 
-        // Cập nhật ngay URL vào state và xóa file cục bộ đã upload thành công
-        // Giúp nếu ảnh sau bị lỗi, ảnh này không bị upload lại
-        setSlotPreviews(prev => {
-          const updated = [...prev];
-          updated[slotIdx] = uploadedUrl;
-          return updated;
-        });
-        setSlotFiles(prev => {
-          const updated = [...prev];
-          updated[slotIdx] = null;
-          return updated;
-        });
-      }
+          // Cập nhật ngay URL vào state và dọn dẹp file cục bộ
+          setSlotPreviews(prev => {
+            const updated = [...prev];
+            updated[slotIdx] = uploadedUrl;
+            return updated;
+          });
+          setSlotFiles(prev => {
+            const updated = [...prev];
+            updated[slotIdx] = null;
+            return updated;
+          });
+        })
+      );
 
       const urls = finalUrls.filter((u): u is string => u !== null);
       onUploadSuccess(urls, files);
