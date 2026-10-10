@@ -21,6 +21,7 @@ export default function LabeledImageUploader({ imageSlots, workType, onUploadSuc
   const [slotFiles, setSlotFiles] = useState<(File | null)[]>(imageSlots.map(() => null));
   const [slotPreviews, setSlotPreviews] = useState<(string | null)[]>(imageSlots.map(() => null));
   const [isUploading, setIsUploading] = useState(false);
+  const [uploadProgressText, setUploadProgressText] = useState('');
   const [error, setError] = useState('');
   const fileInputRefs = useRef<(HTMLInputElement | null)[]>([]);
 
@@ -230,27 +231,67 @@ export default function LabeledImageUploader({ imageSlots, workType, onUploadSuc
 
     setIsUploading(true);
     setError('');
+    setUploadProgressText('');
 
     try {
-      // Upload only newly selected files and merge with existing URLs
-      const finalUrls: (string | null)[] = await Promise.all(
-        imageSlots.map(async (_, index) => {
-          const file = slotFiles[index];
-          const preview = slotPreviews[index];
-          if (file) {
+      const finalUrls: (string | null)[] = [...slotPreviews];
+      const indicesToUpload = imageSlots
+        .map((_, i) => i)
+        .filter(i => !!slotFiles[i]);
+
+      for (let stepIdx = 0; stepIdx < indicesToUpload.length; stepIdx++) {
+        const slotIdx = indicesToUpload[stepIdx];
+        const file = slotFiles[slotIdx]!;
+        const slotLabel = imageSlots[slotIdx].label;
+
+        setUploadProgressText(`Đang tải ảnh ${stepIdx + 1}/${indicesToUpload.length} (${slotLabel})...`);
+
+        let uploadedUrl: string | null = null;
+        let lastErr: any = null;
+
+        // Thử upload ảnh tối đa 2 lần để tránh rớt mạng di động 4G/3G
+        for (let attempt = 1; attempt <= 2; attempt++) {
+          try {
             const uploaded = await uploadImages([file]);
-            return uploaded[0];
+            if (uploaded && uploaded[0]) {
+              uploadedUrl = uploaded[0];
+              break;
+            }
+          } catch (e: any) {
+            lastErr = e;
+            if (attempt < 2) {
+              await new Promise(r => setTimeout(r, 1000));
+            }
           }
-          return preview; // Keeps the existing server URL or null
-        })
-      );
+        }
+
+        if (!uploadedUrl) {
+          throw lastErr || new Error(`Không thể tải ảnh cho mục "${slotLabel}". Vui lòng thử lại.`);
+        }
+
+        finalUrls[slotIdx] = uploadedUrl;
+
+        // Cập nhật ngay URL vào state và xóa file cục bộ đã upload thành công
+        // Giúp nếu ảnh sau bị lỗi, ảnh này không bị upload lại
+        setSlotPreviews(prev => {
+          const updated = [...prev];
+          updated[slotIdx] = uploadedUrl;
+          return updated;
+        });
+        setSlotFiles(prev => {
+          const updated = [...prev];
+          updated[slotIdx] = null;
+          return updated;
+        });
+      }
 
       const urls = finalUrls.filter((u): u is string => u !== null);
       onUploadSuccess(urls, files);
     } catch (err: any) {
-      setError(err.message || 'Lỗi upload ảnh');
+      setError(err.message || 'Lỗi upload ảnh. Vui lòng bấm thử lại.');
     } finally {
       setIsUploading(false);
+      setUploadProgressText('');
     }
   };
 
@@ -419,7 +460,16 @@ export default function LabeledImageUploader({ imageSlots, workType, onUploadSuc
           onClick={handleUpload}
           disabled={isUploading || filledCount === 0}
         >
-          {isUploading ? <span className="spinner"></span> : <><UploadCloud size={18} /> Xác nhận Upload Ảnh</>}
+          {isUploading ? (
+            <>
+              <span className="spinner"></span>
+              <span className="text-xs sm:text-sm font-medium">{uploadProgressText || 'Đang tải ảnh...'}</span>
+            </>
+          ) : (
+            <>
+              <UploadCloud size={18} /> Xác nhận Upload Ảnh
+            </>
+          )}
         </button>
       </div>
 

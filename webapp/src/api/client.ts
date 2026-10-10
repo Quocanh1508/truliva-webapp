@@ -65,13 +65,20 @@ export async function fetchApi(endpoint: string, options: RequestInit = {}) {
   return data;
 }
 
-export async function uploadImage(file: File): Promise<{ url: string; publicId: string }> {
+export async function uploadImage(file: File): Promise<{ url: string; publicId?: string }> {
   const compressedFile = await compressImage(file);
   const formData = new FormData();
   formData.append('image', compressedFile);
 
+  const token = localStorage.getItem('session_token');
+  const headers: Record<string, string> = {};
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+
   const response = await fetch(`${API_URL}/upload`, {
     method: 'POST',
+    headers,
     body: formData, // Không set Content-Type, trình duyệt tự set với boundary
   });
 
@@ -88,8 +95,15 @@ export async function uploadImages(files: File[]): Promise<string[]> {
   const formData = new FormData();
   compressedFiles.forEach((f) => formData.append('images', f));
 
+  const token = localStorage.getItem('session_token');
+  const headers: Record<string, string> = {};
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+
   const response = await fetch(`${API_URL}/upload/multiple`, {
     method: 'POST',
+    headers,
     body: formData,
   });
 
