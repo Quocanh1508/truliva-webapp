@@ -1,37 +1,42 @@
 /**
- * Nén hình ảnh tại client sử dụng HTML5 Canvas
+ * Nén hình ảnh tại client sử dụng HTML5 Canvas và URL.createObjectURL (siêu tốc, tiết kiệm RAM)
  * @param file Đối tượng File ảnh gốc
  * @param maxWidth Chiều rộng tối đa (mặc định 1280)
  * @param maxHeight Chiều cao tối đa (mặc định 1280)
- * @param quality Chất lượng nén từ 0.1 đến 1.0 (mặc định 0.7)
+ * @param quality Chất lượng nén từ 0.1 đến 1.0 (mặc định 0.65)
  * @returns Trả về File đã nén (định dạng JPEG) hoặc File gốc nếu có lỗi/không phải ảnh
  */
 export async function compressImage(
   file: File,
   maxWidth = 1280,
   maxHeight = 1280,
-  quality = 0.7
+  quality = 0.65
 ): Promise<File> {
-  // Bỏ qua nếu không phải là định dạng hình ảnh
-  if (!file.type.startsWith('image/')) {
+  const isImage = file.type.startsWith('image/') || /\.(jpe?g|png|webp|heic|heif|bmp)$/i.test(file.name);
+  if (!isImage) {
     return file;
   }
 
-  // Bỏ qua nếu ảnh quá nhỏ (dưới 300KB thì không cần nén thêm)
-  if (file.size < 300 * 1024) {
+  // Bỏ qua nếu ảnh quá nhỏ (dưới 200KB thì đã tối ưu)
+  if (file.size < 200 * 1024) {
     return file;
   }
 
   return new Promise((resolve) => {
-    const reader = new FileReader();
-    reader.readAsDataURL(file);
-    reader.onload = (event) => {
-      const img = new Image();
-      img.src = event.target?.result as string;
-      img.onload = () => {
-        const canvas = document.createElement('canvas');
-        let width = img.width;
-        let height = img.height;
+    let objectUrl = '';
+    try {
+      objectUrl = URL.createObjectURL(file);
+    } catch {
+      return resolve(file);
+    }
+
+    const img = new Image();
+    img.src = objectUrl;
+
+    img.onload = () => {
+      try {
+        let width = img.naturalWidth || img.width;
+        let height = img.naturalHeight || img.height;
 
         // Tính toán lại kích thước dựa trên giới hạn maxWidth/maxHeight tỷ lệ thuận
         if (width > height) {
@@ -46,16 +51,19 @@ export async function compressImage(
           }
         }
 
+        const canvas = document.createElement('canvas');
         canvas.width = width;
         canvas.height = height;
 
         const ctx = canvas.getContext('2d');
         if (!ctx) {
-          return resolve(file); // Fallback nếu trình duyệt không hỗ trợ Context 2D
+          URL.revokeObjectURL(objectUrl);
+          return resolve(file);
         }
 
         // Vẽ ảnh lên canvas theo kích thước mới
         ctx.drawImage(img, 0, 0, width, height);
+        URL.revokeObjectURL(objectUrl);
 
         // Đổ dữ liệu canvas thành Blob định dạng JPEG với chất lượng nén mong muốn
         canvas.toBlob(
@@ -63,7 +71,6 @@ export async function compressImage(
             if (!blob) {
               return resolve(file);
             }
-            // Tạo đối tượng File mới (đổi đuôi mở rộng thành .jpg)
             const compressedName = file.name.replace(/\.[^/.]+$/, "") + ".jpg";
             const compressedFile = new File([blob], compressedName, {
               type: 'image/jpeg',
@@ -74,13 +81,15 @@ export async function compressImage(
           'image/jpeg',
           quality
         );
-      };
-      img.onerror = () => {
-        resolve(file); // Fallback nếu không load được ảnh
-      };
+      } catch {
+        URL.revokeObjectURL(objectUrl);
+        resolve(file);
+      }
     };
-    reader.onerror = () => {
-      resolve(file); // Fallback nếu không đọc được file
+
+    img.onerror = () => {
+      URL.revokeObjectURL(objectUrl);
+      resolve(file);
     };
   });
 }

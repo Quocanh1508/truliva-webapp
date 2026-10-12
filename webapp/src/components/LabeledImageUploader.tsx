@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Camera, X, UploadCloud, Download } from 'lucide-react';
 import { uploadImages, fetchApi } from '../api/client';
+import { compressImage } from '../utils/compressor';
 import { Capacitor } from '@capacitor/core';
 import { Camera as CapCamera, CameraResultType, CameraSource } from '@capacitor/camera';
 
@@ -60,23 +61,37 @@ export default function LabeledImageUploader({ imageSlots, workType, onUploadSuc
       .catch(err => console.error('Lỗi tải ảnh mẫu:', err));
   }, [workType]);
 
-  const handleFileSelect = (index: number, e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileSelect = async (index: number, e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
-      const file = e.target.files[0];
-
-      const newFiles = [...slotFiles];
-      newFiles[index] = file;
-      setSlotFiles(newFiles);
+      const rawFile = e.target.files[0];
 
       // Revoke old preview if exists
       if (slotPreviews[index] && slotPreviews[index]!.startsWith('blob:')) {
         URL.revokeObjectURL(slotPreviews[index]!);
       }
 
+      // Hiển thị preview ngay lập tức bằng objectUrl (0ms)
+      const previewUrl = URL.createObjectURL(rawFile);
       const newPreviews = [...slotPreviews];
-      newPreviews[index] = URL.createObjectURL(file);
+      newPreviews[index] = previewUrl;
       setSlotPreviews(newPreviews);
       setError('');
+
+      // Nén ảnh tức thì trong nền ngay khi chụp/chọn
+      try {
+        const compressed = await compressImage(rawFile);
+        setSlotFiles(prev => {
+          const u = [...prev];
+          u[index] = compressed;
+          return u;
+        });
+      } catch {
+        setSlotFiles(prev => {
+          const u = [...prev];
+          u[index] = rawFile;
+          return u;
+        });
+      }
     }
   };
 
@@ -92,7 +107,7 @@ export default function LabeledImageUploader({ imageSlots, workType, onUploadSuc
         }
 
         const photo = await CapCamera.getPhoto({
-          quality: 90,
+          quality: 75,
           allowEditing: false,
           resultType: CameraResultType.Base64,
           source: CameraSource.Prompt,
@@ -247,50 +262,46 @@ export default function LabeledImageUploader({ imageSlots, workType, onUploadSuc
 
       setUploadProgressText(`Đang tải đồng loạt ${indicesToUpload.length} ảnh...`);
 
-      // Gửi đồng loạt tất cả các ảnh cùng lúc bằng Promise.all để tối đa hóa tốc độ
-      await Promise.all(
-        indicesToUpload.map(async (slotIdx) => {
-          const file = slotFiles[slotIdx]!;
-          const slotLabel = imageSlots[slotIdx].label;
+      // Chuẩn bị danh sách các file cần upload
+      const filesToUpload = indicesToUpload.map(idx => slotFiles[idx]!);
 
-          let uploadedUrl: string | null = null;
-          let lastErr: any = null;
+      // Gửi toàn bộ ảnh trong đúng 1 request HTTP duy nhất tới /api/upload/multiple (siêu tốc, không nghẽn mạng)
+      let uploadedUrls: string[] = [];
+      let lastErr: any = null;
 
-          // Thử upload tối đa 2 lần nếu sóng 4G/3G có gián đoạn
-          for (let attempt = 1; attempt <= 2; attempt++) {
-            try {
-              const uploaded = await uploadImages([file]);
-              if (uploaded && uploaded[0]) {
-                uploadedUrl = uploaded[0];
-                break;
-              }
-            } catch (e: any) {
-              lastErr = e;
-              if (attempt < 2) {
-                await new Promise(r => setTimeout(r, 600));
-              }
-            }
+      for (let attempt = 1; attempt <= 2; attempt++) {
+        try {
+          uploadedUrls = await uploadImages(filesToUpload);
+          if (uploadedUrls && uploadedUrls.length === filesToUpload.length) {
+            break;
           }
-
-          if (!uploadedUrl) {
-            throw lastErr || new Error(`Không thể tải ảnh cho mục "${slotLabel}". Vui lòng thử lại.`);
+        } catch (e: any) {
+          lastErr = e;
+          if (attempt < 2) {
+            setUploadProgressText('Đang thử lại kết nối...');
+            await new Promise(r => setTimeout(r, 800));
           }
+        }
+      }
 
-          finalUrls[slotIdx] = uploadedUrl;
+      if (!uploadedUrls || uploadedUrls.length !== filesToUpload.length) {
+        throw lastErr || new Error('Không thể tải lên đủ số lượng ảnh. Vui lòng bấm thử lại.');
+      }
 
-          // Cập nhật ngay URL vào state và dọn dẹp file cục bộ
-          setSlotPreviews(prev => {
-            const updated = [...prev];
-            updated[slotIdx] = uploadedUrl;
-            return updated;
-          });
-          setSlotFiles(prev => {
-            const updated = [...prev];
-            updated[slotIdx] = null;
-            return updated;
-          });
-        })
-      );
+      // Map lại chính xác URL vào từng slot
+      indicesToUpload.forEach((slotIdx, i) => {
+        finalUrls[slotIdx] = uploadedUrls[i];
+      });
+
+      // Cập nhật state hiển thị và dọn dẹp slotFiles
+      setSlotPreviews(finalUrls);
+      setSlotFiles(prev => {
+        const updated = [...prev];
+        indicesToUpload.forEach(slotIdx => {
+          updated[slotIdx] = null;
+        });
+        return updated;
+      });
 
       const urls = finalUrls.filter((u): u is string => u !== null);
       onUploadSuccess(urls, files);
