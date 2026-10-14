@@ -2024,20 +2024,8 @@ export async function updateOrder(req: Request, res: Response): Promise<void> {
         return;
       }
 
-      // Xác định xem đơn hàng thuộc diện không trừ kho hay không (Lắp đặt hoặc không có sản phẩm ban đầu)
-      const isInstallation = (workType || oldOrder.workType) === 'Lắp đặt';
-      let originallyHasProducts = false;
-      if (oldOrder.rawData) {
-        try {
-          const raw = typeof oldOrder.rawData === 'string' ? JSON.parse(oldOrder.rawData) : oldOrder.rawData;
-          const itemsList = raw.items || raw.order_items || [];
-          originallyHasProducts = Array.isArray(itemsList) && itemsList.length > 0;
-        } catch (e) {
-          originallyHasProducts = false;
-        }
-      }
-
-      const shouldSyncWarehouseToPancake = !isInstallation && originallyHasProducts && !isManualOrder;
+      // Đơn hàng Pancake POS (pancakeOrderId > 0) luôn đồng bộ kho sang Pancake POS khi đổi kho trên Truliva App
+      const shouldSyncWarehouseToPancake = !isManualOrder;
 
       try {
         let warehouseName = 'Kho hàng';
@@ -2080,10 +2068,9 @@ export async function updateOrder(req: Request, res: Response): Promise<void> {
             }
           }
         } else {
-          logger.info('Bypassed syncing warehouse change to Pancake POS (not deducting inventory)', {
+          logger.info('Bypassed syncing warehouse change to Pancake POS (manual order)', {
             pancakeOrderId: oldOrder.pancakeOrderId,
-            warehouseId: effectiveWarehouseId,
-            reason: isInstallation ? 'Installation order' : (isManualOrder ? 'Manual order' : 'No original products')
+            warehouseId: effectiveWarehouseId
           });
         }
 
@@ -2685,19 +2672,8 @@ export async function bulkAssignOrders(req: Request, res: Response): Promise<voi
 
       // Warehouse
       if (warehouseId !== undefined && warehouseId !== oldOrder.warehouseId) {
-        const isInstallation = oldOrder.workType === 'Lắp đặt';
-        let originallyHasProducts = false;
-        if (oldOrder.rawData) {
-          try {
-            const raw = typeof oldOrder.rawData === 'string' ? JSON.parse(oldOrder.rawData) : oldOrder.rawData;
-            const itemsList = raw.items || raw.order_items || [];
-            originallyHasProducts = Array.isArray(itemsList) && itemsList.length > 0;
-          } catch (e) {
-            originallyHasProducts = false;
-          }
-        }
         const isManualOrder = oldOrder.pancakeOrderId < 0;
-        const shouldSyncWarehouseToPancake = !isInstallation && originallyHasProducts && !isManualOrder;
+        const shouldSyncWarehouseToPancake = !isManualOrder;
 
         try {
           let warehouseName = 'Kho hàng';

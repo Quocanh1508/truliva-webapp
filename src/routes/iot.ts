@@ -7,6 +7,33 @@ import { exec } from 'child_process';
 
 const router = Router();
 
+// ── Helper format telemetry bóc tách lõi lọc và thông số phần cứng ──
+function formatTelemetry(tel: any) {
+  if (!tel) return null;
+  const raw = (typeof tel.rawPayload === 'object' && tel.rawPayload !== null) ? tel.rawPayload : {};
+  return {
+    ...tel,
+    // Thông số 3 lõi lọc nước Truliva
+    ppc: raw.ppc != null ? Number(raw.ppc) : null,
+    ppcBars: raw.ppc_bars != null ? Number(raw.ppc_bars) : null,
+    ppcReplace: raw.ppc_replace === true,
+    ro: raw.ro != null ? Number(raw.ro) : null,
+    roBars: raw.ro_bars != null ? Number(raw.ro_bars) : null,
+    roReplace: raw.ro_replace === true,
+    cto: raw.cto != null ? Number(raw.cto) : null,
+    ctoBars: raw.cto_bars != null ? Number(raw.cto_bars) : null,
+    ctoReplace: raw.cto_replace === true,
+    // Thông số phần cứng, Wi-Fi & bo mạch
+    rssi: raw.rssi != null ? Number(raw.rssi) : null,
+    ip: raw.ip || null,
+    uptime: raw.uptime != null ? Number(raw.uptime) : null,
+    uartOk: raw.uart_ok !== undefined ? raw.uart_ok : true,
+    interval: raw.interval != null ? Number(raw.interval) : 5,
+    statusByte: raw.status != null ? Number(raw.status) : null,
+    fw: raw.fw || null,
+  };
+}
+
 /**
  * GET /api/iot/devices
  * Danh sách tất cả thiết bị IoT
@@ -25,6 +52,22 @@ router.get('/devices', requireAuth, requireAdmin, async (_req: Request, res: Res
       }
     });
 
+    // Liên kết thông tin máy & khách hàng từ bảng Serial (nếu có)
+    const serialNumbers = devices.map(d => d.serialNumber);
+    const serialRecords = await prisma.serial.findMany({
+      where: { serialNumber: { in: serialNumbers } },
+      select: {
+        serialNumber: true,
+        model: true,
+        productLine: true,
+        customerName: true,
+        customerPhone: true,
+        status: true,
+        activationDate: true,
+      }
+    });
+    const serialMap = new Map(serialRecords.map(s => [s.serialNumber, s]));
+
     // Get latest telemetry for each device
     const devicesWithLatest = await Promise.all(
       devices.map(async (device) => {
@@ -33,9 +76,27 @@ router.get('/devices', requireAuth, requireAdmin, async (_req: Request, res: Res
           orderBy: { recordedAt: 'desc' }
         });
 
+        // Đọc live payload mới nhất từ configJson để UI luôn cập nhật realtime
+        const liveData = (typeof device.configJson === 'object' && device.configJson !== null && (device.configJson as any).latestLivePayload)
+          ? (device.configJson as any).latestLivePayload
+          : null;
+
+        const effectiveTelemetry = liveData
+          ? {
+              ...(latestTelemetry || {}),
+              deviceId: device.id,
+              rawPayload: liveData,
+              tdsOut: liveData.tdsOut != null ? Number(liveData.tdsOut) : latestTelemetry?.tdsOut,
+              tdsIn: liveData.tdsIn != null ? Number(liveData.tdsIn) : latestTelemetry?.tdsIn,
+              recordedAt: (device.configJson as any).latestLivePayloadAt || latestTelemetry?.recordedAt || device.lastSeenAt || new Date().toISOString()
+            }
+          : latestTelemetry;
+
         return {
           ...device,
-          latestTelemetry,
+          isMuted: Boolean((device.configJson as any)?.isMuted),
+          serialInfo: serialMap.get(device.serialNumber) || null,
+          latestTelemetry: formatTelemetry(effectiveTelemetry),
           unresolvedAlerts: device._count.alerts,
           totalReadings: device._count.telemetryData,
         };
@@ -80,7 +141,41 @@ router.get('/devices/:serialNumber', requireAuth, requireAdmin, async (req: Requ
       take: 10,
     });
 
-    res.json({ device, recentTelemetry });
+    const serialInfo = await prisma.serial.findUnique({
+      where: { serialNumber },
+      select: {
+        serialNumber: true,
+        model: true,
+        productLine: true,
+        customerName: true,
+        customerPhone: true,
+        status: true,
+        activationDate: true,
+      }
+    });
+
+    const liveData = (typeof device.configJson === 'object' && device.configJson !== null && (device.configJson as any).latestLivePayload)
+      ? (device.configJson as any).latestLivePayload
+      : null;
+
+    const formattedRecent = recentTelemetry.map(formatTelemetry);
+    if (liveData && formattedRecent.length > 0) {
+      formattedRecent[0] = formatTelemetry({
+        ...formattedRecent[0],
+        rawPayload: liveData,
+        tdsOut: liveData.tdsOut != null ? Number(liveData.tdsOut) : formattedRecent[0].tdsOut,
+        recordedAt: (device.configJson as any).latestLivePayloadAt || formattedRecent[0].recordedAt
+      });
+    }
+
+    res.json({
+      device: {
+        ...device,
+        isMuted: Boolean((device.configJson as any)?.isMuted),
+        serialInfo
+      },
+      recentTelemetry: formattedRecent
+    });
   } catch (error: any) {
     logger.error('IoT API: Get device detail error', { error: error.message });
     res.status(500).json({ error: 'Lỗi khi lấy chi tiết thiết bị' });
@@ -119,7 +214,10 @@ router.get('/devices/:serialNumber/telemetry', requireAuth, requireAdmin, async 
       take: Math.min(Number(limit) || 100, 1000),
     });
 
-    res.json({ telemetry, total: telemetry.length });
+    res.json({
+      telemetry: telemetry.map(formatTelemetry),
+      total: telemetry.length
+    });
   } catch (error: any) {
     logger.error('IoT API: Get telemetry error', { error: error.message });
     res.status(500).json({ error: 'Lỗi khi lấy lịch sử dữ liệu' });
@@ -143,18 +241,27 @@ router.get('/alerts', requireAuth, requireAdmin, async (req: Request, res: Respo
       where,
       include: {
         device: {
-          select: { serialNumber: true, firmwareVersion: true }
+          select: { serialNumber: true, firmwareVersion: true, configJson: true }
         }
       },
       orderBy: { createdAt: 'desc' },
       take: Math.min(Number(limit) || 50, 200),
     });
 
+    const formattedAlerts = alerts.map((a) => ({
+      ...a,
+      device: a.device ? {
+        serialNumber: a.device.serialNumber,
+        firmwareVersion: a.device.firmwareVersion,
+        isMuted: Boolean((a.device.configJson as any)?.isMuted)
+      } : null
+    }));
+
     const unresolvedCount = await prisma.iotAlert.count({
       where: { isResolved: false }
     });
 
-    res.json({ alerts, unresolvedCount });
+    res.json({ alerts: formattedAlerts, unresolvedCount });
   } catch (error: any) {
     logger.error('IoT API: Get alerts error', { error: error.message });
     res.status(500).json({ error: 'Lỗi khi lấy danh sách cảnh báo' });
@@ -285,6 +392,116 @@ router.patch('/alerts/:id/resolve', requireAuth, requireAdmin, async (req: Reque
   } catch (error: any) {
     logger.error('IoT API: Resolve alert error', { error: error.message });
     res.status(500).json({ error: 'Lỗi khi cập nhật cảnh báo' });
+  }
+});
+
+/**
+ * POST /api/iot/alerts/resolve-all
+ * Đánh dấu đã xử lý tất cả cảnh báo chưa giải quyết (tuân thủ Rule 7: Zero Hard-Delete Policy)
+ */
+router.post('/alerts/resolve-all', requireAuth, requireAdmin, async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { serialNumber } = req.body;
+
+    let whereClause: any = { isResolved: false };
+    if (serialNumber) {
+      const device = await prisma.iotDevice.findUnique({
+        where: { serialNumber }
+      });
+      if (device) {
+        whereClause.deviceId = device.id;
+      } else {
+        res.status(404).json({ error: 'Thiết bị không tồn tại' });
+        return;
+      }
+    }
+
+    const result = await prisma.iotAlert.updateMany({
+      where: whereClause,
+      data: {
+        isResolved: true,
+        resolvedAt: new Date()
+      }
+    });
+
+    logger.info(`IoT API: Bulk resolved ${result.count} alerts`, { serialNumber });
+    res.json({
+      message: `Đã đánh dấu xử lý ${result.count} cảnh báo`,
+      count: result.count
+    });
+  } catch (error: any) {
+    logger.error('IoT API: Bulk resolve alerts error', { error: error.message });
+    res.status(500).json({ error: 'Lỗi khi xử lý cảnh báo hàng loạt' });
+  }
+});
+
+/**
+ * PATCH /api/iot/devices/:serialNumber/mute
+ * Bật/tắt chế độ tắt thông báo (Mute / Do Not Disturb) cho thiết bị IoT
+ */
+router.patch('/devices/:serialNumber/mute', requireAuth, requireAdmin, async (req: Request, res: Response): Promise<void> => {
+  try {
+    const serialNumber = req.params.serialNumber as string;
+    const { muted = true, resolveExisting = true } = req.body;
+
+    const device = await prisma.iotDevice.findUnique({
+      where: { serialNumber }
+    });
+
+    if (!device) {
+      res.status(404).json({ error: 'Thiết bị không tồn tại' });
+      return;
+    }
+
+    const currentConfig = (typeof device.configJson === 'object' && device.configJson !== null)
+      ? (device.configJson as Record<string, any>)
+      : {};
+
+    const isMuted = Boolean(muted);
+    const updatedConfig = {
+      ...currentConfig,
+      isMuted,
+      mutedAt: isMuted ? new Date().toISOString() : null,
+      mutedBy: (req as any).user?.username || 'admin'
+    };
+
+    await prisma.iotDevice.update({
+      where: { id: device.id },
+      data: { configJson: updatedConfig }
+    });
+
+    let resolvedCount = 0;
+    // Nếu bật mute và resolveExisting = true (mặc định), tự động giải quyết tất cả cảnh báo đang mở của máy này
+    if (isMuted && resolveExisting) {
+      const updateResult = await prisma.iotAlert.updateMany({
+        where: {
+          deviceId: device.id,
+          isResolved: false
+        },
+        data: {
+          isResolved: true,
+          resolvedAt: new Date()
+        }
+      });
+      resolvedCount = updateResult.count;
+    }
+
+    logger.info(`IoT API: Device ${serialNumber} mute changed to ${isMuted}`, {
+      serialNumber,
+      isMuted,
+      resolvedCount
+    });
+
+    res.json({
+      message: isMuted
+        ? `Đã tắt thông báo cho máy ${serialNumber}${resolvedCount > 0 ? ` và xử lý ${resolvedCount} cảnh báo cũ` : ''}`
+        : `Đã bật lại thông báo cho máy ${serialNumber}`,
+      isMuted,
+      resolvedCount
+    });
+  } catch (error: any) {
+    logger.error('IoT API: Toggle mute error', { error: error.message });
+    res.status(500).json({ error: 'Lỗi khi cập nhật trạng thái thông báo' });
   }
 });
 

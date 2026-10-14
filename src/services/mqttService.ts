@@ -17,6 +17,11 @@ const ALERT_THRESHOLDS = {
   OFFLINE_MINUTES: 30,  // Không gửi data > 30 phút → WARNING
 };
 
+// ── Telemetry Storage Throttle Configuration ──
+// Tiết chế lưu DB: Chỉ ghi bản ghi mới vào iot_telemetry khi có thay đổi chỉ số
+// hoặc định kỳ 2 phút (120 giây) một lần theo yêu cầu quản trị để chống phình to Database
+const TELEMETRY_SAVE_THROTTLE_MS = 2 * 60 * 1000; // 2 phút (120.000 ms)
+
 let mqttClient: MqttClient | null = null;
 
 // ── Parse pump status from numeric code ──
@@ -88,18 +93,30 @@ async function handleTelemetryMessage(topic: string, payload: Buffer) {
       });
       logger.info('MQTT: Auto-registered new IoT device', { serial: topicSerial, fw: firmwareVer });
     } else {
-      // Update device status
+      // Update device status and cache latest live payload for instant real-time UI
+      const currentConfig = (typeof device.configJson === 'object' && device.configJson !== null)
+        ? (device.configJson as Record<string, any>)
+        : {};
+
       await prisma.iotDevice.update({
         where: { id: device.id },
         data: {
           lastSeenAt: new Date(),
           isOnline: true,
           firmwareVersion: firmwareVer || device.firmwareVersion,
+          configJson: {
+            ...currentConfig,
+            latestLivePayload: data,
+            latestLivePayloadAt: new Date().toISOString()
+          }
         }
       });
     }
 
-    // 2. Store telemetry data
+    // 2. Auto-resolve self-healing alerts (OFFLINE, UART_ERROR, TDS_HIGH, FILTER_REPLACE)
+    await autoResolveAlerts(device.id, topicSerial, data, data.tdsOut != null ? Number(data.tdsOut) : null);
+
+    // 3. Store telemetry data with intelligent throttle (chỉ lưu DB khi chỉ số đổi hoặc định kỳ 2 phút/lần)
     // Map both camelCase (from ESP32 firmware 1.2.0+) and snake_case (legacy)
     const tdsIn = data.tdsIn != null ? Number(data.tdsIn) : (data.tds_in != null ? Number(data.tds_in) : null);
     const tdsOut = data.tdsOut != null ? Number(data.tdsOut) : (data.tds_out != null ? Number(data.tds_out) : null);
@@ -110,30 +127,103 @@ async function handleTelemetryMessage(topic: string, payload: Buffer) {
       ? Number(data.err)
       : (Array.isArray(data.errorCodes) && data.errorCodes.length > 0 ? Number(data.errorCodes[0]) : 0);
 
-    await prisma.iotTelemetry.create({
-      data: {
-        deviceId: device.id,
-        tdsIn,
+    const now = Date.now();
+    const lastSaved = lastTelemetrySaveMap.get(device.id);
+    const hasChanged = !lastSaved ||
+      lastSaved.tdsOut !== tdsOut ||
+      lastSaved.ppc !== (data.ppc ?? null) ||
+      lastSaved.ro !== (data.ro ?? null) ||
+      lastSaved.cto !== (data.cto ?? null) ||
+      lastSaved.errorCode !== errorCode ||
+      (now - lastSaved.time >= TELEMETRY_SAVE_THROTTLE_MS); // Lưu định kỳ 2 phút/lần (120 giây) nếu chỉ số không đổi
+
+    if (hasChanged) {
+      await prisma.iotTelemetry.create({
+        data: {
+          deviceId: device.id,
+          tdsIn,
+          tdsOut,
+          waterFlowLpm: flow,
+          totalLiters: data.total_l != null ? Number(data.total_l) : null,
+          waterPressure: pressure,
+          pumpStatus: pumpStatus !== 'UNKNOWN' ? pumpStatus : null,
+          errorCode,
+          rawPayload: data,
+          recordedAt: data.ts ? new Date(data.ts * 1000) : new Date(),
+        }
+      });
+
+      lastTelemetrySaveMap.set(device.id, {
+        time: now,
         tdsOut,
-        waterFlowLpm: flow,
-        totalLiters: data.total_l != null ? Number(data.total_l) : null,
-        waterPressure: pressure,
-        pumpStatus: pumpStatus !== 'UNKNOWN' ? pumpStatus : null,
-        errorCode,
-        rawPayload: data,
-        recordedAt: data.ts ? new Date(data.ts * 1000) : new Date(),
-      }
-    });
+        ppc: data.ppc ?? null,
+        ro: data.ro ?? null,
+        cto: data.cto ?? null,
+        errorCode
+      });
+      logger.debug('MQTT: Telemetry stored', { serial: topicSerial, tdsIn, tdsOut, ppc: data.ppc, ro: data.ro, cto: data.cto });
+    }
 
-    // 3. Check alert thresholds
-    await checkAlerts(device.id, topicSerial, data, pumpStatus, tdsOut);
-
-    logger.debug('MQTT: Telemetry stored', { serial: topicSerial, tdsIn, tdsOut, ppc: data.ppc, ro: data.ro, cto: data.cto });
+    // 4. Check alert thresholds
+    const isMuted = Boolean((device.configJson as any)?.isMuted);
+    await checkAlerts(device.id, topicSerial, data, pumpStatus, tdsOut, isMuted);
   } catch (error: any) {
     logger.error('MQTT: Error processing telemetry', {
       serial: topicSerial,
       error: error.message
     });
+  }
+}
+
+// ── In-memory throttle tracker for telemetry ──
+const lastTelemetrySaveMap = new Map<string, { time: number; tdsOut: number | null; ppc: number | null; ro: number | null; cto: number | null; errorCode: number }>();
+
+// ── Auto-resolve self-healing alerts ──
+async function autoResolveAlerts(deviceId: string, serial: string, data: any, tdsOut: number | null) {
+  try {
+    // 1. Auto-resolve OFFLINE alert when device transmits telemetry
+    await prisma.iotAlert.updateMany({
+      where: { deviceId, alertType: 'OFFLINE', isResolved: false },
+      data: { isResolved: true, resolvedAt: new Date() }
+    });
+
+    // 2. Auto-resolve UART_ERROR when uart connection is healthy
+    if (data.uart_ok === true) {
+      await prisma.iotAlert.updateMany({
+        where: { deviceId, alertType: 'UART_ERROR', isResolved: false },
+        data: { isResolved: true, resolvedAt: new Date() }
+      });
+    }
+
+    // 3. Auto-resolve TDS alerts when TDS is in safe range (<= 50)
+    if (tdsOut !== null && tdsOut <= ALERT_THRESHOLDS.TDS_HIGH) {
+      await prisma.iotAlert.updateMany({
+        where: { deviceId, alertType: { in: ['TDS_HIGH', 'TDS_CRITICAL'] }, isResolved: false },
+        data: { isResolved: true, resolvedAt: new Date() }
+      });
+    }
+
+    // 4. Auto-resolve Filter alerts when replaced
+    if (data.ppc_replace === false) {
+      await prisma.iotAlert.updateMany({
+        where: { deviceId, alertType: 'FILTER_PPC_REPLACE', isResolved: false },
+        data: { isResolved: true, resolvedAt: new Date() }
+      });
+    }
+    if (data.ro_replace === false) {
+      await prisma.iotAlert.updateMany({
+        where: { deviceId, alertType: 'FILTER_RO_REPLACE', isResolved: false },
+        data: { isResolved: true, resolvedAt: new Date() }
+      });
+    }
+    if (data.cto_replace === false) {
+      await prisma.iotAlert.updateMany({
+        where: { deviceId, alertType: 'FILTER_CTO_REPLACE', isResolved: false },
+        data: { isResolved: true, resolvedAt: new Date() }
+      });
+    }
+  } catch (err: any) {
+    logger.warn('MQTT: Auto-resolve alerts error', { serial, error: err.message });
   }
 }
 
@@ -143,8 +233,14 @@ async function checkAlerts(
   serial: string,
   data: any,
   pumpStatus: string,
-  tdsOut: number | null
+  tdsOut: number | null,
+  isMuted?: boolean
 ) {
+  if (isMuted) {
+    logger.debug('MQTT: Device alerts muted, skipping alert creation', { serial });
+    return;
+  }
+
   const alerts: { type: string; severity: string; message: string }[] = [];
 
   // TDS Critical
@@ -218,15 +314,14 @@ async function checkAlerts(
     });
   }
 
-  // Create alerts (avoid duplicates within 1 hour)
+  // Create alerts (avoid duplicates within 15 minutes, even if recently resolved)
   for (const alert of alerts) {
-    const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
+    const fifteenMinsAgo = new Date(Date.now() - 15 * 60 * 1000);
     const existingAlert = await prisma.iotAlert.findFirst({
       where: {
         deviceId,
         alertType: alert.type,
-        isResolved: false,
-        createdAt: { gte: oneHourAgo }
+        createdAt: { gte: fifteenMinsAgo }
       }
     });
 
@@ -265,6 +360,12 @@ async function handleStatusMessage(topic: string, payload: Buffer) {
         where: { serialNumber: serial }
       });
       if (device) {
+        const isMuted = Boolean((device.configJson as any)?.isMuted);
+        if (isMuted) {
+          logger.debug('MQTT: Device is muted, skipping offline alert', { serial });
+          return;
+        }
+
         const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
         const existing = await prisma.iotAlert.findFirst({
           where: {
@@ -338,15 +439,18 @@ async function handleCommandResponse(topic: string, payload: Buffer) {
 
       // If OTA rolled back
       if (data.status === 'rolled_back') {
-        await prisma.iotAlert.create({
-          data: {
-            deviceId: device.id,
-            alertType: 'OTA_ROLLBACK',
-            severity: 'WARNING',
-            message: `⚠️ Máy ${serial} đã tự động rollback về firmware cũ (${data.error || 'chưa rõ lý do'})`,
-            payload: data
-          }
-        });
+        const isMuted = Boolean((currentConfig as any)?.isMuted);
+        if (!isMuted) {
+          await prisma.iotAlert.create({
+            data: {
+              deviceId: device.id,
+              alertType: 'OTA_ROLLBACK',
+              severity: 'WARNING',
+              message: `⚠️ Máy ${serial} đã tự động rollback về firmware cũ (${data.error || 'chưa rõ lý do'})`,
+              payload: data
+            }
+          });
+        }
       }
     }
 
@@ -374,12 +478,20 @@ export function publishCommand(serialNumber: string, command: string, params: an
   const topic = `truliva/devices/${serialNumber}/command`;
   const requestId = params.id || `req-${Date.now()}`;
 
+  // Chuẩn hóa tham số cho ESP32 firmware
+  const normalizedParams = { ...params };
+  if (command === 'set_interval') {
+    const sec = Number(params.interval || params.interval_s || 300);
+    normalizedParams.interval = sec;
+    normalizedParams.interval_s = sec;
+  }
+
   // Flatten payload per partner specification:
   // {"cmd": "<tên lệnh>", "id": "<mã yêu cầu, tùy chọn>", ...tham số}
   const payloadObj: any = {
     cmd: command,
     id: requestId,
-    ...params
+    ...normalizedParams
   };
 
   const payload = JSON.stringify(payloadObj);
@@ -389,7 +501,7 @@ export function publishCommand(serialNumber: string, command: string, params: an
     if (err) {
       logger.error('MQTT: Failed to publish command', { serial: serialNumber, error: err.message });
     } else {
-      logger.info('MQTT: Command published', { serial: serialNumber, command, requestId });
+      logger.info('MQTT: Command published', { serial: serialNumber, command, requestId, payload });
     }
   });
   return true;
@@ -415,6 +527,11 @@ async function checkOfflineDevices() {
         where: { id: device.id },
         data: { isOnline: false }
       });
+
+      const isMuted = Boolean((device.configJson as any)?.isMuted);
+      if (isMuted) {
+        continue;
+      }
 
       // Create offline alert if not already exists
       const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);

@@ -334,25 +334,22 @@ export async function processOrderEvent(rawEventId: string | null, payload: any)
       rawData: payload,
     };
 
-    // Bảo vệ warehouseId và warehouseInfo khi đơn đã được phân bổ trên Truliva
-    if (existingOrder && existingOrder.warehouseId) {
-      const isInstallation = existingOrder.workType === 'Lắp đặt';
-      const originallyHasProducts = existingOrder.items && existingOrder.items.length > 0;
-      const isAssigned = Boolean(existingOrder.assignedKtvId);
-      const isProgressing = existingOrder.adminStatus === 'đang thực hiện' || existingOrder.adminStatus === 'hoàn thành';
-
-      // Nếu đơn đã phân công KTV, đang thực hiện/hoàn thành, hoặc đơn lắp đặt/không trừ kho,
-      // hoặc payload từ Pancake không có warehouse_id:
-      // Giữ nguyên warehouseId và warehouseInfo đã phân bổ trên Truliva!
-      if (isAssigned || isProgressing || isInstallation || !originallyHasProducts || !payload.warehouse_id) {
-        orderData.warehouseId = existingOrder.warehouseId;
-        orderData.warehouseInfo = existingOrder.warehouseInfo;
-        logger.info('Preserved Truliva assigned warehouse from being overwritten by Pancake webhook', {
-          pancakeOrderId: systemId,
-          trulivaWarehouseId: existingOrder.warehouseId,
-          pancakePayloadWarehouseId: payload.warehouse_id
-        });
-      }
+    // Đồng bộ kho hàng từ Pancake POS và bảo tồn khi payload không chứa warehouse_id
+    if (!payload.warehouse_id && existingOrder && existingOrder.warehouseId) {
+      // Webhook không chứa trường warehouse_id -> Giữ nguyên kho đã có trên Truliva để tránh bị mất
+      orderData.warehouseId = existingOrder.warehouseId;
+      orderData.warehouseInfo = existingOrder.warehouseInfo;
+      logger.info('Preserved Truliva assigned warehouse because Pancake payload had no warehouse_id', {
+        pancakeOrderId: systemId,
+        trulivaWarehouseId: existingOrder.warehouseId
+      });
+    } else if (payload.warehouse_id && existingOrder && existingOrder.warehouseId && String(payload.warehouse_id) !== existingOrder.warehouseId) {
+      // Người dùng đã đổi kho trên Pancake POS -> Cập nhật kho mới vào Truliva App
+      logger.info('Updated warehouse from Pancake POS webhook change', {
+        pancakeOrderId: systemId,
+        oldWarehouseId: existingOrder.warehouseId,
+        newWarehouseId: String(payload.warehouse_id)
+      });
     }
 
     // ══════════════════════════════════════

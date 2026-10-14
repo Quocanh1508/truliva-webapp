@@ -46,6 +46,8 @@ router.get('/ktvs', requireAuth, async (req: Request, res: Response): Promise<vo
         username: true,
         phoneNumber: true,
         techStationId: true,
+        warehouseId: true,
+        warehouseName: true,
         // Đếm đơn đang xử lý: chưa hủy VÀ chưa có báo cáo
         assignedOrders: {
           where: {
@@ -65,6 +67,8 @@ router.get('/ktvs', requireAuth, async (req: Request, res: Response): Promise<vo
       username: k.username,
       phoneNumber: k.phoneNumber,
       techStationId: k.techStationId,
+      warehouseId: (k as any).warehouseId || null,
+      warehouseName: (k as any).warehouseName || null,
       pendingOrderCount: k.assignedOrders.length
     }));
 

@@ -423,6 +423,7 @@ export default function OrderList() {
   const [warehouses, setWarehouses] = useState<any[]>([]);
   const [productsStock, setProductsStock] = useState<any[]>([]);
   const [selectedWarehouseId, setSelectedWarehouseId] = useState<string>('');
+  const [posOriginalWarehouse, setPosOriginalWarehouse] = useState<{ id: string; name: string } | null>(null);
   const [loadingInventory, setLoadingInventory] = useState<boolean>(false);
   const [warehouseSearch, setWarehouseSearch] = useState('');
   const [showWarehouseDropdown, setShowWarehouseDropdown] = useState(false);
@@ -446,10 +447,28 @@ export default function OrderList() {
   const [showBulkServiceDropdown, setShowBulkServiceDropdown] = useState(false);
 
 
+  const warehouseBlurTimeoutRef = useRef<any>(null);
+  const selectedWarehouseIdRef = useRef(selectedWarehouseId);
+  selectedWarehouseIdRef.current = selectedWarehouseId;
+  const warehouseSearchRef = useRef(warehouseSearch);
+  warehouseSearchRef.current = warehouseSearch;
+  const warehousesRef = useRef(warehouses);
+  warehousesRef.current = warehouses;
+
+  const bulkWarehouseBlurTimeoutRef = useRef<any>(null);
+  const bulkWarehouseIdRef = useRef(bulkWarehouseId);
+  bulkWarehouseIdRef.current = bulkWarehouseId;
+  const bulkWarehouseSearchRef = useRef(bulkWarehouseSearch);
+  bulkWarehouseSearchRef.current = bulkWarehouseSearch;
+
   useEffect(() => {
-    const selectedWh = warehouses.find(w => w.id === selectedWarehouseId);
-    setWarehouseSearch(selectedWh ? selectedWh.name : '');
-  }, [selectedWarehouseId, warehouses]);
+    const selectedWh = warehouses.find(w => String(w.id) === String(selectedWarehouseId));
+    if (selectedWh) {
+      setWarehouseSearch(selectedWh.name);
+    } else if (posOriginalWarehouse?.id && String(posOriginalWarehouse.id) === String(selectedWarehouseId)) {
+      setWarehouseSearch(posOriginalWarehouse.name || '');
+    }
+  }, [selectedWarehouseId, warehouses, posOriginalWarehouse]);
 
   // Smart Dispatching Suggestions
   const [suggestedMain, setSuggestedMain] = useState<any>(null);
@@ -502,6 +521,34 @@ export default function OrderList() {
   const [isAssignModalExpanded, setIsAssignModalExpanded] = useState(false);
   const isAssignModalWide = isAssignProductSelectOpen || isAssignModalExpanded;
   const skipFetchRef = useRef(false);
+
+  // Khóa cuộn trang nền khi mở bất kỳ modal nào (Phân công, Tạo/Sửa ca thủ công, Phân công hàng loạt, Lịch sử, Hủy đơn...)
+  const isAnyModalOpen = Boolean(
+    assignModal?.isOpen ||
+    showCreateModal ||
+    isBulkAssignOpen ||
+    auditModal?.isOpen ||
+    cancelModal?.isOpen ||
+    syncWarningModal?.isOpen
+  );
+
+  useEffect(() => {
+    if (isAnyModalOpen) {
+      const originalOverflow = document.body.style.overflow;
+      const originalPaddingRight = document.body.style.paddingRight;
+      const scrollbarWidth = window.innerWidth - document.documentElement.clientWidth;
+
+      document.body.style.overflow = 'hidden';
+      if (scrollbarWidth > 0) {
+        document.body.style.paddingRight = `${scrollbarWidth}px`;
+      }
+
+      return () => {
+        document.body.style.overflow = originalOverflow;
+        document.body.style.paddingRight = originalPaddingRight;
+      };
+    }
+  }, [isAnyModalOpen]);
 
   // Tự động mở modal và điền sẵn thông tin khi chuyển từ Hotline Ticket
   useEffect(() => {
@@ -1141,7 +1188,7 @@ export default function OrderList() {
 
   // Sync warehouse search string when bulkWarehouseId changes
   useEffect(() => {
-    const selectedWh = warehouses.find(w => w.id === bulkWarehouseId);
+    const selectedWh = warehouses.find(w => String(w.id) === String(bulkWarehouseId));
     setBulkWarehouseSearch(selectedWh ? selectedWh.name : '');
   }, [bulkWarehouseId, warehouses]);
 
@@ -1183,7 +1230,7 @@ export default function OrderList() {
       let finalBulkWarehouseId: string | null = bulkWarehouseId || null;
       if (bulkWarehouseSearch && bulkWarehouseSearch.trim()) {
         const cleanInput = removeAccents(bulkWarehouseSearch).trim().toLowerCase();
-        const matched = warehouses.find(w => w.id === bulkWarehouseId)
+        const matched = warehouses.find(w => String(w.id) === String(bulkWarehouseId))
           || warehouses.find(w => removeAccents(w.name).trim().toLowerCase() === cleanInput)
           || warehouses.find(w => removeAccents(w.name).toLowerCase().includes(cleanInput));
         if (matched) {
@@ -1485,22 +1532,63 @@ export default function OrderList() {
         setWarehouses(whs);
         setProductsStock(prods);
 
-        // Thiết lập kho mặc định
+        // Thiết lập kho mặc định: BẮT BUỘC ưu tiên thông tin kho từ bên POS gửi qua
         let defaultWhId = '';
+        let defaultWhName = '';
+
         if (order.warehouseId) {
-          defaultWhId = order.warehouseId;
+          defaultWhId = String(order.warehouseId);
+          const matchedWh = whs.find((w: any) => String(w.id) === defaultWhId);
+          if (matchedWh) {
+            defaultWhName = matchedWh.name;
+          } else if (order.warehouseInfo?.name) {
+            defaultWhName = order.warehouseInfo.name;
+          }
         } else if (order.warehouseInfo?.id) {
-          defaultWhId = order.warehouseInfo.id;
+          defaultWhId = String(order.warehouseInfo.id);
+          const matchedWh = whs.find((w: any) => String(w.id) === defaultWhId);
+          defaultWhName = matchedWh ? matchedWh.name : (order.warehouseInfo.name || '');
         } else if (order.warehouseInfo?.name) {
           // Đối chiếu tìm kho bằng tên từ danh sách kho của Pancake
           const matchedWh = whs.find((w: any) => w.name === order.warehouseInfo.name);
           if (matchedWh) {
-            defaultWhId = matchedWh.id;
+            defaultWhId = String(matchedWh.id);
+            defaultWhName = matchedWh.name;
+          } else {
+            defaultWhName = order.warehouseInfo.name;
           }
         }
 
+        // Kiểm tra thêm trong rawData nếu chưa có
+        if (!defaultWhId || !defaultWhName) {
+          try {
+            const raw = typeof order.rawData === 'string' ? JSON.parse(order.rawData) : order.rawData;
+            if (raw) {
+              if (!defaultWhId && (raw.warehouse_id || raw.warehouseId)) {
+                defaultWhId = String(raw.warehouse_id || raw.warehouseId);
+              }
+              if (!defaultWhName && (raw.warehouse_name || raw.warehouse_info?.name || raw.warehouseInfo?.name)) {
+                defaultWhName = raw.warehouse_name || raw.warehouse_info?.name || raw.warehouseInfo?.name;
+              }
+            }
+          } catch (e) {}
+        }
+
+        // Nếu defaultWhId có nhưng defaultWhName vẫn chưa có, tra cứu lại trong whs
+        if (defaultWhId && !defaultWhName) {
+          const matchedWh = whs.find((w: any) => String(w.id) === String(defaultWhId));
+          if (matchedWh) defaultWhName = matchedWh.name;
+        }
+
+        // Lưu trữ kho gốc của POS để hỗ trợ nút 1-chạm khôi phục lại kho gốc
+        if (defaultWhId || defaultWhName) {
+          setPosOriginalWarehouse({ id: defaultWhId, name: defaultWhName });
+        } else {
+          setPosOriginalWarehouse(null);
+        }
+
+        // Chỉ khi đơn hoàn toàn không có thông tin kho từ POS mới tìm theo trạm
         if (!defaultWhId) {
-          // Tự động tìm kho khớp trạm gợi ý
           const targetSearchName = matchedTech ? matchedTech.name : (matchedMain ? matchedMain.name : '');
           if (targetSearchName) {
             const cleanStationName = removeAccents(targetSearchName);
@@ -1509,11 +1597,19 @@ export default function OrderList() {
               return cleanWhName.includes(cleanStationName) || cleanStationName.includes(cleanWhName);
             });
             if (foundWh) {
-              defaultWhId = foundWh.id;
+              defaultWhId = String(foundWh.id);
+              defaultWhName = foundWh.name;
             }
           }
         }
+
         setSelectedWarehouseId(defaultWhId);
+        if (defaultWhId) {
+          const matchedWh = whs.find((w: any) => String(w.id) === String(defaultWhId));
+          setWarehouseSearch(matchedWh ? matchedWh.name : defaultWhName);
+        } else {
+          setWarehouseSearch('');
+        }
       })
       .catch(err => {
         console.error('Failed to load inventory stock info', err);
@@ -1608,7 +1704,7 @@ export default function OrderList() {
       let finalWarehouseId: string | null = selectedWarehouseId || null;
       if (warehouseSearch && warehouseSearch.trim()) {
         const cleanInput = removeAccents(warehouseSearch).trim().toLowerCase();
-        const matched = warehouses.find(w => w.id === selectedWarehouseId)
+        const matched = warehouses.find(w => String(w.id) === String(selectedWarehouseId))
           || warehouses.find(w => removeAccents(w.name).trim().toLowerCase() === cleanInput)
           || warehouses.find(w => removeAccents(w.name).toLowerCase().includes(cleanInput));
         if (matched) {
@@ -3710,8 +3806,8 @@ export default function OrderList() {
 
       {/* ASSIGN MODAL (Truliva Flow) */}
       {assignModal?.isOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-2 sm:p-4 backdrop-blur-2xs transition-all duration-300">
-          <div className={`bg-white rounded-xl shadow-2xl w-full overflow-hidden flex flex-col max-h-[92vh] transition-all duration-300 ease-in-out ${
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-2 sm:p-4 backdrop-blur-2xs transition-all duration-300 overscroll-contain">
+          <div className={`bg-white rounded-xl shadow-2xl w-full overflow-hidden flex flex-col max-h-[92vh] transition-all duration-300 ease-in-out overscroll-contain ${
             isAssignModalWide ? 'max-w-5xl' : 'max-w-2xl'
           }`}>
             <div className="px-6 py-4 border-b border-gray-200 bg-gray-50 flex justify-between items-center">
@@ -3766,7 +3862,7 @@ export default function OrderList() {
               </div>
             </div>
 
-            <div className="p-6 overflow-y-auto overflow-x-hidden flex-1 grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="p-6 overflow-y-auto overflow-x-hidden flex-1 grid grid-cols-1 md:grid-cols-2 gap-6 overscroll-contain">
               {/* Cột trái: Phân loại */}
               <div className="space-y-4">
                 <h4 className="font-semibold text-gray-800 border-b pb-2 flex items-center gap-2">
@@ -3797,7 +3893,7 @@ export default function OrderList() {
                   
                   {/* List of tempItems */}
                   {tempItems.length > 0 ? (
-                    <div className="border border-gray-200 rounded divide-y max-h-52 overflow-y-auto bg-gray-50">
+                    <div className="border border-gray-200 rounded divide-y max-h-52 overflow-y-auto bg-gray-50 overscroll-contain">
                       {tempItems.map((item, idx) => {
                         const comboComps = getComboComponents(item.productName, item.sku);
                         return (
@@ -3947,9 +4043,14 @@ export default function OrderList() {
 
                 {/* Phần 3: Kho xuất hàng & Đối chiếu tồn kho */}
                 <div className="border-t pt-4 mt-4 space-y-3">
-                  <h4 className="font-semibold text-gray-800 flex items-center gap-1.5">
-                    3. Kho hàng xuất vật tư
-                  </h4>
+                  <div className="flex items-center justify-between">
+                    <h4 className="font-semibold text-gray-800 flex items-center gap-1.5">
+                      3. Kho hàng xuất vật tư
+                    </h4>
+                    <span className="text-[11px] text-blue-700 bg-blue-50 px-2 py-0.5 rounded-full border border-blue-200 font-medium">
+                      Gợi ý theo KTV / POS (Tùy chọn đổi kho)
+                    </span>
+                  </div>
                   
                   <div className="relative">
                     <label className="block text-xs text-gray-500 mb-1">Chọn kho xuất hàng</label>
@@ -3969,7 +4070,7 @@ export default function OrderList() {
                             const cleanInput = removeAccents(val).trim().toLowerCase();
                             const matched = warehouses.find(w => removeAccents(w.name).trim().toLowerCase() === cleanInput);
                             if (matched) {
-                              setSelectedWarehouseId(matched.id);
+                              setSelectedWarehouseId(String(matched.id));
                             }
                           }
                         }}
@@ -3978,23 +4079,35 @@ export default function OrderList() {
                           setShowWarehouseDropdown(true);
                         }}
                         onBlur={() => {
-                          setTimeout(() => {
+                          if (warehouseBlurTimeoutRef.current) {
+                            clearTimeout(warehouseBlurTimeoutRef.current);
+                          }
+                          warehouseBlurTimeoutRef.current = setTimeout(() => {
                             setShowWarehouseDropdown(false);
-                            // Restore display name of selected warehouse
-                            if (selectedWarehouseId) {
-                              const currentWh = warehouses.find(w => w.id === selectedWarehouseId);
-                              setWarehouseSearch(currentWh ? currentWh.name : '');
-                            } else if (warehouseSearch.trim()) {
-                              const cleanInput = removeAccents(warehouseSearch).trim().toLowerCase();
-                              const matched = warehouses.find(w => removeAccents(w.name).trim().toLowerCase() === cleanInput)
-                                || warehouses.find(w => removeAccents(w.name).toLowerCase().includes(cleanInput));
+                            // Luôn ưu tiên khôi phục tên hiển thị theo kho đang được chọn
+                            const currentId = selectedWarehouseIdRef.current;
+                            if (currentId) {
+                              const currentWh = warehousesRef.current.find(w => String(w.id) === String(currentId));
+                              if (currentWh) {
+                                setWarehouseSearch(currentWh.name);
+                                return;
+                              }
+                            }
+                            const searchVal = warehouseSearchRef.current.trim();
+                            if (searchVal) {
+                              const cleanInput = removeAccents(searchVal).toLowerCase();
+                              const matched = warehousesRef.current.find(w => removeAccents(w.name).trim().toLowerCase() === cleanInput)
+                                || warehousesRef.current.find(w => removeAccents(w.name).toLowerCase().includes(cleanInput));
                               if (matched) {
-                                setSelectedWarehouseId(matched.id);
+                                setSelectedWarehouseId(String(matched.id));
                                 setWarehouseSearch(matched.name);
                               } else {
                                 setWarehouseSearch('');
                                 setSelectedWarehouseId('');
                               }
+                            } else {
+                              setWarehouseSearch('');
+                              setSelectedWarehouseId('');
                             }
                           }, 200);
                         }}
@@ -4002,11 +4115,16 @@ export default function OrderList() {
                       <button
                         type="button"
                         className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 text-xs focus:outline-none"
+                        onMouseDown={(e) => e.preventDefault()}
                         onClick={() => {
+                          if (warehouseBlurTimeoutRef.current) {
+                            clearTimeout(warehouseBlurTimeoutRef.current);
+                            warehouseBlurTimeoutRef.current = null;
+                          }
                           if (!showWarehouseDropdown) {
                             setWarehouseSearch('');
                           } else if (selectedWarehouseId) {
-                            const currentWh = warehouses.find(w => w.id === selectedWarehouseId);
+                            const currentWh = warehouses.find(w => String(w.id) === String(selectedWarehouseId));
                             setWarehouseSearch(currentWh ? currentWh.name : '');
                           }
                           setShowWarehouseDropdown(!showWarehouseDropdown);
@@ -4016,35 +4134,166 @@ export default function OrderList() {
                       </button>
                     </div>
 
+                    {/* Gợi ý khôi phục kho gốc nếu đã đổi sang kho khác */}
+                    {(() => {
+                      if (!posOriginalWarehouse || (!posOriginalWarehouse.name && !posOriginalWarehouse.id)) return null;
+                      
+                      const isCurrentDifferent = (posOriginalWarehouse.id && String(selectedWarehouseId) !== String(posOriginalWarehouse.id)) ||
+                        (!posOriginalWarehouse.id && warehouseSearch !== posOriginalWarehouse.name);
+
+                      if (isCurrentDifferent) {
+                        const posWhName = posOriginalWarehouse.name || warehouses.find(w => String(w.id) === String(posOriginalWarehouse.id))?.name || 'Kho gốc POS';
+                        return (
+                          <div className="mt-2 flex items-center justify-between text-xs text-amber-900 bg-amber-50/90 px-3 py-2 rounded-xl border border-amber-200/80 shadow-xs animate-fade-in">
+                            <span className="truncate flex items-center gap-1.5">
+                              <span>📦</span>
+                              <span>Kho gốc theo đơn POS: <strong>{posWhName}</strong></span>
+                            </span>
+                            <button
+                              type="button"
+                              className="text-blue-600 hover:text-blue-800 font-bold underline shrink-0 ml-3 cursor-pointer hover:bg-blue-50/80 px-2 py-0.5 rounded transition-colors"
+                              onMouseDown={(e) => {
+                                e.preventDefault(); // Ngăn trigger onBlur của input
+                              }}
+                              onClick={() => {
+                                if (warehouseBlurTimeoutRef.current) {
+                                  clearTimeout(warehouseBlurTimeoutRef.current);
+                                  warehouseBlurTimeoutRef.current = null;
+                                }
+                                const targetId = posOriginalWarehouse.id ? String(posOriginalWarehouse.id) : '';
+                                const matchedWh = targetId
+                                  ? warehouses.find(w => String(w.id) === targetId)
+                                  : warehouses.find(w => w.name === posOriginalWarehouse.name);
+                                const targetName = matchedWh?.name || posOriginalWarehouse.name || '';
+
+                                if (targetId || matchedWh?.id) {
+                                  const finalId = targetId || String(matchedWh?.id);
+                                  setSelectedWarehouseId(finalId);
+                                  setWarehouseSearch(targetName);
+                                } else {
+                                  setWarehouseSearch(targetName);
+                                }
+                                setShowWarehouseDropdown(false);
+                              }}
+                            >
+                              Chọn lại kho này
+                            </button>
+                          </div>
+                        );
+                      }
+                      return null;
+                    })()}
+
+                    {/* Gợi ý đổi sang kho trực thuộc KTV (Không tự ý đổi, người dùng chủ động chọn) */}
+                    {(() => {
+                      const activeKtv = allKtvs.find(k => k.id === selectedKtv) || ktvs.find(k => k.id === selectedKtv);
+                      if (!activeKtv || !activeKtv.warehouseId) return null;
+                      
+                      const ktvWhId = String(activeKtv.warehouseId);
+                      if (String(selectedWarehouseId) === ktvWhId) return null;
+
+                      const matchedWh = warehouses.find(w => String(w.id) === ktvWhId);
+                      const ktvWhName = matchedWh?.name || 'Kho trực thuộc KTV';
+
+                      return (
+                        <div className="mt-2 flex items-center justify-between text-xs text-purple-900 bg-purple-50/90 px-3 py-2 rounded-xl border border-purple-200/80 shadow-xs animate-fade-in">
+                          <span className="truncate flex items-center gap-1.5">
+                            <span>🏬</span>
+                            <span>KTV <strong>{activeKtv.fullName}</strong> có kho: <strong>{ktvWhName}</strong></span>
+                          </span>
+                          <button
+                            type="button"
+                            className="text-purple-700 hover:text-purple-900 font-bold underline shrink-0 ml-3 cursor-pointer hover:bg-purple-100/80 px-2 py-0.5 rounded transition-colors"
+                            onMouseDown={(e) => {
+                              e.preventDefault();
+                            }}
+                            onClick={() => {
+                              if (warehouseBlurTimeoutRef.current) {
+                                clearTimeout(warehouseBlurTimeoutRef.current);
+                                warehouseBlurTimeoutRef.current = null;
+                              }
+                              setSelectedWarehouseId(ktvWhId);
+                              setWarehouseSearch(ktvWhName);
+                              setShowWarehouseDropdown(false);
+                            }}
+                          >
+                            Đổi sang kho này
+                          </button>
+                        </div>
+                      );
+                    })()}
+
                     {showWarehouseDropdown && (
                       <>
                         <div className="fixed inset-0 z-10" onClick={() => {
+                          if (warehouseBlurTimeoutRef.current) {
+                            clearTimeout(warehouseBlurTimeoutRef.current);
+                            warehouseBlurTimeoutRef.current = null;
+                          }
                           setShowWarehouseDropdown(false);
                           if (selectedWarehouseId) {
-                            const currentWh = warehouses.find(w => w.id === selectedWarehouseId);
+                            const currentWh = warehouses.find(w => String(w.id) === String(selectedWarehouseId));
                             setWarehouseSearch(currentWh ? currentWh.name : '');
                           }
                         }} />
                         
-                        <div className="absolute left-0 right-0 mt-1 max-h-48 overflow-y-auto bg-white border rounded shadow-lg z-20 divide-y divide-gray-100">
+                        <div 
+                          className="absolute left-0 right-0 mt-1 max-h-48 overflow-y-auto bg-white border rounded shadow-lg z-20 divide-y divide-gray-100"
+                          onMouseDown={(e) => e.preventDefault()}
+                          onTouchStart={(e) => e.stopPropagation()}
+                        >
                           {warehouses
                             .filter(w => !warehouseSearch.trim() || removeAccents(w.name).toLowerCase().includes(removeAccents(warehouseSearch).toLowerCase()))
-                            .map(w => (
-                              <button
-                                key={w.id}
-                                type="button"
-                                className={`w-full text-left px-3 py-2 text-xs hover:bg-blue-50 transition-colors ${
-                                  selectedWarehouseId === w.id ? 'bg-blue-50/70 font-semibold text-blue-700' : 'text-gray-700'
-                                }`}
-                                onClick={() => {
-                                  setSelectedWarehouseId(w.id);
-                                  setWarehouseSearch(w.name);
-                                  setShowWarehouseDropdown(false);
-                                }}
-                              >
-                                {w.name}
-                              </button>
-                            ))}
+                            .map(w => {
+                              const isSelected = String(selectedWarehouseId) === String(w.id);
+                              const isPosOrigin = (assignModal?.order?.warehouseId && String(assignModal.order.warehouseId) === String(w.id)) ||
+                                                  (assignModal?.order?.warehouseInfo?.name && assignModal.order.warehouseInfo.name === w.name);
+                              const matchedKtv = allKtvs.find(k => k.id === selectedKtv) || ktvs.find(k => k.id === selectedKtv);
+                              const isKtvWarehouse = matchedKtv && String(matchedKtv.warehouseId) === String(w.id);
+
+                              return (
+                                <button
+                                  key={w.id}
+                                  type="button"
+                                  className={`w-full text-left px-3 py-2.5 text-xs hover:bg-blue-50 transition-colors active:bg-blue-100 flex items-center justify-between ${
+                                    isSelected ? 'bg-blue-50/70 font-semibold text-blue-700' : 'text-gray-700'
+                                  }`}
+                                  onPointerDown={(e) => {
+                                    e.preventDefault();
+                                    if (warehouseBlurTimeoutRef.current) {
+                                      clearTimeout(warehouseBlurTimeoutRef.current);
+                                      warehouseBlurTimeoutRef.current = null;
+                                    }
+                                    setSelectedWarehouseId(String(w.id));
+                                    setWarehouseSearch(w.name);
+                                    setShowWarehouseDropdown(false);
+                                  }}
+                                  onClick={() => {
+                                    if (warehouseBlurTimeoutRef.current) {
+                                      clearTimeout(warehouseBlurTimeoutRef.current);
+                                      warehouseBlurTimeoutRef.current = null;
+                                    }
+                                    setSelectedWarehouseId(String(w.id));
+                                    setWarehouseSearch(w.name);
+                                    setShowWarehouseDropdown(false);
+                                  }}
+                                >
+                                  <span className="truncate">{w.name}</span>
+                                  <div className="flex items-center gap-1.5 shrink-0 ml-2">
+                                    {isKtvWarehouse && (
+                                      <span className="text-[10px] bg-purple-100 text-purple-700 px-1.5 py-0.5 rounded font-normal">
+                                        Kho KTV
+                                      </span>
+                                    )}
+                                    {isPosOrigin && (
+                                      <span className="text-[10px] bg-amber-100 text-amber-800 px-1.5 py-0.5 rounded font-normal">
+                                        Kho POS
+                                      </span>
+                                    )}
+                                  </div>
+                                </button>
+                              );
+                            })}
                           {warehouses.filter(w => !warehouseSearch.trim() || removeAccents(w.name).toLowerCase().includes(removeAccents(warehouseSearch).toLowerCase())).length === 0 && (
                             <div className="p-3 text-xs text-gray-400 italic text-center">Không tìm thấy kho hàng nào</div>
                           )}
@@ -4060,7 +4309,7 @@ export default function OrderList() {
                     {loadingInventory ? (
                       <div className="text-xs text-gray-400 italic">Đang đối chiếu tồn kho...</div>
                     ) : tempItems && tempItems.length > 0 ? (
-                      <div className="space-y-2 max-h-52 overflow-y-auto pr-1">
+                      <div className="space-y-2 max-h-52 overflow-y-auto pr-1 overscroll-contain">
                         {tempItems.map((item: any, i: number) => {
                             const pName = item.productName || item.rawData?.variation_info?.name || item.rawData?.name || 'Sản phẩm';
                             const itemSku = item.sku || item.rawData?.sku || '';
@@ -4209,7 +4458,9 @@ export default function OrderList() {
                   }}
                   ktvs={ktvs}
                   selectedKtvId={selectedKtv}
-                  onKtvChange={setSelectedKtv}
+                  onKtvChange={(ktvId) => {
+                    setSelectedKtv(ktvId);
+                  }}
                   suggestedMain={suggestedMain}
                   suggestedTech={suggestedTech}
                   suggestedKtv={suggestedKtv}
@@ -4262,9 +4513,9 @@ export default function OrderList() {
       )}
 
       {/* CANCEL MODAL */}
-{cancelModal?.isOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-          <div className="bg-white rounded-lg p-6 w-[400px]">
+      {cancelModal?.isOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 overscroll-contain">
+          <div className="bg-white rounded-lg p-6 w-[400px] overscroll-contain">
             <h3 className="text-lg font-bold text-red-600 mb-4">Hủy yêu cầu dịch vụ</h3>
             <label className="block text-sm mb-2 text-gray-700">Lý do hủy (bắt buộc)</label>
             <textarea className="w-full border p-2 rounded mb-4 outline-none focus:border-red-500" rows={3} value={cancelReason} onChange={e => setCancelReason(e.target.value)} placeholder="Nhập lý do..."></textarea>
@@ -4320,8 +4571,8 @@ export default function OrderList() {
 
       {/* AUDIT LOG MODAL */}
       {auditModal?.isOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 backdrop-blur-sm p-4">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-[650px] max-h-[85vh] flex flex-col overflow-hidden border border-gray-100">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 backdrop-blur-sm p-4 overscroll-contain">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-[650px] max-h-[85vh] flex flex-col overflow-hidden border border-gray-100 overscroll-contain">
             <div className="px-6 py-4 bg-gray-50 border-b border-gray-200 flex justify-between items-center">
               <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2">
                 <History size={20} className="text-gray-500" />
@@ -4335,7 +4586,7 @@ export default function OrderList() {
               </button>
             </div>
 
-            <div className="flex-1 overflow-auto bg-slate-50 p-6 space-y-4">
+            <div className="flex-1 overflow-auto bg-slate-50 p-6 space-y-4 overscroll-contain">
               {loadingAudit ? (
                 <div className="flex flex-col items-center justify-center py-16 gap-3">
                   <div className="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
@@ -4520,8 +4771,8 @@ export default function OrderList() {
 
       {/* CREATE MANUAL ORDER MODAL */}
       {showCreateModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-2 sm:p-4 backdrop-blur-2xs transition-all duration-300">
-          <div className={`bg-white rounded-xl shadow-2xl w-full overflow-hidden flex flex-col max-h-[92vh] transition-all duration-300 ease-in-out ${
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-2 sm:p-4 backdrop-blur-2xs transition-all duration-300 overscroll-contain">
+          <div className={`bg-white rounded-xl shadow-2xl w-full overflow-hidden flex flex-col max-h-[92vh] transition-all duration-300 ease-in-out overscroll-contain ${
             isCreateModalWide ? 'max-w-5xl' : 'max-w-2xl'
           }`}>
             <div className="px-6 py-4 border-b border-gray-200 bg-gray-50 flex justify-between items-center">
@@ -4551,7 +4802,7 @@ export default function OrderList() {
               </div>
             </div>
 
-            <div className="p-6 overflow-y-auto overflow-x-hidden flex-1 grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="p-6 overflow-y-auto overflow-x-hidden flex-1 grid grid-cols-1 md:grid-cols-2 gap-6 overscroll-contain">
               {/* Cột trái: Khách hàng */}
               <div className="space-y-4">
                 <h4 className="font-semibold text-gray-800 border-b pb-2">1. Thông tin Khách hàng</h4>
@@ -5042,8 +5293,8 @@ export default function OrderList() {
 
       {/* BULK ASSIGN MODAL */}
       {isBulkAssignOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs">
-          <div className="bg-white rounded-lg shadow-xl w-full max-w-lg overflow-hidden flex flex-col max-h-[90vh] animate-scale-up">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs overscroll-contain">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-lg overflow-hidden flex flex-col max-h-[90vh] animate-scale-up overscroll-contain">
             <div className="px-6 py-4 border-b border-gray-200 bg-gray-50 flex justify-between items-center">
               <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2">
                 <Users className="text-blue-600" size={20} />
@@ -5054,7 +5305,7 @@ export default function OrderList() {
               </button>
             </div>
 
-            <div className="px-6 pt-6 pb-48 overflow-auto flex-1 space-y-4 text-gray-800">
+            <div className="px-6 pt-6 pb-48 overflow-auto flex-1 space-y-4 text-gray-800 overscroll-contain">
                <div className="p-3 bg-amber-50 border border-amber-200 rounded-md text-xs text-amber-800 leading-relaxed">
                 📌 <b>Lưu ý:</b> Chỉ những trường được chọn giá trị mới được cập nhật hàng loạt cho các đơn hàng đã chọn. 
                 Tất cả các trường (Loại công việc, Loại dịch vụ chi tiết, Trạm chính, Trạm kỹ thuật, KTV, Giờ hẹn và Kho xuất hàng) đều là không bắt buộc (bỏ trống sẽ giữ nguyên giá trị cũ của từng đơn).
@@ -5278,23 +5529,35 @@ export default function OrderList() {
                       setShowBulkWarehouseDropdown(true);
                     }}
                     onBlur={() => {
-                      setTimeout(() => {
+                      if (bulkWarehouseBlurTimeoutRef.current) {
+                        clearTimeout(bulkWarehouseBlurTimeoutRef.current);
+                      }
+                      bulkWarehouseBlurTimeoutRef.current = setTimeout(() => {
                         setShowBulkWarehouseDropdown(false);
                         // Restore display name of selected warehouse
-                        if (bulkWarehouseId) {
-                          const currentWh = warehouses.find(w => w.id === bulkWarehouseId);
-                          setBulkWarehouseSearch(currentWh ? currentWh.name : '');
-                        } else if (bulkWarehouseSearch.trim()) {
-                          const cleanInput = removeAccents(bulkWarehouseSearch).trim().toLowerCase();
-                          const matched = warehouses.find(w => removeAccents(w.name).trim().toLowerCase() === cleanInput)
-                            || warehouses.find(w => removeAccents(w.name).toLowerCase().includes(cleanInput));
+                        const currentId = bulkWarehouseIdRef.current;
+                        if (currentId) {
+                          const currentWh = warehousesRef.current.find(w => String(w.id) === String(currentId));
+                          if (currentWh) {
+                            setBulkWarehouseSearch(currentWh.name);
+                            return;
+                          }
+                        }
+                        const searchVal = bulkWarehouseSearchRef.current.trim();
+                        if (searchVal) {
+                          const cleanInput = removeAccents(searchVal).toLowerCase();
+                          const matched = warehousesRef.current.find(w => removeAccents(w.name).trim().toLowerCase() === cleanInput)
+                            || warehousesRef.current.find(w => removeAccents(w.name).toLowerCase().includes(cleanInput));
                           if (matched) {
-                            setBulkWarehouseId(matched.id);
+                            setBulkWarehouseId(String(matched.id));
                             setBulkWarehouseSearch(matched.name);
                           } else {
                             setBulkWarehouseSearch('');
                             setBulkWarehouseId('');
                           }
+                        } else {
+                          setBulkWarehouseSearch('');
+                          setBulkWarehouseId('');
                         }
                       }, 200);
                     }}
@@ -5302,11 +5565,16 @@ export default function OrderList() {
                   <button
                     type="button"
                     className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 text-xs focus:outline-none"
+                    onMouseDown={(e) => e.preventDefault()}
                     onClick={() => {
+                      if (bulkWarehouseBlurTimeoutRef.current) {
+                        clearTimeout(bulkWarehouseBlurTimeoutRef.current);
+                        bulkWarehouseBlurTimeoutRef.current = null;
+                      }
                       if (!showBulkWarehouseDropdown) {
                         setBulkWarehouseSearch('');
                       } else if (bulkWarehouseId) {
-                        const currentWh = warehouses.find(w => w.id === bulkWarehouseId);
+                        const currentWh = warehouses.find(w => String(w.id) === String(bulkWarehouseId));
                         setBulkWarehouseSearch(currentWh ? currentWh.name : '');
                       }
                       setShowBulkWarehouseDropdown(!showBulkWarehouseDropdown);
@@ -5319,17 +5587,39 @@ export default function OrderList() {
                 {showBulkWarehouseDropdown && (
                   <>
                     <div className="fixed inset-0 z-10" onClick={() => {
+                      if (bulkWarehouseBlurTimeoutRef.current) {
+                        clearTimeout(bulkWarehouseBlurTimeoutRef.current);
+                        bulkWarehouseBlurTimeoutRef.current = null;
+                      }
                       setShowBulkWarehouseDropdown(false);
                       if (bulkWarehouseId) {
-                        const currentWh = warehouses.find(w => w.id === bulkWarehouseId);
+                        const currentWh = warehouses.find(w => String(w.id) === String(bulkWarehouseId));
                         setBulkWarehouseSearch(currentWh ? currentWh.name : '');
                       }
                     }} />
-                    <div className="absolute left-0 right-0 mt-1 max-h-40 overflow-y-auto bg-white border rounded shadow-lg z-20 divide-y divide-gray-100">
+                    <div 
+                      className="absolute left-0 right-0 mt-1 max-h-40 overflow-y-auto bg-white border rounded shadow-lg z-20 divide-y divide-gray-100"
+                      onMouseDown={(e) => e.preventDefault()}
+                      onTouchStart={(e) => e.stopPropagation()}
+                    >
                       <button
                         type="button"
-                        className="w-full text-left px-3 py-2 text-xs hover:bg-blue-50 text-amber-600 font-semibold"
+                        className="w-full text-left px-3 py-2.5 text-xs hover:bg-blue-50 text-amber-600 font-semibold active:bg-amber-100"
+                        onPointerDown={(e) => {
+                          e.preventDefault();
+                          if (bulkWarehouseBlurTimeoutRef.current) {
+                            clearTimeout(bulkWarehouseBlurTimeoutRef.current);
+                            bulkWarehouseBlurTimeoutRef.current = null;
+                          }
+                          setBulkWarehouseId('');
+                          setBulkWarehouseSearch('');
+                          setShowBulkWarehouseDropdown(false);
+                        }}
                         onClick={() => {
+                          if (bulkWarehouseBlurTimeoutRef.current) {
+                            clearTimeout(bulkWarehouseBlurTimeoutRef.current);
+                            bulkWarehouseBlurTimeoutRef.current = null;
+                          }
                           setBulkWarehouseId('');
                           setBulkWarehouseSearch('');
                           setShowBulkWarehouseDropdown(false);
@@ -5343,11 +5633,25 @@ export default function OrderList() {
                           <button
                             key={w.id}
                             type="button"
-                            className={`w-full text-left px-3 py-2 text-xs hover:bg-blue-50 transition-colors ${
-                              bulkWarehouseId === w.id ? 'bg-blue-50/70 font-semibold text-blue-700' : 'text-gray-700'
+                            className={`w-full text-left px-3 py-2.5 text-xs hover:bg-blue-50 transition-colors active:bg-blue-100 ${
+                              String(bulkWarehouseId) === String(w.id) ? 'bg-blue-50/70 font-semibold text-blue-700' : 'text-gray-700'
                             }`}
+                            onPointerDown={(e) => {
+                              e.preventDefault();
+                              if (bulkWarehouseBlurTimeoutRef.current) {
+                                clearTimeout(bulkWarehouseBlurTimeoutRef.current);
+                                bulkWarehouseBlurTimeoutRef.current = null;
+                              }
+                              setBulkWarehouseId(String(w.id));
+                              setBulkWarehouseSearch(w.name);
+                              setShowBulkWarehouseDropdown(false);
+                            }}
                             onClick={() => {
-                              setBulkWarehouseId(w.id);
+                              if (bulkWarehouseBlurTimeoutRef.current) {
+                                clearTimeout(bulkWarehouseBlurTimeoutRef.current);
+                                bulkWarehouseBlurTimeoutRef.current = null;
+                              }
+                              setBulkWarehouseId(String(w.id));
                               setBulkWarehouseSearch(w.name);
                               setShowBulkWarehouseDropdown(false);
                             }}
