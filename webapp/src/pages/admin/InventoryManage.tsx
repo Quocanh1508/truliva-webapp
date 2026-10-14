@@ -736,11 +736,9 @@ export default function InventoryManage() {
               <span className="text-xs text-slate-400">/ tổng số {items.length}</span>
             )}
           </div>
-          {!isKTV && (
-            <span className="text-xs text-slate-400 italic hidden sm:inline">
-              * Bấm vào dòng sản phẩm để xem chi tiết từng nguồn nhập & xuất
-            </span>
-          )}
+          <span className="text-xs text-slate-400 italic hidden sm:inline">
+            * Bấm vào dòng sản phẩm để xem chi tiết biến động xuất / nhập
+          </span>
         </div>
 
         {loading ? (
@@ -769,19 +767,20 @@ export default function InventoryManage() {
             <table className="w-full text-left border-collapse table-auto">
               <thead>
                 <tr className="bg-slate-50 text-slate-600 text-[11px] font-bold uppercase tracking-wider border-b border-slate-200">
-                  <th className="py-3 px-3 w-12 text-center">STT</th>
-                  <th className="py-3 px-4 min-w-[280px]">Sản phẩm</th>
-                  <th className="py-3 px-3 text-center min-w-[90px]">Tồn đầu</th>
-                  <th className="py-3 px-3 text-center min-w-[120px] bg-emerald-50/60 text-emerald-800">
+                  <th className="hidden md:table-cell py-3 px-3 w-12 text-center">STT</th>
+                  <th className="py-3 px-3 md:px-4 md:min-w-[280px]">Sản phẩm</th>
+                  <th className="hidden md:table-cell py-3 px-3 text-center min-w-[90px]">Tồn đầu</th>
+                  <th className="hidden md:table-cell py-3 px-3 text-center min-w-[120px] bg-emerald-50/60 text-emerald-800">
                     Tổng Nhập
                   </th>
-                  <th className="py-3 px-3 text-center min-w-[120px] bg-rose-50/60 text-rose-800">
+                  <th className="hidden md:table-cell py-3 px-3 text-center min-w-[120px] bg-rose-50/60 text-rose-800">
                     Tổng Xuất
                   </th>
-                  <th className="py-3 px-3 text-center min-w-[100px] bg-blue-50/60 text-blue-900">
-                    Tồn cuối
+                  <th className="py-3 px-2 md:px-3 text-center w-24 md:min-w-[100px] bg-blue-50/60 text-blue-900">
+                    <span className="md:hidden">Tồn kho</span>
+                    <span className="hidden md:inline">Tồn cuối</span>
                   </th>
-                  <th className="py-3 px-3 text-center min-w-[110px]">Trạng thái</th>
+                  <th className="hidden md:table-cell py-3 px-3 text-center min-w-[110px]">Trạng thái</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 text-xs text-slate-700">
@@ -793,20 +792,20 @@ export default function InventoryManage() {
                     <Fragment key={item.id}>
                       {/* Dòng chính */}
                       <tr
-                        onClick={() => !isKTV && setExpandedItemId(isExpanded ? null : item.id)}
-                        className={`transition-colors ${
-                          !isKTV ? 'hover:bg-slate-50/80 cursor-pointer' : ''
-                        } ${isExpanded && !isKTV ? 'bg-blue-50/30' : ''}`}
+                        onClick={() => setExpandedItemId(isExpanded ? null : item.id)}
+                        className={`transition-colors cursor-pointer hover:bg-slate-50/80 ${
+                          isExpanded ? 'bg-blue-50/30' : ''
+                        }`}
                       >
-                        {/* 1. STT */}
-                        <td className="py-3 px-3 text-center text-slate-400 font-medium">
+                        {/* 1. STT (Ẩn trên mobile để tiết kiệm diện tích) */}
+                        <td className="hidden md:table-cell py-3 px-3 text-center text-slate-400 font-medium">
                           {idx + 1}
                         </td>
 
                         {/* 2. Sản phẩm */}
-                        <td className="py-3 px-4">
-                          <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 rounded-lg overflow-hidden bg-slate-100 border border-slate-200 shrink-0 flex items-center justify-center">
+                        <td className="py-3 px-3 md:px-4">
+                          <div className="flex items-center gap-2.5 md:gap-3">
+                            <div className="w-10 h-10 md:w-11 md:h-11 rounded-lg overflow-hidden bg-slate-100 border border-slate-200 shrink-0 flex items-center justify-center">
                               {item.imageUrl ? (
                                 <img
                                   src={item.imageUrl}
@@ -821,16 +820,34 @@ export default function InventoryManage() {
                               )}
                             </div>
                             <div className="min-w-0 flex-1">
-                              <div className="font-semibold text-slate-900 truncate leading-snug" title={item.name}>
+                              <div className="font-semibold text-slate-900 text-xs md:text-sm leading-snug line-clamp-2 md:truncate" title={item.name}>
                                 {item.name}
                               </div>
-                              <div className="flex items-center gap-2 mt-0.5">
+                              <div className="flex items-center gap-1.5 mt-1 flex-wrap">
                                 {item.sku && (
-                                  <span className="font-mono text-[10px] font-bold px-1.5 py-0.2 rounded bg-pink-50 text-pink-700 border border-pink-200">
+                                  <span className="font-mono text-[10px] font-bold px-1.5 py-0.5 rounded bg-pink-50 text-pink-700 border border-pink-200 shrink-0">
                                     {item.sku}
                                   </span>
                                 )}
-                                <span className="text-[10px] text-slate-400 truncate">
+
+                                {/* Badge Tồn Cuối nổi bật ngay cạnh / dưới tên SP trên Mobile */}
+                                <span
+                                  className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-bold md:hidden ${
+                                    isOutOfStock
+                                      ? 'bg-rose-50 text-rose-700 border border-rose-200'
+                                      : 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                                  }`}
+                                >
+                                  {isOutOfStock ? (
+                                    <>Hết hàng</>
+                                  ) : (
+                                    <>
+                                      Tồn: <span className="font-extrabold">{item.end_inventory.toLocaleString('vi-VN')}</span>
+                                    </>
+                                  )}
+                                </span>
+
+                                <span className="text-[10px] text-slate-400 truncate max-w-[120px] md:max-w-none">
                                   {item.category}
                                 </span>
                               </div>
@@ -838,13 +855,13 @@ export default function InventoryManage() {
                           </div>
                         </td>
 
-                        {/* 3. Tồn đầu */}
-                        <td className="py-3 px-3 text-center font-semibold text-slate-700">
+                        {/* 3. Tồn đầu (Ẩn trên mobile) */}
+                        <td className="hidden md:table-cell py-3 px-3 text-center font-semibold text-slate-700">
                           {item.begin_inventory.toLocaleString('vi-VN')}
                         </td>
 
-                        {/* 4. Tổng Nhập */}
-                        <td className="py-3 px-3 text-center bg-emerald-50/20">
+                        {/* 4. Tổng Nhập (Ẩn trên mobile) */}
+                        <td className="hidden md:table-cell py-3 px-3 text-center bg-emerald-50/20">
                           <div className="font-bold text-emerald-700 text-sm">
                             {item.total_import.toLocaleString('vi-VN')}
                           </div>
@@ -857,8 +874,8 @@ export default function InventoryManage() {
                           )}
                         </td>
 
-                        {/* 5. Tổng Xuất (HIỂN THỊ SỐ DƯƠNG CHUẨN, KHÔNG DẤU TRỪ) */}
-                        <td className="py-3 px-3 text-center bg-rose-50/20">
+                        {/* 5. Tổng Xuất (Ẩn trên mobile) */}
+                        <td className="hidden md:table-cell py-3 px-3 text-center bg-rose-50/20">
                           <div className="font-bold text-rose-700 text-sm">
                             {item.total_export.toLocaleString('vi-VN')}
                           </div>
@@ -871,22 +888,31 @@ export default function InventoryManage() {
                           )}
                         </td>
 
-                        {/* 6. Tồn cuối */}
-                        <td className="py-3 px-3 text-center bg-blue-50/20">
-                          <div className={`font-extrabold text-sm ${
-                            isOutOfStock ? 'text-rose-600' : 'text-[#1B3A6B]'
-                          }`}>
-                            {item.end_inventory.toLocaleString('vi-VN')}
+                        {/* 6. Tồn cuối / Số lượng chính */}
+                        <td className="py-3 px-2 md:px-3 text-center md:bg-blue-50/20">
+                          <div className="flex items-center justify-center gap-1">
+                            <div className={`font-extrabold text-sm md:text-base ${
+                              isOutOfStock ? 'text-rose-600' : 'text-[#1B3A6B]'
+                            }`}>
+                              {item.end_inventory.toLocaleString('vi-VN')}
+                            </div>
+                            <ChevronDown
+                              size={14}
+                              className={`text-slate-400 transition-transform md:hidden shrink-0 ${isExpanded ? 'rotate-180 text-blue-600' : ''}`}
+                            />
                           </div>
                           {!isKTV && item.sellingPrice > 0 && (
-                            <div className="text-[10px] text-slate-400 mt-0.5 font-medium">
+                            <div className="text-[10px] text-slate-400 mt-0.5 font-medium hidden md:block">
                               {formatCurrency(item.sellingPrice)}
                             </div>
                           )}
+                          <div className="text-[9px] text-slate-400 md:hidden mt-0.5">
+                            {isExpanded ? 'Đóng' : 'Chi tiết'}
+                          </div>
                         </td>
 
-                        {/* 7. Trạng thái badge */}
-                        <td className="py-3 px-3 text-center">
+                        {/* 7. Trạng thái badge (Ẩn trên mobile vì đã có badge trên SP) */}
+                        <td className="hidden md:table-cell py-3 px-3 text-center">
                           {isOutOfStock ? (
                             <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-rose-50 text-rose-700 border border-rose-200">
                               <AlertTriangle size={11} /> Hết hàng
@@ -899,75 +925,131 @@ export default function InventoryManage() {
                         </td>
                       </tr>
 
-                      {/* Dòng Accordion mở rộng chi tiết khi bấm vào (Chỉ Quản lý / Admin) */}
-                      {isExpanded && !isKTV && (
-                        <tr className="bg-slate-50/90 border-y border-slate-200">
-                          <td colSpan={7} className="py-3.5 px-6">
-                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 bg-white p-4 rounded-xl border border-slate-200 shadow-xs">
-                              {/* Cột Chi tiết Nhập */}
-                              <div className="space-y-1.5 text-xs">
-                                <div className="font-bold text-emerald-700 flex items-center gap-1 border-b border-emerald-100 pb-1">
-                                  <ArrowDownLeft size={14} /> Chi tiết nguồn Nhập kho
+                      {/* Dòng Accordion mở rộng chi tiết khi bấm vào */}
+                      {isExpanded && (
+                        <tr className="bg-slate-50/95 border-y border-slate-200">
+                          <td colSpan={7} className="py-3 px-3 md:px-6">
+                            <div className="bg-white p-3.5 md:p-4 rounded-xl border border-slate-200 shadow-xs space-y-3">
+                              {/* Header tóm tắt sản phẩm trong accordion */}
+                              <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+                                <div className="flex items-center gap-2">
+                                  <span className="font-bold text-xs text-slate-800 flex items-center gap-1">
+                                    <Warehouse size={13} className="text-[#1B3A6B]" /> Biến Động Kho
+                                  </span>
+                                  {item.sku && (
+                                    <span className="font-mono text-[10px] font-bold px-1.5 py-0.2 rounded bg-pink-50 text-pink-700 border border-pink-200">
+                                      {item.sku}
+                                    </span>
+                                  )}
                                 </div>
-                                <div className="flex justify-between py-1 text-slate-600">
-                                  <span>Mua từ Nhà cung cấp:</span>
-                                  <span className="font-bold text-emerald-800">{item.purchase_import}</span>
+                                <span className="text-[11px] text-slate-400 truncate max-w-[150px]">
+                                  {item.category}
+                                </span>
+                              </div>
+
+                              {/* 4 Thẻ số liệu Tồn đầu - Nhập - Xuất - Tồn cuối */}
+                              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
+                                <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-100 flex flex-col justify-between">
+                                  <span className="text-[11px] text-slate-500 font-medium">Tồn đầu kỳ</span>
+                                  <span className="text-base font-bold text-slate-800 mt-1">
+                                    {item.begin_inventory.toLocaleString('vi-VN')}
+                                  </span>
                                 </div>
-                                <div className="flex justify-between py-1 text-slate-600">
-                                  <span>Nhập chuyển từ kho khác:</span>
-                                  <span className="font-bold text-emerald-800">{item.transfer_import}</span>
+                                <div className="p-2.5 rounded-xl bg-emerald-50/60 border border-emerald-100 flex flex-col justify-between">
+                                  <span className="text-[11px] text-emerald-800 font-medium flex items-center gap-1">
+                                    <ArrowDownLeft size={12} /> Tổng Nhập
+                                  </span>
+                                  <span className="text-base font-bold text-emerald-700 mt-1">
+                                    +{item.total_import.toLocaleString('vi-VN')}
+                                  </span>
                                 </div>
-                                <div className="flex justify-between py-1 text-slate-600">
-                                  <span>Khách đổi / trả hàng:</span>
-                                  <span className="font-bold text-emerald-800">{item.return_import}</span>
+                                <div className="p-2.5 rounded-xl bg-rose-50/60 border border-rose-100 flex flex-col justify-between">
+                                  <span className="text-[11px] text-rose-800 font-medium flex items-center gap-1">
+                                    <ArrowUpRight size={12} /> Tổng Xuất
+                                  </span>
+                                  <span className="text-base font-bold text-rose-700 mt-1">
+                                    -{item.total_export.toLocaleString('vi-VN')}
+                                  </span>
                                 </div>
-                                <div className="flex justify-between py-1 text-slate-600">
-                                  <span>Nhập kiểm kê cân bằng:</span>
-                                  <span className="font-bold text-emerald-800">{item.stocktaking_import}</span>
+                                <div className="p-2.5 rounded-xl bg-blue-50/70 border border-blue-200 flex flex-col justify-between">
+                                  <span className="text-[11px] text-blue-900 font-bold flex items-center gap-1">
+                                    <Package size={12} /> Tồn hiện tại
+                                  </span>
+                                  <span className="text-base font-extrabold text-[#1B3A6B] mt-1">
+                                    {item.end_inventory.toLocaleString('vi-VN')}
+                                  </span>
                                 </div>
                               </div>
 
-                              {/* Cột Chi tiết Xuất */}
-                              <div className="space-y-1.5 text-xs">
-                                <div className="font-bold text-rose-700 flex items-center gap-1 border-b border-rose-100 pb-1">
-                                  <ArrowUpRight size={14} /> Chi tiết nguồn Xuất kho
-                                </div>
-                                <div className="flex justify-between py-1 text-slate-600">
-                                  <span>Xuất bán (Đơn hàng / KTV dùng):</span>
-                                  <span className="font-bold text-rose-800">{item.sell_export}</span>
-                                </div>
-                                <div className="flex justify-between py-1 text-slate-600">
-                                  <span>Xuất chuyển đi kho khác:</span>
-                                  <span className="font-bold text-rose-800">{item.transfer_export}</span>
-                                </div>
-                                <div className="flex justify-between py-1 text-slate-600">
-                                  <span>Xuất trả lại NCC:</span>
-                                  <span className="font-bold text-rose-800">{item.purchase_export}</span>
-                                </div>
-                                <div className="flex justify-between py-1 text-slate-600">
-                                  <span>Xuất kiểm kê cân bằng:</span>
-                                  <span className="font-bold text-rose-800">{item.stocktaking_export}</span>
-                                </div>
-                              </div>
+                              {/* Nếu là Quản lý / Admin: Phân rã sâu nguồn nhập/xuất & Định giá vốn */}
+                              {!isKTV && (
+                                <div className="pt-2 border-t border-slate-100 grid grid-cols-1 md:grid-cols-3 gap-3">
+                                  {/* Cột Chi tiết Nhập */}
+                                  <div className="space-y-1.5 text-xs bg-slate-50/70 p-3 rounded-lg border border-slate-100">
+                                    <div className="font-bold text-emerald-700 flex items-center gap-1 border-b border-emerald-100 pb-1">
+                                      <ArrowDownLeft size={14} /> Nguồn Nhập kho
+                                    </div>
+                                    <div className="flex justify-between py-0.5 text-slate-600">
+                                      <span>Mua NCC:</span>
+                                      <span className="font-bold text-emerald-800">{item.purchase_import}</span>
+                                    </div>
+                                    <div className="flex justify-between py-0.5 text-slate-600">
+                                      <span>Nhập chuyển kho:</span>
+                                      <span className="font-bold text-emerald-800">{item.transfer_import}</span>
+                                    </div>
+                                    <div className="flex justify-between py-0.5 text-slate-600">
+                                      <span>Khách đổi / trả:</span>
+                                      <span className="font-bold text-emerald-800">{item.return_import}</span>
+                                    </div>
+                                    <div className="flex justify-between py-0.5 text-slate-600">
+                                      <span>Kiểm kê cân bằng:</span>
+                                      <span className="font-bold text-emerald-800">{item.stocktaking_import}</span>
+                                    </div>
+                                  </div>
 
-                              {/* Cột Giá trị tiền & Giá vốn */}
-                              <div className="space-y-1.5 text-xs">
-                                <div className="font-bold text-[#1B3A6B] flex items-center gap-1 border-b border-blue-100 pb-1">
-                                  <Warehouse size={14} /> Định giá tồn kho
+                                  {/* Cột Chi tiết Xuất */}
+                                  <div className="space-y-1.5 text-xs bg-slate-50/70 p-3 rounded-lg border border-slate-100">
+                                    <div className="font-bold text-rose-700 flex items-center gap-1 border-b border-rose-100 pb-1">
+                                      <ArrowUpRight size={14} /> Nguồn Xuất kho
+                                    </div>
+                                    <div className="flex justify-between py-0.5 text-slate-600">
+                                      <span>Xuất bán / KTV:</span>
+                                      <span className="font-bold text-rose-800">{item.sell_export}</span>
+                                    </div>
+                                    <div className="flex justify-between py-0.5 text-slate-600">
+                                      <span>Xuất chuyển kho:</span>
+                                      <span className="font-bold text-rose-800">{item.transfer_export}</span>
+                                    </div>
+                                    <div className="flex justify-between py-0.5 text-slate-600">
+                                      <span>Trả lại NCC:</span>
+                                      <span className="font-bold text-rose-800">{item.purchase_export}</span>
+                                    </div>
+                                    <div className="flex justify-between py-0.5 text-slate-600">
+                                      <span>Kiểm kê cân bằng:</span>
+                                      <span className="font-bold text-rose-800">{item.stocktaking_export}</span>
+                                    </div>
+                                  </div>
+
+                                  {/* Cột Giá trị tiền & Giá vốn */}
+                                  <div className="space-y-1.5 text-xs bg-slate-50/70 p-3 rounded-lg border border-slate-100">
+                                    <div className="font-bold text-[#1B3A6B] flex items-center gap-1 border-b border-blue-100 pb-1">
+                                      <Warehouse size={14} /> Định giá tồn kho
+                                    </div>
+                                    <div className="flex justify-between py-0.5 text-slate-600">
+                                      <span>Giá bán niêm yết:</span>
+                                      <span className="font-semibold text-emerald-600">{formatCurrency(item.sellingPrice)}</span>
+                                    </div>
+                                    <div className="flex justify-between py-0.5 text-slate-600">
+                                      <span>Giá vốn gần nhất:</span>
+                                      <span className="font-semibold text-slate-700">{formatCurrency(item.costPrice)}</span>
+                                    </div>
+                                    <div className="flex justify-between py-0.5 text-slate-600 border-t border-slate-200 pt-1 font-bold text-[#1B3A6B]">
+                                      <span>Tổng giá trị tồn:</span>
+                                      <span>{formatCurrency(item.end_inventory_value)}</span>
+                                    </div>
+                                  </div>
                                 </div>
-                                <div className="flex justify-between py-1 text-slate-600">
-                                  <span>Giá bán niêm yết:</span>
-                                  <span className="font-semibold text-emerald-600">{formatCurrency(item.sellingPrice)}</span>
-                                </div>
-                                <div className="flex justify-between py-1 text-slate-600">
-                                  <span>Giá vốn nhập gần nhất:</span>
-                                  <span className="font-semibold text-slate-700">{formatCurrency(item.costPrice)}</span>
-                                </div>
-                                <div className="flex justify-between py-1 text-slate-600 border-t border-slate-100 pt-1 font-bold text-[#1B3A6B]">
-                                  <span>Tổng giá trị tồn cuối:</span>
-                                  <span>{formatCurrency(item.end_inventory_value)}</span>
-                                </div>
-                              </div>
+                              )}
                             </div>
                           </td>
                         </tr>
@@ -979,10 +1061,11 @@ export default function InventoryManage() {
               {summary && (
                 <tfoot className="bg-slate-100/90 font-bold text-xs text-slate-800 border-t-2 border-slate-300">
                   <tr>
-                    <td colSpan={2} className="py-3 px-4 text-center font-extrabold text-[#1B3A6B]">
-                      TỔNG ({filteredItems.length} sản phẩm)
+                    <td className="hidden md:table-cell py-3 px-3 text-center text-slate-400">#</td>
+                    <td className="py-3 px-3 md:px-4 text-left md:text-center font-extrabold text-[#1B3A6B]">
+                      TỔNG ({filteredItems.length} SP)
                     </td>
-                    <td className="py-3 px-3 text-center text-slate-800">
+                    <td className="hidden md:table-cell py-3 px-3 text-center text-slate-800">
                       <div>{summary.begin_inventory.toLocaleString('vi-VN')}</div>
                       {!isKTV && summary.begin_inventory_value > 0 && (
                         <div className="text-[10px] text-slate-500 font-normal">
@@ -990,7 +1073,7 @@ export default function InventoryManage() {
                         </div>
                       )}
                     </td>
-                    <td className="py-3 px-3 text-center bg-emerald-100/40 text-emerald-800">
+                    <td className="hidden md:table-cell py-3 px-3 text-center bg-emerald-100/40 text-emerald-800">
                       <div>{summary.total_import.toLocaleString('vi-VN')}</div>
                       {!isKTV && summary.total_import_value > 0 && (
                         <div className="text-[10px] text-emerald-700 font-normal">
@@ -998,7 +1081,7 @@ export default function InventoryManage() {
                         </div>
                       )}
                     </td>
-                    <td className="py-3 px-3 text-center bg-rose-100/40 text-rose-800">
+                    <td className="hidden md:table-cell py-3 px-3 text-center bg-rose-100/40 text-rose-800">
                       <div>{summary.total_export.toLocaleString('vi-VN')}</div>
                       {!isKTV && summary.total_export_value > 0 && (
                         <div className="text-[10px] text-rose-700 font-normal">
@@ -1006,15 +1089,15 @@ export default function InventoryManage() {
                         </div>
                       )}
                     </td>
-                    <td className="py-3 px-3 text-center bg-blue-100/40 text-[#1B3A6B]">
+                    <td className="py-3 px-2 md:px-3 text-center bg-blue-100/40 text-[#1B3A6B]">
                       <div>{summary.end_inventory.toLocaleString('vi-VN')}</div>
                       {!isKTV && summary.end_inventory_value > 0 && (
-                        <div className="text-[10px] text-blue-800 font-normal">
+                        <div className="text-[10px] text-blue-800 font-normal hidden md:block">
                           {formatCurrency(summary.end_inventory_value)}
                         </div>
                       )}
                     </td>
-                    <td className="py-3 px-3 text-center text-slate-400 font-normal">
+                    <td className="hidden md:table-cell py-3 px-3 text-center text-slate-400 font-normal">
                       -
                     </td>
                   </tr>
