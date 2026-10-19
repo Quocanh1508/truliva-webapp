@@ -9,6 +9,12 @@ import {
   checkIsOfficialTrulivaKtv
 } from '../services/salaryService';
 import { computeCommissionsForMonth } from '../services/commissionService';
+import {
+  getRatesMatrixData,
+  SALARY_EXPORT_TABS,
+  SalaryExportContext,
+  SalaryExportFilters
+} from '../services/salaryExportService';
 
 /**
  * GET /api/salaries/calculate
@@ -102,6 +108,7 @@ export async function adjustSalary(req: Request, res: Response): Promise<void> {
 export async function exportSalaries(req: Request, res: Response): Promise<void> {
   try {
     const month = (req.query.month as string) || `${new Date().getMonth() + 1}/${new Date().getFullYear()}`;
+    const tab = (req.query.tab as string) || (req.query.sheet as string) || 'all';
 
     const ktvIds = (req.query.ktvIds as string) || (req.query.ktvId as string) || '';
     const stationId = (req.query.stationIds as string) || (req.query.stationId as string) || '';
@@ -111,6 +118,8 @@ export async function exportSalaries(req: Request, res: Response): Promise<void>
     const productFilter = (req.query.products as string) || (req.query.product as string) || '';
     const completedDate = (req.query.completedDate as string) || '';
     const searchQuery = (req.query.search as string || '').toLowerCase().trim();
+    const commissionSearchQuery = (req.query.commissionSearch as string || '').toLowerCase().trim();
+    const commissionKtvId = (req.query.commissionKtvId as string || '').trim();
 
     const rawDistancePresets = (req.query.distancePresets as string) || (req.query.distancePreset as string) || '';
     const distancePresetsList = rawDistancePresets ? rawDistancePresets.split(',').map(s => s.trim()).filter(Boolean) : [];
@@ -128,6 +137,17 @@ export async function exportSalaries(req: Request, res: Response): Promise<void>
     const normStr = (str: string | null | undefined): string => {
       if (!str) return '';
       return String(str).toLowerCase().replace(/trạm\s+/g, '').trim();
+    };
+
+    const toSlug = (str: string | null | undefined): string => {
+      if (!str) return '';
+      return String(str)
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .replace(/đ/g, 'd').replace(/Đ/g, 'D')
+        .replace(/[^a-zA-Z0-9_-]/g, '_')
+        .replace(/_+/g, '_')
+        .replace(/^_+|_+$/g, '');
     };
 
     const isTLSC = (wt: string | null | undefined): boolean => {
@@ -285,376 +305,134 @@ export async function exportSalaries(req: Request, res: Response): Promise<void>
       return true;
     });
 
+    const [ratesMatrix, commissionsData] = await Promise.all([
+      getRatesMatrixData(),
+      computeCommissionsForMonth(month)
+    ]);
+
+    const exportFilters: SalaryExportFilters = {
+      month,
+      ktvIdsList,
+      stationIdsList,
+      mainStationIdsList,
+      workTypesList,
+      serviceTypesList,
+      productsList,
+      completedDate,
+      searchQuery,
+      commissionSearchQuery,
+      commissionKtvId,
+      distancePresetsList,
+      distanceOp,
+      distanceMin,
+      distanceMax,
+      tab
+    };
+
+    const ctx: SalaryExportContext = {
+      filters: exportFilters,
+      filteredSalaries,
+      allSalaries,
+      ratesMatrix,
+      commissionsData
+    };
+
     const workbook = new ExcelJS.Workbook();
     workbook.creator = 'Truliva System';
     workbook.created = new Date();
 
-    const wsSummary = workbook.addWorksheet('Tong_Hop_KTV');
-    wsSummary.views = [{ showGridLines: true }];
+    const rawTab = (req.query.tab as string) || (req.query.tabs as string) || (req.query.sheet as string) || 'default';
 
-    wsSummary.mergeCells('A1:O1');
-    const titleCell = wsSummary.getCell('A1');
-    titleCell.value = `BẢNG TỔNG HỢP THÙ LAO KỸ THUẬT VIÊN - THÁNG ${month}`;
-    titleCell.font = { name: 'Arial', size: 16, bold: true, color: { argb: 'FF1B3A6B' } };
-    titleCell.alignment = { horizontal: 'center', vertical: 'middle' };
-    wsSummary.getRow(1).height = 35;
-
-    wsSummary.mergeCells('A2:O2');
-    const subCell = wsSummary.getCell('A2');
-    subCell.value = `Ngày xuất file: ${new Date().toLocaleDateString('vi-VN')} | Tổng số KTV trong bộ lọc: ${filteredSalaries.length}`;
-    subCell.font = { name: 'Arial', size: 10, italic: true, color: { argb: 'FF64748B' } };
-    subCell.alignment = { horizontal: 'center', vertical: 'middle' };
-    wsSummary.getRow(2).height = 20;
-
-    const summaryHeaders = [
-      'STT', 'Họ và tên KTV', 'Số điện thoại', 'Tỉnh / Trạm KT', 'Trạm Quản Lý',
-      'Số ca', 'Bảo hành', 'Sửa chữa', 'Giao hàng', 'Lắp đặt', 'Giao lắp', 'Thay lọc', 'Cước di chuyển', 'Phí khác', 'Tổng thù lao (VNĐ)'
-    ];
-    const headerRowSummary = wsSummary.addRow(summaryHeaders);
-    headerRowSummary.height = 28;
-
-    headerRowSummary.eachCell((cell) => {
-      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1B3A6B' } };
-      cell.font = { name: 'Arial', size: 11, bold: true, color: { argb: 'FFFFFFFF' } };
-      cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
-      cell.border = {
-        top: { style: 'thin', color: { argb: 'FFCBD5E1' } },
-        left: { style: 'thin', color: { argb: 'FFCBD5E1' } },
-        bottom: { style: 'thin', color: { argb: 'FFCBD5E1' } },
-        right: { style: 'thin', color: { argb: 'FFCBD5E1' } }
-      };
-    });
-
-    let sumTotalCases = 0;
-    let sumTotalBaoHanh = 0;
-    let sumTotalSuaChua = 0;
-    let sumTotalGiaoHang = 0;
-    let sumTotalLapDat = 0;
-    let sumTotalGiaoLap = 0;
-    let sumTotalThayLoc = 0;
-    let sumTotalDistance = 0;
-    let sumTotalOther = 0;
-    let sumGrandTotal = 0;
-
-    const isSpecificCaseFilter = Boolean(completedDate || workTypesList.length > 0 || serviceTypesList.length > 0 || productsList.length > 0 || searchQuery);
-
-    filteredSalaries.forEach((s, idx) => {
-      let ktvBaoHanh = 0;
-      let ktvSuaChua = 0;
-      let ktvGiaoHang = 0;
-      let ktvLapDat = 0;
-      let ktvGiaoLap = 0;
-      let ktvThayLoc = 0;
-      let ktvDistance = 0;
-      let ktvOther = 0;
-
-      const casesToProcess = (s.cases || []).filter((c: any) => {
-        if (completedDate) {
-          const cDate = c.createdAt ? new Date(c.createdAt).toLocaleDateString('sv-SE') : '';
-          if (cDate !== completedDate) return false;
-        }
-        if (workTypesList.length > 0) {
-          const matchWT = workTypesList.some(wt => c.workType && c.workType.toLowerCase().includes(wt.toLowerCase()));
-          if (!matchWT) return false;
-        }
-        if (serviceTypesList.length > 0) {
-          const matchST = serviceTypesList.some(st => c.serviceType && c.serviceType.toLowerCase().includes(st.toLowerCase()));
-          if (!matchST) return false;
-        }
-        if (productsList.length > 0) {
-          const matchProd = productsList.some(p => c.products && Array.isArray(c.products) && c.products.some((prod: any) => String(prod).toLowerCase().includes(p.toLowerCase())));
-          if (!matchProd) return false;
-        }
-        if (!checkCaseDistance(c)) return false;
-        if (searchQuery) {
-          const matchQ = s.fullName.toLowerCase().includes(searchQuery) ||
-            s.username.toLowerCase().includes(searchQuery) ||
-            (s.phoneNumber && s.phoneNumber.includes(searchQuery)) ||
-            (c.customerName && c.customerName.toLowerCase().includes(searchQuery)) ||
-            (c.customerPhone && c.customerPhone.includes(searchQuery)) ||
-            (c.province && c.province.toLowerCase().includes(searchQuery)) ||
-            (c.orderNote && c.orderNote.toLowerCase().includes(searchQuery)) ||
-            (c.reportNote && c.reportNote.toLowerCase().includes(searchQuery)) ||
-            (c.serviceType && c.serviceType.toLowerCase().includes(searchQuery)) ||
-            (c.products && Array.isArray(c.products) && c.products.some((prod: any) => String(prod).toLowerCase().includes(searchQuery)));
-          if (!matchQ) return false;
-        }
-        return true;
-      });
-
-      casesToProcess.forEach((c: any) => {
-        ktvBaoHanh += c.baoHanhCost || 0;
-        ktvSuaChua += c.suaChuaCost || 0;
-        ktvGiaoHang += c.giaoHangCost || 0;
-        ktvLapDat += c.lapDatCost || 0;
-        ktvGiaoLap += c.giaoLapCost || 0;
-        ktvThayLoc += c.thayLocCost || 0;
-        ktvDistance += c.distanceCost || 0;
-        ktvOther += c.otherCost || 0;
-      });
-
-      const ktvCalculatedCost = ktvBaoHanh + ktvSuaChua + ktvGiaoHang + ktvLapDat + ktvGiaoLap + ktvThayLoc + ktvDistance + ktvOther;
-      const ktvTotalCost = isSpecificCaseFilter ? ktvCalculatedCost : (s.adjustedCost || ktvCalculatedCost);
-      const displayCasesCount = isSpecificCaseFilter ? casesToProcess.length : s.casesCount;
-
-      sumTotalCases += displayCasesCount;
-      sumTotalBaoHanh += ktvBaoHanh;
-      sumTotalSuaChua += ktvSuaChua;
-      sumTotalGiaoHang += ktvGiaoHang;
-      sumTotalLapDat += ktvLapDat;
-      sumTotalGiaoLap += ktvGiaoLap;
-      sumTotalThayLoc += ktvThayLoc;
-      sumTotalDistance += ktvDistance;
-      sumTotalOther += ktvOther;
-      sumGrandTotal += ktvTotalCost;
-
-      const row = wsSummary.addRow([
-        idx + 1,
-        s.fullName,
-        s.phoneNumber || '',
-        s.stationName || 'Khác',
-        s.mainStationName || 'Không có',
-        displayCasesCount,
-        ktvBaoHanh,
-        ktvSuaChua,
-        ktvGiaoHang,
-        ktvLapDat,
-        ktvGiaoLap,
-        ktvThayLoc,
-        ktvDistance,
-        ktvOther,
-        ktvTotalCost
-      ]);
-      row.height = 22;
-
-      row.eachCell((cell, colNum) => {
-        cell.alignment = { vertical: 'middle', horizontal: colNum >= 6 ? 'right' : colNum === 1 ? 'center' : 'left' };
-        if (colNum >= 7) cell.numFmt = '#,##0';
-        cell.border = {
-          top: { style: 'thin', color: { argb: 'FFCBD5E1' } },
-          left: { style: 'thin', color: { argb: 'FFCBD5E1' } },
-          bottom: { style: 'thin', color: { argb: 'FFCBD5E1' } },
-          right: { style: 'thin', color: { argb: 'FFCBD5E1' } }
-        };
-      });
-    });
-
-    const topSummaryRow = wsSummary.addRow([
-      'TỔNG CỘNG THEO BỘ LỌC:', '', '', '', '',
-      sumTotalCases, sumTotalBaoHanh, sumTotalSuaChua, sumTotalGiaoHang,
-      sumTotalLapDat, sumTotalGiaoLap, sumTotalThayLoc, sumTotalDistance, sumTotalOther, sumGrandTotal
-    ]);
-    topSummaryRow.height = 26;
-    topSummaryRow.eachCell((cell, colNum) => {
-      cell.font = { name: 'Arial', size: 11, bold: true, color: { argb: 'FF1B3A6B' } };
-      cell.alignment = { vertical: 'middle', horizontal: colNum >= 6 ? 'right' : 'left' };
-      if (colNum >= 7) cell.numFmt = '#,##0';
-      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE2E8F0' } };
-      cell.border = {
-        top: { style: 'medium', color: { argb: 'FF1B3A6B' } },
-        left: { style: 'thin', color: { argb: 'FFCBD5E1' } },
-        bottom: { style: 'medium', color: { argb: 'FF1B3A6B' } },
-        right: { style: 'thin', color: { argb: 'FFCBD5E1' } }
-      };
-    });
-
-    const hasDataRows = filteredSalaries.length > 0;
-    const lastDataRow = hasDataRows ? 4 + filteredSalaries.length : 4;
-    wsSummary.autoFilter = `A4:O${lastDataRow}`;
-
-    [6, 25, 15, 20, 20, 10, 14, 14, 14, 14, 14, 14, 16, 14, 20].forEach((w, i) => {
-      wsSummary.getColumn(i + 1).width = w;
-    });
-
-    // Sheet 2: Chi_Tiet_Ca_Dich_Vu
-    const wsDetail = workbook.addWorksheet('Chi_Tiet_Ca_Dich_Vu');
-    wsDetail.views = [{ showGridLines: true }];
-
-    wsDetail.mergeCells('A1:U1');
-    const detailTitleCell = wsDetail.getCell('A1');
-    detailTitleCell.value = `CHI TIẾT DỊCH VỤ & PHÍ CỤ THỂ THEO CA - THÁNG ${month}`;
-    detailTitleCell.font = { name: 'Arial', size: 16, bold: true, color: { argb: 'FF1B3A6B' } };
-    detailTitleCell.alignment = { horizontal: 'center', vertical: 'middle' };
-    wsDetail.getRow(1).height = 35;
-
-    wsDetail.mergeCells('A2:U2');
-    const detailSubCell = wsDetail.getCell('A2');
-    detailSubCell.value = `Ngày xuất file: ${new Date().toLocaleDateString('vi-VN')}`;
-    detailSubCell.font = { name: 'Arial', size: 10, italic: true, color: { argb: 'FF64748B' } };
-    detailSubCell.alignment = { horizontal: 'center', vertical: 'middle' };
-    wsDetail.getRow(2).height = 20;
-
-    const detailHeaders = [
-      'STT', 'Ngày hoàn thành', 'Tên KTV', 'Trạm KT KTV', 'Tên khách hàng', 'SĐT Khách hàng', 'Tỉnh / Thành',
-      'Sản phẩm', 'Loại công việc', 'Ghi chú đơn', 'Ghi chú báo cáo', 'Khoảng cách (km)',
-      'Phí Bảo Hành', 'Phí Sửa Chữa', 'Phí Giao Hàng', 'Phí Lắp Đặt', 'Phí Giao Lắp', 'Phí Thay Lọc', 'Cước Di Chuyển', 'Phí Khác', 'Tổng chi phí ca (VNĐ)'
-    ];
-    const headerRowDetail = wsDetail.addRow(detailHeaders);
-    headerRowDetail.height = 28;
-
-    headerRowDetail.eachCell((cell) => {
-      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1B3A6B' } };
-      cell.font = { name: 'Arial', size: 11, bold: true, color: { argb: 'FFFFFFFF' } };
-      cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
-      cell.border = {
-        top: { style: 'thin', color: { argb: 'FFCBD5E1' } },
-        left: { style: 'thin', color: { argb: 'FFCBD5E1' } },
-        bottom: { style: 'thin', color: { argb: 'FFCBD5E1' } },
-        right: { style: 'thin', color: { argb: 'FFCBD5E1' } }
-      };
-    });
-
-    let detailIdx = 1;
-    let sumBaoHanh = 0;
-    let sumSuaChua = 0;
-    let sumGiaoHang = 0;
-    let sumLapDat = 0;
-    let sumGiaoLap = 0;
-    let sumThayLoc = 0;
-    let sumDistanceCost = 0;
-    let sumOtherCost = 0;
-    let sumTotalCost = 0;
-
-    const detailRowsData: any[] = [];
-
-    for (const s of filteredSalaries) {
-      for (const c of s.cases || []) {
-        if (completedDate) {
-          const cDate = c.createdAt ? new Date(c.createdAt).toLocaleDateString('sv-SE') : '';
-          if (cDate !== completedDate) continue;
-        }
-
-        if (workTypesList.length > 0) {
-          const matchWT = workTypesList.some(wt => c.workType && c.workType.toLowerCase().includes(wt.toLowerCase()));
-          if (!matchWT) continue;
-        }
-
-        if (serviceTypesList.length > 0) {
-          const matchST = serviceTypesList.some(st => c.serviceType && c.serviceType.toLowerCase().includes(st.toLowerCase()));
-          if (!matchST) continue;
-        }
-
-        if (productsList.length > 0) {
-          const matchProd = productsList.some(p => c.products && Array.isArray(c.products) && c.products.some((prod: any) => String(prod).toLowerCase().includes(p.toLowerCase())));
-          if (!matchProd) continue;
-        }
-
-        if (!checkCaseDistance(c)) continue;
-
-        if (searchQuery) {
-          const matchQ = s.fullName.toLowerCase().includes(searchQuery) ||
-            s.username.toLowerCase().includes(searchQuery) ||
-            (s.phoneNumber && s.phoneNumber.includes(searchQuery)) ||
-            (c.customerName && c.customerName.toLowerCase().includes(searchQuery)) ||
-            (c.customerPhone && c.customerPhone.includes(searchQuery)) ||
-            (c.province && c.province.toLowerCase().includes(searchQuery)) ||
-            (c.orderNote && c.orderNote.toLowerCase().includes(searchQuery)) ||
-            (c.reportNote && c.reportNote.toLowerCase().includes(searchQuery)) ||
-            (c.serviceType && c.serviceType.toLowerCase().includes(searchQuery)) ||
-            (c.products && Array.isArray(c.products) && c.products.some((prod: any) => String(prod).toLowerCase().includes(searchQuery)));
-          if (!matchQ) continue;
-        }
-
-        sumBaoHanh += c.baoHanhCost || 0;
-        sumSuaChua += c.suaChuaCost || 0;
-        sumGiaoHang += c.giaoHangCost || 0;
-        sumLapDat += c.lapDatCost || 0;
-        sumGiaoLap += c.giaoLapCost || 0;
-        sumThayLoc += c.thayLocCost || 0;
-        sumDistanceCost += c.distanceCost || 0;
-        sumOtherCost += c.otherCost || 0;
-        sumTotalCost += c.totalCost || 0;
-
-        const d = new Date(c.createdAt);
-        const formattedDate = `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
-
-        const customCostsObj = (c.customCosts as any) || {};
-
-        detailRowsData.push([
-          detailIdx++,
-          formattedDate,
-          s.fullName,
-          s.stationName || 'Khác',
-          c.customerName || '',
-          c.customerPhone || '',
-          c.province || '',
-          (c.products || []).join(', '),
-          c.workType,
-          c.orderNote || '',
-          c.reportNote || '',
-          c.distance > 0 ? c.distance : '-',
-          (c.baoHanhCost > 0 || customCostsObj.baoHanhCost !== undefined) ? c.baoHanhCost : '-',
-          (c.suaChuaCost > 0 || customCostsObj.suaChuaCost !== undefined) ? c.suaChuaCost : '-',
-          (c.giaoHangCost > 0 || customCostsObj.giaoHangCost !== undefined) ? c.giaoHangCost : '-',
-          (c.lapDatCost > 0 || customCostsObj.lapDatCost !== undefined) ? c.lapDatCost : '-',
-          (c.giaoLapCost > 0 || customCostsObj.giaoLapCost !== undefined) ? c.giaoLapCost : '-',
-          (c.thayLocCost > 0 || customCostsObj.thayLocCost !== undefined || c.workType === 'Thay lọc') ? c.thayLocCost : '-',
-          (c.distanceCost > 0 || customCostsObj.distanceCost !== undefined) ? c.distanceCost : '-',
-          (c.otherCost > 0 || customCostsObj.otherCost !== undefined) ? c.otherCost : '-',
-          c.totalCost
-        ]);
+    // Xác định danh sách các sheet cần xuất (Mặc định: Tất cả ngoại trừ ma trận đơn giá)
+    let targetTabKeys: string[] = [];
+    if (!rawTab || rawTab === 'default') {
+      targetTabKeys = Object.keys(SALARY_EXPORT_TABS).filter(k => k !== 'rates');
+    } else if (rawTab === 'all') {
+      targetTabKeys = Object.keys(SALARY_EXPORT_TABS);
+    } else {
+      const requestedKeys = rawTab.split(',').map(s => s.trim().toLowerCase()).filter(Boolean);
+      targetTabKeys = requestedKeys.filter(k => !!SALARY_EXPORT_TABS[k]);
+      if (targetTabKeys.length === 0) {
+        targetTabKeys = Object.keys(SALARY_EXPORT_TABS).filter(k => k !== 'rates');
       }
     }
 
-    const hasDetailRows = detailRowsData.length > 0;
-    const lastDetailDataRow = hasDetailRows ? 5 + detailRowsData.length : 5;
+    const monthClean = month.replace('/', '_');
 
-    const topSummaryRow2 = wsDetail.addRow([
-      'TỔNG CỘNG THEO BỘ LỌC:', '', '', '', '', '', '', '', '', '', '', '',
-      sumBaoHanh, sumSuaChua, sumGiaoHang, sumLapDat, sumGiaoLap, sumThayLoc, sumDistanceCost, sumOtherCost, sumTotalCost
-    ]);
-    topSummaryRow2.height = 26;
+    // Xây dựng hậu tố tên file dựa trên bộ lọc áp dụng
+    const filterParts: string[] = [];
 
-    topSummaryRow2.eachCell((cell, colNum) => {
-      cell.font = { name: 'Arial', size: 11, bold: true, color: { argb: 'FF1B3A6B' } };
-      cell.alignment = { vertical: 'middle', horizontal: colNum >= 13 ? 'right' : 'left' };
-      if (colNum >= 13) cell.numFmt = '#,##0';
-      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE2E8F0' } };
-      cell.border = {
-        top: { style: 'medium', color: { argb: 'FF1B3A6B' } },
-        left: { style: 'thin', color: { argb: 'FFCBD5E1' } },
-        bottom: { style: 'medium', color: { argb: 'FF1B3A6B' } },
-        right: { style: 'thin', color: { argb: 'FFCBD5E1' } }
-      };
-    });
-
-    for (const rData of detailRowsData) {
-      const row = wsDetail.addRow(rData);
-      row.height = 22;
-      row.eachCell((cell, colNum) => {
-        cell.alignment = { vertical: 'middle', horizontal: colNum >= 12 ? 'right' : colNum === 1 ? 'center' : 'left' };
-        if (colNum >= 13 && typeof cell.value === 'number') {
-          cell.numFmt = '#,##0';
-        }
-        cell.border = {
-          top: { style: 'thin', color: { argb: 'FFCBD5E1' } },
-          left: { style: 'thin', color: { argb: 'FFCBD5E1' } },
-          bottom: { style: 'thin', color: { argb: 'FFCBD5E1' } },
-          right: { style: 'thin', color: { argb: 'FFCBD5E1' } }
-        };
-      });
+    if (ktvIdsList.length === 1) {
+      const singleKtv = allSalaries.find((s: any) => s.userId === ktvIdsList[0]);
+      if (singleKtv && singleKtv.fullName) {
+        filterParts.push(`KTV_${toSlug(singleKtv.fullName)}`);
+      } else {
+        filterParts.push(`KTV_${ktvIdsList[0].slice(0, 8)}`);
+      }
+    } else if (ktvIdsList.length > 1) {
+      filterParts.push(`KTV_${ktvIdsList.length}_nguoi`);
+    } else if (commissionKtvId) {
+      const commKtv = allSalaries.find((s: any) => s.userId === commissionKtvId);
+      if (commKtv && commKtv.fullName) {
+        filterParts.push(`KTV_${toSlug(commKtv.fullName)}`);
+      }
     }
 
-    wsDetail.autoFilter = `A5:U${lastDetailDataRow}`;
-    [6, 18, 22, 18, 20, 14, 15, 25, 20, 25, 25, 15, 15, 15, 15, 15, 15, 15, 15, 15, 18].forEach((w, i) => {
-      wsDetail.getColumn(i + 1).width = w;
-    });
+    if (stationIdsList.length === 1) {
+      let stName = stationIdsList[0];
+      if (stName.includes('::')) stName = stName.split('::')[1] || stName.split('::')[0];
+      filterParts.push(`Tram_${toSlug(stName)}`);
+    } else if (stationIdsList.length > 1) {
+      filterParts.push(`Tram_${stationIdsList.length}_tram`);
+    }
 
-    wsDetail.eachRow((row, rowNumber) => {
-      if (rowNumber >= 4) {
-        row.eachCell((cell) => {
-          cell.border = {
-            top: { style: 'thin', color: { argb: 'FFCBD5E1' } },
-            left: { style: 'thin', color: { argb: 'FFCBD5E1' } },
-            bottom: { style: 'thin', color: { argb: 'FFCBD5E1' } },
-            right: { style: 'thin', color: { argb: 'FFCBD5E1' } }
-          };
-        });
+    if (completedDate) {
+      const dParts = completedDate.split('-');
+      if (dParts.length === 3) {
+        filterParts.push(`Ngay_${dParts[2]}_${dParts[1]}_${dParts[0]}`);
+      } else {
+        filterParts.push(`Ngay_${toSlug(completedDate)}`);
       }
-    });
+    }
+
+    if (workTypesList.length === 1) {
+      filterParts.push(toSlug(workTypesList[0]));
+    }
+
+    if (productsList.length === 1) {
+      filterParts.push(`SP_${toSlug(productsList[0])}`);
+    }
+
+    const filterSuffix = filterParts.length > 0 ? `_${filterParts.join('_')}` : '';
+    const monthTag = `T${monthClean}`;
+
+    let basePrefix = 'Bang_thu_lao_Truliva';
+    if (targetTabKeys.length === 1) {
+      const selectedTab = SALARY_EXPORT_TABS[targetTabKeys[0]];
+      await selectedTab.build(workbook, ctx);
+      basePrefix = selectedTab.fileNamePrefix;
+    } else {
+      for (const tabKey of targetTabKeys) {
+        await SALARY_EXPORT_TABS[tabKey].build(workbook, ctx);
+      }
+      if (targetTabKeys.length === Object.keys(SALARY_EXPORT_TABS).length) {
+        basePrefix = 'Bang_thu_lao_Truliva_Full';
+      } else if (targetTabKeys.includes('rates')) {
+        basePrefix = 'Bang_thu_lao_Truliva_Tuy_chon';
+      } else {
+        basePrefix = 'Bang_thu_lao_Truliva';
+      }
+    }
+
+    let cleanSuffix = filterSuffix;
+    if (basePrefix.endsWith('_KTV') && cleanSuffix.startsWith('_KTV_')) {
+      cleanSuffix = cleanSuffix.slice(4);
+    }
+    const fileName = `${basePrefix}${cleanSuffix}_${monthTag}.xlsx`;
 
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-    res.setHeader('Content-Disposition', `attachment; filename=Bang_chi_phi_dich_vu_Truliva_${month.replace('/', '_')}.xlsx`);
+    res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
+    res.setHeader('Access-Control-Expose-Headers', 'Content-Disposition');
 
     await workbook.xlsx.write(res);
     res.end();
@@ -670,49 +448,7 @@ export async function exportSalaries(req: Request, res: Response): Promise<void>
  */
 export async function getKtvRates(req: Request, res: Response): Promise<void> {
   try {
-    const customRates = await prisma.ktvServiceRate.findMany({
-      include: {
-        user: {
-          select: {
-            id: true,
-            fullName: true,
-            phoneNumber: true,
-            techStation: {
-              select: {
-                name: true,
-                mainStation: { select: { name: true } }
-              }
-            }
-          }
-        }
-      }
-    });
-
-    const stationRates = await loadStationRates();
-
-    const allKtvs = await prisma.user.findMany({
-      where: { role: 'KTV', isActive: true },
-      select: {
-        id: true,
-        fullName: true,
-        phoneNumber: true,
-        techStation: {
-          select: {
-            name: true,
-            mainStation: { select: { name: true } }
-          }
-        }
-      }
-    });
-
-    const ratesByUserMap = new Map<string, Record<string, number>>();
-    for (const r of customRates) {
-      if (!ratesByUserMap.has(r.userId)) {
-        ratesByUserMap.set(r.userId, {});
-      }
-      ratesByUserMap.get(r.userId)![r.workType] = r.rate;
-    }
-
+    const result = await getRatesMatrixData();
     const defaultRates = {
       giaoHang: 20000,
       baoHanh: 60000,
@@ -723,49 +459,8 @@ export async function getKtvRates(req: Request, res: Response): Promise<void> {
       thaoLapLai: 160000,
       kmRate: 3000,
       freeKmThreshold: 20,
-      freeKmThresholdTLSC: 50
+      freeKmThresholdTLSC: 20
     };
-
-    const result = allKtvs.map(ktv => {
-      const ktvPhoneNorm = (ktv.phoneNumber || '').replace(/\D/g, '').replace(/^84/, '').replace(/^0/, '');
-      const stationRate = ktvPhoneNorm ? stationRates.get(ktvPhoneNorm) : null;
-      const customMap = ratesByUserMap.get(ktv.id) || {};
-
-      const isOfficialTrulivaKtv = checkIsOfficialTrulivaKtv(ktv);
-
-      const baseBaoHanh = isOfficialTrulivaKtv ? 60000 : (stationRate?.rates['baoHanh'] || 60000);
-      const baseSuaChua = customMap['suaChua'] ?? customMap['baoHanh'] ?? (stationRate?.rates['suaChua'] || baseBaoHanh);
-      const baseGiaoHang = isOfficialTrulivaKtv ? 20000 : (stationRate?.rates['giaoHang'] || 20000);
-      const baseLapDat = isOfficialTrulivaKtv ? 100000 : (stationRate?.rates['lapDat'] || 100000);
-      const baseGiaoLap = isOfficialTrulivaKtv ? 120000 : (stationRate?.rates['giaoHangLapDat'] || 120000);
-      const baseThayLoc = isOfficialTrulivaKtv ? 40000 : (stationRate?.rates['thayLoc'] || 40000);
-
-      const baseKmRate = stationRate?.kmRate || 3000;
-      const baseFreeKmThreshold = stationRate?.freeKmThreshold || 20;
-      const baseFreeKmThresholdTLSC = isOfficialTrulivaKtv ? 20 : (stationRate?.freeKmThresholdTLSC || 50);
-
-      return {
-        userId: ktv.id,
-        fullName: ktv.fullName,
-        phoneNumber: ktv.phoneNumber,
-        stationName: ktv.techStation?.name || (stationRate ? stationRate.province : 'Không có'),
-        mainStationName: ktv.techStation?.mainStation?.name || 'Không có',
-        province: stationRate?.province || ktv.techStation?.name || 'Chưa cập nhật',
-        isOfficialTrulivaKtv,
-        rates: {
-          baoHanh: customMap['baoHanh'] ?? baseBaoHanh,
-          suaChua: customMap['suaChua'] ?? baseSuaChua,
-          giaoHang: customMap['giaoHang'] ?? baseGiaoHang,
-          lapDat: customMap['lapDat'] ?? baseLapDat,
-          giaoHangLapDat: customMap['giaoHangLapDat'] ?? baseGiaoLap,
-          thayLoc: customMap['thayLoc'] ?? baseThayLoc,
-          kmRate: customMap['kmRate'] ?? baseKmRate,
-          freeKmThreshold: customMap['freeKmThreshold'] ?? baseFreeKmThreshold,
-          freeKmThresholdTLSC: customMap['freeKmThresholdTLSC'] ?? baseFreeKmThresholdTLSC
-        },
-        hasCustomRates: Object.keys(customMap).length > 0
-      };
-    });
 
     res.json({ success: true, defaultRates, matrix: result, data: result });
   } catch (error: any) {

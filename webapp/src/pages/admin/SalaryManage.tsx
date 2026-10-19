@@ -12,6 +12,7 @@ import {
   Lock, 
   RefreshCw, 
   FileSpreadsheet,
+  Download,
   X,
   UserCheck,
   ChevronDown,
@@ -248,6 +249,17 @@ interface SalaryData {
   totalIncome?: number;
 }
 
+function toSlug(str: string | null | undefined): string {
+  if (!str) return '';
+  return String(str)
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/đ/g, 'd').replace(/Đ/g, 'D')
+    .replace(/[^a-zA-Z0-9_-]/g, '_')
+    .replace(/_+/g, '_')
+    .replace(/^_+|_+$/g, '');
+}
+
 export default function SalaryManage() {
   const { confirm } = useConfirm();
   const { user } = useAuth();
@@ -341,28 +353,6 @@ export default function SalaryManage() {
     note: string;
     saving: boolean;
   } | null>(null);
-
-  const filteredCommissions = useMemo(() => {
-    return (commissionsData.commissions || []).filter((comm: any) => {
-      if (selectedCommissionKtvFilter && comm.salesKtv?.id !== selectedCommissionKtvFilter) {
-        return false;
-      }
-      if (!commissionSearchQuery) return true;
-      const q = commissionSearchQuery.toLowerCase().trim();
-      const orderCode = (comm.orderCode || '').toLowerCase();
-      const customerName = (comm.customerName || '').toLowerCase();
-      const customerPhone = (comm.customerPhone || '').toLowerCase();
-      const ktvName = (comm.salesKtv?.fullName || '').toLowerCase();
-      const ktvPhone = (comm.salesKtv?.phoneNumber || '').toLowerCase();
-      return (
-        orderCode.includes(q) ||
-        customerName.includes(q) ||
-        customerPhone.includes(q) ||
-        ktvName.includes(q) ||
-        ktvPhone.includes(q)
-      );
-    });
-  }, [commissionsData.commissions, selectedCommissionKtvFilter, commissionSearchQuery]);
 
   const fetchCommissions = async (silent = false) => {
     if (!silent) setCommissionsLoading(true);
@@ -818,6 +808,26 @@ export default function SalaryManage() {
   const [modalKtvSearchQuery, setModalKtvSearchQuery] = useState('');
   const modalKtvDropdownRef = useRef<HTMLDivElement>(null);
 
+  // Dropdown Tùy chọn Xuất Excel theo từng tab / Toàn bộ
+  const [isExportDropdownOpen, setIsExportDropdownOpen] = useState(false);
+  const exportDropdownRef = useRef<HTMLDivElement>(null);
+
+  // State danh sách các sheet được chọn để xuất Excel (Mặc định: Tất cả NGOẠI TRỪ Ma trận đơn giá)
+  const [selectedExportSheets, setSelectedExportSheets] = useState<string[]>(() => {
+    try {
+      const saved = sessionStorage.getItem('salary_export_sheets');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch (e) {}
+    return ['summary', 'cases', 'commissions'];
+  });
+
+  useEffect(() => {
+    sessionStorage.setItem('salary_export_sheets', JSON.stringify(selectedExportSheets));
+  }, [selectedExportSheets]);
+
   // Tự động lưu bộ lọc vào sessionStorage mỗi khi có thay đổi (Item 8)
   useEffect(() => {
     sessionStorage.setItem('salary_manage_filters', JSON.stringify({
@@ -874,6 +884,9 @@ export default function SalaryManage() {
       }
       if (modalKtvDropdownRef.current && !modalKtvDropdownRef.current.contains(event.target as Node)) {
         setIsModalKtvDropdownOpen(false);
+      }
+      if (exportDropdownRef.current && !exportDropdownRef.current.contains(event.target as Node)) {
+        setIsExportDropdownOpen(false);
       }
     };
     document.addEventListener('mousedown', handleClickOutside);
@@ -1126,13 +1139,28 @@ export default function SalaryManage() {
     }
   };
 
-  // Export to Excel (With full filters support)
-  const handleExportExcel = async () => {
+  // Export to Excel (Hỗ trợ xuất 1, 2, 3 hoặc 4 sheet tùy chọn theo bộ lọc)
+  const handleExportExcel = async (customTabs?: string | string[]) => {
     setExporting(true);
     setMessage(null);
     try {
       const token = localStorage.getItem('session_token');
-      let url = `/api/salaries/export?month=${encodeURIComponent(selectedMonth)}`;
+
+      let tabsToExport: string[] = [];
+      if (Array.isArray(customTabs)) {
+        tabsToExport = customTabs;
+      } else if (typeof customTabs === 'string' && customTabs) {
+        tabsToExport = customTabs.split(',').map(s => s.trim()).filter(Boolean);
+      } else {
+        tabsToExport = selectedExportSheets.length > 0 ? selectedExportSheets : ['summary', 'cases', 'commissions'];
+      }
+
+      if (tabsToExport.length === 0) {
+        tabsToExport = ['summary', 'cases', 'commissions'];
+      }
+
+      const tabsParam = tabsToExport.join(',');
+      let url = `/api/salaries/export?month=${encodeURIComponent(selectedMonth)}&tab=${encodeURIComponent(tabsParam)}`;
       if (selectedKtvsFilter.length > 0) {
         const ktvParam = encodeURIComponent(selectedKtvsFilter.join(','));
         url += `&ktvId=${ktvParam}&ktvIds=${ktvParam}`;
@@ -1155,6 +1183,10 @@ export default function SalaryManage() {
       }
       if (searchQuery) url += `&search=${encodeURIComponent(searchQuery)}`;
 
+      // Tab Hoa hồng filters
+      if (commissionSearchQuery) url += `&commissionSearch=${encodeURIComponent(commissionSearchQuery)}`;
+      if (selectedCommissionKtvFilter) url += `&commissionKtvId=${encodeURIComponent(selectedCommissionKtvFilter)}`;
+
       const response = await fetch(url, {
         headers: {
           'Authorization': `Bearer ${token}`
@@ -1167,7 +1199,76 @@ export default function SalaryManage() {
       const downloadUrl = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = downloadUrl;
-      link.setAttribute('download', `Bang_chi_phi_dich_vu_Truliva_${selectedMonth.replace('/', '_')}.xlsx`);
+      
+      const disposition = response.headers.get('content-disposition');
+      let downloadFilename = '';
+      if (disposition && disposition.includes('filename=')) {
+        const match = disposition.match(/filename="?([^"]+)"?/);
+        if (match && match[1]) downloadFilename = decodeURIComponent(match[1]);
+      }
+
+      if (!downloadFilename) {
+        const filterParts: string[] = [];
+        if (selectedKtvsFilter.length === 1) {
+          const ktv = salaries.find(s => s.userId === selectedKtvsFilter[0]);
+          if (ktv?.fullName) filterParts.push(`KTV_${toSlug(ktv.fullName)}`);
+          else filterParts.push(`KTV_${selectedKtvsFilter[0].slice(0, 8)}`);
+        } else if (selectedKtvsFilter.length > 1) {
+          filterParts.push(`KTV_${selectedKtvsFilter.length}_nguoi`);
+        } else if (selectedCommissionKtvFilter) {
+          const ktv = salaries.find(s => s.userId === selectedCommissionKtvFilter);
+          if (ktv?.fullName) filterParts.push(`KTV_${toSlug(ktv.fullName)}`);
+        }
+
+        if (selectedStationsFilter.length === 1) {
+          let stName = selectedStationsFilter[0];
+          if (stName.includes('::')) stName = stName.split('::')[1] || stName.split('::')[0];
+          filterParts.push(`Tram_${toSlug(stName)}`);
+        } else if (selectedStationsFilter.length > 1) {
+          filterParts.push(`Tram_${selectedStationsFilter.length}_tram`);
+        }
+
+        if (selectedCompletedDateFilter) {
+          const dParts = selectedCompletedDateFilter.split('-');
+          if (dParts.length === 3) filterParts.push(`Ngay_${dParts[2]}_${dParts[1]}_${dParts[0]}`);
+          else filterParts.push(`Ngay_${toSlug(selectedCompletedDateFilter)}`);
+        }
+
+        if (selectedWorkTypeFilter) {
+          filterParts.push(toSlug(selectedWorkTypeFilter));
+        }
+
+        if (selectedProductFilter) {
+          filterParts.push(`SP_${toSlug(selectedProductFilter)}`);
+        }
+
+        const filterSuffix = filterParts.length > 0 ? `_${filterParts.join('_')}` : '';
+        const monthClean = selectedMonth.replace('/', '_');
+
+        let basePrefix = 'Bang_thu_lao_Truliva';
+        if (tabsToExport.length === 1) {
+          const map: Record<string, string> = {
+            summary: 'Bang_tong_hop_thu_lao_KTV',
+            cases: 'Chi_tiet_ca_dich_vu',
+            rates: 'Ma_tran_don_gia_KTV',
+            commissions: 'Bang_hoa_hong_ban_hang'
+          };
+          basePrefix = map[tabsToExport[0]] || 'Bang_thu_lao_Truliva';
+        } else if (tabsToExport.length === 4) {
+          basePrefix = 'Bang_thu_lao_Truliva_Full';
+        } else if (tabsToExport.includes('rates')) {
+          basePrefix = 'Bang_thu_lao_Truliva_Tuy_chon';
+        }
+
+        let cleanSuffix = filterSuffix;
+        if (basePrefix.endsWith('_KTV') && cleanSuffix.startsWith('_KTV_')) {
+          cleanSuffix = cleanSuffix.slice(4);
+        }
+
+        downloadFilename = `${basePrefix}${cleanSuffix}_T${monthClean}.xlsx`;
+      }
+
+      link.setAttribute('download', downloadFilename);
       document.body.appendChild(link);
       link.click();
       link.parentNode?.removeChild(link);
@@ -1176,6 +1277,7 @@ export default function SalaryManage() {
       setMessage({ type: 'error', text: err.message || 'Lỗi khi xuất bảng thù lao Excel' });
     } finally {
       setExporting(false);
+      setIsExportDropdownOpen(false);
     }
   };
 
@@ -1765,6 +1867,164 @@ export default function SalaryManage() {
     });
   }, [salaries, filteredCases, selectedKtvsFilter, selectedStationsFilter, selectedWorkTypeFilter, selectedServiceTypeFilter, selectedProductFilter, selectedCompletedDateFilter, selectedDistancePresets, searchQuery]);
 
+  // Danh sách Đơn hàng Hoa hồng bán hàng sau khi lọc theo KTV, Trạm, Ngày HT, Sản phẩm, Tìm kiếm
+  const filteredCommissions = useMemo(() => {
+    return (commissionsData.commissions || []).filter((comm: any) => {
+      // 1. Lọc theo KTV từ bộ lọc toàn cục (Top Filter Bar)
+      if (selectedKtvsFilter.length > 0) {
+        const salesKtvId = comm.salesKtv?.id || comm.salesKtvId;
+        if (!salesKtvId || !selectedKtvsFilter.includes(salesKtvId)) {
+          return false;
+        }
+      }
+
+      // 2. Lọc theo KTV trong tab Hoa Hồng (Local Dropdown)
+      if (selectedCommissionKtvFilter) {
+        const salesKtvId = comm.salesKtv?.id || comm.salesKtvId;
+        if (salesKtvId !== selectedCommissionKtvFilter) {
+          return false;
+        }
+      }
+
+      // 3. Lọc theo Trạm từ bộ lọc toàn cục
+      if (selectedStationsFilter.length > 0) {
+        const sMain = comm.salesKtv?.techStation?.mainStationName || comm.salesKtv?.mainStationName || 'Trực thuộc Truliva';
+        const sTech = comm.salesKtv?.techStation?.name || comm.salesKtv?.stationName || 'Khác';
+        const sKey = `${sMain}::${sTech}`;
+        const normKey = normStr(sKey);
+        const normMain = normStr(sMain);
+        const normTech = normStr(sTech);
+
+        const matchStation = selectedStationsFilter.some(item => {
+          const filter = item.trim();
+          if (!filter) return false;
+          const normF = normStr(filter);
+          if (filter === sKey || normF === normKey) return true;
+          if (filter.includes('::')) {
+            const [f1, f2] = filter.split('::').map(x => normStr(x));
+            return (f1 === normMain && f2 === normTech) || (f1 === normTech && f2 === normMain);
+          }
+          return normMain === normF || normTech === normF;
+        });
+        if (!matchStation) return false;
+      }
+
+      // 4. Lọc theo Ngày hoàn thành
+      if (selectedCompletedDateFilter) {
+        const cDate = comm.completedDate ? new Date(comm.completedDate).toLocaleDateString('sv-SE') : '';
+        if (cDate !== selectedCompletedDateFilter) return false;
+      }
+
+      // 5. Lọc theo Sản phẩm
+      if (selectedProductFilter && Array.isArray(comm.itemsDetail)) {
+        const prodQ = selectedProductFilter.toLowerCase();
+        const matchProd = comm.itemsDetail.some((it: any) =>
+          (it.name && it.name.toLowerCase().includes(prodQ)) ||
+          (it.sku && it.sku.toLowerCase().includes(prodQ))
+        );
+        if (!matchProd) return false;
+      }
+
+      // 6. Lọc theo ô tìm kiếm trong tab Hoa Hồng
+      if (commissionSearchQuery) {
+        const q = commissionSearchQuery.toLowerCase().trim();
+        const orderCode = (comm.orderCode || '').toLowerCase();
+        const customerName = (comm.customerName || '').toLowerCase();
+        const customerPhone = (comm.customerPhone || '').toLowerCase();
+        const ktvName = (comm.salesKtv?.fullName || '').toLowerCase();
+        const ktvPhone = (comm.salesKtv?.phoneNumber || '').toLowerCase();
+        const match =
+          orderCode.includes(q) ||
+          customerName.includes(q) ||
+          customerPhone.includes(q) ||
+          ktvName.includes(q) ||
+          ktvPhone.includes(q);
+        if (!match) return false;
+      }
+
+      // 7. Lọc theo ô tìm kiếm toàn cục (searchQuery trên header)
+      if (searchQuery) {
+        const q = searchQuery.toLowerCase().trim();
+        const orderCode = (comm.orderCode || '').toLowerCase();
+        const customerName = (comm.customerName || '').toLowerCase();
+        const customerPhone = (comm.customerPhone || '').toLowerCase();
+        const ktvName = (comm.salesKtv?.fullName || '').toLowerCase();
+        const ktvPhone = (comm.salesKtv?.phoneNumber || '').toLowerCase();
+        const match =
+          orderCode.includes(q) ||
+          customerName.includes(q) ||
+          customerPhone.includes(q) ||
+          ktvName.includes(q) ||
+          ktvPhone.includes(q);
+        if (!match) return false;
+      }
+
+      return true;
+    });
+  }, [
+    commissionsData.commissions,
+    selectedKtvsFilter,
+    selectedCommissionKtvFilter,
+    selectedStationsFilter,
+    selectedCompletedDateFilter,
+    selectedProductFilter,
+    commissionSearchQuery,
+    searchQuery
+  ]);
+
+  // Thống kê hoa hồng tương ứng theo dữ liệu đã lọc (đồng bộ cards với bảng)
+  const filteredCommissionStats = useMemo(() => {
+    const totalOrders = filteredCommissions.length;
+    let totalPreVatRevenue = 0;
+    let totalCalculatedCommission = 0;
+    let totalFinalCommission = 0;
+    let totalDeviceCommission = 0;
+    let totalFilterCommission = 0;
+    const ktvSet = new Set<string>();
+
+    filteredCommissions.forEach((comm: any) => {
+      const preVat = (comm.preVatDeviceRevenue || 0) + (comm.preVatFilterRevenue || 0);
+      totalPreVatRevenue += preVat;
+      totalCalculatedCommission += comm.calculatedCommission || 0;
+      totalFinalCommission += (comm.finalCommission !== undefined && comm.finalCommission !== null) ? comm.finalCommission : (comm.calculatedCommission || 0);
+      totalDeviceCommission += Math.max(0, (comm.deviceCommissionGross || comm.deviceCommissionPreLapDat || 0) - (comm.lapDatCostDeducted || 0));
+      totalFilterCommission += (comm.filterCommissionGross || comm.filterCommission || 0);
+      const kId = comm.salesKtv?.id || comm.salesKtvId;
+      if (kId) ktvSet.add(kId);
+    });
+
+    return {
+      totalOrders,
+      totalPreVatRevenue: Math.round(totalPreVatRevenue),
+      totalCalculatedCommission: Math.round(totalCalculatedCommission),
+      totalFinalCommission: Math.round(totalFinalCommission),
+      totalCommission: Math.round(totalFinalCommission),
+      totalDeviceCommission: Math.round(totalDeviceCommission),
+      totalFilterCommission: Math.round(totalFilterCommission),
+      totalSalesKtvs: ktvSet.size
+    };
+  }, [filteredCommissions]);
+
+  // Cấu hình các sheet Excel xuất tương ứng các tab trong Quản lý lương
+  const EXPORT_SHEETS_CONFIG = useMemo(() => [
+    { key: 'summary', sheetNum: 1, label: 'Sheet 1: Tổng Hợp Theo KTV', icon: '📊', count: `${filteredSalaries.length} KTV`, desc: 'Bảng thù lao tổng hợp' },
+    { key: 'cases', sheetNum: 2, label: 'Sheet 2: Chi Tiết Tất Cả Ca Dịch Vụ', icon: '📋', count: `${filteredCases.length} ca`, desc: 'Chi tiết từng ca theo bộ lọc' },
+    { key: 'rates', sheetNum: 3, label: 'Sheet 3: Ma Trận Đơn Giá KTV', icon: '⚙️', count: `${filteredRateMatrix.length} KTV`, desc: 'Ma trận đơn giá (nội bộ)', isInternal: true },
+    { key: 'commissions', sheetNum: 4, label: 'Sheet 4: Hoa Hồng Bán Hàng', icon: '🏷️', count: `${filteredCommissions.length} đơn`, desc: 'Hoa hồng bán máy & lõi lọc' },
+  ], [filteredSalaries.length, filteredCases.length, filteredRateMatrix.length, filteredCommissions.length]);
+
+  const toggleExportSheet = (key: string) => {
+    setSelectedExportSheets(prev => {
+      if (prev.includes(key)) {
+        return prev.filter(k => k !== key);
+      } else {
+        const order = ['summary', 'cases', 'rates', 'commissions'];
+        const next = [...prev, key];
+        return order.filter(k => next.includes(k));
+      }
+    });
+  };
+
   // Floating Sticky Table Header Hook
   const {
     tableWrapperRef,
@@ -2011,7 +2271,7 @@ export default function SalaryManage() {
               }`}
             >
               <Package className="h-4 w-4 text-emerald-600" />
-              <span>🏷️ Hoa Hồng Bán Hàng ({commissionsData.commissions.length})</span>
+              <span>🏷️ Hoa Hồng Bán Hàng ({filteredCommissions.length !== commissionsData.commissions.length ? `${filteredCommissions.length}/${commissionsData.commissions.length}` : commissionsData.commissions.length})</span>
             </button>
           </div>
 
@@ -2026,14 +2286,170 @@ export default function SalaryManage() {
               Tính lại
             </button>
             
-            <button
-              onClick={handleExportExcel}
-              disabled={exporting || salaries.length === 0}
-              className="px-4 py-2 bg-[#107C41] hover:bg-[#0E6C38] text-white font-medium rounded-lg text-xs flex items-center gap-1.5 transition disabled:opacity-50 shadow-sm cursor-pointer"
-            >
-              <FileSpreadsheet className="h-4 w-4" />
-              {exporting ? 'Đang xuất...' : 'Xuất File Excel Pure Vita (2 Sheet)'}
-            </button>
+            {/* Split / Dropdown Excel Export Button (Mặc định: Tất cả trừ Ma trận đơn giá, cho phép chọn 1, 2, 3 hay 4 sheet) */}
+            <div className="relative inline-flex items-center shadow-sm rounded-lg" ref={exportDropdownRef}>
+              <button
+                type="button"
+                onClick={() => handleExportExcel(selectedExportSheets)}
+                disabled={exporting || (salaries.length === 0 && rateMatrix.length === 0 && commissionsData.commissions.length === 0) || selectedExportSheets.length === 0}
+                className="px-3.5 py-2 bg-[#107C41] hover:bg-[#0E6C38] text-white font-medium rounded-l-lg text-xs flex items-center gap-1.5 transition disabled:opacity-50 cursor-pointer border-r border-[#0c5c30]"
+                title={`Tải ${selectedExportSheets.length} sheet Excel đã chọn theo bộ lọc hiện tại`}
+              >
+                <FileSpreadsheet className="h-4 w-4" />
+                <span>
+                  {exporting 
+                    ? 'Đang xuất...' 
+                    : selectedExportSheets.length === 3 && !selectedExportSheets.includes('rates')
+                      ? 'Xuất Excel (3 Sheet chuẩn)'
+                      : `Xuất Excel (${selectedExportSheets.length} Sheet)`}
+                </span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setIsExportDropdownOpen(!isExportDropdownOpen)}
+                disabled={exporting}
+                className="px-2 py-2 bg-[#107C41] hover:bg-[#0E6C38] text-white rounded-r-lg text-xs flex items-center justify-center transition disabled:opacity-50 cursor-pointer"
+                title="Tùy chọn tích chọn các sheet cần xuất"
+              >
+                <ChevronDown className={`h-4 w-4 transition-transform ${isExportDropdownOpen ? 'rotate-180' : ''}`} />
+              </button>
+
+              {/* Dropdown Menu Tùy Chọn Từng Sheet */}
+              {isExportDropdownOpen && (
+                <div className="absolute right-0 top-full mt-1.5 w-88 bg-white border border-gray-200 rounded-xl shadow-2xl z-50 p-3 text-xs space-y-2.5 animate-in fade-in zoom-in-95 duration-150">
+                  <div className="pb-2 border-b border-gray-100 flex items-center justify-between">
+                    <div>
+                      <div className="font-bold text-gray-800 flex items-center gap-1.5">
+                        <FileSpreadsheet className="h-4 w-4 text-[#107C41]" />
+                        <span>Tùy chọn các Sheet xuất Excel</span>
+                      </div>
+                      <div className="text-[10px] text-gray-400 mt-0.5">
+                        Tích chọn sheet muốn xuất (1, 2, 3 hoặc cả 4)
+                      </div>
+                    </div>
+                    <span className="text-[10px] text-blue-700 bg-blue-50 px-2 py-0.5 rounded font-semibold border border-blue-100">
+                      Áp dụng bộ lọc
+                    </span>
+                  </div>
+
+                  {/* Preset Buttons */}
+                  <div className="flex items-center gap-1.5 bg-gray-50 p-1.5 rounded-lg border border-gray-100">
+                    <button
+                      type="button"
+                      onClick={() => setSelectedExportSheets(['summary', 'cases', 'commissions'])}
+                      className={`flex-1 py-1 px-1.5 rounded text-[11px] font-semibold transition cursor-pointer text-center ${
+                        selectedExportSheets.length === 3 && !selectedExportSheets.includes('rates')
+                          ? 'bg-white text-emerald-800 shadow-xs border border-emerald-200'
+                          : 'text-gray-600 hover:text-gray-900 hover:bg-white/60'
+                      }`}
+                      title="Mặc định: Tổng hợp KTV, Chi tiết ca, Hoa hồng (loại trừ Ma trận đơn giá)"
+                    >
+                      🎯 3 Sheet chuẩn
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setSelectedExportSheets(['summary', 'cases', 'rates', 'commissions'])}
+                      className={`flex-1 py-1 px-1.5 rounded text-[11px] font-semibold transition cursor-pointer text-center ${
+                        selectedExportSheets.length === 4
+                          ? 'bg-white text-blue-800 shadow-xs border border-blue-200'
+                          : 'text-gray-600 hover:text-gray-900 hover:bg-white/60'
+                      }`}
+                      title="Chọn tất cả 4 sheet bao gồm cả Ma trận đơn giá"
+                    >
+                      📗 Tất cả 4 sheet
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setSelectedExportSheets([viewMode === 'detail' ? 'cases' : viewMode])}
+                      className={`flex-1 py-1 px-1.5 rounded text-[11px] font-semibold transition cursor-pointer text-center ${
+                        selectedExportSheets.length === 1 && selectedExportSheets.includes(viewMode === 'detail' ? 'cases' : viewMode)
+                          ? 'bg-white text-indigo-800 shadow-xs border border-indigo-200'
+                          : 'text-gray-600 hover:text-gray-900 hover:bg-white/60'
+                      }`}
+                      title="Chỉ chọn tab đang xem trên màn hình"
+                    >
+                      📄 Tab đang xem
+                    </button>
+                  </div>
+
+                  {/* Checklist of sheets */}
+                  <div className="space-y-1 py-1">
+                    {EXPORT_SHEETS_CONFIG.map(item => {
+                      const isChecked = selectedExportSheets.includes(item.key);
+                      return (
+                        <div
+                          key={item.key}
+                          onClick={() => toggleExportSheet(item.key)}
+                          className={`w-full text-left px-2.5 py-2 rounded-lg border transition flex items-center justify-between gap-2.5 cursor-pointer select-none ${
+                            isChecked
+                              ? 'bg-emerald-50/70 border-emerald-200 text-gray-900'
+                              : 'bg-white border-gray-150 hover:bg-gray-50 text-gray-500'
+                          }`}
+                        >
+                          <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                            <input
+                              type="checkbox"
+                              checked={isChecked}
+                              onChange={() => {}} // Controlled by row click
+                              className="rounded border-gray-300 text-emerald-600 focus:ring-emerald-500 cursor-pointer h-4 w-4"
+                            />
+                            <span className="text-base flex-shrink-0">{item.icon}</span>
+                            <div className="min-w-0 flex-1">
+                              <div className="text-xs font-semibold flex items-center gap-1.5 flex-wrap">
+                                <span className={isChecked ? 'text-gray-900 font-bold' : 'text-gray-600'}>
+                                  {item.label}
+                                </span>
+                                {item.isInternal && (
+                                  <span className="text-[9px] bg-amber-100 text-amber-800 px-1.5 py-0.2 rounded font-medium">
+                                    Nội bộ
+                                  </span>
+                                )}
+                              </div>
+                              <div className="text-[10px] text-gray-400 truncate">
+                                {item.desc} • <strong className="text-gray-500">{item.count}</strong>
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Quick single sheet export icon */}
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleExportExcel(item.key);
+                            }}
+                            className="p-1 hover:bg-gray-200/80 rounded-md text-gray-400 hover:text-emerald-700 transition cursor-pointer flex-shrink-0"
+                            title={`Tải ngay riêng ${item.label}`}
+                          >
+                            <Download className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  {/* Action button inside dropdown */}
+                  <div className="pt-2 border-t border-gray-100">
+                    <button
+                      type="button"
+                      onClick={() => handleExportExcel(selectedExportSheets)}
+                      disabled={exporting || selectedExportSheets.length === 0}
+                      className="w-full py-2 px-3 bg-[#107C41] hover:bg-[#0E6C38] text-white font-bold rounded-lg text-xs flex items-center justify-center gap-2 transition disabled:opacity-50 shadow-sm cursor-pointer"
+                    >
+                      <Download className="h-4 w-4" />
+                      <span>
+                        {exporting 
+                          ? 'Đang tạo file Excel...' 
+                          : selectedExportSheets.length === 0 
+                            ? 'Vui lòng chọn ít nhất 1 sheet' 
+                            : `Tải File Excel (${selectedExportSheets.length} Sheet đã chọn)`}
+                      </span>
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
 
             {isAdmin && !isMonthLocked && (
               <>
@@ -4137,10 +4553,10 @@ export default function SalaryManage() {
                 <span className="p-1.5 bg-white/10 rounded-lg">🏷️</span>
               </div>
               <div className="text-2xl font-black tracking-tight text-white mb-1">
-                {formatMoney(commissionsData.stats?.totalCommission || 0)}
+                {formatMoney(filteredCommissionStats.totalCommission)}
               </div>
               <div className="text-xs text-blue-200">
-                {commissionsData.stats?.totalOrders || 0} đơn hàng hoàn thành
+                {filteredCommissionStats.totalOrders} đơn hàng hoàn thành
               </div>
             </div>
 
@@ -4150,7 +4566,7 @@ export default function SalaryManage() {
                 <span className="p-1.5 bg-emerald-50 text-emerald-600 rounded-lg font-bold">15%</span>
               </div>
               <div className="text-2xl font-black tracking-tight text-emerald-700 mb-1">
-                {formatMoney(commissionsData.stats?.totalDeviceCommission || 0)}
+                {formatMoney(filteredCommissionStats.totalDeviceCommission)}
               </div>
               <div className="text-xs text-gray-400">
                 Đã trừ chi phí ca giao hàng & lắp đặt của KTV bán
@@ -4163,7 +4579,7 @@ export default function SalaryManage() {
                 <span className="p-1.5 bg-blue-50 text-blue-600 rounded-lg font-bold">10%</span>
               </div>
               <div className="text-2xl font-black tracking-tight text-blue-700 mb-1">
-                {formatMoney(commissionsData.stats?.totalFilterCommission || 0)}
+                {formatMoney(filteredCommissionStats.totalFilterCommission)}
               </div>
               <div className="text-xs text-gray-400">
                 10% doanh thu thuần sau VAT 8%
@@ -4176,7 +4592,7 @@ export default function SalaryManage() {
                 <span className="p-1.5 bg-amber-50 text-amber-600 rounded-lg">👥</span>
               </div>
               <div className="text-2xl font-black tracking-tight text-amber-800 mb-1">
-                {commissionsData.stats?.totalSalesKtvs || 0} <span className="text-sm font-bold text-gray-500">KTV</span>
+                {filteredCommissionStats.totalSalesKtvs} <span className="text-sm font-bold text-gray-500">KTV</span>
               </div>
               <div className="text-xs text-gray-400">
                 Tháng {selectedMonth}
@@ -4242,8 +4658,16 @@ export default function SalaryManage() {
             ) : filteredCommissions.length === 0 ? (
               <div className="p-12 text-center text-gray-400">
                 <Package className="h-10 w-10 mx-auto text-gray-300 mb-2" />
-                <p className="text-sm font-semibold text-gray-600">Không tìm thấy đơn hàng bán nào trong tháng {selectedMonth}</p>
-                <p className="text-xs text-gray-400 mt-1">Đơn hàng cần có KTV bán hàng được chỉ định và trạng thái hoàn thành trong tháng.</p>
+                <p className="text-sm font-semibold text-gray-600">
+                  {selectedKtvsFilter.length > 0 || selectedStationsFilter.length > 0 || selectedCommissionKtvFilter || commissionSearchQuery || searchQuery
+                    ? `Không tìm thấy đơn hàng bán nào phù hợp với bộ lọc trong tháng ${selectedMonth}`
+                    : `Không tìm thấy đơn hàng bán nào trong tháng ${selectedMonth}`}
+                </p>
+                <p className="text-xs text-gray-400 mt-1">
+                  {selectedKtvsFilter.length > 0
+                    ? 'KTV được lọc không có đơn hàng bán nào được phân công hoặc hoàn thành trong tháng này.'
+                    : 'Đơn hàng cần có KTV bán hàng được chỉ định và trạng thái hoàn thành trong tháng.'}
+                </p>
               </div>
             ) : (
               <div className="overflow-x-auto">

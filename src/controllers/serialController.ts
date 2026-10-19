@@ -240,38 +240,6 @@ export async function confirmPublicSerial(req: Request, res: Response): Promise<
 
 export async function zaloAuthorize(req: Request, res: Response): Promise<void> {
   try {
-    const templateId = process.env.ZALO_ZNS_TEMPLATE_ID || '617366';
-    const appId = process.env.ZALO_APP_ID || process.env.FNS_APP_ID || '2357243243674073653';
-
-    if (req.query.force !== 'oauth') {
-      res.send(`
-        <html>
-          <head>
-            <title>Liên kết Zalo OA</title>
-            <meta charset="utf-8">
-            <style>
-              body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; background-color: #f3f4f6; }
-              .card { background: white; padding: 32px; border-radius: 12px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); text-align: center; max-width: 440px; }
-              h2 { color: #10b981; margin-top: 0; font-size: 20px; }
-              p { color: #4b5563; font-size: 14px; line-height: 1.6; }
-              .badge { display: inline-block; background: #e0e7ff; color: #3730a3; font-weight: 700; padding: 4px 12px; border-radius: 9999px; font-size: 13px; margin: 8px 0; }
-              .btn { background: #2563eb; color: white; border: none; padding: 10px 24px; border-radius: 8px; font-weight: 600; cursor: pointer; margin-top: 16px; font-size: 14px; }
-            </style>
-          </head>
-          <body>
-            <div class="card">
-              <h2>Đã kết nối Zalo ZNS / ZBS Platform</h2>
-              <div class="badge">Template ID: ${templateId}</div>
-              <p>Hệ thống hiện tại đang tự động kết nối và phát tin nhắn ZNS xác nhận bảo hành thông qua cổng <strong>Zalo ZBS / Direct OpenAPI (App ID: ${appId})</strong>.</p>
-              <p>Trạng thái kết nối là <strong>Hoạt động (Active)</strong>. Hệ thống tự động duy trì và làm mới Access Token mà bạn không cần phải thao tác liên kết lại thủ công.</p>
-              <button onclick="window.close()" class="btn">Đóng cửa sổ</button>
-            </div>
-          </body>
-        </html>
-      `);
-      return;
-    }
-
     const config = await getZaloConfig();
     if (!config.appId) {
       res.status(400).send('Cấu hình Zalo OA chưa được thiết lập App ID trong DB hoặc file .env');
@@ -1841,16 +1809,25 @@ export async function restoreSerial(req: Request, res: Response): Promise<void> 
 
 export async function getZaloStatus(req: Request, res: Response): Promise<void> {
   try {
+    const config = await prisma.zaloConfig.findFirst();
     const templateId = process.env.ZALO_ZNS_TEMPLATE_ID || '617366';
-    const appId = process.env.ZALO_APP_ID || process.env.FNS_APP_ID || '2357243243674073653';
+    const appId = config?.appId || process.env.ZALO_APP_ID || '2124199062863091555';
+    const oaId = config?.oaId || process.env.ZALO_OA_ID || '3870382725035413507';
+
+    const hasTokens = !!config?.accessToken && !!config?.refreshToken;
+    let isExpired = false;
+
+    if (config?.tokenExpiredAt) {
+      isExpired = new Date(config.tokenExpiredAt).getTime() < Date.now();
+    }
 
     res.json({
       success: true,
-      isConnected: true,
-      isExpired: false,
-      oaId: `Cấu hình ZNS/ZBS (Template ${templateId})`,
+      isConnected: hasTokens && !isExpired,
+      isExpired,
+      oaId,
       appId,
-      tokenExpiredAt: null
+      tokenExpiredAt: config?.tokenExpiredAt || null
     });
   } catch (error: any) {
     res.status(500).json({ error: error.message || 'Lỗi hệ thống khi kiểm tra trạng thái Zalo' });

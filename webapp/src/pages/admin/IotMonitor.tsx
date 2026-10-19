@@ -21,6 +21,8 @@ import {
   Bell,
   BellOff,
   CheckCheck,
+  Copy,
+  Check,
 } from 'lucide-react';
 import {
   ResponsiveContainer,
@@ -174,6 +176,14 @@ export default function IotMonitor() {
   const [sendingCommand, setSendingCommand] = useState(false);
   const [mutingSerial, setMutingSerial] = useState<string | null>(null);
   const [resolvingAll, setResolvingAll] = useState(false);
+  const [copiedSerial, setCopiedSerial] = useState<string | null>(null);
+
+  const handleCopySerial = (e: React.MouseEvent, serial: string) => {
+    e.stopPropagation();
+    navigator.clipboard?.writeText(serial);
+    setCopiedSerial(serial);
+    setTimeout(() => setCopiedSerial(null), 2000);
+  };
 
   // Fetch devices data
   const fetchData = useCallback(async (isSilent = false) => {
@@ -384,33 +394,33 @@ export default function IotMonitor() {
   const totalAlerts = alerts.length;
 
   return (
-    <div className="p-4 md:p-8 max-w-7xl mx-auto space-y-6">
+    <div className="p-2.5 sm:p-5 md:p-8 max-w-7xl mx-auto space-y-4 sm:space-y-6">
       {/* ── HEADER ── */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-6 rounded-2xl border border-gray-100 shadow-sm">
-        <div className="flex items-center gap-3.5">
-          <div className="w-12 h-12 rounded-2xl bg-[#1B3A6B] text-white flex items-center justify-center shadow-md">
-            <Cpu size={24} />
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-3.5 sm:gap-4 bg-white p-4 sm:p-6 rounded-2xl border border-gray-100 shadow-xs">
+        <div className="flex items-center gap-3 sm:gap-3.5">
+          <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl sm:rounded-2xl bg-[#1B3A6B] text-white flex items-center justify-center shadow-md shrink-0">
+            <Cpu size={22} className="sm:w-6 sm:h-6" />
           </div>
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
-              Giám Sát Thiết Bị IoT (ESP32)
-              <span className="text-xs px-2.5 py-1 rounded-full bg-blue-50 text-[#1B3A6B] font-semibold border border-blue-100">
+          <div className="min-w-0">
+            <h1 className="text-lg sm:text-2xl font-bold text-gray-900 flex items-center flex-wrap gap-1.5 sm:gap-2">
+              <span>Giám Sát Máy IoT</span>
+              <span className="text-[11px] sm:text-xs px-2 py-0.5 rounded-full bg-blue-50 text-[#1B3A6B] font-semibold border border-blue-100 font-mono">
                 MQTT Live
               </span>
             </h1>
-            <p className="text-sm text-gray-500 mt-0.5">
-              Theo dõi chất lượng nước (TDS), tuổi thọ 3 lõi lọc (PPC, RO, CTO) & cảnh báo từ xa
+            <p className="text-xs sm:text-sm text-gray-500 mt-0.5 line-clamp-1 sm:line-clamp-none">
+              Theo dõi TDS, tuổi thọ 3 lõi lọc (PPC, RO, CTO) & điều khiển từ xa
             </p>
           </div>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="grid grid-cols-2 sm:flex sm:items-center gap-2 sm:gap-3 w-full sm:w-auto">
           <button
             onClick={() => fetchData(true)}
             disabled={refreshing}
-            className="border border-gray-200 bg-white hover:bg-gray-50 text-gray-700 font-semibold rounded-xl px-4 py-2.5 flex items-center gap-2 transition-all text-sm shadow-xs"
+            className="border border-gray-200 bg-white hover:bg-gray-50 active:bg-gray-100 text-gray-700 font-semibold rounded-xl px-3 py-2 sm:px-4 sm:py-2.5 flex items-center justify-center gap-2 transition-all text-xs sm:text-sm shadow-xs cursor-pointer"
           >
-            <RefreshCw size={16} className={refreshing ? 'animate-spin text-blue-600' : ''} />
+            <RefreshCw size={14} className={refreshing ? 'animate-spin text-blue-600' : 'sm:w-4 sm:h-4'} />
             Làm mới
           </button>
           <button
@@ -420,131 +430,131 @@ export default function IotMonitor() {
               setAddResult(null);
               setShowAddModal(true);
             }}
-            className="bg-[#1B3A6B] hover:bg-[#2A518E] text-white font-semibold rounded-xl px-4 py-2.5 shadow-xs transition-all active:scale-[0.98] flex items-center gap-2 text-sm"
+            className="bg-[#1B3A6B] hover:bg-[#2A518E] text-white font-semibold rounded-xl px-3 py-2 sm:px-4 sm:py-2.5 shadow-xs transition-all active:scale-[0.98] flex items-center justify-center gap-1.5 sm:gap-2 text-xs sm:text-sm cursor-pointer"
           >
-            <Plus size={18} />
-            Đăng ký Máy IoT
+            <Plus size={16} className="sm:w-4.5 sm:h-4.5" />
+            Đăng ký IoT
           </button>
         </div>
       </div>
 
       {/* ── STATS CARDS ── */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-4">
         {/* Total Devices */}
-        <div className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm flex items-center justify-between">
+        <div className="bg-white p-3.5 sm:p-5 rounded-xl sm:rounded-2xl border border-gray-100 shadow-xs flex items-center justify-between">
           <div>
-            <p className="text-xs font-bold text-gray-500 uppercase tracking-wider">Tổng Thiết Bị</p>
-            <p className="text-3xl font-extrabold text-gray-900 mt-1">{devices.length}</p>
+            <p className="text-[10px] sm:text-xs font-bold text-gray-500 uppercase tracking-wider">Tổng Thiết Bị</p>
+            <p className="text-2xl sm:text-3xl font-black text-gray-900 mt-0.5 sm:mt-1">{devices.length}</p>
           </div>
-          <div className="w-12 h-12 rounded-xl bg-blue-50 text-[#1B3A6B] flex items-center justify-center">
-            <Cpu size={24} />
+          <div className="w-9 h-9 sm:w-12 sm:h-12 rounded-xl bg-blue-50 text-[#1B3A6B] flex items-center justify-center shrink-0">
+            <Cpu size={18} className="sm:w-6 sm:h-6" />
           </div>
         </div>
 
         {/* Online Devices */}
-        <div className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm flex items-center justify-between">
+        <div className="bg-white p-3.5 sm:p-5 rounded-xl sm:rounded-2xl border border-gray-100 shadow-xs flex items-center justify-between">
           <div>
-            <p className="text-xs font-bold text-gray-500 uppercase tracking-wider">Đang Trực Tuyến</p>
-            <p className="text-3xl font-extrabold text-emerald-600 mt-1">{onlineCount}</p>
+            <p className="text-[10px] sm:text-xs font-bold text-gray-500 uppercase tracking-wider">Trực Tuyến</p>
+            <p className="text-2xl sm:text-3xl font-black text-emerald-600 mt-0.5 sm:mt-1">{onlineCount}</p>
           </div>
-          <div className="w-12 h-12 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
-            <Wifi size={24} />
+          <div className="w-9 h-9 sm:w-12 sm:h-12 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
+            <Wifi size={18} className="sm:w-6 sm:h-6" />
           </div>
         </div>
 
         {/* Offline Devices */}
-        <div className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm flex items-center justify-between">
+        <div className="bg-white p-3.5 sm:p-5 rounded-xl sm:rounded-2xl border border-gray-100 shadow-xs flex items-center justify-between">
           <div>
-            <p className="text-xs font-bold text-gray-500 uppercase tracking-wider">Mất Kết Nối</p>
-            <p className="text-3xl font-extrabold text-slate-500 mt-1">{offlineCount}</p>
+            <p className="text-[10px] sm:text-xs font-bold text-gray-500 uppercase tracking-wider">Mất Kết Nối</p>
+            <p className="text-2xl sm:text-3xl font-black text-slate-500 mt-0.5 sm:mt-1">{offlineCount}</p>
           </div>
-          <div className="w-12 h-12 rounded-xl bg-gray-100 text-gray-500 flex items-center justify-center">
-            <WifiOff size={24} />
+          <div className="w-9 h-9 sm:w-12 sm:h-12 rounded-xl bg-gray-100 text-gray-500 flex items-center justify-center shrink-0">
+            <WifiOff size={18} className="sm:w-6 sm:h-6" />
           </div>
         </div>
 
         {/* Alerts */}
-        <div className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm flex items-center justify-between">
+        <div className="bg-white p-3.5 sm:p-5 rounded-xl sm:rounded-2xl border border-gray-100 shadow-xs flex items-center justify-between">
           <div>
-            <p className="text-xs font-bold text-gray-500 uppercase tracking-wider">Cảnh Báo Chưa Xử Lý</p>
-            <p className="text-3xl font-extrabold text-rose-600 mt-1">{totalAlerts}</p>
+            <p className="text-[10px] sm:text-xs font-bold text-gray-500 uppercase tracking-wider">Cảnh Báo Lỗi</p>
+            <p className="text-2xl sm:text-3xl font-black text-rose-600 mt-0.5 sm:mt-1">{totalAlerts}</p>
           </div>
-          <div className="w-12 h-12 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center">
-            <AlertTriangle size={24} />
+          <div className="w-9 h-9 sm:w-12 sm:h-12 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center shrink-0">
+            <AlertTriangle size={18} className="sm:w-6 sm:h-6" />
           </div>
         </div>
       </div>
 
       {/* ── TABS & NAVIGATION ── */}
-      <div className="flex flex-col sm:flex-row items-center justify-between gap-4 border-b border-gray-200 pb-2">
-        <div className="flex items-center gap-2">
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 border-b border-gray-200 pb-2">
+        <div className="grid grid-cols-2 gap-2 w-full sm:w-auto sm:flex sm:items-center">
           <button
             onClick={() => setActiveSubTab('devices')}
-            className={`px-4 py-2 font-bold text-sm rounded-xl transition-all ${
+            className={`px-3 py-2 font-bold text-xs sm:text-sm rounded-xl transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
               activeSubTab === 'devices'
                 ? 'bg-[#1B3A6B] text-white shadow-xs'
                 : 'text-gray-600 hover:bg-gray-100'
             }`}
           >
-            📡 Danh Sách Máy IoT ({devices.length})
+            📡 Máy IoT ({devices.length})
           </button>
           <button
             onClick={() => setActiveSubTab('alerts')}
-            className={`px-4 py-2 font-bold text-sm rounded-xl transition-all flex items-center gap-2 ${
+            className={`px-3 py-2 font-bold text-xs sm:text-sm rounded-xl transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
               activeSubTab === 'alerts'
                 ? 'bg-rose-600 text-white shadow-xs'
                 : 'text-gray-600 hover:bg-gray-100'
             }`}
           >
-            <AlertTriangle size={16} />
-            Cảnh Báo Tự Động ({alerts.length})
+            <AlertTriangle size={15} />
+            Cảnh Báo ({alerts.length})
           </button>
         </div>
 
         {activeSubTab === 'devices' && (
-          <div className="flex items-center gap-2 w-full sm:w-auto">
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full sm:w-auto">
             {/* Search Box */}
             <div className="relative flex-1 sm:w-64">
-              <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+              <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
               <input
                 type="text"
-                placeholder="Tìm Serial, Khách hàng, Model..."
+                placeholder="Tìm Serial, Model, Khách..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-9 pr-3 py-2 rounded-xl border border-gray-200 bg-white text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600"
+                className="w-full pl-9 pr-3 py-2 rounded-xl border border-gray-200 bg-white text-xs sm:text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600"
               />
             </div>
 
             {/* Filter Tabs */}
-            <div className="flex bg-gray-100 p-1 rounded-xl text-xs font-semibold">
+            <div className="grid grid-cols-4 sm:flex bg-gray-100 p-1 rounded-xl text-xs font-semibold text-center">
               <button
                 onClick={() => setFilterTab('all')}
-                className={`px-3 py-1.5 rounded-lg transition-all ${
-                  filterTab === 'all' ? 'bg-white text-gray-800 shadow-xs' : 'text-gray-500'
+                className={`py-1.5 px-2.5 rounded-lg transition-all cursor-pointer ${
+                  filterTab === 'all' ? 'bg-white text-gray-800 shadow-2xs font-bold' : 'text-gray-500'
                 }`}
               >
                 Tất cả
               </button>
               <button
                 onClick={() => setFilterTab('online')}
-                className={`px-3 py-1.5 rounded-lg transition-all ${
-                  filterTab === 'online' ? 'bg-emerald-500 text-white shadow-xs' : 'text-gray-500'
+                className={`py-1.5 px-2.5 rounded-lg transition-all cursor-pointer ${
+                  filterTab === 'online' ? 'bg-emerald-500 text-white shadow-2xs font-bold' : 'text-gray-500'
                 }`}
               >
                 Online
               </button>
               <button
                 onClick={() => setFilterTab('offline')}
-                className={`px-3 py-1.5 rounded-lg transition-all ${
-                  filterTab === 'offline' ? 'bg-gray-600 text-white shadow-xs' : 'text-gray-500'
+                className={`py-1.5 px-2.5 rounded-lg transition-all cursor-pointer ${
+                  filterTab === 'offline' ? 'bg-gray-600 text-white shadow-2xs font-bold' : 'text-gray-500'
                 }`}
               >
                 Offline
               </button>
               <button
                 onClick={() => setFilterTab('alerts')}
-                className={`px-3 py-1.5 rounded-lg transition-all ${
-                  filterTab === 'alerts' ? 'bg-rose-500 text-white shadow-xs' : 'text-gray-500'
+                className={`py-1.5 px-2.5 rounded-lg transition-all cursor-pointer ${
+                  filterTab === 'alerts' ? 'bg-rose-500 text-white shadow-2xs font-bold' : 'text-gray-500'
                 }`}
               >
                 Lỗi
@@ -681,117 +691,140 @@ export default function IotMonitor() {
               return (
                 <div
                   key={device.id}
-                  className="bg-white rounded-2xl border border-gray-100 shadow-sm hover:shadow-md transition-all p-5 flex flex-col justify-between space-y-4 relative overflow-hidden group"
+                  className="bg-white rounded-2xl border border-gray-100 shadow-xs hover:shadow-md transition-all p-3.5 sm:p-5 flex flex-col justify-between space-y-3.5 sm:space-y-4 relative overflow-hidden group"
                 >
                   {/* Top Status Bar */}
-                  <div className="flex items-start justify-between border-b border-gray-100 pb-3 gap-2">
-                    <div className="flex items-center gap-2.5">
-                      <div className="w-10 h-10 rounded-xl bg-[#1B3A6B] text-white flex items-center justify-center font-mono font-bold text-xs shrink-0 shadow-xs">
-                        IoT
-                      </div>
-                      <div>
-                        <h3 className="font-bold text-gray-900 font-mono tracking-tight text-base flex items-center gap-1.5 flex-wrap">
-                          {device.serialNumber}
-                          {device.isMuted && (
-                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-sans font-bold bg-amber-100 text-amber-800 border border-amber-300">
-                              <BellOff size={10} />
-                              Đã tắt thông báo
+                  <div className="border-b border-gray-100 pb-3 space-y-2.5">
+                    {/* Row 1: Icon + Serial & Model + Online/Offline Pill */}
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-[#1B3A6B] text-white flex items-center justify-center font-mono font-bold text-xs shrink-0 shadow-xs">
+                          IoT
+                        </div>
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-1.5">
+                            <h3
+                              className="font-bold text-gray-900 font-mono tracking-tight text-sm sm:text-base truncate cursor-pointer hover:text-blue-700"
+                              onClick={(e) => handleCopySerial(e, device.serialNumber)}
+                              title="Bấm để sao chép số Serial"
+                            >
+                              {device.serialNumber}
+                            </h3>
+                            <button
+                              onClick={(e) => handleCopySerial(e, device.serialNumber)}
+                              className="text-gray-400 hover:text-gray-600 transition-colors p-0.5 rounded cursor-pointer shrink-0"
+                              title="Sao chép Serial"
+                            >
+                              {copiedSerial === device.serialNumber ? (
+                                <Check size={13} className="text-emerald-600" />
+                              ) : (
+                                <Copy size={13} />
+                              )}
+                            </button>
+                          </div>
+                          <p className="text-xs text-gray-500 flex items-center gap-1.5 truncate">
+                            <span className="font-semibold text-blue-800 shrink-0">
+                              {device.serialInfo?.model || 'Máy Lọc Nước Truliva'}
                             </span>
-                          )}
-                        </h3>
-                        <p className="text-xs text-gray-500 flex items-center gap-1">
-                          {device.serialInfo?.model ? (
-                            <span className="font-semibold text-blue-800">{device.serialInfo.model}</span>
-                          ) : (
-                            <span>Máy Lọc Nước Truliva</span>
-                          )}
-                          <span>•</span>
-                          <span className="font-mono text-gray-400">FW {tel?.fw || device.firmwareVersion || '1.2.0'}</span>
-                        </p>
-                        {device.serialInfo?.customerName && (
-                          <p className="text-[11px] text-gray-500 mt-0.5 font-medium">
-                            KH: <strong className="text-gray-700">{device.serialInfo.customerName}</strong>
-                            {device.serialInfo.customerPhone ? ` (${device.serialInfo.customerPhone})` : ''}
+                            <span className="text-gray-300">•</span>
+                            <span className="font-mono text-gray-400 text-[11px] shrink-0">
+                              FW {tel?.fw || device.firmwareVersion || '1.2.0'}
+                            </span>
                           </p>
-                        )}
+                        </div>
                       </div>
-                    </div>
 
-                    {/* Status & Connection Badges */}
-                    <div className="flex flex-col items-end gap-1 shrink-0">
+                      {/* Online / Offline Status Badge */}
                       <span
-                        className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold ${
+                        className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold shrink-0 shadow-2xs ${
                           device.isOnline
                             ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
                             : 'bg-gray-100 text-gray-600 border border-gray-200'
                         }`}
                       >
                         <span
-                          className={`w-2 h-2 rounded-full ${
+                          className={`w-2 h-2 rounded-full shrink-0 ${
                             device.isOnline ? 'bg-emerald-500 animate-pulse' : 'bg-gray-400'
                           }`}
                         />
                         {device.isOnline ? 'Online' : 'Offline'}
                       </span>
+                    </div>
 
-                      {/* Hardware Badges */}
-                      <div className="flex items-center gap-1">
-                        {tel?.uartOk === false ? (
-                          <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-rose-50 text-rose-700 border border-rose-200">
-                            Lỗi UART
-                          </span>
-                        ) : (
-                          <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-200">
-                            UART OK
-                          </span>
-                        )}
-                        {tel?.rssi != null && (
-                          <span
-                            className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-gray-100 text-gray-600 flex items-center gap-0.5"
-                            title={`IP: ${tel.ip || 'N/A'}`}
-                          >
-                            <Wifi size={10} />
-                            {tel.rssi} dBm
-                          </span>
-                        )}
-                      </div>
+                    {/* Row 2: Metadata / Hardware Badges (UART, WiFi, Mute, Customer) */}
+                    <div className="flex items-center flex-wrap gap-1.5 text-[11px]">
+                      {tel?.uartOk === false ? (
+                        <span className="font-bold px-2 py-0.5 rounded-md bg-rose-50 text-rose-700 border border-rose-200 flex items-center gap-1">
+                          <span className="w-1.5 h-1.5 rounded-full bg-rose-500" />
+                          Lỗi UART
+                        </span>
+                      ) : (
+                        <span className="font-semibold px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-700 border border-emerald-200 flex items-center gap-1">
+                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                          UART OK
+                        </span>
+                      )}
+
+                      {tel?.rssi != null && (
+                        <span
+                          className="font-semibold px-2 py-0.5 rounded-md bg-gray-50 text-gray-600 border border-gray-200 flex items-center gap-1"
+                          title={`IP: ${tel.ip || 'N/A'}`}
+                        >
+                          <Wifi size={11} className={tel.rssi >= -65 ? 'text-emerald-500' : tel.rssi >= -75 ? 'text-amber-500' : 'text-rose-500'} />
+                          {tel.rssi} dBm
+                        </span>
+                      )}
+
+                      {device.isMuted && (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md font-bold bg-amber-50 text-amber-800 border border-amber-300">
+                          <BellOff size={11} />
+                          Đã tắt chuông
+                        </span>
+                      )}
+
+                      {device.serialInfo?.customerName && (
+                        <span className="text-gray-500 bg-slate-50 px-2 py-0.5 rounded-md border border-gray-100 font-medium truncate max-w-[200px]" title={device.serialInfo.customerName}>
+                          👤 {device.serialInfo.customerName}
+                          {device.serialInfo.customerPhone ? ` (${device.serialInfo.customerPhone})` : ''}
+                        </span>
+                      )}
                     </div>
                   </div>
 
                   {/* ── HERO METRIC: TDS NƯỚC TINH KHIẾT SAU LỌC ── */}
                   {tel ? (
-                    <div className="space-y-4">
+                    <div className="space-y-3 sm:space-y-3.5">
                       {/* TDS Main Card */}
-                      <div className="p-4 rounded-xl border bg-gradient-to-br from-blue-50/70 via-white to-blue-50/40 border-blue-100">
-                        <div className="flex items-center justify-between text-xs font-medium text-gray-500 mb-2">
-                          <span className="flex items-center gap-1.5 font-bold text-gray-700">
-                            <Droplets size={16} className="text-[#00A3FF]" />
-                            TDS NƯỚC TINH KHIẾT (ĐẦU RA)
+                      <div className="p-3 sm:p-4 rounded-xl border bg-gradient-to-br from-blue-50/70 via-white to-blue-50/40 border-blue-100 shadow-2xs">
+                        <div className="flex items-start sm:items-center justify-between gap-2 mb-1.5">
+                          <span className="flex items-center gap-1.5 font-bold text-gray-800 text-xs tracking-tight">
+                            <Droplets size={16} className="text-[#00A3FF] shrink-0" />
+                            <span>TDS Nước Tinh Khiết (Sau RO)</span>
                           </span>
                           <span
-                            className={`text-[11px] font-bold px-2 py-0.5 rounded-full border ${tdsQuality.bg} ${tdsQuality.color} ${tdsQuality.border}`}
+                            className={`text-[10px] sm:text-[11px] font-bold px-2 py-0.5 rounded-full border shrink-0 text-center ${tdsQuality.bg} ${tdsQuality.color} ${tdsQuality.border}`}
                           >
                             {tdsQuality.text}
                           </span>
                         </div>
 
-                        <div className="flex items-baseline justify-between">
+                        <div className="flex items-baseline justify-between gap-2 pt-0.5">
                           <div className="flex items-baseline gap-1.5">
-                            <span className="text-4xl font-black text-[#1B3A6B] tracking-tight">
+                            <span className="text-3xl sm:text-4xl font-black text-[#1B3A6B] tracking-tight font-mono">
                               {tel.tdsOut != null ? tel.tdsOut : '--'}
                             </span>
-                            <span className="text-sm font-bold text-gray-500">PPM</span>
+                            <span className="text-xs sm:text-sm font-bold text-gray-500">PPM</span>
                           </div>
-                          <p className="text-[11px] text-gray-400 text-right">
-                            Đo tại vòi nước sau màng RO
+                          <p className="text-[10px] sm:text-[11px] text-gray-400 text-right">
+                            Đo tại vòi sau màng RO
                           </p>
                         </div>
                       </div>
 
                       {/* ── BỘ 3 LÕI LỌC TRULIVA (PPC, RO, CTO) ── */}
-                      <div className="bg-slate-50/80 p-3.5 rounded-xl border border-gray-100 space-y-3">
+                      <div className="bg-slate-50/90 p-3 sm:p-3.5 rounded-xl border border-gray-100 space-y-2">
                         <div className="flex items-center justify-between">
-                          <span className="text-xs font-bold text-gray-700 uppercase tracking-wider flex items-center gap-1.5">
+                          <span className="text-xs font-bold text-gray-800 uppercase tracking-wider flex items-center gap-1.5">
                             <Layers size={14} className="text-[#1B3A6B]" />
                             Tuổi Thọ 3 Lõi Lọc
                           </span>
@@ -799,77 +832,101 @@ export default function IotMonitor() {
                         </div>
 
                         {/* Lõi 1: PPC */}
-                        <div className="space-y-1">
-                          <div className="flex items-center justify-between text-xs">
-                            <span className="font-semibold text-gray-700 flex items-center gap-1">
-                              <span>Lõi 1 (PPC)</span>
-                              <span className="text-[10px] text-gray-400 font-normal">Lọc thô</span>
-                            </span>
-                            <div className="flex items-center gap-1.5">
-                              <span className="font-bold text-gray-800">{tel.ppc != null ? `${tel.ppc}%` : '--%'}</span>
-                              <span className="text-[10px] text-gray-500">({tel.ppcBars ?? 4}/4 vạch)</span>
-                              <span className={`text-[10px] px-1.5 py-0.2 rounded font-semibold ${ppcState.bg} ${ppcState.color}`}>
+                        <div className="p-2 sm:p-2.5 rounded-xl bg-white border border-gray-100/90 shadow-2xs space-y-1.5">
+                          <div className="flex items-center justify-between gap-1 text-xs">
+                            <div className="flex items-center gap-1.5 min-w-0">
+                              <span className="w-5 h-5 rounded-md bg-[#1B3A6B]/10 text-[#1B3A6B] font-bold text-[10px] flex items-center justify-center shrink-0">
+                                1
+                              </span>
+                              <span className="font-bold text-gray-800 text-xs truncate">Lõi 1 (PPC)</span>
+                              <span className="text-[10px] text-gray-400 truncate">• Lọc thô</span>
+                            </div>
+                            <div className="flex items-center gap-1.5 shrink-0">
+                              <span className="font-extrabold text-xs sm:text-sm text-gray-900 font-mono">
+                                {tel.ppc != null ? `${tel.ppc}%` : '--%'}
+                              </span>
+                              <span className={`text-[10px] px-1.5 py-0.5 rounded font-semibold ${ppcState.bg} ${ppcState.color}`}>
                                 {ppcState.text}
                               </span>
                             </div>
                           </div>
-                          <div className="w-full bg-gray-200 h-2 rounded-full overflow-hidden">
+                          <div className="w-full bg-gray-100 h-2 rounded-full overflow-hidden">
                             <div
-                              className={`h-full transition-all duration-500 ${ppcState.bar}`}
+                              className={`h-full transition-all duration-500 rounded-full ${ppcState.bar}`}
                               style={{ width: `${Math.min(100, Math.max(0, tel.ppc ?? 0))}%` }}
                             />
+                          </div>
+                          <div className="flex justify-between items-center text-[10px] text-gray-400 px-0.5">
+                            <span>Lọc thô sơ cấp</span>
+                            <span className="font-medium text-gray-600">({tel.ppcBars ?? 4}/4 vạch)</span>
                           </div>
                         </div>
 
                         {/* Lõi 2: RO */}
-                        <div className="space-y-1">
-                          <div className="flex items-center justify-between text-xs">
-                            <span className="font-semibold text-gray-700 flex items-center gap-1">
-                              <span>Lõi 2 (RO)</span>
-                              <span className="text-[10px] text-gray-400 font-normal">Màng lọc tinh</span>
-                            </span>
-                            <div className="flex items-center gap-1.5">
-                              <span className="font-bold text-gray-800">{tel.ro != null ? `${tel.ro}%` : '--%'}</span>
-                              <span className="text-[10px] text-gray-500">({tel.roBars ?? 4}/4 vạch)</span>
-                              <span className={`text-[10px] px-1.5 py-0.2 rounded font-semibold ${roState.bg} ${roState.color}`}>
+                        <div className="p-2 sm:p-2.5 rounded-xl bg-white border border-gray-100/90 shadow-2xs space-y-1.5">
+                          <div className="flex items-center justify-between gap-1 text-xs">
+                            <div className="flex items-center gap-1.5 min-w-0">
+                              <span className="w-5 h-5 rounded-md bg-[#00A3FF]/15 text-[#00A3FF] font-bold text-[10px] flex items-center justify-center shrink-0">
+                                2
+                              </span>
+                              <span className="font-bold text-gray-800 text-xs truncate">Lõi 2 (RO)</span>
+                              <span className="text-[10px] text-gray-400 truncate">• Màng RO</span>
+                            </div>
+                            <div className="flex items-center gap-1.5 shrink-0">
+                              <span className="font-extrabold text-xs sm:text-sm text-gray-900 font-mono">
+                                {tel.ro != null ? `${tel.ro}%` : '--%'}
+                              </span>
+                              <span className={`text-[10px] px-1.5 py-0.5 rounded font-semibold ${roState.bg} ${roState.color}`}>
                                 {roState.text}
                               </span>
                             </div>
                           </div>
-                          <div className="w-full bg-gray-200 h-2 rounded-full overflow-hidden">
+                          <div className="w-full bg-gray-100 h-2 rounded-full overflow-hidden">
                             <div
-                              className={`h-full transition-all duration-500 ${roState.bar}`}
+                              className={`h-full transition-all duration-500 rounded-full ${roState.bar}`}
                               style={{ width: `${Math.min(100, Math.max(0, tel.ro ?? 0))}%` }}
                             />
+                          </div>
+                          <div className="flex justify-between items-center text-[10px] text-gray-400 px-0.5">
+                            <span>Màng lọc tinh RO</span>
+                            <span className="font-medium text-gray-600">({tel.roBars ?? 4}/4 vạch)</span>
                           </div>
                         </div>
 
                         {/* Lõi 3: CTO */}
-                        <div className="space-y-1">
-                          <div className="flex items-center justify-between text-xs">
-                            <span className="font-semibold text-gray-700 flex items-center gap-1">
-                              <span>Lõi 3 (CTO)</span>
-                              <span className="text-[10px] text-gray-400 font-normal">Than hoạt tính</span>
-                            </span>
-                            <div className="flex items-center gap-1.5">
-                              <span className="font-bold text-gray-800">{tel.cto != null ? `${tel.cto}%` : '--%'}</span>
-                              <span className="text-[10px] text-gray-500">({tel.ctoBars ?? 1}/4 vạch)</span>
-                              <span className={`text-[10px] px-1.5 py-0.2 rounded font-semibold ${ctoState.bg} ${ctoState.color}`}>
+                        <div className="p-2 sm:p-2.5 rounded-xl bg-white border border-gray-100/90 shadow-2xs space-y-1.5">
+                          <div className="flex items-center justify-between gap-1 text-xs">
+                            <div className="flex items-center gap-1.5 min-w-0">
+                              <span className="w-5 h-5 rounded-md bg-amber-500/15 text-amber-700 font-bold text-[10px] flex items-center justify-center shrink-0">
+                                3
+                              </span>
+                              <span className="font-bold text-gray-800 text-xs truncate">Lõi 3 (CTO)</span>
+                              <span className="text-[10px] text-gray-400 truncate">• Than hoạt tính</span>
+                            </div>
+                            <div className="flex items-center gap-1.5 shrink-0">
+                              <span className="font-extrabold text-xs sm:text-sm text-gray-900 font-mono">
+                                {tel.cto != null ? `${tel.cto}%` : '--%'}
+                              </span>
+                              <span className={`text-[10px] px-1.5 py-0.5 rounded font-semibold ${ctoState.bg} ${ctoState.color}`}>
                                 {ctoState.text}
                               </span>
                             </div>
                           </div>
-                          <div className="w-full bg-gray-200 h-2 rounded-full overflow-hidden">
+                          <div className="w-full bg-gray-100 h-2 rounded-full overflow-hidden">
                             <div
-                              className={`h-full transition-all duration-500 ${ctoState.bar}`}
+                              className={`h-full transition-all duration-500 rounded-full ${ctoState.bar}`}
                               style={{ width: `${Math.min(100, Math.max(0, tel.cto ?? 0))}%` }}
                             />
+                          </div>
+                          <div className="flex justify-between items-center text-[10px] text-gray-400 px-0.5">
+                            <span>Khử mùi & vị than gáo dừa</span>
+                            <span className="font-medium text-gray-600">({tel.ctoBars ?? 1}/4 vạch)</span>
                           </div>
                         </div>
                       </div>
                     </div>
                   ) : (
-                    <div className="py-10 text-center text-gray-400 bg-gray-50 rounded-xl text-xs flex flex-col items-center gap-2">
+                    <div className="py-8 text-center text-gray-400 bg-gray-50 rounded-xl text-xs flex flex-col items-center gap-2">
                       <Radio size={24} className="text-gray-300 animate-pulse" />
                       <span>Chờ thiết bị gửi dữ liệu cảm biến đầu tiên...</span>
                     </div>
@@ -877,15 +934,17 @@ export default function IotMonitor() {
 
                   {/* Unresolved Alerts Badge if any */}
                   {device.unresolvedAlerts > 0 && (
-                    <div className="bg-rose-50 border border-rose-200 text-rose-800 text-xs px-3 py-2 rounded-xl font-semibold flex items-center justify-between">
-                      <span className="flex items-center gap-1.5">
-                        <AlertTriangle size={14} className="text-rose-600 shrink-0" />
-                        Có {device.unresolvedAlerts} cảnh báo chưa xử lý
+                    <div className="bg-rose-50 border border-rose-200 text-rose-900 text-xs p-2.5 rounded-xl font-semibold flex items-center justify-between gap-2 shadow-2xs">
+                      <span className="flex items-center gap-1.5 min-w-0">
+                        <AlertTriangle size={15} className="text-rose-600 shrink-0 animate-pulse" />
+                        <span className="truncate">
+                          Có <strong className="text-rose-950 font-bold">{device.unresolvedAlerts}</strong> cảnh báo chưa xử lý
+                        </span>
                       </span>
                       <button
                         onClick={() => handleResolveAllAlerts(device.serialNumber)}
                         disabled={resolvingAll}
-                        className="text-[11px] underline font-bold hover:text-rose-950 shrink-0 cursor-pointer"
+                        className="text-[11px] font-bold text-rose-700 hover:text-rose-900 bg-white hover:bg-rose-100/70 border border-rose-200 px-2.5 py-1 rounded-lg shrink-0 cursor-pointer shadow-2xs transition-colors"
                         title="Đánh dấu đã giải quyết tất cả cảnh báo của máy này"
                       >
                         Đã xử lý xong
@@ -894,47 +953,53 @@ export default function IotMonitor() {
                   )}
 
                   {/* Footer Info & Actions */}
-                  <div className="pt-3 border-t border-gray-100 flex items-center justify-between text-xs text-gray-500">
-                    <div className="flex items-center gap-2 text-[11px] text-gray-400">
+                  <div className="pt-3 border-t border-gray-100 space-y-2.5">
+                    {/* Metadata Row: Last seen & Uptime */}
+                    <div className="flex items-center justify-between text-[11px] text-gray-400 px-0.5">
                       <span className="flex items-center gap-1">
-                        <Clock size={12} />
-                        {device.lastSeenAt
-                          ? new Date(device.lastSeenAt).toLocaleTimeString('vi-VN', {
-                              hour: '2-digit',
-                              minute: '2-digit',
-                              second: '2-digit',
-                            })
-                          : 'Chưa online'}
+                        <Clock size={12} className="text-gray-400 shrink-0" />
+                        <span>
+                          {device.lastSeenAt
+                            ? new Date(device.lastSeenAt).toLocaleTimeString('vi-VN', {
+                                hour: '2-digit',
+                                minute: '2-digit',
+                                second: '2-digit',
+                              })
+                            : 'Chưa online'}
+                        </span>
                       </span>
-                      <span>•</span>
-                      <span>Uptime: {formatUptime(tel?.uptime)}</span>
+                      <span className="font-mono text-gray-500">
+                        Uptime: <strong className="text-gray-700 font-semibold">{formatUptime(tel?.uptime)}</strong>
+                      </span>
                     </div>
 
-                    <div className="flex items-center gap-1.5">
+                    {/* Actions Row: 3 Touch-Friendly Buttons */}
+                    <div className="grid grid-cols-3 gap-1.5 sm:gap-2">
                       <button
                         onClick={() => handleToggleMute(device.serialNumber, !!device.isMuted)}
                         disabled={mutingSerial === device.serialNumber}
-                        className={`font-semibold px-2.5 py-1.5 rounded-lg transition-colors flex items-center gap-1 text-xs cursor-pointer ${
+                        className={`font-semibold py-2 px-1 rounded-xl transition-all flex items-center justify-center gap-1 text-xs cursor-pointer active:scale-95 border ${
                           device.isMuted
-                            ? 'bg-amber-100 hover:bg-amber-200 text-amber-900 border border-amber-300'
-                            : 'bg-gray-100 hover:bg-gray-200 text-gray-700'
+                            ? 'bg-amber-50 hover:bg-amber-100 text-amber-800 border-amber-300'
+                            : 'bg-gray-50 hover:bg-gray-100 text-gray-700 border-gray-200'
                         }`}
-                        title={device.isMuted ? 'Bấm để bật lại thông báo' : 'Bấm để tắt thông báo (tránh spam từ máy test)'}
+                        title={device.isMuted ? 'Bấm để bật lại thông báo' : 'Bấm để tắt thông báo (tránh spam)'}
                       >
                         {mutingSerial === device.serialNumber ? (
-                          <Loader2 size={12} className="animate-spin" />
+                          <Loader2 size={13} className="animate-spin" />
                         ) : device.isMuted ? (
                           <>
-                            <Bell size={12} className="text-amber-700" />
-                            Bật chuông
+                            <Bell size={13} className="text-amber-700 shrink-0" />
+                            <span className="truncate">Bật chuông</span>
                           </>
                         ) : (
                           <>
-                            <BellOff size={12} className="text-gray-500" />
-                            Tắt thông báo
+                            <BellOff size={13} className="text-gray-500 shrink-0" />
+                            <span className="truncate">Tắt chuông</span>
                           </>
                         )}
                       </button>
+
                       <button
                         onClick={() => {
                           setCommandDevice(device);
@@ -942,17 +1007,18 @@ export default function IotMonitor() {
                           setCommandParam(String(tel?.interval || 120));
                           setShowCommandModal(true);
                         }}
-                        className="bg-blue-50 hover:bg-blue-100 text-[#1B3A6B] font-semibold px-2.5 py-1.5 rounded-lg transition-colors flex items-center gap-1 text-xs cursor-pointer"
+                        className="bg-blue-50 hover:bg-blue-100 text-[#1B3A6B] border border-blue-200 font-semibold py-2 px-1 rounded-xl transition-all flex items-center justify-center gap-1 text-xs cursor-pointer active:scale-95"
                       >
-                        <Send size={12} />
-                        Lệnh
+                        <Send size={13} className="shrink-0" />
+                        <span className="truncate">Gửi lệnh</span>
                       </button>
+
                       <button
                         onClick={() => handleSelectDevice(device)}
-                        className="bg-gray-100 hover:bg-gray-200 text-gray-800 font-semibold px-2.5 py-1.5 rounded-lg transition-colors flex items-center gap-1 text-xs cursor-pointer"
+                        className="bg-[#1B3A6B] hover:bg-[#2A518E] text-white font-semibold py-2 px-1 rounded-xl transition-all flex items-center justify-center gap-1 text-xs cursor-pointer shadow-2xs active:scale-95"
                       >
-                        Chi tiết
-                        <ChevronRight size={12} />
+                        <span className="truncate">Chi tiết</span>
+                        <ChevronRight size={13} className="shrink-0" />
                       </button>
                     </div>
                   </div>
@@ -968,16 +1034,16 @@ export default function IotMonitor() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4">
           <div className="bg-white rounded-2xl w-full max-w-4xl overflow-hidden shadow-2xl border-t-4 border-[#1B3A6B] flex flex-col max-h-[90vh]">
             {/* Header */}
-            <div className="bg-gray-50/80 p-5 border-b border-gray-100 flex justify-between items-center">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-[#1B3A6B] text-white flex items-center justify-center">
-                  <Activity size={20} />
+            <div className="bg-gray-50/80 p-3.5 sm:p-5 border-b border-gray-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
+                <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-[#1B3A6B] text-white flex items-center justify-center shrink-0">
+                  <Activity size={18} className="sm:w-5 sm:h-5" />
                 </div>
-                <div>
-                  <h2 className="font-bold text-gray-900 text-lg flex items-center gap-2">
-                    Chi Tiết Thiết Bị — {selectedDevice.serialNumber}
+                <div className="min-w-0">
+                  <h2 className="font-bold text-gray-900 text-sm sm:text-lg flex items-center gap-1.5 flex-wrap">
+                    <span className="font-mono truncate">{selectedDevice.serialNumber}</span>
                     <span
-                      className={`text-xs px-2 py-0.5 rounded-full font-bold ${
+                      className={`text-[10px] sm:text-xs px-2 py-0.5 rounded-full font-bold ${
                         selectedDevice.isOnline
                           ? 'bg-emerald-100 text-emerald-800'
                           : 'bg-gray-200 text-gray-700'
@@ -986,18 +1052,18 @@ export default function IotMonitor() {
                       {selectedDevice.isOnline ? 'Online' : 'Offline'}
                     </span>
                   </h2>
-                  <p className="text-xs text-gray-500">
+                  <p className="text-xs text-gray-500 truncate">
                     {selectedDevice.serialInfo?.model || 'Máy Lọc Nước Truliva'}
-                    {selectedDevice.serialInfo?.customerName ? ` • Khách hàng: ${selectedDevice.serialInfo.customerName}` : ''}
+                    {selectedDevice.serialInfo?.customerName ? ` • KH: ${selectedDevice.serialInfo.customerName}` : ''}
                   </p>
                 </div>
               </div>
 
-              <div className="flex items-center gap-2">
+              <div className="flex items-center justify-between sm:justify-end gap-2 w-full sm:w-auto">
                 <button
                   onClick={() => handleToggleMute(selectedDevice.serialNumber, !!selectedDevice.isMuted)}
                   disabled={mutingSerial === selectedDevice.serialNumber}
-                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-colors flex items-center gap-1.5 cursor-pointer ${
+                  className={`px-2.5 py-1.5 sm:px-3 rounded-xl text-xs font-bold transition-colors flex items-center gap-1.5 cursor-pointer flex-1 sm:flex-initial justify-center ${
                     selectedDevice.isMuted
                       ? 'bg-amber-100 hover:bg-amber-200 text-amber-900 border border-amber-300'
                       : 'bg-gray-100 hover:bg-gray-200 text-gray-700 border border-gray-200'
@@ -1009,19 +1075,19 @@ export default function IotMonitor() {
                   ) : selectedDevice.isMuted ? (
                     <>
                       <BellOff size={13} className="text-amber-700" />
-                      Đã tắt thông báo (Bật lại)
+                      <span>Đã tắt (Bật lại)</span>
                     </>
                   ) : (
                     <>
                       <BellOff size={13} className="text-gray-500" />
-                      Tắt thông báo máy này
+                      <span>Tắt thông báo</span>
                     </>
                   )}
                 </button>
 
                 <button
                   onClick={() => setSelectedDevice(null)}
-                  className="w-8 h-8 rounded-full bg-gray-200 hover:bg-gray-300 flex items-center justify-center text-gray-600 transition-colors cursor-pointer"
+                  className="w-8 h-8 rounded-full bg-gray-200 hover:bg-gray-300 flex items-center justify-center text-gray-600 transition-colors cursor-pointer shrink-0"
                 >
                   <X size={18} />
                 </button>
@@ -1029,7 +1095,7 @@ export default function IotMonitor() {
             </div>
 
             {/* Content */}
-            <div className="p-6 overflow-y-auto space-y-6">
+            <div className="p-3.5 sm:p-6 overflow-y-auto space-y-4 sm:space-y-6">
               {loadingTelemetry ? (
                 <div className="py-12 text-center text-gray-400">
                   <Loader2 className="animate-spin mx-auto text-[#1B3A6B] mb-2" size={32} />
@@ -1040,30 +1106,30 @@ export default function IotMonitor() {
               ) : (
                 <>
                   {/* Chart Selection Tabs */}
-                  <div className="flex items-center justify-between border-b border-gray-200 pb-2">
-                    <div className="flex items-center gap-2">
+                  <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2 border-b border-gray-200 pb-2">
+                    <div className="grid grid-cols-2 gap-1.5 sm:flex sm:items-center sm:gap-2">
                       <button
                         onClick={() => setModalChartTab('tds')}
-                        className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all ${
+                        className={`px-2.5 py-1.5 sm:px-3 text-xs font-bold rounded-lg transition-all text-center justify-center ${
                           modalChartTab === 'tds'
                             ? 'bg-[#1B3A6B] text-white'
                             : 'text-gray-600 hover:bg-gray-100'
                         }`}
                       >
-                        💧 Biểu Đồ TDS Nước Tinh Khiết
+                        💧 Biểu Đồ TDS
                       </button>
                       <button
                         onClick={() => setModalChartTab('filters')}
-                        className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-all ${
+                        className={`px-2.5 py-1.5 sm:px-3 text-xs font-bold rounded-lg transition-all text-center justify-center ${
                           modalChartTab === 'filters'
                             ? 'bg-[#1B3A6B] text-white'
                             : 'text-gray-600 hover:bg-gray-100'
                         }`}
                       >
-                        📊 Biểu Đồ Tuổi Thọ 3 Lõi Lọc (%)
+                        📊 3 Lõi Lọc (%)
                       </button>
                     </div>
-                    <span className="text-xs text-gray-400">
+                    <span className="text-[11px] sm:text-xs text-gray-400 text-right">
                       {deviceTelemetry.length} bản ghi gần nhất
                     </span>
                   </div>
@@ -1333,18 +1399,18 @@ export default function IotMonitor() {
                     />
                   </div>
 
-                  <div className="pt-2 flex justify-end gap-3">
+                  <div className="pt-2 flex flex-col-reverse sm:flex-row justify-end gap-2 sm:gap-3">
                     <button
                       type="button"
                       onClick={() => setShowAddModal(false)}
-                      className="px-4 py-2.5 rounded-xl border border-gray-200 text-gray-700 font-semibold text-sm hover:bg-gray-50"
+                      className="w-full sm:w-auto px-4 py-2.5 rounded-xl border border-gray-200 text-gray-700 font-semibold text-sm hover:bg-gray-50 text-center justify-center cursor-pointer"
                     >
                       Hủy
                     </button>
                     <button
                       type="submit"
                       disabled={submittingAdd}
-                      className="bg-[#1B3A6B] hover:bg-[#2A518E] text-white font-semibold rounded-xl px-5 py-2.5 text-sm flex items-center gap-2 disabled:opacity-60"
+                      className="w-full sm:w-auto bg-[#1B3A6B] hover:bg-[#2A518E] text-white font-semibold rounded-xl px-5 py-2.5 text-sm flex items-center justify-center gap-2 disabled:opacity-60 cursor-pointer shadow-xs active:scale-95"
                     >
                       {submittingAdd && <Loader2 className="animate-spin" size={16} />}
                       Tạo Thiết Bị
@@ -1441,11 +1507,11 @@ export default function IotMonitor() {
                 </div>
               )}
 
-              <div className="pt-2 flex justify-end gap-3">
+              <div className="pt-2 flex flex-col-reverse sm:flex-row justify-end gap-2 sm:gap-3">
                 <button
                   type="button"
                   onClick={() => setShowCommandModal(false)}
-                  className="px-4 py-2.5 rounded-xl border border-gray-200 text-gray-700 font-semibold text-sm hover:bg-gray-50"
+                  className="w-full sm:w-auto px-4 py-2.5 rounded-xl border border-gray-200 text-gray-700 font-semibold text-sm hover:bg-gray-50 text-center justify-center cursor-pointer"
                 >
                   Hủy
                 </button>
@@ -1453,7 +1519,7 @@ export default function IotMonitor() {
                   type="button"
                   onClick={handleSendCommand}
                   disabled={sendingCommand}
-                  className="bg-[#1B3A6B] hover:bg-[#2A518E] text-white font-semibold rounded-xl px-5 py-2.5 text-sm flex items-center gap-2 disabled:opacity-60"
+                  className="w-full sm:w-auto bg-[#1B3A6B] hover:bg-[#2A518E] text-white font-semibold rounded-xl px-5 py-2.5 text-sm flex items-center justify-center gap-2 disabled:opacity-60 cursor-pointer shadow-xs active:scale-95"
                 >
                   {sendingCommand && <Loader2 className="animate-spin" size={16} />}
                   Gửi Lệnh MQTT

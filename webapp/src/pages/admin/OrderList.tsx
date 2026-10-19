@@ -4457,6 +4457,7 @@ export default function OrderList() {
                     setSelectedKtv('');
                   }}
                   ktvs={ktvs}
+                  allKtvs={allKtvs}
                   selectedKtvId={selectedKtv}
                   onKtvChange={(ktvId) => {
                     setSelectedKtv(ktvId);

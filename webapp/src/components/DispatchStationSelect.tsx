@@ -31,6 +31,7 @@ interface DispatchStationSelectProps {
   selectedTechId: string;
   onTechChange: (techId: string) => void;
   ktvs: KtvDispatchItem[];
+  allKtvs?: any[];
   selectedKtvId: string;
   onKtvChange: (ktvId: string) => void;
   suggestedMain?: any;
@@ -49,6 +50,7 @@ export const DispatchStationSelect: React.FC<DispatchStationSelectProps> = ({
   selectedTechId,
   onTechChange,
   ktvs,
+  allKtvs = [],
   selectedKtvId,
   onKtvChange,
   suggestedMain,
@@ -122,8 +124,8 @@ export const DispatchStationSelect: React.FC<DispatchStationSelectProps> = ({
   }, [currentMain, selectedTechId]);
 
   const currentKtv = useMemo(() => {
-    return ktvs.find(k => k.id === selectedKtvId) || null;
-  }, [ktvs, selectedKtvId]);
+    return ktvs.find(k => k.id === selectedKtvId) || (allKtvs && allKtvs.find(k => k.id === selectedKtvId)) || null;
+  }, [ktvs, allKtvs, selectedKtvId]);
 
   // Filtered Main Stations (Đưa Truliva lên đầu tiên)
   const filteredMainStations = useMemo(() => {
@@ -184,6 +186,18 @@ export const DispatchStationSelect: React.FC<DispatchStationSelectProps> = ({
     return [...hubs, ...others];
   }, [currentMain, techSearch]);
 
+  // Helper tìm trạm chính & trạm kỹ thuật theo techStationId
+  const getStationInfoForKtv = (techStationId?: string) => {
+    if (!techStationId) return null;
+    for (const main of stations) {
+      if (main.techStations) {
+        const tech = main.techStations.find(t => t.id === techStationId);
+        if (tech) return { main, tech };
+      }
+    }
+    return null;
+  };
+
   // Sorted & Filtered KTVs (least busy first, suggested KTV on top)
   const filteredKtvs = useMemo(() => {
     const list = [...ktvs];
@@ -193,12 +207,35 @@ export const DispatchStationSelect: React.FC<DispatchStationSelectProps> = ({
       return (a.pendingOrderCount || 0) - (b.pendingOrderCount || 0);
     });
 
-    if (!ktvSearch.trim()) return list;
-    return list.filter(k => 
-      matchesSearchTerm(k.fullName, ktvSearch) || 
-      (k.phoneNumber && k.phoneNumber.includes(ktvSearch.replace(/\D/g, '')))
-    );
+    const search = ktvSearch.trim();
+    if (!search) return list;
+    const digitsSearch = search.replace(/\D/g, '');
+
+    return list.filter(k => {
+      const matchName = matchesSearchTerm(k.fullName || '', search);
+      const matchUsername = k.username ? matchesSearchTerm(k.username, search) : false;
+      const cleanPhone = (k.phoneNumber || '').replace(/\D/g, '');
+      const matchPhone = digitsSearch.length > 0 ? cleanPhone.includes(digitsSearch) : false;
+      return matchName || matchUsername || matchPhone;
+    });
   }, [ktvs, ktvSearch, suggestedKtv]);
+
+  // KTV ở các trạm khác khớp với từ khóa tìm kiếm (nếu có allKtvs)
+  const otherStationKtvs = useMemo(() => {
+    if (!allKtvs || allKtvs.length === 0) return [];
+    const search = ktvSearch.trim();
+    if (!search) return [];
+    const digitsSearch = search.replace(/\D/g, '');
+
+    return allKtvs.filter(k => {
+      if (k.techStationId === selectedTechId || ktvs.some(currentK => currentK.id === k.id)) return false;
+      const matchName = matchesSearchTerm(k.fullName || '', search);
+      const matchUsername = k.username ? matchesSearchTerm(k.username, search) : false;
+      const cleanPhone = (k.phoneNumber || '').replace(/\D/g, '');
+      const matchPhone = digitsSearch.length > 0 ? cleanPhone.includes(digitsSearch) : false;
+      return matchName || matchUsername || matchPhone;
+    }).slice(0, 5);
+  }, [allKtvs, ktvs, ktvSearch, selectedTechId]);
 
   // Workload Helper
   const getWorkloadInfo = (count: number = 0) => {
@@ -704,9 +741,56 @@ export const DispatchStationSelect: React.FC<DispatchStationSelectProps> = ({
               })}
 
               {filteredKtvs.length === 0 && (
-                <div className="p-6 text-center text-xs text-slate-400 space-y-1">
+                <div className="p-4 text-center text-xs text-slate-400 space-y-1">
                   <User className="h-6 w-6 text-slate-300 mx-auto" />
-                  <div>Trạm này hiện chưa có Kỹ thuật viên nào kích hoạt.</div>
+                  <div>
+                    {ktvSearch.trim()
+                      ? `Không tìm thấy Kỹ thuật viên nào khớp với "${ktvSearch}" trong trạm này.`
+                      : 'Trạm này hiện chưa có Kỹ thuật viên nào kích hoạt.'}
+                  </div>
+                </div>
+              )}
+
+              {/* 💡 GỢI Ý KTV KHỚP TÊN Ở TRẠM KHÁC (NẾU CÓ) */}
+              {otherStationKtvs.length > 0 && (
+                <div className="pt-2 mt-2 border-t border-dashed border-slate-200">
+                  <div className="text-[11px] font-bold text-amber-800 flex items-center gap-1.5 px-2 py-1 bg-amber-50 rounded-lg mb-1.5">
+                    <Sparkles size={13} className="text-amber-600 shrink-0" />
+                    <span>Tìm thấy KTV ở Trạm khác ({otherStationKtvs.length}):</span>
+                  </div>
+                  <div className="space-y-1">
+                    {otherStationKtvs.map(k => {
+                      const stInfo = getStationInfoForKtv(k.techStationId);
+                      return (
+                        <div
+                          key={k.id}
+                          onClick={() => {
+                            if (stInfo) {
+                              onMainChange(stInfo.main.id);
+                              onTechChange(stInfo.tech.id);
+                            }
+                            onKtvChange(k.id);
+                            setIsKtvOpen(false);
+                          }}
+                          className="flex items-center justify-between p-2 rounded-xl cursor-pointer hover:bg-amber-50 text-xs border border-amber-200 bg-amber-50/40 transition-all select-none"
+                        >
+                          <div className="min-w-0 flex-1">
+                            <div className="font-bold text-slate-800 truncate">
+                              {k.fullName} {k.phoneNumber ? `(${k.phoneNumber})` : ''}
+                            </div>
+                            <div className="text-[10px] text-amber-900 mt-0.5 flex items-center gap-1 flex-wrap">
+                              <MapPin size={10} className="text-amber-700 shrink-0" />
+                              <span>Trạm: <strong>{stInfo ? stInfo.tech.name : 'Trạm khác'}</strong></span>
+                              {stInfo && <span className="text-slate-400 font-normal">({stInfo.main.name})</span>}
+                            </div>
+                          </div>
+                          <span className="text-[10px] bg-amber-600 hover:bg-amber-700 text-white font-bold px-2 py-1 rounded-lg shrink-0 ml-2 shadow-2xs">
+                            Đổi trạm & Chọn
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
                 </div>
               )}
             </div>

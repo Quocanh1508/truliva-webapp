@@ -1,4 +1,5 @@
 import { Request, Response } from 'express';
+import jwt from 'jsonwebtoken';
 import prisma from '../config/database';
 import logger from '../utils/logger';
 import { getNextManualOrderId } from '../services/orderService';
@@ -335,6 +336,7 @@ export async function createShopOrder(req: Request, res: Response): Promise<void
       try {
         const fullItemsText = validatedItems.map(i => `${i.productName} (x${i.quantity})`).join(', ');
         const internalPancakeId = await getNextManualOrderId(tx);
+        const isVietQr = paymentMethod.toUpperCase() === 'VIETQR';
         const internalOrder = await tx.order.create({
           data: {
             pancakeOrderId: internalPancakeId,
@@ -348,10 +350,12 @@ export async function createShopOrder(req: Request, res: Response): Promise<void
             },
             workType: 'Giao hàng và Lắp đặt',
             adminStatus: 'chờ xử lý',
-            moneyToCollect: paymentMethod.toUpperCase() === 'COD' ? finalAmount : 0,
+            moneyToCollect: isVietQr ? 0 : finalAmount,
             totalPrice: finalAmount,
             promoCode: appliedVoucherCode,
-            note: `[ĐƠN ZALO MINI APP] Mã: ${orderCode} | Mặt hàng: ${fullItemsText} | Ghi chú: ${note?.trim() || 'Không có'}`
+            note: isVietQr 
+              ? `[ĐƠN ZALO MINI APP - CHỜ CHUYỂN KHOẢN VIETQR: ${finalAmount.toLocaleString('vi-VN')}đ] | Mã: ${orderCode} | Mặt hàng: ${fullItemsText} | Ghi chú: ${note?.trim() || 'Không có'}`
+              : `[ĐƠN ZALO MINI APP - COD THU TIỀN TẬN NƠI: ${finalAmount.toLocaleString('vi-VN')}đ] | Mã: ${orderCode} | Mặt hàng: ${fullItemsText} | Ghi chú: ${note?.trim() || 'Không có'}`
           }
         });
 
@@ -504,97 +508,204 @@ export async function getShopOrderDetail(req: Request, res: Response): Promise<v
 /**
  * POST /api/zalo-miniapp/shop/payment/webhook
  * Webhook nhận thông báo chuyển khoản Techcombank (Hỗ trợ SePAY, PayOS, Casso hoặc Open Banking)
+ * BẮT BUỘC ĐỐI SOÁT: Token bảo mật + Đúng mã đơn TRU + Đúng và đủ số tiền (transferAmount >= finalAmount)
  */
 export async function handlePaymentWebhook(req: Request, res: Response): Promise<void> {
   try {
+    // 1. Kiểm tra Secret Token bảo vệ Webhook (Chống giả mạo request)
+    const expectedSecret = (process.env.PAYMENT_WEBHOOK_SECRET || process.env.SEPAY_WEBHOOK_KEY || 'truliva_secure_pay_2026').trim();
+    const authHeader = String(req.headers['authorization'] || '').trim();
+    const secureTokenHeader = String(req.headers['secure-token'] || '').trim();
+    const apiKeyHeader = String(req.headers['x-api-key'] || req.headers['api-key'] || '').trim();
+    const querySecret = String(req.query.secret || req.query.token || '').trim();
+
+    let providedSecret = secureTokenHeader || apiKeyHeader || querySecret;
+    if (!providedSecret && authHeader) {
+      if (authHeader.toLowerCase().startsWith('bearer ')) {
+        providedSecret = authHeader.substring(7).trim();
+      } else if (authHeader.toLowerCase().startsWith('apikey ')) {
+        providedSecret = authHeader.substring(7).trim();
+      } else {
+        providedSecret = authHeader;
+      }
+    }
+
+    if (expectedSecret && providedSecret !== expectedSecret) {
+      logger.warn('Payment webhook received invalid secret token', {
+        ip: req.ip || req.socket.remoteAddress,
+        providedSecretPrefix: providedSecret ? providedSecret.substring(0, 4) + '***' : 'none'
+      });
+      res.status(401).json({ success: false, error: 'Unauthorized: Invalid payment webhook secret' });
+      return;
+    }
+
     const payload = req.body || {};
     logger.info('Received Payment Webhook notification', { payload });
 
-    // Hỗ trợ đa dạng cấu trúc Webhook (SePAY, PayOS, Casso, Banking Push Notification)
-    const content = String(
-      payload.content || 
-      payload.description || 
-      payload.data?.description || 
-      payload.transferContent || 
-      payload.msg || 
-      ''
-    );
-
-    const transferAmount = Number(
-      payload.transferAmount || 
-      payload.amount || 
-      payload.data?.amount || 
-      0
-    );
-
-    // Trích xuất mã đơn hàng TRU-... từ nội dung chuyển khoản
-    const match = content.match(/TRU[-_]?[0-9A-Z-]+/i) || content.match(/TRU\s*[0-9A-Z-]+/i);
-    let extractedOrderCode = match ? match[0].replace(/\s+/g, '-').toUpperCase() : '';
-
-    if (!extractedOrderCode && payload.orderCode) {
-      extractedOrderCode = String(payload.orderCode).toUpperCase();
+    // 2. Chuẩn hóa danh sách giao dịch (Hỗ trợ Casso mảng data, PayOS object data, SePAY trực tiếp)
+    let transactionList: any[] = [];
+    if (Array.isArray(payload.data)) {
+      transactionList = payload.data;
+    } else if (payload.data && typeof payload.data === 'object') {
+      transactionList = [payload.data];
+    } else {
+      transactionList = [payload];
     }
 
-    if (!extractedOrderCode) {
-      logger.warn('Payment webhook received without matching TRU order code', { content });
-      res.status(200).json({ success: false, message: 'Nội dung chuyển khoản không chứa mã đơn TRU' });
-      return;
-    }
+    let processedCount = 0;
+    const results: any[] = [];
 
-    // Tìm đơn hàng trong DB
-    const shopOrder = await prisma.shopOrder.findFirst({
-      where: {
-        OR: [
-          { orderCode: extractedOrderCode },
-          { orderCode: { contains: extractedOrderCode, mode: 'insensitive' } }
-        ]
+    for (const item of transactionList) {
+      const content = String(
+        item.content || 
+        item.description || 
+        item.transferContent || 
+        item.msg || 
+        payload.content || 
+        payload.description || 
+        ''
+      );
+
+      const transferAmount = Number(
+        item.transferAmount || 
+        item.amount || 
+        payload.transferAmount || 
+        payload.amount || 
+        0
+      );
+
+      // Trích xuất mã đơn hàng TRU-... từ nội dung chuyển khoản
+      const match = content.match(/TRU[-_]?[0-9A-Z-]+/i) || content.match(/TRU\s*[0-9A-Z-]+/i);
+      let extractedOrderCode = match ? match[0].replace(/\s+/g, '-').toUpperCase() : '';
+
+      if (!extractedOrderCode && (item.orderCode || payload.orderCode)) {
+        extractedOrderCode = String(item.orderCode || payload.orderCode).toUpperCase();
       }
-    });
 
-    if (!shopOrder) {
-      logger.warn('ShopOrder not found for code', { extractedOrderCode });
-      res.status(200).json({ success: false, message: `Không tìm thấy đơn hàng ${extractedOrderCode}` });
-      return;
-    }
-
-    // Cập nhật trạng thái thanh toán thành công
-    const updated = await prisma.shopOrder.update({
-      where: { id: shopOrder.id },
-      data: {
-        paymentStatus: 'PAID',
-        paymentMethod: 'VIETQR'
+      if (!extractedOrderCode) {
+        logger.warn('Payment transaction item has no matching TRU order code', { content });
+        continue;
       }
-    });
 
-    // Cập nhật đơn điều phối KTV nội bộ nếu có
-    if (shopOrder.internalOrderId) {
-      try {
-        const timeStr = new Date().toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' });
-        const existingOrder = await prisma.order.findUnique({
-          where: { id: shopOrder.internalOrderId },
-          select: { note: true, moneyToCollect: true }
+      // Tìm đơn hàng trong DB
+      const shopOrder = await prisma.shopOrder.findFirst({
+        where: {
+          OR: [
+            { orderCode: extractedOrderCode },
+            { orderCode: { contains: extractedOrderCode, mode: 'insensitive' } }
+          ]
+        }
+      });
+
+      if (!shopOrder) {
+        logger.warn('ShopOrder not found for extracted order code', { extractedOrderCode });
+        continue;
+      }
+
+      // Nếu đơn hàng đã được xác nhận thanh toán trước đó (Idempotency)
+      if (shopOrder.paymentStatus === 'PAID') {
+        logger.info('ShopOrder already PAID previously', { orderCode: shopOrder.orderCode });
+        results.push({ orderCode: shopOrder.orderCode, status: 'ALREADY_PAID' });
+        processedCount++;
+        continue;
+      }
+
+      const timeStr = new Date().toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' });
+
+      // 3. KIỂM TRA ĐỐI SOÁT SỐ TIỀN CHUYỂN KHOẢN (STRICT AMOUNT CHECK)
+      if (transferAmount < shopOrder.finalAmount) {
+        logger.warn('ShopOrder payment amount insufficient', {
+          orderCode: shopOrder.orderCode,
+          requiredAmount: shopOrder.finalAmount,
+          receivedAmount: transferAmount,
+          missingAmount: shopOrder.finalAmount - transferAmount
         });
-        await prisma.order.update({
-          where: { id: shopOrder.internalOrderId },
+
+        const missingAmount = shopOrder.finalAmount - transferAmount;
+        const partialWarningNote = `\n[CẢNH BÁO CHUYỂN THIẾU TIỀN]: Nhận ${transferAmount.toLocaleString('vi-VN')}đ / Cần ${shopOrder.finalAmount.toLocaleString('vi-VN')}đ (Thiếu: ${missingAmount.toLocaleString('vi-VN')}đ) lúc ${timeStr}`;
+
+        await prisma.shopOrder.update({
+          where: { id: shopOrder.id },
           data: {
-            moneyToCollect: 0, // Đã thanh toán chuyển khoản, KTV không cần thu tiền mặt nữa
-            note: `${existingOrder?.note || ''} | [ĐÃ THANH TOÁN TECHCOMBANK: ${(transferAmount || shopOrder.finalAmount).toLocaleString('vi-VN')}đ lúc ${timeStr}]`
+            paymentStatus: 'PARTIALLY_PAID',
+            note: `${shopOrder.note || ''}${partialWarningNote}`
           }
         });
-      } catch (err: any) {
-        logger.warn('Could not update internal order with payment note', { error: err.message });
-      }
-    }
 
-    logger.info('ShopOrder marked as PAID via Techcombank Webhook', {
-      orderCode: shopOrder.orderCode,
-      amount: transferAmount || shopOrder.finalAmount
-    });
+        if (shopOrder.internalOrderId) {
+          try {
+            const existingOrder = await prisma.order.findUnique({
+              where: { id: shopOrder.internalOrderId },
+              select: { note: true }
+            });
+            await prisma.order.update({
+              where: { id: shopOrder.internalOrderId },
+              data: {
+                moneyToCollect: missingAmount,
+                note: `${existingOrder?.note || ''} | [CHUYỂN THIẾU: Đã nhận ${transferAmount.toLocaleString('vi-VN')}đ, còn thiếu ${missingAmount.toLocaleString('vi-VN')}đ]`
+              }
+            });
+          } catch (err: any) {
+            logger.warn('Could not update internal order with partial payment note', { error: err.message });
+          }
+        }
+
+        results.push({
+          orderCode: shopOrder.orderCode,
+          status: 'PARTIALLY_PAID',
+          received: transferAmount,
+          required: shopOrder.finalAmount,
+          missing: missingAmount
+        });
+        processedCount++;
+        continue;
+      }
+
+      // 4. SỐ TIỀN ĐỦ HOẶC THỪA (transferAmount >= finalAmount) -> XÁC NHẬN THANH TOÁN THÀNH CÔNG
+      await prisma.shopOrder.update({
+        where: { id: shopOrder.id },
+        data: {
+          paymentStatus: 'PAID',
+          paymentMethod: 'VIETQR',
+          orderStatus: shopOrder.orderStatus === 'PENDING' ? 'CONFIRMED' : shopOrder.orderStatus,
+          note: `${shopOrder.note || ''}\n[ĐÃ NHẬN TIỀN TECHCOMBANK: ${transferAmount.toLocaleString('vi-VN')}đ lúc ${timeStr}]`
+        }
+      });
+
+      // Cập nhật đơn điều phối KTV nội bộ
+      if (shopOrder.internalOrderId) {
+        try {
+          const existingOrder = await prisma.order.findUnique({
+            where: { id: shopOrder.internalOrderId },
+            select: { note: true }
+          });
+          await prisma.order.update({
+            where: { id: shopOrder.internalOrderId },
+            data: {
+              adminStatus: 'chờ xử lý',
+              moneyToCollect: 0, // Đã thanh toán đầy đủ, KTV không cần thu tiền mặt nữa
+              note: `${existingOrder?.note || ''} | [ĐÃ THANH TOÁN TECHCOMBANK: ${transferAmount.toLocaleString('vi-VN')}đ lúc ${timeStr}]`
+            }
+          });
+        } catch (err: any) {
+          logger.warn('Could not update internal order with payment note', { error: err.message });
+        }
+      }
+
+      logger.info('ShopOrder marked as PAID via Techcombank Webhook', {
+        orderCode: shopOrder.orderCode,
+        amount: transferAmount,
+        finalAmount: shopOrder.finalAmount
+      });
+
+      results.push({ orderCode: shopOrder.orderCode, status: 'PAID', amount: transferAmount });
+      processedCount++;
+    }
 
     res.json({
       success: true,
-      message: `Đã xác nhận thanh toán thành công cho đơn hàng ${shopOrder.orderCode}`,
-      orderCode: shopOrder.orderCode
+      processedCount,
+      results
     });
   } catch (error: any) {
     logger.error('Error handling payment webhook', { error: error.message });
@@ -673,6 +784,47 @@ export async function switchOrderToCod(req: Request, res: Response): Promise<voi
  */
 export async function confirmShopOrderPayment(req: Request, res: Response): Promise<void> {
   try {
+    // Sandbox chạy trên port 3001 hoặc có cờ IS_SANDBOX=true. Port 3000 là Production.
+    const isSandboxEnv = String(process.env.PORT || '3000') === '3001' || process.env.IS_SANDBOX === 'true';
+
+    // Bảo mật: Trên Production (Port 3000), bắt buộc phải có phiên đăng nhập của ADMIN
+    if (!isSandboxEnv) {
+      let sessionToken = req.cookies?.session_token;
+      const authHeader = req.headers.authorization;
+      if (authHeader && authHeader.startsWith('Bearer ')) {
+        sessionToken = authHeader.substring(7);
+      }
+
+      let isAdmin = false;
+      const jwtSecret = process.env.JWT_SECRET;
+      if (sessionToken && jwtSecret) {
+        try {
+          const decoded: any = jwt.verify(sessionToken, jwtSecret);
+          if (decoded?.id) {
+            const user = await prisma.user.findUnique({
+              where: { id: decoded.id },
+              select: { role: true, isActive: true }
+            });
+            if (user?.isActive && user.role === 'ADMIN') {
+              isAdmin = true;
+            }
+          }
+        } catch (e) {}
+      }
+
+      if (!isAdmin) {
+        logger.warn('Unauthorized attempt to manually confirm payment in Production', {
+          orderCodeOrId: req.params.orderCodeOrId,
+          ip: req.ip || req.socket.remoteAddress
+        });
+        res.status(403).json({
+          success: false,
+          error: 'Chức năng xác nhận thanh toán thủ công chỉ dành cho Quản trị viên trên Production.'
+        });
+        return;
+      }
+    }
+
     const orderCodeOrId = String(req.params.orderCodeOrId || '').trim();
     if (!orderCodeOrId) {
       res.status(400).json({ success: false, error: 'Thiếu mã đơn hàng' });
@@ -697,18 +849,24 @@ export async function confirmShopOrderPayment(req: Request, res: Response): Prom
       where: { id: order.id },
       data: {
         paymentStatus: 'PAID',
-        paymentMethod: 'VIETQR'
+        paymentMethod: 'VIETQR',
+        orderStatus: order.orderStatus === 'PENDING' ? 'CONFIRMED' : order.orderStatus
       }
     });
 
     if (order.internalOrderId) {
       try {
         const timeStr = new Date().toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' });
+        const existingOrder = await prisma.order.findUnique({
+          where: { id: order.internalOrderId },
+          select: { note: true }
+        });
         await prisma.order.update({
           where: { id: order.internalOrderId },
           data: {
+            adminStatus: 'chờ xử lý',
             moneyToCollect: 0,
-            note: `[ĐƠN ZALO MINI APP - ĐÃ XÁC NHẬN THANH TOÁN] ${order.finalAmount.toLocaleString('vi-VN')}đ lúc ${timeStr}`
+            note: `${existingOrder?.note || ''} | [ĐÃ XÁC NHẬN THANH TOÁN THỦ CÔNG: ${order.finalAmount.toLocaleString('vi-VN')}đ lúc ${timeStr}]`
           }
         });
       } catch (err: any) {

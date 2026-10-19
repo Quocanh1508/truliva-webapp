@@ -1,5 +1,5 @@
 // Cache-busting version - change this value to force iOS PWA to reload all assets
-const SW_VERSION = '2026-10-05-v8';
+const SW_VERSION = '2026-10-19-v1';
 
 self.addEventListener('install', (event) => {
   console.log(`[SW ${SW_VERSION}] Installing...`);
@@ -37,24 +37,50 @@ self.addEventListener('push', (event) => {
 
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
-  const data = event.notification.data;
-  const searchId = data && (data.pancakeOrderId || data.orderId);
-  const targetUrl = searchId 
-    ? `/ktv/my-orders?search=${searchId}` 
-    : '/ktv/my-orders';
-  
+  const data = event.notification.data || {};
+  const orderId = data.orderId;
+  const pancakeOrderId = data.pancakeOrderId;
+
+  let targetPath = '/ktv/my-orders';
+  if (orderId && pancakeOrderId) {
+    targetPath = `/ktv/my-orders?orderId=${encodeURIComponent(orderId)}&search=${encodeURIComponent(pancakeOrderId)}`;
+  } else if (orderId) {
+    targetPath = `/ktv/my-orders?orderId=${encodeURIComponent(orderId)}&search=${encodeURIComponent(orderId)}`;
+  } else if (pancakeOrderId) {
+    targetPath = `/ktv/my-orders?search=${encodeURIComponent(pancakeOrderId)}`;
+  }
+
+  // Đảm bảo tạo URL tuyệt đối trên đúng origin để tránh lỗi phân giải trên Android/iOS
+  const fullTargetUrl = new URL(targetPath, self.location.origin).href;
+
   event.waitUntil(
-    clients.matchAll({ type: 'window', includeUncontrolled: true }).then((windowClients) => {
-      // Tìm bất kỳ tab webapp nào đang mở (bất kể đang ở trang nào)
-      const existingClient = windowClients.find(c => 'focus' in c);
-      if (existingClient) {
-        existingClient.postMessage({ type: 'REDIRECT', url: targetUrl });
-        return existingClient.focus();
+    clients.matchAll({ type: 'window', includeUncontrolled: true }).then(async (windowClients) => {
+      // 1. Tìm client thuộc cùng origin (ưu tiên client đang mở)
+      for (const client of windowClients) {
+        let isSameOrigin = false;
+        try {
+          isSameOrigin = new URL(client.url).origin === self.location.origin;
+        } catch (e) {
+          isSameOrigin = false;
+        }
+
+        if (isSameOrigin && 'focus' in client) {
+          // Gửi thông điệp REDIRECT đồng thời navigate client trực tiếp nếu được hỗ trợ
+          client.postMessage({ type: 'REDIRECT', url: targetPath, fullUrl: fullTargetUrl });
+          if ('navigate' in client) {
+            try {
+              await client.navigate(fullTargetUrl);
+            } catch (navErr) {
+              console.warn('[SW] client.navigate failed:', navErr);
+            }
+          }
+          return client.focus();
+        }
       }
-      
-      // Nếu không có tab nào mở, mở tab mới
+
+      // 2. Nếu không tìm thấy cửa sổ nào đang mở, mở cửa sổ mới với URL tuyệt đối
       if (clients.openWindow) {
-        return clients.openWindow(targetUrl);
+        return clients.openWindow(fullTargetUrl);
       }
     })
   );

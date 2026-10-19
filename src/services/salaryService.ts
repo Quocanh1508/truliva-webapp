@@ -184,18 +184,31 @@ export async function loadStationRates(): Promise<Map<string, any>> {
   return ratesMap;
 }
 
-// Helper to check if a KTV is official company KTV (Nguyen Minh Thuan)
+// Helper to check if a KTV is official company KTV (Nguyen Minh Thuan, Nguyen Minh Tho - Tram Truliva TP.HCM)
 export function checkIsOfficialTrulivaKtv(ktv: { phoneNumber?: string | null; username?: string | null; fullName?: string | null } | string | null | undefined): boolean {
   if (!ktv) return false;
   if (typeof ktv === 'string') {
     const norm = normalizePhone(ktv);
-    return norm === '392110073' || ktv.includes('392110073');
+    return (
+      norm === '392110073' ||
+      norm === '706710688' ||
+      ktv.includes('392110073') ||
+      ktv.includes('0706710688')
+    );
   }
   const phoneNorm = normalizePhone(ktv.phoneNumber || ktv.username);
-  if (phoneNorm === '392110073' || (ktv.phoneNumber && ktv.phoneNumber.includes('392110073'))) {
+  if (
+    phoneNorm === '392110073' ||
+    phoneNorm === '706710688' ||
+    (ktv.phoneNumber && (ktv.phoneNumber.includes('392110073') || ktv.phoneNumber.includes('0706710688')))
+  ) {
     return true;
   }
-  if (ktv.fullName && ktv.fullName.toLowerCase().includes('thuận') && ktv.fullName.toLowerCase().includes('nguyễn minh')) {
+  const nameNorm = (ktv.fullName || '').toLowerCase();
+  if (
+    nameNorm.includes('nguyễn minh') &&
+    (nameNorm.includes('thuận') || nameNorm.includes('thọ'))
+  ) {
     return true;
   }
   return false;
@@ -476,31 +489,30 @@ export async function computeFullSalariesForMonth(month: string) {
     const isStationPaid = !!stationRate;
     const userCustomRates = customKtvRatesByUser.get(ktv.id);
 
-    // KTV chính thức: Mỗi ngày chỉ lấy 1 ca có khoảng cách lớn nhất để tính phí khoảng cách
+    // Tất cả KTV: Mỗi ngày chỉ lấy 1 ca có khoảng cách lớn nhất để tính phí khoảng cách
+    // (Phương án A - áp dụng toàn bộ KTV, không phân biệt chính thức hay ngoài trạm)
     const eligibleDistanceReportIds = new Set<string>();
-    if (isOfficialTrulivaKtv) {
-      const reportsByDay = new Map<string, any[]>();
-      for (const r of finalReports) {
-        const dayKey = r.createdAt ? new Date(r.createdAt).toLocaleDateString('sv-SE', { timeZone: 'Asia/Ho_Chi_Minh' }) : 'no-date';
-        if (!reportsByDay.has(dayKey)) {
-          reportsByDay.set(dayKey, []);
-        }
-        reportsByDay.get(dayKey)!.push(r);
+    const reportsByDay = new Map<string, any[]>();
+    for (const r of finalReports) {
+      const dayKey = r.createdAt ? new Date(r.createdAt).toLocaleDateString('sv-SE', { timeZone: 'Asia/Ho_Chi_Minh' }) : 'no-date';
+      if (!reportsByDay.has(dayKey)) {
+        reportsByDay.set(dayKey, []);
       }
+      reportsByDay.get(dayKey)!.push(r);
+    }
 
-      for (const [dayKey, dayReports] of reportsByDay.entries()) {
-        let maxDist = -1;
-        let maxReportId: string | null = null;
-        for (const r of dayReports) {
-          const dist = r.distanceKm ?? 0;
-          if (dist > maxDist) {
-            maxDist = dist;
-            maxReportId = r.id;
-          }
+    for (const [_dayKey, dayReports] of reportsByDay.entries()) {
+      let maxDist = -1;
+      let maxReportId: string | null = null;
+      for (const r of dayReports) {
+        const dist = r.distanceKm ?? 0;
+        if (dist > maxDist) {
+          maxDist = dist;
+          maxReportId = r.id;
         }
-        if (maxReportId) {
-          eligibleDistanceReportIds.add(maxReportId);
-        }
+      }
+      if (maxReportId) {
+        eligibleDistanceReportIds.add(maxReportId);
       }
     }
 
@@ -508,9 +520,7 @@ export async function computeFullSalariesForMonth(month: string) {
     const reportsDetail = [];
 
     for (const report of finalReports) {
-      const isEligibleForDistance = isOfficialTrulivaKtv
-        ? eligibleDistanceReportIds.has(report.id)
-        : true;
+      const isEligibleForDistance = eligibleDistanceReportIds.has(report.id);
 
       const breakdown = getReportCostBreakdown(report, ktvPhoneNorm, stationRate, userCustomRates, {
         isEligibleForDistanceFee: isEligibleForDistance,

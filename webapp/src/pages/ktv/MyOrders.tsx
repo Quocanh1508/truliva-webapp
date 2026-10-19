@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { getOrders, callCustomer, rescheduleOrder } from '../../api/client';
+import { getOrders, getOrderDetails, callCustomer, rescheduleOrder } from '../../api/client';
 import { Search, ChevronLeft, ChevronRight, Phone, Calendar, FileText, User, MapPin, Clock, MessageSquare, CreditCard, X, Package, ZoomIn } from 'lucide-react';
 import PullToRefresh from '../../components/PullToRefresh';
 import { formatOrderId } from '../../utils/text';
@@ -17,9 +17,12 @@ export default function MyOrders() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
-  // Filters
-  const searchParam = new URLSearchParams(location.search).get('search') || '';
+  // Filters & Query Params
+  const queryParams = new URLSearchParams(location.search);
+  const searchParam = queryParams.get('search') || '';
+  const orderIdParam = queryParams.get('orderId') || '';
   const prevSearchParamRef = useRef(searchParam);
+  const autoOpenedIdRef = useRef<string | null>(null);
   const [search, setSearch] = useState(() => searchParam);
   const [sortBy, setSortBy] = useState('appointmentTime');
   const [sortOrder, setSortOrder] = useState('desc');
@@ -156,6 +159,48 @@ export default function MyOrders() {
     }
   }, [searchParam]);
 
+  // Tự động mở chi tiết ca khi truy cập từ thông báo đẩy (có ?orderId=... hoặc ?search=...)
+  useEffect(() => {
+    const targetId = orderIdParam || searchParam;
+    if (!targetId) {
+      autoOpenedIdRef.current = null;
+      return;
+    }
+    if (autoOpenedIdRef.current === targetId) return;
+
+    // 1. Nếu đơn đã có sẵn trong danh sách orders hiện tại
+    const existing = orders.find(
+      (o) =>
+        o.id === targetId ||
+        String(o.pancakeOrderId) === targetId ||
+        formatOrderId(o.pancakeOrderId) === targetId ||
+        (o.pancakeOrderId < 0 && `M${Math.abs(o.pancakeOrderId)}` === targetId)
+    );
+
+    if (existing) {
+      autoOpenedIdRef.current = targetId;
+      openOrderDetail(existing);
+      return;
+    }
+
+    // 2. Nếu danh sách chưa có (hoặc đang tải), gọi API lấy chi tiết đơn từ server
+    let isCancelled = false;
+    getOrderDetails(targetId)
+      .then((data) => {
+        if (!isCancelled && data && !data.error && data.id) {
+          autoOpenedIdRef.current = targetId;
+          openOrderDetail(data);
+        }
+      })
+      .catch((err) => {
+        console.warn('Could not auto-open order detail:', err);
+      });
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [orderIdParam, searchParam, orders]);
+
   useEffect(() => {
     if (!user) return;
     const loadWeather = async () => {
@@ -251,8 +296,11 @@ export default function MyOrders() {
     if (wt.includes('lắp đặt')) {
       return <span className="inline-flex px-1.5 py-0.5 bg-sky-50 text-sky-700 border border-sky-200 rounded text-[10px] font-bold mt-1 w-max">Lắp đặt</span>;
     }
-    if (wt.includes('bảo hành') || wt.includes('sửa')) {
-      return <span className="inline-flex px-1.5 py-0.5 bg-red-50 text-red-700 border border-red-200 rounded text-[10px] font-bold mt-1 w-max">Bảo hành / Sửa</span>;
+    if (wt.includes('bảo hành')) {
+      return <span className="inline-flex px-1.5 py-0.5 bg-red-50 text-red-700 border border-red-200 rounded text-[10px] font-bold mt-1 w-max">Bảo hành</span>;
+    }
+    if (wt.includes('sửa')) {
+      return <span className="inline-flex px-1.5 py-0.5 bg-purple-50 text-purple-700 border border-purple-200 rounded text-[10px] font-bold mt-1 w-max">Sửa chữa</span>;
     }
     if (wt.includes('thay lọc') || wt.includes('thay lõi')) {
       return <span className="inline-flex px-1.5 py-0.5 bg-indigo-50 text-indigo-700 border border-indigo-200 rounded text-[10px] font-bold mt-1 w-max">Thay lọc</span>;

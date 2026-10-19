@@ -162,9 +162,14 @@ function PushNotificationManager({ children }: { children: React.ReactNode }) {
             const data = typeof rawData === 'string' 
               ? (() => { try { return JSON.parse(rawData); } catch { return {}; } })() 
               : (rawData || {});
-            const targetId = data.pancakeOrderId || data.orderId;
-            if (targetId) {
-              navigate(`/ktv/my-orders?search=${targetId}`);
+            const orderId = data.orderId;
+            const pancakeOrderId = data.pancakeOrderId;
+            if (orderId && pancakeOrderId) {
+              navigate(`/ktv/my-orders?orderId=${encodeURIComponent(orderId)}&search=${encodeURIComponent(pancakeOrderId)}`);
+            } else if (orderId) {
+              navigate(`/ktv/my-orders?orderId=${encodeURIComponent(orderId)}&search=${encodeURIComponent(orderId)}`);
+            } else if (pancakeOrderId) {
+              navigate(`/ktv/my-orders?search=${encodeURIComponent(pancakeOrderId)}`);
             } else {
               navigate('/ktv/my-orders');
             }

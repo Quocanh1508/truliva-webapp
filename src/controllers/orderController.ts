@@ -479,14 +479,35 @@ export async function getOrders(req: Request, res: Response): Promise<void> {
     }
 
     if (creatorList.length > 0) {
+      const mappedUsers = await prisma.user.findMany({
+        where: { pancakeAccountName: { not: null } },
+        select: { fullName: true, pancakeAccountName: true }
+      });
+
       const creatorConditions = creatorList.map(creatorStr => {
         const str = creatorStr.trim();
-        const variations = [
-          str,
-          str.toLowerCase(),
-          str.toUpperCase(),
-          str.split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(' ')
-        ];
+        const rawNamesToMatch = new Set<string>([str]);
+
+        // Mở rộng alias: nếu tên filter trùng fullName hoặc pancakeAccountName của user, thêm tên còn lại
+        for (const u of mappedUsers) {
+          if (!u.fullName || !u.pancakeAccountName) continue;
+          const uFull = u.fullName.trim();
+          const uPancake = u.pancakeAccountName.trim();
+          if (uFull.toLowerCase() === str.toLowerCase() || uPancake.toLowerCase() === str.toLowerCase()) {
+            rawNamesToMatch.add(uFull);
+            rawNamesToMatch.add(uPancake);
+          }
+        }
+
+        const variations: string[] = [];
+        for (const name of rawNamesToMatch) {
+          variations.push(
+            name,
+            name.toLowerCase(),
+            name.toUpperCase(),
+            name.split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(' ')
+          );
+        }
         const uniqueVariations = Array.from(new Set(variations));
         
         return {
@@ -1608,7 +1629,7 @@ export async function exportOrdersExcel(req: Request, res: Response): Promise<vo
  */
 export async function getFilterOptions(req: Request, res: Response): Promise<void> {
   try {
-    const [products, stations, customers, rawCreators] = await Promise.all([
+    const [products, stations, customers, rawCreators, mappedUsers] = await Promise.all([
       prisma.product.findMany({
         where: { isActive: true },
         select: { name: true, category: true, sku: true, sellingPrice: true }
@@ -1627,8 +1648,20 @@ export async function getFilterOptions(req: Request, res: Response): Promise<voi
         FROM "orders"
         WHERE "raw_data"->'creator'->>'name' IS NOT NULL
         ORDER BY name ASC;
-      `
+      `,
+      prisma.user.findMany({
+        where: { pancakeAccountName: { not: null } },
+        select: { fullName: true, pancakeAccountName: true }
+      })
     ]);
+
+    // Map các alias của tài khoản Pancake về fullName trên Truliva để đồng nhất bộ lọc
+    const aliasMap = new Map<string, string>();
+    for (const u of mappedUsers) {
+      if (u.pancakeAccountName && u.fullName) {
+        aliasMap.set(u.pancakeAccountName.trim().toLowerCase(), u.fullName.trim());
+      }
+    }
 
     const categories = Array.from(new Set(products.map(p => p.category).filter(Boolean))) as string[];
     const productNames = Array.from(new Set(products.map(p => p.name).filter(Boolean))) as string[];
@@ -1640,9 +1673,20 @@ export async function getFilterOptions(req: Request, res: Response): Promise<voi
     for (const p of uniqueProvinces) {
       if (!provinces.includes(p)) provinces.push(p);
     }
+
+    const uniqueNormalizedCreators = new Set<string>();
+    for (const c of rawCreators) {
+      if (!c.name) continue;
+      const trimmed = c.name.trim();
+      const mapped = aliasMap.get(trimmed.toLowerCase()) || trimmed;
+      uniqueNormalizedCreators.add(mapped);
+    }
+
+    const sortedCreators = Array.from(uniqueNormalizedCreators).sort((a, b) => a.localeCompare(b, 'vi'));
+
     const creators = [
       'Hệ thống (Shopee, Lazada, Tiktok, Tiki)',
-      ...Array.from(new Set(rawCreators.map(c => c.name).filter(Boolean)))
+      ...sortedCreators
     ] as string[];
 
     res.json({
@@ -1710,7 +1754,7 @@ export async function searchCustomers(req: Request, res: Response): Promise<void
 export async function getOrderById(req: Request, res: Response): Promise<void> {
   try {
     const { id } = req.params;
-    const order = await prisma.order.findUnique({
+    let order = await prisma.order.findUnique({
       where: { id: id as string },
       include: {
         items: true,
@@ -1733,6 +1777,39 @@ export async function getOrderById(req: Request, res: Response): Promise<void> {
         serials: true
       }
     });
+
+    if (!order) {
+      // Thử tìm theo pancakeOrderId nếu id là số hoặc có tiền tố M (VD: M123, 5370)
+      const idStr = String(id);
+      const cleanPancakeId = idStr.startsWith('M') || idStr.startsWith('m')
+        ? -parseInt(idStr.slice(1), 10)
+        : parseInt(idStr, 10);
+      if (!isNaN(cleanPancakeId)) {
+        order = await prisma.order.findFirst({
+          where: { pancakeOrderId: cleanPancakeId },
+          include: {
+            items: true,
+            customer: true,
+            assignedKtv: {
+              select: {
+                id: true,
+                fullName: true
+              }
+            },
+            salesKtv: {
+              select: {
+                id: true,
+                fullName: true,
+                phoneNumber: true
+              }
+            },
+            mainStation: true,
+            techStation: true,
+            serials: true
+          }
+        });
+      }
+    }
 
     if (!order) {
       res.status(404).json({ error: 'Không tìm thấy đơn hàng' });

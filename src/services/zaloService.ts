@@ -92,11 +92,35 @@ export async function exchangeAuthorizationCode(code: string): Promise<any> {
       }
     });
 
+    syncZaloTokensToSandbox(access_token, refresh_token, tokenExpiredAt);
+
     logger.info('Zalo OA linked and tokens saved successfully', { tokenExpiredAt });
     return updatedConfig;
   } catch (error: any) {
     logger.error('Error exchanging Zalo OAuth code', { error: error.message, details: error.response?.data });
     throw error;
+  }
+}
+
+/**
+ * Tự động đồng bộ Access & Refresh Token sang Database Sandbox nếu đang chạy trên Production
+ */
+async function syncZaloTokensToSandbox(accessToken: string, refreshToken: string, tokenExpiredAt: Date) {
+  try {
+    const dbUrl = process.env.DATABASE_URL;
+    if (dbUrl && dbUrl.includes('truliva_db')) {
+      const sandboxDbUrl = dbUrl.replace('truliva_db', 'truliva_sandbox');
+      const { Pool } = require('pg');
+      const pool = new Pool({ connectionString: sandboxDbUrl, connectionTimeoutMillis: 3000 });
+      await pool.query(
+        `UPDATE zalo_configs SET access_token = $1, refresh_token = $2, token_expired_at = $3, updated_at = NOW()`,
+        [accessToken, refreshToken, tokenExpiredAt]
+      );
+      await pool.end();
+      logger.info('Synced Zalo tokens to Sandbox DB successfully');
+    }
+  } catch (err: any) {
+    logger.warn('Could not sync Zalo tokens to Sandbox DB', { error: err.message });
   }
 }
 
@@ -151,6 +175,8 @@ export async function getValidAccessToken(): Promise<string> {
         tokenExpiredAt
       }
     });
+
+    syncZaloTokensToSandbox(access_token, refresh_token, tokenExpiredAt);
 
     logger.info('Zalo access token refreshed successfully', { tokenExpiredAt });
     return access_token;

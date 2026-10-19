@@ -18,7 +18,7 @@ import {
   Sparkles,
   ArrowRight
 } from 'lucide-react';
-import { fetchZaloApi } from '../../api/client';
+import { fetchZaloApi, IS_SANDBOX } from '../../api/client';
 
 interface OrderSuccessPageProps {
   orderData: any;
@@ -75,6 +75,8 @@ export default function OrderSuccessPage({
         if (res.order.paymentStatus === 'PAID') {
           setPaid(true);
           setCheckNotice('Đã xác nhận thanh toán thành công!');
+        } else if (res.order.paymentStatus === 'PARTIALLY_PAID') {
+          setCheckNotice('⚠️ Đã nhận được giao dịch nhưng số tiền chưa đủ. Vui lòng chuyển thêm phần còn thiếu hoặc liên hệ Hotline Truliva.');
         } else if (showNotice) {
           setCheckNotice('Chưa nhận được giao dịch cho mã đơn này. Nếu Quý khách vừa chuyển, vui lòng đợi 30-60 giây để ngân hàng gửi thông báo, sau đó bấm kiểm tra lại.');
         }
@@ -309,16 +311,18 @@ export default function OrderSuccessPage({
               </button>
             </div>
 
-            {/* Giả lập Sandbox (Dành cho Tester) */}
-            <div className="pt-1">
-              <button
-                onClick={handleSimulatePayment}
-                disabled={simulating}
-                className="text-[11px] text-gray-400 hover:text-blue-600 underline cursor-pointer"
-              >
-                {simulating ? 'Đang xác nhận test...' : '⚡ Giả lập xác nhận thanh toán (Môi trường kiểm thử)'}
-              </button>
-            </div>
+            {/* Giả lập Sandbox (Chỉ hiển thị trên Môi trường kiểm thử Sandbox) */}
+            {IS_SANDBOX && (
+              <div className="pt-1">
+                <button
+                  onClick={handleSimulatePayment}
+                  disabled={simulating}
+                  className="text-[11px] text-gray-400 hover:text-blue-600 underline cursor-pointer"
+                >
+                  {simulating ? 'Đang xác nhận test...' : '⚡ Giả lập xác nhận thanh toán (Môi trường Sandbox)'}
+                </button>
+              </div>
+            )}
           </div>
         )}
 
