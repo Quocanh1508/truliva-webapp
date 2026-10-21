@@ -1,7 +1,7 @@
 import { Router, Request, Response } from 'express';
 import prisma from '../config/database';
 import logger from '../utils/logger';
-import { requireAuth } from '../middleware/authSession';
+import { requireAuth, optionalAuth } from '../middleware/authSession';
 import { authenticateZaloMiniAppUser } from '../services/zaloMiniAppService';
 import { activateSerialWarranty } from '../services/warrantyService';
 
@@ -379,8 +379,8 @@ router.get('/shop/products', getShopProducts);
 router.get('/shop/products/:slugOrId', getShopProductDetail);
 router.get('/shop/legal-docs', getLegalDocuments);
 router.get('/shop/legal-docs/:type', getLegalDocumentByType);
-router.post('/shop/orders', createShopOrder);
-router.get('/shop/my-orders', getMyShopOrders);
+router.post('/shop/orders', optionalAuth, createShopOrder);
+router.get('/shop/my-orders', optionalAuth, getMyShopOrders);
 router.get('/shop/orders/:orderCodeOrId', getShopOrderDetail);
 router.post('/shop/orders/:orderCodeOrId/switch-to-cod', switchOrderToCod);
 router.post('/shop/orders/:orderCodeOrId/confirm-payment', confirmShopOrderPayment);

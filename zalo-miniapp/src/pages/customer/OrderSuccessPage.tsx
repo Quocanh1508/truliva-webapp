@@ -16,7 +16,9 @@ import {
   AlertCircle,
   Truck,
   Sparkles,
-  ArrowRight
+  ArrowRight,
+  Download,
+  ExternalLink
 } from 'lucide-react';
 import { fetchZaloApi, IS_SANDBOX } from '../../api/client';
 
@@ -41,6 +43,33 @@ export default function OrderSuccessPage({
   const [checkNotice, setCheckNotice] = useState<string | null>(null);
   const [switchingCod, setSwitchingCod] = useState(false);
   const [simulating, setSimulating] = useState(false);
+  const [timeLeft, setTimeLeft] = useState(900); // 15 phút đếm ngược
+
+  // Đếm ngược 15 phút giữ đơn
+  useEffect(() => {
+    if (!vietQrInfo || paid || order?.paymentMethod === 'COD') return;
+    const timer = setInterval(() => {
+      setTimeLeft(prev => (prev > 0 ? prev - 1 : 0));
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [vietQrInfo, paid, order?.paymentMethod]);
+
+  const formatTime = (seconds: number) => {
+    const m = Math.floor(seconds / 60);
+    const s = seconds % 60;
+    return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+  };
+
+  const handleDownloadQr = () => {
+    if (!vietQrInfo?.qrUrl) return;
+    const w = window.open(vietQrInfo.qrUrl, '_blank');
+    if (!w) {
+      const link = document.createElement('a');
+      link.href = vietQrInfo.qrUrl;
+      link.download = `VietQR_${order?.orderCode || 'Truliva'}.png`;
+      link.click();
+    }
+  };
 
   const formatVND = (amount: number) => {
     return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(amount);
@@ -217,13 +246,41 @@ export default function OrderSuccessPage({
               <span>Quét mã VietQR chuyển khoản Techcombank</span>
             </div>
 
-            {/* Ảnh mã VietQR */}
-            <div className="w-56 h-56 mx-auto bg-white p-2.5 rounded-2xl border-2 border-slate-200 shadow-inner flex items-center justify-center">
-              <img 
-                src={vietQrInfo.qrUrl} 
-                alt="Techcombank VietQR Code" 
-                className="w-full h-full object-contain" 
-              />
+            {/* Đồng hồ đếm ngược giữ đơn hàng */}
+            <div className="flex items-center justify-between bg-amber-50/90 border border-amber-200 px-3.5 py-2 rounded-2xl text-xs font-bold text-amber-900">
+              <div className="flex items-center gap-1.5">
+                <Clock className="w-4 h-4 text-amber-600 animate-pulse" />
+                <span>Thời gian giữ đơn hàng:</span>
+              </div>
+              <span className="font-mono text-sm font-black text-rose-600">{formatTime(timeLeft)}</span>
+            </div>
+
+            {/* Ảnh mã VietQR & Nút tải về */}
+            <div className="space-y-2">
+              <div className="w-56 h-56 mx-auto bg-white p-2.5 rounded-2xl border-2 border-slate-200 shadow-inner flex items-center justify-center">
+                <img 
+                  src={vietQrInfo.qrUrl} 
+                  alt="Techcombank VietQR Code" 
+                  className="w-full h-full object-contain" 
+                />
+              </div>
+              <button
+                type="button"
+                onClick={handleDownloadQr}
+                className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-sky-50 text-[#0284C7] hover:bg-sky-100 text-xs font-bold border border-sky-200 transition cursor-pointer"
+              >
+                <Download className="w-3.5 h-3.5" />
+                <span>Tải ảnh mã QR về máy</span>
+              </button>
+            </div>
+
+            {/* Hướng dẫn 2 bước thực hiện trên điện thoại */}
+            <div className="bg-slate-50 p-3 rounded-2xl border border-slate-200 text-left text-[11px] text-slate-700 space-y-1.5">
+              <p className="font-bold text-slate-900">
+                💡 Hướng dẫn chuyển khoản trên di động:
+              </p>
+              <p>• <strong>Cách 1:</strong> Bấm <em>Sao chép Số tài khoản</em> và <em>Nội dung</em> bên dưới → Mở App ngân hàng chuyển khoản 24/7.</p>
+              <p>• <strong>Cách 2:</strong> Bấm <em>Tải ảnh mã QR</em> (hoặc chụp màn hình) → Mở App ngân hàng chọn <em>Quét QR từ thư viện ảnh</em>.</p>
             </div>
 
             {/* Thông tin chuyển khoản chi tiết có nút copy */}

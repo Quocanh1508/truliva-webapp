@@ -244,3 +244,58 @@ export async function requireSerialAccess(req: Request, res: Response, next: Nex
   res.status(403).json({ error: 'Không có quyền truy cập Quản lý Serial' });
 }
 
+/**
+ * Middleware tùy chọn xác thực session.
+ * Nếu có session_token / Bearer JWT hợp lệ -> gán thông tin user vào req.user.
+ * Nếu không có hoặc token lỗi -> vẫn tiếp tục (next()) để hỗ trợ cả khách vãng lai.
+ */
+export async function optionalAuth(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    let sessionToken = req.cookies?.session_token;
+
+    const authHeader = req.headers.authorization;
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      sessionToken = authHeader.substring(7);
+    }
+
+    if (!sessionToken) {
+      return next();
+    }
+
+    const jwtSecret = process.env.JWT_SECRET;
+    if (!jwtSecret) {
+      return next();
+    }
+
+    let decoded: any;
+    try {
+      decoded = jwt.verify(sessionToken, jwtSecret);
+    } catch {
+      return next();
+    }
+
+    if (decoded && decoded.id) {
+      const user = await prisma.user.findUnique({
+        where: { id: decoded.id },
+        select: { id: true, username: true, fullName: true, phoneNumber: true, role: true, isActive: true, group: true, pancakeAccountName: true },
+      });
+
+      if (user && user.isActive) {
+        req.user = {
+          id: user.id,
+          username: user.username,
+          fullName: user.fullName,
+          phoneNumber: user.phoneNumber,
+          role: user.role,
+          group: user.group,
+          pancakeAccountName: user.pancakeAccountName,
+        };
+      }
+    }
+
+    next();
+  } catch {
+    next();
+  }
+}
+

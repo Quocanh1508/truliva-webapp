@@ -98,7 +98,8 @@ export default function MyOrders() {
 
   const fetchOrdersData = async (silent = false, customSearch?: string) => {
     try {
-      if (!silent) setLoading(true);
+      const isInitialDeepLink = !!(orderIdParam || searchParam);
+      if (!silent && !isInitialDeepLink) setLoading(true);
       const activeSearch = customSearch !== undefined ? customSearch : search;
       const res = await getOrders({
         page,
@@ -168,8 +169,8 @@ export default function MyOrders() {
     }
     if (autoOpenedIdRef.current === targetId) return;
 
-    // 1. Nếu đơn đã có sẵn trong danh sách orders hiện tại
-    const existing = orders.find(
+    // 1. Kiểm tra nhanh trong danh sách orders hiện tại
+    const inCurrent = orders.find(
       (o) =>
         o.id === targetId ||
         String(o.pancakeOrderId) === targetId ||
@@ -177,19 +178,57 @@ export default function MyOrders() {
         (o.pancakeOrderId < 0 && `M${Math.abs(o.pancakeOrderId)}` === targetId)
     );
 
-    if (existing) {
+    if (inCurrent) {
       autoOpenedIdRef.current = targetId;
-      openOrderDetail(existing);
+      openOrderDetail(inCurrent);
       return;
     }
 
-    // 2. Nếu danh sách chưa có (hoặc đang tải), gọi API lấy chi tiết đơn từ server
+    // 2. Thử tìm nhanh trong localStorage cache để mở ngay trong 0ms!
+    try {
+      const cached = localStorage.getItem('cached_ktv_orders');
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        const cachedOrders: any[] = parsed.orders || [];
+        const inCache = cachedOrders.find(
+          (o) =>
+            o.id === targetId ||
+            String(o.pancakeOrderId) === targetId ||
+            formatOrderId(o.pancakeOrderId) === targetId ||
+            (o.pancakeOrderId < 0 && `M${Math.abs(o.pancakeOrderId)}` === targetId)
+        );
+        if (inCache) {
+          autoOpenedIdRef.current = targetId;
+          openOrderDetail(inCache);
+          // Vẫn gọi getOrderDetails ngầm để đảm bảo dữ liệu mới nhất
+          getOrderDetails(targetId).then((freshData) => {
+            if (freshData && !freshData.error && freshData.id) {
+              setSelectedOrderDetail(freshData);
+            }
+          }).catch(() => {});
+          return;
+        }
+      }
+    } catch {
+      // ignore
+    }
+
+    // 3. Nếu chưa có trong cache, mở ngay Modal với Skeleton Shimmer placeholder (0ms tức thì!)
+    autoOpenedIdRef.current = targetId;
+    const fallbackPancakeId = !isNaN(Number(targetId))
+      ? Number(targetId)
+      : (targetId.startsWith('M') ? -Number(targetId.slice(1)) : 0);
+    openOrderDetail({
+      id: targetId,
+      pancakeOrderId: fallbackPancakeId,
+      _isSkeleton: true
+    });
+
     let isCancelled = false;
     getOrderDetails(targetId)
       .then((data) => {
         if (!isCancelled && data && !data.error && data.id) {
-          autoOpenedIdRef.current = targetId;
-          openOrderDetail(data);
+          setSelectedOrderDetail(data);
         }
       })
       .catch((err) => {
@@ -199,7 +238,7 @@ export default function MyOrders() {
     return () => {
       isCancelled = true;
     };
-  }, [orderIdParam, searchParam, orders]);
+  }, [orderIdParam, searchParam]);
 
   useEffect(() => {
     if (!user) return;
@@ -723,7 +762,7 @@ export default function MyOrders() {
         const detailTimeStatus = getAppointmentStatus(selectedOrderDetail.appointmentTime, now);
 
         return (
-          <div className="fixed inset-0 z-50 bg-gray-50 flex flex-col overflow-hidden animate-in fade-in duration-150">
+          <div className="fixed inset-0 z-50 bg-gray-50 flex flex-col overflow-hidden animate-in fade-in slide-in-from-bottom-2 duration-200">
             {/* 1. Header (Sticky Top) */}
             <div className="sticky top-0 z-20 bg-white border-b border-gray-200 px-3.5 py-2.5 flex items-center justify-between shadow-2xs">
               <div className="flex items-center space-x-2 min-w-0">
@@ -739,11 +778,14 @@ export default function MyOrders() {
                 <span className="text-[#1B3A6B] font-extrabold text-[15px] truncate">
                   {formatOrderId(selectedOrderDetail.pancakeOrderId)}
                 </span>
-                {getWorkTypeBadge(selectedOrderDetail.workType)}
+                {selectedOrderDetail.workType && getWorkTypeBadge(selectedOrderDetail.workType)}
               </div>
 
               {/* Trạng thái đơn hàng (Hiển thị trong chi tiết) */}
-              <span className={`text-[10px] font-bold px-2 py-0.5 rounded capitalize shrink-0 ${
+              {selectedOrderDetail._isSkeleton ? (
+                <div className="h-5 w-20 bg-blue-100/60 rounded animate-pulse" />
+              ) : (
+                <span className={`text-[10px] font-bold px-2 py-0.5 rounded capitalize shrink-0 ${
                 selectedOrderDetail.adminStatus === 'đang thực hiện' 
                   ? 'bg-blue-50 text-blue-700 border border-blue-100' 
                   : selectedOrderDetail.adminStatus === 'chờ duyệt'
@@ -762,10 +804,54 @@ export default function MyOrders() {
               }`}>
                 {selectedOrderDetail.adminStatus === 'đang thực hiện' ? 'đã phân công' : (selectedOrderDetail.adminStatus || 'chờ xử lý')}
               </span>
+              )}
             </div>
 
             {/* 2. Scrollable Body */}
-            <div className="flex-1 overflow-y-auto p-3.5 space-y-3 pb-24">
+            {selectedOrderDetail._isSkeleton ? (
+              <div className="flex-1 overflow-y-auto p-3.5 space-y-3 pb-24 animate-pulse">
+                {/* Skeleton Khách hàng & Địa chỉ */}
+                <div className="bg-white rounded-2xl p-3.5 border border-blue-100 shadow-2xs space-y-3">
+                  <div className="flex items-center justify-between pb-2 border-b border-gray-100">
+                    <div className="h-3.5 bg-gray-200 rounded w-32" />
+                    <div className="h-6 bg-gray-100 rounded-lg w-24" />
+                  </div>
+                  <div className="h-5 bg-gray-200 rounded w-40" />
+                  <div className="h-3.5 bg-gray-100 rounded w-full" />
+                  <div className="h-3.5 bg-gray-100 rounded w-3/4" />
+                </div>
+
+                {/* Skeleton Lịch hẹn phục vụ */}
+                <div className="bg-white rounded-2xl p-3.5 border border-blue-100 shadow-2xs space-y-2.5">
+                  <div className="flex items-center justify-between pb-2 border-b border-gray-100">
+                    <div className="h-3.5 bg-gray-200 rounded w-28" />
+                    <div className="h-6 bg-gray-100 rounded-lg w-16" />
+                  </div>
+                  <div className="h-5 bg-gray-200 rounded w-48" />
+                </div>
+
+                {/* Skeleton Sản phẩm & Linh kiện */}
+                <div className="bg-white rounded-2xl p-3.5 border border-blue-100 shadow-2xs space-y-3">
+                  <div className="flex items-center justify-between pb-2 border-b border-gray-100">
+                    <div className="h-3.5 bg-gray-200 rounded w-36" />
+                    <div className="h-5 bg-gray-100 rounded w-20" />
+                  </div>
+                  <div className="flex items-center gap-3 p-2 bg-gray-50/70 rounded-xl">
+                    <div className="w-12 h-12 bg-gray-200 rounded-xl shrink-0" />
+                    <div className="flex-1 space-y-2">
+                      <div className="h-4 bg-gray-200 rounded w-3/4" />
+                      <div className="h-3 bg-gray-100 rounded w-1/3" />
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-center gap-2 py-4 text-xs font-semibold text-blue-600">
+                  <div className="w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
+                  <span>Đang tải chi tiết ca phục vụ...</span>
+                </div>
+              </div>
+            ) : (
+              <div className="flex-1 overflow-y-auto p-3.5 space-y-3 pb-24">
               {/* Card Khách hàng & Địa chỉ (Có Tag Tỉnh Thành) */}
               <div className="bg-white rounded-2xl p-3.5 border border-blue-100 shadow-2xs space-y-2.5">
                 <div className="flex items-center justify-between border-b border-gray-100 pb-2">
@@ -918,64 +1004,73 @@ export default function MyOrders() {
                 </p>
               </div>
             </div>
+            )}
 
             {/* 3. Bottom Sticky Action Bar */}
-            <div className="sticky bottom-0 z-20 bg-white border-t border-gray-200 p-3 shadow-lg flex items-center gap-2">
-              {detailPhone ? (
+            {selectedOrderDetail._isSkeleton ? (
+              <div className="sticky bottom-0 z-20 bg-white border-t border-gray-200 p-3 shadow-lg flex items-center gap-2">
+                <div className="flex-1 h-10 bg-gray-100 rounded-xl animate-pulse" />
+                <div className="flex-1 h-10 bg-gray-100 rounded-xl animate-pulse" />
+                <div className="flex-1 h-10 bg-gray-100 rounded-xl animate-pulse" />
+              </div>
+            ) : (
+              <div className="sticky bottom-0 z-20 bg-white border-t border-gray-200 p-3 shadow-lg flex items-center gap-2">
+                {detailPhone ? (
+                  <button
+                    type="button"
+                    onClick={() => handleCallCustomer(selectedOrderDetail.id, detailPhone)}
+                    disabled={callingOrderId === selectedOrderDetail.id}
+                    className="flex-1 flex items-center justify-center space-x-1 py-2.5 px-2 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 text-emerald-700 rounded-xl font-bold text-xs transition-colors disabled:opacity-50 cursor-pointer active:scale-95"
+                  >
+                    <Phone size={14} />
+                    <span>Gọi khách</span>
+                  </button>
+                ) : null}
+
                 <button
                   type="button"
-                  onClick={() => handleCallCustomer(selectedOrderDetail.id, detailPhone)}
-                  disabled={callingOrderId === selectedOrderDetail.id}
-                  className="flex-1 flex items-center justify-center space-x-1 py-2.5 px-2 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 text-emerald-700 rounded-xl font-bold text-xs transition-colors disabled:opacity-50 cursor-pointer active:scale-95"
+                  onClick={() => setRescheduleModalOrder(selectedOrderDetail)}
+                  className="flex-1 flex items-center justify-center space-x-1 py-2.5 px-2 bg-amber-50 hover:bg-amber-100 border border-amber-200 text-amber-800 rounded-xl font-bold text-xs transition-colors cursor-pointer active:scale-95"
                 >
-                  <Phone size={14} />
-                  <span>Gọi khách</span>
+                  <Calendar size={14} />
+                  <span>Hẹn lại</span>
                 </button>
-              ) : null}
 
-              <button
-                type="button"
-                onClick={() => setRescheduleModalOrder(selectedOrderDetail)}
-                className="flex-1 flex items-center justify-center space-x-1 py-2.5 px-2 bg-amber-50 hover:bg-amber-100 border border-amber-200 text-amber-800 rounded-xl font-bold text-xs transition-colors cursor-pointer active:scale-95"
-              >
-                <Calendar size={14} />
-                <span>Hẹn lại</span>
-              </button>
+                {selectedOrderDetail.checkoutLink && (
+                  <button
+                    type="button"
+                    onClick={() => window.open(selectedOrderDetail.checkoutLink, '_blank', 'noopener,noreferrer')}
+                    className="flex-1 flex items-center justify-center space-x-1 py-2.5 px-2 bg-violet-50 hover:bg-violet-100 border border-violet-200 text-violet-700 rounded-xl font-bold text-xs transition-colors cursor-pointer active:scale-95"
+                  >
+                    <CreditCard size={14} />
+                    <span>Thanh toán</span>
+                  </button>
+                )}
 
-              {selectedOrderDetail.checkoutLink && (
-                <button
-                  type="button"
-                  onClick={() => window.open(selectedOrderDetail.checkoutLink, '_blank', 'noopener,noreferrer')}
-                  className="flex-1 flex items-center justify-center space-x-1 py-2.5 px-2 bg-violet-50 hover:bg-violet-100 border border-violet-200 text-violet-700 rounded-xl font-bold text-xs transition-colors cursor-pointer active:scale-95"
-                >
-                  <CreditCard size={14} />
-                  <span>Thanh toán</span>
-                </button>
-              )}
-
-              {selectedOrderDetail.adminStatus === 'chờ duyệt' ? (
-                <button
-                  disabled
-                  className="flex-1 flex items-center justify-center space-x-1 py-2.5 px-2 bg-gray-100 border border-gray-200 text-gray-400 rounded-xl font-bold text-xs cursor-not-allowed"
-                >
-                  <FileText size={14} />
-                  <span>Chờ duyệt</span>
-                </button>
-              ) : (
-                <button
-                  type="button"
-                  onClick={() => {
-                    const ord = selectedOrderDetail;
-                    closeOrderDetail();
-                    navigate('/ktv/report', { state: { order: ord } });
-                  }}
-                  className="flex-[1.3] flex items-center justify-center space-x-1 py-2.5 px-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold text-xs shadow-md transition-colors cursor-pointer active:scale-95"
-                >
-                  <FileText size={14} />
-                  <span>Báo cáo</span>
-                </button>
-              )}
-            </div>
+                {selectedOrderDetail.adminStatus === 'chờ duyệt' ? (
+                  <button
+                    disabled
+                    className="flex-1 flex items-center justify-center space-x-1 py-2.5 px-2 bg-gray-100 border border-gray-200 text-gray-400 rounded-xl font-bold text-xs cursor-not-allowed"
+                  >
+                    <FileText size={14} />
+                    <span>Chờ duyệt</span>
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const ord = selectedOrderDetail;
+                      closeOrderDetail();
+                      navigate('/ktv/report', { state: { order: ord } });
+                    }}
+                    className="flex-[1.3] flex items-center justify-center space-x-1 py-2.5 px-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold text-xs shadow-md transition-colors cursor-pointer active:scale-95"
+                  >
+                    <FileText size={14} />
+                    <span>Báo cáo</span>
+                  </button>
+                )}
+              </div>
+            )}
           </div>
         );
       })()}

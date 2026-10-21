@@ -1,5 +1,5 @@
 // Cache-busting version - change this value to force iOS PWA to reload all assets
-const SW_VERSION = '2026-10-19-v1';
+const SW_VERSION = '2026-10-21-v1';
 
 self.addEventListener('install', (event) => {
   console.log(`[SW ${SW_VERSION}] Installing...`);
@@ -65,15 +65,8 @@ self.addEventListener('notificationclick', (event) => {
         }
 
         if (isSameOrigin && 'focus' in client) {
-          // Gửi thông điệp REDIRECT đồng thời navigate client trực tiếp nếu được hỗ trợ
+          // Gửi thông điệp REDIRECT để React Router điều hướng nội bộ tức thì trong RAM (0ms)
           client.postMessage({ type: 'REDIRECT', url: targetPath, fullUrl: fullTargetUrl });
-          if ('navigate' in client) {
-            try {
-              await client.navigate(fullTargetUrl);
-            } catch (navErr) {
-              console.warn('[SW] client.navigate failed:', navErr);
-            }
-          }
           return client.focus();
         }
       }

@@ -1974,7 +1974,7 @@ export async function updateOrder(req: Request, res: Response): Promise<void> {
       workType, serviceType, mainStationId, techStationId,
       rescheduleReason, cancelReason, note, warehouseId,
       items, customerName, customerPhone, address, province, moneyToCollect,
-      promoCode, isExplicitUnassign
+      promoCode, isExplicitUnassign, isExplicitClearSalesKtv
     } = req.body;
 
     // Lấy order hiện tại để so sánh cho audit và đồng bộ kho
@@ -2030,6 +2030,21 @@ export async function updateOrder(req: Request, res: Response): Promise<void> {
     let effectiveTechStationId = techStationId;
     let effectiveAdminStatus = adminStatus;
     let effectiveWarehouseId = warehouseId;
+    let effectiveSalesKtvId = salesKtvId;
+
+    // ── Sales KTV Protection Guard ──
+    // Nếu đơn hàng đã có KTV bán hàng mà payload gửi lên rỗng/null mà KHÔNG có cờ chủ động gỡ
+    // (do coordinator chỉ phân bổ KTV thi công hoặc do frontend cache cũ): BẢO TỒN KTV BÁN HÀNG CŨ!
+    if (oldOrder.salesKtvId) {
+      if (!salesKtvId && !isExplicitClearSalesKtv) {
+        effectiveSalesKtvId = oldOrder.salesKtvId;
+        logger.info('Protected salesKtvId from being wiped out without explicit clear flag', {
+          orderId: id,
+          role,
+          preservedSalesKtvId: oldOrder.salesKtvId
+        });
+      }
+    }
 
     if (oldOrder.assignedKtvId) {
       // Đơn hàng ĐÃ CÓ KTV:
@@ -2222,8 +2237,8 @@ export async function updateOrder(req: Request, res: Response): Promise<void> {
       track('assignedKtvId', val);
     }
 
-    if (salesKtvId !== undefined) {
-      const val = salesKtvId || null;
+    if (effectiveSalesKtvId !== undefined) {
+      const val = effectiveSalesKtvId || null;
       track('salesKtvId', val);
     }
 

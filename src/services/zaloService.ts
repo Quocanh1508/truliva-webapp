@@ -113,7 +113,7 @@ async function syncZaloTokensToSandbox(accessToken: string, refreshToken: string
       const { Pool } = require('pg');
       const pool = new Pool({ connectionString: sandboxDbUrl, connectionTimeoutMillis: 3000 });
       await pool.query(
-        `UPDATE zalo_configs SET access_token = $1, refresh_token = $2, token_expired_at = $3, updated_at = NOW()`,
+        `UPDATE zalo_config SET access_token = $1, refresh_token = $2, token_expired_at = $3, updated_at = NOW()`,
         [accessToken, refreshToken, tokenExpiredAt]
       );
       await pool.end();

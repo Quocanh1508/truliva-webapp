@@ -233,20 +233,49 @@ export async function createShopOrder(req: Request, res: Response): Promise<void
       });
     }
 
-    // 2. Tính giảm giá Voucher (nếu có)
+    // 2. Tính giảm giá Voucher (Kiểm tra chặt chẽ điều kiện & số lần sử dụng)
     let discountAmount = 0;
     let appliedVoucherCode: string | null = null;
     if (voucherCode?.trim()) {
       const vCode = voucherCode.trim().toUpperCase();
-      if (vCode === 'TRULIVA500' && totalAmount >= 10000000) {
+
+      // Kiểm tra số lần sử dụng voucher của SĐT này (chống lạm dụng khuyến mãi)
+      const usedVoucherCount = await prisma.shopOrder.count({
+        where: {
+          customerPhone: cleanPhone,
+          voucherCode: vCode,
+          orderStatus: { not: 'CANCELLED' }
+        }
+      });
+
+      if (vCode === 'TRULIVA500') {
+        if (totalAmount < 10000000) {
+          res.status(400).json({ success: false, error: 'Mã ưu đãi TRULIVA500 chỉ áp dụng cho đơn hàng từ 10.000.000đ trở lên' });
+          return;
+        }
+        if (usedVoucherCount >= 1) {
+          res.status(400).json({ success: false, error: 'Mã ưu đãi TRULIVA500 chỉ áp dụng tối đa 01 lần cho mỗi khách hàng' });
+          return;
+        }
         discountAmount = 500000;
         appliedVoucherCode = vCode;
-      } else if (vCode === 'GIAM100K' && totalAmount >= 1000000) {
+      } else if (vCode === 'GIAM100K') {
+        if (totalAmount < 1000000) {
+          res.status(400).json({ success: false, error: 'Mã ưu đãi GIAM100K chỉ áp dụng cho đơn hàng từ 1.000.000đ trở lên' });
+          return;
+        }
+        if (usedVoucherCount >= 3) {
+          res.status(400).json({ success: false, error: 'Quý khách đã sử dụng hết lượt cho mã giảm giá GIAM100K' });
+          return;
+        }
         discountAmount = 100000;
         appliedVoucherCode = vCode;
       } else if (vCode === '12THANGBH') {
         // Tặng thêm 12 tháng bảo hành
         appliedVoucherCode = vCode;
+      } else {
+        res.status(400).json({ success: false, error: `Mã giảm giá "${vCode}" không tồn tại hoặc đã hết hạn áp dụng` });
+        return;
       }
     }
 
@@ -263,12 +292,13 @@ export async function createShopOrder(req: Request, res: Response): Promise<void
     const privacyDoc = await prisma.legalDocument.findUnique({ where: { type: 'PRIVACY' } });
 
     // 5. Thực thi Transaction tạo Đơn hàng Shop + Consent + Ca dịch vụ nội bộ
+    const authenticatedUserId = (req as any).user?.id || (req as any).zaloUser?.id || null;
     const result = await prisma.$transaction(async (tx) => {
       // 5.1 Tạo ShopOrder
       const shopOrder = await tx.shopOrder.create({
         data: {
           orderCode,
-          zaloUserId: (req as any).zaloUser?.id || null,
+          zaloUserId: authenticatedUserId,
           customerName: customerName.trim(),
           customerPhone: cleanPhone,
           address: address.trim(),
@@ -350,12 +380,14 @@ export async function createShopOrder(req: Request, res: Response): Promise<void
             },
             workType: 'Giao hàng và Lắp đặt',
             adminStatus: 'chờ xử lý',
-            moneyToCollect: isVietQr ? 0 : finalAmount,
+            // ⚠️ BẢO VỆ CHỐNG THẤT THOÁT: Khi khách mới tạo đơn và CHƯA thanh toán thành công,
+            // moneyToCollect BẮT BUỘC bằng finalAmount. Chỉ khi Webhook xác nhận PAID mới chuyển về 0!
+            moneyToCollect: finalAmount,
             totalPrice: finalAmount,
             promoCode: appliedVoucherCode,
             note: isVietQr 
-              ? `[ĐƠN ZALO MINI APP - CHỜ CHUYỂN KHOẢN VIETQR: ${finalAmount.toLocaleString('vi-VN')}đ] | Mã: ${orderCode} | Mặt hàng: ${fullItemsText} | Ghi chú: ${note?.trim() || 'Không có'}`
-              : `[ĐƠN ZALO MINI APP - COD THU TIỀN TẬN NƠI: ${finalAmount.toLocaleString('vi-VN')}đ] | Mã: ${orderCode} | Mặt hàng: ${fullItemsText} | Ghi chú: ${note?.trim() || 'Không có'}`
+              ? `[ĐƠN ZALO MINI APP - CHỜ CHUYỂN KHOẢN VIETQR: ${finalAmount.toLocaleString('vi-VN')}đ] | KTV CHƯA THU TIỀN NẾU ĐƠN CHUYỂN SANG ĐÃ THANH TOÁN, HOẶC THU ĐỦ ${finalAmount.toLocaleString('vi-VN')}đ NẾU CHƯA CÓ XÁC NHẬN CHUYỂN KHOẢN | Mã: ${orderCode} | Mặt hàng: ${fullItemsText} | Ghi chú: ${note?.trim() || 'Không có'}`
+              : `[ĐƠN ZALO MINI APP - COD THU TIỀN TẬN NƠI: ${finalAmount.toLocaleString('vi-VN')}đ] | KTV thu đủ sau khi lắp đặt & nghiệm thu | Mã: ${orderCode} | Mặt hàng: ${fullItemsText} | Ghi chú: ${note?.trim() || 'Không có'}`
           }
         });
 
@@ -416,23 +448,33 @@ export async function createShopOrder(req: Request, res: Response): Promise<void
  */
 export async function getMyShopOrders(req: Request, res: Response): Promise<void> {
   try {
-    const phone = (req.query.phone as string || (req as any).zaloUser?.phoneNumber || '').trim();
-    if (!phone) {
+    const user = (req as any).user;
+    const phone = (req.query.phone as string || user?.phoneNumber || (req as any).zaloUser?.phoneNumber || '').trim();
+    const userId = user?.id || null;
+
+    if (!phone && !userId) {
       res.json({ success: true, orders: [] });
       return;
     }
 
-    const cleanPhone = phone.replace(/[^0-9]/g, '');
-    const searchPhones = [cleanPhone];
-    if (cleanPhone.startsWith('84')) {
-      searchPhones.push('0' + cleanPhone.slice(2));
-    } else if (cleanPhone.startsWith('0')) {
-      searchPhones.push('84' + cleanPhone.slice(1));
+    const whereConditions: any[] = [];
+    if (userId) {
+      whereConditions.push({ zaloUserId: userId });
+    }
+    if (phone) {
+      const cleanPhone = phone.replace(/[^0-9]/g, '');
+      const searchPhones = [cleanPhone];
+      if (cleanPhone.startsWith('84')) {
+        searchPhones.push('0' + cleanPhone.slice(2));
+      } else if (cleanPhone.startsWith('0')) {
+        searchPhones.push('84' + cleanPhone.slice(1));
+      }
+      searchPhones.forEach(p => whereConditions.push({ customerPhone: { contains: p } }));
     }
 
     const orders = await prisma.shopOrder.findMany({
       where: {
-        OR: searchPhones.map(p => ({ customerPhone: { contains: p } }))
+        OR: whereConditions
       },
       include: {
         items: {

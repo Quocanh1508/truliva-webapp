@@ -414,6 +414,7 @@ export default function OrderList() {
   const [selectedTech, setSelectedTech] = useState('');
   const [selectedKtv, setSelectedKtv] = useState('');
   const [selectedSalesKtv, setSelectedSalesKtv] = useState('');
+  const [isSalesKtvManuallyCleared, setIsSalesKtvManuallyCleared] = useState(false);
   const [appointmentDate, setAppointmentDate] = useState('');
   const [appointmentTime, setAppointmentTime] = useState('08:30');
   const [rescheduleReason, setRescheduleReason] = useState('');
@@ -1392,8 +1393,9 @@ export default function OrderList() {
     let order = initialOrder;
     try {
       const freshRes = await fetchApi(`/orders/${initialOrder.id}`);
-      if (freshRes?.order) {
-        order = freshRes.order;
+      const freshOrder = freshRes?.id ? freshRes : freshRes?.order;
+      if (freshOrder) {
+        order = freshOrder;
       }
     } catch (e) {
       console.warn('Could not fetch fresh order for assign modal, fallback to current state', e);
@@ -1424,6 +1426,7 @@ export default function OrderList() {
     setSelectedTech(initialTech);
     setSelectedKtv(initialKtv);
     setSelectedSalesKtv(order.salesKtvId || '');
+    setIsSalesKtvManuallyCleared(false);
 
     // Convert UTC to local input format
     let appDateStr = '';
@@ -1730,12 +1733,22 @@ export default function OrderList() {
         payload.mainStationId = selectedMain || null;
         payload.techStationId = selectedTech || null;
         payload.assignedKtvId = selectedKtv || null;
-        payload.salesKtvId = selectedSalesKtv || null;
         payload.adminStatus = selectedKtv ? 'đang thực hiện' : 'chờ xử lý';
         payload.warehouseId = finalWarehouseId;
         // Nếu trước đó đơn đã có KTV và ĐPV cố tình gỡ KTV:
         if (assignModal.order.assignedKtvId && !selectedKtv) {
           payload.isExplicitUnassign = true;
+        }
+
+        // Bảo tồn và xử lý KTV bán hàng:
+        if (selectedSalesKtv) {
+          payload.salesKtvId = selectedSalesKtv;
+        } else if (isSalesKtvManuallyCleared) {
+          payload.salesKtvId = null;
+          payload.isExplicitClearSalesKtv = true;
+        } else if (assignModal.order.salesKtvId) {
+          // Bảo tồn KTV bán hàng cũ nếu không chủ động gỡ
+          payload.salesKtvId = assignModal.order.salesKtvId;
         }
       } else {
         // Tài khoản không có quyền phân bổ KTV (Sale / Hotline / Staff) chỉ sửa dịch vụ/sản phẩm:
@@ -1751,6 +1764,8 @@ export default function OrderList() {
         }
         if (selectedSalesKtv) {
           payload.salesKtvId = selectedSalesKtv;
+        } else if (assignModal.order.salesKtvId) {
+          payload.salesKtvId = assignModal.order.salesKtvId;
         }
       }
 
@@ -4488,7 +4503,14 @@ export default function OrderList() {
                     </div>
                     <SalesKtvSelect
                       value={selectedSalesKtv}
-                      onChange={setSelectedSalesKtv}
+                      onChange={(id) => {
+                        setSelectedSalesKtv(id);
+                        if (!id && assignModal?.order?.salesKtvId) {
+                          setIsSalesKtvManuallyCleared(true);
+                        } else {
+                          setIsSalesKtvManuallyCleared(false);
+                        }
+                      }}
                       ktvs={allKtvs}
                     />
                   </div>

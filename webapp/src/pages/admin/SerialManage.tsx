@@ -747,6 +747,8 @@ export default function SerialManage() {
         padding: '3px 10px', borderRadius: 12,
         backgroundColor: s.bg, color: s.color,
         fontSize: 12, fontWeight: 600,
+        whiteSpace: 'nowrap',
+        flexShrink: 0,
       }}>
         {s.icon} {status}
       </span>
@@ -761,189 +763,149 @@ export default function SerialManage() {
   };
 
   return (
-    <div style={{ padding: '20px', maxWidth: 1400, margin: '0 auto' }}>
+    <div className="p-3 sm:p-5 max-w-[1400px] mx-auto w-full overflow-x-clip">
       {/* Header */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 24 }}>
-        <Hash size={28} color="#4472C4" />
-        <h1 style={{ margin: 0, fontSize: 24, fontWeight: 700, color: '#1e293b' }}>Quản lý Serial</h1>
+      <div className="flex items-center gap-2.5 sm:gap-3 mb-4 sm:mb-6">
+        <Hash className="w-6 h-6 sm:w-7 sm:h-7 text-[#4472C4]" />
+        <h1 className="m-0 text-xl sm:text-2xl font-bold text-slate-800">Quản lý Serial</h1>
       </div>
 
-      {/* Stats Cards - Tầng 1: Tổng thể */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 16, marginBottom: 12 }}>
+      {/* Stats Cards - Tầng 1: Tổng thể (Lưới 2x2 trên mobile, 4 cột trên desktop) */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-4 mb-3">
         {[
           { label: 'Tổng Serial', value: stats.total, color: '#4472C4', bg: '#dbeafe' },
           { label: 'Đã kích hoạt', value: stats.activated, color: '#16a34a', bg: '#dcfce7' },
           { label: 'KH xác nhận', value: stats.confirmed, color: '#1e40af', bg: '#e0e7ff' },
           { label: 'Chưa kích hoạt', value: stats.unactivated, color: '#d97706', bg: '#fef3c7' },
         ].map((stat, i) => (
-          <div key={i} style={{
-            background: 'white', borderRadius: 12, padding: '16px 20px',
-            border: '1px solid #e2e8f0', boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
-          }}>
-            <div style={{ fontSize: 13, color: '#64748b', marginBottom: 4 }}>{stat.label}</div>
-            <div style={{ fontSize: 28, fontWeight: 700, color: stat.color }}>{stat.value.toLocaleString()}</div>
+          <div key={i} className="bg-white rounded-xl p-3 sm:p-4 border border-slate-200 shadow-xs">
+            <div className="text-xs sm:text-sm text-slate-500 mb-1 font-medium">{stat.label}</div>
+            <div className="text-xl sm:text-2xl font-bold" style={{ color: stat.color }}>{stat.value.toLocaleString()}</div>
           </div>
         ))}
       </div>
 
-      {/* Stats Cards - Tầng 2: Chi tiết bảo hành (tập con của Đã kích hoạt + KH xác nhận) */}
-      <div style={{ marginBottom: 24 }}>
-        <div style={{ fontSize: 12, color: '#94a3b8', fontWeight: 600, marginBottom: 8, paddingLeft: 4 }}>
+      {/* Stats Cards - Tầng 2: Chi tiết bảo hành */}
+      <div className="mb-4 sm:mb-6">
+        <div className="text-xs text-slate-400 font-semibold mb-2 px-1">
           Trong đó (Đã kích hoạt + KH xác nhận = {(stats.activated + stats.confirmed).toLocaleString()}):
         </div>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 12, maxWidth: 500 }}>
-          <div style={{
-            background: 'white', borderRadius: 10, padding: '12px 16px',
-            border: '2px solid #86efac', boxShadow: '0 1px 2px rgba(0,0,0,0.04)',
-            display: 'flex', alignItems: 'center', gap: 10,
-          }}>
-            <div style={{ width: 10, height: 10, borderRadius: '50%', background: '#22c55e', flexShrink: 0 }} />
+        <div className="grid grid-cols-2 gap-2 sm:gap-3 max-w-md">
+          <div className="bg-white rounded-xl p-2.5 sm:p-3 border-2 border-emerald-300 shadow-2xs flex items-center gap-2 sm:gap-2.5">
+            <div className="w-2.5 h-2.5 rounded-full bg-emerald-500 shrink-0" />
             <div>
-              <div style={{ fontSize: 12, color: '#64748b' }}>Còn hạn BH</div>
-              <div style={{ fontSize: 22, fontWeight: 700, color: '#16a34a' }}>{stats.valid.toLocaleString()}</div>
+              <div className="text-xs text-slate-500">Còn hạn BH</div>
+              <div className="text-lg sm:text-xl font-bold text-emerald-600">{stats.valid.toLocaleString()}</div>
             </div>
           </div>
-          <div style={{
-            background: 'white', borderRadius: 10, padding: '12px 16px',
-            border: '2px solid #cbd5e1', boxShadow: '0 1px 2px rgba(0,0,0,0.04)',
-            display: 'flex', alignItems: 'center', gap: 10,
-          }}>
-            <div style={{ width: 10, height: 10, borderRadius: '50%', background: '#94a3b8', flexShrink: 0 }} />
+          <div className="bg-white rounded-xl p-2.5 sm:p-3 border-2 border-slate-300 shadow-2xs flex items-center gap-2 sm:gap-2.5">
+            <div className="w-2.5 h-2.5 rounded-full bg-slate-400 shrink-0" />
             <div>
-              <div style={{ fontSize: 12, color: '#64748b' }}>Đã hết hạn BH</div>
-              <div style={{ fontSize: 22, fontWeight: 700, color: '#64748b' }}>{stats.expired.toLocaleString()}</div>
+              <div className="text-xs text-slate-500">Đã hết hạn BH</div>
+              <div className="text-lg sm:text-xl font-bold text-slate-500">{stats.expired.toLocaleString()}</div>
             </div>
           </div>
         </div>
       </div>
 
-      {/* Toolbar */}
-      <div style={{
-        display: 'flex', flexWrap: 'wrap', gap: 12, marginBottom: 20,
-        alignItems: 'center', justifyContent: 'space-between',
-      }}>
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center', flex: 1, minWidth: 0 }}>
+      {/* Toolbar: Tối ưu 2 tầng chuẩn responsive không vỡ layout */}
+      <div className="flex flex-col gap-3 mb-4 w-full">
+        {/* Hàng 1: Tìm kiếm & Bộ lọc */}
+        <div className="flex flex-wrap items-center gap-2 w-full">
           {/* Search */}
-          <div style={{
-            display: 'flex', alignItems: 'center', gap: 8,
-            background: 'white', border: '1px solid #d1d5db', borderRadius: 8,
-            padding: '8px 12px', flex: '1 1 200px', minWidth: 180, maxWidth: 340,
-          }}>
-            <Search size={18} color="#9ca3af" />
+          <div className="flex items-center gap-2 bg-white border border-slate-300 rounded-lg px-3 py-2 w-full sm:w-72 sm:max-w-xs shrink-0 shadow-2xs">
+            <Search size={18} className="text-slate-400 shrink-0" />
             <input
               type="text"
               placeholder="Tìm serial, tên KH, SĐT..."
               value={searchInput}
               onChange={e => setSearchInput(e.target.value)}
               onKeyDown={e => e.key === 'Enter' && handleSearch()}
-              style={{
-                border: 'none', outline: 'none', flex: 1,
-                fontSize: 14, color: '#374151', background: 'transparent',
-              }}
+              className="border-none outline-none flex-1 text-sm text-slate-700 bg-transparent min-w-0"
             />
             {searchInput && (
-              <button onClick={() => { setSearchInput(''); setSearch(''); setPage(1); }}
-                style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>
-                <X size={16} color="#9ca3af" />
+              <button
+                onClick={() => { setSearchInput(''); setSearch(''); setPage(1); }}
+                className="bg-transparent border-none cursor-pointer p-0 text-slate-400 hover:text-slate-600"
+              >
+                <X size={16} />
               </button>
             )}
           </div>
 
-          {/* Status filter */}
-          <div style={{ position: 'relative', flexShrink: 0 }}>
-            <select
-              value={statusFilter}
-              onChange={e => { setStatusFilter(e.target.value); setPage(1); }}
-              style={{
-                padding: '8px 28px 8px 12px', borderRadius: 8,
-                border: '1px solid #d1d5db', background: 'white',
-                fontSize: 13, color: '#374151', cursor: 'pointer',
-                appearance: 'none', flexShrink: 0,
-              }}
-            >
-              <option value="">Tất cả trạng thái</option>
-              <option value="Chưa kích hoạt">Chưa kích hoạt</option>
-              <option value="Đã kích hoạt">Đã kích hoạt</option>
-              <option value="KH xác nhận">KH xác nhận</option>
-              <option value="Chờ duyệt">Chờ duyệt</option>
-              <option value="Đã hết hạn">Đã hết hạn</option>
-            </select>
-            <Filter size={14} style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none', color: '#9ca3af' }} />
-          </div>
+          {/* Nhóm Filter Dropdown (Cuộn ngang trơn tru trên mobile nếu hẹp) */}
+          <div className="flex items-center gap-2 overflow-x-auto pb-1 max-w-full no-scrollbar shrink-0">
+            {/* Status filter */}
+            <div className="relative shrink-0">
+              <select
+                value={statusFilter}
+                onChange={e => { setStatusFilter(e.target.value); setPage(1); }}
+                className="py-2 pl-3 pr-8 rounded-lg border border-slate-300 bg-white text-xs sm:text-sm text-slate-700 cursor-pointer appearance-none shrink-0 shadow-2xs focus:ring-2 focus:ring-blue-500/20"
+              >
+                <option value="">Tất cả trạng thái</option>
+                <option value="Chưa kích hoạt">Chưa kích hoạt</option>
+                <option value="Đã kích hoạt">Đã kích hoạt</option>
+                <option value="KH xác nhận">KH xác nhận</option>
+                <option value="Chờ duyệt">Chờ duyệt</option>
+                <option value="Đã hết hạn">Đã hết hạn</option>
+              </select>
+              <Filter size={14} className="absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400" />
+            </div>
 
-          {/* Batch filter */}
-          <div style={{ position: 'relative', flexShrink: 0 }}>
-            <select
-              value={batchFilter}
-              onChange={e => { setBatchFilter(e.target.value); setPage(1); }}
-              style={{
-                padding: '8px 28px 8px 12px', borderRadius: 8,
-                border: '1px solid #d1d5db', background: 'white',
-                fontSize: 13, color: '#374151', cursor: 'pointer',
-                appearance: 'none',
-                maxWidth: 175,
-                textOverflow: 'ellipsis',
-                flexShrink: 0,
-              }}
-            >
-              <option value="">Tất cả các lô import</option>
-              {batches.map(b => (
-                <option key={b.batchId} value={b.batchId}>
-                  {b.batchId} ({b.count} máy)
-                </option>
-              ))}
-            </select>
-            <Filter size={14} style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none', color: '#9ca3af' }} />
-          </div>
+            {/* Batch filter */}
+            <div className="relative shrink-0">
+              <select
+                value={batchFilter}
+                onChange={e => { setBatchFilter(e.target.value); setPage(1); }}
+                className="py-2 pl-3 pr-8 rounded-lg border border-slate-300 bg-white text-xs sm:text-sm text-slate-700 cursor-pointer appearance-none max-w-[160px] truncate shrink-0 shadow-2xs focus:ring-2 focus:ring-blue-500/20"
+              >
+                <option value="">Tất cả các lô import</option>
+                {batches.map(b => (
+                  <option key={b.batchId} value={b.batchId}>
+                    {b.batchId} ({b.count} máy)
+                  </option>
+                ))}
+              </select>
+              <Filter size={14} className="absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400" />
+            </div>
 
-          {/* Quick Sort selector */}
-          <div style={{ position: 'relative', flexShrink: 0 }}>
-            <select
-              value={`${sortBy}:${sortOrder}`}
-              onChange={e => {
-                const [field, order] = e.target.value.split(':');
-                setSortBy(field);
-                setSortOrder(order as 'asc' | 'desc');
-                setPage(1);
-              }}
-              style={{
-                padding: '8px 28px 8px 12px', borderRadius: 8,
-                border: '1px solid #d1d5db', background: 'white',
-                fontSize: 13, color: '#374151', cursor: 'pointer',
-                appearance: 'none',
-                maxWidth: 175,
-                textOverflow: 'ellipsis',
-                flexShrink: 0,
-              }}
-              title="Tiêu chí sắp xếp danh sách"
-            >
-              <option value="updatedAt:desc">Mới cập nhật</option>
-              <option value="activationDate:desc">Mới kích hoạt</option>
-              <option value="warrantyExpiryDate:asc">Sắp hết hạn BH</option>
-              <option value="warrantyExpiryDate:desc">Hết hạn BH xa nhất</option>
-              <option value="serialNumber:asc">Serial (A → Z)</option>
-              <option value="serialNumber:desc">Serial (Z → A)</option>
-              <option value="createdAt:desc">Ngày nhập mới nhất</option>
-              <option value="createdAt:asc">Ngày nhập cũ nhất</option>
-              <option value="customerName:asc">Tên KH (A → Z)</option>
-            </select>
-            <ArrowUpDown size={14} style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none', color: '#9ca3af' }} />
+            {/* Quick Sort selector */}
+            <div className="relative shrink-0">
+              <select
+                value={`${sortBy}:${sortOrder}`}
+                onChange={e => {
+                  const [field, order] = e.target.value.split(':');
+                  setSortBy(field);
+                  setSortOrder(order as 'asc' | 'desc');
+                  setPage(1);
+                }}
+                className="py-2 pl-3 pr-8 rounded-lg border border-slate-300 bg-white text-xs sm:text-sm text-slate-700 cursor-pointer appearance-none max-w-[160px] truncate shrink-0 shadow-2xs focus:ring-2 focus:ring-blue-500/20"
+                title="Tiêu chí sắp xếp danh sách"
+              >
+                <option value="updatedAt:desc">Mới cập nhật</option>
+                <option value="activationDate:desc">Mới kích hoạt</option>
+                <option value="warrantyExpiryDate:asc">Sắp hết hạn BH</option>
+                <option value="warrantyExpiryDate:desc">Hết hạn BH xa nhất</option>
+                <option value="serialNumber:asc">Serial (A → Z)</option>
+                <option value="serialNumber:desc">Serial (Z → A)</option>
+                <option value="createdAt:desc">Ngày nhập mới nhất</option>
+                <option value="createdAt:asc">Ngày nhập cũ nhất</option>
+                <option value="customerName:asc">Tên KH (A → Z)</option>
+              </select>
+              <ArrowUpDown size={14} className="absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400" />
+            </div>
           </div>
         </div>
 
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center', flexShrink: 0 }}>
+        {/* Hàng 2: Nút thao tác (Cuộn ngang êm ái trên mobile, không tràn màn hình) */}
+        <div className="flex items-center gap-2 overflow-x-auto pb-1 max-w-full no-scrollbar flex-nowrap sm:flex-wrap">
           {/* Rollback batch button */}
           <button
             onClick={() => setShowBatchModal(true)}
-            style={{
-              display: 'flex', alignItems: 'center', gap: 6,
-              padding: '8px 16px', borderRadius: 8,
-              background: '#ef4444', color: 'white', border: 'none',
-              fontSize: 14, fontWeight: 600, cursor: 'pointer',
-            }}
+            className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-red-500 hover:bg-red-600 text-white border-none text-xs sm:text-sm font-semibold cursor-pointer shrink-0 whitespace-nowrap shadow-2xs"
             title="Quản lý các lô đã import và hoàn tác (Rollback)"
           >
-            <RotateCcw size={16} /> Lịch sử Lô
+            <RotateCcw size={15} /> Lịch sử Lô
           </button>
 
           {/* Quản lý Model button */}
@@ -953,18 +915,10 @@ export default function SerialManage() {
                 setShowModelModal(true);
                 loadMachineModels();
               }}
-              style={{
-                display: 'flex', alignItems: 'center', gap: 6,
-                padding: '8px 16px', borderRadius: 8,
-                background: '#1B3A6B', color: 'white', border: 'none',
-                fontSize: 14, fontWeight: 600, cursor: 'pointer',
-                transition: 'background-color 0.2s',
-              }}
-              onMouseOver={e => e.currentTarget.style.background = '#2A518E'}
-              onMouseOut={e => e.currentTarget.style.background = '#1B3A6B'}
+              className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-[#1B3A6B] hover:bg-[#2A518E] text-white border-none text-xs sm:text-sm font-semibold cursor-pointer shrink-0 whitespace-nowrap shadow-2xs transition-colors"
               title="Khai báo và quản lý danh sách Model máy để đồng bộ dropdown Excel"
             >
-              <Layers size={16} /> Quản lý Model
+              <Layers size={15} /> Quản lý Model
             </button>
           )}
 
@@ -972,14 +926,9 @@ export default function SerialManage() {
           {hasPermission('SERIAL_IMPORT_EXCEL') && (
             <button
               onClick={() => setShowImportModal(true)}
-              style={{
-                display: 'flex', alignItems: 'center', gap: 6,
-                padding: '8px 16px', borderRadius: 8,
-                background: '#4472C4', color: 'white', border: 'none',
-                fontSize: 14, fontWeight: 600, cursor: 'pointer',
-              }}
+              className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white border-none text-xs sm:text-sm font-semibold cursor-pointer shrink-0 whitespace-nowrap shadow-2xs"
             >
-              <Upload size={16} /> Import Excel
+              <Upload size={15} /> Import Excel
             </button>
           )}
 
@@ -987,30 +936,18 @@ export default function SerialManage() {
           {canExportExcel && (
             <button
               onClick={handleExport}
-              style={{
-                display: 'flex', alignItems: 'center', gap: 6,
-                padding: '8px 16px', borderRadius: 8,
-                background: 'white', color: '#374151',
-                border: '1px solid #d1d5db',
-                fontSize: 14, fontWeight: 600, cursor: 'pointer',
-              }}
+              className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-white hover:bg-slate-50 text-slate-700 border border-slate-300 text-xs sm:text-sm font-semibold cursor-pointer shrink-0 whitespace-nowrap shadow-2xs"
             >
-              <Download size={16} /> Xuất Excel
+              <Download size={15} /> Xuất Excel
             </button>
           )}
 
           {/* Zalo OA OAuth Button */}
           <button
             onClick={handleConnectZalo}
-            style={{
-              display: 'flex', alignItems: 'center', gap: 6,
-              padding: '8px 16px', borderRadius: 8,
-              background: zaloStatus?.isConnected ? '#10b981' : '#ef4444',
-              color: 'white', border: 'none',
-              fontSize: 14, fontWeight: 600, cursor: 'pointer',
-            }}
+            className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-white border-none text-xs sm:text-sm font-semibold cursor-pointer shrink-0 whitespace-nowrap shadow-2xs ${zaloStatus?.isConnected ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-rose-500 hover:bg-rose-600'}`}
           >
-            <Sparkles size={16} /> {zaloStatus?.isConnected ? 'Đã kết nối Zalo OA' : 'Kết nối Zalo OA'}
+            <Sparkles size={15} /> {zaloStatus?.isConnected ? 'Đã kết nối Zalo OA' : 'Kết nối Zalo OA'}
           </button>
         </div>
       </div>
@@ -1079,20 +1016,16 @@ export default function SerialManage() {
         </div>
       )}
 
-      <div style={{
-        background: 'white', borderRadius: 12,
-        border: '1px solid #e2e8f0', overflow: 'hidden',
-        boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
-      }}>
+      {/* Table: Bao bọc trong card full width và cuộn ngang an toàn */}
+      <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-xs w-full max-w-full">
         <div
           ref={tableWrapperRef}
+          className="overflow-x-auto relative w-full"
           style={{
-            overflowX: 'auto',
-            position: 'relative',
             WebkitOverflowScrolling: 'touch',
           }}
         >
-          <table ref={tableRef} style={{ width: '100%', borderCollapse: 'collapse', fontSize: 14 }}>
+          <table ref={tableRef} style={{ width: '100%', minWidth: '980px', borderCollapse: 'collapse', fontSize: 14 }}>
             <thead ref={realTheadRef} style={{ position: 'sticky', top: 0, zIndex: 20 }}>
               <tr style={{ background: '#f8fafc', borderBottom: '2px solid #e2e8f0' }}>
                 {tableColumns.map(col => (
@@ -1265,16 +1198,7 @@ export default function SerialManage() {
                   {/* Metadata Sub-Row (Khung mở rộng thông tin nguồn kích hoạt & lô nhập) */}
                   <tr style={{ background: '#f8fafc', borderBottom: '2px solid #e2e8f0' }}>
                     <td colSpan={6} style={{ padding: '0 16px 12px 16px' }}>
-                      <div style={{
-                        display: 'grid',
-                        gridTemplateColumns: '1.2fr 1.2fr 1.2fr 1.5fr 1.2fr',
-                        gap: 12,
-                        background: '#ffffff',
-                        padding: '8px 14px',
-                        borderRadius: 8,
-                        border: '1px solid #e2e8f0',
-                        fontSize: 12
-                      }}>
+                      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 bg-white p-3 rounded-lg border border-slate-200 text-xs">
                         {/* 1. Kích hoạt bởi/ Quyền */}
                         <div>
                           <div style={{ fontSize: 11, fontWeight: 700, color: '#64748b', textTransform: 'uppercase', marginBottom: 2 }}>
