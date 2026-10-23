@@ -87,12 +87,13 @@ export default function IotDeviceCard({ serialData, onBookMaintenance }: IotDevi
   const ctoHealth = getFilterHealth(telemetry?.cto ?? 80, telemetry?.ctoReplace);
 
   const tdsVal = telemetry?.tdsOut ?? 12;
-  const isOnline = iot?.isOnline ?? true; // Nếu có iot thì default online
+  // Chuẩn hóa trạng thái kết nối Wi-Fi thực tế (Nếu iot.isOnline === false thì hiển thị ngoại tuyến)
+  const isOnline = Boolean(iot && iot.isOnline);
   const fwVersion = iot?.firmwareVersion ?? 'FW 1.2.0';
   const rssi = telemetry?.rssi ?? -47;
-  const ssidName = telemetry?.ssid ?? 'Truliva_Smart_WiFi';
-  const ipAddress = telemetry?.ip ?? '192.168.1.135';
-  const macAddress = telemetry?.mac ?? `TL-${(s?.serialNumber || '830F5').slice(-6)}`;
+  const ssidName = telemetry?.ssid || 'Truliva_Smart_WiFi';
+  const ipAddress = telemetry?.ip || '192.168.1.135';
+  const macAddress = telemetry?.mac || `TL-${(s?.serialNumber || '830F5').slice(-6)}`;
 
   const modelTitle = s.model || s.productLine || 'UR61096H';
 
@@ -100,7 +101,7 @@ export default function IotDeviceCard({ serialData, onBookMaintenance }: IotDevi
     <div className="bg-white rounded-3xl border border-sky-100 shadow-[0_4px_25px_rgba(27,58,107,0.08)] overflow-hidden transition-all">
       
       {/* ── TOP SEGMENTED CONTROL TABS (Máy của tôi | Cài đặt Wi-Fi) ── */}
-      <div className="p-3 pb-0 bg-slate-50/70 border-b border-slate-100">
+      <div className="p-2.5 pb-0 bg-slate-50/70 border-b border-slate-100">
         <div className="bg-slate-200/70 p-1 rounded-2xl flex items-center gap-1">
           <button
             onClick={() => setActiveSubTab('device')}
@@ -122,9 +123,17 @@ export default function IotDeviceCard({ serialData, onBookMaintenance }: IotDevi
                 : 'text-slate-500 hover:text-slate-800'
             }`}
           >
-            <Wifi size={14} className={activeSubTab === 'wifi' ? 'text-emerald-600' : ''} />
+            {isOnline ? (
+              <Wifi size={14} className={activeSubTab === 'wifi' ? 'text-emerald-600' : 'text-slate-500'} />
+            ) : (
+              <WifiOff size={14} className={activeSubTab === 'wifi' ? 'text-slate-600' : 'text-slate-400'} />
+            )}
             <span>Cài đặt Wi-Fi</span>
-            {isOnline && <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>}
+            {isOnline ? (
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+            ) : (
+              <span className="w-1.5 h-1.5 rounded-full bg-slate-400"></span>
+            )}
           </button>
         </div>
       </div>
@@ -136,14 +145,40 @@ export default function IotDeviceCard({ serialData, onBookMaintenance }: IotDevi
         <div className="p-4 space-y-4">
           {/* Header định danh thiết bị */}
           <div>
-            <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">
-              Máy lọc nước của tôi
-            </p>
-            <div className="flex items-center justify-between mt-0.5">
-              <h2 className="text-xl font-black text-slate-900 tracking-tight">
-                {modelTitle}
-              </h2>
-              <div className="flex items-center space-x-1.5 font-mono text-[11px] text-slate-500 bg-slate-100 px-2.5 py-1 rounded-xl border border-slate-200">
+            <div className="flex items-start justify-between gap-2.5">
+              <div className="flex-1 min-w-0">
+                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                  Máy lọc nước của tôi
+                </p>
+                <h2 className="text-lg font-black text-slate-900 tracking-tight leading-tight truncate mt-0.5" title={modelTitle}>
+                  {modelTitle}
+                </h2>
+                
+                {/* Trạng thái kết nối Wi-Fi (Xám khi chưa kết nối, Xanh khi trực tuyến) */}
+                <div className={`flex items-center space-x-1.5 text-xs mt-1.5 ${
+                  isOnline ? 'text-emerald-600 font-bold' : 'text-slate-500 font-medium'
+                }`}>
+                  {isOnline ? (
+                    <span className="relative flex h-2 w-2 shrink-0">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                      <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                    </span>
+                  ) : (
+                    <span className="h-2 w-2 rounded-full bg-slate-400 shrink-0"></span>
+                  )}
+                  {isOnline ? (
+                    <Wifi size={13} className="shrink-0 text-emerald-600" />
+                  ) : (
+                    <WifiOff size={13} className="shrink-0 text-slate-400" />
+                  )}
+                  <span className="whitespace-nowrap">
+                    {isOnline ? 'Đang kết nối Wi-Fi' : 'Chưa kết nối Wi-Fi'}
+                  </span>
+                </div>
+              </div>
+
+              {/* Box Serial gọn gàng bên phải */}
+              <div className="shrink-0 flex items-center space-x-1.5 font-mono text-[11px] font-semibold text-slate-600 bg-slate-100 px-2.5 py-1.5 rounded-xl border border-slate-200 mt-1">
                 <span>{s.serialNumber}</span>
                 <button 
                   onClick={handleCopySerial}
@@ -154,20 +189,10 @@ export default function IotDeviceCard({ serialData, onBookMaintenance }: IotDevi
                 </button>
               </div>
             </div>
-
-            {/* Trạng thái kết nối Wi-Fi */}
-            <div className="flex items-center space-x-1.5 text-xs font-bold text-emerald-600 mt-1.5">
-              <span className="relative flex h-2 w-2">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
-              </span>
-              <Wifi size={13} className="text-emerald-600" />
-              <span>{isOnline ? 'Đang kết nối Wi-Fi' : 'Chưa kết nối Wi-Fi'}</span>
-            </div>
           </div>
 
           {/* Hộp Thông số Nước Tinh Khiết & Lõi RO tóm tắt */}
-          <div className="bg-gradient-to-r from-sky-50/90 via-blue-50/50 to-slate-50 rounded-2xl p-3.5 border border-sky-100 space-y-2">
+          <div className="bg-gradient-to-r from-sky-50/90 via-blue-50/50 to-slate-50 rounded-2xl p-3 border border-sky-100 space-y-2">
             <div className="flex items-center justify-between text-xs">
               <span className="text-slate-500 font-medium">TDS đầu ra (Sau màng RO)</span>
               <div className="flex items-baseline space-x-1">
@@ -176,11 +201,11 @@ export default function IotDeviceCard({ serialData, onBookMaintenance }: IotDevi
               </div>
             </div>
 
-            <div className="flex items-center justify-between text-xs pt-1 border-t border-sky-100/70">
+            <div className="flex items-center justify-between text-xs pt-1.5 border-t border-sky-100/70">
               <span className="text-slate-500 font-medium">Lõi RO còn lại</span>
-              <div className="flex items-baseline space-x-1">
+              <div className="flex items-baseline space-x-1.5">
                 <span className="text-lg font-black text-emerald-600">{roHealth.val}%</span>
-                <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.2 rounded border border-emerald-200">
+                <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200">
                   Chuẩn tinh khiết
                 </span>
               </div>
@@ -189,32 +214,32 @@ export default function IotDeviceCard({ serialData, onBookMaintenance }: IotDevi
 
           {/* ── BẢNG HIỂN THỊ 3 LÕI LỌC CHUYÊN NGHIỆP (3-STAGE FILTER LIFE MONITOR) ── */}
           <div className="space-y-2.5">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center space-x-1.5 text-xs font-black text-slate-800 uppercase tracking-tight">
-                <Layers size={14} className="text-[#1B3A6B]" />
-                <span>Chi Tiết Tuổi Thọ 3 Lõi Lọc</span>
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center space-x-1.5 text-xs font-black text-slate-800 uppercase tracking-tight whitespace-nowrap">
+                <Layers size={14} className="text-[#1B3A6B] shrink-0" />
+                <span>Tuổi Thọ 3 Lõi Lọc</span>
               </div>
-              <span className="text-[10px] text-slate-400 font-semibold">Tự động đo thời gian thực</span>
+              <span className="text-[10px] text-slate-400 font-medium whitespace-nowrap">Đo thời gian thực</span>
             </div>
 
             {/* Lõi 1: PPC */}
             <div className="bg-white p-3 rounded-2xl border border-slate-100 shadow-xs space-y-2 hover:border-sky-200 transition-colors">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center space-x-2.5">
-                  <div className="w-7 h-7 rounded-xl bg-slate-100 text-slate-800 font-black text-xs flex items-center justify-center border border-slate-200">
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center space-x-2.5 min-w-0 flex-1">
+                  <div className="w-7 h-7 rounded-xl bg-slate-100 text-slate-800 font-black text-xs flex items-center justify-center border border-slate-200 shrink-0">
                     1
                   </div>
-                  <div>
-                    <h4 className="font-extrabold text-xs text-slate-900 leading-none">
+                  <div className="min-w-0 flex-1">
+                    <h4 className="font-extrabold text-xs text-slate-900 leading-none truncate">
                       Lõi 1 (PPC)
                     </h4>
-                    <p className="text-[10px] text-slate-400 mt-0.5">Lọc thô cặn bẩn & gỉ sét • 3-6 tháng</p>
+                    <p className="text-[10px] text-slate-400 mt-1 truncate">Lọc thô cặn bẩn & gỉ sét • 3-6 tháng</p>
                   </div>
                 </div>
 
-                <div className="text-right">
+                <div className="shrink-0 text-right">
                   <div className="font-black text-sm text-slate-900 leading-none">{ppcHealth.val}%</div>
-                  <span className={`inline-block mt-1 text-[9px] font-bold px-1.5 py-0.5 rounded-md border ${ppcHealth.badgeClass}`}>
+                  <span className={`inline-flex items-center justify-center mt-1 text-[9px] font-bold px-2 py-0.5 rounded-md border whitespace-nowrap ${ppcHealth.badgeClass}`}>
                     {ppcHealth.label}
                   </span>
                 </div>
@@ -237,23 +262,23 @@ export default function IotDeviceCard({ serialData, onBookMaintenance }: IotDevi
 
             {/* Lõi 2: RO */}
             <div className="bg-white p-3 rounded-2xl border border-sky-100/80 shadow-xs space-y-2 hover:border-sky-300 transition-colors bg-gradient-to-r from-sky-50/20 to-white">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center space-x-2.5">
-                  <div className="w-7 h-7 rounded-xl bg-sky-100 text-[#0284C7] font-black text-xs flex items-center justify-center border border-sky-200">
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center space-x-2.5 min-w-0 flex-1">
+                  <div className="w-7 h-7 rounded-xl bg-sky-100 text-[#0284C7] font-black text-xs flex items-center justify-center border border-sky-200 shrink-0">
                     2
                   </div>
-                  <div>
+                  <div className="min-w-0 flex-1">
                     <h4 className="font-extrabold text-xs text-slate-900 leading-none flex items-center gap-1">
-                      <span>Lõi 2 (RO)</span>
-                      <span className="text-[9px] bg-sky-100 text-[#0284C7] px-1 rounded font-bold">Trọng tâm</span>
+                      <span className="truncate">Lõi 2 (RO)</span>
+                      <span className="text-[9px] bg-sky-100 text-[#0284C7] px-1 rounded font-bold shrink-0">Trọng tâm</span>
                     </h4>
-                    <p className="text-[10px] text-slate-400 mt-0.5">Màng RO tinh khiết 0.0001µm • 24-36 tháng</p>
+                    <p className="text-[10px] text-slate-400 mt-1 truncate">Màng RO 0.0001µm • 24-36 tháng</p>
                   </div>
                 </div>
 
-                <div className="text-right">
+                <div className="shrink-0 text-right">
                   <div className="font-black text-sm text-sky-700 leading-none">{roHealth.val}%</div>
-                  <span className={`inline-block mt-1 text-[9px] font-bold px-1.5 py-0.5 rounded-md border ${roHealth.badgeClass}`}>
+                  <span className={`inline-flex items-center justify-center mt-1 text-[9px] font-bold px-2 py-0.5 rounded-md border whitespace-nowrap ${roHealth.badgeClass}`}>
                     {roHealth.label}
                   </span>
                 </div>
@@ -276,22 +301,22 @@ export default function IotDeviceCard({ serialData, onBookMaintenance }: IotDevi
 
             {/* Lõi 3: CTO */}
             <div className="bg-white p-3 rounded-2xl border border-slate-100 shadow-xs space-y-2 hover:border-amber-200 transition-colors">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center space-x-2.5">
-                  <div className="w-7 h-7 rounded-xl bg-amber-100 text-amber-800 font-black text-xs flex items-center justify-center border border-amber-200">
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center space-x-2.5 min-w-0 flex-1">
+                  <div className="w-7 h-7 rounded-xl bg-amber-100 text-amber-800 font-black text-xs flex items-center justify-center border border-amber-200 shrink-0">
                     3
                   </div>
-                  <div>
-                    <h4 className="font-extrabold text-xs text-slate-900 leading-none">
+                  <div className="min-w-0 flex-1">
+                    <h4 className="font-extrabold text-xs text-slate-900 leading-none truncate">
                       Lõi 3 (CTO)
                     </h4>
-                    <p className="text-[10px] text-slate-400 mt-0.5">Than hoạt tính gáo dừa khử mùi • 6-9 tháng</p>
+                    <p className="text-[10px] text-slate-400 mt-1 truncate">Than hoạt tính gáo dừa • 6-9 tháng</p>
                   </div>
                 </div>
 
-                <div className="text-right">
+                <div className="shrink-0 text-right">
                   <div className="font-black text-sm text-slate-900 leading-none">{ctoHealth.val}%</div>
-                  <span className={`inline-block mt-1 text-[9px] font-bold px-1.5 py-0.5 rounded-md border ${ctoHealth.badgeClass}`}>
+                  <span className={`inline-flex items-center justify-center mt-1 text-[9px] font-bold px-2 py-0.5 rounded-md border whitespace-nowrap ${ctoHealth.badgeClass}`}>
                     {ctoHealth.label}
                   </span>
                 </div>
@@ -345,53 +370,64 @@ export default function IotDeviceCard({ serialData, onBookMaintenance }: IotDevi
           
           {/* Card trạng thái Wi-Fi thực tế của máy */}
           <div className="bg-gradient-to-br from-[#061226] via-[#0B2545] to-[#0F3866] text-white p-4 rounded-3xl shadow-lg relative overflow-hidden space-y-3">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center space-x-2">
-                <div className="w-8 h-8 rounded-xl bg-cyan-400/20 border border-cyan-400/40 flex items-center justify-center text-cyan-300">
-                  <Wifi size={16} />
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center space-x-2.5 min-w-0">
+                <div className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 border ${
+                  isOnline 
+                    ? 'bg-cyan-400/20 border-cyan-400/40 text-cyan-300' 
+                    : 'bg-slate-700/60 border-slate-600 text-slate-400'
+                }`}>
+                  {isOnline ? <Wifi size={16} /> : <WifiOff size={16} />}
                 </div>
-                <div>
-                  <h3 className="font-black text-sm text-white">Mạng Wi-Fi Của Máy</h3>
-                  <p className="text-[10px] text-sky-200">Đồng bộ đám mây Truliva IoT</p>
+                <div className="min-w-0">
+                  <h3 className="font-black text-xs text-white truncate">Mạng Wi-Fi Của Máy</h3>
+                  <p className="text-[10px] text-sky-200/80 truncate">Đồng bộ đám mây Truliva IoT</p>
                 </div>
               </div>
 
-              <span className={`text-[10px] font-bold px-2.5 py-1 rounded-full border flex items-center space-x-1 ${
+              {/* Badge trạng thái kết nối Wi-Fi 1 dòng ngay ngắn */}
+              <span className={`shrink-0 text-[10px] font-bold px-2.5 py-1 rounded-full border flex items-center space-x-1.5 whitespace-nowrap ${
                 isOnline 
                   ? 'bg-emerald-500/20 text-emerald-300 border-emerald-400/30' 
-                  : 'bg-rose-500/20 text-rose-300 border-rose-400/30'
+                  : 'bg-slate-700/70 text-slate-300 border-slate-600/70'
               }`}>
-                <span className={`w-1.5 h-1.5 rounded-full ${isOnline ? 'bg-emerald-400 animate-pulse' : 'bg-rose-400'}`}></span>
-                <span>{isOnline ? 'Trực tuyến' : 'Mất kết nối'}</span>
+                <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${isOnline ? 'bg-emerald-400 animate-pulse' : 'bg-slate-400'}`}></span>
+                <span>{isOnline ? 'Trực tuyến' : 'Chưa kết nối'}</span>
               </span>
             </div>
 
             {/* Grid thông số mạng chi tiết */}
             <div className="grid grid-cols-2 gap-2 text-xs pt-1">
-              <div className="bg-white/10 p-2.5 rounded-xl border border-white/10">
-                <span className="text-[10px] text-sky-200 block">Tên Wi-Fi (SSID)</span>
-                <span className="font-bold text-white truncate block mt-0.5">{ssidName}</span>
+              <div className="bg-white/10 p-2.5 rounded-xl border border-white/10 min-w-0">
+                <span className="text-[10px] text-sky-200 block truncate">Tên Wi-Fi (SSID)</span>
+                <span className={`font-bold block mt-0.5 truncate ${isOnline ? 'text-white' : 'text-slate-300'}`}>
+                  {isOnline ? ssidName : (ssidName || 'Chưa thiết lập')}
+                </span>
               </div>
 
-              <div className="bg-white/10 p-2.5 rounded-xl border border-white/10">
-                <span className="text-[10px] text-sky-200 block">Tín hiệu sóng (RSSI)</span>
-                <span className="font-bold text-cyan-300 block mt-0.5">{rssi} dBm (Mạnh)</span>
+              <div className="bg-white/10 p-2.5 rounded-xl border border-white/10 min-w-0">
+                <span className="text-[10px] text-sky-200 block truncate">Tín hiệu sóng (RSSI)</span>
+                <span className={`font-bold block mt-0.5 truncate ${isOnline ? 'text-cyan-300' : 'text-slate-400'}`}>
+                  {isOnline ? `${rssi} dBm (Mạnh)` : '-- (Ngoại tuyến)'}
+                </span>
               </div>
 
-              <div className="bg-white/10 p-2.5 rounded-xl border border-white/10">
-                <span className="text-[10px] text-sky-200 block">Địa chỉ IP máy</span>
-                <span className="font-mono text-[11px] text-white block mt-0.5">{ipAddress}</span>
+              <div className="bg-white/10 p-2.5 rounded-xl border border-white/10 min-w-0">
+                <span className="text-[10px] text-sky-200 block truncate">Địa chỉ IP máy</span>
+                <span className={`font-mono text-[11px] block mt-0.5 truncate ${isOnline ? 'text-white' : 'text-slate-400'}`}>
+                  {isOnline ? ipAddress : '-- (Chưa cấp)'}
+                </span>
               </div>
 
-              <div className="bg-white/10 p-2.5 rounded-xl border border-white/10">
-                <span className="text-[10px] text-sky-200 block">Băng tần hỗ trợ</span>
-                <span className="font-bold text-white block mt-0.5">2.4 GHz</span>
+              <div className="bg-white/10 p-2.5 rounded-xl border border-white/10 min-w-0">
+                <span className="text-[10px] text-sky-200 block truncate">Băng tần hỗ trợ</span>
+                <span className="font-bold text-white block mt-0.5 truncate">2.4 GHz</span>
               </div>
             </div>
 
-            <div className="flex items-center justify-between text-[10px] text-sky-300 pt-1 border-t border-white/10">
-              <span>MAC: {macAddress}</span>
-              <span>{fwVersion}</span>
+            <div className="flex items-center justify-between text-[10px] text-sky-300/80 pt-1 border-t border-white/10">
+              <span className="truncate">MAC: {macAddress}</span>
+              <span className="shrink-0 font-mono">{fwVersion}</span>
             </div>
           </div>
 
