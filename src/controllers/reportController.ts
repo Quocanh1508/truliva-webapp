@@ -553,15 +553,27 @@ export async function createReport(req: Request, res: Response): Promise<void> {
             }
 
             let syncStatus = 'SUCCESS';
-            try {
-              await syncOrderStatusToPancake(oldOrder.pancakeOrderId, 'hoàn thành');
-            } catch (syncErr: any) {
-              logger.warn('Non-blocking Pancake POS status sync failed on report submission', {
+            const isPartialReturnOrder =
+              oldOrder.adminStatus === 'hoàn một phần' ||
+              oldOrder.statusCode === 15 ||
+              (oldOrder.statusName || '').toLowerCase().includes('hoàn một phần');
+
+            if (isPartialReturnOrder) {
+              logger.info('Report created for partial return order: preserving POS partial return status (bypassed syncing hoàn thành to Pancake)', {
                 orderId,
-                pancakeOrderId: oldOrder.pancakeOrderId,
-                error: syncErr.message
+                pancakeOrderId: oldOrder.pancakeOrderId
               });
-              syncStatus = 'FAILED';
+            } else {
+              try {
+                await syncOrderStatusToPancake(oldOrder.pancakeOrderId, 'hoàn thành');
+              } catch (syncErr: any) {
+                logger.warn('Non-blocking Pancake POS status sync failed on report submission', {
+                  orderId,
+                  pancakeOrderId: oldOrder.pancakeOrderId,
+                  error: syncErr.message
+                });
+                syncStatus = 'FAILED';
+              }
             }
 
             const orderUpdateData: any = {
@@ -2087,10 +2099,22 @@ export async function approveReport(req: Request, res: Response): Promise<void> 
       }
 
       let syncStatus = 'SUCCESS';
-      try {
-        await syncOrderStatusToPancake(order.pancakeOrderId, 'hoàn thành');
-      } catch (syncErr: any) {
-        syncStatus = 'FAILED';
+      const isPartialReturnOrder =
+        order.adminStatus === 'hoàn một phần' ||
+        order.statusCode === 15 ||
+        (order.statusName || '').toLowerCase().includes('hoàn một phần');
+
+      if (isPartialReturnOrder) {
+        logger.info('Report approved for partial return order: preserving POS partial return status (bypassed syncing hoàn thành to Pancake)', {
+          orderId,
+          pancakeOrderId: order.pancakeOrderId
+        });
+      } else {
+        try {
+          await syncOrderStatusToPancake(order.pancakeOrderId, 'hoàn thành');
+        } catch (syncErr: any) {
+          syncStatus = 'FAILED';
+        }
       }
 
       const updatedOrder = await prisma.order.update({

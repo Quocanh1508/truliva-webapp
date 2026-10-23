@@ -248,7 +248,24 @@ export async function processOrderEvent(rawEventId: string | null, payload: any)
     if (isCancelled) {
       newAdminStatus = 'hủy đơn';
     } else if (isPartialReturn) {
-      newAdminStatus = 'hoàn một phần';
+      const isAssignedKtv = Boolean(existingOrder?.assignedKtvId);
+      const hasReport = existingOrder?.serviceReports && existingOrder.serviceReports.some(r => r.approvalStatus !== 'REJECTED');
+
+      // NGHIỆP VỤ ĐƠN HOÀN MỘT PHẦN:
+      // 1. Nếu đơn ĐÃ phân công KTV và KTV ĐÃ nộp báo cáo nghiệm thu (hoặc đơn đã hoàn thành trước đó):
+      //    Thực tế KTV đã hoàn thành lắp máy (khách chỉ trả lại lõi lọc/quà tặng).
+      //    Bảo tồn trạng thái 'hoàn thành' trên Truliva App để KTV an tâm, ghi nhận 100% công lắp đặt.
+      // 2. Nếu đơn chưa có KTV (khách tự lắp, đại lý ngoài, đơn Ecom chưa gán KTV) HOẶC KTV chưa nộp báo cáo:
+      //    Ghi nhận đúng 'hoàn một phần' để Admin/Điều phối/Kế toán theo dõi kho và đối soát tiền hàng.
+      if (isAssignedKtv && hasReport) {
+        newAdminStatus = 'hoàn thành';
+        logger.info('Preserved hoàn thành status for order with approved report despite POS partial return', {
+          pancakeOrderId: systemId,
+          assignedKtvId: existingOrder?.assignedKtvId
+        });
+      } else {
+        newAdminStatus = 'hoàn một phần';
+      }
     } else if (isReturning) {
       newAdminStatus = 'đang hoàn';
     } else if (isReturned) {
@@ -585,6 +602,35 @@ export async function syncOrderStatusToPancake(pancakeOrderId: number, adminStat
   if (pancakeOrderId < 0) {
     logger.info('Bypassed syncing status change to Pancake POS: manual order', { pancakeOrderId });
     return 'SUCCESS';
+  }
+
+  // ═══ CHỐT CHẶN ĐƠN HOÀN MỘT PHẦN ═══
+  // Nếu đơn hàng gốc trên hệ thống đang là 'hoàn một phần' hoặc trên POS là status 15 / 'hoàn một phần':
+  // TUYỆT ĐỐI KHÔNG đồng bộ 'hoàn thành' (status 3 - Đã nhận) đè lên Pancake POS
+  // để bảo tồn trạng thái 'hoàn một phần' phục vụ kế toán trừ tiền và nhập kho linh kiện trên POS.
+  if (adminStatus === 'hoàn thành') {
+    try {
+      const existing = await prisma.order.findUnique({
+        where: { pancakeOrderId },
+        select: { statusCode: true, statusName: true, adminStatus: true }
+      });
+      const isPosPartialReturn =
+        existing?.statusCode === 15 ||
+        (existing?.statusName || '').toLowerCase().includes('hoàn một phần') ||
+        existing?.adminStatus === 'hoàn một phần';
+
+      if (isPosPartialReturn) {
+        logger.info('Bypassed syncing hoàn thành to Pancake POS because order is a partial return on POS', {
+          pancakeOrderId,
+          statusCode: existing?.statusCode,
+          statusName: existing?.statusName,
+          adminStatus: existing?.adminStatus
+        });
+        return 'SUCCESS';
+      }
+    } catch (checkErr: any) {
+      logger.warn('Failed to check existing order status before syncing to Pancake', { pancakeOrderId, error: checkErr.message });
+    }
   }
 
   const apiKey = process.env.PANCAKE_API_KEY;

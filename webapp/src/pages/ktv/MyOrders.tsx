@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { getOrders, getOrderDetails, callCustomer, rescheduleOrder } from '../../api/client';
-import { Search, ChevronLeft, ChevronRight, Phone, Calendar, FileText, User, MapPin, Clock, MessageSquare, CreditCard, X, Package, ZoomIn } from 'lucide-react';
+import { Search, ChevronLeft, ChevronRight, Phone, Calendar, FileText, User, MapPin, Clock, MessageSquare, CreditCard, X, Package, ZoomIn, CheckCircle2 } from 'lucide-react';
 import PullToRefresh from '../../components/PullToRefresh';
 import { formatOrderId } from '../../utils/text';
 import { fetchCurrentWeather, type WeatherInfo } from '../../utils/weather';
@@ -802,7 +802,11 @@ export default function MyOrders() {
                   ? 'bg-indigo-100 text-indigo-800 border border-indigo-200'
                   : 'bg-amber-50 text-amber-700 border border-amber-100'
               }`}>
-                {selectedOrderDetail.adminStatus === 'đang thực hiện' ? 'đã phân công' : (selectedOrderDetail.adminStatus || 'chờ xử lý')}
+                {selectedOrderDetail.adminStatus === 'đang thực hiện' 
+                  ? 'đã phân công' 
+                  : selectedOrderDetail.adminStatus === 'hoàn một phần'
+                  ? 'hoàn 1 phần (vẫn lắp máy)'
+                  : (selectedOrderDetail.adminStatus || 'chờ xử lý')}
               </span>
               )}
             </div>
@@ -992,6 +996,19 @@ export default function MyOrders() {
                   </div>
                 )}
               </div>
+
+              {/* Card Dặn dò đơn hoàn 1 phần linh kiện */}
+              {selectedOrderDetail.adminStatus === 'hoàn một phần' && (
+                <div className="bg-fuchsia-50/80 rounded-2xl p-3.5 border border-fuchsia-200 shadow-2xs space-y-1.5 animate-fade-in">
+                  <span className="text-[11px] font-bold text-fuchsia-900 uppercase tracking-wider flex items-center gap-1.5">
+                    <CheckCircle2 size={14} className="text-fuchsia-600 shrink-0" />
+                    <span>Lưu ý: Đơn hoàn 1 phần linh kiện / quà tặng</span>
+                  </span>
+                  <p className="text-xs text-fuchsia-800 leading-relaxed bg-white/70 p-2.5 rounded-xl border border-fuchsia-100">
+                    Khách hàng chỉ trả lại phần lõi lọc hoặc quà tặng. Bạn vẫn tiến hành lắp đặt máy chính, kiểm tra TDS và nộp báo cáo nghiệm thu bình thường. Hệ thống ghi nhận đủ 100% công lắp đặt cho bạn.
+                  </p>
+                </div>
+              )}
 
               {/* Card Ghi chú dặn dò */}
               <div className="bg-white rounded-2xl p-3.5 border border-blue-100 shadow-2xs space-y-2">
