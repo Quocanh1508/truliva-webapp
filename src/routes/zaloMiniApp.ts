@@ -158,9 +158,72 @@ router.get('/my-serials', requireAuth, async (req: Request, res: Response): Prom
       orderBy: { createdAt: 'desc' }
     });
 
+    const serialNumbers = serials.map(s => s.serialNumber);
+
+    // Lấy thông tin IoT Devices tương ứng theo số Serial
+    const iotDevices = await prisma.iotDevice.findMany({
+      where: {
+        serialNumber: {
+          in: serialNumbers
+        }
+      },
+      include: {
+        telemetryData: {
+          orderBy: { recordedAt: 'desc' },
+          take: 1
+        }
+      }
+    });
+
+    const iotMap = new Map<string, any>();
+    for (const dev of iotDevices) {
+      const tel = dev.telemetryData[0];
+      const raw = (typeof tel?.rawPayload === 'object' && tel?.rawPayload !== null) ? (tel.rawPayload as any) : {};
+      const config = (typeof dev.configJson === 'object' && dev.configJson !== null) ? (dev.configJson as any) : {};
+
+      iotMap.set(dev.serialNumber, {
+        deviceId: dev.id,
+        isOnline: dev.isOnline,
+        firmwareVersion: dev.firmwareVersion || raw.fw || null,
+        lastSeenAt: dev.lastSeenAt,
+        isMuted: config.isMuted ?? false,
+        telemetry: tel ? {
+          tdsOut: tel.tdsOut != null ? Number(tel.tdsOut) : (raw.tdsOut != null ? Number(raw.tdsOut) : null),
+          tdsIn: tel.tdsIn != null ? Number(tel.tdsIn) : (raw.tdsIn != null ? Number(raw.tdsIn) : null),
+          waterFlowLpm: tel.waterFlowLpm,
+          totalLiters: tel.totalLiters,
+          errorCode: tel.errorCode,
+          recordedAt: tel.recordedAt,
+          // 3 Lõi lọc Truliva
+          ppc: raw.ppc != null ? Number(raw.ppc) : null,
+          ppcBars: raw.ppc_bars != null ? Number(raw.ppc_bars) : 4,
+          ppcReplace: raw.ppc_replace === true,
+          ro: raw.ro != null ? Number(raw.ro) : null,
+          roBars: raw.ro_bars != null ? Number(raw.ro_bars) : 4,
+          roReplace: raw.ro_replace === true,
+          cto: raw.cto != null ? Number(raw.cto) : null,
+          ctoBars: raw.cto_bars != null ? Number(raw.cto_bars) : 4,
+          ctoReplace: raw.cto_replace === true,
+          // Phần cứng / Mạng
+          rssi: raw.rssi != null ? Number(raw.rssi) : null,
+          uartOk: raw.uart_ok !== undefined ? raw.uart_ok : true,
+          uptime: raw.uptime != null ? Number(raw.uptime) : null,
+          ip: raw.ip || null
+        } : null
+      });
+    }
+
+    const enhancedSerials = serials.map(s => {
+      const iot = iotMap.get(s.serialNumber) || null;
+      return {
+        ...s,
+        iot
+      };
+    });
+
     res.json({
       success: true,
-      serials
+      serials: enhancedSerials
     });
   } catch (error: any) {
     res.status(500).json({ error: error.message });

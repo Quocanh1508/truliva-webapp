@@ -29,9 +29,11 @@ import P3ROceanHeader from '../../components/P3ROceanHeader';
 import { openPhone, openWebview } from 'zmp-sdk/apis';
 import { fetchZaloApi } from '../../api/client';
 import { getCustomerRank, MemberTier, RANK_CONFIGS, NEXT_TIER_ORDER } from '../../utils/memberRank';
+import IotDeviceCard from '../../components/IotDeviceCard';
 
 interface CustomerHomeProps {
   user: any;
+  mySerials?: any[];
   onOpenScanner?: () => void;
   onOpenWarranty?: () => void;
   onGoToShop?: () => void;
@@ -86,7 +88,7 @@ const FEATURED_NEWS = [
   }
 ];
 
-export default function CustomerHome({ user, onOpenScanner, onOpenWarranty, onGoToShop }: CustomerHomeProps) {
+export default function CustomerHome({ user, mySerials = [], onOpenScanner, onOpenWarranty, onGoToShop }: CustomerHomeProps) {
   const [showWheelModal, setShowWheelModal] = useState(false);
   const [selectedArticle, setSelectedArticle] = useState<any>(null);
   const [overrideTier, setOverrideTier] = useState<MemberTier | null>(null);
@@ -259,26 +261,49 @@ export default function CustomerHome({ user, onOpenScanner, onOpenWarranty, onGo
         </div>
       </div>
 
-      {/* 4. Section Quét Mã QR Bảo Hành Máy */}
-      <div className="max-w-md mx-auto px-4 mt-4">
-        <div className="bg-white p-4 rounded-3xl border border-sky-100 shadow-[0_4px_20px_rgba(27,58,107,0.06)] flex items-center justify-between hover:shadow-[0_8px_24px_rgba(0,163,255,0.12)] transition-shadow">
-          <div className="flex items-center space-x-3.5">
-            <div className="p-3 bg-gradient-to-br from-sky-50 to-cyan-100 text-[#0284C7] rounded-2xl border border-sky-200/60 shadow-xs">
-              <QrCode size={24} />
+      {/* 4. Section Máy Lọc Nước & Tuổi Thọ Lõi Lọc IoT (Nếu có máy) hoặc Quét Mã QR */}
+      <div className="max-w-md mx-auto px-4 mt-4 space-y-3">
+        {mySerials.length > 0 ? (
+          <div className="space-y-2.5">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-1.5">
+                <div className="p-1 bg-blue-100 text-[#1B3A6B] rounded-md">
+                  <Droplets size={14} />
+                </div>
+                <h3 className="font-extrabold text-xs text-slate-800 tracking-tight">Máy Lọc Nước Của Bạn</h3>
+              </div>
+              <button 
+                onClick={onOpenWarranty}
+                className="text-[11px] font-bold text-[#0284C7] hover:underline cursor-pointer"
+              >
+                Xem chi tiết
+              </button>
             </div>
-            <div>
-              <h4 className="font-black text-xs text-slate-900 uppercase tracking-tight">Kích hoạt bảo hành</h4>
-              <p className="text-[11px] text-slate-500 font-medium mt-0.5">Quét mã QR thân máy để đo TDS & lõi lọc</p>
-            </div>
+            <IotDeviceCard 
+              serialData={mySerials[0]} 
+              onBookMaintenance={onOpenWarranty} 
+            />
           </div>
-          <button 
-            onClick={onOpenScanner}
-            className="shrink-0 w-14 h-16 rounded-2xl bg-gradient-to-b from-[#1B3A6B] to-[#0284C7] hover:from-[#0284C7] hover:to-[#00D2FF] text-white flex flex-col items-center justify-center text-center shadow-md shadow-blue-900/15 border border-sky-300/30 active:scale-95 transition-all cursor-pointer"
-          >
-            <span className="text-[11px] font-black tracking-wider uppercase leading-tight">QUÉT</span>
-            <span className="text-[11px] font-black tracking-wider uppercase leading-tight mt-0.5">MÃ</span>
-          </button>
-        </div>
+        ) : (
+          <div className="bg-white p-4 rounded-3xl border border-sky-100 shadow-[0_4px_20px_rgba(27,58,107,0.06)] flex items-center justify-between hover:shadow-[0_8px_24px_rgba(0,163,255,0.12)] transition-shadow">
+            <div className="flex items-center space-x-3.5">
+              <div className="p-3 bg-gradient-to-br from-sky-50 to-cyan-100 text-[#0284C7] rounded-2xl border border-sky-200/60 shadow-xs">
+                <QrCode size={24} />
+              </div>
+              <div>
+                <h4 className="font-black text-xs text-slate-900 uppercase tracking-tight">Kích hoạt bảo hành</h4>
+                <p className="text-[11px] text-slate-500 font-medium mt-0.5">Quét mã QR thân máy để đo TDS & lõi lọc</p>
+              </div>
+            </div>
+            <button 
+              onClick={onOpenScanner}
+              className="shrink-0 w-14 h-16 rounded-2xl bg-gradient-to-b from-[#1B3A6B] to-[#0284C7] hover:from-[#0284C7] hover:to-[#00D2FF] text-white flex flex-col items-center justify-center text-center shadow-md shadow-blue-900/15 border border-sky-300/30 active:scale-95 transition-all cursor-pointer"
+            >
+              <span className="text-[11px] font-black tracking-wider uppercase leading-tight">QUÉT</span>
+              <span className="text-[11px] font-black tracking-wider uppercase leading-tight mt-0.5">MÃ</span>
+            </button>
+          </div>
+        )}
       </div>
 
       {/* 5. Trust Guarantee Strip */}

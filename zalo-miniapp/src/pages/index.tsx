@@ -413,6 +413,7 @@ export default function IndexPage() {
           {activeTab === 'home' && (
             <CustomerHome 
               user={user} 
+              mySerials={mySerials}
               onOpenScanner={handleOpenScanner}
               onOpenWarranty={() => setActiveTab('profile')}
               onGoToShop={() => {

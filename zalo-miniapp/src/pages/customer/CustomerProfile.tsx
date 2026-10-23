@@ -31,6 +31,7 @@ import CustomerHistoryModal from '../../components/CustomerHistoryModal';
 import CustomerLoyaltyModal from '../../components/CustomerLoyaltyModal';
 import LegalPagesModal, { LegalDocType } from '../../components/LegalPagesModal';
 import P3ROceanHeader from '../../components/P3ROceanHeader';
+import IotDeviceCard from '../../components/IotDeviceCard';
 
 interface CustomerProfileProps {
   user: any;
@@ -254,40 +255,11 @@ export default function CustomerProfile({
             </div>
           ) : (
             mySerials.map((s, idx) => (
-              <div key={idx} className="bg-white rounded-3xl p-4 border border-sky-100 shadow-[0_4px_20px_rgba(27,58,107,0.06)] space-y-3">
-                <div className="flex items-start justify-between">
-                  <div>
-                    <h3 className="font-bold text-slate-800 text-xs">{s.model || s.productLine || 'Máy lọc nước Truliva'}</h3>
-                    <p className="text-[11px] text-slate-400 font-mono mt-0.5">Serial: {s.serialNumber}</p>
-                  </div>
-                  <span className="text-[10px] font-bold px-2 py-0.5 bg-emerald-50 text-emerald-700 rounded-full border border-emerald-100">
-                    {s.status || 'Đang hoạt động'}
-                  </span>
-                </div>
-
-                <div className="grid grid-cols-2 gap-2 text-[11px] bg-slate-50 p-2.5 rounded-2xl border border-slate-100">
-                  <div>
-                    <p className="text-slate-400 text-[10px]">Ngày kích hoạt</p>
-                    <p className="font-semibold text-slate-700 mt-0.5">
-                      {s.activationDate ? new Date(s.activationDate).toLocaleDateString('vi-VN') : 'Mới lắp đặt'}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-slate-400 text-[10px]">Hạn bảo hành</p>
-                    <p className="font-semibold text-emerald-600 mt-0.5">
-                      {s.warrantyExpiryDate ? new Date(s.warrantyExpiryDate).toLocaleDateString('vi-VN') : '12 - 24 tháng'}
-                    </p>
-                  </div>
-                </div>
-
-                <button
-                  onClick={() => handleBookMaintenance(s.serialNumber)}
-                  className="w-full py-2 bg-sky-50 hover:bg-sky-100 text-[#0284C7] rounded-xl text-xs font-bold flex items-center justify-center space-x-1.5 transition-colors cursor-pointer border border-sky-100"
-                >
-                  <Wrench size={14} />
-                  <span>Yêu cầu KTV bảo trì / Thay lõi</span>
-                </button>
-              </div>
+              <IotDeviceCard 
+                key={s.serialNumber || idx} 
+                serialData={s} 
+                onBookMaintenance={handleBookMaintenance} 
+              />
             ))
           )}
         </div>
