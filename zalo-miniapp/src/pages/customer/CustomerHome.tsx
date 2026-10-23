@@ -5,6 +5,7 @@ import {
   Megaphone, 
   PhoneCall, 
   ChevronRight, 
+  ChevronLeft,
   Eye, 
   Sparkles, 
   ShieldCheck, 
@@ -98,6 +99,26 @@ export default function CustomerHome({ user, mySerials = [], onOpenScanner, onOp
   // Legal Modal
   const [showLegalModal, setShowLegalModal] = useState(false);
   const [legalDocType, setLegalDocType] = useState<LegalDocType>('TERMS');
+
+  // Phân trang 5 bài viết gần nhất
+  const [articlePage, setArticlePage] = useState(1);
+  const ARTICLES_PER_PAGE = 5;
+
+  const totalArticlePages = Math.ceil(newsList.length / ARTICLES_PER_PAGE) || 1;
+  const currentArticles = newsList.slice(
+    (articlePage - 1) * ARTICLES_PER_PAGE, 
+    articlePage * ARTICLES_PER_PAGE
+  );
+
+  const handleNextArticlePage = () => {
+    setArticlePage(p => Math.min(totalArticlePages, p + 1));
+    document.getElementById('tin-tuc-noi-bat')?.scrollIntoView({ behavior: 'smooth' });
+  };
+
+  const handlePrevArticlePage = () => {
+    setArticlePage(p => Math.max(1, p - 1));
+    document.getElementById('tin-tuc-noi-bat')?.scrollIntoView({ behavior: 'smooth' });
+  };
 
   React.useEffect(() => {
     fetchZaloApi('/zalo-miniapp/articles?limit=60')
@@ -336,13 +357,14 @@ export default function CustomerHome({ user, mySerials = [], onOpenScanner, onOp
             </div>
             <h2 className="text-sm font-bold text-slate-800 tracking-tight">Tin Tức & Cẩm Nang</h2>
           </div>
-          <span className="text-[11px] font-bold text-[#0284C7] bg-sky-50 px-2 py-0.5 rounded-full border border-sky-100">
-            {newsList.length} bài viết
+          <span className="text-[11px] font-bold text-[#0284C7] bg-sky-50 px-2.5 py-0.5 rounded-full border border-sky-100">
+            {newsList.length > 5 ? `Trang ${articlePage}/${totalArticlePages} (${newsList.length} bài)` : `${newsList.length} bài viết`}
           </span>
         </div>
 
+        {/* Danh sách 5 bài viết */}
         <div className="grid grid-cols-1 gap-3">
-          {newsList.map((news) => (
+          {currentArticles.map((news) => (
             <div 
               key={news.id} 
               onClick={() => setSelectedArticle(news)}
@@ -373,6 +395,41 @@ export default function CustomerHome({ user, mySerials = [], onOpenScanner, onOp
             </div>
           ))}
         </div>
+
+        {/* Thanh chuyển tiếp bài viết (Pagination 5 bài/lần) */}
+        {totalArticlePages > 1 && (
+          <div className="flex items-center justify-between pt-1 px-1">
+            <button
+              onClick={handlePrevArticlePage}
+              disabled={articlePage === 1}
+              className={`px-3 py-2 rounded-xl text-xs font-bold flex items-center space-x-1 transition-all ${
+                articlePage === 1 
+                  ? 'bg-slate-100 text-slate-400 cursor-not-allowed border border-slate-200/60' 
+                  : 'bg-white text-[#1B3A6B] border border-sky-100 shadow-2xs hover:bg-sky-50 active:scale-95 cursor-pointer'
+              }`}
+            >
+              <ChevronLeft size={14} />
+              <span>Bài trước</span>
+            </button>
+
+            <span className="text-[11px] font-bold text-slate-500 font-mono">
+              {articlePage} / {totalArticlePages}
+            </span>
+
+            <button
+              onClick={handleNextArticlePage}
+              disabled={articlePage >= totalArticlePages}
+              className={`px-3.5 py-2 rounded-xl text-xs font-bold flex items-center space-x-1 transition-all ${
+                articlePage >= totalArticlePages 
+                  ? 'bg-slate-100 text-slate-400 cursor-not-allowed border border-slate-200/60' 
+                  : 'bg-[#1B3A6B] text-white shadow-xs hover:bg-[#152e55] active:scale-95 cursor-pointer'
+              }`}
+            >
+              <span>Xem tiếp</span>
+              <ChevronRight size={14} />
+            </button>
+          </div>
+        )}
       </div>
 
       {/* 7. ⚖️ Legal Compliance Footer Bar */}
