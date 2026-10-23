@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   ShieldCheck, 
   Clock, 
@@ -215,16 +215,58 @@ export default function IndexPage() {
     }
   }, []);
 
-  // Handler khi chọn sản phẩm từ catalog
+  // ══════════════════════════════════════════════════════════════════════
+  // NAVIGATION HISTORY GUARD: Bắt cử chỉ vuốt mép màn hình (Edge Swipe Back)
+  // để quay lại màn hình trước thay vì bị thoát Mini App
+  // ══════════════════════════════════════════════════════════════════════
+  const activeTabRef = useRef<MainTabType>(activeTab);
+  activeTabRef.current = activeTab;
+
+  const shopSubViewRef = useRef<ShopSubView>(shopSubView);
+  shopSubViewRef.current = shopSubView;
+
+  useEffect(() => {
+    // Đặt state gốc nếu chưa có
+    try {
+      if (!window.history.state) {
+        window.history.replaceState({ tab: 'home', subView: 'catalog' }, '');
+      }
+    } catch (_) {}
+
+    const handlePopState = () => {
+      // 1. Nếu đang ở màn hình con (chi tiết SP, giỏ hàng, checkout...) -> Lùi về catalog
+      if (shopSubViewRef.current !== 'catalog') {
+        setShopSubView('catalog');
+        return;
+      }
+
+      // 2. Nếu đang ở tab khác ngoài home -> Lùi về tab home
+      if (activeTabRef.current !== 'home') {
+        setActiveTab('home');
+        return;
+      }
+    };
+
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
+
+  // Handler khi chọn sản phẩm từ catalog (Đẩy state vào history stack)
   const handleSelectProduct = (product: any) => {
     setSelectedProduct(product);
     setShopSubView('detail');
+    try {
+      window.history.pushState({ tab: activeTabRef.current, subView: 'detail' }, '');
+    } catch (_) {}
   };
 
   // Handler khi nhấn "Mua ngay" trên trang chi tiết
   const handleBuyNow = (product: any, quantity: number) => {
     addToCart(product, quantity);
     setShopSubView('checkout');
+    try {
+      window.history.pushState({ tab: activeTabRef.current, subView: 'checkout' }, '');
+    } catch (_) {}
   };
 
   // Handler khi đặt hàng thành công
@@ -234,11 +276,26 @@ export default function IndexPage() {
     setShopSubView('success');
   };
 
-  // Handler chuyển tab chính
+  // Handler chuyển tab chính (Đẩy state nếu sang tab khác home)
   const handleTabChange = (tab: MainTabType) => {
+    if (tab === activeTabRef.current) return;
     setActiveTab(tab);
     if (tab === 'shop') {
       setShopSubView('catalog');
+    }
+    if (tab !== 'home') {
+      try {
+        window.history.pushState({ tab, subView: 'catalog' }, '');
+      } catch (_) {}
+    }
+  };
+
+  // Handler nút Back vật lý / UI
+  const handleBackAction = (fallbackSubView: ShopSubView = 'catalog') => {
+    if (window.history.length > 1) {
+      window.history.back();
+    } else {
+      setShopSubView(fallbackSubView);
     }
   };
 
@@ -436,20 +493,24 @@ export default function IndexPage() {
               {shopSubView === 'detail' && selectedProduct && (
                 <ProductDetail
                   product={selectedProduct}
-                  onBack={() => setShopSubView('catalog')}
-                  onGoToCart={() => setShopSubView('cart')}
+                  onBack={() => handleBackAction('catalog')}
+                  onGoToCart={() => {
+                    setShopSubView('cart');
+                    try { window.history.pushState({ tab: activeTab, subView: 'cart' }, ''); } catch (_) {}
+                  }}
                   onBuyNow={handleBuyNow}
                 />
               )}
 
               {shopSubView === 'cart' && (
                 <CartPage
-                  onBack={() => setShopSubView('catalog')}
+                  onBack={() => handleBackAction('catalog')}
                   onGoToCheckout={(vCode) => {
                     setCheckoutVoucher(vCode);
                     setShopSubView('checkout');
+                    try { window.history.pushState({ tab: activeTab, subView: 'checkout' }, ''); } catch (_) {}
                   }}
-                  onExploreProducts={() => setShopSubView('catalog')}
+                  onExploreProducts={() => handleBackAction('catalog')}
                 />
               )}
 
@@ -457,7 +518,7 @@ export default function IndexPage() {
                 <CheckoutPage
                   user={user}
                   voucherCode={checkoutVoucher}
-                  onBack={() => setShopSubView('cart')}
+                  onBack={() => handleBackAction('cart')}
                   onOrderSuccess={handleOrderSuccess}
                 />
               )}
@@ -469,8 +530,9 @@ export default function IndexPage() {
                   onViewMyOrders={() => {
                     setActiveTab('profile');
                     setShopSubView('my_orders');
+                    try { window.history.pushState({ tab: 'profile', subView: 'my_orders' }, ''); } catch (_) {}
                   }}
-                  onContinueShopping={() => setShopSubView('catalog')}
+                  onContinueShopping={() => handleBackAction('catalog')}
                 />
               )}
             </>
@@ -482,7 +544,7 @@ export default function IndexPage() {
               {shopSubView === 'my_orders' ? (
                 <MyOrdersPage
                   user={user}
-                  onBack={() => setShopSubView('catalog')}
+                  onBack={() => handleBackAction('catalog')}
                   onExploreProducts={() => {
                     setActiveTab('shop');
                     setShopSubView('catalog');
@@ -494,7 +556,10 @@ export default function IndexPage() {
                   mySerials={mySerials} 
                   onLogout={handleLogout} 
                   onOpenScanner={handleOpenScanner}
-                  onViewMyOrders={() => setShopSubView('my_orders')}
+                  onViewMyOrders={() => {
+                    setShopSubView('my_orders');
+                    try { window.history.pushState({ tab: 'profile', subView: 'my_orders' }, ''); } catch (_) {}
+                  }}
                 />
               )}
             </>

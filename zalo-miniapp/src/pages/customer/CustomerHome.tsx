@@ -106,6 +106,27 @@ export default function CustomerHome({ user, mySerials = [], onOpenScanner, onOp
   const [articlePage, setArticlePage] = useState(1);
   const ARTICLES_PER_PAGE = 5;
 
+  // Đóng bài viết hoặc modal khi vuốt mép màn hình (Edge Swipe Back) thay vì thoát app
+  React.useEffect(() => {
+    const isAnyOpen = Boolean(selectedArticle || showLegalModal || showWheelModal);
+    if (isAnyOpen) {
+      try {
+        window.history.pushState({ modalHome: true }, '');
+      } catch (_) {}
+
+      const handlePop = () => {
+        setSelectedArticle(null);
+        setShowLegalModal(false);
+        setShowWheelModal(false);
+      };
+
+      window.addEventListener('popstate', handlePop, { once: true });
+      return () => {
+        window.removeEventListener('popstate', handlePop);
+      };
+    }
+  }, [selectedArticle, showLegalModal, showWheelModal]);
+
   const totalArticlePages = Math.ceil(newsList.length / ARTICLES_PER_PAGE) || 1;
   const currentArticles = newsList.slice(
     (articlePage - 1) * ARTICLES_PER_PAGE, 

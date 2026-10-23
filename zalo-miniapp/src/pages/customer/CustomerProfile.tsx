@@ -57,6 +57,28 @@ export default function CustomerProfile({
   // Legal Modal
   const [showLegalModal, setShowLegalModal] = useState(false);
   const [legalDocType, setLegalDocType] = useState<LegalDocType>('TERMS');
+
+  // Đóng modal khi người dùng vuốt mép màn hình (Edge Swipe Back) thay vì thoát app
+  useEffect(() => {
+    const isAnyModalOpen = showHistoryModal || showLegalModal || showVoucherModal || showLoyaltyModal;
+    if (isAnyModalOpen) {
+      try {
+        window.history.pushState({ modalOpen: true }, '');
+      } catch (_) {}
+
+      const handleModalPopState = () => {
+        setShowHistoryModal(false);
+        setShowLegalModal(false);
+        setShowVoucherModal(false);
+        setShowLoyaltyModal(false);
+      };
+
+      window.addEventListener('popstate', handleModalPopState, { once: true });
+      return () => {
+        window.removeEventListener('popstate', handleModalPopState);
+      };
+    }
+  }, [showHistoryModal, showLegalModal, showVoucherModal, showLoyaltyModal]);
   
   const devicesSectionRef = useRef<HTMLDivElement>(null);
 

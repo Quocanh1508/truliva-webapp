@@ -1,5 +1,11 @@
 @import "tailwindcss";
 
+/* Ngăn chặn cử chỉ vuốt mép ngang màn hình ngoài ý muốn làm thoát Mini App */
+html, body {
+  overscroll-behavior-x: none;
+  touch-action: pan-y pinch-zoom;
+}
+
 /* ═══════════════════════════════════════════════════════════════
    PERSONA 3 RELOAD (P3R) OCEAN & WATER EFFECT SYSTEM
    ═══════════════════════════════════════════════════════════════ */
