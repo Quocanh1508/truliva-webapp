@@ -168,19 +168,21 @@ export default function ProductCatalog({ onSelectProduct, onGoToCart }: ProductC
         </div>
       )}
 
-      {/* Legal Compliance Fast-Notice Bar */}
-      <div className="mx-4 my-2 p-2.5 rounded-xl bg-blue-50/80 border border-blue-100 text-[11px] text-blue-900 flex items-center justify-between">
-        <div className="flex items-center gap-1.5">
-          <ShieldCheck className="w-4 h-4 text-blue-600 shrink-0" />
-          <span>Sản phẩm chính hãng • Đầy đủ hoá đơn VAT & Bảo hành điện tử</span>
+      {/* Legal Compliance Fast-Notice Bar (chỉ hiện khi bật Ecommerce) */}
+      {FEATURES.ENABLE_ECOMMERCE && (
+        <div className="mx-4 my-2 p-2.5 rounded-xl bg-blue-50/80 border border-blue-100 text-[11px] text-blue-900 flex items-center justify-between">
+          <div className="flex items-center gap-1.5">
+            <ShieldCheck className="w-4 h-4 text-blue-600 shrink-0" />
+            <span>Sản phẩm chính hãng • Đầy đủ hoá đơn VAT & Bảo hành điện tử</span>
+          </div>
+          <button 
+            onClick={() => { setLegalDocType('TERMS'); setShowLegalModal(true); }}
+            className="font-bold text-[#1B3A6B] hover:underline flex items-center shrink-0 ml-1"
+          >
+            Chính sách TMĐT <ChevronRight className="w-3 h-3" />
+          </button>
         </div>
-        <button 
-          onClick={() => { setLegalDocType('TERMS'); setShowLegalModal(true); }}
-          className="font-bold text-[#1B3A6B] hover:underline flex items-center shrink-0 ml-1"
-        >
-          Chính sách TMĐT <ChevronRight className="w-3 h-3" />
-        </button>
-      </div>
+      )}
 
       {/* Product List Grid */}
       <div className="px-4 py-2">
@@ -208,14 +210,14 @@ export default function ProductCatalog({ onSelectProduct, onGoToCart }: ProductC
                   onClick={() => onSelectProduct(product)}
                   className="bg-white rounded-2xl border border-gray-100 overflow-hidden shadow-xs hover:shadow-md transition-all active:scale-[0.98] flex flex-col relative group cursor-pointer"
                 >
-                  {/* Badge */}
-                  {product.badge && (
+                  {/* Badge (bỏ tag chính hãng nếu có) */}
+                  {product.badge && !product.badge.toLowerCase().includes('chính hãng') && (
                     <span className="absolute top-2 left-2 z-10 px-2 py-0.5 rounded-md bg-rose-600 text-white text-[10px] font-extrabold shadow-xs">
                       {product.badge}
                     </span>
                   )}
 
-                  {discountPercent > 0 && (
+                  {discountPercent > 0 && FEATURES.ENABLE_ECOMMERCE && (
                     <span className="absolute top-2 right-2 z-10 px-1.5 py-0.5 rounded-md bg-amber-500 text-white text-[10px] font-bold shadow-xs">
                       -{discountPercent}%
                     </span>
@@ -237,15 +239,9 @@ export default function ProductCatalog({ onSelectProduct, onGoToCart }: ProductC
                       <div className="text-[10px] text-gray-400 font-bold uppercase tracking-wider mb-0.5">
                         {product.sku}
                       </div>
-                      <h3 className="font-bold text-gray-900 text-xs line-clamp-2 leading-snug mb-1.5 min-h-[32px]">
+                      <h3 className="font-bold text-gray-900 text-xs line-clamp-2 leading-snug mb-2 min-h-[32px]">
                         {product.name}
                       </h3>
-
-                      {/* Warranty Badge */}
-                      <div className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-emerald-50 text-emerald-700 text-[10px] font-semibold border border-emerald-100 mb-2">
-                        <Award className="w-3 h-3 text-emerald-600" />
-                        <span>BH {product.warrantyMonths || 12}T chính hãng</span>
-                      </div>
                     </div>
 
                     {/* Pricing and Action */}

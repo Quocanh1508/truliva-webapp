@@ -109,7 +109,7 @@ export default function ProductDetail({ product, onBack, onGoToCart, onBuyNow }:
             alt={product.name}
             className="w-full h-full object-cover"
           />
-          {product.badge && (
+          {product.badge && !product.badge.toLowerCase().includes('chính hãng') && (
             <span className="absolute top-3 left-3 px-3 py-1 rounded-xl bg-rose-600 text-white text-xs font-extrabold shadow-md">
               {product.badge}
             </span>
@@ -185,7 +185,7 @@ export default function ProductDetail({ product, onBack, onGoToCart, onBuyNow }:
       {/* Commitments & Warranties 3-Box Strip */}
       <div className="bg-white p-4 mt-2 border-y border-gray-100">
         <div className="font-bold text-xs text-gray-900 uppercase tracking-wider mb-3">
-          Cam kết & Quyền lợi chính hãng Truliva
+          Cam kết & Quyền lợi Truliva
         </div>
         <div className="grid grid-cols-3 gap-2 text-center text-xs">
           <div 
