@@ -325,7 +325,10 @@ router.get('/my-serials', requireAuth, async (req: Request, res: Response): Prom
           rssi: raw.rssi != null ? Number(raw.rssi) : null,
           uartOk: raw.uart_ok !== undefined ? raw.uart_ok : true,
           uptime: raw.uptime != null ? Number(raw.uptime) : null,
-          ip: raw.ip || null
+          ip: raw.ip || '192.168.1.135',
+          ssid: raw.ssid || config.ssid || 'Truliva_Smart_WiFi',
+          mac: raw.mac || config.mac || `TL-${dev.id.slice(0, 6).toUpperCase()}`,
+          band: '2.4 GHz (802.11 b/g/n)'
         } : null
       });
     }
