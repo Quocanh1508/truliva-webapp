@@ -149,6 +149,7 @@ router.get('/my-serials', requireAuth, async (req: Request, res: Response): Prom
       standardPhone.startsWith('0') ? standardPhone.substring(1) : standardPhone
     ]));
 
+    // 1. Lấy danh sách Serial đã kích hoạt / đăng ký trực tiếp
     const serials = await prisma.serial.findMany({
       where: {
         customerPhone: {
@@ -158,7 +159,123 @@ router.get('/my-serials', requireAuth, async (req: Request, res: Response): Prom
       orderBy: { createdAt: 'desc' }
     });
 
-    const serialNumbers = serials.map(s => s.serialNumber);
+    const existingSerialNumbers = new Set(serials.map(s => s.serialNumber));
+
+    // 2. Tự động nạp thêm các thiết bị từ Đơn hàng Dịch vụ Hoàn thành đã phân công KTV
+    // Tiêu chí lọc:
+    // - Đã phân công KTV: assignedKtvId != null
+    // - Trạng thái hoàn thành: adminStatus in ['hoàn thành', 'completed'] hoặc statusName in ['completed', 'delivered', 'received_money']
+    // - Loại trừ giao hàng đơn tự tạo: NOT (workType in ['Giao hàng', 'giao_hang'] AND pancakeOrderId < 0)
+    // - Không lấy đơn ecom: NOT (orderSource in ['zalo_shop', 'ecom', 'Ecom', 'Zalo Shop'])
+    // - Khớp SĐT người nhận: billPhoneNumber in phoneVariants hoặc customer.phoneNumber in phoneVariants
+    const eligibleOrders = await prisma.order.findMany({
+      where: {
+        assignedKtvId: { not: null },
+        OR: [
+          { billPhoneNumber: { in: phoneVariants } },
+          { customer: { phoneNumber: { in: phoneVariants } } }
+        ],
+        AND: [
+          {
+            OR: [
+              { adminStatus: { in: ['hoàn thành', 'completed', 'Hoàn thành', 'Đã hoàn thành'] } },
+              { statusName: { in: ['completed', 'delivered', 'received_money', 'hoàn thành'] } }
+            ]
+          },
+          {
+            NOT: {
+              AND: [
+                { workType: { in: ['Giao hàng', 'giao_hang'] } },
+                { pancakeOrderId: { lt: 0 } }
+              ]
+            }
+          },
+          {
+            NOT: {
+              orderSource: { in: ['zalo_shop', 'ecom', 'Ecom', 'Zalo Shop'] }
+            }
+          }
+        ]
+      },
+      include: {
+        items: true,
+        serials: true,
+        serviceReports: {
+          select: { id: true, serialNumber: true }
+        }
+      },
+      orderBy: { createdAt: 'desc' }
+    });
+
+    const allSerials: any[] = [...serials];
+
+    for (const order of eligibleOrders) {
+      // a. Serial gắn trực tiếp với Order
+      for (const s of order.serials) {
+        if (!existingSerialNumbers.has(s.serialNumber)) {
+          existingSerialNumbers.add(s.serialNumber);
+          allSerials.push(s);
+        }
+      }
+
+      // b. Serial trong ServiceReport
+      for (const rep of order.serviceReports) {
+        if (rep.serialNumber && !existingSerialNumbers.has(rep.serialNumber)) {
+          existingSerialNumbers.add(rep.serialNumber);
+          const dbSerial = await prisma.serial.findUnique({
+            where: { serialNumber: rep.serialNumber }
+          });
+          if (dbSerial) {
+            allSerials.push(dbSerial);
+          } else {
+            const modelName = order.items[0]?.productName || 'Máy lọc nước Truliva';
+            allSerials.push({
+              id: `order-rep-${rep.id}`,
+              serialNumber: rep.serialNumber,
+              model: modelName,
+              productLine: order.workType || 'Máy lọc nước Truliva',
+              status: 'Đã kích hoạt',
+              activationDate: order.updatedAt || order.createdAt,
+              warrantyExpiryDate: new Date(new Date(order.updatedAt || order.createdAt).getTime() + 2 * 365 * 24 * 60 * 60 * 1000),
+              customerPhone: phone,
+              customerName: order.billFullName || null,
+              createdAt: order.createdAt,
+              updatedAt: order.updatedAt,
+              orderId: order.id
+            });
+          }
+        }
+      }
+
+      // c. Đơn có sản phẩm máy lọc nước nhưng chưa có serial lưu riêng
+      const purifierItem = order.items.find(i => 
+        (i.productName && (i.productName.toLowerCase().includes('máy lọc nước') || i.productName.toLowerCase().includes('máy nước nóng'))) ||
+        (order.workType && (order.workType.includes('Lắp đặt') || order.workType.includes('Giao hàng và Lắp đặt')))
+      );
+
+      if (purifierItem && !order.serials.length && !order.serviceReports.some(r => r.serialNumber)) {
+        const fallbackSerial = `TL-${order.pancakeOrderId || order.id.slice(0, 8).toUpperCase()}`;
+        if (!existingSerialNumbers.has(fallbackSerial)) {
+          existingSerialNumbers.add(fallbackSerial);
+          allSerials.push({
+            id: `order-${order.id}`,
+            serialNumber: fallbackSerial,
+            model: purifierItem.productName || 'Máy lọc nước Truliva',
+            productLine: order.workType || 'Máy lọc nước Truliva',
+            status: 'Đang hoạt động',
+            activationDate: order.updatedAt || order.createdAt,
+            warrantyExpiryDate: new Date(new Date(order.updatedAt || order.createdAt).getTime() + 2 * 365 * 24 * 60 * 60 * 1000),
+            customerPhone: phone,
+            customerName: order.billFullName || null,
+            createdAt: order.createdAt,
+            updatedAt: order.updatedAt,
+            orderId: order.id
+          });
+        }
+      }
+    }
+
+    const serialNumbers = allSerials.map(s => s.serialNumber);
 
     // Lấy thông tin IoT Devices tương ứng theo số Serial
     const iotDevices = await prisma.iotDevice.findMany({
@@ -213,7 +330,7 @@ router.get('/my-serials', requireAuth, async (req: Request, res: Response): Prom
       });
     }
 
-    const enhancedSerials = serials.map(s => {
+    const enhancedSerials = allSerials.map(s => {
       const iot = iotMap.get(s.serialNumber) || null;
       return {
         ...s,
@@ -351,6 +468,7 @@ router.get('/service-history', requireAuth, async (req: Request, res: Response):
     });
     const serialNumbers = serials.map(s => s.serialNumber);
 
+    // 1. Lấy báo cáo dịch vụ từ KTV (ServiceReport)
     const reports = await prisma.serviceReport.findMany({
       where: {
         OR: [
@@ -366,9 +484,87 @@ router.get('/service-history', requireAuth, async (req: Request, res: Response):
       orderBy: { createdAt: 'desc' }
     });
 
+    const reportedOrderIds = new Set(reports.map(r => r.orderId).filter(Boolean));
+
+    // 2. Tự động nạp thêm các Đơn hàng Dịch vụ Hoàn thành đã phân công KTV
+    // Tiêu chí:
+    // - Đã phân công KTV: assignedKtvId != null
+    // - Trạng thái hoàn thành: adminStatus in ['hoàn thành', 'completed'] hoặc statusName in ['completed', 'delivered', 'received_money']
+    // - Loại trừ giao hàng đơn tự tạo: NOT (workType in ['Giao hàng', 'giao_hang'] AND pancakeOrderId < 0)
+    // - Không lấy đơn ecom: NOT (orderSource in ['zalo_shop', 'ecom', 'Ecom', 'Zalo Shop'])
+    // - Khớp SĐT: billPhoneNumber in phoneVariants hoặc customer.phoneNumber in phoneVariants
+    const completedOrders = await prisma.order.findMany({
+      where: {
+        assignedKtvId: { not: null },
+        OR: [
+          { billPhoneNumber: { in: phoneVariants } },
+          { customer: { phoneNumber: { in: phoneVariants } } }
+        ],
+        AND: [
+          {
+            OR: [
+              { adminStatus: { in: ['hoàn thành', 'completed', 'Hoàn thành', 'Đã hoàn thành'] } },
+              { statusName: { in: ['completed', 'delivered', 'received_money', 'hoàn thành'] } }
+            ]
+          },
+          {
+            NOT: {
+              AND: [
+                { workType: { in: ['Giao hàng', 'giao_hang'] } },
+                { pancakeOrderId: { lt: 0 } }
+              ]
+            }
+          },
+          {
+            NOT: {
+              orderSource: { in: ['zalo_shop', 'ecom', 'Ecom', 'Zalo Shop'] }
+            }
+          }
+        ]
+      },
+      include: {
+        assignedKtv: {
+          select: { fullName: true, phoneNumber: true }
+        },
+        items: {
+          select: { productName: true, quantity: true, sku: true }
+        },
+        serials: {
+          select: { serialNumber: true, model: true }
+        }
+      },
+      orderBy: { createdAt: 'desc' }
+    });
+
+    // 3. Ghép danh sách lịch sử dịch vụ không trùng lặp
+    const historyList: any[] = [...reports];
+
+    for (const ord of completedOrders) {
+      if (reportedOrderIds.has(ord.id)) continue;
+
+      const itemNames = ord.items.map(i => `${i.productName || 'Sản phẩm'} (x${i.quantity || 1})`).join(', ');
+      historyList.push({
+        id: `ord-${ord.id}`,
+        workType: ord.workType || 'Dịch vụ KTV',
+        serviceType: ord.serviceType || ord.workType || 'Bảo dưỡng / Lắp đặt máy',
+        createdAt: ord.updatedAt || ord.createdAt,
+        serialNumber: ord.serials[0]?.serialNumber || null,
+        tdsIn: null,
+        tdsOut: null,
+        ktvUser: ord.assignedKtv ? {
+          fullName: ord.assignedKtv.fullName,
+          phoneNumber: ord.assignedKtv.phoneNumber
+        } : null,
+        notes: itemNames ? `Sản phẩm / Hạng mục: ${itemNames}` : (ord.note || 'Ca dịch vụ kỹ thuật hoàn thành')
+      });
+    }
+
+    // Sắp xếp theo ngày giảm dần
+    historyList.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+
     res.json({
       success: true,
-      history: reports
+      history: historyList
     });
   } catch (error: any) {
     res.status(500).json({ error: error.message });
