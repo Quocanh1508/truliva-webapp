@@ -20,7 +20,8 @@ import {
   Store,
   Truck,
   RotateCcw,
-  Scale
+  Scale,
+  Droplets
 } from 'lucide-react';
 import LuckyWheelModal from '../../components/LuckyWheelModal';
 import NewsDetailModal from '../../components/NewsDetailModal';
