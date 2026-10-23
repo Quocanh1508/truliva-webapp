@@ -536,13 +536,18 @@ router.get('/service-history', requireAuth, async (req: Request, res: Response):
       orderBy: { createdAt: 'desc' }
     });
 
+    // Khử bỏ ghi chú nội bộ của Sales/KTV/Hotline trước khi trả về cho khách hàng
+    const sanitizedReports = reports.map(r => {
+      const { notes, ...rest } = r;
+      return rest;
+    });
+
     // 3. Ghép danh sách lịch sử dịch vụ không trùng lặp
-    const historyList: any[] = [...reports];
+    const historyList: any[] = [...sanitizedReports];
 
     for (const ord of completedOrders) {
       if (reportedOrderIds.has(ord.id)) continue;
 
-      const itemNames = ord.items.map(i => `${i.productName || 'Sản phẩm'} (x${i.quantity || 1})`).join(', ');
       historyList.push({
         id: `ord-${ord.id}`,
         workType: ord.workType || 'Dịch vụ KTV',
@@ -554,8 +559,7 @@ router.get('/service-history', requireAuth, async (req: Request, res: Response):
         ktvUser: ord.assignedKtv ? {
           fullName: ord.assignedKtv.fullName,
           phoneNumber: ord.assignedKtv.phoneNumber
-        } : null,
-        notes: itemNames ? `Sản phẩm / Hạng mục: ${itemNames}` : (ord.note || 'Ca dịch vụ kỹ thuật hoàn thành')
+        } : null
       });
     }
 

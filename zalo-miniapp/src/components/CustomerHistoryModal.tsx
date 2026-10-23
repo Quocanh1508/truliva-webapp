@@ -131,12 +131,6 @@ export default function CustomerHistoryModal({ isOpen, onClose, onBookService }:
                     )}
                   </div>
                 )}
-
-                {item.notes && (
-                  <p className="text-[10px] text-slate-500 italic bg-amber-50/50 p-1.5 rounded border border-amber-100/60">
-                    Ghi chú: {item.notes}
-                  </p>
-                )}
               </div>
             ))
           )}
