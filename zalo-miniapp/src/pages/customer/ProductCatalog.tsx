@@ -12,11 +12,13 @@ import {
   RotateCcw,
   SlidersHorizontal,
   Flame,
-  Info
+  Info,
+  BookOpen
 } from 'lucide-react';
 import { fetchZaloApi } from '../../api/client';
 import { useCart } from '../../context/CartContext';
 import LegalPagesModal, { LegalDocType } from '../../components/LegalPagesModal';
+import { FEATURES } from '../../config/features';
 
 interface ProductCatalogProps {
   onSelectProduct: (product: any) => void;
@@ -34,7 +36,7 @@ const CATEGORIES = [
 export default function ProductCatalog({ onSelectProduct, onGoToCart }: ProductCatalogProps) {
   const [products, setProducts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [category, setCategory] = useState('ALL');
+  const [category, setCategory] = useState(FEATURES.ENABLE_ECOMMERCE ? 'ALL' : 'WATER_PURIFIER');
   const [search, setSearch] = useState('');
   const [addedSku, setAddedSku] = useState<string | null>(null);
 
@@ -88,25 +90,31 @@ export default function ProductCatalog({ onSelectProduct, onGoToCart }: ProductC
           <div>
             <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-white/10 text-cyan-300 text-[11px] font-semibold backdrop-blur-xs mb-1">
               <Sparkles className="w-3 h-3" />
-              <span>Gian hàng chính hãng Truliva</span>
+              <span>{FEATURES.ENABLE_ECOMMERCE ? 'Gian hàng chính hãng Truliva' : 'Thiết bị & Hướng dẫn sử dụng'}</span>
             </div>
             <h1 className="text-xl font-extrabold text-white tracking-tight">
-              Cửa Hàng Máy Lọc Nước
+              {FEATURES.ENABLE_ECOMMERCE ? 'Cửa Hàng Máy Lọc Nước' : 'Máy Lọc Nước Truliva'}
             </h1>
           </div>
 
-          {/* Cart Icon Badge */}
-          <button 
-            onClick={onGoToCart}
-            className="relative w-11 h-11 rounded-2xl bg-white/10 border border-white/15 flex items-center justify-center text-white backdrop-blur-md active:scale-95 transition"
-          >
-            <ShoppingCart className="w-5 h-5" />
-            {totalItemsCount > 0 && (
-              <span className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-rose-500 text-white text-[11px] font-bold flex items-center justify-center shadow-xs border border-white">
-                {totalItemsCount > 99 ? '99+' : totalItemsCount}
-              </span>
-            )}
-          </button>
+          {/* Cart Icon Badge (chỉ hiện khi bật Ecommerce) */}
+          {FEATURES.ENABLE_ECOMMERCE ? (
+            <button 
+              onClick={onGoToCart}
+              className="relative w-11 h-11 rounded-2xl bg-white/10 border border-white/15 flex items-center justify-center text-white backdrop-blur-md active:scale-95 transition cursor-pointer"
+            >
+              <ShoppingCart className="w-5 h-5" />
+              {totalItemsCount > 0 && (
+                <span className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-rose-500 text-white text-[11px] font-bold flex items-center justify-center shadow-xs border border-white">
+                  {totalItemsCount > 99 ? '99+' : totalItemsCount}
+                </span>
+              )}
+            </button>
+          ) : (
+            <div className="w-11 h-11 rounded-2xl bg-white/10 border border-white/15 flex items-center justify-center text-cyan-300 backdrop-blur-md">
+              <BookOpen className="w-5 h-5" />
+            </div>
+          )}
         </div>
 
         {/* Search Input Bar */}
@@ -115,7 +123,7 @@ export default function ProductCatalog({ onSelectProduct, onGoToCart }: ProductC
             type="text"
             value={search}
             onChange={e => setSearch(e.target.value)}
-            placeholder="Tìm kiếm máy lọc nước, lõi lọc, phụ kiện..."
+            placeholder={FEATURES.ENABLE_ECOMMERCE ? 'Tìm kiếm máy lọc nước, lõi lọc, phụ kiện...' : 'Tìm kiếm dòng máy lọc nước, model...'}
             className="w-full h-11 pl-10 pr-4 rounded-xl bg-white text-gray-900 placeholder-gray-400 text-sm shadow-inner focus:outline-none focus:ring-2 focus:ring-[#00A3FF]"
           />
           <Search className="w-4 h-4 text-gray-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
@@ -138,25 +146,27 @@ export default function ProductCatalog({ onSelectProduct, onGoToCart }: ProductC
         </div>
       </div>
 
-      {/* Category Tabs */}
-      <div className="px-4 py-3 flex items-center gap-2 overflow-x-auto no-scrollbar sticky top-0 bg-[#F8FAFC]/95 backdrop-blur-md z-20 border-b border-gray-100">
-        {CATEGORIES.map(cat => {
-          const isSelected = category === cat.key;
-          return (
-            <button
-              key={cat.key}
-              onClick={() => setCategory(cat.key)}
-              className={`px-4 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-all ${
-                isSelected
-                  ? 'bg-[#1B3A6B] text-white shadow-sm shadow-[#1B3A6B]/20 scale-102'
-                  : 'bg-white text-gray-600 border border-gray-200/80 hover:bg-gray-50'
-              }`}
-            >
-              {cat.label}
-            </button>
-          );
-        })}
-      </div>
+      {/* Category Tabs (Chỉ hiển thị khi bật bán hàng, hoặc chỉ hiện tab Máy lọc nước) */}
+      {FEATURES.ENABLE_ECOMMERCE && (
+        <div className="px-4 py-3 flex items-center gap-2 overflow-x-auto no-scrollbar sticky top-0 bg-[#F8FAFC]/95 backdrop-blur-md z-20 border-b border-gray-100">
+          {CATEGORIES.map(cat => {
+            const isSelected = category === cat.key;
+            return (
+              <button
+                key={cat.key}
+                onClick={() => setCategory(cat.key)}
+                className={`px-4 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-all ${
+                  isSelected
+                    ? 'bg-[#1B3A6B] text-white shadow-sm shadow-[#1B3A6B]/20 scale-102'
+                    : 'bg-white text-gray-600 border border-gray-200/80 hover:bg-gray-50'
+                }`}
+              >
+                {cat.label}
+              </button>
+            );
+          })}
+        </div>
+      )}
 
       {/* Legal Compliance Fast-Notice Bar */}
       <div className="mx-4 my-2 p-2.5 rounded-xl bg-blue-50/80 border border-blue-100 text-[11px] text-blue-900 flex items-center justify-between">
@@ -241,32 +251,47 @@ export default function ProductCatalog({ onSelectProduct, onGoToCart }: ProductC
                     {/* Pricing and Action */}
                     <div className="pt-2 border-t border-gray-50 flex items-center justify-between gap-1">
                       <div>
-                        <div className="text-rose-600 font-extrabold text-sm leading-tight">
-                          {formatVND(product.price)}
-                        </div>
-                        {product.originalPrice && product.originalPrice > product.price && (
-                          <div className="text-[11px] text-gray-400 line-through">
-                            {formatVND(product.originalPrice)}
+                        {FEATURES.ENABLE_ECOMMERCE ? (
+                          <>
+                            <div className="text-rose-600 font-extrabold text-sm leading-tight">
+                              {formatVND(product.price)}
+                            </div>
+                            {product.originalPrice && product.originalPrice > product.price && (
+                              <div className="text-[11px] text-gray-400 line-through">
+                                {formatVND(product.originalPrice)}
+                              </div>
+                            )}
+                          </>
+                        ) : (
+                          <div className="text-[#0284C7] font-bold text-xs flex items-center gap-1">
+                            <BookOpen className="w-3.5 h-3.5" />
+                            <span>HDSD & Thông số</span>
                           </div>
                         )}
                       </div>
 
-                      {/* Quick Add Button */}
-                      <button
-                        onClick={(e) => handleQuickAddToCart(e, product)}
-                        className={`w-8 h-8 rounded-xl flex items-center justify-center transition-all ${
-                          addedSku === product.sku
-                            ? 'bg-emerald-600 text-white scale-110'
-                            : 'bg-[#1B3A6B] text-white hover:bg-[#152e55] active:scale-90 shadow-xs'
-                        }`}
-                        title="Thêm vào giỏ hàng"
-                      >
-                        {addedSku === product.sku ? (
-                          <Check className="w-4 h-4" />
-                        ) : (
-                          <Plus className="w-4 h-4" />
-                        )}
-                      </button>
+                      {/* Quick Action Button */}
+                      {FEATURES.ENABLE_ECOMMERCE ? (
+                        <button
+                          onClick={(e) => handleQuickAddToCart(e, product)}
+                          className={`w-8 h-8 rounded-xl flex items-center justify-center transition-all ${
+                            addedSku === product.sku
+                              ? 'bg-emerald-600 text-white scale-110'
+                              : 'bg-[#1B3A6B] text-white hover:bg-[#152e55] active:scale-90 shadow-xs'
+                          }`}
+                          title="Thêm vào giỏ hàng"
+                        >
+                          {addedSku === product.sku ? (
+                            <Check className="w-4 h-4" />
+                          ) : (
+                            <Plus className="w-4 h-4" />
+                          )}
+                        </button>
+                      ) : (
+                        <div className="w-7 h-7 rounded-xl bg-sky-50 text-[#0284C7] flex items-center justify-center border border-sky-100 group-hover:bg-[#1B3A6B] group-hover:text-white transition-colors">
+                          <ChevronRight className="w-4 h-4" />
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -276,8 +301,8 @@ export default function ProductCatalog({ onSelectProduct, onGoToCart }: ProductC
         )}
       </div>
 
-      {/* Floating Bottom Cart Bar (if cart has items) */}
-      {totalItemsCount > 0 && (
+      {/* Floating Bottom Cart Bar (chỉ hiện khi bật Ecommerce và giỏ có hàng) */}
+      {FEATURES.ENABLE_ECOMMERCE && totalItemsCount > 0 && (
         <div className="fixed bottom-16 left-0 right-0 p-3 z-30 pointer-events-none">
           <div className="max-w-md mx-auto pointer-events-auto">
             <button

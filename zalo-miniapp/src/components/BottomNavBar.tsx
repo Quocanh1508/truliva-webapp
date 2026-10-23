@@ -1,7 +1,8 @@
 import React from 'react';
-import { Home, Store, MessageCircle, User } from 'lucide-react';
+import { Home, Store, MessageCircle, User, BookOpen } from 'lucide-react';
 import { openChat } from 'zmp-sdk/apis';
 import { useCart } from '../context/CartContext';
+import { FEATURES } from '../config/features';
 
 export type MainTabType = 'home' | 'shop' | 'chat' | 'profile';
 
@@ -48,7 +49,7 @@ export default function BottomNavBar({ activeTab, onChangeTab }: BottomNavBarPro
           <span className="text-[10px] mt-0.5 tracking-tight">Trang chủ</span>
         </button>
 
-        {/* 🛍️ Cửa hàng */}
+        {/* 🛍️ Cửa hàng hoặc 📖 Sản phẩm */}
         <button 
           onClick={() => onChangeTab('shop')}
           className={`flex-1 flex flex-col items-center justify-center min-h-[46px] py-1 px-1 rounded-2xl transition-all duration-200 active:scale-95 cursor-pointer ${
@@ -62,14 +63,20 @@ export default function BottomNavBar({ activeTab, onChangeTab }: BottomNavBarPro
               ? 'bg-gradient-to-r from-sky-100/90 to-blue-100/80 text-[#0284C7] shadow-xs' 
               : 'text-slate-400'
           }`}>
-            <Store size={19} strokeWidth={activeTab === 'shop' ? 2.5 : 2} />
-            {totalItemsCount > 0 && (
+            {FEATURES.ENABLE_ECOMMERCE ? (
+              <Store size={19} strokeWidth={activeTab === 'shop' ? 2.5 : 2} />
+            ) : (
+              <BookOpen size={19} strokeWidth={activeTab === 'shop' ? 2.5 : 2} />
+            )}
+            {FEATURES.ENABLE_ECOMMERCE && totalItemsCount > 0 && (
               <span className="absolute -top-1 -right-0.5 min-w-[17px] h-4 bg-rose-500 text-white rounded-full text-[9px] font-black px-1 flex items-center justify-center shadow-xs border-2 border-white animate-pulse">
                 {totalItemsCount > 99 ? '99+' : totalItemsCount}
               </span>
             )}
           </div>
-          <span className="text-[10px] mt-0.5 tracking-tight">Cửa hàng</span>
+          <span className="text-[10px] mt-0.5 tracking-tight">
+            {FEATURES.ENABLE_ECOMMERCE ? 'Cửa hàng' : 'Sản phẩm'}
+          </span>
         </button>
 
         {/* 💬 Tư vấn Zalo OA */}

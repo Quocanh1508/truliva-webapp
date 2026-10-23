@@ -32,6 +32,7 @@ import CustomerLoyaltyModal from '../../components/CustomerLoyaltyModal';
 import LegalPagesModal, { LegalDocType } from '../../components/LegalPagesModal';
 import P3ROceanHeader from '../../components/P3ROceanHeader';
 import IotDeviceCard from '../../components/IotDeviceCard';
+import { FEATURES } from '../../config/features';
 
 interface CustomerProfileProps {
   user: any;
@@ -166,54 +167,76 @@ export default function CustomerProfile({
                 {syncing ? 'Đang đồng bộ Zalo...' : 'Đồng bộ tên & avatar Zalo'}
               </button>
               
-              {/* Dynamic Rank Badge */}
-              <button 
-                onClick={handleCycleTier}
-                title="Nhấn để đổi xem màu các hạng thành viên: Đồng ➔ Bạc ➔ Vàng ➔ Kim Cương"
-                className={`mt-2 inline-block p3r-slanted-badge ${rank.badgeBg} border ${rank.borderColor} px-3 py-0.5 text-[9px] font-black ${rank.textColor} uppercase tracking-wider ${rank.shadowGlow} active:scale-95 transition-all cursor-pointer`}
-              >
-                <div className="flex items-center space-x-1.5">
-                  {rank.tier === 'GOLD' ? (
-                    <Crown size={11} style={{ color: rank.iconColor }} />
-                  ) : rank.tier === 'DIAMOND' ? (
-                    <Gem size={11} style={{ color: rank.iconColor }} />
-                  ) : rank.tier === 'BRONZE' ? (
-                    <Award size={11} style={{ color: rank.iconColor }} />
-                  ) : (
-                    <Sparkles size={11} style={{ color: rank.iconColor }} />
-                  )}
-                  <span>{rank.label} ({overrideTier ? rank.minPoints : userPoints} Điểm)</span>
-                </div>
-              </button>
+              {/* Dynamic Rank Badge (Tạm ẩn khi disable ranking) */}
+              {FEATURES.ENABLE_MEMBER_RANKING && (
+                <button 
+                  onClick={handleCycleTier}
+                  title="Nhấn để đổi xem màu các hạng thành viên: Đồng ➔ Bạc ➔ Vàng ➔ Kim Cương"
+                  className={`mt-2 inline-block p3r-slanted-badge ${rank.badgeBg} border ${rank.borderColor} px-3 py-0.5 text-[9px] font-black ${rank.textColor} uppercase tracking-wider ${rank.shadowGlow} active:scale-95 transition-all cursor-pointer`}
+                >
+                  <div className="flex items-center space-x-1.5">
+                    {rank.tier === 'GOLD' ? (
+                      <Crown size={11} style={{ color: rank.iconColor }} />
+                    ) : rank.tier === 'DIAMOND' ? (
+                      <Gem size={11} style={{ color: rank.iconColor }} />
+                    ) : rank.tier === 'BRONZE' ? (
+                      <Award size={11} style={{ color: rank.iconColor }} />
+                    ) : (
+                      <Sparkles size={11} style={{ color: rank.iconColor }} />
+                    )}
+                    <span>{rank.label} ({overrideTier ? rank.minPoints : userPoints} Điểm)</span>
+                  </div>
+                </button>
+              )}
             </div>
           </div>
 
           {/* Quick Stats Grid */}
-          <div className="grid grid-cols-3 gap-2 bg-[#041426]/70 backdrop-blur-md rounded-2xl p-2.5 text-center border border-cyan-400/30 text-xs shadow-[0_4px_20px_rgba(0,210,255,0.15)]">
-            <button 
-              onClick={scrollToDevices}
-              className="p-1 rounded-xl hover:bg-white/10 active:scale-95 transition-all cursor-pointer group"
-            >
-              <p className="text-[9px] text-sky-200 uppercase tracking-wider font-bold group-hover:text-white transition-colors">Thiết bị</p>
-              <p className="font-black text-white text-base mt-0.5">{(mySerials || []).length}</p>
-            </button>
+          {FEATURES.ENABLE_MEMBER_RANKING ? (
+            <div className="grid grid-cols-3 gap-2 bg-[#041426]/70 backdrop-blur-md rounded-2xl p-2.5 text-center border border-cyan-400/30 text-xs shadow-[0_4px_20px_rgba(0,210,255,0.15)]">
+              <button 
+                onClick={scrollToDevices}
+                className="p-1 rounded-xl hover:bg-white/10 active:scale-95 transition-all cursor-pointer group"
+              >
+                <p className="text-[9px] text-sky-200 uppercase tracking-wider font-bold group-hover:text-white transition-colors">Thiết bị</p>
+                <p className="font-black text-white text-base mt-0.5">{(mySerials || []).length}</p>
+              </button>
 
-            <button 
-              onClick={() => setShowLoyaltyModal(true)}
-              className="p-1 rounded-xl border-x border-cyan-400/20 hover:bg-white/10 active:scale-95 transition-all cursor-pointer group"
-            >
-              <p className="text-[9px] text-sky-200 uppercase tracking-wider font-bold group-hover:text-white transition-colors">Điểm thưởng</p>
-              <p className="font-black text-base mt-0.5 drop-shadow-xs" style={{ color: rank.iconColor }}>{userPoints}</p>
-            </button>
+              <button 
+                onClick={() => setShowLoyaltyModal(true)}
+                className="p-1 rounded-xl border-x border-cyan-400/20 hover:bg-white/10 active:scale-95 transition-all cursor-pointer group"
+              >
+                <p className="text-[9px] text-sky-200 uppercase tracking-wider font-bold group-hover:text-white transition-colors">Điểm thưởng</p>
+                <p className="font-black text-base mt-0.5 drop-shadow-xs" style={{ color: rank.iconColor }}>{userPoints}</p>
+              </button>
 
-            <button 
-              onClick={() => setShowVoucherModal(true)}
-              className="p-1 rounded-xl hover:bg-white/10 active:scale-95 transition-all cursor-pointer group"
-            >
-              <p className="text-[9px] text-sky-200 uppercase tracking-wider font-bold group-hover:text-white transition-colors">Voucher</p>
-              <p className="font-black text-cyan-300 text-base mt-0.5">3</p>
-            </button>
-          </div>
+              <button 
+                onClick={() => setShowVoucherModal(true)}
+                className="p-1 rounded-xl hover:bg-white/10 active:scale-95 transition-all cursor-pointer group"
+              >
+                <p className="text-[9px] text-sky-200 uppercase tracking-wider font-bold group-hover:text-white transition-colors">Voucher</p>
+                <p className="font-black text-cyan-300 text-base mt-0.5">3</p>
+              </button>
+            </div>
+          ) : (
+            <div className="grid grid-cols-2 gap-2 bg-[#041426]/70 backdrop-blur-md rounded-2xl p-2.5 text-center border border-cyan-400/30 text-xs shadow-[0_4px_20px_rgba(0,210,255,0.15)]">
+              <button 
+                onClick={scrollToDevices}
+                className="p-1 rounded-xl hover:bg-white/10 active:scale-95 transition-all cursor-pointer group"
+              >
+                <p className="text-[9px] text-sky-200 uppercase tracking-wider font-bold group-hover:text-white transition-colors">Máy kích hoạt</p>
+                <p className="font-black text-white text-base mt-0.5">{(mySerials || []).length} máy</p>
+              </button>
+
+              <a 
+                href="tel:1900638463"
+                className="p-1 rounded-xl border-l border-cyan-400/20 hover:bg-white/10 active:scale-95 transition-all cursor-pointer group block"
+              >
+                <p className="text-[9px] text-sky-200 uppercase tracking-wider font-bold group-hover:text-white transition-colors">Hotline kỹ thuật</p>
+                <p className="font-black text-cyan-300 text-sm mt-1">1900 638 463</p>
+              </a>
+            </div>
+          )}
         </div>
       </P3ROceanHeader>
 
@@ -266,8 +289,8 @@ export default function CustomerProfile({
 
         {/* 3. E-Commerce & Service Actions List */}
         <div className="bg-white rounded-3xl border border-sky-100 shadow-[0_4px_20px_rgba(27,58,107,0.06)] divide-y divide-slate-100 text-xs overflow-hidden">
-          {/* My Orders Button */}
-          {onViewMyOrders && (
+          {/* My Orders Button (Tạm ẩn khi disable ecommerce) */}
+          {FEATURES.ENABLE_ECOMMERCE && onViewMyOrders && (
             <button 
               onClick={onViewMyOrders}
               className="w-full p-3.5 flex items-center justify-between text-slate-800 font-semibold hover:bg-slate-50 active:bg-slate-100 transition-colors cursor-pointer"
@@ -285,18 +308,21 @@ export default function CustomerProfile({
             </button>
           )}
 
-          <button 
-            onClick={() => setShowVoucherModal(true)}
-            className="w-full p-3.5 flex items-center justify-between text-slate-800 font-semibold hover:bg-slate-50 active:bg-slate-100 transition-colors cursor-pointer"
-          >
-            <div className="flex items-center space-x-3">
-              <div className="p-2.5 bg-cyan-50 text-[#00A3FF] rounded-2xl border border-cyan-100">
-                <Ticket size={18} />
+          {/* Vouchers (Tạm ẩn khi disable ranking) */}
+          {FEATURES.ENABLE_MEMBER_RANKING && (
+            <button 
+              onClick={() => setShowVoucherModal(true)}
+              className="w-full p-3.5 flex items-center justify-between text-slate-800 font-semibold hover:bg-slate-50 active:bg-slate-100 transition-colors cursor-pointer"
+            >
+              <div className="flex items-center space-x-3">
+                <div className="p-2.5 bg-cyan-50 text-[#00A3FF] rounded-2xl border border-cyan-100">
+                  <Ticket size={18} />
+                </div>
+                <span className="font-bold">Ưu đãi & Voucher của tôi (3)</span>
               </div>
-              <span className="font-bold">Ưu đãi & Voucher của tôi (3)</span>
-            </div>
-            <ChevronRight size={16} className="text-slate-400" />
-          </button>
+              <ChevronRight size={16} className="text-slate-400" />
+            </button>
+          )}
 
           <button 
             onClick={() => setShowHistoryModal(true)}
@@ -330,7 +356,7 @@ export default function CustomerProfile({
           <div className="p-3 bg-gray-50/70 border-b border-gray-100 flex items-center justify-between text-[11px] text-gray-500 font-bold uppercase tracking-wider">
             <span className="flex items-center gap-1.5">
               <Scale size={14} className="text-[#1B3A6B]" />
-              Pháp Lý & Quy Chế TMĐT Truliva
+              Pháp Lý & Quy Chế Dịch Vụ Truliva
             </span>
             <span className="text-[9px] px-1.5 py-0.5 rounded bg-blue-100 text-blue-800 font-extrabold">Luật 2025</span>
           </div>
@@ -352,7 +378,7 @@ export default function CustomerProfile({
           >
             <div className="flex items-center space-x-2.5">
               <FileText size={16} className="text-gray-400" />
-              <span>Điều khoản giao dịch mua bán hàng</span>
+              <span>Điều khoản & Quy định sử dụng dịch vụ</span>
             </div>
             <ChevronRight size={14} className="text-slate-400" />
           </button>
@@ -374,7 +400,7 @@ export default function CustomerProfile({
           >
             <div className="flex items-center space-x-2.5">
               <Award size={16} className="text-gray-400" />
-              <span>Xem toàn bộ 8 chính sách TMĐT</span>
+              <span>Xem toàn bộ 8 chính sách & quy định</span>
             </div>
             <span className="text-[10px] font-bold text-[#1B3A6B] flex items-center">
               Chi tiết <ChevronRight size={14} />
@@ -395,14 +421,26 @@ export default function CustomerProfile({
       </div>
 
       {/* Interactive Modals */}
-      <CustomerVoucherModal
-        isOpen={showVoucherModal}
-        onClose={() => setShowVoucherModal(false)}
-        onUseVoucher={(_code) => {
-          setShowVoucherModal(false);
-          handleBookMaintenance();
-        }}
-      />
+      {FEATURES.ENABLE_MEMBER_RANKING && (
+        <>
+          <CustomerVoucherModal
+            isOpen={showVoucherModal}
+            onClose={() => setShowVoucherModal(false)}
+            onUseVoucher={(_code) => {
+              setShowVoucherModal(false);
+              handleBookMaintenance();
+            }}
+          />
+
+          <CustomerLoyaltyModal
+            isOpen={showLoyaltyModal}
+            onClose={() => setShowLoyaltyModal(false)}
+            userPoints={userPoints}
+            rank={rank}
+            onOpenScanner={onOpenScanner}
+          />
+        </>
+      )}
 
       <CustomerHistoryModal
         isOpen={showHistoryModal}
@@ -411,14 +449,6 @@ export default function CustomerProfile({
           setShowHistoryModal(false);
           handleBookMaintenance(serialNumber);
         }}
-      />
-
-      <CustomerLoyaltyModal
-        isOpen={showLoyaltyModal}
-        onClose={() => setShowLoyaltyModal(false)}
-        userPoints={userPoints}
-        rank={rank}
-        onOpenScanner={onOpenScanner}
       />
 
       <LegalPagesModal

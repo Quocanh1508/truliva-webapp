@@ -22,16 +22,18 @@ import {
   Truck,
   RotateCcw,
   Scale,
-  Droplets
+  Droplets,
+  BookOpen
 } from 'lucide-react';
 import LuckyWheelModal from '../../components/LuckyWheelModal';
 import NewsDetailModal from '../../components/NewsDetailModal';
 import LegalPagesModal, { LegalDocType } from '../../components/LegalPagesModal';
 import P3ROceanHeader from '../../components/P3ROceanHeader';
-import { openPhone, openWebview } from 'zmp-sdk/apis';
+import { openPhone, openWebview, openChat } from 'zmp-sdk/apis';
 import { fetchZaloApi } from '../../api/client';
 import { getCustomerRank, MemberTier, RANK_CONFIGS, NEXT_TIER_ORDER } from '../../utils/memberRank';
 import IotDeviceCard from '../../components/IotDeviceCard';
+import { FEATURES } from '../../config/features';
 
 interface CustomerHomeProps {
   user: any;
@@ -176,66 +178,94 @@ export default function CustomerHome({ user, mySerials = [], onOpenScanner, onOp
             </div>
           </div>
 
-          <div className="flex-shrink-0 ml-2">
-            <button 
-              onClick={handleCycleTier}
-              title="Nhấn để đổi xem màu các hạng thành viên: Đồng ➔ Bạc ➔ Vàng ➔ Kim Cương"
-              className={`p3r-slanted-badge ${rank.badgeBg} border ${rank.borderColor} px-2.5 py-1 text-[10px] font-black ${rank.textColor} uppercase tracking-wider flex items-center space-x-1 ${rank.shadowGlow} active:scale-95 transition-all cursor-pointer`}
-            >
-              <div className="flex items-center space-x-1">
-                {rank.tier === 'GOLD' ? (
-                  <Crown size={11} style={{ color: rank.iconColor }} />
-                ) : rank.tier === 'DIAMOND' ? (
-                  <Gem size={11} style={{ color: rank.iconColor }} />
-                ) : rank.tier === 'BRONZE' ? (
-                  <Award size={11} style={{ color: rank.iconColor }} />
-                ) : (
-                  <Sparkles size={11} style={{ color: rank.iconColor }} />
-                )}
-                <span>{rank.label}</span>
-              </div>
-            </button>
-          </div>
+          {FEATURES.ENABLE_MEMBER_RANKING && (
+            <div className="flex-shrink-0 ml-2">
+              <button 
+                onClick={handleCycleTier}
+                title="Nhấn để đổi xem màu các hạng thành viên: Đồng ➔ Bạc ➔ Vàng ➔ Kim Cương"
+                className={`p3r-slanted-badge ${rank.badgeBg} border ${rank.borderColor} px-2.5 py-1 text-[10px] font-black ${rank.textColor} uppercase tracking-wider flex items-center space-x-1 ${rank.shadowGlow} active:scale-95 transition-all cursor-pointer`}
+              >
+                <div className="flex items-center space-x-1">
+                  {rank.tier === 'GOLD' ? (
+                    <Crown size={11} style={{ color: rank.iconColor }} />
+                  ) : rank.tier === 'DIAMOND' ? (
+                    <Gem size={11} style={{ color: rank.iconColor }} />
+                  ) : rank.tier === 'BRONZE' ? (
+                    <Award size={11} style={{ color: rank.iconColor }} />
+                  ) : (
+                    <Sparkles size={11} style={{ color: rank.iconColor }} />
+                  )}
+                  <span>{rank.label}</span>
+                </div>
+              </button>
+            </div>
+          )}
         </div>
       </P3ROceanHeader>
 
       {/* 2. Floating Quick Nav Card */}
       <div className="max-w-md mx-auto px-4 -mt-10 relative z-10">
         <div className="bg-white/95 backdrop-blur-md rounded-3xl shadow-[0_12px_36px_rgba(11,37,69,0.12)] p-3.5 border border-sky-100/90 grid grid-cols-4 gap-2 text-center">
-          {/* Cửa hàng */}
+          {/* Cửa hàng / Sản phẩm */}
           <button 
             onClick={onGoToShop}
             className="flex flex-col items-center justify-center space-y-1.5 p-2 rounded-2xl hover:bg-sky-50/80 active:scale-95 transition-all cursor-pointer group"
           >
             <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-blue-50 to-indigo-100/80 text-[#1B3A6B] flex items-center justify-center border border-blue-200/60 shadow-xs group-hover:scale-105 transition-all">
-              <Store size={22} className="text-[#1B3A6B]" />
+              {FEATURES.ENABLE_ECOMMERCE ? <Store size={22} className="text-[#1B3A6B]" /> : <BookOpen size={22} className="text-[#1B3A6B]" />}
             </div>
-            <span className="text-[11px] font-bold text-slate-700 tracking-tight whitespace-nowrap">Cửa hàng</span>
+            <span className="text-[11px] font-bold text-slate-700 tracking-tight whitespace-nowrap">
+              {FEATURES.ENABLE_ECOMMERCE ? 'Cửa hàng' : 'Sản phẩm'}
+            </span>
           </button>
 
-          {/* Tích điểm */}
+          {/* Tích điểm hoặc Bảo hành */}
           <button 
             onClick={onOpenWarranty}
             className="flex flex-col items-center justify-center space-y-1.5 p-2 rounded-2xl hover:bg-sky-50/80 active:scale-95 transition-all cursor-pointer group"
           >
             <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-amber-50 to-orange-100/80 text-amber-600 flex items-center justify-center border border-amber-200/60 shadow-xs group-hover:scale-105 transition-all">
-              <Star size={22} className="text-amber-500 fill-amber-200" />
+              {FEATURES.ENABLE_MEMBER_RANKING ? (
+                <Star size={22} className="text-amber-500 fill-amber-200" />
+              ) : (
+                <ShieldCheck size={22} className="text-amber-600" />
+              )}
             </div>
-            <span className="text-[11px] font-bold text-slate-700 tracking-tight whitespace-nowrap">Tích điểm</span>
+            <span className="text-[11px] font-bold text-slate-700 tracking-tight whitespace-nowrap">
+              {FEATURES.ENABLE_MEMBER_RANKING ? 'Tích điểm' : 'Bảo hành'}
+            </span>
           </button>
 
-          {/* Ưu đãi */}
-          <button 
-            onClick={() => setShowWheelModal(true)}
-            className="flex flex-col items-center justify-center space-y-1.5 p-2 rounded-2xl hover:bg-cyan-50/80 active:scale-95 transition-all cursor-pointer group"
-          >
-            <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-cyan-50 to-sky-100/80 text-[#00A3FF] flex items-center justify-center border border-cyan-200/60 shadow-xs relative group-hover:scale-105 transition-all">
-              <Gift size={22} className="text-[#00A3FF]" />
-              <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 bg-[#00D2FF] rounded-full animate-ping"></span>
-              <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 bg-[#00D2FF] rounded-full shadow-[0_0_6px_#00D2FF]"></span>
-            </div>
-            <span className="text-[11px] font-bold text-slate-700 tracking-tight whitespace-nowrap">Vòng quay</span>
-          </button>
+          {/* Vòng quay hoặc Tư vấn OA */}
+          {FEATURES.ENABLE_MEMBER_RANKING ? (
+            <button 
+              onClick={() => setShowWheelModal(true)}
+              className="flex flex-col items-center justify-center space-y-1.5 p-2 rounded-2xl hover:bg-cyan-50/80 active:scale-95 transition-all cursor-pointer group"
+            >
+              <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-cyan-50 to-sky-100/80 text-[#00A3FF] flex items-center justify-center border border-cyan-200/60 shadow-xs relative group-hover:scale-105 transition-all">
+                <Gift size={22} className="text-[#00A3FF]" />
+                <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 bg-[#00D2FF] rounded-full animate-ping"></span>
+                <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 bg-[#00D2FF] rounded-full shadow-[0_0_6px_#00D2FF]"></span>
+              </div>
+              <span className="text-[11px] font-bold text-slate-700 tracking-tight whitespace-nowrap">Vòng quay</span>
+            </button>
+          ) : (
+            <button 
+              onClick={async () => {
+                try {
+                  await openChat({ type: 'oa', id: '3870382725035413507' });
+                } catch {
+                  window.location.href = 'https://zalo.me/3870382725035413507';
+                }
+              }}
+              className="flex flex-col items-center justify-center space-y-1.5 p-2 rounded-2xl hover:bg-cyan-50/80 active:scale-95 transition-all cursor-pointer group"
+            >
+              <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-cyan-50 to-sky-100/80 text-[#00A3FF] flex items-center justify-center border border-cyan-200/60 shadow-xs group-hover:scale-105 transition-all">
+                <MessageSquare size={22} className="text-[#00A3FF]" />
+              </div>
+              <span className="text-[11px] font-bold text-slate-700 tracking-tight whitespace-nowrap">Tư vấn OA</span>
+            </button>
+          )}
 
           {/* Hotline */}
           <button 
@@ -256,32 +286,34 @@ export default function CustomerHome({ user, mySerials = [], onOpenScanner, onOp
         </div>
       </div>
 
-      {/* 3. 🛍️ High-Conversion E-Commerce Promo Banner */}
-      <div className="max-w-md mx-auto px-4 mt-4">
-        <div 
-          onClick={onGoToShop}
-          className="bg-gradient-to-r from-[#1B3A6B] via-[#152e55] to-[#0284C7] text-white rounded-3xl p-4.5 border border-cyan-400/40 shadow-[0_8px_25px_rgba(27,58,107,0.18)] flex items-center justify-between cursor-pointer hover:shadow-[0_12px_32px_rgba(0,163,255,0.25)] active:scale-[0.99] transition-all relative overflow-hidden"
-        >
-          <div className="absolute top-0 right-0 w-36 h-36 bg-[#00A3FF]/20 rounded-full blur-xl pointer-events-none"></div>
-          
-          <div className="space-y-1 z-10">
-            <div className="inline-flex items-center gap-1 bg-[#00D2FF] text-[#061226] px-2.5 py-0.5 text-[9px] font-extrabold uppercase tracking-wider rounded-md">
-              <Sparkles size={11} />
-              <span>GIAN HÀNG CHÍNH HÃNG</span>
+      {/* 3. 🛍️ High-Conversion E-Commerce Promo Banner (chỉ hiện khi bật Ecommerce) */}
+      {FEATURES.ENABLE_ECOMMERCE && (
+        <div className="max-w-md mx-auto px-4 mt-4">
+          <div 
+            onClick={onGoToShop}
+            className="bg-gradient-to-r from-[#1B3A6B] via-[#152e55] to-[#0284C7] text-white rounded-3xl p-4.5 border border-cyan-400/40 shadow-[0_8px_25px_rgba(27,58,107,0.18)] flex items-center justify-between cursor-pointer hover:shadow-[0_12px_32px_rgba(0,163,255,0.25)] active:scale-[0.99] transition-all relative overflow-hidden"
+          >
+            <div className="absolute top-0 right-0 w-36 h-36 bg-[#00A3FF]/20 rounded-full blur-xl pointer-events-none"></div>
+            
+            <div className="space-y-1 z-10">
+              <div className="inline-flex items-center gap-1 bg-[#00D2FF] text-[#061226] px-2.5 py-0.5 text-[9px] font-extrabold uppercase tracking-wider rounded-md">
+                <Sparkles size={11} />
+                <span>GIAN HÀNG CHÍNH HÃNG</span>
+              </div>
+              <h3 className="font-extrabold text-[15px] text-white tracking-tight leading-tight">
+                Máy Lọc Nước Truliva 2026
+              </h3>
+              <p className="text-[11px] text-cyan-200">
+                Miễn phí giao hàng & lắp đặt • Bảo hành 1-2 năm theo POS
+              </p>
             </div>
-            <h3 className="font-extrabold text-[15px] text-white tracking-tight leading-tight">
-              Máy Lọc Nước Truliva 2026
-            </h3>
-            <p className="text-[11px] text-cyan-200">
-              Miễn phí giao hàng & lắp đặt • Bảo hành 1-2 năm theo POS
-            </p>
-          </div>
 
-          <div className="p-3 bg-white/15 border border-white/20 backdrop-blur-md rounded-2xl text-cyan-300 z-10 shrink-0">
-            <ShoppingBag size={24} />
+            <div className="p-3 bg-white/15 border border-white/20 backdrop-blur-md rounded-2xl text-cyan-300 z-10 shrink-0">
+              <ShoppingBag size={24} />
+            </div>
           </div>
         </div>
-      </div>
+      )}
 
       {/* 4. Section Máy Lọc Nước & Tuổi Thọ Lõi Lọc IoT (Nếu có máy) hoặc Quét Mã QR */}
       <div className="max-w-md mx-auto px-4 mt-4 space-y-3">
