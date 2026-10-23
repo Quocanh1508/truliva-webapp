@@ -55,7 +55,7 @@ export default function IotDeviceCard({ serialData, onBookMaintenance }: IotDevi
     if (isReplace || val < 20) {
       return { 
         val,
-        label: 'Cần thay ngay', 
+        label: 'Cần thay', 
         color: 'bg-rose-500', 
         textColor: 'text-rose-600',
         badgeClass: 'bg-rose-50 text-rose-700 border-rose-200',
@@ -65,7 +65,7 @@ export default function IotDeviceCard({ serialData, onBookMaintenance }: IotDevi
     if (val < 50) {
       return { 
         val,
-        label: 'Chuẩn bị thay', 
+        label: 'Sắp thay', 
         color: 'bg-amber-500', 
         textColor: 'text-amber-600',
         badgeClass: 'bg-amber-50 text-amber-700 border-amber-200',
@@ -74,7 +74,7 @@ export default function IotDeviceCard({ serialData, onBookMaintenance }: IotDevi
     }
     return { 
       val,
-      label: 'Tình trạng tốt', 
+      label: 'Đang tốt', 
       color: 'bg-emerald-500', 
       textColor: 'text-emerald-600',
       badgeClass: 'bg-emerald-50 text-emerald-700 border-emerald-200',
@@ -143,42 +143,15 @@ export default function IotDeviceCard({ serialData, onBookMaintenance }: IotDevi
           ═══════════════════════════════════════════════════════════════ */}
       {activeSubTab === 'device' && (
         <div className="p-4 space-y-4">
-          {/* Header định danh thiết bị */}
-          <div>
-            <div className="flex items-start justify-between gap-2.5">
-              <div className="flex-1 min-w-0">
-                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
-                  Máy lọc nước của tôi
-                </p>
-                <h2 className="text-lg font-black text-slate-900 tracking-tight leading-tight truncate mt-0.5" title={modelTitle}>
-                  {modelTitle}
-                </h2>
-                
-                {/* Trạng thái kết nối Wi-Fi (Xám khi chưa kết nối, Xanh khi trực tuyến) */}
-                <div className={`flex items-center space-x-1.5 text-xs mt-1.5 ${
-                  isOnline ? 'text-emerald-600 font-bold' : 'text-slate-500 font-medium'
-                }`}>
-                  {isOnline ? (
-                    <span className="relative flex h-2 w-2 shrink-0">
-                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                      <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
-                    </span>
-                  ) : (
-                    <span className="h-2 w-2 rounded-full bg-slate-400 shrink-0"></span>
-                  )}
-                  {isOnline ? (
-                    <Wifi size={13} className="shrink-0 text-emerald-600" />
-                  ) : (
-                    <WifiOff size={13} className="shrink-0 text-slate-400" />
-                  )}
-                  <span className="whitespace-nowrap">
-                    {isOnline ? 'Đang kết nối Wi-Fi' : 'Chưa kết nối Wi-Fi'}
-                  </span>
-                </div>
-              </div>
+          {/* Header định danh thiết bị - Hiển thị đầy đủ tên máy & số serial */}
+          <div className="space-y-1.5">
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                Máy lọc nước của tôi
+              </span>
 
               {/* Box Serial gọn gàng bên phải */}
-              <div className="shrink-0 flex items-center space-x-1.5 font-mono text-[11px] font-semibold text-slate-600 bg-slate-100 px-2.5 py-1.5 rounded-xl border border-slate-200 mt-1">
+              <div className="shrink-0 flex items-center space-x-1.5 font-mono text-[11px] font-semibold text-slate-600 bg-slate-100 px-2.5 py-1 rounded-xl border border-slate-200">
                 <span>{s.serialNumber}</span>
                 <button 
                   onClick={handleCopySerial}
@@ -188,6 +161,33 @@ export default function IotDeviceCard({ serialData, onBookMaintenance }: IotDevi
                   {copied ? <Check size={12} className="text-emerald-600" /> : <Copy size={12} />}
                 </button>
               </div>
+            </div>
+
+            {/* Tên máy trọn vẹn 100%, không bị cắt truncate dấu ba chấm */}
+            <h2 className="text-base sm:text-lg font-black text-slate-900 tracking-tight leading-snug break-words">
+              {modelTitle}
+            </h2>
+            
+            {/* Trạng thái kết nối Wi-Fi (Xám khi chưa kết nối, Xanh khi trực tuyến) */}
+            <div className={`flex items-center space-x-1.5 text-xs pt-0.5 ${
+              isOnline ? 'text-emerald-600 font-bold' : 'text-slate-500 font-medium'
+            }`}>
+              {isOnline ? (
+                <span className="relative flex h-2 w-2 shrink-0">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                </span>
+              ) : (
+                <span className="h-2 w-2 rounded-full bg-slate-400 shrink-0"></span>
+              )}
+              {isOnline ? (
+                <Wifi size={13} className="shrink-0 text-emerald-600" />
+              ) : (
+                <WifiOff size={13} className="shrink-0 text-slate-400" />
+              )}
+              <span className="whitespace-nowrap">
+                {isOnline ? 'Đang kết nối Wi-Fi' : 'Chưa kết nối Wi-Fi'}
+              </span>
             </div>
           </div>
 
@@ -230,10 +230,10 @@ export default function IotDeviceCard({ serialData, onBookMaintenance }: IotDevi
                     1
                   </div>
                   <div className="min-w-0 flex-1">
-                    <h4 className="font-extrabold text-xs text-slate-900 leading-none truncate">
+                    <h4 className="font-extrabold text-xs text-slate-900 leading-none">
                       Lõi 1 (PPC)
                     </h4>
-                    <p className="text-[10px] text-slate-400 mt-1 truncate">Lọc thô cặn bẩn & gỉ sét • 3-6 tháng</p>
+                    <p className="text-[10px] text-slate-400 mt-1">Lọc thô cặn bẩn & gỉ sét</p>
                   </div>
                 </div>
 
@@ -253,9 +253,9 @@ export default function IotDeviceCard({ serialData, onBookMaintenance }: IotDevi
                     style={{ width: `${Math.min(100, Math.max(8, ppcHealth.val))}%` }}
                   ></div>
                 </div>
-                <div className="flex items-center justify-between text-[10px] text-slate-400 font-medium">
-                  <span>Ước tính: {ppcHealth.daysEstimate}</span>
-                  <span>(4/4 vạch)</span>
+                <div className="flex items-center justify-between text-[10px] text-slate-500 font-medium">
+                  <span className="text-slate-600 font-semibold">Chu kỳ: 3 - 6 tháng</span>
+                  <span className="text-slate-400">(4/4 vạch)</span>
                 </div>
               </div>
             </div>
@@ -269,10 +269,10 @@ export default function IotDeviceCard({ serialData, onBookMaintenance }: IotDevi
                   </div>
                   <div className="min-w-0 flex-1">
                     <h4 className="font-extrabold text-xs text-slate-900 leading-none flex items-center gap-1">
-                      <span className="truncate">Lõi 2 (RO)</span>
+                      <span>Lõi 2 (RO)</span>
                       <span className="text-[9px] bg-sky-100 text-[#0284C7] px-1 rounded font-bold shrink-0">Trọng tâm</span>
                     </h4>
-                    <p className="text-[10px] text-slate-400 mt-1 truncate">Màng RO 0.0001µm • 24-36 tháng</p>
+                    <p className="text-[10px] text-slate-400 mt-1">Màng lọc tinh RO 0.0001µm</p>
                   </div>
                 </div>
 
@@ -292,9 +292,9 @@ export default function IotDeviceCard({ serialData, onBookMaintenance }: IotDevi
                     style={{ width: `${Math.min(100, Math.max(8, roHealth.val))}%` }}
                   ></div>
                 </div>
-                <div className="flex items-center justify-between text-[10px] text-slate-400 font-medium">
-                  <span>Ước tính: {roHealth.daysEstimate}</span>
-                  <span>(4/4 vạch)</span>
+                <div className="flex items-center justify-between text-[10px] text-slate-500 font-medium">
+                  <span className="text-slate-600 font-semibold">Chu kỳ: 24 - 36 tháng</span>
+                  <span className="text-slate-400">(4/4 vạch)</span>
                 </div>
               </div>
             </div>
@@ -307,10 +307,10 @@ export default function IotDeviceCard({ serialData, onBookMaintenance }: IotDevi
                     3
                   </div>
                   <div className="min-w-0 flex-1">
-                    <h4 className="font-extrabold text-xs text-slate-900 leading-none truncate">
+                    <h4 className="font-extrabold text-xs text-slate-900 leading-none">
                       Lõi 3 (CTO)
                     </h4>
-                    <p className="text-[10px] text-slate-400 mt-1 truncate">Than hoạt tính gáo dừa • 6-9 tháng</p>
+                    <p className="text-[10px] text-slate-400 mt-1">Khử mùi & vị than gáo dừa</p>
                   </div>
                 </div>
 
@@ -330,9 +330,9 @@ export default function IotDeviceCard({ serialData, onBookMaintenance }: IotDevi
                     style={{ width: `${Math.min(100, Math.max(8, ctoHealth.val))}%` }}
                   ></div>
                 </div>
-                <div className="flex items-center justify-between text-[10px] text-slate-400 font-medium">
-                  <span>Ước tính: {ctoHealth.daysEstimate}</span>
-                  <span>(4/4 vạch)</span>
+                <div className="flex items-center justify-between text-[10px] text-slate-500 font-medium">
+                  <span className="text-slate-600 font-semibold">Chu kỳ: 6 - 9 tháng</span>
+                  <span className="text-slate-400">(4/4 vạch)</span>
                 </div>
               </div>
             </div>
