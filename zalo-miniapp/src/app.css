@@ -1,9 +1,13 @@
 @import "tailwindcss";
 
-/* Ngăn chặn cử chỉ vuốt mép ngang màn hình ngoài ý muốn làm thoát Mini App */
+/* Ngăn chặn cử chỉ vuốt mép ngang màn hình ngoài ý muốn làm thoát Mini App & tối ưu font chữ tiếng Việt */
 html, body {
   overscroll-behavior-x: none;
   touch-action: pan-y pinch-zoom;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
 }
 
 /* ═══════════════════════════════════════════════════════════════

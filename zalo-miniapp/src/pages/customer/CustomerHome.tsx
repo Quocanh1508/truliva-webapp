@@ -361,47 +361,29 @@ export default function CustomerHome({ user, mySerials = [], onOpenScanner, onOp
       <div className="max-w-md mx-auto px-4 mt-4 space-y-3">
         {mySerials.length > 0 ? (
           <div className="space-y-2.5">
-            {/* Header: Tiêu đề + Nút chuyển đổi nhanh hoặc Xem tất cả */}
-            <div className="flex items-center justify-between">
-              <div className="flex items-center space-x-1.5">
-                <div className="p-1 bg-blue-100 text-[#1B3A6B] rounded-md">
-                  <Droplets size={14} />
+            {/* Header: Tiêu đề gọn gàng + Badge số lượng + Nút xem chi tiết (Không bị rớt dòng) */}
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center space-x-2 min-w-0">
+                <div className="p-1.5 bg-sky-100 text-[#1B3A6B] rounded-xl shrink-0">
+                  <Droplets size={15} />
                 </div>
-                <h3 className="font-extrabold text-xs text-slate-800 tracking-tight">
-                  Máy Lọc Nước Của Bạn {mySerials.length > 1 && `(${mySerials.length} máy)`}
+                <h3 className="font-bold text-sm text-slate-900 tracking-tight whitespace-nowrap">
+                  Máy Lọc Nước Của Bạn
                 </h3>
-              </div>
-
-              <div className="flex items-center space-x-2">
                 {mySerials.length > 1 && (
-                  <div className="flex items-center space-x-1 bg-slate-100 p-0.5 rounded-xl border border-slate-200">
-                    <button 
-                      onClick={() => setSelectedDeviceIndex(prev => (prev > 0 ? prev - 1 : mySerials.length - 1))}
-                      className="w-6 h-6 flex items-center justify-center rounded-lg text-slate-600 hover:bg-white hover:text-[#1B3A6B] active:scale-90 transition cursor-pointer"
-                      title="Máy trước"
-                    >
-                      <ChevronLeft size={14} />
-                    </button>
-                    <span className="text-[10px] font-bold text-slate-600 px-1 font-mono">
-                      {(selectedDeviceIndex < mySerials.length ? selectedDeviceIndex : 0) + 1}/{mySerials.length}
-                    </span>
-                    <button 
-                      onClick={() => setSelectedDeviceIndex(prev => (prev < mySerials.length - 1 ? prev + 1 : 0))}
-                      className="w-6 h-6 flex items-center justify-center rounded-lg text-slate-600 hover:bg-white hover:text-[#1B3A6B] active:scale-90 transition cursor-pointer"
-                      title="Máy tiếp theo"
-                    >
-                      <ChevronRight size={14} />
-                    </button>
-                  </div>
+                  <span className="text-[11px] font-bold text-[#0284C7] bg-sky-50 px-2 py-0.5 rounded-full border border-sky-100 shrink-0">
+                    {mySerials.length} máy
+                  </span>
                 )}
-
-                <button 
-                  onClick={() => handleDirectWarranty()}
-                  className="text-[11px] font-bold text-[#0284C7] hover:underline cursor-pointer"
-                >
-                  Xem chi tiết
-                </button>
               </div>
+
+              <button 
+                onClick={() => handleDirectWarranty()}
+                className="text-xs font-semibold text-[#0284C7] hover:text-[#1B3A6B] flex items-center space-x-0.5 shrink-0 whitespace-nowrap cursor-pointer transition active:scale-95"
+              >
+                <span>Xem chi tiết</span>
+                <ChevronRight size={13} />
+              </button>
             </div>
 
             {/* Bộ chọn máy (Horizontal Device Tabs Selector) khi có nhiều máy */}
