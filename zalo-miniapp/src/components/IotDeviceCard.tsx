@@ -370,24 +370,33 @@ export default function IotDeviceCard({ serialData, user, onBookMaintenance }: I
             </div>
           </div>
 
-          {/* ── CỤM NÚT HÀNH ĐỘNG (BẢO HÀNH AUTO-FILL SERIAL & WI-FI) ── */}
+          {/* ── CỤM NÚT HÀNH ĐỘNG (BẢO HÀNH & TIỆN ÍCH MÁY) ── */}
           <div className="pt-2 space-y-2">
-            {/* Nút 1: Kích hoạt bảo hành điện tử (Auto-fill Serial sang Web Warranty) */}
-            <button
-              onClick={handleOpenWarranty}
-              className={`w-full py-3 rounded-2xl font-black text-xs flex items-center justify-center space-x-2 shadow-md active:scale-[0.99] transition-all cursor-pointer ${
-                isActivated
-                  ? 'bg-gradient-to-r from-[#1B3A6B] to-[#2563EB] text-white hover:opacity-95 shadow-blue-900/15'
-                  : 'bg-gradient-to-r from-emerald-600 via-teal-600 to-[#1B3A6B] text-white hover:opacity-95 shadow-emerald-900/20 ring-2 ring-emerald-400/30'
-              }`}
-            >
-              {isActivated ? <FileText size={15} /> : <Sparkles size={15} />}
-              <span>
-                {isActivated 
-                  ? `Xem Chứng Nhận Bảo Hành (${s.serialNumber})` 
-                  : `Kích Hoạt Bảo Hành Điện Tử Máy Này`}
-              </span>
-            </button>
+            {/* Nút Bảo Hành: Kích hoạt bảo hành / Đã kích hoạt bảo hành */}
+            {isActivated ? (
+              <button
+                onClick={handleOpenWarranty}
+                className="w-full py-2.5 px-3 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 rounded-xl text-xs font-bold flex items-center justify-between border border-emerald-200 transition-all cursor-pointer active:scale-[0.99]"
+              >
+                <div className="flex items-center space-x-1.5">
+                  <CheckCircle2 size={15} className="text-emerald-600 shrink-0" />
+                  <span>Đã kích hoạt bảo hành</span>
+                </div>
+                {expiryDateStr && (
+                  <span className="text-[10px] font-semibold text-emerald-700 bg-white/90 px-2 py-0.5 rounded-md border border-emerald-200/60 font-mono">
+                    Hạn: {expiryDateStr}
+                  </span>
+                )}
+              </button>
+            ) : (
+              <button
+                onClick={handleOpenWarranty}
+                className="w-full py-3 bg-gradient-to-r from-[#1B3A6B] to-[#0284C7] hover:from-[#152e55] hover:to-[#0274b3] text-white rounded-xl font-bold text-xs flex items-center justify-center space-x-2 shadow-md shadow-blue-900/15 active:scale-[0.99] transition-all cursor-pointer"
+              >
+                <Sparkles size={15} className="text-[#00D2FF]" />
+                <span>Kích hoạt bảo hành</span>
+              </button>
+            )}
 
             {/* Hàng 2 nút tiện ích: Cài đặt lại Wi-Fi & Yêu cầu KTV */}
             <div className="grid grid-cols-2 gap-2 pt-0.5">
