@@ -85,8 +85,14 @@ export default function IndexPage() {
         const res = await fetchZaloApi('/zalo-miniapp/my-serials');
         if (res.success) setMySerials(res.serials || []);
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
+      if (err?.message?.includes('hết hạn') || err?.message?.includes('không hợp lệ')) {
+        localStorage.removeItem('zalo_session_token');
+        localStorage.removeItem('zalo_user_cache');
+        setUser(null);
+        setMySerials([]);
+      }
     }
   };
 
@@ -208,6 +214,14 @@ export default function IndexPage() {
         })
         .catch(err => {
           console.warn('Profile fetch error:', err);
+          // NẾU TOKEN HẾT HẠN HOẶC KHÔNG HỢP LỆ (401):
+          // Dọn sạch phiên hỏng để không bị kẹt ở trạng thái zombie
+          localStorage.removeItem('zalo_session_token');
+          localStorage.removeItem('zalo_user_cache');
+          setUser(null);
+          setMySerials([]);
+          // Tự động làm mới phiên 1-chạm qua Zalo SDK
+          handle1ClickZaloAuth();
         })
         .finally(() => setLoading(false));
     } else {

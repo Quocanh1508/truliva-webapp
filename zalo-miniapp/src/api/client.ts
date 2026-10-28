@@ -41,6 +41,13 @@ export async function fetchZaloApi(endpoint: string, options: RequestInit = {}) 
     const data = await response.json();
 
     if (!response.ok) {
+      if (response.status === 401) {
+        // Tự động xóa token hỏng hoặc hết hạn để tránh bị kẹt vĩnh viễn ở trạng thái zombie
+        try {
+          localStorage.removeItem('zalo_session_token');
+          localStorage.removeItem('zalo_user_cache');
+        } catch (_) {}
+      }
       throw new Error(data.error || 'Có lỗi xảy ra khi kết nối máy chủ Truliva');
     }
 
