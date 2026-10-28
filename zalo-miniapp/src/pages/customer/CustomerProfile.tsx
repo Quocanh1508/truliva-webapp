@@ -21,6 +21,7 @@ import {
   ShoppingBag,
   Building2,
   FileText,
+  RefreshCw,
   Scale
 } from 'lucide-react';
 import { openWebview, openChat, getUserInfo } from 'zmp-sdk/apis';
@@ -39,6 +40,7 @@ interface CustomerProfileProps {
   mySerials: any[];
   onLogout?: () => void;
   onOpenScanner?: () => void;
+  onRefresh?: () => void;
   onViewMyOrders?: () => void;
 }
 
@@ -47,6 +49,7 @@ export default function CustomerProfile({
   mySerials, 
   onLogout, 
   onOpenScanner,
+  onRefresh,
   onViewMyOrders 
 }: CustomerProfileProps) {
   const [overrideTier, setOverrideTier] = useState<MemberTier | null>(null);
@@ -138,7 +141,11 @@ export default function CustomerProfile({
         });
         if (res && res.success && res.user) {
           setSafeStorage('zalo_user_cache', JSON.stringify(res.user));
-          window.location.reload();
+          if (onRefresh) {
+            onRefresh();
+          } else {
+            window.location.reload();
+          }
         }
       }
     } catch (err: any) {
@@ -288,15 +295,26 @@ export default function CustomerProfile({
                   Quét mã QR trên thân máy hoặc nhập số Serial để theo dõi bảo hành và tuổi thọ lõi lọc tự động.
                 </p>
               </div>
-              {onOpenScanner && (
-                <button
-                  onClick={onOpenScanner}
-                  className="inline-flex items-center space-x-2 px-4 py-2 bg-[#1B3A6B] hover:bg-[#152e55] text-white rounded-xl text-xs font-bold shadow-xs active:scale-95 transition-all cursor-pointer"
-                >
-                  <QrCode size={14} />
-                  <span>Quét mã QR thân máy</span>
-                </button>
-              )}
+              <div className="flex items-center justify-center gap-2 pt-1 flex-wrap">
+                {onOpenScanner && (
+                  <button
+                    onClick={onOpenScanner}
+                    className="inline-flex items-center space-x-1.5 px-3.5 py-2 bg-[#1B3A6B] hover:bg-[#152e55] text-white rounded-xl text-xs font-bold shadow-xs active:scale-95 transition-all cursor-pointer"
+                  >
+                    <QrCode size={13} />
+                    <span>Quét mã QR</span>
+                  </button>
+                )}
+                {onRefresh && (
+                  <button
+                    onClick={onRefresh}
+                    className="inline-flex items-center space-x-1.5 px-3.5 py-2 bg-sky-50 hover:bg-sky-100 text-[#0284C7] rounded-xl text-xs font-bold border border-sky-100 active:scale-95 transition-all cursor-pointer"
+                  >
+                    <RefreshCw size={13} className={syncing ? 'animate-spin' : ''} />
+                    <span>Làm mới danh sách</span>
+                  </button>
+                )}
+              </div>
             </div>
           ) : (
             mySerials.map((s, idx) => (

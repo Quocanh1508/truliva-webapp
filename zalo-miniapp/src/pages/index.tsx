@@ -283,6 +283,9 @@ export default function IndexPage() {
     if (tab === 'shop') {
       setShopSubView('catalog');
     }
+    if ((tab === 'home' || tab === 'profile') && user && mySerials.length === 0) {
+      loadUserContent(user);
+    }
     if (tab !== 'home') {
       try {
         window.history.pushState({ tab, subView: 'catalog' }, '');
@@ -556,6 +559,7 @@ export default function IndexPage() {
                   mySerials={mySerials} 
                   onLogout={handleLogout} 
                   onOpenScanner={handleOpenScanner}
+                  onRefresh={() => loadUserContent(user)}
                   onViewMyOrders={() => {
                     setShopSubView('my_orders');
                     try { window.history.pushState({ tab: 'profile', subView: 'my_orders' }, ''); } catch (_) {}
