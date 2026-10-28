@@ -1,15 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { 
   ShieldCheck, 
-  Clock, 
-  PhoneCall, 
   Phone,
-  MapPin, 
   AlertTriangle,
   RefreshCw,
-  FileText,
   User,
-  LogIn,
   QrCode
 } from 'lucide-react';
 import { getPhoneNumber, getUserInfo, getAccessToken, scanQRCode } from 'zmp-sdk/apis';
@@ -31,7 +26,6 @@ export default function IndexPage() {
   const [loading, setLoading] = useState(true);
   const [user, setUser] = useState<any>(null);
   const [mySerials, setMySerials] = useState<any[]>([]);
-  const [ktvOrders, setKtvOrders] = useState<any[]>([]);
   const [error, setError] = useState<string | null>(null);
 
   // Tab State: 'home' | 'shop' | 'chat' | 'profile'
@@ -46,7 +40,6 @@ export default function IndexPage() {
 
   // Dev simulation state
   const [testPhone, setTestPhone] = useState('0915185982');
-  const [ktvViewMode, setKtvViewMode] = useState<'ktv' | 'customer'>('customer');
 
   const { addToCart } = useCart();
 
@@ -77,20 +70,12 @@ export default function IndexPage() {
     }
   };
 
-  const loadUserContent = async (currentUser: any) => {
+  const loadUserContent = async (_currentUser?: any) => {
     try {
-      // Tải song song cả danh sách máy của khách và ca dịch vụ KTV (nếu có)
-      const isKtvUser = currentUser?.role === 'KTV';
-      const [ktvRes, serialRes] = await Promise.allSettled([
-        isKtvUser ? fetchZaloApi('/zalo-miniapp/ktv-orders') : Promise.resolve({ success: false, orders: [] }),
-        fetchZaloApi('/zalo-miniapp/my-serials')
-      ]);
-
-      if (ktvRes.status === 'fulfilled' && ktvRes.value && (ktvRes.value as any).success) {
-        setKtvOrders((ktvRes.value as any).orders || []);
-      }
-      if (serialRes.status === 'fulfilled' && serialRes.value && (serialRes.value as any).success) {
-        setMySerials((serialRes.value as any).serials || []);
+      // Zalo Mini App phục vụ 100% Khách Hàng -> Luôn tải danh sách máy lọc nước
+      const res = await fetchZaloApi('/zalo-miniapp/my-serials');
+      if (res && res.success) {
+        setMySerials(res.serials || []);
       }
     } catch (err: any) {
       console.error(err);
@@ -173,7 +158,6 @@ export default function IndexPage() {
     localStorage.removeItem('zalo_user_cache');
     setUser(null);
     setMySerials([]);
-    setKtvOrders([]);
     setActiveTab('home');
     setShopSubView('catalog');
   };
@@ -421,102 +405,9 @@ export default function IndexPage() {
         </div>
       )}
 
-      {/* Đã đăng nhập - Role KTV (Chế độ ca làm việc) */}
-      {!loading && user && user.role === 'KTV' && ktvViewMode === 'ktv' && (
-        <div className="p-4 pb-20 space-y-4">
-          <div className="bg-[#1B3A6B] text-white p-4 rounded-2xl shadow-md space-y-3">
-            <div className="flex justify-between items-center">
-              <div>
-                <span className="bg-[#0284C7] text-white text-[10px] uppercase font-bold px-2 py-0.5 rounded-full">
-                  Kỹ Thuật Viên
-                </span>
-                <h2 className="font-bold text-sm mt-1">{user.fullName}</h2>
-                <p className="text-[11px] text-sky-200">Trạm: {user.techStation?.name || 'Truliva'}</p>
-              </div>
-              <button 
-                onClick={handleLogout}
-                className="p-2 bg-white/10 hover:bg-white/20 rounded-xl text-white text-xs cursor-pointer"
-              >
-                Đăng xuất
-              </button>
-            </div>
-
-            {/* Nút chuyển đổi nhanh sang giao diện Khách hàng & Máy IoT */}
-            <button
-              onClick={() => setKtvViewMode('customer')}
-              className="w-full py-2.5 bg-gradient-to-r from-sky-400 to-[#00D2FF] text-[#0B2545] rounded-xl text-xs font-black flex items-center justify-center space-x-1.5 shadow-sm active:scale-95 transition-all cursor-pointer"
-            >
-              <Droplets size={14} />
-              <span>Chuyển Sang Giao Diện Khách Hàng ({mySerials.length} máy)</span>
-            </button>
-          </div>
-
-          <h2 className="text-xs font-bold text-slate-700 uppercase tracking-wider">
-            Ca dịch vụ được gán ({ktvOrders.length})
-          </h2>
-
-          {ktvOrders.length === 0 ? (
-            <div className="bg-white p-6 rounded-2xl text-center text-xs text-slate-400 border border-slate-200">
-              Bạn hiện tại không có ca dịch vụ nào chờ xử lý.
-            </div>
-          ) : (
-            ktvOrders.map((order) => (
-              <div key={order.id} className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm space-y-3">
-                <div className="flex justify-between items-start">
-                  <div>
-                    <span className="bg-sky-100 text-sky-800 px-2 py-0.5 rounded text-[10px] font-bold">
-                      {order.code || 'Đơn hàng'}
-                    </span>
-                    <h3 className="font-bold text-slate-900 text-sm mt-1">{order.customerName}</h3>
-                  </div>
-                  <a
-                    href={`tel:${order.customerPhone}`}
-                    className="p-2 bg-sky-50 text-[#0284C7] rounded-xl hover:bg-sky-100 transition-colors"
-                  >
-                    <PhoneCall size={18} />
-                  </a>
-                </div>
-
-                <div className="text-xs space-y-1 text-slate-600 border-t pt-2 border-slate-100">
-                  <p className="flex items-center text-slate-700">
-                    <MapPin size={14} className="mr-1.5 text-slate-400 flex-shrink-0" />
-                    {order.customerAddress || 'Chưa có địa chỉ'}
-                  </p>
-                  <p className="flex items-center text-slate-500 text-[11px]">
-                    <Clock size={14} className="mr-1.5 text-slate-400 flex-shrink-0" />
-                    Hẹn lúc: {order.scheduledDate ? new Date(order.scheduledDate).toLocaleString('vi-VN') : 'Hôm nay'}
-                  </p>
-                </div>
-
-                <button className="w-full py-2.5 bg-[#1B3A6B] hover:bg-[#2563EB] text-white rounded-xl text-xs font-bold flex items-center justify-center space-x-1.5 shadow-sm transition-colors cursor-pointer">
-                  <FileText size={14} />
-                  <span>Nộp báo cáo ca KTV</span>
-                </button>
-              </div>
-            ))
-          )}
-        </div>
-      )}
-
-      {/* Đã đăng nhập - Role Khách Hàng (Hoặc KTV chuyển sang chế độ Khách Hàng) */}
-      {!loading && user && (user.role !== 'KTV' || ktvViewMode === 'customer') && (
+      {/* Đã đăng nhập - Toàn bộ người dùng đều vào giao diện Khách Hàng (Customer) */}
+      {!loading && user && (
         <>
-          {/* Banner chuyển về ca làm việc dành cho KTV */}
-          {user.role === 'KTV' && (
-            <div className="bg-[#0B2545] text-white px-4 py-2 flex items-center justify-between text-xs sticky top-0 z-40 shadow-sm border-b border-sky-400/20">
-              <div className="flex items-center space-x-1.5">
-                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-                <span className="text-[11px] text-sky-200">Chế độ Khách hàng</span>
-              </div>
-              <button
-                onClick={() => setKtvViewMode('ktv')}
-                className="px-2.5 py-1 bg-[#0284C7] hover:bg-[#00D2FF] hover:text-[#061226] text-white rounded-lg text-[11px] font-bold transition-all cursor-pointer flex items-center gap-1"
-              >
-                <span>Về ca KTV ({ktvOrders.length})</span>
-                <ChevronRight size={12} />
-              </button>
-            </div>
-          )}
           {/* TAB 1: Trang Chủ */}
           {activeTab === 'home' && (
             <CustomerHome 
@@ -619,8 +510,8 @@ export default function IndexPage() {
         </>
       )}
 
-      {/* Bottom Navigation Bar: Chỉ hiển thị ở các tab chính, ẩn khi vào Giỏ hàng, Chi tiết, Thanh toán hoặc đang ở ca KTV */}
-      {!loading && user && !(user.role === 'KTV' && ktvViewMode === 'ktv') && !(
+      {/* Bottom Navigation Bar: Luôn hiển thị cho toàn bộ khách hàng ở các tab chính */}
+      {!loading && user && !(
         (activeTab === 'shop' && shopSubView !== 'catalog') ||
         (activeTab === 'profile' && shopSubView === 'my_orders')
       ) && (
