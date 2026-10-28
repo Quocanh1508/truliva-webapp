@@ -109,6 +109,24 @@ export default function CustomerHome({ user, mySerials = [], onOpenScanner, onOp
   // Quản lý máy lọc nước đang chọn xem (hỗ trợ nhiều máy)
   const [selectedDeviceIndex, setSelectedDeviceIndex] = useState(0);
 
+  // Mở trang Web Bảo hành Truliva (Auto-fill Serial, Phone, Tên của khách hàng)
+  const handleDirectWarranty = (targetSerial?: string) => {
+    const activeIdx = selectedDeviceIndex < mySerials.length ? selectedDeviceIndex : 0;
+    const currentDevice = mySerials[activeIdx];
+    const sn = targetSerial || currentDevice?.serialNumber || '';
+    const phone = user?.phoneNumber || currentDevice?.customerPhone || '';
+    const name = user?.fullName || currentDevice?.customerName || '';
+    const url = sn 
+      ? `https://trulivaofficial.com/warranty-activate?serial=${encodeURIComponent(sn)}&phone=${encodeURIComponent(phone)}&name=${encodeURIComponent(name)}`
+      : 'https://trulivaofficial.com/warranty-activate';
+
+    try {
+      openWebview({ url });
+    } catch {
+      window.open(url, '_blank');
+    }
+  };
+
   // Đóng bài viết hoặc modal khi vuốt mép màn hình (Edge Swipe Back) thay vì thoát app
   React.useEffect(() => {
     const isAnyOpen = Boolean(selectedArticle || showLegalModal || showWheelModal);
@@ -243,9 +261,9 @@ export default function CustomerHome({ user, mySerials = [], onOpenScanner, onOp
             </span>
           </button>
 
-          {/* Tích điểm hoặc Bảo hành */}
+          {/* Tích điểm hoặc Bảo hành (Mở thẳng Web Warranty với Serial Auto-fill) */}
           <button 
-            onClick={onOpenWarranty}
+            onClick={() => handleDirectWarranty()}
             className="flex flex-col items-center justify-center space-y-1.5 p-2 rounded-2xl hover:bg-sky-50/80 active:scale-95 transition-all cursor-pointer group"
           >
             <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-amber-50 to-orange-100/80 text-amber-600 flex items-center justify-center border border-amber-200/60 shadow-xs group-hover:scale-105 transition-all">
@@ -378,7 +396,7 @@ export default function CustomerHome({ user, mySerials = [], onOpenScanner, onOp
                 )}
 
                 <button 
-                  onClick={onOpenWarranty}
+                  onClick={() => handleDirectWarranty()}
                   className="text-[11px] font-bold text-[#0284C7] hover:underline cursor-pointer"
                 >
                   Xem chi tiết
@@ -428,8 +446,9 @@ export default function CustomerHome({ user, mySerials = [], onOpenScanner, onOp
               return (
                 <IotDeviceCard 
                   key={currentDevice?.serialNumber || activeIdx}
-                  serialData={currentDevice} 
-                  onBookMaintenance={onOpenWarranty} 
+                  serialData={currentDevice}
+                  user={user}
+                  onBookMaintenance={handleDirectWarranty} 
                 />
               );
             })()}
@@ -446,7 +465,7 @@ export default function CustomerHome({ user, mySerials = [], onOpenScanner, onOp
               </div>
             </div>
             <button 
-              onClick={onOpenScanner}
+              onClick={() => handleDirectWarranty()}
               className="shrink-0 w-14 h-16 rounded-2xl bg-gradient-to-b from-[#1B3A6B] to-[#0284C7] hover:from-[#0284C7] hover:to-[#00D2FF] text-white flex flex-col items-center justify-center text-center shadow-md shadow-blue-900/15 border border-sky-300/30 active:scale-95 transition-all cursor-pointer"
             >
               <span className="text-[11px] font-black tracking-wider uppercase leading-tight">QUÉT</span>

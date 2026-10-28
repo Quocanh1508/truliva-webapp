@@ -314,7 +314,8 @@ export default function CustomerProfile({
                   </div>
                 )}
                 <IotDeviceCard 
-                  serialData={s} 
+                  serialData={s}
+                  user={user}
                   onBookMaintenance={handleBookMaintenance} 
                 />
               </div>

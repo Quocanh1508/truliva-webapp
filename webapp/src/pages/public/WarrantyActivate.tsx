@@ -377,14 +377,16 @@ interface SerialValidation {
 export default function WarrantyActivate() {
   const [searchParams] = useSearchParams();
   const serialFromUrl = searchParams.get('serial') || '';
+  const phoneFromUrl = searchParams.get('phone') || '';
+  const nameFromUrl = searchParams.get('name') || '';
 
   // Step tracking: 0 = Landing, 1 = Enter Details & Invoice, 2 = Check/Confirm Details, 3 = Success
   const [step, setStep] = useState(serialFromUrl ? 1 : 0);
 
   // Form states
   const [serialInput, setSerialInput] = useState(formatSerialNumber(serialFromUrl));
-  const [customerName, setCustomerName] = useState('');
-  const [customerPhone, setCustomerPhone] = useState('');
+  const [customerName, setCustomerName] = useState(nameFromUrl);
+  const [customerPhone, setCustomerPhone] = useState(phoneFromUrl);
   const [address, setAddress] = useState('');
   const [province, setProvince] = useState('');
   const [invoiceImageUrl, setInvoiceImageUrl] = useState('');
@@ -615,13 +617,19 @@ export default function WarrantyActivate() {
     }
   };
 
-  // Auto-fill serial if provided in URL
+  // Auto-fill serial, phone, name if provided in URL
   useEffect(() => {
     if (serialFromUrl) {
       setSerialInput(formatSerialNumber(serialFromUrl));
       setStep(1);
     }
-  }, [serialFromUrl]);
+    if (phoneFromUrl) {
+      setCustomerPhone(phoneFromUrl);
+    }
+    if (nameFromUrl) {
+      setCustomerName(nameFromUrl);
+    }
+  }, [serialFromUrl, phoneFromUrl, nameFromUrl]);
 
   // Validate serial when input reaches at least 10 chars (without prefilling any personal data)
   useEffect(() => {

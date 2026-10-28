@@ -17,14 +17,15 @@ import {
   RefreshCw,
   AlertCircle
 } from 'lucide-react';
-import { openPhone } from 'zmp-sdk/apis';
+import { openPhone, openWebview } from 'zmp-sdk/apis';
 
 interface IotDeviceCardProps {
   serialData: any;
+  user?: any;
   onBookMaintenance?: (serialNumber: string) => void;
 }
 
-export default function IotDeviceCard({ serialData, onBookMaintenance }: IotDeviceCardProps) {
+export default function IotDeviceCard({ serialData, user, onBookMaintenance }: IotDeviceCardProps) {
   const [activeSubTab, setActiveSubTab] = useState<'device' | 'wifi'>('device');
   const [copied, setCopied] = useState(false);
   const [showConfigModal, setShowConfigModal] = useState(false);
@@ -48,6 +49,26 @@ export default function IotDeviceCard({ serialData, onBookMaintenance }: IotDevi
       window.location.href = 'tel:1900638463';
     }
   };
+
+  // Mở trang Web Bảo hành Truliva với Serial được Auto-Fill tự động
+  const handleOpenWarranty = async () => {
+    const sn = s?.serialNumber || '';
+    const phone = user?.phoneNumber || s?.customerPhone || '';
+    const name = user?.fullName || s?.customerName || '';
+    const url = sn
+      ? `https://trulivaofficial.com/warranty-activate?serial=${encodeURIComponent(sn)}&phone=${encodeURIComponent(phone)}&name=${encodeURIComponent(name)}`
+      : 'https://trulivaofficial.com/warranty-activate';
+
+    try {
+      await openWebview({ url });
+    } catch {
+      window.open(url, '_blank');
+    }
+  };
+
+  // Kiểm tra trạng thái kích hoạt bảo hành của thiết bị
+  const isActivated = s?.status === 'Đã kích hoạt' || s?.status === 'KH xác nhận' || Boolean(s?.activationDate);
+  const expiryDateStr = s?.warrantyExpiryDate ? new Date(s.warrantyExpiryDate).toLocaleDateString('vi-VN') : null;
 
   // Helper tính màu trạng thái lõi lọc
   const getFilterHealth = (pct: number | null | undefined, isReplace?: boolean) => {
@@ -146,9 +167,19 @@ export default function IotDeviceCard({ serialData, onBookMaintenance }: IotDevi
           {/* Header định danh thiết bị - Hiển thị đầy đủ tên máy & số serial */}
           <div className="space-y-1.5">
             <div className="flex items-center justify-between gap-2">
-              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
-                Máy lọc nước của tôi
-              </span>
+              <div className="flex items-center space-x-1.5 flex-wrap gap-y-1">
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                  Máy lọc nước của tôi
+                </span>
+                <span className={`text-[9px] font-bold px-2 py-0.5 rounded-full border whitespace-nowrap flex items-center space-x-1 ${
+                  isActivated 
+                    ? 'bg-emerald-50 text-emerald-700 border-emerald-200' 
+                    : 'bg-amber-50 text-amber-700 border-amber-200'
+                }`}>
+                  <ShieldCheck size={11} className={isActivated ? 'text-emerald-600' : 'text-amber-600'} />
+                  <span>{isActivated ? (expiryDateStr ? `Hạn BH: ${expiryDateStr}` : 'Đã kích hoạt BH') : 'Chưa kích hoạt BH'}</span>
+                </span>
+              </div>
 
               {/* Box Serial gọn gàng bên phải */}
               <div className="shrink-0 flex items-center space-x-1.5 font-mono text-[11px] font-semibold text-slate-600 bg-slate-100 px-2.5 py-1 rounded-xl border border-slate-200">
@@ -338,26 +369,43 @@ export default function IotDeviceCard({ serialData, onBookMaintenance }: IotDevi
             </div>
           </div>
 
-          {/* ── CỤM NÚT HÀNH ĐỘNG (CHUẨN THEO ẢNH USER) ── */}
+          {/* ── CỤM NÚT HÀNH ĐỘNG (BẢO HÀNH AUTO-FILL SERIAL & WI-FI) ── */}
           <div className="pt-2 space-y-2">
-            {/* Nút Cài đặt lại Wi-Fi màu đen phong cách Smart App */}
+            {/* Nút 1: Kích hoạt bảo hành điện tử (Auto-fill Serial sang Web Warranty) */}
             <button
-              onClick={() => setActiveSubTab('wifi')}
-              className="w-full py-3 bg-[#0F172A] hover:bg-[#1E293B] text-white rounded-2xl font-black text-xs flex items-center justify-center space-x-2 shadow-md active:scale-[0.99] transition-all cursor-pointer"
+              onClick={handleOpenWarranty}
+              className={`w-full py-3 rounded-2xl font-black text-xs flex items-center justify-center space-x-2 shadow-md active:scale-[0.99] transition-all cursor-pointer ${
+                isActivated
+                  ? 'bg-gradient-to-r from-[#1B3A6B] to-[#2563EB] text-white hover:opacity-95 shadow-blue-900/15'
+                  : 'bg-gradient-to-r from-emerald-600 via-teal-600 to-[#1B3A6B] text-white hover:opacity-95 shadow-emerald-900/20 ring-2 ring-emerald-400/30'
+              }`}
             >
-              <Settings size={15} />
-              <span>Cài đặt lại Wi-Fi</span>
+              <ShieldCheck size={16} />
+              <span>
+                {isActivated 
+                  ? `Xem Chứng Nhận Bảo Hành (${s.serialNumber})` 
+                  : `Kích Hoạt Bảo Hành Điện Tử Máy Này`}
+              </span>
             </button>
 
-            {onBookMaintenance && (
+            {/* Hàng 2 nút tiện ích: Cài đặt lại Wi-Fi & Yêu cầu KTV */}
+            <div className="grid grid-cols-2 gap-2 pt-0.5">
               <button
-                onClick={() => onBookMaintenance(s.serialNumber)}
-                className="w-full py-2.5 bg-sky-50 hover:bg-sky-100 text-[#0284C7] rounded-xl text-xs font-bold flex items-center justify-center space-x-1.5 transition-colors cursor-pointer border border-sky-100"
+                onClick={() => setActiveSubTab('wifi')}
+                className="py-2.5 bg-[#0F172A] hover:bg-[#1E293B] text-white rounded-xl font-bold text-xs flex items-center justify-center space-x-1.5 transition-all cursor-pointer shadow-xs active:scale-95"
+              >
+                <Settings size={13} />
+                <span>Cài đặt lại Wi-Fi</span>
+              </button>
+
+              <button
+                onClick={handleCallHotline}
+                className="py-2.5 bg-sky-50 hover:bg-sky-100 text-[#0284C7] rounded-xl text-xs font-bold flex items-center justify-center space-x-1.5 transition-all cursor-pointer border border-sky-100 active:scale-95"
               >
                 <Wrench size={13} />
-                <span>Yêu cầu KTV bảo trì / Thay lõi</span>
+                <span>Yêu cầu KTV</span>
               </button>
-            )}
+            </div>
           </div>
         </div>
       )}
