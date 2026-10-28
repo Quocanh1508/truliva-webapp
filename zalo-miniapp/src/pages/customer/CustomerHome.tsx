@@ -23,7 +23,8 @@ import {
   RotateCcw,
   Scale,
   Droplets,
-  BookOpen
+  BookOpen,
+  FileText
 } from 'lucide-react';
 import LuckyWheelModal from '../../components/LuckyWheelModal';
 import NewsDetailModal from '../../components/NewsDetailModal';
@@ -266,11 +267,11 @@ export default function CustomerHome({ user, mySerials = [], onOpenScanner, onOp
             onClick={() => handleDirectWarranty()}
             className="flex flex-col items-center justify-center space-y-1.5 p-2 rounded-2xl hover:bg-sky-50/80 active:scale-95 transition-all cursor-pointer group"
           >
-            <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-amber-50 to-orange-100/80 text-amber-600 flex items-center justify-center border border-amber-200/60 shadow-xs group-hover:scale-105 transition-all">
+            <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-sky-50 to-blue-100/80 text-[#1B3A6B] flex items-center justify-center border border-blue-200/60 shadow-xs group-hover:scale-105 transition-all">
               {FEATURES.ENABLE_MEMBER_RANKING ? (
                 <Star size={22} className="text-amber-500 fill-amber-200" />
               ) : (
-                <ShieldCheck size={22} className="text-amber-600" />
+                <FileText size={22} className="text-[#1B3A6B]" />
               )}
             </div>
             <span className="text-[11px] font-bold text-slate-700 tracking-tight whitespace-nowrap">
@@ -479,7 +480,7 @@ export default function CustomerHome({ user, mySerials = [], onOpenScanner, onOp
       <div className="max-w-md mx-auto px-4 mt-4">
         <div className="bg-sky-50/80 border border-sky-100/90 rounded-2xl py-2.5 px-3 flex items-center justify-between text-[10px] text-slate-600 font-semibold">
           <div className="flex items-center space-x-1">
-            <ShieldCheck size={13} className="text-[#0284C7]" />
+            <CheckCircle2 size={13} className="text-[#0284C7]" />
             <span>Chính hãng 100%</span>
           </div>
           <span className="text-slate-300">•</span>

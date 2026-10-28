@@ -8,14 +8,15 @@ import {
   Clock, 
   Wrench,
   Settings,
-  ShieldCheck,
   Layers,
   Radio,
   Smartphone,
   Info,
   Phone,
   RefreshCw,
-  AlertCircle
+  FileText,
+  Sparkles,
+  CheckCircle2
 } from 'lucide-react';
 import { openPhone, openWebview } from 'zmp-sdk/apis';
 
@@ -171,13 +172,13 @@ export default function IotDeviceCard({ serialData, user, onBookMaintenance }: I
                 <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
                   Máy lọc nước của tôi
                 </span>
-                <span className={`text-[9px] font-bold px-2 py-0.5 rounded-full border whitespace-nowrap flex items-center space-x-1 ${
+                <span className={`text-[9px] font-bold px-2 py-0.5 rounded-full border whitespace-nowrap flex items-center space-x-1.5 ${
                   isActivated 
                     ? 'bg-emerald-50 text-emerald-700 border-emerald-200' 
-                    : 'bg-amber-50 text-amber-700 border-amber-200'
+                    : 'bg-slate-100 text-slate-600 border-slate-200'
                 }`}>
-                  <ShieldCheck size={11} className={isActivated ? 'text-emerald-600' : 'text-amber-600'} />
-                  <span>{isActivated ? (expiryDateStr ? `Hạn BH: ${expiryDateStr}` : 'Đã kích hoạt BH') : 'Chưa kích hoạt BH'}</span>
+                  <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${isActivated ? 'bg-emerald-500' : 'bg-slate-400'}`}></span>
+                  <span>{isActivated ? (expiryDateStr ? `Hạn BH: ${expiryDateStr}` : 'Đã kích hoạt bảo hành') : 'Chưa kích hoạt bảo hành'}</span>
                 </span>
               </div>
 
@@ -380,7 +381,7 @@ export default function IotDeviceCard({ serialData, user, onBookMaintenance }: I
                   : 'bg-gradient-to-r from-emerald-600 via-teal-600 to-[#1B3A6B] text-white hover:opacity-95 shadow-emerald-900/20 ring-2 ring-emerald-400/30'
               }`}
             >
-              <ShieldCheck size={16} />
+              {isActivated ? <FileText size={15} /> : <Sparkles size={15} />}
               <span>
                 {isActivated 
                   ? `Xem Chứng Nhận Bảo Hành (${s.serialNumber})` 
@@ -479,13 +480,13 @@ export default function IotDeviceCard({ serialData, user, onBookMaintenance }: I
             </div>
           </div>
 
-          {/* Alert nhắc nhở băng tần 2.4GHz */}
-          <div className="p-3 bg-amber-50 border border-amber-200/80 rounded-2xl text-xs text-amber-900 flex items-start space-x-2.5">
-            <AlertCircle size={18} className="text-amber-600 shrink-0 mt-0.5" />
+          {/* Hộp lưu ý băng tần 2.4GHz */}
+          <div className="p-3 bg-sky-50/70 border border-sky-100 rounded-2xl text-xs text-slate-700 flex items-start space-x-2.5">
+            <Info size={16} className="text-[#0284C7] shrink-0 mt-0.5" />
             <div className="space-y-0.5">
-              <p className="font-bold text-[11px]">Yêu cầu mạng Wi-Fi gia đình:</p>
-              <p className="text-[11px] text-amber-800 leading-relaxed">
-                Máy lọc nước Truliva chỉ kết nối với mạng <strong>Wi-Fi 2.4GHz</strong>. Vui lòng không chọn Wi-Fi 5GHz khi cấu hình lại mạng.
+              <p className="font-bold text-[11px] text-[#1B3A6B]">Lưu ý mạng Wi-Fi gia đình:</p>
+              <p className="text-[11px] text-slate-600 leading-relaxed">
+                Máy lọc nước Truliva kết nối qua băng tần <strong>Wi-Fi 2.4GHz</strong>. Vui lòng chọn đúng mạng 2.4GHz khi cấu hình lại mạng.
               </p>
             </div>
           </div>
