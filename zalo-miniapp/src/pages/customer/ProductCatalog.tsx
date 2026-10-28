@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { 
   Search, 
-  Sparkles, 
   ShieldCheck, 
   ShoppingCart, 
   Plus, 
@@ -18,6 +17,7 @@ import {
 import { fetchZaloApi } from '../../api/client';
 import { useCart } from '../../context/CartContext';
 import LegalPagesModal, { LegalDocType } from '../../components/LegalPagesModal';
+import P3ROceanHeader from '../../components/P3ROceanHeader';
 import { FEATURES } from '../../config/features';
 
 interface ProductCatalogProps {
@@ -82,69 +82,71 @@ export default function ProductCatalog({ onSelectProduct, onGoToCart }: ProductC
 
   return (
     <div className="min-h-screen bg-[#F8FAFC] pb-24 font-sans text-gray-800 animate-fade-in">
-      {/* Top Banner Header */}
-      <div className="bg-gradient-to-br from-[#1B3A6B] via-[#152e55] to-[#0B1E36] text-white pt-6 pb-6 px-4 relative overflow-hidden rounded-b-3xl shadow-md">
-        <div className="absolute top-0 right-0 w-64 h-64 bg-[#00A3FF]/10 rounded-full blur-2xl -mr-16 -mt-16 pointer-events-none"></div>
-        
-        <div className="relative z-10 flex items-center justify-between mb-3">
-          <div>
-            <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-white/10 text-cyan-300 text-[11px] font-semibold backdrop-blur-xs mb-1">
-              <Sparkles className="w-3 h-3" />
-              <span>{FEATURES.ENABLE_ECOMMERCE ? 'Gian hàng chính hãng Truliva' : 'Thiết bị & Hướng dẫn sử dụng'}</span>
+      {/* Top Banner Header with Persona 3 Reload Ocean Waves */}
+      <P3ROceanHeader className="p-5 pt-6 pb-6">
+        <div className="max-w-md mx-auto space-y-3">
+          <div className="flex items-center justify-between gap-3">
+            <div className="min-w-0">
+              <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-white/10 text-cyan-300 text-[10px] font-bold border border-white/15 backdrop-blur-xs mb-1.5">
+                <span className="w-1.5 h-1.5 rounded-full bg-[#00D2FF]"></span>
+                <span className="truncate">{FEATURES.ENABLE_ECOMMERCE ? 'Gian hàng chính hãng Truliva' : 'Thiết bị & Hướng dẫn sử dụng'}</span>
+              </div>
+              <h1 className="text-lg sm:text-xl font-black text-white tracking-tight leading-snug">
+                {FEATURES.ENABLE_ECOMMERCE ? 'Cửa Hàng Máy Lọc Nước' : 'Máy Lọc Nước Truliva'}
+              </h1>
             </div>
-            <h1 className="text-xl font-extrabold text-white tracking-tight">
-              {FEATURES.ENABLE_ECOMMERCE ? 'Cửa Hàng Máy Lọc Nước' : 'Máy Lọc Nước Truliva'}
-            </h1>
+
+            {/* Cart Icon Badge (chỉ hiện khi bật Ecommerce) */}
+            {FEATURES.ENABLE_ECOMMERCE ? (
+              <button 
+                onClick={onGoToCart}
+                className="relative w-11 h-11 rounded-2xl bg-white/10 border border-white/15 flex items-center justify-center text-white backdrop-blur-md active:scale-95 transition cursor-pointer shrink-0"
+              >
+                <ShoppingCart className="w-5 h-5" />
+                {totalItemsCount > 0 && (
+                  <span className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-rose-500 text-white text-[11px] font-bold flex items-center justify-center shadow-xs border border-white">
+                    {totalItemsCount > 99 ? '99+' : totalItemsCount}
+                  </span>
+                )}
+              </button>
+            ) : (
+              <div className="w-10 h-10 rounded-2xl bg-white/10 border border-white/15 flex items-center justify-center text-cyan-300 backdrop-blur-md shrink-0">
+                <BookOpen className="w-5 h-5" />
+              </div>
+            )}
           </div>
 
-          {/* Cart Icon Badge (chỉ hiện khi bật Ecommerce) */}
-          {FEATURES.ENABLE_ECOMMERCE ? (
-            <button 
-              onClick={onGoToCart}
-              className="relative w-11 h-11 rounded-2xl bg-white/10 border border-white/15 flex items-center justify-center text-white backdrop-blur-md active:scale-95 transition cursor-pointer"
-            >
-              <ShoppingCart className="w-5 h-5" />
-              {totalItemsCount > 0 && (
-                <span className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-rose-500 text-white text-[11px] font-bold flex items-center justify-center shadow-xs border border-white">
-                  {totalItemsCount > 99 ? '99+' : totalItemsCount}
-                </span>
-              )}
-            </button>
-          ) : (
-            <div className="w-11 h-11 rounded-2xl bg-white/10 border border-white/15 flex items-center justify-center text-cyan-300 backdrop-blur-md">
-              <BookOpen className="w-5 h-5" />
+          {/* Search Input Bar */}
+          <form onSubmit={handleSearchSubmit} className="relative">
+            <input
+              type="text"
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              placeholder={FEATURES.ENABLE_ECOMMERCE ? 'Tìm kiếm máy lọc nước, lõi lọc, phụ kiện...' : 'Tìm kiếm dòng máy lọc nước, model...'}
+              className="w-full h-10 pl-9 pr-4 rounded-xl bg-white text-slate-800 placeholder-slate-400 text-xs shadow-xs focus:outline-none focus:ring-2 focus:ring-[#00D2FF]"
+            />
+            <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+          </form>
+
+          {/* Trust Badges Strip (1 Hàng ngang ngăn nắp, không bị rớt dòng) */}
+          <div className="flex items-center justify-between text-[11px] text-sky-200/90 pt-2 border-t border-white/10 font-medium whitespace-nowrap">
+            <div className="flex items-center gap-1">
+              <Truck size={13} className="text-cyan-300" />
+              <span>Miễn phí giao lắp</span>
             </div>
-          )}
-        </div>
-
-        {/* Search Input Bar */}
-        <form onSubmit={handleSearchSubmit} className="relative mt-2">
-          <input
-            type="text"
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-            placeholder={FEATURES.ENABLE_ECOMMERCE ? 'Tìm kiếm máy lọc nước, lõi lọc, phụ kiện...' : 'Tìm kiếm dòng máy lọc nước, model...'}
-            className="w-full h-11 pl-10 pr-4 rounded-xl bg-white text-gray-900 placeholder-gray-400 text-sm shadow-inner focus:outline-none focus:ring-2 focus:ring-[#00A3FF]"
-          />
-          <Search className="w-4 h-4 text-gray-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
-        </form>
-
-        {/* Trust Badges Strip */}
-        <div className="grid grid-cols-3 gap-2 mt-4 pt-3 border-t border-white/10 text-[11px] text-blue-100">
-          <div className="flex items-center gap-1.5 justify-center">
-            <Truck className="w-3.5 h-3.5 text-cyan-300 shrink-0" />
-            <span>Miễn phí giao lắp</span>
-          </div>
-          <div className="flex items-center gap-1.5 justify-center">
-            <Award className="w-3.5 h-3.5 text-amber-300 shrink-0" />
-            <span>Bảo hành 1-2 năm</span>
-          </div>
-          <div className="flex items-center gap-1.5 justify-center">
-            <RotateCcw className="w-3.5 h-3.5 text-emerald-300 shrink-0" />
-            <span>Đổi mới 7 ngày</span>
+            <span className="text-white/20">•</span>
+            <div className="flex items-center gap-1">
+              <Award size={13} className="text-amber-300" />
+              <span>Bảo hành 1-2 năm</span>
+            </div>
+            <span className="text-white/20">•</span>
+            <div className="flex items-center gap-1">
+              <RotateCcw size={13} className="text-emerald-300" />
+              <span>Đổi mới 7 ngày</span>
+            </div>
           </div>
         </div>
-      </div>
+      </P3ROceanHeader>
 
       {/* Category Tabs (Chỉ hiển thị khi bật bán hàng, hoặc chỉ hiện tab Máy lọc nước) */}
       {FEATURES.ENABLE_ECOMMERCE && (
@@ -236,56 +238,51 @@ export default function ProductCatalog({ onSelectProduct, onGoToCart }: ProductC
                   {/* Info Box */}
                   <div className="p-3 flex-1 flex flex-col justify-between">
                     <div>
-                      <div className="text-[10px] text-gray-400 font-bold uppercase tracking-wider mb-0.5">
+                      <div className="text-[10px] text-slate-400 font-mono font-bold uppercase tracking-wider mb-0.5">
                         {product.sku}
                       </div>
-                      <h3 className="font-bold text-gray-900 text-xs line-clamp-2 leading-snug mb-2 min-h-[32px]">
+                      <h3 className="font-bold text-slate-900 text-xs line-clamp-2 leading-snug min-h-[32px]">
                         {product.name}
                       </h3>
                     </div>
 
                     {/* Pricing and Action */}
-                    <div className="pt-2 border-t border-gray-50 flex items-center justify-between gap-1">
-                      <div>
-                        {FEATURES.ENABLE_ECOMMERCE ? (
-                          <>
+                    <div className="mt-2 pt-2 border-t border-slate-100">
+                      {FEATURES.ENABLE_ECOMMERCE ? (
+                        <div className="flex items-center justify-between gap-1">
+                          <div>
                             <div className="text-rose-600 font-extrabold text-sm leading-tight">
                               {formatVND(product.price)}
                             </div>
                             {product.originalPrice && product.originalPrice > product.price && (
-                              <div className="text-[11px] text-gray-400 line-through">
+                              <div className="text-[11px] text-slate-400 line-through">
                                 {formatVND(product.originalPrice)}
                               </div>
                             )}
-                          </>
-                        ) : (
-                          <div className="text-[#0284C7] font-bold text-xs flex items-center gap-1">
-                            <BookOpen className="w-3.5 h-3.5" />
-                            <span>HDSD & Thông số</span>
                           </div>
-                        )}
-                      </div>
-
-                      {/* Quick Action Button */}
-                      {FEATURES.ENABLE_ECOMMERCE ? (
-                        <button
-                          onClick={(e) => handleQuickAddToCart(e, product)}
-                          className={`w-8 h-8 rounded-xl flex items-center justify-center transition-all ${
-                            addedSku === product.sku
-                              ? 'bg-emerald-600 text-white scale-110'
-                              : 'bg-[#1B3A6B] text-white hover:bg-[#152e55] active:scale-90 shadow-xs'
-                          }`}
-                          title="Thêm vào giỏ hàng"
-                        >
-                          {addedSku === product.sku ? (
-                            <Check className="w-4 h-4" />
-                          ) : (
-                            <Plus className="w-4 h-4" />
-                          )}
-                        </button>
+                          <button
+                            onClick={(e) => handleQuickAddToCart(e, product)}
+                            className={`w-8 h-8 rounded-xl flex items-center justify-center transition-all ${
+                              addedSku === product.sku
+                                ? 'bg-emerald-600 text-white scale-110'
+                                : 'bg-[#1B3A6B] text-white hover:bg-[#152e55] active:scale-90 shadow-xs'
+                            }`}
+                            title="Thêm vào giỏ hàng"
+                          >
+                            {addedSku === product.sku ? (
+                              <Check className="w-4 h-4" />
+                            ) : (
+                              <Plus className="w-4 h-4" />
+                            )}
+                          </button>
+                        </div>
                       ) : (
-                        <div className="w-7 h-7 rounded-xl bg-sky-50 text-[#0284C7] flex items-center justify-center border border-sky-100 group-hover:bg-[#1B3A6B] group-hover:text-white transition-colors">
-                          <ChevronRight className="w-4 h-4" />
+                        <div className="w-full py-1.5 px-2.5 bg-sky-50 group-hover:bg-[#1B3A6B] text-[#0284C7] group-hover:text-white rounded-xl text-[11px] font-bold flex items-center justify-between border border-sky-100/70 transition-all cursor-pointer">
+                          <div className="flex items-center gap-1.5 min-w-0">
+                            <BookOpen size={12} className="shrink-0" />
+                            <span className="whitespace-nowrap">Thông số & HDSD</span>
+                          </div>
+                          <ChevronRight size={13} className="shrink-0 text-[#0284C7] group-hover:text-white transition-colors" />
                         </div>
                       )}
                     </div>
