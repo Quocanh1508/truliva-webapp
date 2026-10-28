@@ -300,11 +300,24 @@ export default function CustomerProfile({
             </div>
           ) : (
             mySerials.map((s, idx) => (
-              <IotDeviceCard 
-                key={s.serialNumber || idx} 
-                serialData={s} 
-                onBookMaintenance={handleBookMaintenance} 
-              />
+              <div key={s.serialNumber || idx} className="space-y-1.5">
+                {mySerials.length > 1 && (
+                  <div className="flex items-center justify-between px-1 pt-1">
+                    <span className="text-[11px] font-bold text-slate-600 uppercase tracking-wider font-mono">
+                      Thiết bị #{idx + 1}: {s.serialNumber}
+                    </span>
+                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                      s.iot?.isOnline ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-slate-100 text-slate-500'
+                    }`}>
+                      {s.iot?.isOnline ? '🟢 Trực tuyến' : '⚪ Ngoại tuyến'}
+                    </span>
+                  </div>
+                )}
+                <IotDeviceCard 
+                  serialData={s} 
+                  onBookMaintenance={handleBookMaintenance} 
+                />
+              </div>
             ))
           )}
         </div>

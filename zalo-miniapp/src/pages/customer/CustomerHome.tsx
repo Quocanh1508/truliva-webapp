@@ -106,6 +106,9 @@ export default function CustomerHome({ user, mySerials = [], onOpenScanner, onOp
   const [articlePage, setArticlePage] = useState(1);
   const ARTICLES_PER_PAGE = 5;
 
+  // Quản lý máy lọc nước đang chọn xem (hỗ trợ nhiều máy)
+  const [selectedDeviceIndex, setSelectedDeviceIndex] = useState(0);
+
   // Đóng bài viết hoặc modal khi vuốt mép màn hình (Edge Swipe Back) thay vì thoát app
   React.useEffect(() => {
     const isAnyOpen = Boolean(selectedArticle || showLegalModal || showWheelModal);
@@ -340,24 +343,96 @@ export default function CustomerHome({ user, mySerials = [], onOpenScanner, onOp
       <div className="max-w-md mx-auto px-4 mt-4 space-y-3">
         {mySerials.length > 0 ? (
           <div className="space-y-2.5">
+            {/* Header: Tiêu đề + Nút chuyển đổi nhanh hoặc Xem tất cả */}
             <div className="flex items-center justify-between">
               <div className="flex items-center space-x-1.5">
                 <div className="p-1 bg-blue-100 text-[#1B3A6B] rounded-md">
                   <Droplets size={14} />
                 </div>
-                <h3 className="font-extrabold text-xs text-slate-800 tracking-tight">Máy Lọc Nước Của Bạn</h3>
+                <h3 className="font-extrabold text-xs text-slate-800 tracking-tight">
+                  Máy Lọc Nước Của Bạn {mySerials.length > 1 && `(${mySerials.length} máy)`}
+                </h3>
               </div>
-              <button 
-                onClick={onOpenWarranty}
-                className="text-[11px] font-bold text-[#0284C7] hover:underline cursor-pointer"
-              >
-                Xem chi tiết
-              </button>
+
+              <div className="flex items-center space-x-2">
+                {mySerials.length > 1 && (
+                  <div className="flex items-center space-x-1 bg-slate-100 p-0.5 rounded-xl border border-slate-200">
+                    <button 
+                      onClick={() => setSelectedDeviceIndex(prev => (prev > 0 ? prev - 1 : mySerials.length - 1))}
+                      className="w-6 h-6 flex items-center justify-center rounded-lg text-slate-600 hover:bg-white hover:text-[#1B3A6B] active:scale-90 transition cursor-pointer"
+                      title="Máy trước"
+                    >
+                      <ChevronLeft size={14} />
+                    </button>
+                    <span className="text-[10px] font-bold text-slate-600 px-1 font-mono">
+                      {(selectedDeviceIndex < mySerials.length ? selectedDeviceIndex : 0) + 1}/{mySerials.length}
+                    </span>
+                    <button 
+                      onClick={() => setSelectedDeviceIndex(prev => (prev < mySerials.length - 1 ? prev + 1 : 0))}
+                      className="w-6 h-6 flex items-center justify-center rounded-lg text-slate-600 hover:bg-white hover:text-[#1B3A6B] active:scale-90 transition cursor-pointer"
+                      title="Máy tiếp theo"
+                    >
+                      <ChevronRight size={14} />
+                    </button>
+                  </div>
+                )}
+
+                <button 
+                  onClick={onOpenWarranty}
+                  className="text-[11px] font-bold text-[#0284C7] hover:underline cursor-pointer"
+                >
+                  Xem chi tiết
+                </button>
+              </div>
             </div>
-            <IotDeviceCard 
-              serialData={mySerials[0]} 
-              onBookMaintenance={onOpenWarranty} 
-            />
+
+            {/* Bộ chọn máy (Horizontal Device Tabs Selector) khi có nhiều máy */}
+            {mySerials.length > 1 && (
+              <div className="flex items-center gap-2 overflow-x-auto pb-1 no-scrollbar pt-0.5">
+                {mySerials.map((device, idx) => {
+                  const activeIdx = selectedDeviceIndex < mySerials.length ? selectedDeviceIndex : 0;
+                  const isSelected = idx === activeIdx;
+                  const isDevOnline = Boolean(device.iot && device.iot.isOnline);
+                  const shortModel = device.model?.replace('Máy lọc nước ', '').replace('Máy Lọc Nước ', '') || device.serialNumber;
+                  return (
+                    <button
+                      key={device.serialNumber || idx}
+                      onClick={() => setSelectedDeviceIndex(idx)}
+                      className={`shrink-0 px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center space-x-1.5 cursor-pointer border ${
+                        isSelected
+                          ? 'bg-[#1B3A6B] text-white border-[#1B3A6B] shadow-sm scale-[1.02]'
+                          : 'bg-white text-slate-600 border-slate-200 hover:border-sky-300 hover:bg-slate-50'
+                      }`}
+                    >
+                      <span className={`w-2 h-2 rounded-full shrink-0 ${
+                        isDevOnline 
+                          ? (isSelected ? 'bg-[#00D2FF] animate-pulse' : 'bg-emerald-500') 
+                          : (isSelected ? 'bg-slate-400' : 'bg-slate-300')
+                      }`}></span>
+                      <span className="truncate max-w-[130px]">{shortModel}</span>
+                      <span className={`text-[10px] font-mono px-1 py-0.2 rounded font-semibold ${
+                        isSelected ? 'bg-white/20 text-sky-100' : 'bg-slate-100 text-slate-500'
+                      }`}>
+                        #{idx + 1}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+
+            {/* Thẻ IoT của máy được chọn */}
+            {(() => {
+              const activeIdx = selectedDeviceIndex < mySerials.length ? selectedDeviceIndex : 0;
+              const currentDevice = mySerials[activeIdx];
+              return (
+                <IotDeviceCard 
+                  key={currentDevice?.serialNumber || activeIdx}
+                  serialData={currentDevice} 
+                  onBookMaintenance={onOpenWarranty} 
+                />
+              );
+            })()}
           </div>
         ) : (
           <div className="bg-white p-4 rounded-3xl border border-sky-100 shadow-[0_4px_20px_rgba(27,58,107,0.06)] flex items-center justify-between hover:shadow-[0_8px_24px_rgba(0,163,255,0.12)] transition-shadow">
