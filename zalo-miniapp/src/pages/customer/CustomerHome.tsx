@@ -8,7 +8,6 @@ import {
   ChevronLeft,
   Eye, 
   Sparkles, 
-  ShieldCheck, 
   User, 
   MessageSquare,
   QrCode,

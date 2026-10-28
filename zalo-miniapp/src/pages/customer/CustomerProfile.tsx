@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { 
   User, 
   Phone, 
-  ShieldCheck, 
+  Lock, 
   Wrench, 
   QrCode, 
   Star, 
@@ -424,7 +424,7 @@ export default function CustomerProfile({
             className="w-full p-3 flex items-center justify-between text-slate-800 hover:bg-slate-50 transition-colors cursor-pointer text-left"
           >
             <div className="flex items-center space-x-2.5">
-              <ShieldCheck size={16} className="text-gray-400" />
+              <Lock size={16} className="text-gray-400" />
               <span>Chính sách bảo vệ dữ liệu cá nhân</span>
             </div>
             <ChevronRight size={14} className="text-slate-400" />
