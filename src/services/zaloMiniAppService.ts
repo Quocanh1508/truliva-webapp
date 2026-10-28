@@ -114,13 +114,20 @@ export async function authenticateZaloMiniAppUser(
   ]));
 
   // 1. Tìm người dùng trong hệ thống theo số điện thoại (so khớp chính xác danh sách định dạng)
-  let user = await prisma.user.findFirst({
+  // Nếu có nhiều tài khoản cùng số điện thoại (ví dụ vừa có ADMIN vừa có KTV):
+  // Ưu tiên tài khoản ADMIN / DEV / Quản trị trước để người dùng có đầy đủ quyền và xem được thiết bị mẫu
+  const matchingUsers = await prisma.user.findMany({
     where: {
       phoneNumber: {
         in: phoneVariants
       }
     }
   });
+
+  let user = matchingUsers.find(u => u.role === 'ADMIN' || u.role === 'DEV')
+    || matchingUsers.find(u => u.role !== 'KTV')
+    || matchingUsers[0]
+    || null;
 
   // NẾU LÀ TÀI KHOẢN CÓ QUYỀN NỘI BỘ (ADMIN, KTV, STAFF KHÔNG PHẢI CUSTOMER)
   // BẮT BUỘC PHẢI CÓ TOKEN ZALO XÁC THỰC THẬT (isVerified === true)

@@ -46,6 +46,7 @@ export default function IndexPage() {
 
   // Dev simulation state
   const [testPhone, setTestPhone] = useState('0915185982');
+  const [ktvViewMode, setKtvViewMode] = useState<'ktv' | 'customer'>('customer');
 
   const { addToCart } = useCart();
 
@@ -78,12 +79,18 @@ export default function IndexPage() {
 
   const loadUserContent = async (currentUser: any) => {
     try {
-      if (currentUser.role === 'KTV') {
-        const res = await fetchZaloApi('/zalo-miniapp/ktv-orders');
-        if (res.success) setKtvOrders(res.orders || []);
-      } else {
-        const res = await fetchZaloApi('/zalo-miniapp/my-serials');
-        if (res.success) setMySerials(res.serials || []);
+      // Tải song song cả danh sách máy của khách và ca dịch vụ KTV (nếu có)
+      const isKtvUser = currentUser?.role === 'KTV';
+      const [ktvRes, serialRes] = await Promise.allSettled([
+        isKtvUser ? fetchZaloApi('/zalo-miniapp/ktv-orders') : Promise.resolve({ success: false, orders: [] }),
+        fetchZaloApi('/zalo-miniapp/my-serials')
+      ]);
+
+      if (ktvRes.status === 'fulfilled' && ktvRes.value && (ktvRes.value as any).success) {
+        setKtvOrders((ktvRes.value as any).orders || []);
+      }
+      if (serialRes.status === 'fulfilled' && serialRes.value && (serialRes.value as any).success) {
+        setMySerials((serialRes.value as any).serials || []);
       }
     } catch (err: any) {
       console.error(err);
@@ -414,22 +421,33 @@ export default function IndexPage() {
         </div>
       )}
 
-      {/* Đã đăng nhập - Role KTV */}
-      {!loading && user && user.role === 'KTV' && (
+      {/* Đã đăng nhập - Role KTV (Chế độ ca làm việc) */}
+      {!loading && user && user.role === 'KTV' && ktvViewMode === 'ktv' && (
         <div className="p-4 pb-20 space-y-4">
-          <div className="bg-[#1B3A6B] text-white p-4 rounded-2xl shadow-md flex justify-between items-center">
-            <div>
-              <span className="bg-[#0284C7] text-white text-[10px] uppercase font-bold px-2 py-0.5 rounded-full">
-                Kỹ Thuật Viên
-              </span>
-              <h2 className="font-bold text-sm mt-1">{user.fullName}</h2>
-              <p className="text-[11px] text-sky-200">Trạm: {user.techStation?.name || 'Truliva'}</p>
+          <div className="bg-[#1B3A6B] text-white p-4 rounded-2xl shadow-md space-y-3">
+            <div className="flex justify-between items-center">
+              <div>
+                <span className="bg-[#0284C7] text-white text-[10px] uppercase font-bold px-2 py-0.5 rounded-full">
+                  Kỹ Thuật Viên
+                </span>
+                <h2 className="font-bold text-sm mt-1">{user.fullName}</h2>
+                <p className="text-[11px] text-sky-200">Trạm: {user.techStation?.name || 'Truliva'}</p>
+              </div>
+              <button 
+                onClick={handleLogout}
+                className="p-2 bg-white/10 hover:bg-white/20 rounded-xl text-white text-xs cursor-pointer"
+              >
+                Đăng xuất
+              </button>
             </div>
-            <button 
-              onClick={handleLogout}
-              className="p-2 bg-white/10 hover:bg-white/20 rounded-xl text-white text-xs cursor-pointer"
+
+            {/* Nút chuyển đổi nhanh sang giao diện Khách hàng & Máy IoT */}
+            <button
+              onClick={() => setKtvViewMode('customer')}
+              className="w-full py-2.5 bg-gradient-to-r from-sky-400 to-[#00D2FF] text-[#0B2545] rounded-xl text-xs font-black flex items-center justify-center space-x-1.5 shadow-sm active:scale-95 transition-all cursor-pointer"
             >
-              Đăng xuất
+              <Droplets size={14} />
+              <span>Chuyển Sang Giao Diện Khách Hàng ({mySerials.length} máy)</span>
             </button>
           </div>
 
@@ -480,9 +498,25 @@ export default function IndexPage() {
         </div>
       )}
 
-      {/* Đã đăng nhập - Role Khách Hàng (Customer) */}
-      {!loading && user && user.role !== 'KTV' && (
+      {/* Đã đăng nhập - Role Khách Hàng (Hoặc KTV chuyển sang chế độ Khách Hàng) */}
+      {!loading && user && (user.role !== 'KTV' || ktvViewMode === 'customer') && (
         <>
+          {/* Banner chuyển về ca làm việc dành cho KTV */}
+          {user.role === 'KTV' && (
+            <div className="bg-[#0B2545] text-white px-4 py-2 flex items-center justify-between text-xs sticky top-0 z-40 shadow-sm border-b border-sky-400/20">
+              <div className="flex items-center space-x-1.5">
+                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                <span className="text-[11px] text-sky-200">Chế độ Khách hàng</span>
+              </div>
+              <button
+                onClick={() => setKtvViewMode('ktv')}
+                className="px-2.5 py-1 bg-[#0284C7] hover:bg-[#00D2FF] hover:text-[#061226] text-white rounded-lg text-[11px] font-bold transition-all cursor-pointer flex items-center gap-1"
+              >
+                <span>Về ca KTV ({ktvOrders.length})</span>
+                <ChevronRight size={12} />
+              </button>
+            </div>
+          )}
           {/* TAB 1: Trang Chủ */}
           {activeTab === 'home' && (
             <CustomerHome 
@@ -585,8 +619,8 @@ export default function IndexPage() {
         </>
       )}
 
-      {/* Bottom Navigation Bar: Chỉ hiển thị ở các tab chính, ẩn khi vào Giỏ hàng, Chi tiết, Thanh toán... */}
-      {!loading && user?.role !== 'KTV' && !(
+      {/* Bottom Navigation Bar: Chỉ hiển thị ở các tab chính, ẩn khi vào Giỏ hàng, Chi tiết, Thanh toán hoặc đang ở ca KTV */}
+      {!loading && user && !(user.role === 'KTV' && ktvViewMode === 'ktv') && !(
         (activeTab === 'shop' && shopSubView !== 'catalog') ||
         (activeTab === 'profile' && shopSubView === 'my_orders')
       ) && (
