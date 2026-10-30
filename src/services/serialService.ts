@@ -39,7 +39,7 @@ export function parseExcelDate(value: any): Date | null {
  * Chuẩn hóa số serial: trim, uppercase, loại bỏ ký tự đặc biệt
  */
 export function cleanSerialNumber(serial: string): string {
-  return serial.trim().replace(/[^a-zA-Z0-9_]/g, '').toUpperCase();
+  return serial.trim().replace(/[^a-zA-Z0-9_\-]/g, '').toUpperCase();
 }
 
 /**
@@ -123,8 +123,14 @@ export async function getPreviewDuration(modelInput: string, orderId?: string) {
  */
 export async function checkSerialPublicInfo(serialNumber: string, orderId?: string) {
   const cleaned = cleanSerialNumber(serialNumber);
-  const serial = await prisma.serial.findUnique({
-    where: { serialNumber: cleaned }
+  const unhyphenated = cleaned.replace(/[-_]/g, '');
+  const serial = await prisma.serial.findFirst({
+    where: {
+      OR: [
+        { serialNumber: cleaned },
+        { serialNumber: unhyphenated }
+      ]
+    }
   });
 
   if (!serial) return null;

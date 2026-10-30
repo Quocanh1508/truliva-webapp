@@ -87,8 +87,14 @@ export async function activatePublicSerial(req: Request, res: Response): Promise
     }
 
     const cleaned = cleanSerialNumber(serialNumber);
-    const serial = await prisma.serial.findUnique({
-      where: { serialNumber: cleaned }
+    const unhyphenated = cleaned.replace(/[-_]/g, '');
+    const serial = await prisma.serial.findFirst({
+      where: {
+        OR: [
+          { serialNumber: cleaned },
+          { serialNumber: unhyphenated }
+        ]
+      }
     });
 
     if (!serial) {
@@ -102,7 +108,7 @@ export async function activatePublicSerial(req: Request, res: Response): Promise
     }
 
     const updated = await activateSerialWarranty(
-      cleaned,
+      serial.serialNumber,
       null,
       {
         customerName: customerName.trim(),
@@ -206,8 +212,14 @@ export async function confirmPublicSerial(req: Request, res: Response): Promise<
     }
 
     const cleaned = cleanSerialNumber(serialNumber);
-    const serial = await prisma.serial.findUnique({
-      where: { serialNumber: cleaned }
+    const unhyphenated = cleaned.replace(/[-_]/g, '');
+    const serial = await prisma.serial.findFirst({
+      where: {
+        OR: [
+          { serialNumber: cleaned },
+          { serialNumber: unhyphenated }
+        ]
+      }
     });
 
     if (!serial) {

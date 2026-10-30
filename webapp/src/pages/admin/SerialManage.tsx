@@ -1238,7 +1238,7 @@ export default function SerialManage() {
                             Tạo bởi/ lúc
                           </div>
                           <div style={{ color: '#334155', fontWeight: 500 }}>
-                            {s.importedBy?.fullName || s.importedBy?.username || s.importedBy?.email || (typeof s.rawData === 'object' && s.rawData?.creator) || 'phan-duy.minh@unilever.com'}
+                            {s.importedBy?.fullName || s.importedBy?.username || s.importedBy?.email || (typeof s.rawData === 'object' && s.rawData?.creator) || 'Hệ thống'}
                           </div>
                           <div style={{ fontSize: 11, color: '#64748b' }}>
                             {formatDateTime(s.createdAt)}
