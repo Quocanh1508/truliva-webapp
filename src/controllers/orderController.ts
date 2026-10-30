@@ -969,7 +969,23 @@ export async function createManualOrder(req: Request, res: Response): Promise<vo
     const nextManualId = await getNextManualOrderId();
 
     // 3. Tạo Order
-    const apptDate = appointmentTime ? new Date(appointmentTime) : null;
+    let apptDate: Date | null = null;
+    if (appointmentTime) {
+      const parsedDate = new Date(appointmentTime);
+      if (isNaN(parsedDate.getTime())) {
+        res.status(400).json({ error: 'Thời gian hẹn khách không hợp lệ' });
+        return;
+      }
+
+      const apptDateVnStr = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Ho_Chi_Minh' }).format(parsedDate);
+      const todayVnStr = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Ho_Chi_Minh' }).format(new Date());
+
+      if (apptDateVnStr < todayVnStr) {
+        res.status(400).json({ error: 'Thời gian hẹn khách không được ở trong quá khứ. Vui lòng chọn từ ngày hôm nay trở đi.' });
+        return;
+      }
+      apptDate = parsedDate;
+    }
     const totalQty = Array.isArray(items) ? items.reduce((acc: number, curr: any) => acc + (Number(curr.quantity) || 1), 0) : 0;
     const finalTotalPrice = Array.isArray(items) ? items.reduce((acc: number, curr: any) => acc + ((Number(curr.price) || 0) * (Number(curr.quantity) || 1)), 0) : 0;
 
@@ -2244,6 +2260,22 @@ export async function updateOrder(req: Request, res: Response): Promise<void> {
 
     if (appointmentTime !== undefined) {
       const val = appointmentTime ? new Date(appointmentTime) : null;
+      if (val) {
+        if (isNaN(val.getTime())) {
+          res.status(400).json({ error: 'Thời gian hẹn khách không hợp lệ' });
+          return;
+        }
+        const oldValStr = oldOrder.appointmentTime ? new Date(oldOrder.appointmentTime).toISOString() : '';
+        const newValStr = val.toISOString();
+        if (oldValStr !== newValStr) {
+          const apptDateVnStr = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Ho_Chi_Minh' }).format(val);
+          const todayVnStr = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Ho_Chi_Minh' }).format(new Date());
+          if (apptDateVnStr < todayVnStr) {
+            res.status(400).json({ error: 'Thời gian hẹn khách không được ở trong quá khứ. Vui lòng chọn từ ngày hôm nay trở đi.' });
+            return;
+          }
+        }
+      }
       updateData.appointmentTime = val;
       if (String(val) !== String(oldOrder.appointmentTime)) {
         changes.push({ field: 'appointmentTime', from: oldOrder.appointmentTime, to: val });

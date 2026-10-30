@@ -496,6 +496,8 @@ export default function OrderList() {
   // Create Manual Order Modal
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [editingOrderId, setEditingOrderId] = useState<string | null>(null);
+  const [originalAppointmentDate, setOriginalAppointmentDate] = useState<string>('');
+  const todayVnStr = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Ho_Chi_Minh' }).format(new Date());
   const [showCreateServiceDropdown, setShowCreateServiceDropdown] = useState(false);
   const [newOrderForm, setNewOrderForm] = useState({
     customerName: '',
@@ -563,6 +565,7 @@ export default function OrderList() {
       const ticketProduct = (ticket.productName || '').trim();
 
       setEditingOrderId(null);
+      setOriginalAppointmentDate('');
       setCustomerSuggestions([]);
       skipFetchRef.current = true;
 
@@ -677,6 +680,7 @@ export default function OrderList() {
 
   const openCreateModal = () => {
     setEditingOrderId(null);
+    setOriginalAppointmentDate('');
     setCustomerSuggestions([]);
     skipFetchRef.current = false;
     setNewOrderForm({
@@ -756,6 +760,7 @@ export default function OrderList() {
       .catch(console.error);
 
     setEditingOrderId(order.id);
+    setOriginalAppointmentDate(appDateStr);
     setShowCreateModal(true);
   };
 
@@ -810,6 +815,13 @@ export default function OrderList() {
     if (!newOrderForm.appointmentDate) {
       alert('Vui lòng chọn Thời gian hẹn khách (Ngày hẹn).');
       return;
+    }
+
+    if (newOrderForm.appointmentDate < todayVnStr) {
+      if (!editingOrderId || newOrderForm.appointmentDate !== originalAppointmentDate) {
+        alert('Thời gian hẹn khách không được ở trong quá khứ. Vui lòng chọn từ ngày hôm nay trở đi.');
+        return;
+      }
     }
 
     let appointmentTimeStr = null;
@@ -5033,10 +5045,20 @@ export default function OrderList() {
                     <div>
                       <input
                         type="date"
-                        className="w-full border rounded p-2 text-sm outline-none focus:border-blue-500 text-gray-800 bg-white"
+                        className={`w-full border rounded p-2 text-sm outline-none focus:border-blue-500 text-gray-800 bg-white ${
+                          newOrderForm.appointmentDate && newOrderForm.appointmentDate < todayVnStr && (!editingOrderId || newOrderForm.appointmentDate !== originalAppointmentDate)
+                            ? 'border-red-500 bg-red-50'
+                            : ''
+                        }`}
                         value={newOrderForm.appointmentDate}
+                        min={editingOrderId && originalAppointmentDate && originalAppointmentDate < todayVnStr ? originalAppointmentDate : todayVnStr}
                         onChange={e => setNewOrderForm(prev => ({ ...prev, appointmentDate: e.target.value }))}
                       />
+                      {newOrderForm.appointmentDate && newOrderForm.appointmentDate < todayVnStr && (!editingOrderId || newOrderForm.appointmentDate !== originalAppointmentDate) && (
+                        <p className="text-xs text-red-500 mt-1 font-medium">
+                          ⚠️ Ngày hẹn không được ở trong quá khứ.
+                        </p>
+                      )}
                     </div>
                     <div>
                       <input
