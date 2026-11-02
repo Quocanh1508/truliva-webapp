@@ -292,7 +292,9 @@ export function calculateSingleOrderCommission(
       completionDate = new Date(approvedReports[0].createdAt);
     }
   }
-  if (!completionDate && order.updatedAt) {
+  if (!completionDate && order.appointmentTime) {
+    completionDate = new Date(order.appointmentTime);
+  } else if (!completionDate && order.updatedAt) {
     completionDate = new Date(order.updatedAt);
   }
 
@@ -454,7 +456,11 @@ export async function computeCommissionsForMonth(
       // Hoặc đơn ở trạng thái hoàn thành cập nhật trong tháng (nếu không qua flow báo cáo)
       {
         adminStatus: 'hoàn thành',
-        updatedAt: { gte: startDate, lte: endDate }
+        OR: [
+          { updatedAt: { gte: startDate, lte: endDate } },
+          { appointmentTime: { gte: startDate, lte: endDate } },
+          { pancakeCreatedAt: { gte: startDate, lte: endDate } }
+        ]
       }
     ]
   };

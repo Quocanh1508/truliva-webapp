@@ -1647,6 +1647,43 @@ export default function OrderList() {
   const submitAssign = async () => {
     if (!assignModal) return;
 
+    const isCompletedOrder = assignModal.order.adminStatus === 'hoàn thành';
+
+    if (isCompletedOrder) {
+      try {
+        const payload: any = {
+          adminStatus: 'hoàn thành',
+          workType: assignModal.order.workType || null,
+          serviceType: assignModal.order.serviceType || null,
+          appointmentTime: assignModal.order.appointmentTime || null,
+          mainStationId: assignModal.order.mainStationId || null,
+          techStationId: assignModal.order.techStationId || null,
+          assignedKtvId: assignModal.order.assignedKtvId || null,
+          warehouseId: assignModal.order.warehouseId || null,
+        };
+
+        if (selectedSalesKtv) {
+          payload.salesKtvId = selectedSalesKtv;
+        } else if (isSalesKtvManuallyCleared) {
+          payload.salesKtvId = null;
+          payload.isExplicitClearSalesKtv = true;
+        } else if (assignModal.order.salesKtvId) {
+          payload.salesKtvId = assignModal.order.salesKtvId;
+        }
+
+        await updateOrder(assignModal.orderId, payload);
+        alert('Cập nhật KTV bán hàng cho đơn hoàn thành thành công!');
+        setAssignModal(null);
+        setIsAssignProductSelectOpen(false);
+        setIsAssignModalExpanded(false);
+        fetchOrdersData();
+        return;
+      } catch (err: any) {
+        alert(err.message || 'Lỗi cập nhật KTV bán hàng');
+        return;
+      }
+    }
+
     if (!tempItems || tempItems.length === 0) {
       alert('Vui lòng chọn ít nhất một sản phẩm yêu cầu dịch vụ.');
       return;
@@ -3889,9 +3926,21 @@ export default function OrderList() {
               </div>
             </div>
 
+            {assignModal.order.adminStatus === 'hoàn thành' && (
+              <div className="mx-6 mt-4 p-3.5 bg-emerald-50 border border-emerald-200 rounded-xl flex items-start gap-3 shadow-xs">
+                <span className="text-xl leading-none">🏷️</span>
+                <div className="text-xs text-emerald-950">
+                  <p className="font-bold text-sm text-emerald-900 mb-0.5">Đơn hàng đã hoàn thành - Bổ sung KTV bán hàng</p>
+                  <p className="text-emerald-800 leading-relaxed">
+                    Đơn hàng đã được nghiệm thu hoàn thành. Bạn có thể chọn hoặc cập nhật <strong>KTV bán hàng</strong> để ghi nhận hoa hồng trong Quản lý lương. Trạng thái đơn, báo cáo nghiệm thu và tiền công thi công của KTV lắp đặt được giữ nguyên 100%.
+                  </p>
+                </div>
+              </div>
+            )}
+
             <div className="p-6 overflow-y-auto overflow-x-hidden flex-1 grid grid-cols-1 md:grid-cols-2 gap-6 overscroll-contain">
               {/* Cột trái: Phân loại */}
-              <div className="space-y-4">
+              <div className={`space-y-4 ${assignModal.order.adminStatus === 'hoàn thành' ? 'opacity-60 pointer-events-none select-none' : ''}`}>
                 <h4 className="font-semibold text-gray-800 border-b pb-2 flex items-center gap-2">
                   <FileText className="w-4 h-4 text-[#1B3A6B]" />
                   <span>1. Phân loại Yêu cầu</span>
@@ -4471,6 +4520,7 @@ export default function OrderList() {
                 <h4 className="font-semibold text-gray-800 border-b pb-2">2. Phân bổ Kỹ thuật viên</h4>
 
                 <DispatchStationSelect
+                  disabled={assignModal.order.adminStatus === 'hoàn thành'}
                   stations={stations}
                   selectedMainId={selectedMain}
                   onMainChange={(id) => {
@@ -4541,7 +4591,16 @@ export default function OrderList() {
               >
                 Hủy
               </button>
-              <button onClick={submitAssign} className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">Lưu thông tin & Phân bổ</button>
+              <button 
+                onClick={submitAssign} 
+                className={`px-5 py-2 rounded-xl text-sm font-semibold shadow-xs transition-colors cursor-pointer text-white ${
+                  assignModal.order.adminStatus === 'hoàn thành'
+                    ? 'bg-emerald-600 hover:bg-emerald-700'
+                    : 'bg-blue-600 hover:bg-blue-700'
+                }`}
+              >
+                {assignModal.order.adminStatus === 'hoàn thành' ? 'Cập nhật KTV bán hàng' : 'Lưu thông tin & Phân bổ'}
+              </button>
             </div>
           </div>
         </div>

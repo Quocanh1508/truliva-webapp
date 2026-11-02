@@ -2062,6 +2062,18 @@ export async function updateOrder(req: Request, res: Response): Promise<void> {
       }
     }
 
+    if (oldOrder.adminStatus === 'hoàn thành') {
+      // Bảo tồn KTV thi công cũ của đơn đã hoàn thành, tránh làm lệch Báo cáo KTV (ServiceReport)
+      if (effectiveAssignedKtvId !== undefined && effectiveAssignedKtvId !== oldOrder.assignedKtvId) {
+        logger.warn('Blocked attempt to change assignedKtvId on a completed order', {
+          orderId: id,
+          currentKtv: oldOrder.assignedKtvId,
+          requestedKtv: effectiveAssignedKtvId
+        });
+        effectiveAssignedKtvId = oldOrder.assignedKtvId;
+      }
+    }
+
     if (oldOrder.assignedKtvId) {
       // Đơn hàng ĐÃ CÓ KTV:
       if (!hasAssignPermission) {
@@ -2105,12 +2117,12 @@ export async function updateOrder(req: Request, res: Response): Promise<void> {
       }
     }
 
-    // Validation: Require workType and serviceType if KTV is being assigned or already assigned
+    // Validation: Require workType and serviceType if KTV is being assigned or already assigned (only for non-completed orders)
     const finalKtvId = effectiveAssignedKtvId !== undefined ? effectiveAssignedKtvId : oldOrder.assignedKtvId;
     const finalWorkType = workType !== undefined ? workType : oldOrder.workType;
     const finalServiceType = serviceType !== undefined ? serviceType : oldOrder.serviceType;
 
-    if (finalKtvId) {
+    if (finalKtvId && oldOrder.adminStatus !== 'hoàn thành') {
       if (!finalWorkType || !finalWorkType.trim() || finalWorkType === 'Chưa xác định') {
         res.status(400).json({ error: 'Vui lòng chọn loại công việc trước khi phân công KTV.' });
         return;
@@ -2199,7 +2211,13 @@ export async function updateOrder(req: Request, res: Response): Promise<void> {
     // Auto update adminStatus if KTV is assigned and status is currently 'chờ xử lý'
     const finalKtv = effectiveAssignedKtvId !== undefined ? (effectiveAssignedKtvId || null) : oldOrder.assignedKtvId;
     let targetAdminStatus = effectiveAdminStatus;
-    if (finalKtv && (!targetAdminStatus || targetAdminStatus === 'chờ xử lý') && (!oldOrder.adminStatus || oldOrder.adminStatus === 'chờ xử lý')) {
+    if (oldOrder.adminStatus === 'hoàn thành') {
+      // Đơn đã hoàn thành: Giữ nguyên 'hoàn thành', không tự động hạ về 'đang thực hiện' hay 'chờ xử lý'
+      if (!effectiveAdminStatus || effectiveAdminStatus === 'đang thực hiện' || effectiveAdminStatus === 'chờ xử lý') {
+        targetAdminStatus = 'hoàn thành';
+        effectiveAdminStatus = 'hoàn thành';
+      }
+    } else if (finalKtv && (!targetAdminStatus || targetAdminStatus === 'chờ xử lý') && (!oldOrder.adminStatus || oldOrder.adminStatus === 'chờ xử lý')) {
       targetAdminStatus = 'đang thực hiện';
     } else if (!finalKtv && (targetAdminStatus === 'đang thực hiện' || (!targetAdminStatus && oldOrder.adminStatus === 'đang thực hiện'))) {
       targetAdminStatus = 'chờ xử lý';
@@ -2267,7 +2285,7 @@ export async function updateOrder(req: Request, res: Response): Promise<void> {
         }
         const oldValStr = oldOrder.appointmentTime ? new Date(oldOrder.appointmentTime).toISOString() : '';
         const newValStr = val.toISOString();
-        if (oldValStr !== newValStr) {
+        if (oldValStr !== newValStr && oldOrder.adminStatus !== 'hoàn thành') {
           const apptDateVnStr = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Ho_Chi_Minh' }).format(val);
           const todayVnStr = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Ho_Chi_Minh' }).format(new Date());
           if (apptDateVnStr < todayVnStr) {
