@@ -29,6 +29,7 @@ export async function getCalculatedSalaries(req: Request, res: Response): Promis
     ]);
 
     const commissionsByKtv = commissionResult.ktvSummaries || {};
+    const existingKtvIds = new Set(salaryResult.map((ktv: any) => ktv.userId));
     const mergedSalaries = salaryResult.map((ktv: any) => {
       const comm = commissionsByKtv[ktv.userId];
       const salesCommission = comm ? comm.totalFinalCommission : 0;
@@ -42,6 +43,29 @@ export async function getCalculatedSalaries(req: Request, res: Response): Promis
         totalIncome: (ktv.adjustedCost !== undefined && ktv.adjustedCost !== null ? ktv.adjustedCost : ktv.calculatedCost) + salesCommission
       };
     });
+
+    for (const [kId, comm] of Object.entries(commissionsByKtv as Record<string, any>)) {
+      if (!existingKtvIds.has(kId)) {
+        mergedSalaries.push({
+          userId: kId,
+          fullName: comm.ktvName,
+          username: comm.ktvPhone,
+          phoneNumber: comm.ktvPhone,
+          stationName: comm.stationName || 'Khác',
+          mainStationName: comm.mainStationName || 'Trực thuộc Truliva',
+          casesCount: 0,
+          calculatedCost: 0,
+          adjustedCost: 0,
+          adjustmentNote: '',
+          status: 'DRAFT',
+          cases: [],
+          salesCommission: comm.totalFinalCommission || 0,
+          salesCommissionOrdersCount: comm.totalOrders || 0,
+          salesCommissionCalculated: comm.totalCalculatedCommission || 0,
+          totalIncome: comm.totalFinalCommission || 0
+        });
+      }
+    }
 
     res.json({
       month,

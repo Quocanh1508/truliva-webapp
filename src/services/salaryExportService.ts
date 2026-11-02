@@ -657,14 +657,35 @@ export function buildCommissionsSheet(workbook: ExcelJS.Workbook, ctx: SalaryExp
       if (!matchKtv) return false;
     }
 
-    // 2. Lọc theo Trạm (Trạm của KTV bán hàng)
+    // 2. Lọc theo Trạm (Trạm của KTV bán hàng hoặc đơn hàng)
     if (filters.stationIdsList.length > 0) {
-      const sKtvStation = c.salesKtv?.techStation?.name || '';
-      const matchStation = filters.stationIdsList.some(st => {
-        const norm = st.toLowerCase().replace(/trạm\s+/g, '').trim();
-        return sKtvStation.toLowerCase().includes(norm);
+      const sMain = c.mainStationName || c.salesKtv?.mainStationName || c.salesKtv?.techStation?.mainStation?.name || 'Trực thuộc Truliva';
+      const sTech = c.stationName || c.salesKtv?.stationName || c.salesKtv?.techStation?.name || 'Khác';
+      const sKey = `${sMain}::${sTech}`.toLowerCase();
+      const normMain = sMain.toLowerCase().replace(/trạm\s+/g, '').trim();
+      const normTech = sTech.toLowerCase().replace(/trạm\s+/g, '').trim();
+
+      const matchStation = filters.stationIdsList.some(item => {
+        const filter = item.trim().toLowerCase();
+        if (!filter) return false;
+        if (filter === sKey || filter === sTech.toLowerCase() || filter === sMain.toLowerCase()) return true;
+        if (filter.includes('::')) {
+          const [f1, f2] = filter.split('::').map(x => x.trim().toLowerCase().replace(/trạm\s+/g, ''));
+          return (f1 === normMain && f2 === normTech) || (f1 === normTech && f2 === normMain);
+        }
+        const normFilter = filter.replace(/trạm\s+/g, '');
+        return normMain.includes(normFilter) || normTech.includes(normFilter);
       });
       if (!matchStation) return false;
+    }
+
+    if (filters.mainStationIdsList && filters.mainStationIdsList.length > 0) {
+      const sMain = (c.mainStationName || c.salesKtv?.mainStationName || c.salesKtv?.techStation?.mainStation?.name || 'Trực thuộc Truliva').toLowerCase();
+      const matchMain = filters.mainStationIdsList.some(m => {
+        const norm = m.toLowerCase().replace(/trạm\s+/g, '').trim();
+        return sMain.includes(norm);
+      });
+      if (!matchMain) return false;
     }
 
     // 3. Lọc theo Ngày hoàn thành

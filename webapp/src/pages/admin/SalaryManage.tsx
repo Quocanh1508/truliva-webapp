@@ -1411,27 +1411,32 @@ export default function SalaryManage() {
     return `Đã chọn ${selectedDistancePresets.length} tiêu chí KC`;
   };
 
-  // Các hàm kiểm tra điều kiện lọc đơn lẻ cho từng ca (Atomic matchers)
-  const caseMatchesStation = (c: any) => {
+  // Hàm kiểm tra khớp Trạm theo Trạm chính (Quản lý trạm) và Trạm kỹ thuật
+  const matchesStation = (mainName?: string | null, techName?: string | null): boolean => {
     if (selectedStationsFilter.length === 0) return true;
-    const cMain = c.mainStationName && c.mainStationName !== 'Không có' ? c.mainStationName : 'Trực thuộc Truliva';
-    const cTech = c.stationName && c.stationName !== 'Không có' ? c.stationName : 'Khác';
-    const cKey = `${cMain}::${cTech}`;
-    const normKey = normStr(cKey);
-    const normMain = normStr(cMain);
-    const normTech = normStr(cTech);
+    const sMain = mainName && mainName !== 'Không có' ? mainName : 'Trực thuộc Truliva';
+    const sTech = techName && techName !== 'Không có' ? techName : 'Khác';
+    const sKey = `${sMain}::${sTech}`;
+    const normKey = normStr(sKey);
+    const normMain = normStr(sMain);
+    const normTech = normStr(sTech);
 
     return selectedStationsFilter.some(item => {
       const filter = item.trim();
       if (!filter) return false;
       const normF = normStr(filter);
-      if (filter === cKey || normF === normKey) return true;
+      if (filter === sKey || normF === normKey) return true;
       if (filter.includes('::')) {
         const [f1, f2] = filter.split('::').map(x => normStr(x));
         return (f1 === normMain && f2 === normTech) || (f1 === normTech && f2 === normMain);
       }
       return normMain === normF || normTech === normF;
     });
+  };
+
+  // Các hàm kiểm tra điều kiện lọc đơn lẻ cho từng ca (Atomic matchers)
+  const caseMatchesStation = (c: any) => {
+    return matchesStation(c.mainStationName, c.stationName);
   };
 
   const caseMatchesKtv = (c: any) => {
@@ -1518,31 +1523,14 @@ export default function SalaryManage() {
       .filter(s => {
         // Trạm quản lý phải thỏa mãn nếu đang chọn
         if (selectedStationsFilter.length > 0) {
-          const sMain = s.mainStationName && s.mainStationName !== 'Không có' ? s.mainStationName : 'Trực thuộc Truliva';
-          const sTech = s.stationName && s.stationName !== 'Không có' ? s.stationName : 'Khác';
-          const sKey = `${sMain}::${sTech}`;
-          const normKey = normStr(sKey);
-          const normMain = normStr(sMain);
-          const normTech = normStr(sTech);
-          const matchSt = selectedStationsFilter.some(item => {
-            const filter = item.trim();
-            if (!filter) return false;
-            const normF = normStr(filter);
-            if (filter === sKey || normF === normKey) return true;
-            if (filter.includes('::')) {
-              const [f1, f2] = filter.split('::').map(x => normStr(x));
-              return (f1 === normMain && f2 === normTech) || (f1 === normTech && f2 === normMain);
-            }
-            return normMain === normF || normTech === normF;
-          });
-          if (!matchSt) return false;
+          if (!matchesStation(s.mainStationName, s.stationName)) return false;
         }
 
         const count = counts.get(s.userId) || 0;
         if (hasSpecificFilters) {
           return count > 0;
         }
-        return s.casesCount > 0;
+        return s.casesCount > 0 || (s.salesCommissionOrdersCount && s.salesCommissionOrdersCount > 0);
       })
       .map(s => ({
         ...s,
@@ -1590,18 +1578,42 @@ export default function SalaryManage() {
     const map = new Map<string, Map<string, { key: string; name: string; count: number }>>();
     const stationCounts = new Map<string, number>();
 
-    for (const c of allCases) {
-      if (
-        caseMatchesKtv(c) &&
-        caseMatchesWorkType(c) &&
-        caseMatchesServiceType(c) &&
-        caseMatchesProduct(c) &&
-        caseMatchesDate(c) &&
-        caseMatchesDistance(c) &&
-        caseMatchesSearch(c)
-      ) {
-        const sMain = c.mainStationName && c.mainStationName !== 'Không có' ? c.mainStationName : 'Trực thuộc Truliva';
-        const sTech = c.stationName && c.stationName !== 'Không có' ? c.stationName : 'Khác';
+    if (viewMode === 'commissions') {
+      // Khi ở tab Hoa Hồng Bán Hàng: Facet đếm theo số đơn hoa hồng bán hàng
+      for (const comm of (commissionsData.commissions || [])) {
+        if (selectedKtvsFilter.length > 0) {
+          const sId = comm.salesKtv?.id || comm.salesKtvId;
+          if (!sId || !selectedKtvsFilter.includes(sId)) continue;
+        }
+        if (selectedCommissionKtvFilter) {
+          const sId = comm.salesKtv?.id || comm.salesKtvId;
+          if (sId !== selectedCommissionKtvFilter) continue;
+        }
+        if (selectedCompletedDateFilter) {
+          const cDate = comm.completedDate ? new Date(comm.completedDate).toLocaleDateString('sv-SE') : '';
+          if (cDate !== selectedCompletedDateFilter) continue;
+        }
+        if (selectedProductFilter && Array.isArray(comm.itemsDetail)) {
+          const prodQ = selectedProductFilter.toLowerCase();
+          const matchProd = comm.itemsDetail.some((it: any) =>
+            (it.name && it.name.toLowerCase().includes(prodQ)) ||
+            (it.sku && it.sku.toLowerCase().includes(prodQ))
+          );
+          if (!matchProd) continue;
+        }
+        if (commissionSearchQuery || searchQuery) {
+          const q = (commissionSearchQuery || searchQuery).toLowerCase().trim();
+          const orderCode = (comm.orderCode || '').toLowerCase();
+          const customerName = (comm.customerName || '').toLowerCase();
+          const customerPhone = (comm.customerPhone || '').toLowerCase();
+          const ktvName = (comm.salesKtv?.fullName || '').toLowerCase();
+          const ktvPhone = (comm.salesKtv?.phoneNumber || '').toLowerCase();
+          const match = orderCode.includes(q) || customerName.includes(q) || customerPhone.includes(q) || ktvName.includes(q) || ktvPhone.includes(q);
+          if (!match) continue;
+        }
+
+        const sMain = comm.mainStationName || comm.salesKtv?.mainStationName || comm.salesKtv?.techStation?.mainStation?.name || 'Trực thuộc Truliva';
+        const sTech = comm.stationName || comm.salesKtv?.stationName || comm.salesKtv?.techStation?.name || 'Khác';
         const sKey = `${sMain}::${sTech}`;
         stationCounts.set(sKey, (stationCounts.get(sKey) || 0) + 1);
 
@@ -1613,21 +1625,62 @@ export default function SalaryManage() {
         }
         map.get(sMain)!.get(sKey)!.count = stationCounts.get(sKey)!;
       }
+    } else {
+      // Khi ở tab Tổng hợp KTV, Chi tiết ca hoặc Ma trận đơn giá: Facet đếm theo số ca dịch vụ
+      for (const c of allCases) {
+        if (
+          caseMatchesKtv(c) &&
+          caseMatchesWorkType(c) &&
+          caseMatchesServiceType(c) &&
+          caseMatchesProduct(c) &&
+          caseMatchesDate(c) &&
+          caseMatchesDistance(c) &&
+          caseMatchesSearch(c)
+        ) {
+          const sMain = c.mainStationName && c.mainStationName !== 'Không có' ? c.mainStationName : 'Trực thuộc Truliva';
+          const sTech = c.stationName && c.stationName !== 'Không có' ? c.stationName : 'Khác';
+          const sKey = `${sMain}::${sTech}`;
+          stationCounts.set(sKey, (stationCounts.get(sKey) || 0) + 1);
+
+          if (!map.has(sMain)) {
+            map.set(sMain, new Map());
+          }
+          if (!map.get(sMain)!.has(sKey)) {
+            map.get(sMain)!.set(sKey, { key: sKey, name: sTech, count: 0 });
+          }
+          map.get(sMain)!.get(sKey)!.count = stationCounts.get(sKey)!;
+        }
+      }
     }
 
-    // Nếu chưa có ca nào lọc hoặc không khớp, fallback nạp tất cả trạm từ active KTV
-    if (map.size === 0 && salaries.length > 0) {
-      salaries.filter(s => s.casesCount > 0).forEach(s => {
-        const sMain = s.mainStationName && s.mainStationName !== 'Không có' ? s.mainStationName : 'Trực thuộc Truliva';
-        const sTech = s.stationName && s.stationName !== 'Không có' ? s.stationName : 'Khác';
-        const sKey = `${sMain}::${sTech}`;
-        if (!map.has(sMain)) {
-          map.set(sMain, new Map());
-        }
-        if (!map.get(sMain)!.has(sKey)) {
-          map.get(sMain)!.set(sKey, { key: sKey, name: sTech, count: s.casesCount });
-        }
-      });
+    // Nếu chưa có trạm nào khớp, fallback nạp tất cả trạm từ salaries và hoa hồng
+    if (map.size === 0) {
+      if (salaries.length > 0) {
+        salaries.forEach(s => {
+          const sMain = s.mainStationName && s.mainStationName !== 'Không có' ? s.mainStationName : 'Trực thuộc Truliva';
+          const sTech = s.stationName && s.stationName !== 'Không có' ? s.stationName : 'Khác';
+          const sKey = `${sMain}::${sTech}`;
+          if (!map.has(sMain)) {
+            map.set(sMain, new Map());
+          }
+          if (!map.get(sMain)!.has(sKey)) {
+            map.get(sMain)!.set(sKey, { key: sKey, name: sTech, count: s.casesCount || 0 });
+          }
+        });
+      }
+      if (commissionsData.commissions && commissionsData.commissions.length > 0) {
+        commissionsData.commissions.forEach((comm: any) => {
+          const sMain = comm.mainStationName || comm.salesKtv?.mainStationName || comm.salesKtv?.techStation?.mainStation?.name || 'Trực thuộc Truliva';
+          const sTech = comm.stationName || comm.salesKtv?.stationName || comm.salesKtv?.techStation?.name || 'Khác';
+          const sKey = `${sMain}::${sTech}`;
+          if (!map.has(sMain)) {
+            map.set(sMain, new Map());
+          }
+          if (!map.get(sMain)!.has(sKey)) {
+            map.get(sMain)!.set(sKey, { key: sKey, name: sTech, count: 0 });
+          }
+        });
+      }
     }
 
     const list: Array<{ mainStationName: string; stations: Array<{ key: string; name: string; count: number }> }> = [];
@@ -1640,7 +1693,7 @@ export default function SalaryManage() {
     });
 
     return list.sort((a, b) => a.mainStationName.localeCompare(b.mainStationName, 'vi'));
-  }, [allCases, salaries, selectedKtvsFilter, selectedWorkTypeFilter, selectedServiceTypeFilter, selectedProductFilter, selectedCompletedDateFilter, selectedDistancePresets, customDistanceOp, customDistanceMin, customDistanceMax, searchQuery]);
+  }, [allCases, salaries, commissionsData.commissions, viewMode, selectedKtvsFilter, selectedCommissionKtvFilter, selectedWorkTypeFilter, selectedServiceTypeFilter, selectedProductFilter, selectedCompletedDateFilter, selectedDistancePresets, customDistanceOp, customDistanceMin, customDistanceMax, commissionSearchQuery, searchQuery]);
 
   // Toggle single technical station selection
   const toggleStation = (stationKey: string) => {
@@ -1823,31 +1876,11 @@ export default function SalaryManage() {
     );
 
     return salaries.filter(s => {
-      const hasActivity = s.casesCount > 0 || (s.adjustedCost !== s.calculatedCost) || !!s.adjustmentNote;
+      const hasActivity = s.casesCount > 0 || (s.salesCommission && s.salesCommission > 0) || (s.salesCommissionOrdersCount && s.salesCommissionOrdersCount > 0) || (s.adjustedCost !== s.calculatedCost) || !!s.adjustmentNote;
       const matchKtv = selectedKtvsFilter.length === 0 ? hasActivity : selectedKtvsFilter.includes(s.userId);
       if (!matchKtv) return false;
 
-      if (selectedStationsFilter.length > 0) {
-        const sMain = s.mainStationName && s.mainStationName !== 'Không có' ? s.mainStationName : 'Trực thuộc Truliva';
-        const sTech = s.stationName && s.stationName !== 'Không có' ? s.stationName : 'Khác';
-        const sKey = `${sMain}::${sTech}`;
-        const normKey = normStr(sKey);
-        const normMain = normStr(sMain);
-        const normTech = normStr(sTech);
-
-        const matchStation = selectedStationsFilter.some(item => {
-          const filter = item.trim();
-          if (!filter) return false;
-          const normF = normStr(filter);
-          if (filter === sKey || normF === normKey) return true;
-          if (filter.includes('::')) {
-            const [f1, f2] = filter.split('::').map(x => normStr(x));
-            return (f1 === normMain && f2 === normTech) || (f1 === normTech && f2 === normMain);
-          }
-          return normMain === normF || normTech === normF;
-        });
-        if (!matchStation) return false;
-      }
+      if (!matchesStation(s.mainStationName, s.stationName)) return false;
 
       if (hasCaseSpecificFilters) {
         return activeKtvIdsInCases.has(s.userId);
@@ -1866,6 +1899,13 @@ export default function SalaryManage() {
       return true;
     });
   }, [salaries, filteredCases, selectedKtvsFilter, selectedStationsFilter, selectedWorkTypeFilter, selectedServiceTypeFilter, selectedProductFilter, selectedCompletedDateFilter, selectedDistancePresets, searchQuery]);
+
+  // Danh sách KTV bán hàng khả dụng theo Trạm đang chọn (cho dropdown nội bộ tab Hoa Hồng)
+  const availableCommissionKtvs = useMemo(() => {
+    const list = Object.values(commissionsData.ktvSummaries || {});
+    if (selectedStationsFilter.length === 0) return list;
+    return list.filter((s: any) => matchesStation(s.mainStationName, s.stationName));
+  }, [commissionsData.ktvSummaries, selectedStationsFilter]);
 
   // Danh sách Đơn hàng Hoa hồng bán hàng sau khi lọc theo KTV, Trạm, Ngày HT, Sản phẩm, Tìm kiếm
   const filteredCommissions = useMemo(() => {
@@ -1886,27 +1926,11 @@ export default function SalaryManage() {
         }
       }
 
-      // 3. Lọc theo Trạm từ bộ lọc toàn cục
+      // 3. Lọc theo Trạm từ bộ lọc toàn cục (Cây quản lý trạm)
       if (selectedStationsFilter.length > 0) {
-        const sMain = comm.salesKtv?.techStation?.mainStationName || comm.salesKtv?.mainStationName || 'Trực thuộc Truliva';
-        const sTech = comm.salesKtv?.techStation?.name || comm.salesKtv?.stationName || 'Khác';
-        const sKey = `${sMain}::${sTech}`;
-        const normKey = normStr(sKey);
-        const normMain = normStr(sMain);
-        const normTech = normStr(sTech);
-
-        const matchStation = selectedStationsFilter.some(item => {
-          const filter = item.trim();
-          if (!filter) return false;
-          const normF = normStr(filter);
-          if (filter === sKey || normF === normKey) return true;
-          if (filter.includes('::')) {
-            const [f1, f2] = filter.split('::').map(x => normStr(x));
-            return (f1 === normMain && f2 === normTech) || (f1 === normTech && f2 === normMain);
-          }
-          return normMain === normF || normTech === normF;
-        });
-        if (!matchStation) return false;
+        const sMain = comm.mainStationName || comm.salesKtv?.mainStationName || comm.salesKtv?.techStation?.mainStation?.name || 'Trực thuộc Truliva';
+        const sTech = comm.stationName || comm.salesKtv?.stationName || comm.salesKtv?.techStation?.name || 'Khác';
+        if (!matchesStation(sMain, sTech)) return false;
       }
 
       // 4. Lọc theo Ngày hoàn thành
@@ -2696,7 +2720,7 @@ export default function SalaryManage() {
                                   📍 {st.name}
                                 </span>
                                 <span className="text-[10px] font-semibold text-gray-500 bg-gray-100 px-1.5 py-0.2 rounded-full flex-shrink-0">
-                                  {st.count} ca
+                                  {st.count} {viewMode === 'commissions' ? 'đơn' : 'ca'}
                                 </span>
                               </label>
                             );
@@ -4622,9 +4646,9 @@ export default function SalaryManage() {
                   onChange={e => setSelectedCommissionKtvFilter(e.target.value)}
                   className="w-full py-2 px-3 text-xs border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:outline-none bg-white font-medium text-gray-700"
                 >
-                  <option value="">Tất cả KTV bán hàng ({Object.keys(commissionsData.ktvSummaries || {}).length})</option>
-                  {Object.entries(commissionsData.ktvSummaries || {}).map(([ktvId, summary]: [string, any]) => (
-                    <option key={ktvId} value={ktvId}>
+                  <option value="">Tất cả KTV bán hàng ({availableCommissionKtvs.length})</option>
+                  {availableCommissionKtvs.map((summary: any) => (
+                    <option key={summary.ktvId} value={summary.ktvId}>
                       {summary.ktvName} ({summary.orderCount || summary.totalOrders || 0} đơn - {formatMoney(summary.totalCommission ?? summary.totalFinalCommission ?? 0)})
                     </option>
                   ))}

@@ -90,6 +90,8 @@ export interface OrderCommissionResult {
   assignedKtvName?: string | null;
   assignedKtv?: any; // Object cho frontend display
   workType?: string | null;
+  stationName?: string | null;
+  mainStationName?: string | null;
   itemsDetail: OrderCommissionItem[];
   // Device numbers
   deviceRevenue: number;
@@ -298,6 +300,16 @@ export function calculateSingleOrderCommission(
     completionDate = new Date(order.updatedAt);
   }
 
+  const ktvMainStationName = order.salesKtv?.techStation?.mainStation?.name;
+  const ktvTechStationName = order.salesKtv?.techStation?.name;
+  const orderMainStationName = order.mainStation?.name || order.techStation?.mainStation?.name;
+  const orderTechStationName = order.techStation?.name;
+  const assignedMainStationName = order.assignedKtv?.techStation?.mainStation?.name;
+  const assignedTechStationName = order.assignedKtv?.techStation?.name;
+
+  const mainStationName = ktvMainStationName || orderMainStationName || assignedMainStationName || 'Trực thuộc Truliva';
+  const stationName = ktvTechStationName || orderTechStationName || assignedTechStationName || 'Khác';
+
   return {
     orderId: order.id,
     pancakeOrderId: order.pancakeOrderId,
@@ -311,12 +323,29 @@ export function calculateSingleOrderCommission(
     salesKtvId: order.salesKtvId,
     salesKtvName: order.salesKtv?.fullName,
     salesKtvPhone: order.salesKtv?.phoneNumber,
+    stationName,
+    mainStationName,
     // Object salesKtv cho frontend dropdown/display
     salesKtv: order.salesKtv ? {
       id: order.salesKtv.id,
       fullName: order.salesKtv.fullName,
       phoneNumber: order.salesKtv.phoneNumber,
-      techStation: order.salesKtv.techStation
+      mainStationName,
+      stationName,
+      techStation: order.salesKtv.techStation || (order.techStation ? {
+        id: order.techStation.id,
+        name: stationName,
+        mainStation: {
+          name: mainStationName
+        },
+        mainStationName
+      } : {
+        name: stationName,
+        mainStation: {
+          name: mainStationName
+        },
+        mainStationName
+      })
     } : null,
     assignedKtvId: order.assignedKtvId,
     assignedKtvName: order.assignedKtv?.fullName,
@@ -324,7 +353,10 @@ export function calculateSingleOrderCommission(
     assignedKtv: order.assignedKtv ? {
       id: order.assignedKtv.id,
       fullName: order.assignedKtv.fullName,
-      phoneNumber: order.assignedKtv.phoneNumber
+      phoneNumber: order.assignedKtv.phoneNumber,
+      mainStationName: assignedMainStationName || mainStationName,
+      stationName: assignedTechStationName || stationName,
+      techStation: order.assignedKtv.techStation
     } : null,
     workType: order.workType,
     itemsDetail,
@@ -476,13 +508,22 @@ export async function computeCommissionsForMonth(
           fullName: true,
           phoneNumber: true,
           techStation: {
-            select: { name: true, mainStation: { select: { name: true } } }
+            select: { id: true, name: true, mainStation: { select: { id: true, name: true } } }
           }
         }
       },
       assignedKtv: {
-        select: { id: true, fullName: true, phoneNumber: true }
+        select: {
+          id: true,
+          fullName: true,
+          phoneNumber: true,
+          techStation: {
+            select: { id: true, name: true, mainStation: { select: { id: true, name: true } } }
+          }
+        }
       },
+      mainStation: { select: { id: true, name: true } },
+      techStation: { select: { id: true, name: true, mainStation: { select: { id: true, name: true } } } },
       serviceReports: {
         where: { approvalStatus: 'APPROVED' },
         orderBy: { createdAt: 'desc' }
@@ -529,6 +570,8 @@ export async function computeCommissionsForMonth(
         ktvId,
         ktvName: order.salesKtv?.fullName || 'Chưa đặt tên',
         ktvPhone: order.salesKtv?.phoneNumber || '',
+        mainStationName: result.mainStationName || 'Trực thuộc Truliva',
+        stationName: result.stationName || 'Khác',
         totalOrders: 0,
         orderCount: 0,
         totalPreVatRevenue: 0,
