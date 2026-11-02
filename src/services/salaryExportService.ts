@@ -124,7 +124,7 @@ export async function getRatesMatrixData(): Promise<any[]> {
  * 1. Sheet Tổng hợp thù lao KTV
  */
 export function buildSummarySheet(workbook: ExcelJS.Workbook, ctx: SalaryExportContext): void {
-  const { filteredSalaries, filters } = ctx;
+  const { filteredSalaries, filters, commissionsData } = ctx;
   const wsSummary = workbook.addWorksheet('Tong_Hop_KTV');
   wsSummary.views = [{ showGridLines: true }];
 
@@ -143,9 +143,10 @@ export function buildSummarySheet(workbook: ExcelJS.Workbook, ctx: SalaryExportC
   subCell.alignment = { horizontal: 'center', vertical: 'middle' };
   wsSummary.getRow(2).height = 20;
 
+  // Header 15 cột (Bỏ STT, thêm Hoa hồng bán hàng)
   const summaryHeaders = [
-    'STT', 'Họ và tên KTV', 'Số điện thoại', 'Tỉnh / Trạm KT', 'Trạm Quản Lý',
-    'Số ca', 'Bảo hành', 'Sửa chữa', 'Giao hàng', 'Lắp đặt', 'Giao lắp', 'Thay lọc', 'Cước di chuyển', 'Phí khác', 'Tổng thù lao (VNĐ)'
+    'Họ và tên KTV', 'Số điện thoại', 'Tỉnh / Trạm KT', 'Trạm Quản Lý',
+    'Số ca', 'Bảo hành', 'Sửa chữa', 'Giao hàng', 'Lắp đặt', 'Giao lắp', 'Thay lọc', 'Cước di chuyển', 'Phí khác', 'Hoa hồng bán hàng (VNĐ)', 'Tổng thu nhập (VNĐ)'
   ];
   const headerRowSummary = wsSummary.addRow(summaryHeaders);
   headerRowSummary.height = 28;
@@ -171,6 +172,7 @@ export function buildSummarySheet(workbook: ExcelJS.Workbook, ctx: SalaryExportC
   let sumTotalThayLoc = 0;
   let sumTotalDistance = 0;
   let sumTotalOther = 0;
+  let sumSalesComm = 0;
   let sumGrandTotal = 0;
 
   const isSpecificCaseFilter = Boolean(
@@ -182,7 +184,7 @@ export function buildSummarySheet(workbook: ExcelJS.Workbook, ctx: SalaryExportC
     filters.distancePresetsList.length > 0
   );
 
-  filteredSalaries.forEach((s, idx) => {
+  filteredSalaries.forEach((s) => {
     let ktvBaoHanh = 0;
     let ktvSuaChua = 0;
     let ktvGiaoHang = 0;
@@ -221,7 +223,6 @@ export function buildSummarySheet(workbook: ExcelJS.Workbook, ctx: SalaryExportC
         let gl = Number(c.giaoLapCost) || 0;
         let tl = Number(c.thayLocCost) || 0;
 
-        // Chỉ Fallback theo workType nếu các trường breakdown CHƯA ĐƯỢC GÁN (undefined)
         if (!hasExplicitBreakdown && baseCost > 0) {
           if (wt.includes('bảo hành') || wt.includes('bao hanh')) bh = baseCost;
           else if (wt.includes('sửa chữa') || wt.includes('sua chua')) sc = baseCost;
@@ -255,6 +256,11 @@ export function buildSummarySheet(workbook: ExcelJS.Workbook, ctx: SalaryExportC
       ktvTotalCost = (s.adjustedCost !== undefined && s.adjustedCost !== null) ? Number(s.adjustedCost) : (Number(s.calculatedCost) || 0);
     }
 
+    const salesComm = s.salesCommission !== undefined
+      ? Number(s.salesCommission)
+      : (Number(commissionsData?.ktvSummaries?.[s.userId]?.totalFinalCommission) || 0);
+    const ktvTotalIncome = ktvTotalCost + salesComm;
+
     sumTotalCases += displayCasesCount;
     sumTotalBaoHanh += ktvBaoHanh;
     sumTotalSuaChua += ktvSuaChua;
@@ -264,10 +270,10 @@ export function buildSummarySheet(workbook: ExcelJS.Workbook, ctx: SalaryExportC
     sumTotalThayLoc += ktvThayLoc;
     sumTotalDistance += ktvDistance;
     sumTotalOther += ktvOther;
-    sumGrandTotal += ktvTotalCost;
+    sumSalesComm += salesComm;
+    sumGrandTotal += ktvTotalIncome;
 
     const row = wsSummary.addRow([
-      idx + 1,
       s.fullName,
       s.phoneNumber || '',
       s.stationName || 'Khác',
@@ -281,13 +287,14 @@ export function buildSummarySheet(workbook: ExcelJS.Workbook, ctx: SalaryExportC
       ktvThayLoc,
       ktvDistance,
       ktvOther,
-      ktvTotalCost
+      salesComm,
+      ktvTotalIncome
     ]);
     row.height = 22;
 
     row.eachCell((cell, colNum) => {
-      cell.alignment = { vertical: 'middle', horizontal: colNum >= 6 ? 'right' : colNum === 1 ? 'center' : 'left' };
-      if (colNum >= 7) cell.numFmt = '#,##0';
+      cell.alignment = { vertical: 'middle', horizontal: colNum >= 5 ? 'right' : 'left' };
+      if (colNum >= 6) cell.numFmt = '#,##0';
       cell.border = {
         top: { style: 'thin', color: { argb: 'FFCBD5E1' } },
         left: { style: 'thin', color: { argb: 'FFCBD5E1' } },
@@ -297,17 +304,30 @@ export function buildSummarySheet(workbook: ExcelJS.Workbook, ctx: SalaryExportC
     });
   });
 
-  // Hàng tổng cộng
+  const hasDataRows = filteredSalaries.length > 0;
+  const startRow = 4;
+  const endRow = hasDataRows ? 3 + filteredSalaries.length : 3;
+
+  // Hàng tổng cộng (Hàm SUBTOTAL 109 tính động theo AutoFilter)
   const topSummaryRow = wsSummary.addRow([
-    'TỔNG CỘNG THEO BỘ LỌC:', '', '', '', '',
-    sumTotalCases, sumTotalBaoHanh, sumTotalSuaChua, sumTotalGiaoHang,
-    sumTotalLapDat, sumTotalGiaoLap, sumTotalThayLoc, sumTotalDistance, sumTotalOther, sumGrandTotal
+    'TỔNG CỘNG THEO BỘ LỌC:', '', '', '',
+    hasDataRows ? { formula: `SUBTOTAL(109,E${startRow}:E${endRow})`, result: sumTotalCases } : 0,
+    hasDataRows ? { formula: `SUBTOTAL(109,F${startRow}:F${endRow})`, result: sumTotalBaoHanh } : 0,
+    hasDataRows ? { formula: `SUBTOTAL(109,G${startRow}:G${endRow})`, result: sumTotalSuaChua } : 0,
+    hasDataRows ? { formula: `SUBTOTAL(109,H${startRow}:H${endRow})`, result: sumTotalGiaoHang } : 0,
+    hasDataRows ? { formula: `SUBTOTAL(109,I${startRow}:I${endRow})`, result: sumTotalLapDat } : 0,
+    hasDataRows ? { formula: `SUBTOTAL(109,J${startRow}:J${endRow})`, result: sumTotalGiaoLap } : 0,
+    hasDataRows ? { formula: `SUBTOTAL(109,K${startRow}:K${endRow})`, result: sumTotalThayLoc } : 0,
+    hasDataRows ? { formula: `SUBTOTAL(109,L${startRow}:L${endRow})`, result: sumTotalDistance } : 0,
+    hasDataRows ? { formula: `SUBTOTAL(109,M${startRow}:M${endRow})`, result: sumTotalOther } : 0,
+    hasDataRows ? { formula: `SUBTOTAL(109,N${startRow}:N${endRow})`, result: sumSalesComm } : 0,
+    hasDataRows ? { formula: `SUBTOTAL(109,O${startRow}:O${endRow})`, result: sumGrandTotal } : 0
   ]);
   topSummaryRow.height = 26;
   topSummaryRow.eachCell((cell, colNum) => {
     cell.font = { name: 'Arial', size: 11, bold: true, color: { argb: 'FF1B3A6B' } };
-    cell.alignment = { vertical: 'middle', horizontal: colNum >= 6 ? 'right' : 'left' };
-    if (colNum >= 7) cell.numFmt = '#,##0';
+    cell.alignment = { vertical: 'middle', horizontal: colNum >= 5 ? 'right' : 'left' };
+    if (colNum >= 6) cell.numFmt = '#,##0';
     cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE2E8F0' } };
     cell.border = {
       top: { style: 'medium', color: { argb: 'FF1B3A6B' } },
@@ -317,11 +337,9 @@ export function buildSummarySheet(workbook: ExcelJS.Workbook, ctx: SalaryExportC
     };
   });
 
-  const hasDataRows = filteredSalaries.length > 0;
-  const lastDataRow = hasDataRows ? 4 + filteredSalaries.length : 4;
-  wsSummary.autoFilter = `A4:O${lastDataRow}`;
+  wsSummary.autoFilter = hasDataRows ? `A3:O${endRow}` : `A3:O3`;
 
-  [6, 25, 15, 20, 20, 10, 14, 14, 14, 14, 14, 14, 16, 14, 20].forEach((w, i) => {
+  [25, 15, 20, 20, 10, 14, 14, 14, 14, 14, 14, 16, 14, 22, 22].forEach((w, i) => {
     wsSummary.getColumn(i + 1).width = w;
   });
 }
@@ -334,22 +352,24 @@ export function buildCasesSheet(workbook: ExcelJS.Workbook, ctx: SalaryExportCon
   const wsDetail = workbook.addWorksheet('Chi_Tiet_Ca_Dich_Vu');
   wsDetail.views = [{ showGridLines: true }];
 
-  wsDetail.mergeCells('A1:U1');
+  // Tiêu đề
+  wsDetail.mergeCells('A1:T1');
   const detailTitleCell = wsDetail.getCell('A1');
   detailTitleCell.value = `CHI TIẾT DỊCH VỤ & PHÍ CỤ THỂ THEO CA - THÁNG ${filters.month}`;
   detailTitleCell.font = { name: 'Arial', size: 16, bold: true, color: { argb: 'FF1B3A6B' } };
   detailTitleCell.alignment = { horizontal: 'center', vertical: 'middle' };
   wsDetail.getRow(1).height = 35;
 
-  wsDetail.mergeCells('A2:U2');
+  wsDetail.mergeCells('A2:T2');
   const detailSubCell = wsDetail.getCell('A2');
   detailSubCell.value = `Ngày xuất file: ${new Date().toLocaleDateString('vi-VN')}`;
   detailSubCell.font = { name: 'Arial', size: 10, italic: true, color: { argb: 'FF64748B' } };
   detailSubCell.alignment = { horizontal: 'center', vertical: 'middle' };
   wsDetail.getRow(2).height = 20;
 
+  // Header 20 cột (Bỏ STT)
   const detailHeaders = [
-    'STT', 'Ngày hoàn thành', 'Tên KTV', 'Trạm KT KTV', 'Tên khách hàng', 'SĐT Khách hàng', 'Tỉnh / Thành',
+    'Ngày hoàn thành', 'Tên KTV', 'Trạm KT KTV', 'Tên khách hàng', 'SĐT Khách hàng', 'Tỉnh / Thành',
     'Sản phẩm', 'Loại công việc', 'Ghi chú đơn', 'Ghi chú báo cáo', 'Khoảng cách (km)',
     'Phí Bảo Hành', 'Phí Sửa Chữa', 'Phí Giao Hàng', 'Phí Lắp Đặt', 'Phí Giao Lắp', 'Phí Thay Lọc', 'Cước Di Chuyển', 'Phí Khác', 'Tổng chi phí ca (VNĐ)'
   ];
@@ -368,7 +388,6 @@ export function buildCasesSheet(workbook: ExcelJS.Workbook, ctx: SalaryExportCon
     };
   });
 
-  let detailIdx = 1;
   let sumBaoHanh = 0;
   let sumSuaChua = 0;
   let sumGiaoHang = 0;
@@ -406,7 +425,6 @@ export function buildCasesSheet(workbook: ExcelJS.Workbook, ctx: SalaryExportCon
       let pGiaoLap = Number(c.giaoLapCost) || 0;
       let pThayLoc = Number(c.thayLocCost) || 0;
 
-      // Chỉ Fallback theo workType nếu các trường breakdown CHƯA ĐƯỢC GÁN (undefined)
       if (!hasExplicitBreakdown && baseCost > 0) {
         if (wt.includes('bảo hành') || wt.includes('bao hanh')) pBaoHanh = baseCost;
         else if (wt.includes('sửa chữa') || wt.includes('sua chua')) pSuaChua = baseCost;
@@ -437,7 +455,6 @@ export function buildCasesSheet(workbook: ExcelJS.Workbook, ctx: SalaryExportCon
       const prodsStr = Array.isArray(c.products) ? c.products.join(', ') : (c.products || '');
 
       detailRowsData.push([
-        detailIdx++,
         dateStr,
         s.fullName,
         s.stationName || 'Khác',
@@ -462,34 +479,13 @@ export function buildCasesSheet(workbook: ExcelJS.Workbook, ctx: SalaryExportCon
     }
   }
 
-  const hasDetailRows = detailRowsData.length > 0;
-  const lastDetailDataRow = hasDetailRows ? 5 + detailRowsData.length : 5;
-
-  const topSummaryRow2 = wsDetail.addRow([
-    'TỔNG CỘNG THEO BỘ LỌC:', '', '', '', '', '', '', '', '', '', '', '',
-    sumBaoHanh, sumSuaChua, sumGiaoHang, sumLapDat, sumGiaoLap, sumThayLoc, sumDistanceCost, sumOtherCost, sumTotalCost
-  ]);
-  topSummaryRow2.height = 26;
-
-  topSummaryRow2.eachCell((cell, colNum) => {
-    cell.font = { name: 'Arial', size: 11, bold: true, color: { argb: 'FF1B3A6B' } };
-    cell.alignment = { vertical: 'middle', horizontal: colNum >= 13 ? 'right' : 'left' };
-    if (colNum >= 13) cell.numFmt = '#,##0';
-    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE2E8F0' } };
-    cell.border = {
-      top: { style: 'medium', color: { argb: 'FF1B3A6B' } },
-      left: { style: 'thin', color: { argb: 'FFCBD5E1' } },
-      bottom: { style: 'medium', color: { argb: 'FF1B3A6B' } },
-      right: { style: 'thin', color: { argb: 'FFCBD5E1' } }
-    };
-  });
-
+  // 1. Thêm các dòng chi tiết dữ liệu trước
   for (const rData of detailRowsData) {
     const row = wsDetail.addRow(rData);
     row.height = 22;
     row.eachCell((cell, colNum) => {
-      cell.alignment = { vertical: 'middle', horizontal: colNum >= 12 ? 'right' : colNum === 1 ? 'center' : 'left' };
-      if (colNum >= 13 && typeof cell.value === 'number') {
+      cell.alignment = { vertical: 'middle', horizontal: colNum >= 11 ? 'right' : colNum === 1 ? 'center' : 'left' };
+      if (colNum >= 12 && typeof cell.value === 'number') {
         cell.numFmt = '#,##0';
       }
       cell.border = {
@@ -501,8 +497,39 @@ export function buildCasesSheet(workbook: ExcelJS.Workbook, ctx: SalaryExportCon
     });
   }
 
-  wsDetail.autoFilter = `A5:U${lastDetailDataRow}`;
-  [6, 18, 22, 18, 20, 14, 15, 25, 20, 25, 25, 15, 15, 15, 15, 15, 15, 15, 15, 15, 18].forEach((w, i) => {
+  // 2. Thêm HÀNG TỔNG CỘNG ở CUỐI SHEET cho đồng bộ với các sheet khác
+  const hasDetailRows = detailRowsData.length > 0;
+  const startDetailRow = 4;
+  const endDetailRow = hasDetailRows ? 3 + detailRowsData.length : 3;
+
+  const totalCasesRow = wsDetail.addRow([
+    'TỔNG CỘNG THEO BỘ LỌC:', '', '', '', '', '', '', '', '', '', '',
+    hasDetailRows ? { formula: `SUBTOTAL(109,L${startDetailRow}:L${endDetailRow})`, result: sumBaoHanh } : 0,
+    hasDetailRows ? { formula: `SUBTOTAL(109,M${startDetailRow}:M${endDetailRow})`, result: sumSuaChua } : 0,
+    hasDetailRows ? { formula: `SUBTOTAL(109,N${startDetailRow}:N${endDetailRow})`, result: sumGiaoHang } : 0,
+    hasDetailRows ? { formula: `SUBTOTAL(109,O${startDetailRow}:O${endDetailRow})`, result: sumLapDat } : 0,
+    hasDetailRows ? { formula: `SUBTOTAL(109,P${startDetailRow}:P${endDetailRow})`, result: sumGiaoLap } : 0,
+    hasDetailRows ? { formula: `SUBTOTAL(109,Q${startDetailRow}:Q${endDetailRow})`, result: sumThayLoc } : 0,
+    hasDetailRows ? { formula: `SUBTOTAL(109,R${startDetailRow}:R${endDetailRow})`, result: sumDistanceCost } : 0,
+    hasDetailRows ? { formula: `SUBTOTAL(109,S${startDetailRow}:S${endDetailRow})`, result: sumOtherCost } : 0,
+    hasDetailRows ? { formula: `SUBTOTAL(109,T${startDetailRow}:T${endDetailRow})`, result: sumTotalCost } : 0
+  ]);
+  totalCasesRow.height = 26;
+  totalCasesRow.eachCell((cell, colNum) => {
+    cell.font = { name: 'Arial', size: 11, bold: true, color: { argb: 'FF1B3A6B' } };
+    cell.alignment = { vertical: 'middle', horizontal: colNum >= 12 ? 'right' : 'left' };
+    if (colNum >= 12) cell.numFmt = '#,##0';
+    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE2E8F0' } };
+    cell.border = {
+      top: { style: 'medium', color: { argb: 'FF1B3A6B' } },
+      left: { style: 'thin', color: { argb: 'FFCBD5E1' } },
+      bottom: { style: 'medium', color: { argb: 'FF1B3A6B' } },
+      right: { style: 'thin', color: { argb: 'FFCBD5E1' } }
+    };
+  });
+
+  wsDetail.autoFilter = hasDetailRows ? `A3:T${endDetailRow}` : `A3:T3`;
+  [16, 22, 18, 20, 14, 15, 25, 20, 25, 25, 15, 15, 15, 15, 15, 15, 15, 15, 15, 18].forEach((w, i) => {
     wsDetail.getColumn(i + 1).width = w;
   });
 }
@@ -744,24 +771,25 @@ export function buildCommissionsSheet(workbook: ExcelJS.Workbook, ctx: SalaryExp
     sumFinalComm += c.finalCommission || 0;
   });
 
-  // Tiêu đề
-  wsComm.mergeCells('A1:S1');
+  // Tiêu đề (Merged A1:M1 vì đã bỏ 4 cột)
+  wsComm.mergeCells('A1:M1');
   const titleCell = wsComm.getCell('A1');
   titleCell.value = `BẢNG TÍNH HOA HỒNG BÁN HÀNG KỸ THUẬT VIÊN - THÁNG ${filters.month}`;
   titleCell.font = { name: 'Arial', size: 16, bold: true, color: { argb: 'FF1B3A6B' } };
   titleCell.alignment = { horizontal: 'center', vertical: 'middle' };
   wsComm.getRow(1).height = 35;
 
-  wsComm.mergeCells('A2:S2');
+  wsComm.mergeCells('A2:M2');
   const subCell = wsComm.getCell('A2');
   subCell.value = `Ngày xuất file: ${new Date().toLocaleDateString('vi-VN')} | Số đơn hàng: ${filteredCommissions.length} | Tổng hoa hồng thực nhận: ${Math.round(sumFinalComm).toLocaleString('vi-VN')} VNĐ`;
   subCell.font = { name: 'Arial', size: 10, italic: true, color: { argb: 'FF64748B' } };
   subCell.alignment = { horizontal: 'center', vertical: 'middle' };
   wsComm.getRow(2).height = 20;
 
+  // Header 13 cột: Bỏ STT, SĐT KTV Bán, Trạm KTV Bán, KTV Lắp đặt
   const commHeaders = [
-    'STT', 'Mã đơn hàng', 'Ngày hoàn thành', 'Khách hàng', 'SĐT Khách hàng',
-    'KTV Bán hàng', 'SĐT KTV Bán', 'Trạm KTV Bán', 'KTV Lắp đặt',
+    'Mã đơn hàng', 'Ngày hoàn thành', 'Khách hàng', 'SĐT Khách hàng',
+    'KTV Bán hàng',
     'Doanh số Máy (Trước VAT)', 'Trừ ca GH & LĐ (VNĐ)', 'Hoa hồng Máy (15%)',
     'Doanh số Lõi/PK (Trước VAT)', 'Hoa hồng Lõi/PK (10%)',
     'Hoa hồng tự động tính (VNĐ)', 'Điều chỉnh / Ghi chú', 'Hoa hồng thực nhận (VNĐ)'
@@ -781,22 +809,18 @@ export function buildCommissionsSheet(workbook: ExcelJS.Workbook, ctx: SalaryExp
     };
   });
 
-  filteredCommissions.forEach((c, idx) => {
+  filteredCommissions.forEach((c) => {
     const dateStr = c.completedDate
       ? new Date(c.completedDate).toLocaleDateString('vi-VN')
       : '';
     const deviceNetComm = Math.max(0, (c.deviceCommissionGross || 0) - (c.lapDatCostDeducted || 0));
 
     const row = wsComm.addRow([
-      idx + 1,
       c.orderCode || c.pancakeOrderId || c.orderId,
       dateStr,
       c.customerName || 'Khách vãng lai',
       c.customerPhone || '',
       c.salesKtvName || c.salesKtv?.fullName || 'Chưa chọn',
-      c.salesKtvPhone || c.salesKtv?.phoneNumber || '',
-      c.salesKtv?.techStation?.name || '',
-      c.assignedKtvName || c.assignedKtv?.fullName || 'Chưa phân KTV',
       c.preVatDeviceRevenue || 0,
       c.lapDatCostDeducted || 0,
       deviceNetComm,
@@ -811,12 +835,12 @@ export function buildCommissionsSheet(workbook: ExcelJS.Workbook, ctx: SalaryExp
     row.eachCell((cell, colNum) => {
       cell.alignment = {
         vertical: 'middle',
-        horizontal: (colNum >= 10 && colNum <= 15) || colNum === 17 ? 'right' : colNum === 1 || colNum === 2 || colNum === 3 ? 'center' : 'left'
+        horizontal: (colNum >= 6 && colNum <= 11) || colNum === 13 ? 'right' : (colNum === 1 || colNum === 2 ? 'center' : 'left')
       };
-      if ((colNum >= 10 && colNum <= 15) || colNum === 17) {
+      if ((colNum >= 6 && colNum <= 11) || colNum === 13) {
         cell.numFmt = '#,##0';
       }
-      if (colNum === 17) {
+      if (colNum === 13) {
         cell.font = { name: 'Arial', size: 10, bold: true, color: { argb: 'FF065F46' } };
         cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFECFDF5' } };
       }
@@ -829,23 +853,32 @@ export function buildCommissionsSheet(workbook: ExcelJS.Workbook, ctx: SalaryExp
     });
   });
 
-  // Hàng tổng cộng Hoa hồng
-  const topSummaryRow = wsComm.addRow([
-    'TỔNG CỘNG THEO BỘ LỌC:', '', '', '', '', '', '', '', '',
-    sumPreVatDeviceRevenue,
-    sumLapDatDeducted,
-    sumDeviceComm,
-    sumPreVatFilterRevenue,
-    sumFilterComm,
-    sumCalcComm,
+  const hasCommRows = filteredCommissions.length > 0;
+  const startCommRow = 4;
+  const endCommRow = hasCommRows ? 3 + filteredCommissions.length : 3;
+
+  // Hàng tổng cộng Hoa hồng (Hàm SUBTOTAL 109 tính động theo AutoFilter)
+  const totalCommRow = wsComm.addRow([
+    'TỔNG CỘNG THEO BỘ LỌC:', '', '', '', '',
+    hasCommRows ? { formula: `SUBTOTAL(109,F${startCommRow}:F${endCommRow})`, result: sumPreVatDeviceRevenue } : 0,
+    hasCommRows ? { formula: `SUBTOTAL(109,G${startCommRow}:G${endCommRow})`, result: sumLapDatDeducted } : 0,
+    hasCommRows ? { formula: `SUBTOTAL(109,H${startCommRow}:H${endCommRow})`, result: sumDeviceComm } : 0,
+    hasCommRows ? { formula: `SUBTOTAL(109,I${startCommRow}:I${endCommRow})`, result: sumPreVatFilterRevenue } : 0,
+    hasCommRows ? { formula: `SUBTOTAL(109,J${startCommRow}:J${endCommRow})`, result: sumFilterComm } : 0,
+    hasCommRows ? { formula: `SUBTOTAL(109,K${startCommRow}:K${endCommRow})`, result: sumCalcComm } : 0,
     '',
-    sumFinalComm
+    hasCommRows ? { formula: `SUBTOTAL(109,M${startCommRow}:M${endCommRow})`, result: sumFinalComm } : 0
   ]);
-  topSummaryRow.height = 26;
-  topSummaryRow.eachCell((cell, colNum) => {
+  totalCommRow.height = 26;
+  totalCommRow.eachCell((cell, colNum) => {
     cell.font = { name: 'Arial', size: 11, bold: true, color: { argb: 'FF1B3A6B' } };
-    cell.alignment = { vertical: 'middle', horizontal: (colNum >= 10 && colNum <= 15) || colNum === 17 ? 'right' : 'left' };
-    if ((colNum >= 10 && colNum <= 15) || colNum === 17) cell.numFmt = '#,##0';
+    cell.alignment = {
+      vertical: 'middle',
+      horizontal: (colNum >= 6 && colNum <= 11) || colNum === 13 ? 'right' : 'left'
+    };
+    if ((colNum >= 6 && colNum <= 11) || colNum === 13) {
+      cell.numFmt = '#,##0';
+    }
     cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE2E8F0' } };
     cell.border = {
       top: { style: 'medium', color: { argb: 'FF1B3A6B' } },
@@ -855,10 +888,9 @@ export function buildCommissionsSheet(workbook: ExcelJS.Workbook, ctx: SalaryExp
     };
   });
 
-  const lastCommRow = 4 + filteredCommissions.length;
-  wsComm.autoFilter = `A4:Q${Math.max(lastCommRow, 4)}`;
+  wsComm.autoFilter = hasCommRows ? `A3:M${endCommRow}` : `A3:M3`;
 
-  [6, 18, 16, 22, 15, 22, 15, 18, 20, 22, 18, 18, 22, 18, 22, 22, 22].forEach((w, i) => {
+  [16, 16, 22, 15, 22, 20, 18, 18, 22, 18, 22, 22, 22].forEach((w, i) => {
     wsComm.getColumn(i + 1).width = w;
   });
 }

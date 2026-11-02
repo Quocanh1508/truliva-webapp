@@ -243,10 +243,53 @@ export async function exportSalaries(req: Request, res: Response): Promise<void>
       return false;
     };
 
-    const allSalaries = await computeFullSalariesForMonth(month);
+    const [rawSalaries, ratesMatrix, commissionsData] = await Promise.all([
+      computeFullSalariesForMonth(month),
+      getRatesMatrixData(),
+      computeCommissionsForMonth(month)
+    ]);
+
+    const commissionsByKtv = (commissionsData.ktvSummaries || {}) as Record<string, any>;
+    const existingKtvIds = new Set(rawSalaries.map((k: any) => k.userId));
+    const allSalaries = rawSalaries.map((ktv: any) => {
+      const comm = commissionsByKtv[ktv.userId];
+      const salesCommission = comm ? (comm.totalFinalCommission ?? comm.totalCommission ?? 0) : 0;
+      const salesCommissionOrdersCount = comm ? (comm.totalOrders ?? comm.orderCount ?? 0) : 0;
+      const salesCommissionCalculated = comm ? (comm.totalCalculatedCommission ?? 0) : 0;
+      return {
+        ...ktv,
+        salesCommission,
+        salesCommissionOrdersCount,
+        salesCommissionCalculated,
+        totalIncome: (ktv.adjustedCost !== undefined && ktv.adjustedCost !== null ? ktv.adjustedCost : ktv.calculatedCost) + salesCommission
+      };
+    });
+
+    for (const [kId, comm] of Object.entries(commissionsByKtv as Record<string, any>)) {
+      if (!existingKtvIds.has(kId)) {
+        allSalaries.push({
+          userId: kId,
+          fullName: comm.ktvName,
+          username: comm.ktvPhone,
+          phoneNumber: comm.ktvPhone,
+          stationName: comm.stationName || 'Khác',
+          mainStationName: comm.mainStationName || 'Trực thuộc Truliva',
+          casesCount: 0,
+          calculatedCost: 0,
+          adjustedCost: 0,
+          adjustmentNote: '',
+          status: 'DRAFT',
+          cases: [],
+          salesCommission: comm.totalFinalCommission ?? comm.totalCommission ?? 0,
+          salesCommissionOrdersCount: comm.totalOrders ?? comm.orderCount ?? 0,
+          salesCommissionCalculated: comm.totalCalculatedCommission ?? 0,
+          totalIncome: comm.totalFinalCommission ?? comm.totalCommission ?? 0
+        });
+      }
+    }
 
     const filteredSalaries = allSalaries.filter(s => {
-      const hasActivity = s.casesCount > 0 || (s.adjustedCost !== s.calculatedCost) || !!s.adjustmentNote;
+      const hasActivity = s.casesCount > 0 || (s.salesCommission > 0) || (s.adjustedCost !== s.calculatedCost) || !!s.adjustmentNote;
       const matchKtv = ktvIdsList.length === 0 ? hasActivity : ktvIdsList.includes(s.userId);
       if (!matchKtv) return false;
 
@@ -328,11 +371,6 @@ export async function exportSalaries(req: Request, res: Response): Promise<void>
 
       return true;
     });
-
-    const [ratesMatrix, commissionsData] = await Promise.all([
-      getRatesMatrixData(),
-      computeCommissionsForMonth(month)
-    ]);
 
     const exportFilters: SalaryExportFilters = {
       month,
