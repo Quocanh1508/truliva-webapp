@@ -451,13 +451,23 @@ router.post(
         return;
       }
 
-      const title = req.body.title || req.file.originalname.replace(/\.[^/.]+$/, '');
+      let fileName = req.file.originalname;
+      try {
+        const decoded = Buffer.from(req.file.originalname, 'latin1').toString('utf8');
+        if (decoded && decoded.trim()) {
+          fileName = decoded;
+        }
+      } catch (e) {
+        // Giữ tên gốc nếu decode thất bại
+      }
+
+      const title = req.body.title || fileName.replace(/\.[^/.]+$/, '');
       const user = (req as any).user;
       const uploadedBy = user?.fullName || user?.id || 'Admin';
 
       const result = await ingestDocument(
         req.file.buffer,
-        req.file.originalname,
+        fileName,
         title,
         uploadedBy
       );

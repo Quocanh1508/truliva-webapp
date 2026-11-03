@@ -135,7 +135,7 @@ Nhiệm vụ của bạn:
 TUYỆT ĐỐI không tóm tắt sơ sài, hãy giữ nguyên các chi tiết số liệu kỹ thuật chính xác.`;
 
     let responseText = '';
-    const modelsToTry = ['gemini-3.5-flash', 'gemini-3.5-flash-lite', 'gemini-flash-latest'];
+    const modelsToTry = ['gemini-2.5-flash', 'gemini-3-flash-preview', 'gemini-2.5-pro', 'gemini-3.5-flash'];
     let lastError: any = null;
 
     for (const model of modelsToTry) {
@@ -154,16 +154,22 @@ TUYỆT ĐỐI không tóm tắt sơ sài, hãy giữ nguyên các chi tiết s�
             ],
             generationConfig: {
               temperature: 0.1,
-              maxOutputTokens: 8192
+              maxOutputTokens: 32768
             }
           },
-          { timeout: 180000 }
+          { timeout: 240000 }
         );
 
         responseText = genRes.data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
         if (responseText && responseText.trim().length > 30) {
           logger.info(`[OCR] Nhận dạng thành công với mô hình ${model} (${responseText.length} ký tự)!`);
           break;
+        } else {
+          const candidate = genRes.data?.candidates?.[0];
+          logger.warn(`[OCR] Mô hình ${model} trả về nội dung rỗng hoặc quá ngắn (${responseText?.length || 0} ký tự)`, {
+            finishReason: candidate?.finishReason,
+            blockReason: genRes.data?.promptFeedback?.blockReason
+          });
         }
       } catch (err: any) {
         lastError = err;
