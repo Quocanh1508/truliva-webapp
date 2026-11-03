@@ -37,45 +37,224 @@ export interface IngestResult {
   totalChunks: number;
   totalPages: number;
   status: string;
+  isOcr?: boolean;
 }
 
 /**
- * Trích xuất văn bản từ file PDF theo từng trang
+ * Trích xuất văn bản từ tệp PDF scan/hình ảnh bằng Gemini Vision (OCR)
  */
-export async function extractTextFromPdf(buffer: Buffer): Promise<{
+export async function extractTextWithGeminiVision(buffer: Buffer, fileName: string): Promise<{
   text: string;
   pages: Array<{ pageNumber: number; text: string }>;
   totalPages: number;
 }> {
+  if (!GEMINI_API_KEY) {
+    throw new Error('Chưa cấu hình GEMINI_API_KEY trong hệ thống để thực hiện OCR');
+  }
+
+  logger.info('[OCR] Bắt đầu tải tệp lên Gemini File API để thực hiện Vision OCR...', {
+    fileName,
+    sizeMb: (buffer.length / (1024 * 1024)).toFixed(2)
+  });
+
+  let fileResourceName = '';
+  try {
+    // 1. Khởi tạo phiên Resumable Upload
+    const initRes = await axios.post(
+      `https://generativelanguage.googleapis.com/upload/v1beta/files?key=${GEMINI_API_KEY}`,
+      { file: { display_name: fileName } },
+      {
+        headers: {
+          'X-Goog-Upload-Protocol': 'resumable',
+          'X-Goog-Upload-Command': 'start',
+          'X-Goog-Upload-Header-Content-Length': buffer.length,
+          'X-Goog-Upload-Header-Content-Type': 'application/pdf',
+          'Content-Type': 'application/json'
+        },
+        timeout: 30000
+      }
+    );
+
+    const uploadUrl = initRes.headers['x-goog-upload-url'];
+    if (!uploadUrl) {
+      throw new Error('Không nhận được upload URL từ Gemini File API');
+    }
+
+    // 2. Tải trực tiếp buffer lên upload URL
+    const uploadRes = await axios.put(uploadUrl, buffer, {
+      headers: {
+        'Content-Length': buffer.length,
+        'X-Goog-Upload-Offset': '0',
+        'X-Goog-Upload-Command': 'upload, finalize'
+      },
+      maxBodyLength: 150 * 1024 * 1024,
+      maxContentLength: 150 * 1024 * 1024,
+      timeout: 180000
+    });
+
+    const fileUri = uploadRes.data?.file?.uri;
+    fileResourceName = uploadRes.data?.file?.name || '';
+    if (!fileUri || !fileResourceName) {
+      throw new Error('Gemini File API không trả về fileUri hợp lệ');
+    }
+
+    logger.info('[OCR] Tệp đã tải lên Gemini thành công, đang kiểm tra trạng thái xử lý...', {
+      fileResourceName,
+      fileUri
+    });
+
+    // 3. Chờ trạng thái tệp chuyển sang ACTIVE nếu cần
+    let fileState = uploadRes.data?.file?.state;
+    let pollCount = 0;
+    while (fileState === 'PROCESSING' && pollCount < 25) {
+      await new Promise(r => setTimeout(r, 2000));
+      const pollRes = await axios.get(
+        `https://generativelanguage.googleapis.com/v1beta/${fileResourceName}?key=${GEMINI_API_KEY}`
+      );
+      fileState = pollRes.data?.state;
+      pollCount++;
+    }
+
+    if (fileState === 'FAILED') {
+      throw new Error('Gemini báo lỗi khi tiền xử lý tệp PDF.');
+    }
+
+    // 4. Gọi mô hình Gemini Vision để trích xuất văn bản (Thử gemini-3.5-flash trước, dự phòng gemini-3.5-flash-lite)
+    const ocrPrompt = `Bạn là hệ thống OCR chuyên nghiệp nhận dạng tài liệu máy lọc nước Truliva.
+Nhiệm vụ của bạn:
+1. Đọc kỹ toàn bộ các trang trong tài liệu đính kèm (kể cả tài liệu scan/slide ảnh chụp).
+2. Trích xuất đầy đủ toàn bộ văn bản, tên model sản phẩm (ví dụ: UR3626, UR5840, UR5676...), thông số kỹ thuật (kích thước, công suất lọc, điện áp, áp suất, khối lượng, tỷ lệ giảm TDS), giá bán niêm yết, các loại linh kiện (bộ vòi, van, lõi lọc PCP, màng RO...).
+3. BẮT BUỘC định dạng rõ ràng từng trang theo mẫu sau:
+--- TRANG 1 ---
+[Toàn bộ nội dung chữ và thông số của trang 1]
+--- TRANG 2 ---
+[Toàn bộ nội dung chữ và thông số của trang 2]
+...
+(Đánh số liên tục đến hết tất cả các trang có trong tài liệu).
+
+TUYỆT ĐỐI không tóm tắt sơ sài, hãy giữ nguyên các chi tiết số liệu kỹ thuật chính xác.`;
+
+    let responseText = '';
+    const modelsToTry = ['gemini-3.5-flash', 'gemini-3.5-flash-lite', 'gemini-flash-latest'];
+    let lastError: any = null;
+
+    for (const model of modelsToTry) {
+      try {
+        logger.info(`[OCR] Đang gọi mô hình ${model} để nhận dạng chữ từ hình ảnh...`);
+        const genRes = await axios.post(
+          `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${GEMINI_API_KEY}`,
+          {
+            contents: [
+              {
+                parts: [
+                  { fileData: { mimeType: 'application/pdf', fileUri } },
+                  { text: ocrPrompt }
+                ]
+              }
+            ],
+            generationConfig: {
+              temperature: 0.1,
+              maxOutputTokens: 8192
+            }
+          },
+          { timeout: 180000 }
+        );
+
+        responseText = genRes.data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
+        if (responseText && responseText.trim().length > 30) {
+          logger.info(`[OCR] Nhận dạng thành công với mô hình ${model} (${responseText.length} ký tự)!`);
+          break;
+        }
+      } catch (err: any) {
+        lastError = err;
+        logger.warn(`[OCR] Thử mô hình ${model} không thành công, thử mô hình dự phòng tiếp theo...`, {
+          error: err.response?.data?.error?.message || err.message
+        });
+      }
+    }
+
+    if (!responseText || responseText.trim().length <= 30) {
+      throw new Error(`Gemini Vision OCR không thể đọc chữ từ tệp PDF này: ${lastError?.message || 'Không có phản hồi'}`);
+    }
+
+    // 5. Phân tách theo từng trang từ marker "--- TRANG \d+ ---"
+    const pageRegex = /---\s*TRANG\s+(\d+)\s*---([\s\S]*?)(?=(?:---\s*TRANG\s+\d+\s*---|$))/gi;
+    const pagesList: Array<{ pageNumber: number; text: string }> = [];
+    let match;
+    while ((match = pageRegex.exec(responseText)) !== null) {
+      const pageNum = parseInt(match[1], 10);
+      const content = match[2].trim();
+      if (content) {
+        pagesList.push({ pageNumber: pageNum, text: content });
+      }
+    }
+
+    if (pagesList.length === 0) {
+      pagesList.push({ pageNumber: 1, text: responseText.trim() });
+    }
+
+    return {
+      text: responseText,
+      pages: pagesList,
+      totalPages: pagesList.length
+    };
+  } finally {
+    // 6. Dọn dẹp tệp tạm trên Gemini File API
+    if (fileResourceName) {
+      try {
+        await axios.delete(
+          `https://generativelanguage.googleapis.com/v1beta/${fileResourceName}?key=${GEMINI_API_KEY}`
+        );
+        logger.info('[OCR] Đã dọn dẹp tệp tạm trên Gemini File API thành công', { fileResourceName });
+      } catch (e: any) {
+        logger.warn('[OCR] Không thể xóa tệp tạm trên Gemini File API', { fileResourceName, error: e.message });
+      }
+    }
+  }
+}
+
+/**
+ * Trích xuất văn bản từ file PDF theo từng trang (Tự động chuyển sang Gemini Vision OCR nếu là file scan/ảnh)
+ */
+export async function extractTextFromPdf(buffer: Buffer, fileName = 'document.pdf'): Promise<{
+  text: string;
+  pages: Array<{ pageNumber: number; text: string }>;
+  totalPages: number;
+  isOcr?: boolean;
+}> {
+  let isDigitalValid = false;
+  let digitalPagesList: Array<{ pageNumber: number; text: string }> = [];
+  let digitalText = '';
+  let digitalTotal = 0;
+
   try {
     const { PDFParse } = await import('pdf-parse');
     const parser = new (PDFParse as any)({ data: new Uint8Array(buffer) });
     const result = await parser.getText();
-    const pagesList: Array<{ pageNumber: number; text: string }> = [];
 
     if (Array.isArray(result.pages) && result.pages.length > 0) {
       for (const p of result.pages) {
         if (p.text && p.text.trim()) {
-          pagesList.push({
-            pageNumber: p.num || pagesList.length + 1,
+          digitalPagesList.push({
+            pageNumber: p.num || digitalPagesList.length + 1,
             text: p.text.trim()
           });
         }
       }
     }
 
-    // Nếu pages rỗng nhưng có result.text
-    if (pagesList.length === 0 && result.text && result.text.trim()) {
-      pagesList.push({
+    if (digitalPagesList.length === 0 && result.text && result.text.trim()) {
+      digitalPagesList.push({
         pageNumber: 1,
         text: result.text.trim()
       });
     }
 
-    // Kiểm tra xem văn bản trích xuất có nội dung thực sự hay chỉ là số trang rỗng (như "-- 1 of 33 --")
     const cleanText = (result.text || '').replace(/--\s*\d+\s*of\s*\d+\s*--/gi, '').trim();
-    if (cleanText.length < 50) {
-      throw new Error('Tệp PDF này là dạng hình ảnh scan/slide không có lớp văn bản kỹ thuật số (text layer). Vui lòng tải tài liệu có văn bản số hoặc tệp .txt/.doc để hệ thống lập chỉ mục chính xác.');
+    if (cleanText.length >= 50) {
+      isDigitalValid = true;
+      digitalText = result.text || '';
+      digitalTotal = result.total || digitalPagesList.length;
     }
 
     try {
@@ -83,16 +262,33 @@ export async function extractTextFromPdf(buffer: Buffer): Promise<{
     } catch (e) {
       // bỏ qua lỗi destroy nếu có
     }
-
-    return {
-      text: result.text || '',
-      pages: pagesList,
-      totalPages: result.total || pagesList.length
-    };
-  } catch (error: any) {
-    logger.error('Failed to parse PDF file', { error: error.message });
-    throw new Error(`Không thể đọc nội dung PDF: ${error.message}`);
+  } catch (parseErr: any) {
+    logger.warn('pdf-parse không đọc được text layer kỹ thuật số, chuẩn bị gọi Gemini Vision OCR', {
+      error: parseErr.message
+    });
   }
+
+  if (isDigitalValid) {
+    return {
+      text: digitalText,
+      pages: digitalPagesList,
+      totalPages: digitalTotal,
+      isOcr: false
+    };
+  }
+
+  // Tệp PDF là dạng scan/hình ảnh: Kích hoạt Gemini Vision OCR
+  logger.info('Tệp PDF không có lớp văn bản kỹ thuật số. Đang tự động kích hoạt Gemini Vision OCR...', {
+    fileName
+  });
+
+  const ocrResult = await extractTextWithGeminiVision(buffer, fileName);
+  return {
+    text: ocrResult.text,
+    pages: ocrResult.pages,
+    totalPages: ocrResult.totalPages,
+    isOcr: true
+  };
 }
 
 /**
@@ -243,11 +439,13 @@ export async function ingestDocument(
   try {
     let pages: Array<{ pageNumber: number; text: string }> = [];
     let totalPages = 1;
+    let isOcr = false;
 
     if (isPdf) {
-      const extracted = await extractTextFromPdf(fileBuffer);
+      const extracted = await extractTextFromPdf(fileBuffer, fileName);
       pages = extracted.pages;
       totalPages = extracted.totalPages;
+      isOcr = !!extracted.isOcr;
     } else {
       const rawText = fileBuffer.toString('utf-8');
       pages = [{ pageNumber: 1, text: rawText }];
@@ -259,7 +457,8 @@ export async function ingestDocument(
     logger.info('Document chunked successfully', {
       documentId,
       totalChunks: chunks.length,
-      totalPages
+      totalPages,
+      isOcr
     });
 
     if (chunks.length === 0) {
@@ -272,7 +471,8 @@ export async function ingestDocument(
         fileName,
         totalChunks: 0,
         totalPages,
-        status: 'FAILED'
+        status: 'FAILED',
+        isOcr
       };
     }
 
@@ -288,7 +488,8 @@ export async function ingestDocument(
       const metadata = JSON.stringify({
         pageNumber: c.pageNumber,
         fileName,
-        title
+        title,
+        ocr: isOcr
       });
 
       if (embStr) {
@@ -322,7 +523,8 @@ export async function ingestDocument(
       fileName,
       totalChunks: chunks.length,
       totalPages,
-      status: 'READY'
+      status: 'READY',
+      isOcr
     };
   } catch (error: any) {
     logger.error('Failed to ingest document', { documentId, error: error.message });

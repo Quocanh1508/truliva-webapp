@@ -745,7 +745,7 @@ export default function AiAssistantManage() {
 
               <div className="flex items-center justify-between pt-2">
                 <span className="text-[11px] text-gray-400 italic">
-                  * Hỗ trợ tài liệu đào tạo nội bộ, cẩm nang bảo hành, quy chuẩn KTV thi công.
+                  * Hỗ trợ tài liệu đào tạo, cẩm nang (.pdf, .txt). Tự động nhận dạng OCR (Gemini Vision) cho bản scan/slide ảnh chụp.
                 </span>
                 <button
                   onClick={handleUploadDocument}
@@ -755,7 +755,7 @@ export default function AiAssistantManage() {
                   {uploadingDoc ? (
                     <>
                       <Loader2 className="animate-spin" size={15} />
-                      <span>Đang trích xuất & tạo Vector...</span>
+                      <span>Đang phân tích & tạo Vector (OCR)...</span>
                     </>
                   ) : (
                     <>

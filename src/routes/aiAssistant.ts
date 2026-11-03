@@ -462,9 +462,13 @@ router.post(
         uploadedBy
       );
 
+      const message = result.isOcr
+        ? `Đã nhận dạng OCR (Gemini Vision) và nạp thành công tài liệu "${title}" với ${result.totalChunks} đoạn dữ liệu (${result.totalPages} trang)!`
+        : `Đã nạp thành công tài liệu "${title}" với ${result.totalChunks} đoạn dữ liệu!`;
+
       res.json({
         success: true,
-        message: `Đã nạp thành công tài liệu "${title}" với ${result.totalChunks} đoạn dữ liệu!`,
+        message,
         result
       });
     } catch (error: any) {
