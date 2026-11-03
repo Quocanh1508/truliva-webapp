@@ -87,12 +87,8 @@ export default function Layout() {
       );
     }
 
-    // 1. Dashboard: Admin, Dev, Staff (Service group)
-    const canSeeDashboard = 
-      user.role === 'ADMIN' || 
-      user.role === 'DEV' ||
-      (user.role === 'STAFF' && user.group === 'Service');
-    if (canSeeDashboard) {
+    // 1. Dashboard: kiểm tra quyền DASHBOARD_VIEW
+    if (hasPermission('DASHBOARD_VIEW')) {
       items.push({ name: 'Dashboard', path: '/admin', icon: <BarChart size={20} /> });
     }
 
@@ -136,8 +132,8 @@ export default function Layout() {
       items.push({ name: 'Quản lý nhân viên', path: '/admin/users', icon: <Users size={20} /> });
     }
 
-    // 10. Ảnh mẫu báo cáo
-    if (user.role === 'ADMIN' || user.role === 'COORDINATOR') {
+    // 10. Ảnh mẫu báo cáo: kiểm tra quyền SAMPLE_IMAGE_MANAGE
+    if (hasPermission('SAMPLE_IMAGE_MANAGE')) {
       items.push({ name: 'Ảnh mẫu báo cáo', path: '/admin/sample-images', icon: <ImageIcon size={20} /> });
     }
 
@@ -146,16 +142,18 @@ export default function Layout() {
       items.push({ name: 'Quản lý lương', path: '/admin/salaries', icon: <Calculator size={20} /> });
     }
     
-    // Gửi thông báo hệ thống & IoT: Admin
-    if (user.role === 'ADMIN') {
-      items.push(
-        { name: 'Giám sát IoT (ESP32)', path: '/admin/iot', icon: <Cpu size={20} /> },
-        { name: 'Gửi thông báo', path: '/admin/broadcast', icon: <Send size={20} /> }
-      );
+    // 12. Giám sát IoT (ESP32): kiểm tra quyền IOT_MONITOR_VIEW
+    if (hasPermission('IOT_MONITOR_VIEW')) {
+      items.push({ name: 'Giám sát IoT (ESP32)', path: '/admin/iot', icon: <Cpu size={20} /> });
     }
 
-    // Quản lý Trợ lý AI & Tri thức (Admin, Dev)
-    if (user.role === 'ADMIN' || user.role === 'DEV') {
+    // 13. Gửi thông báo hệ thống: kiểm tra quyền BROADCAST_MANAGE
+    if (hasPermission('BROADCAST_MANAGE')) {
+      items.push({ name: 'Gửi thông báo', path: '/admin/broadcast', icon: <Send size={20} /> });
+    }
+
+    // 14. Quản lý Trợ lý AI & Tri thức: kiểm tra quyền AI_ASSISTANT_VIEW
+    if (hasPermission('AI_ASSISTANT_VIEW')) {
       items.push({ name: 'Trợ lý AI & Tri thức', path: '/admin/ai-assistant', icon: <Bot size={20} /> });
     }
     

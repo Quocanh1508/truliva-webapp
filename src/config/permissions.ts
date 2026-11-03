@@ -21,6 +21,8 @@ export const SYSTEM_MODULES = [
   { id: 'salaries', name: '💰 Quản lý Lương & Chi phí KTV' },
   { id: 'inventory', name: '📦 Quản lý Kho & Vật tư' },
   { id: 'system', name: '⚙️ Quản lý Hệ thống & Nhân sự' },
+  { id: 'ai_assistant', name: '🤖 Quản lý Trợ lý AI & Tri thức' },
+  { id: 'iot', name: '📡 Giám sát IoT (ESP32)' },
   { id: 'dev_tools', name: '🛠️ Công cụ Nhà phát triển (Dev Only)' }
 ];
 
@@ -280,6 +282,15 @@ export const SYSTEM_FEATURES: SystemFeature[] = [
     defaultRoles: ['ADMIN', 'DEV', 'COORDINATOR', 'STAFF'],
     addedAt: 'v1.0'
   },
+  {
+    key: 'SAMPLE_IMAGE_MANAGE',
+    module: 'reports',
+    moduleName: '📝 Quản lý Báo cáo',
+    name: 'Quản lý Ảnh mẫu Báo cáo KTV',
+    description: 'Cấu hình và tải ảnh mẫu nghiệm thu chuẩn (chụp tem máy, vị trí lắp, đồng hồ TDS...)',
+    defaultRoles: ['ADMIN', 'DEV', 'COORDINATOR'],
+    addedAt: '2026-11-03'
+  },
 
   // 4. Quản lý Lương & Chi phí KTV
   {
@@ -420,6 +431,73 @@ export const SYSTEM_FEATURES: SystemFeature[] = [
     description: 'Xem danh sách góp ý lỗi và đóng góp ý kiến',
     defaultRoles: ['ADMIN', 'DEV'],
     addedAt: 'v1.0'
+  },
+  {
+    key: 'BROADCAST_MANAGE',
+    module: 'system',
+    moduleName: '⚙️ Quản lý Hệ thống',
+    name: 'Gửi Thông báo Hệ thống (Broadcast)',
+    description: 'Gửi thông báo đẩy Web Push / In-App cho toàn bộ nhân sự hoặc từng nhóm/KTV',
+    defaultRoles: ['ADMIN', 'DEV'],
+    addedAt: '2026-11-03'
+  },
+  {
+    key: 'DASHBOARD_VIEW',
+    module: 'system',
+    moduleName: '⚙️ Quản lý Hệ thống',
+    name: 'Xem Bảng điều khiển (Dashboard)',
+    description: 'Xem số liệu thống kê tổng quan ca dịch vụ, doanh thu và biểu đồ phân tích điều hành',
+    defaultRoles: ['ADMIN', 'DEV', 'STAFF'],
+    addedAt: '2026-11-03'
+  },
+
+  // 6.5 Quản lý Trợ lý AI & Tri thức
+  {
+    key: 'AI_ASSISTANT_VIEW',
+    module: 'ai_assistant',
+    moduleName: '🤖 Quản lý Trợ lý AI & Tri thức',
+    name: 'Xem & Thử nghiệm Trợ lý AI',
+    description: 'Quyền xem cấu hình bot AI, giọng điệu, danh mục cẩm nang và chat thử nghiệm',
+    defaultRoles: ['ADMIN', 'DEV'],
+    addedAt: '2026-11-03'
+  },
+  {
+    key: 'AI_ASSISTANT_CONFIG',
+    module: 'ai_assistant',
+    moduleName: '🤖 Quản lý Trợ lý AI & Tri thức',
+    name: 'Chỉnh sửa Cấu hình AI & FAQ',
+    description: 'Tùy chỉnh Prompt hệ thống, FAQ chuẩn, thông tin hotline và tích hợp Facebook Page',
+    defaultRoles: ['ADMIN'],
+    addedAt: '2026-11-03'
+  },
+  {
+    key: 'AI_DOCUMENT_MANAGE',
+    module: 'ai_assistant',
+    moduleName: '🤖 Quản lý Trợ lý AI & Tri thức',
+    name: 'Quản lý Thư viện RAG & Tự động OCR',
+    description: 'Tải lên tài liệu kỹ thuật, tự động nhận dạng OCR văn bản và lập chỉ mục HNSW',
+    defaultRoles: ['ADMIN', 'DEV'],
+    addedAt: '2026-11-03'
+  },
+
+  // 6.6 Giám sát Thiết bị IoT (ESP32)
+  {
+    key: 'IOT_MONITOR_VIEW',
+    module: 'iot',
+    moduleName: '📡 Giám sát IoT (ESP32)',
+    name: 'Xem giám sát thiết bị IoT trực tiếp',
+    description: 'Theo dõi tình trạng online/offline, chỉ số TDS, lưu lượng nước và tuổi thọ lõi lọc qua MQTT',
+    defaultRoles: ['ADMIN', 'DEV'],
+    addedAt: '2026-11-03'
+  },
+  {
+    key: 'IOT_DEVICE_CONTROL',
+    module: 'iot',
+    moduleName: '📡 Giám sát IoT (ESP32)',
+    name: 'Điều khiển thiết bị IoT từ xa qua MQTT',
+    description: 'Gửi lệnh đóng/ngắt van nước điện từ, tắt còi cảnh báo và reset chu kỳ lõi lọc từ xa',
+    defaultRoles: ['ADMIN', 'DEV'],
+    addedAt: '2026-11-03'
   },
 
   // 7. Công cụ Nhà phát triển (Dev Only) — Tự động bật cho DEV, ẩn khỏi ma trận Admin

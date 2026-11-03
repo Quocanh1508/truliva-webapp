@@ -345,7 +345,7 @@ export default function App() {
                 </Route>
 
                 {/* Dashboard Route */}
-                <Route element={<ProtectedRoute allowedRoles={['ADMIN', 'STAFF']} requireDashboard={true} />}>
+                <Route element={<ProtectedRoute featureKey="DASHBOARD_VIEW" allowedRoles={['ADMIN', 'DEV', 'STAFF']} />}>
                   <Route path="/admin" element={<Dashboard />} />
                 </Route>
 
@@ -355,6 +355,8 @@ export default function App() {
                 </Route>
                 <Route element={<ProtectedRoute allowedRoles={['ADMIN', 'COORDINATOR']} featureKey="STATION_MANAGE" />}>
                   <Route path="/admin/stations" element={<StationManage />} />
+                </Route>
+                <Route element={<ProtectedRoute allowedRoles={['ADMIN', 'DEV', 'COORDINATOR']} featureKey="SAMPLE_IMAGE_MANAGE" />}>
                   <Route path="/admin/sample-images" element={<SampleImageManage />} />
                 </Route>
                 <Route element={<ProtectedRoute allowedRoles={['ADMIN', 'COORDINATOR']} featureKey="USER_MANAGE" />}>
@@ -367,7 +369,7 @@ export default function App() {
                 </Route>
 
                 {/* Admin & Dev Broadcast Routes */}
-                <Route element={<ProtectedRoute allowedRoles={['ADMIN', 'DEV']} featureKey="USER_MANAGE" />}>
+                <Route element={<ProtectedRoute allowedRoles={['ADMIN', 'DEV']} featureKey="BROADCAST_MANAGE" />}>
                   <Route path="/admin/broadcast" element={<BroadcastNotification />} />
                 </Route>
 
@@ -375,8 +377,10 @@ export default function App() {
                 <Route element={<ProtectedRoute allowedRoles={['ADMIN']} featureKey="SALARY_VIEW" />}>
                   <Route path="/admin/salaries" element={<SalaryManage />} />
                 </Route>
-                <Route element={<ProtectedRoute allowedRoles={['ADMIN', 'DEV']} />}>
+                <Route element={<ProtectedRoute allowedRoles={['ADMIN', 'DEV']} featureKey="IOT_MONITOR_VIEW" />}>
                   <Route path="/admin/iot" element={<IotMonitor />} />
+                </Route>
+                <Route element={<ProtectedRoute allowedRoles={['ADMIN', 'DEV']} featureKey="AI_ASSISTANT_VIEW" />}>
                   <Route path="/admin/ai-assistant" element={<AiAssistantManage />} />
                 </Route>
 

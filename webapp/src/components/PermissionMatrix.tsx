@@ -38,6 +38,8 @@ export const PermissionMatrix: React.FC = () => {
     salaries: true,
     inventory: true,
     system: true,
+    ai_assistant: true,
+    iot: true,
     dev_tools: true
   });
   const [updatingKey, setUpdatingKey] = useState<string | null>(null);
