@@ -865,3 +865,46 @@ model AiBotConfig {
 
   @@map("ai_bot_configs")
 }
+
+// ── Quản lý Phiên Chat và Nhật ký Token AI ──
+model AiChatSession {
+  id            String          @id @default(uuid()) @db.Uuid
+  sessionCode   String?         @map("session_code") @db.VarChar(100)
+  title         String          @default("Phiên hội thoại mới") @db.VarChar(255)
+  channel       String          @default("PLAYGROUND") @db.VarChar(50) // PLAYGROUND, FACEBOOK, ZALO, WEB
+  userId        String?         @map("user_id") @db.Uuid
+  userName      String?         @map("user_name") @db.VarChar(100)
+  totalMessages Int             @default(0) @map("total_messages")
+  totalTokens   Int             @default(0) @map("total_tokens")
+  metadata      Json            @default("{}")
+  isActive      Boolean         @default(true) @map("is_active")
+  createdAt     DateTime        @default(now()) @map("created_at")
+  updatedAt     DateTime        @updatedAt @map("updated_at")
+
+  messages      AiChatMessage[]
+
+  @@index([channel])
+  @@index([createdAt])
+  @@map("ai_chat_sessions")
+}
+
+model AiChatMessage {
+  id               String        @id @default(uuid()) @db.Uuid
+  sessionId        String        @map("session_id") @db.Uuid
+  role             String        @db.VarChar(20) // user, assistant, system
+  content          String        @db.Text
+  promptTokens     Int           @default(0) @map("prompt_tokens")
+  completionTokens Int           @default(0) @map("completion_tokens")
+  totalTokens      Int           @default(0) @map("total_tokens")
+  latencyMs        Int?          @map("latency_ms")
+  model            String?       @db.VarChar(100)
+  retrievedChunks  Json?         @map("retrieved_chunks")
+  metadata         Json          @default("{}")
+  createdAt        DateTime      @default(now()) @map("created_at")
+
+  session          AiChatSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@index([sessionId])
+  @@index([createdAt])
+  @@map("ai_chat_messages")
+}

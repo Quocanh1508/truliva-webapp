@@ -370,23 +370,252 @@ router.post('/test-chat', requireAuth, async (req: Request, res: Response): Prom
     });
 
     const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${GEMINI_API_KEY}`;
+    const startTime = Date.now();
     const geminiRes = await axios.post(geminiUrl, {
       system_instruction: {
         parts: [{ text: fullSystemInstruction }]
       },
       contents
     }, { timeout: 35000 });
+    const latencyMs = Date.now() - startTime;
 
     const reply = geminiRes.data?.candidates?.[0]?.content?.parts?.[0]?.text || 'Không có phản hồi từ AI';
+    const usage = geminiRes.data?.usageMetadata || {
+      promptTokenCount: 0,
+      candidatesTokenCount: 0,
+      totalTokenCount: 0
+    };
+
+    const promptTokens = usage.promptTokenCount || 0;
+    const completionTokens = usage.candidatesTokenCount || 0;
+    const totalTokens = usage.totalTokenCount || 0;
+
+    // Lưu phiên chat và chi tiết Tokens vào CSDL
+    let currentSessionId = req.body.sessionId;
+    const user = (req as any).user;
+    const userId = user?.id || null;
+    const userName = user?.fullName || user?.username || 'Admin / Dev';
+
+    let chatSession: any = null;
+    if (currentSessionId) {
+      chatSession = await prisma.aiChatSession.findUnique({
+        where: { id: currentSessionId }
+      });
+    }
+
+    if (!chatSession) {
+      chatSession = await prisma.aiChatSession.create({
+        data: {
+          title: message.trim().substring(0, 80),
+          channel: 'PLAYGROUND',
+          userId,
+          userName,
+          totalMessages: 0,
+          totalTokens: 0,
+          isActive: true
+        }
+      });
+      currentSessionId = chatSession.id;
+    }
+
+    // Lưu tin nhắn User
+    await prisma.aiChatMessage.create({
+      data: {
+        sessionId: chatSession.id,
+        role: 'user',
+        content: message.trim(),
+        promptTokens: 0,
+        completionTokens: 0,
+        totalTokens: 0
+      }
+    });
+
+    // Lưu tin nhắn AI kèm thống kê token
+    await prisma.aiChatMessage.create({
+      data: {
+        sessionId: chatSession.id,
+        role: 'assistant',
+        content: reply,
+        promptTokens,
+        completionTokens,
+        totalTokens,
+        latencyMs,
+        model: GEMINI_MODEL,
+        retrievedChunks: retrievedChunks && retrievedChunks.length > 0 ? retrievedChunks : undefined
+      }
+    });
+
+    // Cập nhật session
+    await prisma.aiChatSession.update({
+      where: { id: chatSession.id },
+      data: {
+        totalMessages: { increment: 2 },
+        totalTokens: { increment: totalTokens },
+        updatedAt: new Date()
+      }
+    });
 
     res.json({
       success: true,
       reply,
-      retrievedChunks
+      sessionId: chatSession.id,
+      retrievedChunks,
+      tokens: {
+        promptTokens,
+        completionTokens,
+        totalTokens
+      },
+      latencyMs,
+      model: GEMINI_MODEL
     });
   } catch (error: any) {
     logger.error('Failed to run AI test chat', { error: error.message });
     res.status(500).json({ success: false, message: error.response?.data?.error?.message || error.message });
+  }
+});
+
+/**
+ * GET /api/ai-assistant/sessions
+ * Danh sách phiên chat và giám sát tokens (Dành riêng cho ADMIN và DEV)
+ */
+router.get('/sessions', requireAuth, async (req: Request, res: Response): Promise<void> => {
+  try {
+    const userRole = (req as any).user?.role;
+    if (userRole !== 'ADMIN' && userRole !== 'DEV') {
+      res.status(403).json({ success: false, message: 'Chức năng chỉ dành riêng cho Admin và Developer' });
+      return;
+    }
+
+    const { channel, search, page = '1', limit = '20' } = req.query;
+    const pageNum = Math.max(1, parseInt(page as string, 10) || 1);
+    const limitNum = Math.min(100, Math.max(1, parseInt(limit as string, 10) || 20));
+    const skip = (pageNum - 1) * limitNum;
+
+    const where: any = { isActive: true };
+    if (channel && channel !== 'ALL') {
+      where.channel = String(channel).toUpperCase();
+    }
+    if (search && String(search).trim()) {
+      const q = String(search).trim();
+      where.OR = [
+        { title: { contains: q, mode: 'insensitive' } },
+        { userName: { contains: q, mode: 'insensitive' } }
+      ];
+    }
+
+    const [sessions, totalCount, statsAgg, tokenAvgAgg] = await Promise.all([
+      prisma.aiChatSession.findMany({
+        where,
+        orderBy: { updatedAt: 'desc' },
+        skip,
+        take: limitNum,
+        include: {
+          messages: {
+            orderBy: { createdAt: 'desc' },
+            take: 1,
+            select: { content: true, createdAt: true, role: true, totalTokens: true }
+          }
+        }
+      }),
+      prisma.aiChatSession.count({ where }),
+      prisma.aiChatSession.aggregate({
+        where: { isActive: true },
+        _count: { id: true },
+        _sum: { totalMessages: true, totalTokens: true }
+      }),
+      prisma.aiChatMessage.aggregate({
+        where: { role: 'assistant', totalTokens: { gt: 0 } },
+        _avg: { latencyMs: true, totalTokens: true, promptTokens: true, completionTokens: true }
+      })
+    ]);
+
+    res.json({
+      success: true,
+      sessions,
+      pagination: {
+        page: pageNum,
+        limit: limitNum,
+        totalCount,
+        totalPages: Math.ceil(totalCount / limitNum)
+      },
+      stats: {
+        totalSessions: statsAgg._count.id || 0,
+        totalMessages: statsAgg._sum.totalMessages || 0,
+        totalTokens: statsAgg._sum.totalTokens || 0,
+        avgLatencyMs: Math.round(tokenAvgAgg._avg.latencyMs || 0),
+        avgTokensPerTurn: Math.round(tokenAvgAgg._avg.totalTokens || 0),
+        avgPromptTokens: Math.round(tokenAvgAgg._avg.promptTokens || 0),
+        avgCompletionTokens: Math.round(tokenAvgAgg._avg.completionTokens || 0)
+      }
+    });
+  } catch (error: any) {
+    logger.error('Failed to get AI chat sessions', { error: error.message });
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+/**
+ * GET /api/ai-assistant/sessions/:id
+ * Chi tiết lịch sử tin nhắn và tokens của 1 phiên chat (ADMIN & DEV)
+ */
+router.get('/sessions/:id', requireAuth, async (req: Request, res: Response): Promise<void> => {
+  try {
+    const userRole = (req as any).user?.role;
+    if (userRole !== 'ADMIN' && userRole !== 'DEV') {
+      res.status(403).json({ success: false, message: 'Chức năng chỉ dành riêng cho Admin và Developer' });
+      return;
+    }
+
+    const id = req.params.id as string;
+    const session = await prisma.aiChatSession.findUnique({
+      where: { id },
+      include: {
+        messages: {
+          orderBy: { createdAt: 'asc' }
+        }
+      }
+    });
+
+    if (!session) {
+      res.status(404).json({ success: false, message: 'Không tìm thấy phiên chat này' });
+      return;
+    }
+
+    res.json({
+      success: true,
+      session
+    });
+  } catch (error: any) {
+    logger.error('Failed to get AI chat session detail', { error: error.message });
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+/**
+ * DELETE /api/ai-assistant/sessions/:id
+ * Xóa mềm phiên chat (Soft-delete: isActive = false)
+ */
+router.delete('/sessions/:id', requireAuth, async (req: Request, res: Response): Promise<void> => {
+  try {
+    const userRole = (req as any).user?.role;
+    if (userRole !== 'ADMIN' && userRole !== 'DEV') {
+      res.status(403).json({ success: false, message: 'Chức năng chỉ dành riêng cho Admin và Developer' });
+      return;
+    }
+
+    const id = req.params.id as string;
+    await prisma.aiChatSession.update({
+      where: { id },
+      data: { isActive: false, updatedAt: new Date() }
+    });
+
+    res.json({
+      success: true,
+      message: 'Đã lưu trữ và ẩn phiên chat thành công'
+    });
+  } catch (error: any) {
+    logger.error('Failed to soft delete AI chat session', { error: error.message });
+    res.status(500).json({ success: false, message: error.message });
   }
 });
 

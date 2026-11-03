@@ -474,6 +474,15 @@ export const SYSTEM_FEATURES: SystemFeature[] = [
     defaultRoles: ['ADMIN', 'DEV'],
     addedAt: '2026-11-03'
   },
+  {
+    key: 'AI_CHAT_SESSION_MANAGE',
+    module: 'ai_assistant',
+    moduleName: '🤖 Quản lý Trợ lý AI & Tri thức',
+    name: 'Quản lý Phiên Chat & Giám sát Tokens',
+    description: 'Xem lịch sử các phiên hội thoại với AI, chi tiết lượng tokens tiêu thụ và thời gian phản hồi cho từng câu hỏi (Admin & Dev)',
+    defaultRoles: ['ADMIN', 'DEV'],
+    addedAt: '2026-11-03'
+  },
 
   // 6.6 Giám sát Thiết bị IoT (ESP32)
   {

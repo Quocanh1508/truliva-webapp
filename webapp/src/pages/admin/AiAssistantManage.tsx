@@ -1,5 +1,7 @@
 import { useState, useEffect } from 'react';
 import { fetchApi } from '../../api/client';
+import { useAuth } from '../../context/AuthContext';
+import { usePermission } from '../../context/PermissionContext';
 import {
   Bot,
   Sparkles,
@@ -27,7 +29,12 @@ import {
   Cpu,
   Pencil,
   Check,
-  X
+  X,
+  History,
+  Eye,
+  Zap,
+  Activity,
+  MessageCircle
 } from 'lucide-react';
 
 interface FAQItem {
@@ -93,10 +100,44 @@ interface ChatMessage {
   text: string;
   time: string;
   retrievedChunks?: RagChunkMatch[];
+  tokens?: {
+    promptTokens: number;
+    completionTokens: number;
+    totalTokens: number;
+  };
+  latencyMs?: number;
+  model?: string;
+}
+
+interface ChatSessionItem {
+  id: string;
+  sessionCode?: string;
+  title: string;
+  channel: string;
+  userName?: string;
+  totalMessages: number;
+  totalTokens: number;
+  createdAt: string;
+  updatedAt: string;
+  messages?: Array<{ content: string; createdAt: string; role: string; totalTokens: number }>;
+}
+
+interface SessionStats {
+  totalSessions: number;
+  totalMessages: number;
+  totalTokens: number;
+  avgLatencyMs: number;
+  avgTokensPerTurn: number;
+  avgPromptTokens: number;
+  avgCompletionTokens: number;
 }
 
 export default function AiAssistantManage() {
-  const [activeTab, setActiveTab] = useState<'identity' | 'knowledge' | 'documents' | 'faq' | 'database' | 'playground'>('identity');
+  const { user } = useAuth();
+  const { hasPermission } = usePermission();
+  const canManageSessions = user?.role === 'ADMIN' || user?.role === 'DEV' || hasPermission('AI_CHAT_SESSION_MANAGE');
+
+  const [activeTab, setActiveTab] = useState<'identity' | 'knowledge' | 'documents' | 'faq' | 'database' | 'playground' | 'sessions'>('identity');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [successMsg, setSuccessMsg] = useState('');
@@ -142,6 +183,17 @@ export default function AiAssistantManage() {
     }
   ]);
   const [testingChat, setTestingChat] = useState(false);
+  const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
+
+  // Sessions Management State (Admin & Dev)
+  const [sessions, setSessions] = useState<ChatSessionItem[]>([]);
+  const [sessionStats, setSessionStats] = useState<SessionStats | null>(null);
+  const [loadingSessions, setLoadingSessions] = useState(false);
+  const [sessionChannelFilter, setSessionChannelFilter] = useState<'ALL' | 'PLAYGROUND' | 'FACEBOOK' | 'ZALO' | 'WEB'>('ALL');
+  const [sessionSearch, setSessionSearch] = useState('');
+  const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null);
+  const [sessionDetail, setSessionDetail] = useState<any | null>(null);
+  const [loadingDetail, setLoadingDetail] = useState(false);
 
   // New FAQ Modal / Inline form
   const [newCategory, setNewCategory] = useState('Chung');
@@ -434,6 +486,74 @@ export default function AiAssistantManage() {
     }
   };
 
+  useEffect(() => {
+    if (activeTab === 'sessions' && canManageSessions) {
+      loadSessions();
+    }
+  }, [activeTab, sessionChannelFilter, sessionSearch]);
+
+  const loadSessions = async () => {
+    try {
+      setLoadingSessions(true);
+      const query = new URLSearchParams();
+      if (sessionChannelFilter !== 'ALL') query.set('channel', sessionChannelFilter);
+      if (sessionSearch.trim()) query.set('search', sessionSearch.trim());
+      const res = await fetchApi(`/ai-assistant/sessions?${query.toString()}`);
+      if (res.success) {
+        setSessions(res.sessions || []);
+        setSessionStats(res.stats || null);
+      }
+    } catch (err: any) {
+      console.error('Không thể tải danh sách phiên chat', err);
+    } finally {
+      setLoadingSessions(false);
+    }
+  };
+
+  const handleViewSessionDetail = async (id: string) => {
+    try {
+      setSelectedSessionId(id);
+      setLoadingDetail(true);
+      const res = await fetchApi(`/ai-assistant/sessions/${id}`);
+      if (res.success) {
+        setSessionDetail(res.session);
+      }
+    } catch (err: any) {
+      alert('Không thể tải chi tiết phiên chat: ' + err.message);
+    } finally {
+      setLoadingDetail(false);
+    }
+  };
+
+  const handleDeleteSession = async (id: string) => {
+    if (!confirm('Bạn có chắc muốn lưu trữ và ẩn phiên chat này không?')) return;
+    try {
+      const res = await fetchApi(`/ai-assistant/sessions/${id}`, { method: 'DELETE' });
+      if (res.success) {
+        setSessions(prev => prev.filter(s => s.id !== id));
+        setSuccessMsg('Đã lưu trữ phiên chat thành công!');
+        setTimeout(() => setSuccessMsg(''), 3000);
+        if (selectedSessionId === id) {
+          setSelectedSessionId(null);
+          setSessionDetail(null);
+        }
+      }
+    } catch (err: any) {
+      alert('Lỗi khi xóa phiên chat: ' + err.message);
+    }
+  };
+
+  const handleResetPlaygroundSession = () => {
+    setCurrentSessionId(null);
+    setChatMessages([
+      {
+        sender: 'ai',
+        text: 'Dạ Truliva xin chào bạn! Mình đã bắt đầu một phiên hội thoại mới. Bạn có thể hỏi mình bất kỳ câu hỏi nào về sản phẩm, bảng giá hoặc sự cố máy lọc nước để thử nghiệm nhé!',
+        time: 'Vừa xong'
+      }
+    ]);
+  };
+
   const handleSendTestChat = async () => {
     if (!testInput.trim() || testingChat) return;
 
@@ -453,16 +573,22 @@ export default function AiAssistantManage() {
     try {
       const res = await fetchApi('/ai-assistant/test-chat', {
         method: 'POST',
-        body: JSON.stringify({ message: userMsg, history })
+        body: JSON.stringify({ message: userMsg, history, sessionId: currentSessionId })
       });
       if (res.success && res.reply) {
+        if (res.sessionId) {
+          setCurrentSessionId(res.sessionId);
+        }
         setChatMessages(prev => [
           ...prev,
           {
             sender: 'ai',
             text: res.reply,
             time: nowTime,
-            retrievedChunks: res.retrievedChunks || []
+            retrievedChunks: res.retrievedChunks || [],
+            tokens: res.tokens,
+            latencyMs: res.latencyMs,
+            model: res.model
           }
         ]);
       } else {
@@ -598,6 +724,19 @@ export default function AiAssistantManage() {
           <MessageSquare size={16} className={activeTab === 'playground' ? 'text-[#00A3FF]' : 'text-gray-400'} />
           <span>6. Thử nghiệm (Playground)</span>
         </button>
+
+        {canManageSessions && (
+          <button
+            onClick={() => setActiveTab('sessions')}
+            className={`flex items-center gap-2 px-4 py-2.5 rounded-xl font-medium transition-all shrink-0 ${activeTab === 'sessions' ? 'bg-white text-[#1B3A6B] shadow-xs font-semibold' : 'text-gray-600 hover:text-gray-900 hover:bg-white/50'}`}
+          >
+            <History size={16} className={activeTab === 'sessions' ? 'text-[#00A3FF]' : 'text-gray-400'} />
+            <span>7. Quản lý Phiên & Tokens</span>
+            <span className="px-1.5 py-0.2 text-[10px] font-bold rounded-full bg-indigo-100 text-indigo-700">
+              Admin & Dev
+            </span>
+          </button>
+        )}
       </div>
 
       {/* ── TAB 1: IDENTITY & TONE ── */}
@@ -1421,14 +1560,23 @@ export default function AiAssistantManage() {
                 </div>
               </div>
 
-              <button
-                onClick={() => setChatMessages([])}
-                className="text-xs text-gray-400 hover:text-gray-600 flex items-center gap-1"
-                title="Xóa lịch sử chat"
-              >
-                <RefreshCw size={12} />
-                <span>Xóa hội thoại</span>
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={handleResetPlaygroundSession}
+                  className="px-2.5 py-1 text-xs text-indigo-700 hover:text-indigo-900 bg-indigo-50 hover:bg-indigo-100 rounded-lg border border-indigo-200/60 font-semibold flex items-center gap-1 transition-colors"
+                  title="Bắt đầu phiên hội thoại mới và lưu vào nhật ký"
+                >
+                  <Plus size={13} />
+                  <span>Phiên mới</span>
+                </button>
+                <button
+                  onClick={() => setChatMessages([])}
+                  className="text-xs text-gray-400 hover:text-gray-600 p-1.5 rounded-lg hover:bg-gray-100 flex items-center gap-1"
+                  title="Xóa màn hình chat"
+                >
+                  <RefreshCw size={13} />
+                </button>
+              </div>
             </div>
 
             {/* Khung tin nhắn */}
@@ -1469,6 +1617,34 @@ export default function AiAssistantManage() {
                         ))}
                       </div>
                     )}
+                    {/* Thống kê Token & Độ trễ */}
+                    {msg.tokens && (
+                      <div className="mt-2.5 pt-2 border-t border-slate-100 flex flex-wrap items-center gap-2 text-[10.5px]">
+                        <span className="inline-flex items-center gap-1 font-bold text-indigo-700 bg-indigo-50 border border-indigo-100 px-2 py-0.5 rounded-md">
+                          <Zap size={11} className="text-indigo-600" />
+                          {msg.tokens.totalTokens.toLocaleString('vi-VN')} tokens
+                        </span>
+                        <span className="text-slate-500">
+                          Input: <strong className="text-slate-800">{msg.tokens.promptTokens.toLocaleString('vi-VN')}</strong>
+                        </span>
+                        <span className="text-slate-300">•</span>
+                        <span className="text-slate-500">
+                          Output: <strong className="text-slate-800">{msg.tokens.completionTokens.toLocaleString('vi-VN')}</strong>
+                        </span>
+                        {msg.latencyMs && (
+                          <>
+                            <span className="text-slate-300">•</span>
+                            <span className="text-slate-500 font-medium">{msg.latencyMs}ms</span>
+                          </>
+                        )}
+                        {msg.model && (
+                          <>
+                            <span className="text-slate-300">•</span>
+                            <span className="text-slate-400 font-mono text-[10px]">{msg.model}</span>
+                          </>
+                        )}
+                      </div>
+                    )}
                   </div>
                   <span className="text-[10px] text-gray-400 mt-1 px-1">{msg.time}</span>
                 </div>
@@ -1502,6 +1678,351 @@ export default function AiAssistantManage() {
               </button>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* ── TAB 7: CHAT SESSIONS & TOKEN MONITORING (ADMIN & DEV) ── */}
+      {activeTab === 'sessions' && canManageSessions && (
+        <div className="space-y-6 animate-fade-in">
+          {/* Top Banner */}
+          <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+            <div>
+              <div className="flex items-center gap-2">
+                <h2 className="text-base font-bold text-gray-900 flex items-center gap-2">
+                  <History size={18} className="text-[#00A3FF]" />
+                  Quản Lý Phiên Chat & Nhật Ký Tokens AI
+                </h2>
+                <span className="px-2 py-0.5 text-[10px] font-bold rounded-full bg-indigo-100 text-indigo-700 border border-indigo-200">
+                  Dành riêng Admin & Dev
+                </span>
+              </div>
+              <p className="text-xs text-gray-500 mt-1">
+                Theo dõi tất cả lịch sử hội thoại khách hàng, phiên thử nghiệm và chi tiết lượng tokens tiêu thụ cho từng câu trả lời.
+              </p>
+            </div>
+
+            <button
+              onClick={loadSessions}
+              disabled={loadingSessions}
+              className="bg-white hover:bg-gray-50 border border-gray-200 text-gray-700 font-semibold rounded-xl px-3.5 py-2 text-xs shadow-2xs transition-all flex items-center gap-1.5 self-end sm:self-auto cursor-pointer"
+            >
+              <RefreshCw size={14} className={loadingSessions ? 'animate-spin text-blue-600' : ''} />
+              <span>Làm mới dữ liệu</span>
+            </button>
+          </div>
+
+          {/* KPI Summary Cards */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="bg-white p-4.5 rounded-2xl border border-gray-100 shadow-xs space-y-1.5">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-semibold text-gray-500">Tổng Phiên Hội Thoại</span>
+                <div className="w-8 h-8 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center">
+                  <MessageCircle size={16} />
+                </div>
+              </div>
+              <div className="text-2xl font-bold text-gray-900">
+                {sessionStats?.totalSessions.toLocaleString('vi-VN') || 0}
+              </div>
+              <p className="text-[11px] text-gray-400">Được lưu trữ trong PostgreSQL</p>
+            </div>
+
+            <div className="bg-white p-4.5 rounded-2xl border border-gray-100 shadow-xs space-y-1.5">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-semibold text-gray-500">Tổng Tin Nhắn Trao Đổi</span>
+                <div className="w-8 h-8 rounded-xl bg-cyan-50 text-cyan-600 flex items-center justify-center">
+                  <MessageSquare size={16} />
+                </div>
+              </div>
+              <div className="text-2xl font-bold text-gray-900">
+                {sessionStats?.totalMessages.toLocaleString('vi-VN') || 0}
+              </div>
+              <p className="text-[11px] text-gray-400">Gồm câu hỏi của User & AI trả lời</p>
+            </div>
+
+            <div className="bg-white p-4.5 rounded-2xl border border-gray-100 shadow-xs space-y-1.5">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-semibold text-gray-500">Tổng Lượng Tokens Đã Dùng</span>
+                <div className="w-8 h-8 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center">
+                  <Zap size={16} />
+                </div>
+              </div>
+              <div className="text-2xl font-bold text-indigo-700">
+                {(sessionStats?.totalTokens || 0).toLocaleString('vi-VN')}
+              </div>
+              <p className="text-[11px] text-gray-500 font-medium">
+                TB: ~{sessionStats?.avgTokensPerTurn.toLocaleString('vi-VN') || 0} tokens / câu
+              </p>
+            </div>
+
+            <div className="bg-white p-4.5 rounded-2xl border border-gray-100 shadow-xs space-y-1.5">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-semibold text-gray-500">Độ Trễ Trung Bình (Latency)</span>
+                <div className="w-8 h-8 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
+                  <Activity size={16} />
+                </div>
+              </div>
+              <div className="text-2xl font-bold text-emerald-600">
+                {sessionStats?.avgLatencyMs || 0} <span className="text-sm font-normal text-gray-500">ms</span>
+              </div>
+              <p className="text-[11px] text-gray-400">Thời gian phản hồi API Gemini</p>
+            </div>
+          </div>
+
+          {/* Filter Bar */}
+          <div className="bg-white p-4 rounded-2xl border border-gray-100 shadow-xs flex flex-col md:flex-row items-center justify-between gap-3">
+            {/* Channel Tabs */}
+            <div className="flex items-center gap-1.5 bg-slate-100/80 p-1 rounded-xl text-xs overflow-x-auto w-full md:w-auto">
+              {[
+                { id: 'ALL', label: 'Tất cả kênh' },
+                { id: 'PLAYGROUND', label: 'Playground Thử Nghiệm' },
+                { id: 'FACEBOOK', label: 'Facebook Fanpage' },
+                { id: 'ZALO', label: 'Zalo' },
+                { id: 'WEB', label: 'Web' }
+              ].map(tab => (
+                <button
+                  key={tab.id}
+                  onClick={() => setSessionChannelFilter(tab.id as any)}
+                  className={`px-3 py-1.5 rounded-lg font-medium transition-all whitespace-nowrap cursor-pointer ${
+                    sessionChannelFilter === tab.id
+                      ? 'bg-white text-[#1B3A6B] font-bold shadow-2xs'
+                      : 'text-gray-600 hover:text-gray-900'
+                  }`}
+                >
+                  {tab.label}
+                </button>
+              ))}
+            </div>
+
+            {/* Search Box */}
+            <div className="relative w-full md:w-72">
+              <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+              <input
+                type="text"
+                value={sessionSearch}
+                onChange={e => setSessionSearch(e.target.value)}
+                placeholder="Tìm theo chủ đề, người dùng..."
+                className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-gray-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600"
+              />
+            </div>
+          </div>
+
+          {/* Sessions List */}
+          <div className="bg-white rounded-2xl border border-gray-100 shadow-xs overflow-hidden">
+            {loadingSessions ? (
+              <div className="flex flex-col items-center justify-center py-16 gap-3">
+                <Loader2 size={32} className="animate-spin text-[#1B3A6B]" />
+                <span className="text-xs text-gray-500">Đang tải danh sách phiên chat...</span>
+              </div>
+            ) : sessions.length === 0 ? (
+              <div className="text-center py-16 text-gray-400 text-xs">
+                Chưa có phiên hội thoại nào được ghi nhận. Hãy thử nghiệm chat ở tab Playground hoặc tương tác qua bot nhé!
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs">
+                  <thead className="bg-slate-50/80 text-gray-500 font-semibold border-b border-gray-100">
+                    <tr>
+                      <th className="py-3.5 px-4">Chủ đề & Phiên hội thoại</th>
+                      <th className="py-3.5 px-4">Kênh</th>
+                      <th className="py-3.5 px-4">Người tương tác</th>
+                      <th className="py-3.5 px-4 text-center">Số tin</th>
+                      <th className="py-3.5 px-4 text-right">Tổng Tokens</th>
+                      <th className="py-3.5 px-4">Cập nhật</th>
+                      <th className="py-3.5 px-4 text-center">Hành động</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100 text-gray-700">
+                    {sessions.map(s => (
+                      <tr key={s.id} className="hover:bg-slate-50/60 transition-colors">
+                        <td className="py-3 px-4 max-w-xs">
+                          <div className="font-bold text-gray-900 truncate">{s.title}</div>
+                          {s.messages && s.messages[0] && (
+                            <div className="text-[11px] text-gray-400 truncate mt-0.5 italic">
+                              "{s.messages[0].content}"
+                            </div>
+                          )}
+                        </td>
+                        <td className="py-3 px-4">
+                          <span className={`px-2 py-0.5 rounded-md text-[10.5px] font-bold ${
+                            s.channel === 'PLAYGROUND'
+                              ? 'bg-indigo-50 text-indigo-700 border border-indigo-200/60'
+                              : s.channel === 'FACEBOOK'
+                              ? 'bg-blue-50 text-blue-700 border border-blue-200/60'
+                              : 'bg-emerald-50 text-emerald-700 border border-emerald-200/60'
+                          }`}>
+                            {s.channel}
+                          </span>
+                        </td>
+                        <td className="py-3 px-4 font-medium text-gray-800">
+                          {s.userName || 'Ẩn danh'}
+                        </td>
+                        <td className="py-3 px-4 text-center font-semibold text-gray-600">
+                          {s.totalMessages}
+                        </td>
+                        <td className="py-3 px-4 text-right">
+                          <span className="inline-flex items-center gap-1 font-bold text-indigo-700 bg-indigo-50/80 px-2 py-0.5 rounded-md border border-indigo-100 text-[11px]">
+                            <Zap size={11} className="text-indigo-600" />
+                            {s.totalTokens.toLocaleString('vi-VN')}
+                          </span>
+                        </td>
+                        <td className="py-3 px-4 text-gray-500 text-[11px]">
+                          {new Date(s.updatedAt).toLocaleDateString('vi-VN', {
+                            day: '2-digit',
+                            month: '2-digit',
+                            year: 'numeric',
+                            hour: '2-digit',
+                            minute: '2-digit'
+                          })}
+                        </td>
+                        <td className="py-3 px-4 text-center">
+                          <div className="flex items-center justify-center gap-1">
+                            <button
+                              onClick={() => handleViewSessionDetail(s.id)}
+                              className="p-1.5 text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded-lg transition-colors cursor-pointer"
+                              title="Xem chi tiết hội thoại và tokens"
+                            >
+                              <Eye size={15} />
+                            </button>
+                            <button
+                              onClick={() => handleDeleteSession(s.id)}
+                              className="p-1.5 text-rose-500 hover:text-rose-700 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
+                              title="Lưu trữ / Ẩn phiên chat này"
+                            >
+                              <Trash2 size={15} />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+
+          {/* Modal Xem Chi Tiết Phiên Chat */}
+          {selectedSessionId && (
+            <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4 animate-fade-in">
+              <div className="bg-white rounded-2xl border border-gray-100 shadow-xl max-w-3xl w-full max-h-[90vh] flex flex-col overflow-hidden animate-scale-in">
+                {/* Modal Header */}
+                <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between bg-slate-50">
+                  <div className="space-y-0.5">
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-bold text-[#1B3A6B] uppercase tracking-wider">
+                        Chi Tiết Phiên Hội Thoại
+                      </span>
+                      {sessionDetail && (
+                        <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-200">
+                          {sessionDetail.channel}
+                        </span>
+                      )}
+                    </div>
+                    <h3 className="text-sm font-bold text-gray-900">
+                      {sessionDetail?.title || 'Đang tải thông tin...'}
+                    </h3>
+                  </div>
+
+                  <button
+                    onClick={() => { setSelectedSessionId(null); setSessionDetail(null); }}
+                    className="p-1.5 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-white transition-colors cursor-pointer"
+                  >
+                    <X size={18} />
+                  </button>
+                </div>
+
+                {/* Modal Content */}
+                <div className="flex-1 overflow-y-auto p-6 space-y-4 text-xs bg-slate-50/50">
+                  {loadingDetail ? (
+                    <div className="flex flex-col items-center justify-center py-16 gap-3">
+                      <Loader2 size={32} className="animate-spin text-[#1B3A6B]" />
+                      <span className="text-xs text-gray-500">Đang tải lịch sử hội thoại và chi tiết tokens...</span>
+                    </div>
+                  ) : sessionDetail?.messages?.length === 0 ? (
+                    <div className="text-center py-12 text-gray-400">Phiên này chưa có tin nhắn nào.</div>
+                  ) : (
+                    sessionDetail?.messages?.map((m: any, idx: number) => (
+                      <div
+                        key={idx}
+                        className={`flex flex-col ${m.role === 'user' ? 'items-end' : 'items-start'}`}
+                      >
+                        <div
+                          className={`max-w-[85%] p-4 rounded-2xl leading-relaxed whitespace-pre-wrap ${
+                            m.role === 'user'
+                              ? 'bg-[#1B3A6B] text-white rounded-tr-xs'
+                              : 'bg-white text-gray-800 border border-gray-200 shadow-2xs rounded-tl-xs'
+                          }`}
+                        >
+                          <div className="text-[11px] font-bold mb-1 opacity-75">
+                            {m.role === 'user' ? (sessionDetail.userName || 'Người dùng') : 'Trợ lý AI Truliva'}
+                          </div>
+                          <div>{m.content}</div>
+
+                          {/* Phân tích Token cho câu trả lời của AI */}
+                          {m.role === 'assistant' && (
+                            <div className="mt-3 pt-2.5 border-t border-slate-100 text-[11px] text-gray-600 space-y-2">
+                              <div className="flex flex-wrap items-center gap-2">
+                                <span className="inline-flex items-center gap-1 font-bold text-indigo-700 bg-indigo-50 border border-indigo-100 px-2.5 py-0.5 rounded-md">
+                                  <Zap size={12} className="text-indigo-600" />
+                                  {m.totalTokens.toLocaleString('vi-VN')} tokens
+                                </span>
+                                <span className="text-gray-400">•</span>
+                                <span>Input: <strong className="text-gray-900">{m.promptTokens.toLocaleString('vi-VN')}</strong></span>
+                                <span className="text-gray-400">•</span>
+                                <span>Output: <strong className="text-gray-900">{m.completionTokens.toLocaleString('vi-VN')}</strong></span>
+                                {m.latencyMs && (
+                                  <>
+                                    <span className="text-gray-400">•</span>
+                                    <span className="text-emerald-700 font-semibold">{m.latencyMs} ms</span>
+                                  </>
+                                )}
+                                {m.model && (
+                                  <>
+                                    <span className="text-gray-400">•</span>
+                                    <span className="font-mono text-gray-400 text-[10px]">{m.model}</span>
+                                  </>
+                                )}
+                              </div>
+
+                              {/* Hiển thị đoạn RAG nếu có */}
+                              {m.retrievedChunks && Array.isArray(m.retrievedChunks) && m.retrievedChunks.length > 0 && (
+                                <div className="mt-2 bg-blue-50/60 p-2.5 rounded-xl border border-blue-100 space-y-1">
+                                  <div className="font-bold text-blue-900 flex items-center gap-1">
+                                    <FileText size={12} />
+                                    <span>Đã tham chiếu {m.retrievedChunks.length} tài liệu RAG:</span>
+                                  </div>
+                                  {m.retrievedChunks.map((chunk: any, cIdx: number) => (
+                                    <div key={cIdx} className="text-[10.5px] text-blue-950 pl-2 border-l-2 border-blue-300">
+                                      #{cIdx + 1}. {chunk.sourceTitle || chunk.fileName} (Trang {chunk.metadata?.pageNumber || 1}) - Khớp {(chunk.rrfScore * 100).toFixed(1)}%
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                        <span className="text-[10px] text-gray-400 mt-1 px-1">
+                          {new Date(m.createdAt).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                        </span>
+                      </div>
+                    ))
+                  )}
+                </div>
+
+                {/* Modal Footer */}
+                <div className="px-6 py-3 border-t border-gray-100 bg-white flex items-center justify-between text-xs text-gray-500">
+                  <div>
+                    Tổng tokens của phiên: <strong className="text-indigo-700 font-bold">{sessionDetail?.totalTokens?.toLocaleString('vi-VN') || 0} tokens</strong>
+                  </div>
+                  <button
+                    onClick={() => { setSelectedSessionId(null); setSessionDetail(null); }}
+                    className="px-4 py-1.5 bg-slate-100 hover:bg-slate-200 text-gray-700 font-semibold rounded-xl transition-colors cursor-pointer"
+                  >
+                    Đóng
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>

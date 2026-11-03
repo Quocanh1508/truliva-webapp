@@ -238,9 +238,10 @@ export async function processFacebookMessageWithAI(
 
     // 4. Tra cứu tài liệu nội bộ qua Hybrid RAG nếu có nội dung hỏi
     let ragInstruction = instruction;
+    let ragChunks: any[] = [];
     if (userText && userText.trim()) {
       try {
-        const ragChunks = await searchHybridRAG(userText.trim(), 3);
+        ragChunks = await searchHybridRAG(userText.trim(), 3);
         if (ragChunks && ragChunks.length > 0) {
           const ragInfo = '\n\nTÀI LIỆU CHÍNH HÃNG TRULIVA TRA CỨU ĐƯỢC (HYBRID RAG):\n' +
             ragChunks.map((c, idx) => `[Đoạn ${idx + 1} - ${c.sourceTitle || c.fileName} | Trang ${c.metadata?.pageNumber || 1}]:\n${c.content}`).join('\n\n');
@@ -270,7 +271,7 @@ export async function processFacebookMessageWithAI(
       return;
     }
 
-    // Lưu câu trả lời của AI vào lịch sử
+    // Lưu câu trả lời của AI vào lịch sử bộ nhớ tạm
     session.turns.push({
       role: 'model',
       parts: [{ text: replyText }]
@@ -278,6 +279,67 @@ export async function processFacebookMessageWithAI(
 
     // 5. Gửi câu trả lời về Facebook Messenger
     await sendFacebookReply(senderId, replyText);
+
+    // 6. Ghi nhận phiên chat Facebook và lượng Tokens tiêu thụ vào CSDL
+    try {
+      let fbSession = await prisma.aiChatSession.findFirst({
+        where: { sessionCode: `FB_${senderId}`, isActive: true }
+      });
+
+      if (!fbSession) {
+        fbSession = await prisma.aiChatSession.create({
+          data: {
+            sessionCode: `FB_${senderId}`,
+            title: `Khách Facebook: ${(userText || 'Tin nhắn mới').slice(0, 50)}`,
+            channel: 'FACEBOOK',
+            userName: `Khách FB (${senderId.slice(-4)})`,
+            totalMessages: 0,
+            totalTokens: 0,
+            isActive: true
+          }
+        });
+      }
+
+      const usage = geminiRes.data?.usageMetadata || {};
+      const promptTokens = usage.promptTokenCount || 0;
+      const completionTokens = usage.candidatesTokenCount || 0;
+      const totalTokens = usage.totalTokenCount || 0;
+
+      await prisma.aiChatMessage.create({
+        data: {
+          sessionId: fbSession.id,
+          role: 'user',
+          content: userText || '[Hình ảnh]',
+          promptTokens: 0,
+          completionTokens: 0,
+          totalTokens: 0
+        }
+      });
+
+      await prisma.aiChatMessage.create({
+        data: {
+          sessionId: fbSession.id,
+          role: 'assistant',
+          content: replyText,
+          promptTokens,
+          completionTokens,
+          totalTokens,
+          model: GEMINI_MODEL,
+          retrievedChunks: ragChunks && ragChunks.length > 0 ? ragChunks : undefined
+        }
+      });
+
+      await prisma.aiChatSession.update({
+        where: { id: fbSession.id },
+        data: {
+          totalMessages: { increment: 2 },
+          totalTokens: { increment: totalTokens },
+          updatedAt: new Date()
+        }
+      });
+    } catch (dbErr: any) {
+      logger.warn('Failed to record Facebook chat session tokens in DB', { error: dbErr.message });
+    }
 
   } catch (error: any) {
     logger.error('Error processing message with Gemini AI', {
