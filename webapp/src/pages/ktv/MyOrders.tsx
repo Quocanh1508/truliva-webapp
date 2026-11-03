@@ -1077,8 +1077,8 @@ export default function MyOrders() {
                     type="button"
                     onClick={() => {
                       const ord = selectedOrderDetail;
-                      closeOrderDetail();
-                      navigate('/ktv/report', { state: { order: ord } });
+                      setSelectedOrderDetail(null);
+                      navigate('/ktv/report', { replace: true, state: { order: ord } });
                     }}
                     className="flex-[1.3] flex items-center justify-center space-x-1 py-2.5 px-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold text-xs shadow-md transition-colors cursor-pointer active:scale-95"
                   >

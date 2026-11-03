@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { Outlet, useNavigate, useLocation, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { usePermission } from '../context/PermissionContext';
-import { LogOut, Menu, X, FileText, List, Users, BarChart, Building, Image as ImageIcon, MessageSquare, Bell, Wrench, User, Warehouse, Network, Send, Hash, Tag, Calculator, Cpu, PhoneCall } from 'lucide-react';
+import { LogOut, Menu, X, FileText, List, Users, BarChart, Building, Image as ImageIcon, MessageSquare, Bell, Wrench, User, Warehouse, Network, Send, Hash, Tag, Calculator, Cpu, PhoneCall, Bot } from 'lucide-react';
 import { fetchApi } from '../api/client';
 import SyncManager from './SyncManager';
 import { fetchCurrentWeather, type WeatherInfo } from '../utils/weather';
@@ -152,6 +152,11 @@ export default function Layout() {
         { name: 'Giám sát IoT (ESP32)', path: '/admin/iot', icon: <Cpu size={20} /> },
         { name: 'Gửi thông báo', path: '/admin/broadcast', icon: <Send size={20} /> }
       );
+    }
+
+    // Quản lý Trợ lý AI & Tri thức (Admin, Dev)
+    if (user.role === 'ADMIN' || user.role === 'DEV') {
+      items.push({ name: 'Trợ lý AI & Tri thức', path: '/admin/ai-assistant', icon: <Bot size={20} /> });
     }
     
     // Shared elements

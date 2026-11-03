@@ -844,3 +844,24 @@ model ShopOrderItem {
 }
 
 
+
+// ── Cấu hình Trợ lý AI và Cơ sở Tri thức Truliva ──
+model AiBotConfig {
+  id            String   @id @default("default")
+  botName       String   @default("Truliva Assistant") @map("bot_name")
+  greeting      String?  @map("greeting")
+  personaTone   String   @default("Dạ Truliva xin chào..., xưng Truliva và gọi khách là bạn/anh/chị") @map("persona_tone")
+  hotline       String   @default("1900 23 23 89")
+  workingHours  String   @default("08:00 - 18:00 (Thứ 2 - Chủ Nhật)") @map("working_hours")
+  address       String   @default("Trụ sở chính: Tòa nhà Truliva, TP.HCM")
+  systemPrompt  String   @db.Text @map("system_prompt")
+  knowledgeText String   @db.Text @map("knowledge_text")
+  faqs          Json     @default("[]")
+  syncCatalog   Boolean  @default(true) @map("sync_catalog")
+  isEnabled     Boolean  @default(true) @map("is_enabled")
+  updatedBy     String?  @map("updated_by")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  @@map("ai_bot_configs")
+}

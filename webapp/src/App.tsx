@@ -40,6 +40,7 @@ import SerialManage from './pages/admin/SerialManage';
 import PromoManage from './pages/admin/PromoManage';
 import SalaryManage from './pages/admin/SalaryManage';
 import IotMonitor from './pages/admin/IotMonitor';
+import AiAssistantManage from './pages/admin/AiAssistantManage';
 import WarrantyActivate from './pages/public/WarrantyActivate';
 import WarrantyConfirm from './pages/public/WarrantyConfirm';
 
@@ -374,8 +375,9 @@ export default function App() {
                 <Route element={<ProtectedRoute allowedRoles={['ADMIN']} featureKey="SALARY_VIEW" />}>
                   <Route path="/admin/salaries" element={<SalaryManage />} />
                 </Route>
-                <Route element={<ProtectedRoute allowedRoles={['ADMIN']} />}>
+                <Route element={<ProtectedRoute allowedRoles={['ADMIN', 'DEV']} />}>
                   <Route path="/admin/iot" element={<IotMonitor />} />
+                  <Route path="/admin/ai-assistant" element={<AiAssistantManage />} />
                 </Route>
 
                 {/* All Office/Administrative Routes */}

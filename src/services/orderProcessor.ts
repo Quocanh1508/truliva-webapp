@@ -226,9 +226,10 @@ export async function processOrderEvent(rawEventId: string | null, payload: any)
 
     // 2. Trạng thái Hủy đơn (chỉ Đã hủy + Xóa gần đây)
     const isCancelled =
-      statusId === 6 ||
+      Number(statusId) === 6 ||
+      pStatus === 'canceled' ||
       pStatus === 'cancelled' ||
-      pStatus === 'cancel' ||
+      pStatus.includes('cancel') ||
       pStatus.includes('đã hủy') ||
       pStatus.includes('xóa gần đây');
 

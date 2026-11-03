@@ -30,6 +30,7 @@ import iotRoutes from './routes/iot';
 import permissionRoutes from './routes/permissions';
 import hotlineRoutes from './routes/hotlines';
 import comboRoutes from './routes/combos';
+import aiAssistantRoutes from './routes/aiAssistant';
 import { startOrderSyncScheduler } from './services/orderSyncScheduler';
 import { startReportCleanupScheduler } from './services/reportCleanupScheduler';
 import { startPancakeRetryScheduler } from './services/pancakeRetryScheduler';
@@ -176,6 +177,7 @@ app.use('/api/iot', iotRoutes);
 app.use('/api/permissions', permissionRoutes);
 app.use('/api/hotlines', hotlineRoutes);
 app.use('/api/combos', comboRoutes);
+app.use('/api/ai-assistant', aiAssistantRoutes);
 
 // ── Serve uploaded images ──
 app.use('/uploads', express.static(path.join(process.cwd(), 'uploads'), {

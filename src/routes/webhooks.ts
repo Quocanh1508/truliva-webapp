@@ -5,6 +5,7 @@ import logger from '../utils/logger';
 import { verifyPancakeToken } from '../middleware/auth';
 import { validateWebhookPayload } from '../middleware/validatePayload';
 import { routeEvent } from '../services/eventRouter';
+import { processFacebookMessageWithAI } from '../services/facebookAiBot';
 
 const router = Router();
 
@@ -244,6 +245,89 @@ router.get('/check-nga', async (req: Request, res: Response): Promise<void> => {
     });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
+  }
+});
+
+// ── Facebook Messenger Webhooks ──
+
+/**
+ * GET /webhooks/facebook
+ * Xác thực Webhook với Meta Developer Portal
+ */
+router.get('/facebook', (req: Request, res: Response): void => {
+  const FB_VERIFY_TOKEN = process.env.FB_VERIFY_TOKEN || 'truliva_fb_token_2026';
+
+  const mode = req.query['hub.mode'];
+  const token = req.query['hub.verify_token'];
+  const challenge = req.query['hub.challenge'];
+
+  if (mode === 'subscribe' && token === FB_VERIFY_TOKEN) {
+    logger.info('Facebook Webhook verification successful');
+    res.status(200).send(challenge);
+    return;
+  }
+
+  logger.warn('Facebook Webhook verification failed', { mode, token });
+  res.sendStatus(403);
+});
+
+/**
+ * POST /webhooks/facebook
+ * Nhận tin nhắn và sự kiện từ Facebook Messenger
+ */
+router.post('/facebook', (req: Request, res: Response): void => {
+  const body = req.body;
+
+  // Trả về 200 OK ngay lập tức để Meta không gửi lại (retry)
+  if (body.object === 'page') {
+    res.status(200).send('EVENT_RECEIVED');
+
+    // Xử lý các entry và tin nhắn
+    if (Array.isArray(body.entry)) {
+      for (const entry of body.entry) {
+        if (Array.isArray(entry.messaging)) {
+          for (const event of entry.messaging) {
+            const senderId = event.sender?.id;
+
+            // Bỏ qua tin nhắn do chính Trang gửi đi (is_echo) để tránh lặp vô tận
+            if (event.message && event.message.is_echo) {
+              continue;
+            }
+
+            if (event.message && senderId) {
+              const text = event.message.text || '';
+              const imageUrls: string[] = [];
+
+              if (Array.isArray(event.message.attachments)) {
+                for (const att of event.message.attachments) {
+                  if (att.type === 'image' && att.payload?.url) {
+                    imageUrls.push(att.payload.url);
+                  }
+                }
+              }
+
+              logger.info('Processing incoming Facebook message with AI', {
+                senderId,
+                hasText: !!text,
+                imageCount: imageUrls.length
+              });
+
+              // Chạy bất đồng bộ để không chặn luồng webhook
+              processFacebookMessageWithAI(senderId, text, imageUrls).catch(err => {
+                logger.error('Failed to process message with AI', { senderId, error: err.message });
+              });
+            } else if (event.postback && senderId) {
+              const payload = event.postback.title || event.postback.payload || 'Bắt đầu';
+              processFacebookMessageWithAI(senderId, payload, []).catch(err => {
+                logger.error('Failed to process postback with AI', { senderId, error: err.message });
+              });
+            }
+          }
+        }
+      }
+    }
+  } else {
+    res.sendStatus(404);
   }
 });
 
