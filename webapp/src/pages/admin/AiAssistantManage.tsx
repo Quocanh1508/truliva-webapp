@@ -338,6 +338,13 @@ export default function AiAssistantManage() {
 
     const userMsg = testInput.trim();
     const nowTime = new Date().toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
+    
+    // Thu thập các tin nhắn gần nhất trong khung chat để truyền ngữ cảnh hội thoại (Multi-turn Context)
+    const history = chatMessages.slice(-8).map(m => ({
+      role: m.sender === 'user' ? 'user' : 'model',
+      text: m.text
+    }));
+
     setChatMessages(prev => [...prev, { sender: 'user', text: userMsg, time: nowTime }]);
     setTestInput('');
     setTestingChat(true);
@@ -345,7 +352,7 @@ export default function AiAssistantManage() {
     try {
       const res = await fetchApi('/ai-assistant/test-chat', {
         method: 'POST',
-        body: JSON.stringify({ message: userMsg })
+        body: JSON.stringify({ message: userMsg, history })
       });
       if (res.success && res.reply) {
         setChatMessages(prev => [

@@ -12,23 +12,41 @@ const upload = multer({
   limits: { fileSize: 100 * 1024 * 1024 } // 100MB cho tài liệu kỹ thuật lớn
 });
 
-const DEFAULT_SYSTEM_PROMPT = `Bạn là Trợ lý ảo CSKH chính thức của Truliva (Pure Vita) - Thương hiệu máy lọc nước & giải pháp nước sạch gia đình.
+const DEFAULT_SYSTEM_PROMPT = `Bạn là Trợ lý AI CSKH chính thức của Truliva (Pure Vita) - Thương hiệu máy lọc nước & giải pháp nước sạch gia đình.
 
-NGUYÊN TẮC TRẢ LỜI QUAN TRỌNG NHẤT:
-1. TRẢ LỜI NGẮN GỌN, TRỰC DIỆN, ĐÚNG TRỌNG TÂM: Tuyệt đối không lan man, không viết văn dài dòng, không hỏi ngược khách dồn dập. Đi thẳng vào câu trả lời trong 3-5 dòng.
-2. XƯNG HÔ: "Dạ Truliva xin chào...", gọi khách là "anh/chị" hoặc "bạn". Giọng điệu lịch sự, chuyên nghiệp, rõ ràng.
-3. CHÍNH SÁCH BẢO HÀNH CHUẨN XÁC THEO TỪNG MODEL:
+PHONG CÁCH VÀ NGUYÊN TẮC TƯ VẤN:
+1. TỰ NHIÊN, NHÃ NHẶN VÀ LINH HOẠT:
+   - Trò chuyện tự nhiên, chuyên nghiệp và ấm áp như một chuyên viên tư vấn khách hàng thực thụ.
+   - QUY TẮC CHÀO HỎI: CHỈ gửi lời chào trang trọng ("Dạ Truliva xin chào anh/chị...") ở TIN NHẮN ĐẦU TIÊN của cuộc trò chuyện.
+   - Ở các câu hỏi tiếp theo trong cùng hội thoại, TUYỆT ĐỐI KHÔNG lặp lại câu chào "Dạ Truliva xin chào". Hãy vào thẳng vấn đề một cách tự nhiên (ví dụ: "Dạ đối với model UR3626...", "Dạ vâng ạ, thông số kỹ thuật của máy gồm có...", "Dạ hiện tại giá máy là...").
+   - Xưng hô: "Dạ em / Truliva", gọi khách là "anh/chị" hoặc "bạn".
+
+2. KHÔNG LẠM DỤNG HOẶC ĐẨY KHÁCH SANG HOTLINE:
+   - Khách hàng đang nhắn tin để được tư vấn trực tiếp tại đây. TUYỆT ĐỐI KHÔNG kết thúc câu trả lời bằng câu rập khuôn mời gọi hotline: "vui lòng liên hệ Hotline 1900 638 463...".
+   - Chỉ cung cấp số Hotline khi:
+     + Khách chủ động hỏi số điện thoại hỗ trợ hoặc thông tin liên hệ.
+     + Khách có sự cố rò rỉ nước khẩn cấp hoặc yêu cầu kỹ thuật viên đến tận nhà khảo sát/lắp đặt gấp.
+   - Luôn sẵn sàng giải đáp tại chỗ các thắc mắc về giá, tính năng, thông số kỹ thuật và cách sử dụng.
+
+3. GHI NHỚ VÀ THEO SÁT NGỮ CẢNH HỘI THOẠI (MULTI-TURN CONTEXT):
+   - Luôn chú ý câu hỏi trước đó của khách để hiểu đúng đối tượng đang nói tới.
+   - Ví dụ: Khách vừa hỏi "cho xin giá máy UR3626", sau đó hỏi "thông số chi tiết máy là như nào" hoặc "máy này bảo hành bao lâu" -> Phải hiểu ngay "máy này" là model UR3626 vừa đề cập, KHÔNG ĐƯỢC hỏi lại "anh/chị muốn hỏi model nào".
+
+4. PHÂN BIỆT RÕ RÀNG MÁY CHÍNH VÀ LINH KIỆN / PHỤ KIỆN / COMBO:
+   - Khi khách hỏi "giá máy [Model]" (ví dụ: UR3626, UR5840, UR5676...):
+     + Luôn ưu tiên báo giá của MÁY LỌC NƯỚC CHÍNH trước (ví dụ: Máy lọc nước Truliva UR3626 giá niêm yết 12.900.000 đ).
+     + Nếu có combo hoặc phụ kiện liên quan (như Bộ vòi, Lõi lọc PCP, Lõi lọc RO), có thể giải thích thêm rõ ràng: "Ngoài ra, máy còn có phụ kiện thay thế như Bộ vòi (800.000 đ) hoặc lõi lọc thay thế...".
+     + TUYỆT ĐỐI KHÔNG nhầm giá của linh kiện/phụ kiện (vòi, van, vỏ hộp) thành giá của cả chiếc máy lọc nước.
+
+5. CHÍNH SÁCH BẢO HÀNH CHUẨN XÁC:
    - Dòng máy Delica UR5840: Bảo hành chính hãng 24 THÁNG (2 năm).
-   - Tất cả các dòng máy lọc nước khác (UR5676, UR5640, CR5240, UR3140, W6412, UR61096H, CR-ZX5170, UX5010...): Bảo hành chính hãng 12 THÁNG (1 năm).
-   - Lõi lọc tiêu hao: Không thuộc phạm vi bảo hành máy, có chu kỳ thay định kỳ (Lõi 1: 3-6 tháng, Lõi 2: 6-9 tháng, Lõi 3: 9-12 tháng, RO: 24-36 tháng).
-4. QUY TRÌNH HƯỚNG DẪN KÍCH HOẠT BẢO HÀNH ĐIỆN TỬ:
-   - Hướng dẫn khách truy cập: https://trulivavietnam.com/warranty-activate hoặc mở Zalo Mini App "Truliva" (hoặc quét mã QR trên tem máy).
-   - Nhập số Serial in trên tem máy (15-20 ký tự).
-   - Điền Tên + Số điện thoại nhận tin nhắn Zalo xác nhận là xong ngay.
-5. THÔNG TIN LIÊN HỆ CHÍNH HÃNG:
-   - Hotline CSKH: 1900 638 463 (08:00 - 18:00 hàng ngày)
-   - Trụ sở: 65 Đường 42-AP, Phường An Phú, TP. Thủ Đức, TP. Hồ Chí Minh
-   - Website: https://trulivavietnam.com`;
+   - Tất cả các dòng máy lọc nước khác (UR3626, UR5676, UR5640, CR5240, UR3140, W6412, UR61096H, CR-ZX5170, UX5010...): Bảo hành chính hãng 12 THÁNG (1 năm).
+   - Lõi lọc tiêu hao: Định kỳ thay thế (Lõi thô: 3-6 tháng, Lõi than: 6-9 tháng, Lõi RO: 24-36 tháng).
+
+6. THÔNG TIN DOANH NGHIỆP TRULIVA:
+   - Hotline hỗ trợ: 1900 638 463 (08:00 - 18:00)
+   - Kích hoạt bảo hành điện tử: https://trulivavietnam.com/warranty-activate hoặc Zalo Mini App "Truliva"
+   - Website chính thức: https://trulivavietnam.com`;
 
 const DEFAULT_KNOWLEDGE = `# QUY ĐỊNH BẢO HÀNH & KÍCH HOẠT ĐIỆN TỬ TRULIVA
 
@@ -218,7 +236,7 @@ router.get('/catalog-summary', requireAuth, async (req: Request, res: Response):
  */
 router.post('/test-chat', requireAuth, async (req: Request, res: Response): Promise<void> => {
   try {
-    const { message } = req.body;
+    const { message, history } = req.body;
     if (!message || !message.trim()) {
       res.status(400).json({ success: false, message: 'Nội dung tin nhắn không được để trống' });
       return;
@@ -239,32 +257,87 @@ router.post('/test-chat', requireAuth, async (req: Request, res: Response): Prom
         faqs.map(f => `Hỏi: ${f.question}\nĐáp: ${f.answer}`).join('\n\n');
     }
 
+    // 1. Phân tích ngữ cảnh: Tìm model được nhắc tới từ tin nhắn hiện tại hoặc lịch sử gần nhất
+    const recentContextText = [
+      ...(Array.isArray(history) ? history.slice(-3).map((h: any) => h.text || '') : []),
+      message
+    ].join(' ');
+
+    const modelMatches = recentContextText.match(/\b(?:UR|CR|CR-ZX|W|UX|YDZ|QY\/F)?[0-9]{4,6}[A-Z]*\b/gi) || [];
+    const detectedModels = Array.from(new Set(modelMatches.map(m => m.trim().toUpperCase()))).filter(m => m.length >= 3);
+    const primaryModel = detectedModels[detectedModels.length - 1] || '';
+
+    // 2. Tra cứu sản phẩm động dựa trên model hoặc danh mục tiêu biểu
     let catalogContext = '';
     if (config?.syncCatalog) {
-      const [products, combos] = await Promise.all([
-        prisma.product.findMany({
-          where: { isActive: true },
-          select: { name: true, sku: true, sellingPrice: true },
-          take: 15
-        }),
-        prisma.productCombo.findMany({
-          where: { isActive: true },
-          select: { displayName: true, comboKey: true },
-          take: 10
-        })
-      ]);
+      let products: any[] = [];
+      if (detectedModels.length > 0) {
+        const orConds = detectedModels.map(m => ({
+          OR: [
+            { name: { contains: m, mode: 'insensitive' as const } },
+            { sku: { contains: m, mode: 'insensitive' as const } }
+          ]
+        }));
+        products = await prisma.product.findMany({
+          where: {
+            isActive: true,
+            OR: orConds.flatMap(c => c.OR)
+          },
+          select: { name: true, sku: true, sellingPrice: true, category: true },
+          take: 25
+        });
+      }
 
-      catalogContext = '\n\nDANH MỤC SẢN PHẨM & COMBO THỰC TẾ TRONG HỆ THỐNG TRULIVA:\n' +
-        '1. Sản phẩm/Linh kiện:\n' +
-        products.map(p => `- ${p.name} (SKU: ${p.sku}) | Giá niêm yết: ${p.sellingPrice?.toLocaleString('vi-VN')} đ`).join('\n') +
-        '\n2. Các gói Combo phổ biến:\n' +
-        combos.map(c => `- ${c.displayName} (${c.comboKey})`).join('\n');
+      if (products.length === 0) {
+        products = await prisma.product.findMany({
+          where: {
+            isActive: true,
+            name: { startsWith: 'Máy lọc nước' }
+          },
+          select: { name: true, sku: true, sellingPrice: true, category: true },
+          orderBy: { sellingPrice: 'desc' },
+          take: 12
+        });
+      }
+
+      // Đưa Máy lọc nước chính lên đầu, sau đó mới tới phụ kiện / lõi lọc
+      products.sort((a, b) => {
+        const aIsMain = a.name.startsWith('Máy lọc nước') ? 1 : 0;
+        const bIsMain = b.name.startsWith('Máy lọc nước') ? 1 : 0;
+        if (aIsMain !== bIsMain) return bIsMain - aIsMain;
+        return (b.sellingPrice || 0) - (a.sellingPrice || 0);
+      });
+
+      const mainMachines = products.filter(p => p.name.startsWith('Máy lọc nước'));
+      const accessories = products.filter(p => !p.name.startsWith('Máy lọc nước'));
+
+      let catalogLines: string[] = [];
+      if (mainMachines.length > 0) {
+        catalogLines.push('1. Máy lọc nước chính hãng (Thiết bị chính):');
+        mainMachines.forEach(p => {
+          catalogLines.push(`- ${p.name} (SKU: ${p.sku}) | Giá niêm yết: ${p.sellingPrice ? p.sellingPrice.toLocaleString('vi-VN') + ' đ' : 'Liên hệ'}`);
+        });
+      }
+      if (accessories.length > 0) {
+        catalogLines.push('2. Phụ kiện / Linh kiện / Lõi lọc đi kèm:');
+        accessories.slice(0, 10).forEach(p => {
+          catalogLines.push(`- ${p.name} (SKU: ${p.sku}) | Giá niêm yết: ${p.sellingPrice ? p.sellingPrice.toLocaleString('vi-VN') + ' đ' : 'Liên hệ'}`);
+        });
+      }
+
+      catalogContext = '\n\nBẢNG GIÁ & DANH MỤC SẢN PHẨM TRULIVA CHÍNH THỨC:\n' + catalogLines.join('\n');
+    }
+
+    // 3. Tra cứu Hybrid RAG (kèm model context nếu câu hỏi ngắn)
+    let ragSearchQuery = message.trim();
+    if (primaryModel && !ragSearchQuery.toUpperCase().includes(primaryModel)) {
+      ragSearchQuery = `${primaryModel} ${ragSearchQuery}`;
     }
 
     let ragContext = '';
     let retrievedChunks: any[] = [];
     try {
-      retrievedChunks = await searchHybridRAG(message, 3);
+      retrievedChunks = await searchHybridRAG(ragSearchQuery, 4, 0.35, primaryModel);
       if (retrievedChunks.length > 0) {
         ragContext = '\n\nTÀI LIỆU CHÍNH HÃNG TRULIVA TRA CỨU ĐƯỢC (HYBRID RAG):\n' +
           retrievedChunks.map((c, idx) => 
@@ -277,17 +350,31 @@ router.post('/test-chat', requireAuth, async (req: Request, res: Response): Prom
 
     const fullSystemInstruction = `${systemPrompt}\n\nTHÔNG TIN LIÊN HỆ:\n- Hotline: ${config?.hotline || '1900 638 463'}\n- Giờ làm việc: ${config?.workingHours || '08:00 - 18:00'}\n- Địa chỉ: ${config?.address || 'TP.HCM'}\n\n${knowledgeText}${faqContext}${catalogContext}${ragContext}`;
 
+    // 4. Chuẩn bị Multi-turn Contents cho Gemini
+    const contents: any[] = [];
+    if (Array.isArray(history) && history.length > 0) {
+      for (const turn of history.slice(-6)) {
+        const role = turn.role === 'model' || turn.sender === 'ai' || turn.sender === 'bot' || turn.sender === 'model' ? 'model' : 'user';
+        const text = typeof turn.text === 'string' ? turn.text.trim() : '';
+        if (text) {
+          contents.push({
+            role,
+            parts: [{ text }]
+          });
+        }
+      }
+    }
+    contents.push({
+      role: 'user',
+      parts: [{ text: message.trim() }]
+    });
+
     const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${GEMINI_API_KEY}`;
     const geminiRes = await axios.post(geminiUrl, {
       system_instruction: {
         parts: [{ text: fullSystemInstruction }]
       },
-      contents: [
-        {
-          role: 'user',
-          parts: [{ text: message }]
-        }
-      ]
+      contents
     }, { timeout: 35000 });
 
     const reply = geminiRes.data?.candidates?.[0]?.content?.parts?.[0]?.text || 'Không có phản hồi từ AI';

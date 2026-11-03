@@ -1,7 +1,16 @@
 import prisma from '../config/database';
 import logger from '../utils/logger';
 import axios from 'axios';
-import { PDFParse } from 'pdf-parse';
+// Polyfill môi trường Node.js cho thư viện đọc PDF (pdfjs-dist)
+if (typeof (globalThis as any).DOMMatrix === 'undefined') {
+  (globalThis as any).DOMMatrix = class DOMMatrix {};
+}
+if (typeof (globalThis as any).Path2D === 'undefined') {
+  (globalThis as any).Path2D = class Path2D {};
+}
+if (typeof (globalThis as any).ImageData === 'undefined') {
+  (globalThis as any).ImageData = class ImageData {};
+}
 
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY || '';
 const EMBEDDING_MODEL = 'gemini-embedding-001';
@@ -39,7 +48,8 @@ export async function extractTextFromPdf(buffer: Buffer): Promise<{
   totalPages: number;
 }> {
   try {
-    const parser = new PDFParse({ data: new Uint8Array(buffer) });
+    const { PDFParse } = await import('pdf-parse');
+    const parser = new (PDFParse as any)({ data: new Uint8Array(buffer) });
     const result = await parser.getText();
     const pagesList: Array<{ pageNumber: number; text: string }> = [];
 
@@ -60,6 +70,12 @@ export async function extractTextFromPdf(buffer: Buffer): Promise<{
         pageNumber: 1,
         text: result.text.trim()
       });
+    }
+
+    // Kiểm tra xem văn bản trích xuất có nội dung thực sự hay chỉ là số trang rỗng (như "-- 1 of 33 --")
+    const cleanText = (result.text || '').replace(/--\s*\d+\s*of\s*\d+\s*--/gi, '').trim();
+    if (cleanText.length < 50) {
+      throw new Error('Tệp PDF này là dạng hình ảnh scan/slide không có lớp văn bản kỹ thuật số (text layer). Vui lòng tải tài liệu có văn bản số hoặc tệp .txt/.doc để hệ thống lập chỉ mục chính xác.');
     }
 
     try {
@@ -323,12 +339,16 @@ export async function ingestDocument(
 export async function searchHybridRAG(
   query: string,
   limit = 4,
-  vectorThreshold = 0.35
+  vectorThreshold = 0.35,
+  modelKeyword?: string
 ): Promise<DocumentChunkResult[]> {
   try {
     if (!query || !query.trim()) return [];
 
     const cleanQuery = query.trim();
+    // Tự động phát hiện model nếu chưa truyền (ví dụ: UR3626, 3626, UR5840...)
+    const kw = (modelKeyword || cleanQuery.match(/\b(?:UR|CR|CR-ZX|W|UX|YDZ|QY\/F)?[0-9]{4,6}[A-Z]*\b/i)?.[0] || '').trim();
+
     // Tạo embedding cho câu truy vấn
     const queryEmbedding = await getSingleEmbedding(cleanQuery);
     const embStr = queryEmbedding ? `[${queryEmbedding.join(',')}]` : null;
@@ -346,10 +366,10 @@ export async function searchHybridRAG(
         FROM document_chunks c
         JOIN document_sources s ON s.id = c.document_id
         WHERE s.is_active = true
-          AND c.tsv_content @@ plainto_tsquery('simple', $1)
+          AND (c.tsv_content @@ plainto_tsquery('simple', $1) OR ($2 <> '' AND c.content ILIKE ('%' || $2 || '%')))
         ORDER BY "textScore" DESC
-        LIMIT $2;
-      `, cleanQuery, limit);
+        LIMIT $3;
+      `, cleanQuery, kw, limit);
 
       return keywordOnly || [];
     }
@@ -370,11 +390,20 @@ export async function searchHybridRAG(
       keyword_matches AS (
         SELECT 
           c.id, c.document_id, c.chunk_index, c.section_title, c.content, c.metadata,
-          ts_rank_cd(c.tsv_content, plainto_tsquery('simple', $2)) AS text_score,
-          ROW_NUMBER() OVER (ORDER BY ts_rank_cd(c.tsv_content, plainto_tsquery('simple', $2)) DESC) AS rank_text
+          GREATEST(
+            COALESCE(ts_rank_cd(c.tsv_content, plainto_tsquery('simple', $2)), 0.0),
+            CASE WHEN $3 <> '' AND c.content ILIKE ('%' || $3 || '%') THEN 0.8 ELSE 0.0 END
+          ) AS text_score,
+          ROW_NUMBER() OVER (
+            ORDER BY GREATEST(
+              COALESCE(ts_rank_cd(c.tsv_content, plainto_tsquery('simple', $2)), 0.0),
+              CASE WHEN $3 <> '' AND c.content ILIKE ('%' || $3 || '%') THEN 0.8 ELSE 0.0 END
+            ) DESC
+          ) AS rank_text
         FROM document_chunks c
         JOIN document_sources s ON s.id = c.document_id
-        WHERE s.is_active = true AND c.tsv_content @@ plainto_tsquery('simple', $2)
+        WHERE s.is_active = true 
+          AND (c.tsv_content @@ plainto_tsquery('simple', $2) OR ($3 <> '' AND c.content ILIKE ('%' || $3 || '%')))
         ORDER BY text_score DESC
         LIMIT 25
       )
@@ -395,8 +424,8 @@ export async function searchHybridRAG(
       JOIN document_sources s ON s.id = COALESCE(v.document_id, k.document_id)
       WHERE s.is_active = true
       ORDER BY "rrfScore" DESC
-      LIMIT $3;
-    `, embStr, cleanQuery, limit);
+      LIMIT $4;
+    `, embStr, cleanQuery, kw, limit);
 
     return rawResults || [];
   } catch (error: any) {
