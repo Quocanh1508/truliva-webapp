@@ -24,7 +24,10 @@ import {
   Search,
   Layers,
   FileUp,
-  Cpu
+  Cpu,
+  Pencil,
+  Check,
+  X
 } from 'lucide-react';
 
 interface FAQItem {
@@ -146,6 +149,13 @@ export default function AiAssistantManage() {
   const [newAnswer, setNewAnswer] = useState('');
   const [showAddFaq, setShowAddFaq] = useState(false);
 
+  // Edit FAQ State
+  const [editingFaqIndex, setEditingFaqIndex] = useState<number | null>(null);
+  const [editCategory, setEditCategory] = useState('');
+  const [editQuestion, setEditQuestion] = useState('');
+  const [editAnswer, setEditAnswer] = useState('');
+  const [savingFaq, setSavingFaq] = useState(false);
+
   useEffect(() => {
     loadConfig();
     loadCatalogSummary();
@@ -216,7 +226,7 @@ export default function AiAssistantManage() {
     }
   };
 
-  const handleAddFaq = () => {
+  const handleAddFaq = async () => {
     if (!newQuestion.trim() || !newAnswer.trim()) {
       alert('Vui lòng nhập cả câu hỏi và câu trả lời!');
       return;
@@ -229,16 +239,107 @@ export default function AiAssistantManage() {
         answer: newAnswer.trim()
       }
     ];
-    setConfig(prev => ({ ...prev, faqs: updatedFaqs }));
+    const updatedConfig = { ...config, faqs: updatedFaqs };
+    setConfig(updatedConfig);
     setNewQuestion('');
     setNewAnswer('');
     setShowAddFaq(false);
+
+    try {
+      setSavingFaq(true);
+      const res = await fetchApi('/ai-assistant/config', {
+        method: 'PUT',
+        body: JSON.stringify(updatedConfig)
+      });
+      if (res.success) {
+        setSuccessMsg('Đã thêm câu hỏi FAQ mới và lưu vào hệ thống thành công!');
+        if (res.config) setConfig(res.config);
+        setTimeout(() => setSuccessMsg(''), 4000);
+      }
+    } catch (err: any) {
+      setErrorMsg('Lỗi lưu FAQ mới: ' + (err.message || 'Không thể cập nhật'));
+    } finally {
+      setSavingFaq(false);
+    }
   };
 
-  const handleRemoveFaq = (index: number) => {
+  const handleStartEditFaq = (index: number) => {
+    const item = config.faqs[index];
+    if (!item) return;
+    setEditingFaqIndex(index);
+    setEditCategory(item.category || 'Chung');
+    setEditQuestion(item.question || '');
+    setEditAnswer(item.answer || '');
+    setShowAddFaq(false);
+  };
+
+  const handleCancelEditFaq = () => {
+    setEditingFaqIndex(null);
+    setEditCategory('');
+    setEditQuestion('');
+    setEditAnswer('');
+  };
+
+  const handleSaveEditFaq = async (index: number) => {
+    if (!editQuestion.trim() || !editAnswer.trim()) {
+      alert('Vui lòng nhập cả câu hỏi và câu trả lời!');
+      return;
+    }
+
+    const updatedFaqs = [...config.faqs];
+    updatedFaqs[index] = {
+      category: editCategory.trim() || 'Chung',
+      question: editQuestion.trim(),
+      answer: editAnswer.trim()
+    };
+
+    const updatedConfig = { ...config, faqs: updatedFaqs };
+    setConfig(updatedConfig);
+    setEditingFaqIndex(null);
+
+    try {
+      setSavingFaq(true);
+      const res = await fetchApi('/ai-assistant/config', {
+        method: 'PUT',
+        body: JSON.stringify(updatedConfig)
+      });
+      if (res.success) {
+        setSuccessMsg('Đã cập nhật câu hỏi FAQ thành công!');
+        if (res.config) setConfig(res.config);
+        setTimeout(() => setSuccessMsg(''), 4000);
+      }
+    } catch (err: any) {
+      setErrorMsg('Lỗi cập nhật FAQ: ' + (err.message || 'Không thể cập nhật'));
+    } finally {
+      setSavingFaq(false);
+    }
+  };
+
+  const handleRemoveFaq = async (index: number) => {
     if (!confirm('Bạn có chắc muốn xóa câu hỏi này khỏi danh sách tri thức của AI?')) return;
-    const updated = config.faqs.filter((_, i) => i !== index);
-    setConfig(prev => ({ ...prev, faqs: updated }));
+    if (editingFaqIndex === index) {
+      setEditingFaqIndex(null);
+    }
+    const updatedFaqs = config.faqs.filter((_, i) => i !== index);
+    const updatedConfig = { ...config, faqs: updatedFaqs };
+    setConfig(updatedConfig);
+
+    try {
+      setSavingFaq(true);
+      const res = await fetchApi('/ai-assistant/config', {
+        method: 'PUT',
+        body: JSON.stringify(updatedConfig)
+      });
+      if (res.success) {
+        setSuccessMsg('Đã xóa câu hỏi FAQ thành công!');
+        if (res.config) setConfig(res.config);
+        setTimeout(() => setSuccessMsg(''), 4000);
+      }
+    } catch (err: any) {
+      setErrorMsg('Lỗi xóa FAQ: ' + (err.message || 'Không thể cập nhật'));
+    } finally {
+      setSavingFaq(false);
+    }
   };
 
   const handleUploadDocument = async () => {
@@ -1036,34 +1137,137 @@ export default function AiAssistantManage() {
 
           {/* Danh sách FAQ Cards */}
           <div className="grid grid-cols-1 gap-3.5">
-            {config.faqs?.map((faq, index) => (
-              <div
-                key={index}
-                className="bg-white p-5 rounded-2xl border border-gray-100 shadow-xs hover:border-blue-200 transition-all flex flex-col sm:flex-row items-start justify-between gap-4"
-              >
-                <div className="space-y-2 flex-1">
-                  <div className="flex items-center gap-2">
-                    <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-slate-100 text-slate-700 border border-slate-200">
-                      {faq.category || 'Chung'}
-                    </span>
-                    <h4 className="text-sm font-bold text-gray-900">
-                      {faq.question}
-                    </h4>
-                  </div>
-                  <p className="text-xs text-gray-600 bg-slate-50 p-3 rounded-xl border border-slate-100 leading-relaxed whitespace-pre-wrap">
-                    {faq.answer}
-                  </p>
-                </div>
-
-                <button
-                  onClick={() => handleRemoveFaq(index)}
-                  className="text-gray-400 hover:text-rose-600 p-2 rounded-lg hover:bg-rose-50 transition-colors shrink-0"
-                  title="Xóa câu hỏi này"
+            {config.faqs?.map((faq, index) =>
+              editingFaqIndex === index ? (
+                <div
+                  key={index}
+                  className="bg-blue-50/50 p-5 rounded-2xl border-2 border-blue-400/80 shadow-xs space-y-4 animate-scale-in"
                 >
-                  <Trash2 size={16} />
-                </button>
-              </div>
-            ))}
+                  <div className="flex items-center justify-between pb-2 border-b border-blue-100">
+                    <div className="flex items-center gap-2">
+                      <div className="w-7 h-7 rounded-lg bg-blue-100 text-[#1B3A6B] flex items-center justify-center">
+                        <Pencil size={14} />
+                      </div>
+                      <div>
+                        <h4 className="text-xs font-bold text-[#1B3A6B] uppercase tracking-wider">
+                          Chỉnh sửa cặp Hỏi - Đáp #{index + 1}
+                        </h4>
+                        <p className="text-[11px] text-gray-500">Cập nhật nội dung câu hỏi và câu trả lời mẫu cho AI</p>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={handleCancelEditFaq}
+                      className="text-gray-400 hover:text-gray-600 p-1.5 rounded-lg hover:bg-white/80 transition-colors"
+                      title="Đóng / Hủy chỉnh sửa"
+                    >
+                      <X size={16} />
+                    </button>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                    <div>
+                      <label className="block text-xs font-semibold text-gray-700 mb-1">Phân loại / Chủ đề</label>
+                      <input
+                        type="text"
+                        value={editCategory}
+                        onChange={e => setEditCategory(e.target.value)}
+                        placeholder="Ví dụ: Giá cả, Kỹ thuật, Bảo hành..."
+                        className="w-full px-3 py-2 rounded-xl border border-blue-200 bg-white text-xs focus:ring-2 focus:ring-[#1B3A6B] focus:border-[#1B3A6B] outline-none transition-all"
+                      />
+                    </div>
+                    <div className="md:col-span-2">
+                      <label className="block text-xs font-semibold text-gray-700 mb-1">Câu hỏi của khách</label>
+                      <input
+                        type="text"
+                        value={editQuestion}
+                        onChange={e => setEditQuestion(e.target.value)}
+                        placeholder="Ví dụ: Giá thay lõi số 1 là bao nhiêu?"
+                        className="w-full px-3 py-2 rounded-xl border border-blue-200 bg-white text-xs focus:ring-2 focus:ring-[#1B3A6B] focus:border-[#1B3A6B] outline-none transition-all"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-700 mb-1">Câu trả lời mẫu của Truliva</label>
+                    <textarea
+                      rows={4}
+                      value={editAnswer}
+                      onChange={e => setEditAnswer(e.target.value)}
+                      placeholder="Nhập nội dung trả lời chuẩn xác mà AI sẽ dùng..."
+                      className="w-full px-3 py-2 rounded-xl border border-blue-200 bg-white text-xs leading-relaxed focus:ring-2 focus:ring-[#1B3A6B] focus:border-[#1B3A6B] outline-none transition-all"
+                    />
+                  </div>
+
+                  <div className="flex items-center justify-end gap-2 pt-1">
+                    <button
+                      type="button"
+                      onClick={handleCancelEditFaq}
+                      disabled={savingFaq}
+                      className="px-3.5 py-2 text-xs font-semibold text-gray-600 hover:bg-white rounded-xl border border-gray-200 transition-colors"
+                    >
+                      Hủy
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleSaveEditFaq(index)}
+                      disabled={savingFaq}
+                      className="bg-[#1B3A6B] hover:bg-[#2A518E] text-white font-semibold px-4 py-2 text-xs rounded-xl shadow-xs transition-all flex items-center gap-1.5 disabled:opacity-60 cursor-pointer"
+                    >
+                      {savingFaq ? (
+                        <>
+                          <Loader2 size={14} className="animate-spin" />
+                          <span>Đang lưu...</span>
+                        </>
+                      ) : (
+                        <>
+                          <Check size={14} />
+                          <span>Lưu thay đổi</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div
+                  key={index}
+                  className="bg-white p-5 rounded-2xl border border-gray-100 shadow-xs hover:border-blue-200 transition-all flex flex-col sm:flex-row items-start justify-between gap-4"
+                >
+                  <div className="space-y-2 flex-1">
+                    <div className="flex items-center gap-2">
+                      <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-slate-100 text-slate-700 border border-slate-200">
+                        {faq.category || 'Chung'}
+                      </span>
+                      <h4 className="text-sm font-bold text-gray-900">
+                        {faq.question}
+                      </h4>
+                    </div>
+                    <p className="text-xs text-gray-600 bg-slate-50 p-3 rounded-xl border border-slate-100 leading-relaxed whitespace-pre-wrap">
+                      {faq.answer}
+                    </p>
+                  </div>
+
+                  <div className="flex items-center gap-1 shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => handleStartEditFaq(index)}
+                      className="text-gray-400 hover:text-blue-600 p-2 rounded-lg hover:bg-blue-50 transition-colors"
+                      title="Chỉnh sửa câu hỏi này"
+                    >
+                      <Pencil size={16} />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleRemoveFaq(index)}
+                      className="text-gray-400 hover:text-rose-600 p-2 rounded-lg hover:bg-rose-50 transition-colors"
+                      title="Xóa câu hỏi này"
+                    >
+                      <Trash2 size={16} />
+                    </button>
+                  </div>
+                </div>
+              )
+            )}
 
             {(!config.faqs || config.faqs.length === 0) && (
               <div className="text-center py-12 bg-white rounded-2xl border border-gray-100 text-gray-400 text-sm">
