@@ -5,7 +5,7 @@ import logger from '../utils/logger';
 import { verifyPancakeToken } from '../middleware/auth';
 import { validateWebhookPayload } from '../middleware/validatePayload';
 import { routeEvent } from '../services/eventRouter';
-import { processFacebookMessageWithAI } from '../services/facebookAiBot';
+import { processFacebookMessageWithAI, enqueueFacebookMessage } from '../services/facebookAiBot';
 
 const router = Router();
 
@@ -312,15 +312,12 @@ router.post('/facebook', (req: Request, res: Response): void => {
                 imageCount: imageUrls.length
               });
 
-              // Chạy bất đồng bộ để không chặn luồng webhook
-              processFacebookMessageWithAI(senderId, text, imageUrls).catch(err => {
-                logger.error('Failed to process message with AI', { senderId, error: err.message });
-              });
+              // Đưa vào bộ đệm gom tin nhắn 5 giây (Debounce buffer)
+              enqueueFacebookMessage(senderId, text, imageUrls);
             } else if (event.postback && senderId) {
               const payload = event.postback.title || event.postback.payload || 'Bắt đầu';
-              processFacebookMessageWithAI(senderId, payload, []).catch(err => {
-                logger.error('Failed to process postback with AI', { senderId, error: err.message });
-              });
+              // Postback xử lý tức thì (immediate = true)
+              enqueueFacebookMessage(senderId, payload, [], true);
             }
           }
         }

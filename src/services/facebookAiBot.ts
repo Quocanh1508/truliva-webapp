@@ -72,7 +72,11 @@ PHONG CÁCH VÀ NGUYÊN TẮC TƯ VẤN:
 
 7. QUY TẮC BẢNG GIÁ & CHỐNG ẢO GIÁC (ANTI-HALLUCINATION):
    - CHỈ được báo giá các sản phẩm và phụ kiện CÓ MẶT trong mục "BẢNG GIÁ & DANH MỤC SẢN PHẨM TRULIVA CHÍNH THỨC" hoặc trong tài liệu RAG chính thức được cung cấp.
-   - TUYỆT ĐỐI KHÔNG tự suy đoán, bịa đặt hoặc phỏng đoán mức giá nếu sản phẩm chưa có trong danh mục được cung cấp. Nếu chưa có thông tin giá niêm yết trong bảng giá, hãy lịch sự giải thích rằng giá đang được cập nhật và mời khách để lại thông tin để chuyên viên kiểm tra ưu đãi.`;
+   - TUYỆT ĐỐI KHÔNG tự suy đoán, bịa đặt hoặc phỏng đoán mức giá nếu sản phẩm chưa có trong danh mục được cung cấp. Nếu chưa có thông tin giá niêm yết trong bảng giá, hãy lịch sự giải thích rằng giá đang được cập nhật và mời khách để lại thông tin để chuyên viên kiểm tra ưu đãi.
+
+8. QUY TẮC XỬ LÝ ẢNH & ƯU TIÊN THỊ GIÁC (VISUAL PRIORITY):
+   - Khi khách hàng gửi kèm hình ảnh sản phẩm cùng với câu hỏi ngắn gọn (như "xin giá", "giá sao", "máy này bao nhiêu", "thông số thế nào", "còn hàng không"), bạn PHẢI coi sản phẩm trong hình ảnh là đối tượng chính cần giải đáp.
+   - Tuyệt đối không lấy nhầm các model đã đề cập trong các lượt chat cũ trước đó nếu khách vừa gửi một bức ảnh sản phẩm mới. Hãy đọc kỹ logo, model và thiết kế trên hình ảnh đính kèm (ví dụ: máy treo tường W6412-ECO, máy âm tủ, vòi lọc...) để tư vấn chính xác model trong ảnh.`;
 
 let cachedInstruction = '';
 let cachedSyncCatalog = true;
@@ -226,6 +230,123 @@ async function fetchImageAsBase64(imageUrl: string): Promise<{ mimeType: string;
 /**
  * Gửi tin nhắn trả lời lại khách hàng qua Facebook Graph API
  */
+/**
+ * Gửi hiệu ứng "đang soạn tin nhắn..." (typing_on) qua Facebook Graph API
+ */
+export async function sendFacebookTypingIndicator(recipientId: string): Promise<boolean> {
+  try {
+    const url = `https://graph.facebook.com/v21.0/me/messages?access_token=${FB_PAGE_ACCESS_TOKEN}`;
+    await axios.post(url, {
+      recipient: { id: recipientId },
+      sender_action: 'typing_on'
+    }, { timeout: 5000 });
+    return true;
+  } catch (error: any) {
+    logger.warn('Failed to send typing_on to Facebook', { recipientId, error: error.message });
+    return false;
+  }
+}
+
+// ── BỘ ĐỆM GOM CỤM TIN NHẮN (MESSAGE DEBOUNCE AGGREGATOR - 5 GIÂY) ──
+interface PendingBufferItem {
+  texts: string[];
+  imageUrls: string[];
+  firstReceivedAt: number;
+  timer: NodeJS.Timeout;
+}
+
+const pendingBuffers: Map<string, PendingBufferItem> = new Map();
+const DEBOUNCE_DELAY_MS = 5000; // Bộ đệm 5 giây
+const MAX_BUFFER_WAIT_MS = 8000; // Tối đa 8 giây chờ
+
+/**
+ * Đưa tin nhắn / hình ảnh của khách vào hàng đợi gom tin nhắn 5 giây
+ */
+export function enqueueFacebookMessage(
+  senderId: string,
+  text: string,
+  imageUrls: string[] = [],
+  immediate: boolean = false
+): void {
+  // Gửi ngay hiệu ứng đang soạn tin nhắn để khách biết bot đang xử lý
+  sendFacebookTypingIndicator(senderId).catch(() => {});
+
+  if (immediate) {
+    processFacebookMessageWithAI(senderId, text, imageUrls).catch(err => {
+      logger.error('Failed to process immediate message with AI', { senderId, error: err.message });
+    });
+    return;
+  }
+
+  const cleanText = text?.trim() || '';
+  const now = Date.now();
+  const existing = pendingBuffers.get(senderId);
+
+  if (existing) {
+    if (cleanText && !existing.texts.includes(cleanText)) {
+      existing.texts.push(cleanText);
+    }
+    for (const url of imageUrls) {
+      if (!existing.imageUrls.includes(url)) {
+        existing.imageUrls.push(url);
+      }
+    }
+    clearTimeout(existing.timer);
+
+    // Nếu thời gian chờ từ tin đầu tiên vượt quá trần MAX_BUFFER_WAIT_MS (8s), xử lý ngay
+    if (now - existing.firstReceivedAt >= MAX_BUFFER_WAIT_MS) {
+      pendingBuffers.delete(senderId);
+      const combinedText = existing.texts.join('\n');
+      const combinedImages = existing.imageUrls;
+      logger.info('Flushing Facebook message buffer (Max wait reached)', {
+        senderId,
+        textCount: existing.texts.length,
+        imageCount: combinedImages.length
+      });
+      processFacebookMessageWithAI(senderId, combinedText, combinedImages).catch(err => {
+        logger.error('Failed to process flushed buffer message with AI', { senderId, error: err.message });
+      });
+      return;
+    }
+
+    // Đặt lại timer 5s kể từ tin mới nhất
+    existing.timer = setTimeout(() => {
+      pendingBuffers.delete(senderId);
+      const combinedText = existing.texts.join('\n');
+      const combinedImages = existing.imageUrls;
+      logger.info('Flushing Facebook message buffer (Debounce timer elapsed)', {
+        senderId,
+        textCount: existing.texts.length,
+        imageCount: combinedImages.length
+      });
+      processFacebookMessageWithAI(senderId, combinedText, combinedImages).catch(err => {
+        logger.error('Failed to process debounced message with AI', { senderId, error: err.message });
+      });
+    }, DEBOUNCE_DELAY_MS);
+  } else {
+    // Tạo bộ đệm mới cho senderId
+    const item: PendingBufferItem = {
+      texts: cleanText ? [cleanText] : [],
+      imageUrls: [...imageUrls],
+      firstReceivedAt: now,
+      timer: setTimeout(() => {
+        pendingBuffers.delete(senderId);
+        const combinedText = item.texts.join('\n');
+        const combinedImages = item.imageUrls;
+        logger.info('Flushing Facebook message buffer (Initial timer elapsed)', {
+          senderId,
+          textCount: item.texts.length,
+          imageCount: combinedImages.length
+        });
+        processFacebookMessageWithAI(senderId, combinedText, combinedImages).catch(err => {
+          logger.error('Failed to process initial debounced message with AI', { senderId, error: err.message });
+        });
+      }, DEBOUNCE_DELAY_MS)
+    };
+    pendingBuffers.set(senderId, item);
+  }
+}
+
 export async function sendFacebookReply(recipientId: string, messageText: string): Promise<boolean> {
   try {
     const url = `https://graph.facebook.com/v21.0/me/messages?access_token=${FB_PAGE_ACCESS_TOKEN}`;
