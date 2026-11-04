@@ -68,29 +68,35 @@ PHONG CÁCH VÀ NGUYÊN TẮC TƯ VẤN:
 6. THÔNG TIN DOANH NGHIỆP TRULIVA:
    - Hotline hỗ trợ: 1900 638 463 (08:00 - 18:00)
    - Kích hoạt bảo hành điện tử: https://trulivavietnam.com/warranty-activate hoặc Zalo Mini App "Truliva"
-   - Website chính thức: https://trulivavietnam.com`;
+   - Website chính thức: https://trulivavietnam.com
+
+7. QUY TẮC BẢNG GIÁ & CHỐNG ẢO GIÁC (ANTI-HALLUCINATION):
+   - CHỈ được báo giá các sản phẩm và phụ kiện CÓ MẶT trong mục "BẢNG GIÁ & DANH MỤC SẢN PHẨM TRULIVA CHÍNH THỨC" hoặc trong tài liệu RAG chính thức được cung cấp.
+   - TUYỆT ĐỐI KHÔNG tự suy đoán, bịa đặt hoặc phỏng đoán mức giá nếu sản phẩm chưa có trong danh mục được cung cấp. Nếu chưa có thông tin giá niêm yết trong bảng giá, hãy lịch sự giải thích rằng giá đang được cập nhật và mời khách để lại thông tin để chuyên viên kiểm tra ưu đãi.`;
 
 let cachedInstruction = '';
+let cachedSyncCatalog = true;
 let lastInstructionFetch = 0;
 
 /**
- * Lấy prompt và tri thức động từ Database Truliva
+ * Lấy prompt và tri thức cơ bản động từ Database Truliva
  */
-async function getDynamicSystemInstruction(): Promise<{ instruction: string; isEnabled: boolean }> {
+async function getDynamicSystemInstruction(): Promise<{ instruction: string; isEnabled: boolean; syncCatalog: boolean }> {
   const now = Date.now();
   if (cachedInstruction && now - lastInstructionFetch < 60 * 1000) {
-    return { instruction: cachedInstruction, isEnabled: true };
+    return { instruction: cachedInstruction, isEnabled: true, syncCatalog: cachedSyncCatalog };
   }
 
   try {
     const config = await prisma.aiBotConfig.findUnique({ where: { id: 'default' } });
     if (config && !config.isEnabled) {
-      return { instruction: '', isEnabled: false };
+      return { instruction: '', isEnabled: false, syncCatalog: false };
     }
 
     const systemPrompt = config?.systemPrompt || SYSTEM_INSTRUCTION_FALLBACK;
     const knowledgeText = config?.knowledgeText || '';
     const faqs = (config?.faqs as any[]) || [];
+    const syncCatalog = config?.syncCatalog ?? true;
 
     let faqContext = '';
     if (Array.isArray(faqs) && faqs.length > 0) {
@@ -98,36 +104,100 @@ async function getDynamicSystemInstruction(): Promise<{ instruction: string; isE
         faqs.map(f => `Hỏi: ${f.question}\nĐáp: ${f.answer}`).join('\n\n');
     }
 
-    let catalogContext = '';
-    if (config?.syncCatalog) {
-      const [products, combos] = await Promise.all([
-        prisma.product.findMany({
-          where: { isActive: true },
-          select: { name: true, sku: true, sellingPrice: true },
-          take: 20
-        }),
-        prisma.productCombo.findMany({
-          where: { isActive: true },
-          select: { displayName: true, comboKey: true },
-          take: 15
-        })
-      ]);
-
-      catalogContext = '\n\nDANH MỤC SẢN PHẨM & COMBO THỰC TẾ TRONG HỆ THỐNG TRULIVA:\n' +
-        '1. Sản phẩm/Linh kiện:\n' +
-        products.map(p => `- ${p.name} (SKU: ${p.sku}) | Giá niêm yết: ${p.sellingPrice?.toLocaleString('vi-VN')} đ`).join('\n') +
-        '\n2. Các gói Combo phổ biến:\n' +
-        combos.map(c => `- ${c.displayName} (${c.comboKey})`).join('\n');
-    }
-
-    const full = `${systemPrompt}\n\nTHÔNG TIN LIÊN HỆ:\n- Hotline: ${config?.hotline || '1900 638 463'}\n- Giờ làm việc: ${config?.workingHours || '08:00 - 18:00'}\n- Địa chỉ: ${config?.address || '65 Đường 42-AP, Phường An Phú, TP. Thủ Đức, TP. HCM'}\n\n${knowledgeText}${faqContext}${catalogContext}`;
+    const full = `${systemPrompt}\n\nTHÔNG TIN LIÊN HỆ:\n- Hotline: ${config?.hotline || '1900 638 463'}\n- Giờ làm việc: ${config?.workingHours || '08:00 - 18:00'}\n- Địa chỉ: ${config?.address || '65 Đường 42-AP, Phường An Phú, TP. Thủ Đức, TP. HCM'}\n\n${knowledgeText}${faqContext}`;
     
     cachedInstruction = full;
+    cachedSyncCatalog = syncCatalog;
     lastInstructionFetch = now;
-    return { instruction: full, isEnabled: true };
+    return { instruction: full, isEnabled: true, syncCatalog };
   } catch (error: any) {
     logger.warn('Failed to load dynamic AI config, using fallback', { error: error.message });
-    return { instruction: SYSTEM_INSTRUCTION_FALLBACK, isEnabled: true };
+    return { instruction: SYSTEM_INSTRUCTION_FALLBACK, isEnabled: true, syncCatalog: true };
+  }
+}
+
+/**
+ * Lấy danh mục sản phẩm động dựa trên model hoặc ngữ cảnh hội thoại
+ */
+async function getDynamicCatalogContext(contextText: string): Promise<{ catalogContext: string; primaryModel: string }> {
+  try {
+    const modelMatches = contextText.match(/\b(?:UR|CR|CR-ZX|W|UX|YDZ|QY\/F)?\s*[0-9]{4,6}[A-Z]*\b/gi) || [];
+    const detectedModels = Array.from(new Set(modelMatches.map(m => m.replace(/\s+/g, '').trim().toUpperCase()))).filter(m => m.length >= 3);
+    const primaryModel = detectedModels[detectedModels.length - 1] || '';
+
+    let products: any[] = [];
+    if (detectedModels.length > 0) {
+      const orConds = detectedModels.map(m => ({
+        OR: [
+          { name: { contains: m, mode: 'insensitive' as const } },
+          { sku: { contains: m, mode: 'insensitive' as const } }
+        ]
+      }));
+      products = await prisma.product.findMany({
+        where: {
+          isActive: true,
+          OR: orConds.flatMap(c => c.OR)
+        },
+        select: { name: true, sku: true, sellingPrice: true, category: true },
+        take: 25
+      });
+    }
+
+    if (products.length === 0) {
+      products = await prisma.product.findMany({
+        where: {
+          isActive: true,
+          name: { startsWith: 'Máy lọc nước' }
+        },
+        select: { name: true, sku: true, sellingPrice: true, category: true },
+        orderBy: { sellingPrice: 'desc' },
+        take: 12
+      });
+    }
+
+    // Đưa Máy lọc nước chính lên đầu, sau đó mới tới phụ kiện / lõi lọc
+    products.sort((a, b) => {
+      const aIsMain = a.name.startsWith('Máy lọc nước') ? 1 : 0;
+      const bIsMain = b.name.startsWith('Máy lọc nước') ? 1 : 0;
+      if (aIsMain !== bIsMain) return bIsMain - aIsMain;
+      return (b.sellingPrice || 0) - (a.sellingPrice || 0);
+    });
+
+    const mainMachines = products.filter(p => p.name.startsWith('Máy lọc nước'));
+    const accessories = products.filter(p => !p.name.startsWith('Máy lọc nước'));
+
+    let catalogLines: string[] = [];
+    if (mainMachines.length > 0) {
+      catalogLines.push('1. Máy lọc nước chính hãng (Thiết bị chính):');
+      mainMachines.forEach(p => {
+        catalogLines.push(`- ${p.name} (SKU: ${p.sku}) | Giá niêm yết: ${p.sellingPrice ? p.sellingPrice.toLocaleString('vi-VN') + ' đ' : 'Liên hệ'}`);
+      });
+    }
+    if (accessories.length > 0) {
+      catalogLines.push('2. Phụ kiện / Linh kiện / Lõi lọc đi kèm:');
+      accessories.slice(0, 10).forEach(p => {
+        catalogLines.push(`- ${p.name} (SKU: ${p.sku}) | Giá niêm yết: ${p.sellingPrice ? p.sellingPrice.toLocaleString('vi-VN') + ' đ' : 'Liên hệ'}`);
+      });
+    }
+
+    // Lấy thêm combo phổ biến
+    const combos = await prisma.productCombo.findMany({
+      where: { isActive: true },
+      select: { displayName: true, comboKey: true },
+      take: 10
+    });
+    if (combos.length > 0) {
+      catalogLines.push('3. Các gói Combo sản phẩm phổ biến:');
+      combos.forEach(c => {
+        catalogLines.push(`- ${c.displayName} (${c.comboKey})`);
+      });
+    }
+
+    const catalogContext = '\n\nBẢNG GIÁ & DANH MỤC SẢN PHẨM TRULIVA CHÍNH THỨC:\n' + catalogLines.join('\n');
+    return { catalogContext, primaryModel };
+  } catch (err: any) {
+    logger.warn('Failed to load dynamic catalog for Facebook Bot', { error: err.message });
+    return { catalogContext: '', primaryModel: '' };
   }
 }
 
@@ -188,7 +258,7 @@ export async function processFacebookMessageWithAI(
 ): Promise<void> {
   try {
     // 0. Lấy System Instruction động từ DB
-    const { instruction, isEnabled } = await getDynamicSystemInstruction();
+    const { instruction, isEnabled, syncCatalog } = await getDynamicSystemInstruction();
     if (!isEnabled) {
       logger.info('AI Bot is disabled in admin settings, skipping reply', { senderId });
       return;
@@ -201,6 +271,20 @@ export async function processFacebookMessageWithAI(
       userConversationHistory.set(senderId, session);
     }
     session.lastActive = Date.now();
+
+    // 1.1 Phân tích model từ tin nhắn hiện tại và lịch sử gần nhất
+    const recentContextText = [
+      ...session.turns.slice(-3).map(t => t.parts.map(p => p.text || '').join(' ')),
+      userText || ''
+    ].join(' ');
+
+    let catalogContext = '';
+    let primaryModel = '';
+    if (syncCatalog) {
+      const catalogRes = await getDynamicCatalogContext(recentContextText);
+      catalogContext = catalogRes.catalogContext;
+      primaryModel = catalogRes.primaryModel;
+    }
 
     // 2. Chuẩn bị parts của user turn hiện tại
     const currentParts: ChatMessagePart[] = [];
@@ -237,11 +321,15 @@ export async function processFacebookMessageWithAI(
     }
 
     // 4. Tra cứu tài liệu nội bộ qua Hybrid RAG nếu có nội dung hỏi
-    let ragInstruction = instruction;
+    let ragInstruction = instruction + catalogContext;
     let ragChunks: any[] = [];
     if (userText && userText.trim()) {
       try {
-        ragChunks = await searchHybridRAG(userText.trim(), 3);
+        let ragSearchQuery = userText.trim();
+        if (primaryModel && !ragSearchQuery.toUpperCase().includes(primaryModel)) {
+          ragSearchQuery = `${primaryModel} ${ragSearchQuery}`;
+        }
+        ragChunks = await searchHybridRAG(ragSearchQuery, 3);
         if (ragChunks && ragChunks.length > 0) {
           const ragInfo = '\n\nTÀI LIỆU CHÍNH HÃNG TRULIVA TRA CỨU ĐƯỢC (HYBRID RAG):\n' +
             ragChunks.map((c, idx) => `[Đoạn ${idx + 1} - ${c.sourceTitle || c.fileName} | Trang ${c.metadata?.pageNumber || 1}]:\n${c.content}`).join('\n\n');
