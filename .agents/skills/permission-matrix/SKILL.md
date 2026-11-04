@@ -210,3 +210,4 @@ Trước khi báo cáo hoàn tất bất kỳ yêu cầu tính năng nào cho Us
 - [ ] Giao diện có sử dụng `hasPermission('KEY')` để ẩn các phần nhạy cảm khi chưa được cấp quyền chưa?
 - [ ] Backend route có bắt buộc `requireAuth` và kiểm tra quyền chưa?
 - [ ] Đã nghiệm thu cả quyền hợp lệ (200) và không hợp lệ (403) trên Sandbox trước khi lên Prod chưa?
+

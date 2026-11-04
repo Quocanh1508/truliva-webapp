@@ -9,3 +9,4 @@ if (fs.existsSync(rootAudit)) {
   console.error('Audit script not found at:', rootAudit);
   process.exit(1);
 }
+

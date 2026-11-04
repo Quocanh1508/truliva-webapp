@@ -78,7 +78,7 @@ export function getCustomerRank(user: any, pointsOverride?: number): RankConfig 
 
   const points = typeof pointsOverride === 'number' 
     ? pointsOverride 
-    : Number(user?.rewardPoints ?? user?.points ?? 250);
+    : Number(user?.rewardPoints ?? user?.points ?? 0);
 
   if (points >= 1000) return RANK_CONFIGS.DIAMOND;
   if (points >= 500) return RANK_CONFIGS.GOLD;

@@ -178,7 +178,7 @@ export default function CustomerHome({ user, mySerials = [], onOpenScanner, onOp
 
   const userName = user?.fullName || 'Khách hàng Truliva';
   const userPhone = user?.phoneNumber || '';
-  const userPoints = Number(user?.rewardPoints ?? user?.points ?? 250);
+  const userPoints = Number(user?.rewardPoints ?? user?.points ?? 0);
 
   const baseRank = getCustomerRank(user, userPoints);
   const rank = overrideTier ? RANK_CONFIGS[overrideTier] : baseRank;

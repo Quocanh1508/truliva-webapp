@@ -1,3 +1,4 @@
+import { calculateCustomerLoyalty } from '../routes/zaloMiniApp';
 import { Request, Response } from 'express';
 import jwt from 'jsonwebtoken';
 import prisma from '../config/database';
@@ -172,6 +173,7 @@ export async function createShopOrder(req: Request, res: Response): Promise<void
       note,
       items,
       voucherCode,
+      pointsUsed,
       paymentMethod = 'COD',
       consents // { termsAccepted: boolean, privacyAccepted: boolean }
     } = req.body;
@@ -277,6 +279,20 @@ export async function createShopOrder(req: Request, res: Response): Promise<void
         res.status(400).json({ success: false, error: `Mã giảm giá "${vCode}" không tồn tại hoặc đã hết hạn áp dụng` });
         return;
       }
+    }
+
+    // 2.1 Tính khấu trừ Điểm tích lũy (Cơ chế Shopee Xu: 1 điểm = 1.000 VNĐ)
+    let pointsDiscount = 0;
+    let actualPointsUsed = 0;
+    const requestedPoints = Math.max(0, parseInt(pointsUsed, 10) || 0);
+    if (requestedPoints > 0) {
+      const userLoyalty = await calculateCustomerLoyalty(cleanPhone);
+      const availablePoints = userLoyalty.points;
+      actualPointsUsed = Math.min(requestedPoints, availablePoints);
+      
+      const remainingAmount = Math.max(0, totalAmount - discountAmount);
+      pointsDiscount = Math.min(actualPointsUsed * 1000, remainingAmount);
+      discountAmount += pointsDiscount;
     }
 
     const shippingFee = 0; // Miễn phí 100% giao hàng & lắp đặt
@@ -386,7 +402,7 @@ export async function createShopOrder(req: Request, res: Response): Promise<void
             totalPrice: finalAmount,
             promoCode: appliedVoucherCode,
             note: isVietQr 
-              ? `[ĐƠN ZALO MINI APP - CHỜ CHUYỂN KHOẢN VIETQR: ${finalAmount.toLocaleString('vi-VN')}đ] | KTV CHƯA THU TIỀN NẾU ĐƠN CHUYỂN SANG ĐÃ THANH TOÁN, HOẶC THU ĐỦ ${finalAmount.toLocaleString('vi-VN')}đ NẾU CHƯA CÓ XÁC NHẬN CHUYỂN KHOẢN | Mã: ${orderCode} | Mặt hàng: ${fullItemsText} | Ghi chú: ${note?.trim() || 'Không có'}`
+              ? `[ĐƠN ZALO MINI APP - CHỜ CHUYỂN KHOẢN VIETQR: ${finalAmount.toLocaleString('vi-VN')}đ]${actualPointsUsed > 0 ? ` (Đã trừ ${actualPointsUsed} Điểm = -${pointsDiscount.toLocaleString('vi-VN')}đ)` : ''} | KTV CHƯA THU TIỀN NẾU ĐƠN CHUYỂN SANG ĐÃ THANH TOÁN, HOẶC THU ĐỦ ${finalAmount.toLocaleString('vi-VN')}đ NẾU CHƯA CÓ XÁC NHẬN CHUYỂN KHOẢN | Mã: ${orderCode} | Mặt hàng: ${fullItemsText} | Ghi chú: ${note?.trim() || 'Không có'}`
               : `[ĐƠN ZALO MINI APP - COD THU TIỀN TẬN NƠI: ${finalAmount.toLocaleString('vi-VN')}đ] | KTV thu đủ sau khi lắp đặt & nghiệm thu | Mã: ${orderCode} | Mặt hàng: ${fullItemsText} | Ghi chú: ${note?.trim() || 'Không có'}`
           }
         });

@@ -14,7 +14,8 @@ import {
   ChevronRight,
   QrCode,
   Banknote,
-  ArrowRight
+  ArrowRight,
+  Sparkles
 } from 'lucide-react';
 import { useCart } from '../../context/CartContext';
 import { fetchZaloApi } from '../../api/client';
@@ -63,12 +64,21 @@ export default function CheckoutPage({ user, voucherCode, onBack, onOrderSuccess
     return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(amount);
   };
 
+  const userPoints = Number(user?.rewardPoints ?? user?.points ?? 0);
+  const [usePoints, setUsePoints] = useState(false);
+
   let discountAmount = 0;
   if (voucherCode === 'TRULIVA500' && totalAmount >= 10000000) discountAmount = 500000;
   else if (voucherCode === 'GIAM100K' && totalAmount >= 1000000) discountAmount = 100000;
 
+  const remainingAfterVoucher = Math.max(0, totalAmount - discountAmount);
+  // Dùng tối đa điểm khách có nhưng không vượt quá tổng tiền còn lại (1 điểm = 1.000 VNĐ)
+  const maxUsablePoints = Math.min(userPoints, Math.floor(remainingAfterVoucher / 1000));
+  const pointsDeduction = usePoints ? maxUsablePoints * 1000 : 0;
+  const actualPointsUsed = usePoints ? maxUsablePoints : 0;
+
   const shippingFee = 0; // Miễn phí 100%
-  const finalAmount = Math.max(0, totalAmount - discountAmount + shippingFee);
+  const finalAmount = Math.max(0, remainingAfterVoucher - pointsDeduction + shippingFee);
 
   const handleOpenLegalDoc = (type: LegalDocType) => {
     setLegalDocType(type);
@@ -109,6 +119,7 @@ export default function CheckoutPage({ user, voucherCode, onBack, onOrderSuccess
         ward: ward.trim(),
         note: note.trim(),
         voucherCode: voucherCode || null,
+        pointsUsed: actualPointsUsed,
         paymentMethod,
         consents: {
           termsAccepted: true,
@@ -333,6 +344,12 @@ export default function CheckoutPage({ user, voucherCode, onBack, onOrderSuccess
               <div className="flex justify-between text-emerald-600 font-semibold">
                 <span>Giảm giá ({voucherCode}):</span>
                 <span>-{formatVND(discountAmount)}</span>
+              </div>
+            )}
+            {pointsDeduction > 0 && (
+              <div className="flex justify-between text-amber-600 font-semibold">
+                <span>Điểm Truliva ({actualPointsUsed} Điểm):</span>
+                <span>-{formatVND(pointsDeduction)}</span>
               </div>
             )}
             <div className="flex justify-between text-gray-500">

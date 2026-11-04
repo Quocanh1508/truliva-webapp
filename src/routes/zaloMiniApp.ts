@@ -46,6 +46,136 @@ router.post('/auth', async (req: Request, res: Response): Promise<void> => {
  * GET /api/zalo-miniapp/profile
  * Lấy thông tin cá nhân & vai trò hiện tại của tài khoản Zalo Mini App
  */
+/**
+ * Chuẩn hóa và tạo các biến thể số điện thoại để truy vấn chính xác
+ */
+export function buildPhoneVariants(phone: string): string[] {
+  if (!phone) return [];
+  const cleanPhone = phone.replace(/[^0-9]/g, '');
+  const standardPhone = cleanPhone.startsWith('84') ? '0' + cleanPhone.substring(2) : cleanPhone;
+  return Array.from(new Set([
+    standardPhone,
+    standardPhone.startsWith('0') ? '84' + standardPhone.substring(1) : standardPhone,
+    standardPhone.startsWith('0') ? standardPhone.substring(1) : standardPhone,
+    standardPhone.startsWith('0') ? '+84' + standardPhone.substring(1) : standardPhone
+  ]));
+}
+
+/**
+ * Tính điểm tích lũy khách hàng từ các đơn hàng Truliva App
+ * - Đơn <= 5.000.000đ: 10% giá trị đơn (làm tròn lên)
+ * - Đơn > 5.000.000đ: 5% giá trị đơn (làm tròn lên)
+ * - Quy đổi: 1 điểm = 1.000 VNĐ (tương tự cơ chế Shopee Xu)
+ */
+export async function calculateCustomerLoyalty(phoneNumber: string | null | undefined) {
+  if (!phoneNumber) {
+    return {
+      points: 0,
+      rewardPoints: 0,
+      pointValueVnd: 0,
+      tier: 'BRONZE',
+      rankLabel: 'Thành viên Đồng',
+      completedOrdersCount: 0,
+      totalSpent: 0,
+      orders: []
+    };
+  }
+
+  const phoneVariants = buildPhoneVariants(phoneNumber);
+
+  const completedOrders = await prisma.order.findMany({
+    where: {
+      OR: [
+        { billPhoneNumber: { in: phoneVariants } },
+        { customer: { phoneNumber: { in: phoneVariants } } }
+      ],
+      adminStatus: {
+        notIn: ['hủy đơn', 'đã hoàn']
+      },
+      AND: [
+        {
+          OR: [
+            { adminStatus: { in: ['hoàn thành', 'completed', 'Hoàn thành', 'Đã hoàn thành'] } },
+            { statusName: { in: ['completed', 'delivered', 'received_money', 'hoàn thành'] } }
+          ]
+        }
+      ]
+    },
+    select: {
+      id: true,
+      pancakeOrderId: true,
+      totalPrice: true,
+      moneyToCollect: true,
+      adminStatus: true,
+      statusName: true,
+      createdAt: true,
+      updatedAt: true,
+      items: {
+        select: {
+          productName: true,
+          quantity: true,
+          price: true
+        }
+      }
+    },
+    orderBy: { createdAt: 'desc' }
+  });
+
+  let totalPoints = 0;
+  let totalSpent = 0;
+  const historyOrders: any[] = [];
+
+  for (const ord of completedOrders) {
+    const amount = Number(ord.totalPrice ?? ord.moneyToCollect ?? 0);
+    if (amount <= 0) continue;
+
+    totalSpent += amount;
+    // Cơ chế tích điểm: <= 5tr lấy 10% (làm tròn lên), > 5tr lấy 5% (làm tròn lên)
+    const ratePercent = amount <= 5000000 ? 10 : 5;
+    const rate = ratePercent / 100;
+    const rawPoint = (amount * rate) / 1000;
+    const pointsEarned = Math.ceil(rawPoint);
+
+    totalPoints += pointsEarned;
+    historyOrders.push({
+      orderId: ord.id,
+      pancakeOrderId: ord.pancakeOrderId,
+      orderCode: ord.pancakeOrderId ? `#${ord.pancakeOrderId}` : `#${ord.id.slice(0, 8).toUpperCase()}`,
+      orderAmount: amount,
+      ratePercent,
+      pointsEarned,
+      pointValueVnd: pointsEarned * 1000,
+      createdAt: ord.updatedAt || ord.createdAt,
+      itemsSummary: ord.items.map((i: any) => i.productName).filter(Boolean).join(', ') || 'Đơn hàng hoàn thành'
+    });
+  }
+
+  // Xác định hạng thành viên theo điểm tích lũy
+  let tier = 'BRONZE';
+  let rankLabel = 'Thành viên Đồng';
+  if (totalPoints >= 1000) {
+    tier = 'DIAMOND';
+    rankLabel = 'Thành viên Kim Cương';
+  } else if (totalPoints >= 500) {
+    tier = 'GOLD';
+    rankLabel = 'Thành viên Vàng';
+  } else if (totalPoints >= 200) {
+    tier = 'SILVER';
+    rankLabel = 'Thành viên Bạc';
+  }
+
+  return {
+    points: totalPoints,
+    rewardPoints: totalPoints,
+    pointValueVnd: totalPoints * 1000,
+    tier,
+    rankLabel,
+    completedOrdersCount: historyOrders.length,
+    totalSpent,
+    orders: historyOrders
+  };
+}
+
 router.get('/profile', requireAuth, async (req: Request, res: Response): Promise<void> => {
   try {
     const user = req.user;
@@ -71,9 +201,46 @@ router.get('/profile', requireAuth, async (req: Request, res: Response): Promise
       }
     });
 
+    const loyalty = await calculateCustomerLoyalty(fullUser?.phoneNumber || (user as any).phone);
+
     res.json({
       success: true,
-      user: fullUser
+      user: {
+        ...fullUser,
+        rewardPoints: loyalty.points,
+        points: loyalty.points,
+        pointValueVnd: loyalty.pointValueVnd,
+        membershipTier: loyalty.tier,
+        rankLabel: loyalty.rankLabel,
+        loyaltySummary: loyalty
+      }
+    });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/**
+ * GET /api/zalo-miniapp/loyalty
+ * Lấy chi tiết lịch sử tích điểm và danh sách đơn hàng đã tích lũy từ Truliva App
+ */
+router.get('/loyalty', requireAuth, async (req: Request, res: Response): Promise<void> => {
+  try {
+    const user = req.user;
+    if (!user) {
+      res.status(401).json({ error: 'Chưa đăng nhập' });
+      return;
+    }
+
+    const fullUser = await prisma.user.findUnique({
+      where: { id: user.id },
+      select: { phoneNumber: true }
+    });
+
+    const loyalty = await calculateCustomerLoyalty(fullUser?.phoneNumber || (user as any).phone);
+    res.json({
+      success: true,
+      ...loyalty
     });
   } catch (error: any) {
     res.status(500).json({ error: error.message });
