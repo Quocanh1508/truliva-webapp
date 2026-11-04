@@ -74,4 +74,14 @@ Dưới đây là các đúc kết thực tế để tối ưu hóa việc deplo
   - Tuyệt đối không chạy thử nghiệm tính năng chưa kiểm chứng trực tiếp trên môi trường Production.
   - Chỉ sau khi đã nghiệm thu 100% trên Sandbox (qua HTTP và UI), mới tiến hành cập nhật lên Production theo đúng quy chuẩn Rule 4.
 
+## 9. ĐỒNG BỘ MA TRẬN PHÂN QUYỀN (ZERO-ORPHANED-FEATURE POLICY)
+- **Khai báo phân quyền bắt buộc**: Mọi tính năng, API endpoint, trang UI, nút bấm hoặc tác vụ nghiệp vụ mới được tạo ra **BẮT BUỘC** phải được đăng ký vào ma trận phân quyền hệ thống. CẤM tạo tính năng mới mà bỏ sót việc khai báo phân quyền.
+- **Quy trình chuẩn**:
+  1. Khai báo mã `key` và thông tin feature trong `src/config/permissions.ts` (kèm `addedAt: 'YYYY-MM-DD'` ngày hiện tại).
+  2. Đồng bộ 100% sang `webapp/src/config/permissions.ts`.
+  3. Đặt chốt chặn bảo mật: Middleware `requireAuth` / kiểm tra quyền ở Backend; `usePermission()` / `hasPermission()` ở Frontend.
+  4. Chạy lệnh audit tự động: `npm run audit:permissions` (bắt buộc đạt kết quả xanh 100% trước khi deploy).
+  5. Chi tiết quy chuẩn và hướng dẫn tra cứu tại Skill `permission-matrix` ([SKILL.md](file:///c:/StudyZone/Project/Truliva/.agents/skills/permission-matrix/SKILL.md)).
+
+
 

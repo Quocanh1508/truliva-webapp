@@ -15,6 +15,7 @@
     "prisma:studio": "node scripts/start_vps_studio.js",
     "studio": "node scripts/start_vps_studio.js",
     "studio:sandbox": "node scripts/start_vps_studio.js sandbox",
+    "audit:permissions": "node scripts/audit_permissions.js",
     "test": "echo \"Error: no test specified\" && exit 1",
     "test:security": "node scripts/security/run-strix-scan.js"
   },
