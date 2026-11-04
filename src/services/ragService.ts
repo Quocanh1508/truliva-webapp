@@ -16,6 +16,22 @@ const GEMINI_API_KEY = process.env.GEMINI_API_KEY || '';
 const EMBEDDING_MODEL = 'gemini-embedding-001';
 const EMBEDDING_DIMENSION = 768;
 
+const RAG_STOP_WORDS = new Set([
+  'trên', 'trong', 'dưới', 'được', 'website', 'và', 'các', 'cho', 'với', 'của', 'là', 'có', 'ở', 'tại', 'những', 
+  'về', 'này', 'đó', 'xin', 'hỏi', 'giá', 'thông', 'nào', 'nhiêu', 'như', 'sao', 'biết', 'mình', 'em', 'anh', 
+  'chị', 'bạn', 'muốn', 'cần', 'máy', 'lọc', 'nước'
+]);
+
+function buildOrTsQuery(text: string): string {
+  const words = text
+    .replace(/[^\p{L}\p{N}\s]/gu, ' ')
+    .split(/\s+/)
+    .map(w => w.trim())
+    .filter(w => w.length >= 2 && !RAG_STOP_WORDS.has(w.toLowerCase()));
+  if (words.length === 0) return 'truliva';
+  return words.join(' | ');
+}
+
 export interface DocumentChunkResult {
   id: string;
   documentId: string;
@@ -546,13 +562,14 @@ export async function ingestDocument(
  */
 export async function searchHybridRAG(
   query: string,
-  limit = 4,
+  limit: number | any = 4,
   vectorThreshold = 0.35,
   modelKeyword?: string
 ): Promise<DocumentChunkResult[]> {
   try {
     if (!query || !query.trim()) return [];
 
+    const safeLimit = typeof limit === 'object' && limit !== null ? Number((limit as any).limit) || 4 : Number(limit) || 4;
     const cleanQuery = query.trim();
     // Tự động phát hiện model nếu chưa truyền (ví dụ: UR3626, 3626, UR5840...)
     const kw = (modelKeyword || cleanQuery.match(/\b(?:UR|CR|CR-ZX|W|UX|YDZ|QY\/F)?[0-9]{4,6}[A-Z]*\b/i)?.[0] || '').trim();
@@ -561,23 +578,43 @@ export async function searchHybridRAG(
     const queryEmbedding = await getSingleEmbedding(cleanQuery);
     const embStr = queryEmbedding ? `[${queryEmbedding.join(',')}]` : null;
 
+    const orQuery = buildOrTsQuery(cleanQuery);
+
     if (!embStr) {
-      // Nếu embedding lỗi, fallback sang full-text keyword search
+      // Nếu embedding lỗi, fallback sang full-text keyword search linh hoạt kết hợp model keyword boost
       const keywordOnly: any = await prisma.$queryRawUnsafe(`
         SELECT 
           c.id, c.document_id AS "documentId", c.chunk_index AS "chunkIndex",
           c.section_title AS "sectionTitle", c.content, c.metadata,
           0.0 AS "vectorSimilarity",
-          ts_rank_cd(c.tsv_content, plainto_tsquery('simple', $1)) AS "textScore",
-          ts_rank_cd(c.tsv_content, plainto_tsquery('simple', $1)) AS "rrfScore",
+          (
+            COALESCE(ts_rank_cd(c.tsv_content, to_tsquery('simple', $1)), 0.0)
+            + CASE 
+                WHEN $2 <> '' AND (c.content ILIKE ('%' || $2 || '%') OR c.section_title ILIKE ('%' || $2 || '%')) 
+                THEN 5.0 
+                ELSE 0.0 
+              END
+          ) AS "textScore",
+          (
+            COALESCE(ts_rank_cd(c.tsv_content, to_tsquery('simple', $1)), 0.0)
+            + CASE 
+                WHEN $2 <> '' AND (c.content ILIKE ('%' || $2 || '%') OR c.section_title ILIKE ('%' || $2 || '%')) 
+                THEN 5.0 
+                ELSE 0.0 
+              END
+          ) AS "rrfScore",
           s.title AS "sourceTitle", s.file_name AS "fileName"
         FROM document_chunks c
         JOIN document_sources s ON s.id = c.document_id
         WHERE s.is_active = true
-          AND (c.tsv_content @@ plainto_tsquery('simple', $1) OR ($2 <> '' AND c.content ILIKE ('%' || $2 || '%')))
+          AND (
+            ($2 <> '' AND (c.content ILIKE ('%' || $2 || '%') OR c.section_title ILIKE ('%' || $2 || '%')))
+            OR c.tsv_content @@ to_tsquery('simple', $1) 
+            OR c.tsv_content @@ plainto_tsquery('simple', $3)
+          )
         ORDER BY "textScore" DESC
-        LIMIT $3;
-      `, cleanQuery, kw, limit);
+        LIMIT $4;
+      `, orQuery, kw, cleanQuery, safeLimit);
 
       return keywordOnly || [];
     }
@@ -599,19 +636,25 @@ export async function searchHybridRAG(
         SELECT 
           c.id, c.document_id, c.chunk_index, c.section_title, c.content, c.metadata,
           GREATEST(
-            COALESCE(ts_rank_cd(c.tsv_content, plainto_tsquery('simple', $2)), 0.0),
-            CASE WHEN $3 <> '' AND c.content ILIKE ('%' || $3 || '%') THEN 0.8 ELSE 0.0 END
+            COALESCE(ts_rank_cd(c.tsv_content, to_tsquery('simple', $2)), 0.0),
+            COALESCE(ts_rank_cd(c.tsv_content, plainto_tsquery('simple', $3)), 0.0),
+            CASE WHEN $4 <> '' AND c.content ILIKE ('%' || $4 || '%') THEN 0.8 ELSE 0.0 END
           ) AS text_score,
           ROW_NUMBER() OVER (
             ORDER BY GREATEST(
-              COALESCE(ts_rank_cd(c.tsv_content, plainto_tsquery('simple', $2)), 0.0),
-              CASE WHEN $3 <> '' AND c.content ILIKE ('%' || $3 || '%') THEN 0.8 ELSE 0.0 END
+              COALESCE(ts_rank_cd(c.tsv_content, to_tsquery('simple', $2)), 0.0),
+              COALESCE(ts_rank_cd(c.tsv_content, plainto_tsquery('simple', $3)), 0.0),
+              CASE WHEN $4 <> '' AND c.content ILIKE ('%' || $4 || '%') THEN 0.8 ELSE 0.0 END
             ) DESC
           ) AS rank_text
         FROM document_chunks c
         JOIN document_sources s ON s.id = c.document_id
         WHERE s.is_active = true 
-          AND (c.tsv_content @@ plainto_tsquery('simple', $2) OR ($3 <> '' AND c.content ILIKE ('%' || $3 || '%')))
+          AND (
+            c.tsv_content @@ to_tsquery('simple', $2)
+            OR c.tsv_content @@ plainto_tsquery('simple', $3)
+            OR ($4 <> '' AND c.content ILIKE ('%' || $4 || '%'))
+          )
         ORDER BY text_score DESC
         LIMIT 25
       )
@@ -632,8 +675,8 @@ export async function searchHybridRAG(
       JOIN document_sources s ON s.id = COALESCE(v.document_id, k.document_id)
       WHERE s.is_active = true
       ORDER BY "rrfScore" DESC
-      LIMIT $4;
-    `, embStr, cleanQuery, kw, limit);
+      LIMIT $5;
+    `, embStr, orQuery, cleanQuery, kw, safeLimit);
 
     return rawResults || [];
   } catch (error: any) {
