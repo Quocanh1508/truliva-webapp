@@ -765,4 +765,118 @@ router.delete('/documents/:id', requireAuth, requireAdmin, async (req: Request, 
   }
 });
 
+/**
+ * POST /api/ai-assistant/trace-sources
+ * Phân tích và truy vết nguồn gốc tri thức (Database, RAG Documents, FAQ, System Prompt) từ đoạn văn bản/câu trả lời
+ */
+router.post('/trace-sources', requireAuth, async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { text } = req.body;
+    if (!text || !text.trim()) {
+      res.status(400).json({ success: false, message: 'Nội dung truy vết không được để trống' });
+      return;
+    }
+
+    const cleanText = text.trim();
+
+    // 1. Trích xuất Model codes & các con số giá tiền
+    const rawModels = cleanText.match(/(?:UR|CR|UX|W)\d+[A-Z\d]*/gi) || [];
+    const modelMatches: string[] = Array.from(new Set(rawModels));
+
+    const rawNumbers = cleanText.match(/\d+[\d.,]*/g) || [];
+    const cleanNumbers: number[] = Array.from(
+      new Set(
+        rawNumbers
+          .map((n: string) => parseInt(n.replace(/[.,]/g, ''), 10))
+          .filter((n: number) => !isNaN(n) && n > 1000)
+      )
+    );
+
+    // 2. Truy vết Database Sản phẩm & Combo
+    const productOrConditions: any[] = [];
+    for (const m of modelMatches) {
+      productOrConditions.push({ name: { contains: m, mode: 'insensitive' } });
+      productOrConditions.push({ sku: { contains: m, mode: 'insensitive' } });
+    }
+    for (const p of cleanNumbers) {
+      productOrConditions.push({ sellingPrice: p });
+    }
+
+    let matchedProducts: any[] = [];
+    if (productOrConditions.length > 0) {
+      matchedProducts = await prisma.product.findMany({
+        where: { OR: productOrConditions },
+        select: { id: true, name: true, sku: true, sellingPrice: true, isActive: true },
+        take: 12
+      });
+    }
+
+    // Truy vết Combos
+    let matchedCombos: any[] = [];
+    if (modelMatches.length > 0) {
+      matchedCombos = await prisma.productCombo.findMany({
+        where: {
+          OR: modelMatches.map(m => ({ displayName: { contains: m, mode: 'insensitive' } }))
+        },
+        select: { id: true, displayName: true, comboKey: true, isActive: true },
+        take: 6
+      });
+    }
+
+    // 3. Truy vết Hybrid RAG Chunks từ tài liệu nội bộ
+    let matchedRagChunks: any[] = [];
+    try {
+      matchedRagChunks = await searchHybridRAG(cleanText, 5);
+    } catch (err: any) {
+      logger.warn('Failed to search RAG chunks in trace-sources', { error: err.message });
+    }
+
+    // 4. Truy vết FAQ và System Prompt
+    const config = await prisma.aiBotConfig.findUnique({ where: { id: 'default' } });
+    const matchedFaqs: any[] = [];
+    if (Array.isArray(config?.faqs)) {
+      for (const faq of (config.faqs as any[])) {
+        const matchesModel = modelMatches.some(m => 
+          (faq.question && faq.question.toUpperCase().includes(m.toUpperCase())) ||
+          (faq.answer && faq.answer.toUpperCase().includes(m.toUpperCase()))
+        );
+        const matchesKeyword = cleanText.toLowerCase().includes(faq.question.toLowerCase().slice(0, 20));
+        if (matchesModel || matchesKeyword) {
+          matchedFaqs.push(faq);
+        }
+      }
+    }
+
+    // Truy vết Prompt / Quy tắc bảo hành cốt lõi
+    const matchedPromptRules: string[] = [];
+    if (config?.systemPrompt) {
+      const promptLines = config.systemPrompt.split('\n');
+      for (const line of promptLines) {
+        if (modelMatches.some(m => line.includes(m)) || (cleanNumbers.length > 0 && cleanNumbers.some(p => line.includes(p.toString())))) {
+          if (line.trim().length > 10) matchedPromptRules.push(line.trim());
+        }
+      }
+    }
+
+    res.json({
+      success: true,
+      queryText: cleanText,
+      extractedInfo: {
+        models: modelMatches,
+        prices: cleanNumbers
+      },
+      sources: {
+        products: matchedProducts,
+        combos: matchedCombos,
+        ragChunks: matchedRagChunks,
+        faqs: matchedFaqs,
+        promptRules: matchedPromptRules
+      }
+    });
+  } catch (error: any) {
+    logger.error('Failed to trace sources', { error: error.message });
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
+
 export default router;

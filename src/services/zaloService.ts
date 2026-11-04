@@ -199,6 +199,8 @@ export function formatZaloPhone(phone: string): string {
 
 /**
  * Gửi tin nhắn ZNS xác nhận kích hoạt bảo hành
+ * QUY CHUẨN MỚI: Chỉ gửi qua FPT FNS Gateway (Template 10232 - Lắp đặt & Bảo hành)
+ * Template 617366 (Zalo Direct) ĐÃ NGỪNG ÁP DỤNG theo yêu cầu chương trình mới.
  */
 export async function sendZnsWarrantyActivation(
   serialNumber: string, 
@@ -213,15 +215,12 @@ export async function sendZnsWarrantyActivation(
 ): Promise<any> {
   const cleanSerial = serialNumber.trim().replace(/[^a-zA-Z0-9_]/g, '').toUpperCase();
   const formattedPhone = formatZaloPhone(recipientPhone.trim());
-  const zaloTemplateId = process.env.ZALO_ZNS_TEMPLATE_ID || '617366';
   const fnsTemplateId = Number(process.env.FNS_TEMPLATE_ID_LAP_DAT || '10232');
   const fnsAppId = process.env.FNS_APP_ID || '';
   const fnsSecretKey = process.env.FNS_SECRET_KEY || '';
-  const gatewayMode = options?.gatewayMode || 'AUTO';
 
-  if (!zaloTemplateId || zaloTemplateId === 'YOUR_APPROVED_TEMPLATE_ID') {
-    logger.warn('Chưa cấu hình ZALO_ZNS_TEMPLATE_ID trong .env. Tin nhắn ZNS sẽ giả lập gửi thành công.');
-    return { success: true, message: '[Simulation] ZNS sent successfully (Template ID not configured)' };
+  if (options?.gatewayMode === 'ZALO_DIRECT') {
+    logger.warn('Chương trình Template 617366 (Zalo Direct) đã ngừng áp dụng. Tự động chuyển phát qua cổng FPT FNS Gateway (Template 10232).');
   }
 
   // 1. Lấy thông tin bảo hành của Serial từ DB (nếu có)
@@ -260,52 +259,7 @@ export async function sendZnsWarrantyActivation(
     expiryDateStr = `${day}/${month}/${year}`;
   }
 
-  // Template data cho Zalo Direct OpenAPI (Template 617366)
-  const zaloTemplateData = {
-    _TEN_KHACH_HANG_: customerName.substring(0, 30),
-    _TEN_SAN_PHAM_: productName.substring(0, 200),
-    _ID_BAO_HANH_: cleanSerial.substring(0, 30),
-    _NGAY_BAO_HANH_: expiryDateStr.substring(0, 30),
-    _TEN_: customerName.substring(0, 30),
-    _SO_SERI_: cleanSerial.substring(0, 30),
-    _NGAY_HET_BAO_HANH_: expiryDateStr.substring(0, 30),
-
-    TEN_KHACH_HANG: customerName,
-    TEN_SAN_PHAM: productName,
-    ID_BAO_HANH: cleanSerial,
-    NGAY_BAO_HANH: expiryDateStr,
-    SO_SERI: cleanSerial,
-    NGAY_HET_BAO_HANH: expiryDateStr,
-
-    Ten_Khach_Hang: customerName,
-    Ten_San_Pham: productName,
-    Id_Bao_Hanh: cleanSerial,
-    Ngay_Bao_Hanh: expiryDateStr,
-    So_Seri: cleanSerial,
-    Ngay_Het_Bao_Hanh: expiryDateStr,
-
-    ten_khach_hang: customerName,
-    ten_san_pham: productName,
-    so_seri: cleanSerial,
-    ngay_het_bao_hanh: expiryDateStr,
-
-    customer_name: customerName,
-    product_name: productName,
-    code: cleanSerial,
-    serial_number: cleanSerial,
-    expiry_date: expiryDateStr,
-    time: expiryDateStr,
-    date: expiryDateStr,
-
-    _CUSTOMER_NAME_: customerName,
-    _PRODUCT_NAME_: productName,
-    _CODE_: cleanSerial,
-    _SERIAL_NUMBER_: cleanSerial,
-    _EXPIRY_DATE_: expiryDateStr,
-    _TIME_: expiryDateStr
-  };
-
-  // Template data chuẩn hóa cho FPT FNS Gateway (Template 10232 - DỊCH VỤ LẮP ĐẶT)
+  // Template data chuẩn hóa cho FPT FNS Gateway (Template 10232 - DỊCH VỤ LẮP ĐẶT & KÍCH HOẠT BẢO HÀNH)
   const fnsTemplateData = {
     Ten_Khach_Hang: customerName.substring(0, 30),
     Ten_San_Pham: productName.substring(0, 200),
@@ -320,7 +274,7 @@ export async function sendZnsWarrantyActivation(
       serialNumber: cleanSerial,
       customerName,
       productName,
-      templateId: zaloTemplateId
+      templateId: fnsTemplateId
     });
 
     const mockMsgId = `SANDBOX_MOCK_${Date.now()}`;
@@ -332,12 +286,12 @@ export async function sendZnsWarrantyActivation(
           serialNumber: cleanSerial,
           customerName,
           productName,
-          templateId: zaloTemplateId,
+          templateId: String(fnsTemplateId),
           status: 'SUCCESS',
           sentAt: new Date(),
           durationMs: '1ms',
-          gateway: 'Sandbox Mock (Blocked External Dispatch)',
-          rawData: { simulated: true, environment: 'SANDBOX', note: 'ZNS blocked and simulated in sandbox environment' }
+          gateway: 'FPT FNS Gateway (Sandbox Simulation)',
+          rawData: { simulated: true, environment: 'SANDBOX', templateId: fnsTemplateId, template_data: fnsTemplateData, note: 'Simulated via FNS Gateway (Template 10232)' }
         }
       });
     } catch (dbErr: any) {
@@ -346,33 +300,36 @@ export async function sendZnsWarrantyActivation(
 
     return {
       success: true,
-      message: '[SANDBOX MOCK] ZNS message simulated successfully (Blocked real external dispatch)',
+      message: '[SANDBOX MOCK] ZNS message simulated successfully via FPT FNS Gateway (Template 10232)',
       data: { message_id: mockMsgId },
-      trackingId: `${cleanSerial}-${Date.now()}`
+      trackingId: `${cleanSerial}-${Date.now()}`,
+      gateway: 'FPT FNS Gateway (Sandbox Simulation)',
+      templateId: fnsTemplateId
     };
   }
 
-  // Helper hàm gửi tin qua FPT FNS Gateway
-  const sendViaFnsGateway = async (isFallback: boolean = false, primaryErrorMsg?: string) => {
-    if (!fnsAppId || !fnsSecretKey) {
-      throw new Error('Chưa cấu hình cổng FPT FNS Gateway (FNS_APP_ID / FNS_SECRET_KEY) trong file .env');
-    }
+  // ─────────────────────────────────────────────────────────────
+  // PHÁT TIN QUA FPT FNS GATEWAY (TEMPLATE 10232)
+  // ─────────────────────────────────────────────────────────────
+  if (!fnsAppId || !fnsSecretKey) {
+    throw new Error('Chưa cấu hình cổng FPT FNS Gateway (FNS_APP_ID / FNS_SECRET_KEY) trong file .env');
+  }
 
-    const fnsPayload = {
-      phone: formattedPhone,
-      template_id: fnsTemplateId,
-      template_data: fnsTemplateData,
-      ref_id: `${isFallback ? 'FB-' : ''}${cleanSerial}-${Date.now()}`
-    };
+  const fnsPayload = {
+    phone: formattedPhone,
+    template_id: fnsTemplateId,
+    template_data: fnsTemplateData,
+    ref_id: `${cleanSerial}-${Date.now()}`
+  };
 
-    logger.info(`Sending ZNS warranty activation message via FNS Gateway ${isFallback ? '(FALLBACK MODE)' : ''}`, {
-      phone: formattedPhone,
-      templateId: fnsTemplateId,
-      fnsAppId,
-      isFallback
-    });
+  logger.info('Sending ZNS warranty activation message via FPT FNS Gateway (Template 10232)', {
+    phone: formattedPhone,
+    templateId: fnsTemplateId,
+    fnsAppId
+  });
 
-    const startTimeFns = Date.now();
+  const startTimeFns = Date.now();
+  try {
     const response = await axios.post('https://api-fns.fpt.work/api/send-message', fnsPayload, {
       headers: {
         'Content-Type': 'application/json',
@@ -388,15 +345,14 @@ export async function sendZnsWarrantyActivation(
     }
 
     const durationMs = Date.now() - startTimeFns;
-    const gatewayName = isFallback ? 'FPT FNS Gateway (Fallback)' : 'FPT FNS Gateway';
+    const gatewayName = 'FPT FNS Gateway';
 
-    logger.info(`ZNS message sent successfully via ${gatewayName}`, {
+    logger.info(`ZNS message sent successfully via ${gatewayName} (Template 10232)`, {
       phone: formattedPhone,
       serialNumber: cleanSerial,
       templateId: fnsTemplateId,
       messageId: data.data?.message_id,
-      durationMs: `${durationMs}ms`,
-      isFallback
+      durationMs: `${durationMs}ms`
     });
 
     try {
@@ -414,8 +370,7 @@ export async function sendZnsWarrantyActivation(
           sentAt: new Date(),
           rawData: {
             fnsData: data,
-            isFallback,
-            primaryError: primaryErrorMsg || null
+            template_data: fnsTemplateData
           }
         }
       });
@@ -426,95 +381,11 @@ export async function sendZnsWarrantyActivation(
     return {
       ...data,
       gateway: gatewayName,
-      isFallback,
       templateId: fnsTemplateId
     };
-  };
-
-  // ─────────────────────────────────────────────────────────────
-  // NẾU CHỈ ĐỊNH CHỈ GỬI QUA FNS (FNS_GATEWAY)
-  // ─────────────────────────────────────────────────────────────
-  if (gatewayMode === 'FNS_GATEWAY') {
-    return await sendViaFnsGateway(false);
-  }
-
-  // ─────────────────────────────────────────────────────────────
-  // KÊNH 1 (PRIMARY): GỬI QUA ZALO DIRECT OPENAPI (TEMPLATE 617366)
-  // ─────────────────────────────────────────────────────────────
-  let primaryError: any = null;
-  const startTimeDirect = Date.now();
-
-  try {
-    const accessToken = await getValidAccessToken();
-    const payload = {
-      phone: formattedPhone,
-      template_id: zaloTemplateId,
-      template_data: zaloTemplateData,
-      tracking_id: `${cleanSerial}-${Date.now()}`
-    };
-
-    logger.info('Sending ZNS warranty activation message via Zalo Direct API (Primary Channel)', {
-      phone: formattedPhone,
-      templateId: zaloTemplateId
-    });
-
-    const response = await axios.post('https://business.openapi.zalo.me/message/template', payload, {
-      headers: {
-        'Content-Type': 'application/json',
-        'access_token': accessToken
-      },
-      timeout: 10000
-    });
-
-    const data = response.data;
-    if (data.error && data.error !== 0) {
-      throw new Error(`Zalo ZNS Send Error: ${data.message} (Code: ${data.error})`);
-    }
-
-    const durationMs = Date.now() - startTimeDirect;
-    logger.info('ZNS message sent successfully via Zalo Direct API', {
-      phone: formattedPhone,
-      serialNumber: cleanSerial,
-      customerName,
-      productName,
-      templateId: payload.template_id,
-      trackingId: payload.tracking_id,
-      messageId: data.data?.message_id,
-      durationMs: `${durationMs}ms`,
-      status: 'SUCCESS'
-    });
-
-    // Lưu vào bảng ZnsMessageLog trong Database
-    try {
-      await prisma.znsMessageLog.create({
-        data: {
-          messageId: data.data?.message_id || null,
-          phone: formattedPhone,
-          serialNumber: cleanSerial,
-          customerName,
-          productName,
-          templateId: payload.template_id,
-          status: 'SUCCESS',
-          durationMs: `${durationMs}ms`,
-          gateway: 'Zalo Direct ZBS OpenAPI',
-          sentAt: new Date(),
-          rawData: data
-        }
-      });
-    } catch (dbErr: any) {
-      logger.warn('Failed to save ZnsMessageLog to DB', { error: dbErr.message });
-    }
-
-    return {
-      ...data,
-      gateway: 'Zalo Direct ZBS OpenAPI',
-      isFallback: false,
-      templateId: payload.template_id
-    };
   } catch (err: any) {
-    primaryError = err;
-    const durationMs = Date.now() - startTimeDirect;
-    logger.warn('Primary Channel (Zalo Direct API) failed, checking fallback...', {
+    const durationMs = Date.now() - startTimeFns;
+    logger.error('FPT FNS Gateway failed to send warranty activation ZNS', {
       phone: formattedPhone,
       serialNumber: cleanSerial,
       error: err.message,
@@ -522,94 +393,26 @@ export async function sendZnsWarrantyActivation(
       durationMs: `${durationMs}ms`
     });
 
-    // Nếu chỉ định ZALO_DIRECT only thì không fallback
-    if (gatewayMode === 'ZALO_DIRECT') {
-      try {
-        await prisma.znsMessageLog.create({
-          data: {
-            phone: formattedPhone,
-            serialNumber: cleanSerial,
-            customerName,
-            productName,
-            templateId: zaloTemplateId,
-            status: 'FAILED',
-            error: err.message,
-            durationMs: `${durationMs}ms`,
-            gateway: 'Zalo Direct ZBS OpenAPI',
-            sentAt: new Date(),
-            rawData: { error: err.message, details: err.response?.data }
-          }
-        });
-      } catch (dbErr: any) {}
-      throw err;
-    }
-  }
-
-  // ─────────────────────────────────────────────────────────────
-  // KÊNH 2 (FALLBACK): KÍCH HOẠT DỰ PHÒNG FPT FNS GATEWAY (TEMPLATE 10232)
-  // ─────────────────────────────────────────────────────────────
-  if (fnsAppId && fnsSecretKey) {
     try {
-      logger.info('🚀 Kích hoạt Fallback sang FPT FNS Gateway (Template 10232)...', {
-        phone: formattedPhone,
-        serialNumber: cleanSerial,
-        primaryError: primaryError?.message
+      await prisma.znsMessageLog.create({
+        data: {
+          phone: formattedPhone,
+          serialNumber: cleanSerial,
+          customerName,
+          productName,
+          templateId: String(fnsTemplateId),
+          status: 'FAILED',
+          error: err.message,
+          durationMs: `${durationMs}ms`,
+          gateway: 'FPT FNS Gateway',
+          sentAt: new Date(),
+          rawData: { error: err.message, details: err.response?.data }
+        }
       });
+    } catch (dbErr: any) {}
 
-      return await sendViaFnsGateway(true, primaryError?.message || 'Zalo Direct failed');
-    } catch (fnsErr: any) {
-      logger.error('❌ Cả 2 kênh (Zalo Direct và FPT FNS Gateway Fallback) đều thất bại!', {
-        phone: formattedPhone,
-        serialNumber: cleanSerial,
-        primaryError: primaryError?.message,
-        fallbackError: fnsErr.message
-      });
-
-      try {
-        await prisma.znsMessageLog.create({
-          data: {
-            phone: formattedPhone,
-            serialNumber: cleanSerial,
-            customerName,
-            productName,
-            templateId: `${zaloTemplateId} -> ${fnsTemplateId}`,
-            status: 'FAILED',
-            error: `Primary (Zalo Direct): ${primaryError?.message} | Fallback (FNS): ${fnsErr.message}`,
-            durationMs: `${Date.now() - startTimeDirect}ms`,
-            gateway: 'Zalo Direct + FPT FNS (Both Failed)',
-            sentAt: new Date(),
-            rawData: {
-              primaryError: primaryError?.response?.data || primaryError?.message,
-              fallbackError: fnsErr.response?.data || fnsErr.message
-            }
-          }
-        });
-      } catch (dbErr: any) {}
-
-      throw new Error(`Gửi ZNS thất bại qua cả 2 cổng. Kênh 1: ${primaryError?.message}; Kênh dự phòng FNS: ${fnsErr.message}`);
-    }
+    throw err;
   }
-
-  // Nếu không có FNS config, lưu log thất bại và ném lỗi Kênh 1
-  try {
-    await prisma.znsMessageLog.create({
-      data: {
-        phone: formattedPhone,
-        serialNumber: cleanSerial,
-        customerName,
-        productName,
-        templateId: zaloTemplateId,
-        status: 'FAILED',
-        error: primaryError?.message,
-        durationMs: `${Date.now() - startTimeDirect}ms`,
-        gateway: 'Zalo Direct ZBS OpenAPI (No Fallback Configured)',
-        sentAt: new Date(),
-        rawData: { error: primaryError?.message, details: primaryError?.response?.data }
-      }
-    });
-  } catch (dbErr: any) {}
-
-  throw primaryError;
 }
 
 /**

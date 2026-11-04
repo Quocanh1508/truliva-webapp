@@ -101,7 +101,7 @@ export default function ZnsManage() {
     name: '',
     product: '',
     expiry: '',
-    gatewayMode: 'AUTO',
+    gatewayMode: 'FNS_GATEWAY',
     loading: false,
     result: null
   });
@@ -262,7 +262,7 @@ export default function ZnsManage() {
       name: d.customerName || 'Quý Khách',
       product: d.model || 'Máy lọc nước Truliva',
       expiry: expiryStr,
-      gatewayMode: 'AUTO',
+      gatewayMode: 'FNS_GATEWAY',
       loading: false,
       result: null
     });
@@ -427,10 +427,10 @@ export default function ZnsManage() {
           </div>
           <div>
             <p className="text-xs font-medium text-gray-500">Cổng phát tin ZNS</p>
-            <p className="text-sm font-bold text-gray-900 mt-0.5">Zalo Direct ZBS OpenAPI</p>
-            <span className="inline-flex items-center text-[11px] text-emerald-600 font-semibold mt-0.5">
-              <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full mr-1.5 animate-pulse"></span>
-              Template: 617366 (Bảo hành)
+            <p className="text-sm font-bold text-gray-900 mt-0.5">FPT FNS Gateway</p>
+            <span className="inline-flex items-center text-[11px] text-purple-600 font-semibold mt-0.5">
+              <span className="w-1.5 h-1.5 bg-purple-500 rounded-full mr-1.5 animate-pulse"></span>
+              Template: 10232 (Lắp đặt) & 10233 (Dịch vụ)
             </span>
           </div>
         </div>
@@ -767,7 +767,7 @@ export default function ZnsManage() {
                                   className={`inline-flex items-center text-[10px] font-bold px-2 py-0.5 rounded-md border ${
                                     d.gateway.includes('Fallback') || d.gateway.includes('FNS')
                                       ? 'bg-purple-50 text-purple-700 border-purple-200'
-                                      : 'bg-blue-50 text-blue-700 border-blue-200'
+                                      : 'bg-gray-100 text-gray-500 border-gray-200'
                                   }`}
                                   title={d.gateway}
                                 >
@@ -775,7 +775,7 @@ export default function ZnsManage() {
                                     ? '🟣 FNS (Fallback 10232)'
                                     : d.gateway.includes('FNS')
                                     ? '🟣 FNS Gateway'
-                                    : '🔵 Zalo Direct (617366)'}
+                                    : '⚪ Zalo Direct 617366 (Đã ngừng)'}
                                 </span>
                               )}
                             </div>
@@ -1414,12 +1414,12 @@ export default function ZnsManage() {
                   onChange={(e) => setResendModal(prev => ({ ...prev, gatewayMode: e.target.value as any }))}
                   className="w-full px-3 py-2 border border-gray-300 rounded-xl font-medium bg-white focus:ring-2 focus:ring-blue-500 text-xs"
                 >
-                  <option value="AUTO">⚡ Tự động (Ưu tiên Zalo Direct 617366 ➔ Dự phòng FNS 10232)</option>
-                  <option value="ZALO_DIRECT">🔵 Chỉ dùng Zalo Direct OpenAPI (Template 617366)</option>
-                  <option value="FNS_GATEWAY">🟣 Chỉ dùng FPT FNS Gateway (Template 10232)</option>
+                  <option value="FNS_GATEWAY">🟣 FPT FNS Gateway (Template 10232 - Chuẩn hiện hành)</option>
+                  <option value="AUTO">⚙️ Tự động (Mặc định FPT FNS Gateway)</option>
+                  <option value="ZALO_DIRECT" disabled>⚪ Zalo Direct OpenAPI (Template 617366 - Đã ngừng áp dụng)</option>
                 </select>
-                <p className="text-[11px] text-gray-400 mt-1">
-                  Chế độ Tự động sẽ thử Zalo Direct trước, nếu gặp sự cố sẽ tự động chuyển sang FNS Gateway 10232.
+                <p className="text-[11px] text-gray-500 mt-1">
+                  Chương trình Template 617366 đã ngừng hoạt động. Toàn bộ tin ZNS được phát qua cổng FPT FNS Gateway (10232/10233).
                 </p>
               </div>
             </div>

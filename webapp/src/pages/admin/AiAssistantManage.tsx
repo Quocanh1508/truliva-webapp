@@ -34,7 +34,9 @@ import {
   Eye,
   Zap,
   Activity,
-  MessageCircle
+  MessageCircle,
+  Compass,
+  Tag
 } from 'lucide-react';
 
 interface FAQItem {
@@ -194,6 +196,21 @@ export default function AiAssistantManage() {
   const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null);
   const [sessionDetail, setSessionDetail] = useState<any | null>(null);
   const [loadingDetail, setLoadingDetail] = useState(false);
+
+  // Source Tracer State (Truy vết nguồn gốc tri thức)
+  const [traceInput, setTraceInput] = useState('');
+  const [tracing, setTracing] = useState(false);
+  const [traceResult, setTraceResult] = useState<{
+    queryText: string;
+    extractedInfo: { models: string[]; prices: number[] };
+    sources: {
+      products: any[];
+      combos: any[];
+      ragChunks: RagChunkMatch[];
+      faqs: FAQItem[];
+      promptRules: string[];
+    };
+  } | null>(null);
 
   // New FAQ Modal / Inline form
   const [newCategory, setNewCategory] = useState('Chung');
@@ -483,6 +500,32 @@ export default function AiAssistantManage() {
       alert('Lỗi tra cứu Hybrid RAG: ' + err.message);
     } finally {
       setSearchingRag(false);
+    }
+  };
+
+  const handleTraceSources = async (textToTrace?: string) => {
+    const text = (typeof textToTrace === 'string' ? textToTrace : traceInput).trim();
+    if (!text) {
+      alert('Vui lòng nhập hoặc dán đoạn văn bản cần truy vết nguồn gốc!');
+      return;
+    }
+
+    try {
+      setTracing(true);
+      const res = await fetchApi('/ai-assistant/trace-sources', {
+        method: 'POST',
+        body: JSON.stringify({ text })
+      });
+
+      if (res.success) {
+        setTraceResult(res);
+      } else {
+        alert(res.message || 'Lỗi khi truy vết nguồn tri thức');
+      }
+    } catch (err: any) {
+      alert('Không thể truy vết nguồn: ' + err.message);
+    } finally {
+      setTracing(false);
     }
   };
 
@@ -1113,6 +1156,202 @@ export default function AiAssistantManage() {
             )}
           </div>
 
+          {/* ── NGUỒN GỐC TRI THỨC / SOURCE TRACER ── */}
+          <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-xs space-y-5">
+            <div className="flex items-center justify-between border-b border-gray-100 pb-3">
+              <div>
+                <h3 className="text-sm font-bold text-gray-900 flex items-center gap-2">
+                  <Compass size={17} className="text-[#00A3FF]" />
+                  Công Cụ Truy Vết Nguồn Gốc Tri Thức (Knowledge Source Tracer)
+                </h3>
+                <p className="text-[11px] text-gray-500">
+                  Dán câu trả lời của AI hoặc đoạn văn bản bất kỳ để hệ thống tự động bóc tách và định vị chính xác nguồn thông tin (Bảng Sản phẩm CSDL, Trang tài liệu PDF RAG, FAQ, hay Chỉ dẫn hệ thống)
+                </p>
+              </div>
+            </div>
+
+            <div className="space-y-3">
+              <textarea
+                rows={3}
+                value={traceInput}
+                onChange={e => setTraceInput(e.target.value)}
+                placeholder='Ví dụ: Dạ nếu anh/chị muốn tìm dòng máy tích hợp vòi nóng lạnh với mức giá "mềm" hơn, Truliva có model *UR3626 kèm vòi nóng* với giá niêm yết là *18.900.000 đ* ạ...'
+                className="w-full px-3.5 py-2.5 rounded-xl border border-gray-200 text-xs focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 font-sans"
+              />
+
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    const sample = 'Dạ nếu anh/chị muốn tìm dòng máy tích hợp vòi nóng lạnh với mức giá "mềm" hơn, Truliva có model *UR3626 kèm vòi nóng* với giá niêm yết là *18.900.000 đ* ạ.';
+                    setTraceInput(sample);
+                    handleTraceSources(sample);
+                  }}
+                  className="text-[11px] font-semibold text-blue-600 hover:text-blue-800 hover:underline flex items-center gap-1"
+                >
+                  <span>⚡ Dán đoạn văn bản mẫu (UR3626 kèm vòi nóng 18.900.000 đ)</span>
+                </button>
+
+                <button
+                  onClick={() => handleTraceSources()}
+                  disabled={tracing || !traceInput.trim()}
+                  className="bg-[#1B3A6B] hover:bg-[#2A518E] text-white font-semibold rounded-xl px-4 py-2.5 text-xs flex items-center gap-1.5 transition-all disabled:opacity-50"
+                >
+                  {tracing ? <Loader2 size={14} className="animate-spin" /> : <Search size={14} />}
+                  <span>Truy Vết Nguồn Gốc</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Hiển thị kết quả truy vết nguồn gốc */}
+            {traceResult && (
+              <div className="pt-4 border-t border-gray-100 space-y-4 animate-fade-in">
+                {/* Extracted Entity Tags */}
+                <div className="flex flex-wrap items-center gap-2 text-xs">
+                  <span className="font-bold text-gray-700">Dữ liệu thực thể bóc tách được:</span>
+                  {traceResult.extractedInfo?.models?.map((m: string, i: number) => (
+                    <span key={i} className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-blue-50 text-blue-800 border border-blue-200 font-bold text-[11px]">
+                      <Tag size={10} /> Model: {m}
+                    </span>
+                  ))}
+                  {traceResult.extractedInfo?.prices?.map((p: number, i: number) => (
+                    <span key={i} className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200 font-bold text-[11px]">
+                      💵 Giá: {p.toLocaleString('vi-VN')} đ
+                    </span>
+                  ))}
+                </div>
+
+                {/* 4 Nguồn dữ liệu */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {/* Nguồn 1: Database Sản Phẩm */}
+                  <div className="p-4 rounded-xl border border-blue-100 bg-blue-50/20 space-y-3">
+                    <div className="flex items-center justify-between border-b border-blue-100 pb-2">
+                      <h4 className="font-bold text-xs text-[#1B3A6B] flex items-center gap-1.5">
+                        <Package size={14} className="text-blue-600" />
+                        1. Khớp CSDL Sản Phẩm & Giá ({traceResult.sources?.products?.length || 0})
+                      </h4>
+                      <span className="text-[10px] bg-blue-100 text-blue-800 font-semibold px-2 py-0.5 rounded-md">
+                        Bảng Product
+                      </span>
+                    </div>
+
+                    {traceResult.sources?.products?.length === 0 ? (
+                      <p className="text-[11px] text-gray-400 italic">Không có sản phẩm nào khớp trong CSDL</p>
+                    ) : (
+                      <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
+                        {traceResult.sources.products.map((p: any) => (
+                          <div key={p.id} className="p-2.5 bg-white rounded-lg border border-gray-100 text-xs space-y-1">
+                            <div className="font-bold text-gray-900">{p.name}</div>
+                            <div className="flex items-center justify-between text-[11px]">
+                              <span className="text-gray-500 font-mono">SKU: {p.sku}</span>
+                              <span className="font-bold text-emerald-600">
+                                {p.sellingPrice ? `${p.sellingPrice.toLocaleString('vi-VN')} đ` : 'Liên hệ'}
+                              </span>
+                            </div>
+                            <div className="text-[10px] text-blue-600">
+                              ✓ Nạp tự động vào AI qua tính năng Đồng bộ CSDL (Sync Catalog)
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Nguồn 2: Hybrid RAG Chunks */}
+                  <div className="p-4 rounded-xl border border-indigo-100 bg-indigo-50/20 space-y-3">
+                    <div className="flex items-center justify-between border-b border-indigo-100 pb-2">
+                      <h4 className="font-bold text-xs text-indigo-950 flex items-center gap-1.5">
+                        <FileText size={14} className="text-indigo-600" />
+                        2. Khớp Tài Liệu Hybrid RAG ({traceResult.sources?.ragChunks?.length || 0})
+                      </h4>
+                      <span className="text-[10px] bg-indigo-100 text-indigo-800 font-semibold px-2 py-0.5 rounded-md">
+                        HNSW + BM25
+                      </span>
+                    </div>
+
+                    {traceResult.sources?.ragChunks?.length === 0 ? (
+                      <p className="text-[11px] text-gray-400 italic">Không có tài liệu RAG nào khớp</p>
+                    ) : (
+                      <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
+                        {traceResult.sources.ragChunks.map((c: any, i: number) => (
+                          <div key={c.id || i} className="p-2.5 bg-white rounded-lg border border-gray-100 text-xs space-y-1.5">
+                            <div className="flex items-center justify-between text-[11px]">
+                              <span className="font-bold text-indigo-900 truncate max-w-[200px]" title={c.sourceTitle || c.fileName}>
+                                {c.sourceTitle || c.fileName}
+                              </span>
+                              <span className="bg-indigo-50 text-indigo-700 px-1.5 py-0.2 rounded font-semibold text-[10px]">
+                                Trang {c.metadata?.pageNumber || 1}
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-2 text-[10px] text-gray-500">
+                              <span>Sim: {(c.vectorSimilarity * 100).toFixed(1)}%</span>
+                              <span>•</span>
+                              <span>RRF: {(c.rrfScore * 100).toFixed(2)}%</span>
+                            </div>
+                            <p className="text-[11px] text-gray-700 italic line-clamp-2 bg-slate-50 p-1.5 rounded">
+                              "{c.content}"
+                            </p>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Nguồn 3: FAQ */}
+                  <div className="p-4 rounded-xl border border-amber-100 bg-amber-50/20 space-y-3">
+                    <div className="flex items-center justify-between border-b border-amber-100 pb-2">
+                      <h4 className="font-bold text-xs text-amber-950 flex items-center gap-1.5">
+                        <HelpCircle size={14} className="text-amber-600" />
+                        3. Khớp Câu Hỏi Thường Gặp FAQ ({traceResult.sources?.faqs?.length || 0})
+                      </h4>
+                      <span className="text-[10px] bg-amber-100 text-amber-800 font-semibold px-2 py-0.5 rounded-md">
+                        FAQ List
+                      </span>
+                    </div>
+
+                    {traceResult.sources?.faqs?.length === 0 ? (
+                      <p className="text-[11px] text-gray-400 italic">Không có câu hỏi FAQ nào khớp trực tiếp</p>
+                    ) : (
+                      <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
+                        {traceResult.sources.faqs.map((f: any, i: number) => (
+                          <div key={i} className="p-2.5 bg-white rounded-lg border border-gray-100 text-xs space-y-1">
+                            <div className="font-bold text-gray-800">Q: {f.question}</div>
+                            <p className="text-[11px] text-gray-600 line-clamp-2">A: {f.answer}</p>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Nguồn 4: System Prompt Rules */}
+                  <div className="p-4 rounded-xl border border-emerald-100 bg-emerald-50/20 space-y-3">
+                    <div className="flex items-center justify-between border-b border-emerald-100 pb-2">
+                      <h4 className="font-bold text-xs text-emerald-950 flex items-center gap-1.5">
+                        <Sparkles size={14} className="text-emerald-600" />
+                        4. Khớp Chỉ Dẫn Hệ Thống ({traceResult.sources?.promptRules?.length || 0})
+                      </h4>
+                      <span className="text-[10px] bg-emerald-100 text-emerald-800 font-semibold px-2 py-0.5 rounded-md">
+                        System Prompt
+                      </span>
+                    </div>
+
+                    {traceResult.sources?.promptRules?.length === 0 ? (
+                      <p className="text-[11px] text-gray-400 italic">Không có điều khoản prompt đặc biệt nào khớp</p>
+                    ) : (
+                      <div className="space-y-1.5 max-h-56 overflow-y-auto pr-1">
+                        {traceResult.sources.promptRules.map((r: string, i: number) => (
+                          <div key={i} className="p-2 bg-white rounded-lg border border-gray-100 text-[11px] text-emerald-900 font-mono">
+                            {r}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+
           {/* RAG Inspector & Search Tester */}
           <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-xs space-y-5">
             <div className="flex items-center justify-between border-b border-gray-100 pb-3">
@@ -1188,6 +1427,202 @@ export default function AiAssistantManage() {
                       </div>
                     </div>
                   ))}
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* ── NGUỒN GỐC TRI THỨC / SOURCE TRACER ── */}
+          <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-xs space-y-5">
+            <div className="flex items-center justify-between border-b border-gray-100 pb-3">
+              <div>
+                <h3 className="text-sm font-bold text-gray-900 flex items-center gap-2">
+                  <Compass size={17} className="text-[#00A3FF]" />
+                  Công Cụ Truy Vết Nguồn Gốc Tri Thức (Knowledge Source Tracer)
+                </h3>
+                <p className="text-[11px] text-gray-500">
+                  Dán câu trả lời của AI hoặc đoạn văn bản bất kỳ để hệ thống tự động bóc tách và định vị chính xác nguồn thông tin (Bảng Sản phẩm CSDL, Trang tài liệu PDF RAG, FAQ, hay Chỉ dẫn hệ thống)
+                </p>
+              </div>
+            </div>
+
+            <div className="space-y-3">
+              <textarea
+                rows={3}
+                value={traceInput}
+                onChange={e => setTraceInput(e.target.value)}
+                placeholder='Ví dụ: Dạ nếu anh/chị muốn tìm dòng máy tích hợp vòi nóng lạnh với mức giá "mềm" hơn, Truliva có model *UR3626 kèm vòi nóng* với giá niêm yết là *18.900.000 đ* ạ...'
+                className="w-full px-3.5 py-2.5 rounded-xl border border-gray-200 text-xs focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 font-sans"
+              />
+
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    const sample = 'Dạ nếu anh/chị muốn tìm dòng máy tích hợp vòi nóng lạnh với mức giá "mềm" hơn, Truliva có model *UR3626 kèm vòi nóng* với giá niêm yết là *18.900.000 đ* ạ.';
+                    setTraceInput(sample);
+                    handleTraceSources(sample);
+                  }}
+                  className="text-[11px] font-semibold text-blue-600 hover:text-blue-800 hover:underline flex items-center gap-1"
+                >
+                  <span>⚡ Dán đoạn văn bản mẫu (UR3626 kèm vòi nóng 18.900.000 đ)</span>
+                </button>
+
+                <button
+                  onClick={() => handleTraceSources()}
+                  disabled={tracing || !traceInput.trim()}
+                  className="bg-[#1B3A6B] hover:bg-[#2A518E] text-white font-semibold rounded-xl px-4 py-2.5 text-xs flex items-center gap-1.5 transition-all disabled:opacity-50"
+                >
+                  {tracing ? <Loader2 size={14} className="animate-spin" /> : <Search size={14} />}
+                  <span>Truy Vết Nguồn Gốc</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Hiển thị kết quả truy vết nguồn gốc */}
+            {traceResult && (
+              <div className="pt-4 border-t border-gray-100 space-y-4 animate-fade-in">
+                {/* Extracted Entity Tags */}
+                <div className="flex flex-wrap items-center gap-2 text-xs">
+                  <span className="font-bold text-gray-700">Dữ liệu thực thể bóc tách được:</span>
+                  {traceResult.extractedInfo?.models?.map((m: string, i: number) => (
+                    <span key={i} className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-blue-50 text-blue-800 border border-blue-200 font-bold text-[11px]">
+                      <Tag size={10} /> Model: {m}
+                    </span>
+                  ))}
+                  {traceResult.extractedInfo?.prices?.map((p: number, i: number) => (
+                    <span key={i} className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200 font-bold text-[11px]">
+                      💵 Giá: {p.toLocaleString('vi-VN')} đ
+                    </span>
+                  ))}
+                </div>
+
+                {/* 4 Nguồn dữ liệu */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {/* Nguồn 1: Database Sản Phẩm */}
+                  <div className="p-4 rounded-xl border border-blue-100 bg-blue-50/20 space-y-3">
+                    <div className="flex items-center justify-between border-b border-blue-100 pb-2">
+                      <h4 className="font-bold text-xs text-[#1B3A6B] flex items-center gap-1.5">
+                        <Package size={14} className="text-blue-600" />
+                        1. Khớp CSDL Sản Phẩm & Giá ({traceResult.sources?.products?.length || 0})
+                      </h4>
+                      <span className="text-[10px] bg-blue-100 text-blue-800 font-semibold px-2 py-0.5 rounded-md">
+                        Bảng Product
+                      </span>
+                    </div>
+
+                    {traceResult.sources?.products?.length === 0 ? (
+                      <p className="text-[11px] text-gray-400 italic">Không có sản phẩm nào khớp trong CSDL</p>
+                    ) : (
+                      <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
+                        {traceResult.sources.products.map((p: any) => (
+                          <div key={p.id} className="p-2.5 bg-white rounded-lg border border-gray-100 text-xs space-y-1">
+                            <div className="font-bold text-gray-900">{p.name}</div>
+                            <div className="flex items-center justify-between text-[11px]">
+                              <span className="text-gray-500 font-mono">SKU: {p.sku}</span>
+                              <span className="font-bold text-emerald-600">
+                                {p.sellingPrice ? `${p.sellingPrice.toLocaleString('vi-VN')} đ` : 'Liên hệ'}
+                              </span>
+                            </div>
+                            <div className="text-[10px] text-blue-600">
+                              ✓ Nạp tự động vào AI qua tính năng Đồng bộ CSDL (Sync Catalog)
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Nguồn 2: Hybrid RAG Chunks */}
+                  <div className="p-4 rounded-xl border border-indigo-100 bg-indigo-50/20 space-y-3">
+                    <div className="flex items-center justify-between border-b border-indigo-100 pb-2">
+                      <h4 className="font-bold text-xs text-indigo-950 flex items-center gap-1.5">
+                        <FileText size={14} className="text-indigo-600" />
+                        2. Khớp Tài Liệu Hybrid RAG ({traceResult.sources?.ragChunks?.length || 0})
+                      </h4>
+                      <span className="text-[10px] bg-indigo-100 text-indigo-800 font-semibold px-2 py-0.5 rounded-md">
+                        HNSW + BM25
+                      </span>
+                    </div>
+
+                    {traceResult.sources?.ragChunks?.length === 0 ? (
+                      <p className="text-[11px] text-gray-400 italic">Không có tài liệu RAG nào khớp</p>
+                    ) : (
+                      <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
+                        {traceResult.sources.ragChunks.map((c: any, i: number) => (
+                          <div key={c.id || i} className="p-2.5 bg-white rounded-lg border border-gray-100 text-xs space-y-1.5">
+                            <div className="flex items-center justify-between text-[11px]">
+                              <span className="font-bold text-indigo-900 truncate max-w-[200px]" title={c.sourceTitle || c.fileName}>
+                                {c.sourceTitle || c.fileName}
+                              </span>
+                              <span className="bg-indigo-50 text-indigo-700 px-1.5 py-0.2 rounded font-semibold text-[10px]">
+                                Trang {c.metadata?.pageNumber || 1}
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-2 text-[10px] text-gray-500">
+                              <span>Sim: {(c.vectorSimilarity * 100).toFixed(1)}%</span>
+                              <span>•</span>
+                              <span>RRF: {(c.rrfScore * 100).toFixed(2)}%</span>
+                            </div>
+                            <p className="text-[11px] text-gray-700 italic line-clamp-2 bg-slate-50 p-1.5 rounded">
+                              "{c.content}"
+                            </p>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Nguồn 3: FAQ */}
+                  <div className="p-4 rounded-xl border border-amber-100 bg-amber-50/20 space-y-3">
+                    <div className="flex items-center justify-between border-b border-amber-100 pb-2">
+                      <h4 className="font-bold text-xs text-amber-950 flex items-center gap-1.5">
+                        <HelpCircle size={14} className="text-amber-600" />
+                        3. Khớp Câu Hỏi Thường Gặp FAQ ({traceResult.sources?.faqs?.length || 0})
+                      </h4>
+                      <span className="text-[10px] bg-amber-100 text-amber-800 font-semibold px-2 py-0.5 rounded-md">
+                        FAQ List
+                      </span>
+                    </div>
+
+                    {traceResult.sources?.faqs?.length === 0 ? (
+                      <p className="text-[11px] text-gray-400 italic">Không có câu hỏi FAQ nào khớp trực tiếp</p>
+                    ) : (
+                      <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
+                        {traceResult.sources.faqs.map((f: any, i: number) => (
+                          <div key={i} className="p-2.5 bg-white rounded-lg border border-gray-100 text-xs space-y-1">
+                            <div className="font-bold text-gray-800">Q: {f.question}</div>
+                            <p className="text-[11px] text-gray-600 line-clamp-2">A: {f.answer}</p>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Nguồn 4: System Prompt Rules */}
+                  <div className="p-4 rounded-xl border border-emerald-100 bg-emerald-50/20 space-y-3">
+                    <div className="flex items-center justify-between border-b border-emerald-100 pb-2">
+                      <h4 className="font-bold text-xs text-emerald-950 flex items-center gap-1.5">
+                        <Sparkles size={14} className="text-emerald-600" />
+                        4. Khớp Chỉ Dẫn Hệ Thống ({traceResult.sources?.promptRules?.length || 0})
+                      </h4>
+                      <span className="text-[10px] bg-emerald-100 text-emerald-800 font-semibold px-2 py-0.5 rounded-md">
+                        System Prompt
+                      </span>
+                    </div>
+
+                    {traceResult.sources?.promptRules?.length === 0 ? (
+                      <p className="text-[11px] text-gray-400 italic">Không có điều khoản prompt đặc biệt nào khớp</p>
+                    ) : (
+                      <div className="space-y-1.5 max-h-56 overflow-y-auto pr-1">
+                        {traceResult.sources.promptRules.map((r: string, i: number) => (
+                          <div key={i} className="p-2 bg-white rounded-lg border border-gray-100 text-[11px] text-emerald-900 font-mono">
+                            {r}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
             )}
@@ -1411,6 +1846,202 @@ export default function AiAssistantManage() {
             {(!config.faqs || config.faqs.length === 0) && (
               <div className="text-center py-12 bg-white rounded-2xl border border-gray-100 text-gray-400 text-sm">
                 Chưa có câu hỏi thường gặp nào. Hãy bấm "Thêm câu hỏi mới" để nạp cho AI nhé!
+              </div>
+            )}
+          </div>
+
+          {/* ── NGUỒN GỐC TRI THỨC / SOURCE TRACER ── */}
+          <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-xs space-y-5">
+            <div className="flex items-center justify-between border-b border-gray-100 pb-3">
+              <div>
+                <h3 className="text-sm font-bold text-gray-900 flex items-center gap-2">
+                  <Compass size={17} className="text-[#00A3FF]" />
+                  Công Cụ Truy Vết Nguồn Gốc Tri Thức (Knowledge Source Tracer)
+                </h3>
+                <p className="text-[11px] text-gray-500">
+                  Dán câu trả lời của AI hoặc đoạn văn bản bất kỳ để hệ thống tự động bóc tách và định vị chính xác nguồn thông tin (Bảng Sản phẩm CSDL, Trang tài liệu PDF RAG, FAQ, hay Chỉ dẫn hệ thống)
+                </p>
+              </div>
+            </div>
+
+            <div className="space-y-3">
+              <textarea
+                rows={3}
+                value={traceInput}
+                onChange={e => setTraceInput(e.target.value)}
+                placeholder='Ví dụ: Dạ nếu anh/chị muốn tìm dòng máy tích hợp vòi nóng lạnh với mức giá "mềm" hơn, Truliva có model *UR3626 kèm vòi nóng* với giá niêm yết là *18.900.000 đ* ạ...'
+                className="w-full px-3.5 py-2.5 rounded-xl border border-gray-200 text-xs focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 font-sans"
+              />
+
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    const sample = 'Dạ nếu anh/chị muốn tìm dòng máy tích hợp vòi nóng lạnh với mức giá "mềm" hơn, Truliva có model *UR3626 kèm vòi nóng* với giá niêm yết là *18.900.000 đ* ạ.';
+                    setTraceInput(sample);
+                    handleTraceSources(sample);
+                  }}
+                  className="text-[11px] font-semibold text-blue-600 hover:text-blue-800 hover:underline flex items-center gap-1"
+                >
+                  <span>⚡ Dán đoạn văn bản mẫu (UR3626 kèm vòi nóng 18.900.000 đ)</span>
+                </button>
+
+                <button
+                  onClick={() => handleTraceSources()}
+                  disabled={tracing || !traceInput.trim()}
+                  className="bg-[#1B3A6B] hover:bg-[#2A518E] text-white font-semibold rounded-xl px-4 py-2.5 text-xs flex items-center gap-1.5 transition-all disabled:opacity-50"
+                >
+                  {tracing ? <Loader2 size={14} className="animate-spin" /> : <Search size={14} />}
+                  <span>Truy Vết Nguồn Gốc</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Hiển thị kết quả truy vết nguồn gốc */}
+            {traceResult && (
+              <div className="pt-4 border-t border-gray-100 space-y-4 animate-fade-in">
+                {/* Extracted Entity Tags */}
+                <div className="flex flex-wrap items-center gap-2 text-xs">
+                  <span className="font-bold text-gray-700">Dữ liệu thực thể bóc tách được:</span>
+                  {traceResult.extractedInfo?.models?.map((m: string, i: number) => (
+                    <span key={i} className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-blue-50 text-blue-800 border border-blue-200 font-bold text-[11px]">
+                      <Tag size={10} /> Model: {m}
+                    </span>
+                  ))}
+                  {traceResult.extractedInfo?.prices?.map((p: number, i: number) => (
+                    <span key={i} className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200 font-bold text-[11px]">
+                      💵 Giá: {p.toLocaleString('vi-VN')} đ
+                    </span>
+                  ))}
+                </div>
+
+                {/* 4 Nguồn dữ liệu */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {/* Nguồn 1: Database Sản Phẩm */}
+                  <div className="p-4 rounded-xl border border-blue-100 bg-blue-50/20 space-y-3">
+                    <div className="flex items-center justify-between border-b border-blue-100 pb-2">
+                      <h4 className="font-bold text-xs text-[#1B3A6B] flex items-center gap-1.5">
+                        <Package size={14} className="text-blue-600" />
+                        1. Khớp CSDL Sản Phẩm & Giá ({traceResult.sources?.products?.length || 0})
+                      </h4>
+                      <span className="text-[10px] bg-blue-100 text-blue-800 font-semibold px-2 py-0.5 rounded-md">
+                        Bảng Product
+                      </span>
+                    </div>
+
+                    {traceResult.sources?.products?.length === 0 ? (
+                      <p className="text-[11px] text-gray-400 italic">Không có sản phẩm nào khớp trong CSDL</p>
+                    ) : (
+                      <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
+                        {traceResult.sources.products.map((p: any) => (
+                          <div key={p.id} className="p-2.5 bg-white rounded-lg border border-gray-100 text-xs space-y-1">
+                            <div className="font-bold text-gray-900">{p.name}</div>
+                            <div className="flex items-center justify-between text-[11px]">
+                              <span className="text-gray-500 font-mono">SKU: {p.sku}</span>
+                              <span className="font-bold text-emerald-600">
+                                {p.sellingPrice ? `${p.sellingPrice.toLocaleString('vi-VN')} đ` : 'Liên hệ'}
+                              </span>
+                            </div>
+                            <div className="text-[10px] text-blue-600">
+                              ✓ Nạp tự động vào AI qua tính năng Đồng bộ CSDL (Sync Catalog)
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Nguồn 2: Hybrid RAG Chunks */}
+                  <div className="p-4 rounded-xl border border-indigo-100 bg-indigo-50/20 space-y-3">
+                    <div className="flex items-center justify-between border-b border-indigo-100 pb-2">
+                      <h4 className="font-bold text-xs text-indigo-950 flex items-center gap-1.5">
+                        <FileText size={14} className="text-indigo-600" />
+                        2. Khớp Tài Liệu Hybrid RAG ({traceResult.sources?.ragChunks?.length || 0})
+                      </h4>
+                      <span className="text-[10px] bg-indigo-100 text-indigo-800 font-semibold px-2 py-0.5 rounded-md">
+                        HNSW + BM25
+                      </span>
+                    </div>
+
+                    {traceResult.sources?.ragChunks?.length === 0 ? (
+                      <p className="text-[11px] text-gray-400 italic">Không có tài liệu RAG nào khớp</p>
+                    ) : (
+                      <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
+                        {traceResult.sources.ragChunks.map((c: any, i: number) => (
+                          <div key={c.id || i} className="p-2.5 bg-white rounded-lg border border-gray-100 text-xs space-y-1.5">
+                            <div className="flex items-center justify-between text-[11px]">
+                              <span className="font-bold text-indigo-900 truncate max-w-[200px]" title={c.sourceTitle || c.fileName}>
+                                {c.sourceTitle || c.fileName}
+                              </span>
+                              <span className="bg-indigo-50 text-indigo-700 px-1.5 py-0.2 rounded font-semibold text-[10px]">
+                                Trang {c.metadata?.pageNumber || 1}
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-2 text-[10px] text-gray-500">
+                              <span>Sim: {(c.vectorSimilarity * 100).toFixed(1)}%</span>
+                              <span>•</span>
+                              <span>RRF: {(c.rrfScore * 100).toFixed(2)}%</span>
+                            </div>
+                            <p className="text-[11px] text-gray-700 italic line-clamp-2 bg-slate-50 p-1.5 rounded">
+                              "{c.content}"
+                            </p>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Nguồn 3: FAQ */}
+                  <div className="p-4 rounded-xl border border-amber-100 bg-amber-50/20 space-y-3">
+                    <div className="flex items-center justify-between border-b border-amber-100 pb-2">
+                      <h4 className="font-bold text-xs text-amber-950 flex items-center gap-1.5">
+                        <HelpCircle size={14} className="text-amber-600" />
+                        3. Khớp Câu Hỏi Thường Gặp FAQ ({traceResult.sources?.faqs?.length || 0})
+                      </h4>
+                      <span className="text-[10px] bg-amber-100 text-amber-800 font-semibold px-2 py-0.5 rounded-md">
+                        FAQ List
+                      </span>
+                    </div>
+
+                    {traceResult.sources?.faqs?.length === 0 ? (
+                      <p className="text-[11px] text-gray-400 italic">Không có câu hỏi FAQ nào khớp trực tiếp</p>
+                    ) : (
+                      <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
+                        {traceResult.sources.faqs.map((f: any, i: number) => (
+                          <div key={i} className="p-2.5 bg-white rounded-lg border border-gray-100 text-xs space-y-1">
+                            <div className="font-bold text-gray-800">Q: {f.question}</div>
+                            <p className="text-[11px] text-gray-600 line-clamp-2">A: {f.answer}</p>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Nguồn 4: System Prompt Rules */}
+                  <div className="p-4 rounded-xl border border-emerald-100 bg-emerald-50/20 space-y-3">
+                    <div className="flex items-center justify-between border-b border-emerald-100 pb-2">
+                      <h4 className="font-bold text-xs text-emerald-950 flex items-center gap-1.5">
+                        <Sparkles size={14} className="text-emerald-600" />
+                        4. Khớp Chỉ Dẫn Hệ Thống ({traceResult.sources?.promptRules?.length || 0})
+                      </h4>
+                      <span className="text-[10px] bg-emerald-100 text-emerald-800 font-semibold px-2 py-0.5 rounded-md">
+                        System Prompt
+                      </span>
+                    </div>
+
+                    {traceResult.sources?.promptRules?.length === 0 ? (
+                      <p className="text-[11px] text-gray-400 italic">Không có điều khoản prompt đặc biệt nào khớp</p>
+                    ) : (
+                      <div className="space-y-1.5 max-h-56 overflow-y-auto pr-1">
+                        {traceResult.sources.promptRules.map((r: string, i: number) => (
+                          <div key={i} className="p-2 bg-white rounded-lg border border-gray-100 text-[11px] text-emerald-900 font-mono">
+                            {r}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
               </div>
             )}
           </div>
@@ -1646,6 +2277,23 @@ export default function AiAssistantManage() {
                       </div>
                     )}
                   </div>
+
+                    {msg.sender === 'ai' && (
+                      <div className="mt-2 pt-1.5 border-t border-slate-100 flex items-center justify-between">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setTraceInput(msg.text);
+                            setActiveTab('documents');
+                            handleTraceSources(msg.text);
+                          }}
+                          className="text-[10.5px] font-semibold text-[#00A3FF] hover:text-[#1B3A6B] flex items-center gap-1 hover:underline"
+                        >
+                          <Compass size={11} />
+                          <span>Truy vết nguồn gốc câu trả lời này ↗</span>
+                        </button>
+                      </div>
+                    )}
                   <span className="text-[10px] text-gray-400 mt-1 px-1">{msg.time}</span>
                 </div>
               ))}
@@ -1896,6 +2544,202 @@ export default function AiAssistantManage() {
                     ))}
                   </tbody>
                 </table>
+              </div>
+            )}
+          </div>
+
+          {/* ── NGUỒN GỐC TRI THỨC / SOURCE TRACER ── */}
+          <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-xs space-y-5">
+            <div className="flex items-center justify-between border-b border-gray-100 pb-3">
+              <div>
+                <h3 className="text-sm font-bold text-gray-900 flex items-center gap-2">
+                  <Compass size={17} className="text-[#00A3FF]" />
+                  Công Cụ Truy Vết Nguồn Gốc Tri Thức (Knowledge Source Tracer)
+                </h3>
+                <p className="text-[11px] text-gray-500">
+                  Dán câu trả lời của AI hoặc đoạn văn bản bất kỳ để hệ thống tự động bóc tách và định vị chính xác nguồn thông tin (Bảng Sản phẩm CSDL, Trang tài liệu PDF RAG, FAQ, hay Chỉ dẫn hệ thống)
+                </p>
+              </div>
+            </div>
+
+            <div className="space-y-3">
+              <textarea
+                rows={3}
+                value={traceInput}
+                onChange={e => setTraceInput(e.target.value)}
+                placeholder='Ví dụ: Dạ nếu anh/chị muốn tìm dòng máy tích hợp vòi nóng lạnh với mức giá "mềm" hơn, Truliva có model *UR3626 kèm vòi nóng* với giá niêm yết là *18.900.000 đ* ạ...'
+                className="w-full px-3.5 py-2.5 rounded-xl border border-gray-200 text-xs focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 font-sans"
+              />
+
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    const sample = 'Dạ nếu anh/chị muốn tìm dòng máy tích hợp vòi nóng lạnh với mức giá "mềm" hơn, Truliva có model *UR3626 kèm vòi nóng* với giá niêm yết là *18.900.000 đ* ạ.';
+                    setTraceInput(sample);
+                    handleTraceSources(sample);
+                  }}
+                  className="text-[11px] font-semibold text-blue-600 hover:text-blue-800 hover:underline flex items-center gap-1"
+                >
+                  <span>⚡ Dán đoạn văn bản mẫu (UR3626 kèm vòi nóng 18.900.000 đ)</span>
+                </button>
+
+                <button
+                  onClick={() => handleTraceSources()}
+                  disabled={tracing || !traceInput.trim()}
+                  className="bg-[#1B3A6B] hover:bg-[#2A518E] text-white font-semibold rounded-xl px-4 py-2.5 text-xs flex items-center gap-1.5 transition-all disabled:opacity-50"
+                >
+                  {tracing ? <Loader2 size={14} className="animate-spin" /> : <Search size={14} />}
+                  <span>Truy Vết Nguồn Gốc</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Hiển thị kết quả truy vết nguồn gốc */}
+            {traceResult && (
+              <div className="pt-4 border-t border-gray-100 space-y-4 animate-fade-in">
+                {/* Extracted Entity Tags */}
+                <div className="flex flex-wrap items-center gap-2 text-xs">
+                  <span className="font-bold text-gray-700">Dữ liệu thực thể bóc tách được:</span>
+                  {traceResult.extractedInfo?.models?.map((m: string, i: number) => (
+                    <span key={i} className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-blue-50 text-blue-800 border border-blue-200 font-bold text-[11px]">
+                      <Tag size={10} /> Model: {m}
+                    </span>
+                  ))}
+                  {traceResult.extractedInfo?.prices?.map((p: number, i: number) => (
+                    <span key={i} className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200 font-bold text-[11px]">
+                      💵 Giá: {p.toLocaleString('vi-VN')} đ
+                    </span>
+                  ))}
+                </div>
+
+                {/* 4 Nguồn dữ liệu */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {/* Nguồn 1: Database Sản Phẩm */}
+                  <div className="p-4 rounded-xl border border-blue-100 bg-blue-50/20 space-y-3">
+                    <div className="flex items-center justify-between border-b border-blue-100 pb-2">
+                      <h4 className="font-bold text-xs text-[#1B3A6B] flex items-center gap-1.5">
+                        <Package size={14} className="text-blue-600" />
+                        1. Khớp CSDL Sản Phẩm & Giá ({traceResult.sources?.products?.length || 0})
+                      </h4>
+                      <span className="text-[10px] bg-blue-100 text-blue-800 font-semibold px-2 py-0.5 rounded-md">
+                        Bảng Product
+                      </span>
+                    </div>
+
+                    {traceResult.sources?.products?.length === 0 ? (
+                      <p className="text-[11px] text-gray-400 italic">Không có sản phẩm nào khớp trong CSDL</p>
+                    ) : (
+                      <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
+                        {traceResult.sources.products.map((p: any) => (
+                          <div key={p.id} className="p-2.5 bg-white rounded-lg border border-gray-100 text-xs space-y-1">
+                            <div className="font-bold text-gray-900">{p.name}</div>
+                            <div className="flex items-center justify-between text-[11px]">
+                              <span className="text-gray-500 font-mono">SKU: {p.sku}</span>
+                              <span className="font-bold text-emerald-600">
+                                {p.sellingPrice ? `${p.sellingPrice.toLocaleString('vi-VN')} đ` : 'Liên hệ'}
+                              </span>
+                            </div>
+                            <div className="text-[10px] text-blue-600">
+                              ✓ Nạp tự động vào AI qua tính năng Đồng bộ CSDL (Sync Catalog)
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Nguồn 2: Hybrid RAG Chunks */}
+                  <div className="p-4 rounded-xl border border-indigo-100 bg-indigo-50/20 space-y-3">
+                    <div className="flex items-center justify-between border-b border-indigo-100 pb-2">
+                      <h4 className="font-bold text-xs text-indigo-950 flex items-center gap-1.5">
+                        <FileText size={14} className="text-indigo-600" />
+                        2. Khớp Tài Liệu Hybrid RAG ({traceResult.sources?.ragChunks?.length || 0})
+                      </h4>
+                      <span className="text-[10px] bg-indigo-100 text-indigo-800 font-semibold px-2 py-0.5 rounded-md">
+                        HNSW + BM25
+                      </span>
+                    </div>
+
+                    {traceResult.sources?.ragChunks?.length === 0 ? (
+                      <p className="text-[11px] text-gray-400 italic">Không có tài liệu RAG nào khớp</p>
+                    ) : (
+                      <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
+                        {traceResult.sources.ragChunks.map((c: any, i: number) => (
+                          <div key={c.id || i} className="p-2.5 bg-white rounded-lg border border-gray-100 text-xs space-y-1.5">
+                            <div className="flex items-center justify-between text-[11px]">
+                              <span className="font-bold text-indigo-900 truncate max-w-[200px]" title={c.sourceTitle || c.fileName}>
+                                {c.sourceTitle || c.fileName}
+                              </span>
+                              <span className="bg-indigo-50 text-indigo-700 px-1.5 py-0.2 rounded font-semibold text-[10px]">
+                                Trang {c.metadata?.pageNumber || 1}
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-2 text-[10px] text-gray-500">
+                              <span>Sim: {(c.vectorSimilarity * 100).toFixed(1)}%</span>
+                              <span>•</span>
+                              <span>RRF: {(c.rrfScore * 100).toFixed(2)}%</span>
+                            </div>
+                            <p className="text-[11px] text-gray-700 italic line-clamp-2 bg-slate-50 p-1.5 rounded">
+                              "{c.content}"
+                            </p>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Nguồn 3: FAQ */}
+                  <div className="p-4 rounded-xl border border-amber-100 bg-amber-50/20 space-y-3">
+                    <div className="flex items-center justify-between border-b border-amber-100 pb-2">
+                      <h4 className="font-bold text-xs text-amber-950 flex items-center gap-1.5">
+                        <HelpCircle size={14} className="text-amber-600" />
+                        3. Khớp Câu Hỏi Thường Gặp FAQ ({traceResult.sources?.faqs?.length || 0})
+                      </h4>
+                      <span className="text-[10px] bg-amber-100 text-amber-800 font-semibold px-2 py-0.5 rounded-md">
+                        FAQ List
+                      </span>
+                    </div>
+
+                    {traceResult.sources?.faqs?.length === 0 ? (
+                      <p className="text-[11px] text-gray-400 italic">Không có câu hỏi FAQ nào khớp trực tiếp</p>
+                    ) : (
+                      <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
+                        {traceResult.sources.faqs.map((f: any, i: number) => (
+                          <div key={i} className="p-2.5 bg-white rounded-lg border border-gray-100 text-xs space-y-1">
+                            <div className="font-bold text-gray-800">Q: {f.question}</div>
+                            <p className="text-[11px] text-gray-600 line-clamp-2">A: {f.answer}</p>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Nguồn 4: System Prompt Rules */}
+                  <div className="p-4 rounded-xl border border-emerald-100 bg-emerald-50/20 space-y-3">
+                    <div className="flex items-center justify-between border-b border-emerald-100 pb-2">
+                      <h4 className="font-bold text-xs text-emerald-950 flex items-center gap-1.5">
+                        <Sparkles size={14} className="text-emerald-600" />
+                        4. Khớp Chỉ Dẫn Hệ Thống ({traceResult.sources?.promptRules?.length || 0})
+                      </h4>
+                      <span className="text-[10px] bg-emerald-100 text-emerald-800 font-semibold px-2 py-0.5 rounded-md">
+                        System Prompt
+                      </span>
+                    </div>
+
+                    {traceResult.sources?.promptRules?.length === 0 ? (
+                      <p className="text-[11px] text-gray-400 italic">Không có điều khoản prompt đặc biệt nào khớp</p>
+                    ) : (
+                      <div className="space-y-1.5 max-h-56 overflow-y-auto pr-1">
+                        {traceResult.sources.promptRules.map((r: string, i: number) => (
+                          <div key={i} className="p-2 bg-white rounded-lg border border-gray-100 text-[11px] text-emerald-900 font-mono">
+                            {r}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
               </div>
             )}
           </div>

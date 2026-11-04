@@ -1822,7 +1822,7 @@ export async function restoreSerial(req: Request, res: Response): Promise<void> 
 export async function getZaloStatus(req: Request, res: Response): Promise<void> {
   try {
     const config = await prisma.zaloConfig.findFirst();
-    const templateId = process.env.ZALO_ZNS_TEMPLATE_ID || '617366';
+    const templateId = process.env.FNS_TEMPLATE_ID_LAP_DAT || '10232';
     const appId = config?.appId || process.env.ZALO_APP_ID || '2124199062863091555';
     const oaId = config?.oaId || process.env.ZALO_OA_ID || '3870382725035413507';
 
@@ -1839,7 +1839,9 @@ export async function getZaloStatus(req: Request, res: Response): Promise<void> 
       isExpired,
       oaId,
       appId,
-      tokenExpiredAt: config?.tokenExpiredAt || null
+      tokenExpiredAt: config?.tokenExpiredAt || null,
+      templateId,
+      activeGateway: 'FPT FNS Gateway'
     });
   } catch (error: any) {
     res.status(500).json({ error: error.message || 'Lỗi hệ thống khi kiểm tra trạng thái Zalo' });
@@ -1945,7 +1947,7 @@ export async function activateZns(req: Request, res: Response): Promise<void> {
     }
 
     // ─────────────────────────────────────────────────────────────
-    // 2. NGƯỢC LẠI: CA LẮP ĐẶT THIẾT BỊ MÁY (TEMPLATE 617366 / FNS 10232)
+    // 2. NGƯỢC LẠI: CA LẮP ĐẶT THIẾT BỊ MÁY (FPT FNS TEMPLATE 10232)
     // ─────────────────────────────────────────────────────────────
     if (!serialNumber) {
       res.status(400).json({ error: 'Thiếu số Serial đối với ca Lắp đặt thiết bị máy' });
@@ -2213,7 +2215,8 @@ export async function checkZnsStatus(req: Request, res: Response): Promise<void>
           oaId: config.oaId,
           tokenExpiredAt: config.tokenExpiredAt,
           isTokenValid: config.tokenExpiredAt ? new Date(config.tokenExpiredAt) > new Date() : false,
-          templateId: process.env.ZALO_ZNS_TEMPLATE_ID || '617366'
+          templateId: process.env.FNS_TEMPLATE_ID_LAP_DAT || '10232',
+          activeGateway: 'FPT FNS Gateway'
         };
       }
     } catch (e) {}
@@ -2319,8 +2322,8 @@ export async function getZnsLogs(req: Request, res: Response): Promise<void> {
       durationMs: log.durationMs || '~145ms',
       status: log.status,
       error: log.error,
-      templateId: log.templateId || '617366',
-      gateway: log.gateway || 'Zalo Direct ZBS OpenAPI',
+      templateId: log.templateId || '10232',
+      gateway: log.gateway || 'FPT FNS Gateway',
       orderNumber: log.orderNumber
     }));
 
@@ -2390,11 +2393,11 @@ export async function updateZnsLog(req: Request, res: Response): Promise<void> {
           serialNumber: cleanSerial,
           customerName: cleanCust,
           productName: cleanProd,
-          templateId: existingLog.templateId || '617366',
+          templateId: existingLog.templateId || '10232',
           status: cleanStatus,
           error: error !== undefined ? error : existingLog.error,
           durationMs: durationMs || existingLog.durationMs || '~145ms',
-          gateway: existingLog.gateway || 'Zalo Direct ZBS OpenAPI',
+          gateway: existingLog.gateway || 'FPT FNS Gateway',
           orderNumber: cleanOrder,
           sentAt: new Date(),
           rawData: {
