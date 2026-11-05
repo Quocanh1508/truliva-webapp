@@ -46,15 +46,29 @@ export async function searchCustomerHistory(req: Request, res: Response) {
       return res.status(401).json({ error: 'Chưa đăng nhập' });
     }
 
-    const canSearch = await checkDynamicPermission(user.role, 'HOTLINE_SEARCH_CUSTOMER', user.group, user.id);
+    const queryParam = (req.query.q || req.query.query || req.query.search || req.query.phone || req.query.serial || '').toString().trim();
+    const phoneParam = req.query.phone ? req.query.phone.toString().replace(/\D/g, '') : '';
+    
+    // Nếu là gọi gợi ý theo SĐT (req.query.phone), bắt buộc phải đúng format 10 số bắt đầu bằng 0
+    if (req.query.phone && !/^0\d{9}$/.test(phoneParam)) {
+      return res.json({
+        query: queryParam,
+        customers: [],
+        serials: [],
+        orders: [],
+        serviceOrders: [],
+        hotlineTickets: []
+      });
+    }
+
+    const isPhoneSearch = !!(req.query.phone || (queryParam && /^0\d{9}$/.test(queryParam)));
+    const canSearch = isPhoneSearch || await checkDynamicPermission(user.role, 'HOTLINE_SEARCH_CUSTOMER', user.group, user.id);
     if (!canSearch) {
       return res.status(403).json({ error: 'Tài khoản của bạn không có quyền tra cứu lịch sử khách hàng' });
     }
 
     const isSuper = isHotlineSuperUser(user?.role);
     const hotlineScopeWhere = !isSuper && user?.id ? { createdById: user.id } : {};
-
-    const queryParam = (req.query.q || req.query.query || req.query.search || req.query.phone || req.query.serial || '').toString().trim();
     
     if (!queryParam || queryParam.length < 2) {
       return res.json({
@@ -68,6 +82,10 @@ export async function searchCustomerHistory(req: Request, res: Response) {
     }
 
     // 1. Tìm các SĐT & Serial liên quan từ tất cả các bảng
+    const numericQuery = queryParam.replace(/^[#M]/i, '').trim();
+    const isNumeric = /^\d+$/.test(numericQuery);
+    const parsedOrderId = isNumeric ? Number(numericQuery) : null;
+
     const [dbCustomers, dbOrders, dbSerials, dbHotlineTickets] = await Promise.all([
       prisma.customer.findMany({
         where: {
@@ -83,10 +101,11 @@ export async function searchCustomerHistory(req: Request, res: Response) {
           OR: [
             { billPhoneNumber: { contains: queryParam } },
             { billFullName: { contains: queryParam, mode: 'insensitive' } },
-            { items: { some: { productName: { contains: queryParam, mode: 'insensitive' } } } }
+            { items: { some: { productName: { contains: queryParam, mode: 'insensitive' } } } },
+            ...(parsedOrderId ? [{ pancakeOrderId: parsedOrderId }, { pancakeOrderId: -parsedOrderId }] : [])
           ]
         },
-        select: { billPhoneNumber: true },
+        select: { billPhoneNumber: true, customerId: true },
         take: 20
       }),
       prisma.serial.findMany({
@@ -142,6 +161,10 @@ export async function searchCustomerHistory(req: Request, res: Response) {
 
     const matchedPhones = Array.from(phoneSet).filter(p => p.length >= 4);
     const matchedSerials = Array.from(serialSet).filter(s => s.length >= 3);
+    const matchedCustomerIds = Array.from(new Set([
+      ...dbCustomers.map(c => c.id),
+      ...dbOrders.map(o => o.customerId).filter(Boolean) as string[]
+    ]));
 
     // 2. Truy vấn chi tiết cả 4 nhóm thông tin
     const [finalCustomers, finalSerials, finalOrders, finalHotlineTickets] = await Promise.all([
@@ -191,9 +214,15 @@ export async function searchCustomerHistory(req: Request, res: Response) {
       prisma.order.findMany({
         where: {
           OR: [
-            { billPhoneNumber: { in: matchedPhones.length > 0 ? matchedPhones : undefined } },
+            ...(matchedPhones.length > 0 ? [{ billPhoneNumber: { in: matchedPhones } }] : []),
+            ...(matchedCustomerIds.length > 0 ? [{ customerId: { in: matchedCustomerIds } }] : []),
+            ...(matchedSerials.length > 0 ? [
+              { serials: { some: { serialNumber: { in: matchedSerials } } } },
+              { serviceReports: { some: { serialNumber: { in: matchedSerials } } } }
+            ] : []),
             { billFullName: { contains: queryParam, mode: 'insensitive' } },
-            { items: { some: { productName: { contains: queryParam, mode: 'insensitive' } } } }
+            { items: { some: { productName: { contains: queryParam, mode: 'insensitive' } } } },
+            ...(parsedOrderId ? [{ pancakeOrderId: parsedOrderId }, { pancakeOrderId: -parsedOrderId }] : [])
           ]
         },
         select: {
@@ -203,22 +232,77 @@ export async function searchCustomerHistory(req: Request, res: Response) {
           billPhoneNumber: true,
           shippingAddress: true,
           workType: true,
+          serviceType: true,
           adminStatus: true,
-          assignedKtv: { select: { fullName: true } },
+          appointmentTime: true,
+          rescheduleReason: true,
+          cancelReason: true,
+          note: true,
+          moneyToCollect: true,
+          promoCode: true,
+          orderSource: true,
+          pancakeCreatedAt: true,
+          ktvCalledAt: true,
           createdAt: true,
-          items: { select: { productName: true, quantity: true } },
+          customer: {
+            select: {
+              id: true,
+              fullName: true,
+              phoneNumber: true,
+              fullAddress: true,
+              provinceName: true
+            }
+          },
+          assignedKtv: {
+            select: {
+              id: true,
+              fullName: true,
+              phoneNumber: true
+            }
+          },
+          mainStation: {
+            select: {
+              id: true,
+              name: true
+            }
+          },
+          techStation: {
+            select: {
+              id: true,
+              name: true
+            }
+          },
+          items: {
+            select: {
+              id: true,
+              productName: true,
+              quantity: true
+            }
+          },
+          serials: {
+            select: {
+              id: true,
+              serialNumber: true,
+              status: true,
+              model: true,
+              productLine: true,
+              activationDate: true,
+              warrantyExpiryDate: true
+            }
+          },
           serviceReports: {
             select: {
               id: true,
               serviceType: true,
               serialNumber: true,
               notes: true,
+              workType: true,
               createdAt: true
             },
-            take: 1
+            take: 5
           }
         },
-        take: 20,
+        take: 30,
         orderBy: { createdAt: 'desc' }
       }),
 

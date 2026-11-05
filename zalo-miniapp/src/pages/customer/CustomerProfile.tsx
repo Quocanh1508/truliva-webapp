@@ -22,7 +22,8 @@ import {
   Building2,
   FileText,
   RefreshCw,
-  Scale
+  Scale,
+  Coins
 } from 'lucide-react';
 import { openWebview, openChat, getUserInfo } from 'zmp-sdk/apis';
 import { fetchZaloApi, setSafeStorage } from '../../api/client';
@@ -220,52 +221,32 @@ export default function CustomerProfile({
             </div>
           </div>
 
-          {/* Quick Stats Grid */}
-          {FEATURES.ENABLE_MEMBER_RANKING ? (
-            <div className="grid grid-cols-3 gap-2 bg-[#041426]/70 backdrop-blur-md rounded-2xl p-2.5 text-center border border-cyan-400/30 text-xs shadow-[0_4px_20px_rgba(0,210,255,0.15)]">
-              <button 
-                onClick={scrollToDevices}
-                className="p-1 rounded-xl hover:bg-white/10 active:scale-95 transition-all cursor-pointer group"
-              >
-                <p className="text-[9px] text-sky-200 uppercase tracking-wider font-bold group-hover:text-white transition-colors">Thiết bị</p>
-                <p className="font-black text-white text-base mt-0.5">{(mySerials || []).length}</p>
-              </button>
+          {/* Quick Stats Grid: Thiết bị | Điểm tích lũy | Hotline */}
+          <div className="grid grid-cols-3 gap-2 bg-[#041426]/70 backdrop-blur-md rounded-2xl p-2.5 text-center border border-cyan-400/30 text-xs shadow-[0_4px_20px_rgba(0,210,255,0.15)]">
+            <button 
+              onClick={scrollToDevices}
+              className="p-1 rounded-xl hover:bg-white/10 active:scale-95 transition-all cursor-pointer group"
+            >
+              <p className="text-[9px] text-sky-200 uppercase tracking-wider font-bold group-hover:text-white transition-colors">Thiết bị</p>
+              <p className="font-black text-white text-base mt-0.5">{(mySerials || []).length} máy</p>
+            </button>
 
-              <button 
-                onClick={() => setShowLoyaltyModal(true)}
-                className="p-1 rounded-xl border-x border-cyan-400/20 hover:bg-white/10 active:scale-95 transition-all cursor-pointer group"
-              >
-                <p className="text-[9px] text-sky-200 uppercase tracking-wider font-bold group-hover:text-white transition-colors">Điểm thưởng</p>
-                <p className="font-black text-base mt-0.5 drop-shadow-xs" style={{ color: rank.iconColor }}>{userPoints}</p>
-              </button>
+            <button 
+              onClick={() => setShowLoyaltyModal(true)}
+              className="p-1 rounded-xl border-x border-cyan-400/20 hover:bg-white/10 active:scale-95 transition-all cursor-pointer group"
+            >
+              <p className="text-[9px] text-sky-200 uppercase tracking-wider font-bold group-hover:text-white transition-colors">Điểm tích lũy</p>
+              <p className="font-black text-amber-400 text-base mt-0.5 drop-shadow-xs">{userPoints.toLocaleString('vi-VN')}</p>
+            </button>
 
-              <button 
-                onClick={() => setShowVoucherModal(true)}
-                className="p-1 rounded-xl hover:bg-white/10 active:scale-95 transition-all cursor-pointer group"
-              >
-                <p className="text-[9px] text-sky-200 uppercase tracking-wider font-bold group-hover:text-white transition-colors">Voucher</p>
-                <p className="font-black text-cyan-300 text-base mt-0.5">3</p>
-              </button>
-            </div>
-          ) : (
-            <div className="grid grid-cols-2 gap-2 bg-[#041426]/70 backdrop-blur-md rounded-2xl p-2.5 text-center border border-cyan-400/30 text-xs shadow-[0_4px_20px_rgba(0,210,255,0.15)]">
-              <button 
-                onClick={scrollToDevices}
-                className="p-1 rounded-xl hover:bg-white/10 active:scale-95 transition-all cursor-pointer group"
-              >
-                <p className="text-[9px] text-sky-200 uppercase tracking-wider font-bold group-hover:text-white transition-colors">Máy kích hoạt</p>
-                <p className="font-black text-white text-base mt-0.5">{(mySerials || []).length} máy</p>
-              </button>
-
-              <a 
-                href="tel:1900638463"
-                className="p-1 rounded-xl border-l border-cyan-400/20 hover:bg-white/10 active:scale-95 transition-all cursor-pointer group block"
-              >
-                <p className="text-[9px] text-sky-200 uppercase tracking-wider font-bold group-hover:text-white transition-colors">Hotline kỹ thuật</p>
-                <p className="font-black text-cyan-300 text-sm mt-1">1900 638 463</p>
-              </a>
-            </div>
-          )}
+            <a 
+              href="tel:1900638463"
+              className="p-1 rounded-xl hover:bg-white/10 active:scale-95 transition-all cursor-pointer group block"
+            >
+              <p className="text-[9px] text-sky-200 uppercase tracking-wider font-bold group-hover:text-white transition-colors">Hotline</p>
+              <p className="font-black text-cyan-300 text-sm mt-1">1900 638 463</p>
+            </a>
+          </div>
         </div>
       </P3ROceanHeader>
 
@@ -377,6 +358,30 @@ export default function CustomerProfile({
               <ChevronRight size={16} className="text-slate-400" />
             </button>
           )}
+
+          {/* Điểm tích lũy Truliva */}
+          <button 
+            onClick={() => setShowLoyaltyModal(true)}
+            className="w-full p-3.5 flex items-center justify-between text-slate-800 font-semibold hover:bg-slate-50 active:bg-slate-100 transition-colors cursor-pointer"
+          >
+            <div className="flex items-center space-x-3">
+              <div className="p-2.5 bg-amber-50 text-amber-600 rounded-2xl border border-amber-200">
+                <Coins size={18} />
+              </div>
+              <div className="text-left">
+                <div className="font-bold flex items-center space-x-1.5">
+                  <span>Điểm tích lũy của tôi</span>
+                  <span className="text-[10px] bg-amber-100 text-amber-800 font-black px-1.5 py-0.5 rounded-full">
+                    {userPoints.toLocaleString('vi-VN')} Điểm
+                  </span>
+                </div>
+                <div className="text-[10px] text-emerald-600 font-bold">
+                  ≈ {(userPoints * 1000).toLocaleString('vi-VN')}đ ưu đãi đơn hàng
+                </div>
+              </div>
+            </div>
+            <ChevronRight size={16} className="text-slate-400" />
+          </button>
 
           <button 
             onClick={() => setShowHistoryModal(true)}

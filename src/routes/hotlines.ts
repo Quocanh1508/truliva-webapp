@@ -25,8 +25,8 @@ router.get('/public/devices', getPublicSupportDevices);
 
 router.use(requireAuth);
 
-// Phase 1: Tra cứu lịch sử KH
-router.get('/search-customer', requirePermission('HOTLINE_SEARCH_CUSTOMER'), searchCustomerHistory);
+// Phase 1: Tra cứu lịch sử KH & Gợi ý SĐT
+router.get('/search-customer', searchCustomerHistory);
 
 // Dropdown danh sách người xử lý (HOTLINE/ADMIN/COORDINATOR)
 router.get('/handlers', getHotlineHandlers);

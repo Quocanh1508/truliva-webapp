@@ -8,10 +8,12 @@ import {
   Search, Plus, UserPlus, ArrowRightCircle, ShoppingCart, Phone, MapPin, User,
   Clock, Loader2, ChevronLeft, ChevronRight, X, Wrench, Package,
   PhoneCall, Copy, CheckCircle2, Filter, Layers, Settings, Building2, Users,
-  Calendar, XCircle, Download, Check, ChevronDown, UserCheck
+  Calendar, XCircle, Download, Check, ChevronDown, UserCheck, Tag, FileText
 } from 'lucide-react';
 import HotlineTicketModal from './HotlineTicketModal';
 import DateRangePicker from '../DateRangePicker';
+import { formatOrderId } from '../../utils/text';
+import { normalizeProvince } from '../../utils/provinces';
 
 // ═══════════════════════════════════════════════════
 //  Types
@@ -111,6 +113,31 @@ function formatDateDisplay(dateStr: string): string {
   }
   return dateStr;
 }
+
+const getServiceStatusBadge = (status?: string | null) => {
+  const norm = (status || '').toLowerCase().trim();
+  switch (norm) {
+    case 'chờ xử lý':
+      return { bg: 'bg-amber-50 text-amber-700 border-amber-200', dot: 'bg-amber-500', label: 'Chờ xử lý' };
+    case 'đang thực hiện':
+    case 'đã phân công':
+      return { bg: 'bg-blue-50 text-blue-700 border-blue-200', dot: 'bg-blue-500', label: 'Đang thực hiện' };
+    case 'chờ duyệt':
+      return { bg: 'bg-orange-50 text-orange-700 border-orange-200', dot: 'bg-orange-500', label: 'Chờ duyệt' };
+    case 'hoàn thành':
+      return { bg: 'bg-emerald-50 text-emerald-700 border-emerald-200', dot: 'bg-emerald-500', label: 'Hoàn thành' };
+    case 'hủy đơn':
+      return { bg: 'bg-rose-50 text-rose-700 border-rose-200', dot: 'bg-rose-500', label: 'Hủy đơn' };
+    case 'đang hoàn':
+    case 'đã hoàn':
+    case 'đang đổi':
+    case 'đã đổi':
+    case 'hoàn một phần':
+      return { bg: 'bg-purple-50 text-purple-700 border-purple-200', dot: 'bg-purple-500', label: status || 'Đổi hoàn' };
+    default:
+      return { bg: 'bg-gray-50 text-gray-700 border-gray-200', dot: 'bg-gray-400', label: status || 'Chờ xử lý' };
+  }
+};
 
 // ═══════════════════════════════════════════════════
 //  Main Component
@@ -922,11 +949,264 @@ export default function HotlineManage() {
                 )}
               </div>
 
-              {/* 3. Các Yêu Cầu Hotline */}
+              {/* 3. Lịch sử dịch vụ */}
+              <div className="bg-white rounded-2xl border border-gray-200 p-5 shadow-sm space-y-3">
+                <div className="flex items-center justify-between border-b border-gray-100 pb-3">
+                  <div className="flex items-center gap-2">
+                    <Wrench className="text-amber-600" size={18} />
+                    <h4 className="font-bold text-gray-800 text-sm">3. Lịch sử dịch vụ ({historyResults.serviceOrders?.length || 0})</h4>
+                  </div>
+                  <span className="text-[11px] text-gray-400">Dữ liệu từ màn hình Quản lý dịch vụ</span>
+                </div>
+
+                {historyResults.serviceOrders?.length === 0 ? (
+                  <div className="text-xs text-gray-400 py-3 italic">Không có đơn dịch vụ nào</div>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-xs text-left">
+                      <thead className="bg-gray-50/80 border-b border-gray-200 font-bold text-gray-600">
+                        <tr>
+                          <th className="px-3 py-2.5 whitespace-nowrap">Mã đơn</th>
+                          <th className="px-3 py-2.5 whitespace-nowrap">Khách hàng</th>
+                          <th className="px-3 py-2.5 whitespace-nowrap">Công việc</th>
+                          <th className="px-3 py-2.5 whitespace-nowrap">Ghi chú</th>
+                          <th className="px-3 py-2.5 whitespace-nowrap">Trạm - KTV</th>
+                          <th className="px-3 py-2.5 whitespace-nowrap">Thông tin máy</th>
+                          <th className="px-3 py-2.5 whitespace-nowrap">Thời gian</th>
+                          <th className="px-3 py-2.5 text-center whitespace-nowrap">Thao tác</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-100">
+                        {historyResults.serviceOrders.map((o: any) => {
+                          const customerName = o.billFullName || o.customer?.fullName || 'Khách lẻ';
+                          const phone = o.billPhoneNumber || o.customer?.phoneNumber || '';
+                          const rawProvince = o.shippingAddress?.province_name || o.shippingAddress?.province || o.customer?.provinceName || '';
+                          const provinceName = normalizeProvince(rawProvince) || rawProvince;
+                          const ktvName = o.assignedKtv?.fullName || 'Chưa gán';
+                          const mainStationName = o.mainStation?.name || '';
+                          const techStationName = o.techStation?.name || '';
+
+                          const hasKtv = !!(o.assignedKtvId || o.assignedKtv);
+                          const isPendingStatus = !o.adminStatus || o.adminStatus === 'chờ xử lý';
+                          const displayStatus = (hasKtv && isPendingStatus) ? 'đang thực hiện' : (o.adminStatus || 'chờ xử lý');
+                          const statusBadge = getServiceStatusBadge(displayStatus);
+
+                          // Thông tin serials
+                          const serialsToShow = o.serials && o.serials.length > 0
+                            ? o.serials
+                            : (o.serviceReports || []).filter((r: any) => r.serialNumber && r.serialNumber !== 'XXXXX').map((r: any) => ({
+                                id: r.id,
+                                serialNumber: r.serialNumber,
+                                status: null,
+                                fromReport: true
+                              }));
+
+                          return (
+                            <tr key={o.id} className="hover:bg-amber-50/30 transition-colors">
+                              {/* 1. Mã đơn */}
+                              <td className="px-3 py-2.5 font-medium align-top whitespace-nowrap">
+                                <div className="flex flex-col items-start gap-0.5">
+                                  <div
+                                    onClick={(e) => handleCopyPhone(formatOrderId(o.pancakeOrderId), e)}
+                                    className="font-bold text-blue-700 hover:text-blue-900 cursor-pointer hover:underline font-mono"
+                                    title="Click để sao chép mã đơn"
+                                  >
+                                    {formatOrderId(o.pancakeOrderId)}
+                                  </div>
+                                  {o.promoCode && (
+                                    <span className="inline-flex items-center gap-1 text-[9px] font-bold text-amber-700 bg-amber-50 border border-amber-200 rounded px-1.5 py-0.2" title={`Khuyến mãi: ${o.promoCode}`}>
+                                      <Tag size={9} className="text-amber-500" />
+                                      <span>{o.promoCode}</span>
+                                    </span>
+                                  )}
+                                  {o.orderSource && (
+                                    <span className="text-[9px] text-gray-500 font-medium bg-gray-100 rounded px-1.5 py-0.2">
+                                      {o.orderSource}
+                                    </span>
+                                  )}
+                                </div>
+                              </td>
+
+                              {/* 2. Khách hàng */}
+                              <td className="px-3 py-2.5 align-top min-w-[160px] max-w-[220px]">
+                                <div className="font-bold text-gray-900 text-xs">{customerName}</div>
+                                {phone && (
+                                  <div
+                                    onClick={(e) => handleCopyPhone(phone, e)}
+                                    className="text-gray-700 font-semibold text-[11px] my-0.5 cursor-pointer hover:text-blue-600 flex items-center gap-1"
+                                    title="Click để sao chép SĐT"
+                                  >
+                                    <Phone size={10} className="text-gray-400" />
+                                    <span>{phone}</span>
+                                  </div>
+                                )}
+                                <div className="text-gray-500 text-[11px] leading-tight line-clamp-2" title={o.shippingAddress?.full_address || o.customer?.fullAddress || ''}>
+                                  {o.shippingAddress?.full_address || o.customer?.fullAddress || '—'}
+                                </div>
+                                {provinceName && (
+                                  <span className="inline-flex items-center gap-0.5 text-[9px] font-bold text-blue-700 bg-blue-50 border border-blue-200/60 rounded px-1.5 py-0.2 mt-1">
+                                    📍 {provinceName}
+                                  </span>
+                                )}
+                              </td>
+
+                              {/* 3. Công việc */}
+                              <td className="px-3 py-2.5 align-top min-w-[180px] max-w-[260px]">
+                                <div className="flex items-center flex-wrap gap-1.5 mb-1">
+                                  <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold border ${statusBadge.bg}`}>
+                                    <span className={`w-1.5 h-1.5 rounded-full ${statusBadge.dot}`}></span>
+                                    {statusBadge.label}
+                                  </span>
+                                </div>
+
+                                {o.adminStatus === 'hoàn thành' ? (
+                                  <div className="text-[10px] font-bold text-emerald-800 bg-emerald-50 border border-emerald-200/60 rounded px-1.5 py-0.5 my-1 inline-flex items-center gap-1">
+                                    <CheckCircle2 size={11} className="text-emerald-600 shrink-0" />
+                                    <span>Hoàn thành: {formatDateTime(o.serviceReports?.[0]?.createdAt || o.appointmentTime || o.createdAt)}</span>
+                                  </div>
+                                ) : o.appointmentTime ? (
+                                  <div className="text-[11px] font-bold text-blue-700 my-0.5 flex items-center gap-1">
+                                    <Calendar size={11} className="text-blue-500 shrink-0" />
+                                    <span>{formatDateTime(o.appointmentTime)}</span>
+                                  </div>
+                                ) : (
+                                  <div className="text-[10px] text-gray-400 italic">Chưa hẹn lịch</div>
+                                )}
+
+                                {o.rescheduleReason && (
+                                  <div className="text-[10px] text-amber-800 bg-amber-50 border border-amber-200/60 rounded px-1.5 py-0.5 my-0.5">
+                                    ⚠️ <span className="font-semibold">Hẹn lại:</span> {o.rescheduleReason}
+                                  </div>
+                                )}
+                                {o.adminStatus === 'hủy đơn' && o.cancelReason && (
+                                  <div className="text-[10px] text-rose-800 bg-rose-50 border border-rose-200/60 rounded px-1.5 py-0.5 my-0.5">
+                                    🚫 <span className="font-semibold">Lý do hủy:</span> {o.cancelReason}
+                                  </div>
+                                )}
+
+                                <div className="text-[11px] font-medium text-gray-800 mt-1">
+                                  <span className="text-gray-500">CV: </span>
+                                  <span className="font-semibold text-blue-800">{o.workType || 'Chưa xác định'}</span>
+                                  {o.serviceType && o.serviceType !== 'Công việc đã bao gồm dịch vụ' && (
+                                    <span className="text-gray-500 font-normal text-[10px]"> ({o.serviceType})</span>
+                                  )}
+                                </div>
+
+                                {o.items && o.items.length > 0 && (
+                                  <div className="flex flex-col gap-0.5 mt-1 text-[11px] text-gray-700">
+                                    {o.items.map((item: any, i: number) => (
+                                      <span key={item.id || i} className="font-medium">
+                                        📦 {item.productName} {item.quantity > 1 ? `(x${item.quantity})` : ''}
+                                      </span>
+                                    ))}
+                                  </div>
+                                )}
+
+                                {o.moneyToCollect > 0 && (
+                                  <div className="text-emerald-700 font-bold text-[11px] mt-1">
+                                    Thu: {(o.moneyToCollect).toLocaleString('vi-VN')} đ
+                                  </div>
+                                )}
+                              </td>
+
+                              {/* 4. Ghi chú */}
+                              <td className="px-3 py-2.5 align-top min-w-[140px] max-w-[220px]">
+                                <div className="text-gray-700 text-[11px] italic whitespace-pre-wrap leading-relaxed">
+                                  {o.note || '—'}
+                                </div>
+                              </td>
+
+                              {/* 5. Trạm - KTV */}
+                              <td className="px-3 py-2.5 align-top whitespace-nowrap">
+                                <div className="font-bold text-gray-800 text-xs">{mainStationName || 'Chưa phân trạm'}</div>
+                                {techStationName && <div className="text-[11px] text-gray-600 font-medium">{techStationName}</div>}
+                                <div className="text-gray-500 text-[11px] mt-0.5">
+                                  KTV: <span className="font-semibold text-gray-700">{ktvName}</span>
+                                </div>
+                                {o.ktvCalledAt && (
+                                  <div className="text-[10px] text-emerald-600 bg-emerald-50 border border-emerald-200 px-1 py-0.2 rounded mt-1 inline-block">
+                                    📞 Đã gọi: {formatDateTime(o.ktvCalledAt)}
+                                  </div>
+                                )}
+                              </td>
+
+                              {/* 6. Thông tin máy */}
+                              <td className="px-3 py-2.5 align-top min-w-[150px] max-w-[200px]">
+                                {serialsToShow.length === 0 ? (
+                                  <span className="text-gray-400 italic text-[11px]">Chưa có thông tin máy</span>
+                                ) : (
+                                  <div className="space-y-1.5">
+                                    {serialsToShow.map((s: any, idx: number) => {
+                                      const isExp = s.warrantyExpiryDate && new Date(s.warrantyExpiryDate).getTime() < Date.now();
+                                      const isAct = s.status === 'Đã kích hoạt' || !!s.activationDate;
+                                      return (
+                                        <div key={s.id || idx} className="p-1.5 bg-gray-50 border border-gray-200 rounded text-[11px] space-y-0.5">
+                                          <div className="font-mono font-bold text-purple-700">{s.serialNumber}</div>
+                                          {s.productLine && <div className="text-[10px] text-gray-500">{s.productLine}</div>}
+                                          {s.status && (
+                                            <div className="text-[10px]">
+                                              <span className={`px-1.5 py-0.2 rounded font-semibold ${
+                                                isExp ? 'bg-rose-100 text-rose-700' : isAct ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-100 text-gray-600'
+                                              }`}>
+                                                {isExp ? 'Đã hết hạn' : s.status}
+                                              </span>
+                                            </div>
+                                          )}
+                                          {s.warrantyExpiryDate && (
+                                            <div className="text-[10px] text-gray-500">
+                                              Hạn BH: <span className={isExp ? 'text-rose-600 font-bold' : 'text-gray-700'}>{formatDateDisplay(new Date(s.warrantyExpiryDate).toISOString().split('T')[0])}</span>
+                                            </div>
+                                          )}
+                                        </div>
+                                      );
+                                    })}
+                                  </div>
+                                )}
+                              </td>
+
+                              {/* 7. Thời gian */}
+                              <td className="px-3 py-2.5 align-top whitespace-nowrap text-gray-600 text-[11px]">
+                                <div className="font-semibold text-gray-800">{formatDateTime(o.pancakeCreatedAt || o.createdAt)}</div>
+                                {o.orderSource && <div className="text-[10px] text-gray-400 mt-0.5">{o.orderSource}</div>}
+                              </td>
+
+                              {/* 8. Thao tác */}
+                              <td className="px-3 py-2.5 align-top text-center whitespace-nowrap">
+                                <div className="flex flex-col gap-1 items-center">
+                                  <button
+                                    onClick={() => navigate('/admin/orders', { state: { search: String(o.pancakeOrderId) } })}
+                                    className="flex items-center justify-center gap-1 px-2.5 py-1 bg-blue-50 text-blue-700 hover:bg-blue-100 rounded-lg text-xs font-semibold transition-colors w-full cursor-pointer"
+                                    title="Xem ca trên màn hình Quản lý dịch vụ"
+                                  >
+                                    <Wrench size={12} />
+                                    <span>Xem ca</span>
+                                  </button>
+                                  {o.serviceReports && o.serviceReports.length > 0 && (
+                                    <button
+                                      onClick={() => navigate(`/admin/reports?search=${o.pancakeOrderId}`)}
+                                      className="flex items-center justify-center gap-1 px-2.5 py-1 bg-teal-50 text-teal-700 hover:bg-teal-100 rounded-lg text-xs font-semibold transition-colors w-full cursor-pointer"
+                                      title="Xem báo cáo KTV"
+                                    >
+                                      <FileText size={12} />
+                                      <span>Báo cáo</span>
+                                    </button>
+                                  )}
+                                </div>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+
+              {/* 4. Các Yêu Cầu Hotline */}
               <div className="bg-white rounded-2xl border border-gray-200 p-5 shadow-sm space-y-3">
                 <div className="flex items-center gap-2 border-b border-gray-100 pb-3">
                   <PhoneCall className="text-emerald-600" size={18} />
-                  <h4 className="font-bold text-gray-800 text-sm">3. Các Yêu cầu Hotline ({historyResults.hotlineTickets?.length || 0})</h4>
+                  <h4 className="font-bold text-gray-800 text-sm">4. Các Yêu cầu Hotline ({historyResults.hotlineTickets?.length || 0})</h4>
                 </div>
 
                 {historyResults.hotlineTickets?.length === 0 ? (

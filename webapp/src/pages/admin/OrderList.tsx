@@ -222,8 +222,29 @@ export default function OrderList() {
 
   // Filters
 
-  const [search, setSearch] = useState<string>(() => getSavedFilter('search', ''));
-  const [debouncedSearch, setDebouncedSearch] = useState<string>(() => getSavedFilter('search', ''));
+  const [search, setSearch] = useState<string>(() => {
+    try {
+      const sp = new URLSearchParams(window.location.search).get('search');
+      if (sp) return sp;
+    } catch {}
+    return getSavedFilter('search', '');
+  });
+  const [debouncedSearch, setDebouncedSearch] = useState<string>(() => {
+    try {
+      const sp = new URLSearchParams(window.location.search).get('search');
+      if (sp) return sp;
+    } catch {}
+    return getSavedFilter('search', '');
+  });
+
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const searchParam = params.get('search') || location.state?.search;
+    if (searchParam) {
+      setSearch(String(searchParam));
+      setDebouncedSearch(String(searchParam));
+    }
+  }, [location.search, location.state]);
 
   useEffect(() => {
     const handler = setTimeout(() => {
@@ -625,8 +646,9 @@ export default function OrderList() {
   const [customerSuggestions, setCustomerSuggestions] = useState<any[]>([]);
 
   useEffect(() => {
-    const phone = newOrderForm.customerPhone.trim();
-    if (phone.length < 3) {
+    const digits = newOrderForm.customerPhone.replace(/\D/g, '').trim();
+    // Phải gõ đủ 10 ký tự số liền kề nhau và bắt đầu bằng số 0 mới hiện kết quả gợi ý
+    if (!/^0\d{9}$/.test(digits)) {
       setCustomerSuggestions([]);
       return;
     }
@@ -637,12 +659,12 @@ export default function OrderList() {
 
     const delayDebounceFn = setTimeout(async () => {
       try {
-        const results = await searchCustomers(phone);
-        setCustomerSuggestions(results);
+        const results = await searchCustomers(digits);
+        setCustomerSuggestions(Array.isArray(results) ? results : []);
       } catch (err) {
         console.error('Lỗi tìm kiếm khách hàng:', err);
       }
-    }, 300);
+    }, 250);
 
     return () => clearTimeout(delayDebounceFn);
   }, [newOrderForm.customerPhone]);
@@ -4918,19 +4940,39 @@ export default function OrderList() {
                   <input
                     type="text"
                     required
-                    className="w-full border rounded p-2 text-sm outline-none focus:border-blue-500 text-gray-800 bg-white"
-                    placeholder="Nhập số điện thoại..."
+                    maxLength={10}
+                    className={`w-full border rounded p-2 text-sm outline-none focus:border-blue-500 text-gray-800 bg-white ${
+                      newOrderForm.customerPhone && !/^0\d{9}$/.test(newOrderForm.customerPhone)
+                        ? 'border-amber-300 bg-amber-50/20'
+                        : 'border-gray-300'
+                    }`}
+                    placeholder="Nhập 10 số (bắt đầu bằng 0)..."
                     value={newOrderForm.customerPhone}
-                    onChange={e => setNewOrderForm(prev => ({ ...prev, customerPhone: e.target.value }))}
+                    onChange={e => {
+                      const digits = e.target.value.replace(/\D/g, '').slice(0, 10);
+                      setNewOrderForm(prev => ({ ...prev, customerPhone: digits }));
+                      if (!/^0\d{9}$/.test(digits)) {
+                        setCustomerSuggestions([]);
+                      }
+                    }}
                     onBlur={() => setTimeout(() => setCustomerSuggestions([]), 200)}
                   />
+                  {newOrderForm.customerPhone && newOrderForm.customerPhone.length > 0 && newOrderForm.customerPhone.length < 10 && (
+                    <p className="text-xs text-amber-500 mt-0.5">Cần nhập đủ 10 số ({newOrderForm.customerPhone.length}/10)</p>
+                  )}
+                  {newOrderForm.customerPhone && newOrderForm.customerPhone.length === 10 && !/^0\d{9}$/.test(newOrderForm.customerPhone) && (
+                    <p className="text-xs text-red-500 mt-0.5">SĐT phải bắt đầu bằng số 0</p>
+                  )}
                   {customerSuggestions.length > 0 && (
-                    <div className="absolute left-0 right-0 z-50 mt-1 bg-white border border-gray-200 rounded-md shadow-lg max-h-60 overflow-y-auto">
-                      {customerSuggestions.map(cust => (
+                    <div className="absolute left-0 right-0 z-50 mt-1 bg-white border border-gray-200 rounded-xl shadow-xl max-h-60 overflow-y-auto">
+                      <div className="px-3 py-1.5 bg-gray-50 border-b border-gray-200 text-[11px] text-gray-500 font-semibold uppercase">
+                        Gợi ý từ lịch sử ({customerSuggestions.length})
+                      </div>
+                      {customerSuggestions.map((cust, idx) => (
                         <button
-                          key={cust.id}
+                          key={`${cust.type || 'c'}-${cust.id || idx}`}
                           type="button"
-                          className="w-full text-left px-3 py-2 text-sm hover:bg-blue-50 hover:text-blue-700 transition-colors border-b border-gray-100 last:border-0 cursor-pointer"
+                          className="w-full text-left px-3 py-2 text-sm hover:bg-blue-50 hover:text-blue-700 transition-colors border-b border-gray-100 last:border-0 cursor-pointer flex items-center justify-between gap-2"
                           onMouseDown={(e) => {
                             e.preventDefault();
                             handleSelectCustomer(cust);
@@ -4940,15 +4982,26 @@ export default function OrderList() {
                             handleSelectCustomer(cust);
                           }}
                         >
-                          <div className="font-semibold text-gray-800">{cust.fullName}</div>
-                          <div className="text-xs text-gray-500 flex justify-between">
-                            <span>SĐT: {cust.phoneNumber}</span>
-                            {cust.provinceName && <span>Tỉnh: {cust.provinceName}</span>}
-                          </div>
-                          {(cust.fullAddress || cust.address) && (
-                            <div className="text-[11px] text-gray-400 truncate mt-0.5">
-                              ĐC: {cust.fullAddress || cust.address}
+                          <div className="min-w-0 flex-1">
+                            <div className="font-semibold text-gray-800 truncate">{cust.fullName}</div>
+                            <div className="text-xs text-gray-500 flex items-center gap-2">
+                              <span>SĐT: {cust.phoneNumber}</span>
+                              {cust.provinceName && <span>• 📍 {cust.provinceName}</span>}
+                              {cust.productName && <span className="text-blue-600 truncate">• 📦 {cust.productName}</span>}
                             </div>
+                            {(cust.fullAddress || cust.address) && (
+                              <div className="text-[11px] text-gray-400 truncate mt-0.5">
+                                ĐC: {cust.fullAddress || cust.address}
+                              </div>
+                            )}
+                          </div>
+                          {cust.type && (
+                            <span className={`text-[10px] px-1.5 py-0.5 rounded font-semibold shrink-0 ${
+                              cust.type === 'customer' ? 'bg-blue-100 text-blue-700' :
+                              cust.type === 'order' ? 'bg-purple-100 text-purple-700' : 'bg-emerald-100 text-emerald-700'
+                            }`}>
+                              {cust.type === 'customer' ? 'KH' : cust.type === 'order' ? 'ĐH' : 'Serial'}
+                            </span>
                           )}
                         </button>
                       ))}

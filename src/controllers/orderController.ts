@@ -1730,33 +1730,120 @@ export async function searchCustomers(req: Request, res: Response): Promise<void
       res.json([]);
       return;
     }
-    const cleanPhone = phone.trim();
-    if (cleanPhone.length < 3) {
+    const cleanPhone = phone.replace(/\D/g, '').trim();
+    // Phải gõ đủ 10 ký tự số liền kề nhau bắt đầu bằng 0 thì kết quả gợi ý mới hiện ra, không gợi ý trước nếu chưa đúng format
+    if (!/^0\d{9}$/.test(cleanPhone)) {
       res.json([]);
       return;
     }
-    const customers = await prisma.customer.findMany({
-      where: {
-        phoneNumber: {
-          contains: cleanPhone,
+
+    const [dbCustomers, dbOrders, dbSerials] = await Promise.all([
+      prisma.customer.findMany({
+        where: { phoneNumber: { contains: cleanPhone } },
+        take: 10,
+        select: {
+          id: true,
+          fullName: true,
+          phoneNumber: true,
+          address: true,
+          fullAddress: true,
+          provinceName: true,
+          districtName: true,
+          communeName: true,
+          provinceId: true,
+          districtId: true,
+          communeId: true,
         }
-      },
-      take: 10,
-      select: {
-        id: true,
-        fullName: true,
-        phoneNumber: true,
-        address: true,
-        fullAddress: true,
-        provinceName: true,
-        districtName: true,
-        communeName: true,
-        provinceId: true,
-        districtId: true,
-        communeId: true,
+      }),
+      prisma.order.findMany({
+        where: { billPhoneNumber: { contains: cleanPhone } },
+        take: 10,
+        orderBy: { createdAt: 'desc' },
+        select: {
+          id: true,
+          billFullName: true,
+          billPhoneNumber: true,
+          shippingAddress: true,
+          items: { select: { productName: true }, take: 1 },
+          createdAt: true
+        }
+      }),
+      prisma.serial.findMany({
+        where: { customerPhone: { contains: cleanPhone } },
+        take: 10,
+        orderBy: { createdAt: 'desc' },
+        select: {
+          id: true,
+          customerName: true,
+          customerPhone: true,
+          address: true,
+          province: true,
+          productLine: true,
+          model: true,
+          serialNumber: true,
+          createdAt: true
+        }
+      })
+    ]);
+
+    const suggestions: any[] = [];
+    const seen = new Set<string>();
+
+    dbCustomers.forEach(c => {
+      const key = `${(c.phoneNumber || '').trim()}_${(c.fullName || '').trim()}`.toLowerCase();
+      if (!seen.has(key)) {
+        seen.add(key);
+        suggestions.push({
+          id: c.id,
+          fullName: c.fullName || 'Khách hàng',
+          phoneNumber: c.phoneNumber,
+          address: c.address,
+          fullAddress: c.fullAddress || c.address || '',
+          provinceName: c.provinceName || '',
+          districtName: c.districtName || '',
+          communeName: c.communeName || '',
+          type: 'customer'
+        });
       }
     });
-    res.json(customers);
+
+    dbOrders.forEach(o => {
+      const key = `${(o.billPhoneNumber || '').trim()}_${(o.billFullName || '').trim()}`.toLowerCase();
+      if (!seen.has(key)) {
+        seen.add(key);
+        const sAddr = o.shippingAddress as any;
+        suggestions.push({
+          id: o.id,
+          fullName: o.billFullName || 'Khách hàng',
+          phoneNumber: o.billPhoneNumber,
+          address: sAddr?.address || '',
+          fullAddress: sAddr?.full_address || sAddr?.address || '',
+          provinceName: sAddr?.province_name || sAddr?.province || '',
+          productName: o.items?.[0]?.productName || '',
+          type: 'order'
+        });
+      }
+    });
+
+    dbSerials.forEach(s => {
+      const key = `${(s.customerPhone || '').trim()}_${(s.customerName || '').trim()}`.toLowerCase();
+      if (!seen.has(key)) {
+        seen.add(key);
+        suggestions.push({
+          id: s.id,
+          fullName: s.customerName || 'Khách hàng',
+          phoneNumber: s.customerPhone,
+          address: s.address,
+          fullAddress: s.address || '',
+          provinceName: s.province || '',
+          productName: [s.productLine, s.model].filter(Boolean).join(' ') || s.serialNumber,
+          serialNumber: s.serialNumber,
+          type: 'serial'
+        });
+      }
+    });
+
+    res.json(suggestions);
   } catch (error: any) {
     logger.error('Search customers error', { error: error.message });
     res.status(500).json({ error: 'Lỗi tìm kiếm thông tin khách hàng' });

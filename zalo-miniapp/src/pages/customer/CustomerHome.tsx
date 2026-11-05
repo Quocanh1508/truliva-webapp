@@ -23,8 +23,10 @@ import {
   Scale,
   Droplets,
   BookOpen,
-  FileText
+  FileText,
+  Coins
 } from 'lucide-react';
+import CustomerLoyaltyModal from '../../components/CustomerLoyaltyModal';
 import LuckyWheelModal from '../../components/LuckyWheelModal';
 import NewsDetailModal from '../../components/NewsDetailModal';
 import LegalPagesModal, { LegalDocType } from '../../components/LegalPagesModal';
@@ -94,6 +96,7 @@ const FEATURED_NEWS = [
 
 export default function CustomerHome({ user, mySerials = [], onOpenScanner, onOpenWarranty, onGoToShop }: CustomerHomeProps) {
   const [showWheelModal, setShowWheelModal] = useState(false);
+  const [showLoyaltyModal, setShowLoyaltyModal] = useState(false);
   const [selectedArticle, setSelectedArticle] = useState<any>(null);
   const [overrideTier, setOverrideTier] = useState<MemberTier | null>(null);
   const [newsList, setNewsList] = useState<any[]>(FEATURED_NEWS);
@@ -248,7 +251,7 @@ export default function CustomerHome({ user, mySerials = [], onOpenScanner, onOp
       {/* 2. Floating Quick Nav Card */}
       <div className="max-w-md mx-auto px-4 -mt-10 relative z-10">
         <div className="bg-white/95 backdrop-blur-md rounded-3xl shadow-[0_12px_36px_rgba(11,37,69,0.12)] p-3.5 border border-sky-100/90 grid grid-cols-4 gap-2 text-center">
-          {/* Cửa hàng / Sản phẩm */}
+          {/* 1. Cửa hàng / Sản phẩm */}
           <button 
             onClick={onGoToShop}
             className="flex flex-col items-center justify-center space-y-1.5 p-2 rounded-2xl hover:bg-sky-50/80 active:scale-95 transition-all cursor-pointer group"
@@ -261,55 +264,33 @@ export default function CustomerHome({ user, mySerials = [], onOpenScanner, onOp
             </span>
           </button>
 
-          {/* Tích điểm hoặc Bảo hành (Mở thẳng Web Warranty với Serial Auto-fill) */}
+          {/* 2. Điểm tích lũy */}
+          <button 
+            onClick={() => setShowLoyaltyModal(true)}
+            className="flex flex-col items-center justify-center space-y-1.5 p-2 rounded-2xl hover:bg-amber-50/80 active:scale-95 transition-all cursor-pointer group"
+          >
+            <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-amber-50 to-orange-100/80 text-amber-600 flex items-center justify-center border border-amber-200/60 shadow-xs group-hover:scale-105 transition-all">
+              <Coins size={22} className="text-amber-500" />
+            </div>
+            <span className="text-[11px] font-bold text-slate-700 tracking-tight whitespace-nowrap">
+              Điểm tích lũy
+            </span>
+          </button>
+
+          {/* 3. Bảo hành (Kích hoạt & tra cứu bảo hành điện tử) */}
           <button 
             onClick={() => handleDirectWarranty()}
             className="flex flex-col items-center justify-center space-y-1.5 p-2 rounded-2xl hover:bg-sky-50/80 active:scale-95 transition-all cursor-pointer group"
           >
             <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-sky-50 to-blue-100/80 text-[#1B3A6B] flex items-center justify-center border border-blue-200/60 shadow-xs group-hover:scale-105 transition-all">
-              {FEATURES.ENABLE_MEMBER_RANKING ? (
-                <Star size={22} className="text-amber-500 fill-amber-200" />
-              ) : (
-                <FileText size={22} className="text-[#1B3A6B]" />
-              )}
+              <FileText size={22} className="text-[#1B3A6B]" />
             </div>
             <span className="text-[11px] font-bold text-slate-700 tracking-tight whitespace-nowrap">
-              {FEATURES.ENABLE_MEMBER_RANKING ? 'Tích điểm' : 'Bảo hành'}
+              Bảo hành
             </span>
           </button>
 
-          {/* Vòng quay hoặc Tư vấn OA */}
-          {FEATURES.ENABLE_MEMBER_RANKING ? (
-            <button 
-              onClick={() => setShowWheelModal(true)}
-              className="flex flex-col items-center justify-center space-y-1.5 p-2 rounded-2xl hover:bg-cyan-50/80 active:scale-95 transition-all cursor-pointer group"
-            >
-              <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-cyan-50 to-sky-100/80 text-[#00A3FF] flex items-center justify-center border border-cyan-200/60 shadow-xs relative group-hover:scale-105 transition-all">
-                <Gift size={22} className="text-[#00A3FF]" />
-                <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 bg-[#00D2FF] rounded-full animate-ping"></span>
-                <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 bg-[#00D2FF] rounded-full shadow-[0_0_6px_#00D2FF]"></span>
-              </div>
-              <span className="text-[11px] font-bold text-slate-700 tracking-tight whitespace-nowrap">Vòng quay</span>
-            </button>
-          ) : (
-            <button 
-              onClick={async () => {
-                try {
-                  await openChat({ type: 'oa', id: '3870382725035413507' });
-                } catch {
-                  window.location.href = 'https://zalo.me/3870382725035413507';
-                }
-              }}
-              className="flex flex-col items-center justify-center space-y-1.5 p-2 rounded-2xl hover:bg-cyan-50/80 active:scale-95 transition-all cursor-pointer group"
-            >
-              <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-cyan-50 to-sky-100/80 text-[#00A3FF] flex items-center justify-center border border-cyan-200/60 shadow-xs group-hover:scale-105 transition-all">
-                <MessageSquare size={22} className="text-[#00A3FF]" />
-              </div>
-              <span className="text-[11px] font-bold text-slate-700 tracking-tight whitespace-nowrap">Tư vấn OA</span>
-            </button>
-          )}
-
-          {/* Hotline */}
+          {/* 4. Hotline */}
           <button 
             onClick={async () => {
               try {
@@ -592,6 +573,12 @@ export default function CustomerHome({ user, mySerials = [], onOpenScanner, onOp
       </div>
 
       {/* Modals */}
+      <CustomerLoyaltyModal
+        isOpen={showLoyaltyModal}
+        onClose={() => setShowLoyaltyModal(false)}
+        userPoints={Number(user?.rewardPoints ?? user?.points ?? 0)}
+      />
+
       <LuckyWheelModal 
         isOpen={showWheelModal} 
         onClose={() => setShowWheelModal(false)} 

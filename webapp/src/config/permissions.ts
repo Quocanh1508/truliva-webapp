@@ -162,7 +162,7 @@ export const SYSTEM_FEATURES: SystemFeature[] = [
     moduleName: '📞 Quản lý Yêu Cầu Hotline',
     name: 'Tra cứu Lịch sử Khách hàng',
     description: 'Tra cứu toàn bộ thông tin tương tác, đơn hàng, serial và cuộc gọi của khách hàng',
-    defaultRoles: ['ADMIN', 'DEV', 'COORDINATOR', 'HOTLINE'],
+    defaultRoles: ['ADMIN', 'DEV', 'COORDINATOR', 'HOTLINE', 'SALE_SUPERVISOR', 'SALER', 'STAFF'],
     addedAt: 'v1.1'
   },
   {

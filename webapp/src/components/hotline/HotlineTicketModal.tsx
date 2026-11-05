@@ -70,14 +70,16 @@ export default function HotlineTicketModal({ ticket, isOpen, onClose, onSaved, u
   }, []);
 
   const searchPhoneSuggestions = useCallback(async (phone: string) => {
-    if (!hasPermission('HOTLINE_SEARCH_CUSTOMER') || phone.length < 5) {
+    const cleanDigits = phone.replace(/\D/g, '');
+    // Phải gõ đủ 10 ký tự số liền kề nhau và bắt đầu bằng số 0 thì kết quả gợi ý mới hiện ra
+    if (!/^0\d{9}$/.test(cleanDigits)) {
       setPhoneSuggestions([]);
       setShowPhoneSuggestions(false);
       return;
     }
     setPhoneSearching(true);
     try {
-      const data = await fetchApi(`/hotlines/search-customer?phone=${encodeURIComponent(phone)}`);
+      const data = await fetchApi(`/hotlines/search-customer?phone=${encodeURIComponent(cleanDigits)}`);
       const suggestions: any[] = [];
       // Collect customers
       if (data.customers?.length) {
@@ -123,9 +125,15 @@ export default function HotlineTicketModal({ ticket, isOpen, onClose, onSaved, u
     // Only allow digits
     const digits = value.replace(/\D/g, '').slice(0, 10);
     updateForm('customerPhone', digits);
-    // Debounce search
     if (phoneDebounceRef.current) clearTimeout(phoneDebounceRef.current);
-    phoneDebounceRef.current = setTimeout(() => searchPhoneSuggestions(digits), 500);
+    // Không gợi ý trước nếu chưa đúng format 10 số bắt đầu bằng 0
+    if (!/^0\d{9}$/.test(digits)) {
+      setPhoneSuggestions([]);
+      setShowPhoneSuggestions(false);
+      return;
+    }
+    // Gõ đủ 10 số đúng format -> kích hoạt tìm kiếm gợi ý
+    phoneDebounceRef.current = setTimeout(() => searchPhoneSuggestions(digits), 250);
   };
 
   const selectSuggestion = (s: any) => {
@@ -378,7 +386,7 @@ export default function HotlineTicketModal({ ticket, isOpen, onClose, onSaved, u
                   <div className="relative">
                     <input type="text" placeholder="Nhập 10 ký tự số" value={formData.customerPhone}
                       onChange={(e) => handlePhoneChange(e.target.value)}
-                      onFocus={() => { if (phoneSuggestions.length > 0) setShowPhoneSuggestions(true); }}
+                      onFocus={() => { if (/^0\d{9}$/.test(formData.customerPhone) && phoneSuggestions.length > 0) setShowPhoneSuggestions(true); }}
                       maxLength={10}
                       className={`w-full px-3 py-2.5 border rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-200 ${
                         formData.customerPhone && !/^0\d{9}$/.test(formData.customerPhone)
