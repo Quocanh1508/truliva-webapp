@@ -323,7 +323,7 @@ export default function ProductDetail({ product, onBack, onGoToCart, onBuyNow }:
               <span>3. Chu kỳ khuyến cáo thay lõi</span>
             </div>
             <ul className="text-[11px] text-slate-500 pl-5 list-disc list-inside space-y-0.5">
-              <li>Lõi 1 (PPC Lọc thô): 3 – 6 tháng (10.000L)</li>
+              <li>Lõi 1 (PGB Lọc thô): 3 – 6 tháng (10.000L)</li>
               <li>Lõi 2 (Màng tinh RO): 24 – 36 tháng</li>
               <li>Lõi 3 (CTO Than hoạt tính): 6 – 9 tháng (15.000L)</li>
             </ul>

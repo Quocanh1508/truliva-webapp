@@ -254,7 +254,7 @@ export default function IotDeviceCard({ serialData, user, onBookMaintenance }: I
               <span className="text-[10px] text-slate-400 font-bold whitespace-nowrap">Đo thời gian thực</span>
             </div>
 
-            {/* Lõi 1: PPC */}
+            {/* Lõi 1: PGB */}
             <div className="bg-white p-3 rounded-2xl border border-slate-100 shadow-xs space-y-2 hover:border-sky-200 transition-colors">
               <div className="flex items-center justify-between gap-2">
                 <div className="flex items-center space-x-2.5 min-w-0 flex-1">
@@ -263,7 +263,7 @@ export default function IotDeviceCard({ serialData, user, onBookMaintenance }: I
                   </div>
                   <div className="min-w-0 flex-1">
                     <h4 className="font-extrabold text-xs text-slate-900 leading-none">
-                      Lõi 1 (PPC)
+                      Lõi 1 (PGB)
                     </h4>
                     <p className="text-[10px] text-slate-400 mt-1">Lọc thô cặn bẩn & gỉ sét</p>
                   </div>
