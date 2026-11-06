@@ -28,39 +28,42 @@ export default function BottomNavBar({ activeTab, onChangeTab }: BottomNavBarPro
     <div className="fixed bottom-0 left-0 right-0 z-40 px-3 pb-3 pt-1 pointer-events-none">
       <nav 
         aria-label="Bottom Navigation" 
-        className="max-w-md mx-auto pointer-events-auto bg-white/90 backdrop-blur-xl border border-slate-200/90 shadow-[0_8px_32px_rgba(11,37,69,0.12)] rounded-3xl py-2 px-2 flex justify-around items-center"
+        className="max-w-md mx-auto pointer-events-auto bg-white/85 backdrop-blur-2xl border border-white/80 shadow-[0_12px_40px_rgba(11,37,69,0.14)] rounded-[2rem] py-2 px-2 flex justify-around items-center"
       >
         {/* 🏠 Trang chủ */}
         <button 
           onClick={() => onChangeTab('home')}
-          className={`flex-1 flex flex-col items-center justify-center min-h-[46px] py-1 px-1 rounded-2xl transition-all duration-200 active:scale-95 cursor-pointer ${
+          className={`flex-1 flex flex-col items-center justify-center min-h-[48px] py-1 px-1 rounded-2xl transition-all duration-200 active:scale-95 cursor-pointer touch-tactile ${
             activeTab === 'home' 
               ? 'text-[#1B3A6B] font-black' 
               : 'text-slate-400 hover:text-slate-600 font-semibold'
           }`}
         >
-          <div className={`relative px-3 py-1 rounded-full transition-all duration-300 ${
+          <div className={`relative px-3.5 py-1 rounded-full transition-all duration-300 ${
             activeTab === 'home' 
-              ? 'bg-gradient-to-r from-sky-100/90 to-blue-100/80 text-[#0284C7] shadow-xs' 
+              ? 'bg-gradient-to-r from-sky-100 via-sky-50 to-blue-100 text-[#0284C7] shadow-[0_2px_10px_rgba(2,132,199,0.15)] ring-1 ring-sky-200/50' 
               : 'text-slate-400'
           }`}>
             <Home size={19} strokeWidth={activeTab === 'home' ? 2.5 : 2} />
           </div>
-          <span className="text-[10px] mt-0.5 tracking-tight">Trang chủ</span>
+          <span className="text-[10px] mt-0.5 tracking-tight flex items-center gap-1">
+            Trang chủ
+            {activeTab === 'home' && <span className="w-1 h-1 rounded-full bg-[#0284C7]"></span>}
+          </span>
         </button>
 
         {/* 🛍️ Cửa hàng hoặc 📖 Sản phẩm */}
         <button 
           onClick={() => onChangeTab('shop')}
-          className={`flex-1 flex flex-col items-center justify-center min-h-[46px] py-1 px-1 rounded-2xl transition-all duration-200 active:scale-95 cursor-pointer ${
+          className={`flex-1 flex flex-col items-center justify-center min-h-[48px] py-1 px-1 rounded-2xl transition-all duration-200 active:scale-95 cursor-pointer touch-tactile ${
             activeTab === 'shop' 
               ? 'text-[#1B3A6B] font-black' 
               : 'text-slate-400 hover:text-slate-600 font-semibold'
           }`}
         >
-          <div className={`relative px-3 py-1 rounded-full transition-all duration-300 ${
+          <div className={`relative px-3.5 py-1 rounded-full transition-all duration-300 ${
             activeTab === 'shop' 
-              ? 'bg-gradient-to-r from-sky-100/90 to-blue-100/80 text-[#0284C7] shadow-xs' 
+              ? 'bg-gradient-to-r from-sky-100 via-sky-50 to-blue-100 text-[#0284C7] shadow-[0_2px_10px_rgba(2,132,199,0.15)] ring-1 ring-sky-200/50' 
               : 'text-slate-400'
           }`}>
             {FEATURES.ENABLE_ECOMMERCE ? (
@@ -74,19 +77,20 @@ export default function BottomNavBar({ activeTab, onChangeTab }: BottomNavBarPro
               </span>
             )}
           </div>
-          <span className="text-[10px] mt-0.5 tracking-tight">
+          <span className="text-[10px] mt-0.5 tracking-tight flex items-center gap-1">
             {FEATURES.ENABLE_ECOMMERCE ? 'Cửa hàng' : 'Sản phẩm'}
+            {activeTab === 'shop' && <span className="w-1 h-1 rounded-full bg-[#0284C7]"></span>}
           </span>
         </button>
 
         {/* 💬 Tư vấn Zalo OA */}
         <button 
           onClick={handleOpenOaChat}
-          className="flex-1 flex flex-col items-center justify-center min-h-[46px] py-1 px-1 rounded-2xl text-slate-400 hover:text-slate-600 font-semibold transition-all duration-200 active:scale-95 cursor-pointer"
+          className="flex-1 flex flex-col items-center justify-center min-h-[48px] py-1 px-1 rounded-2xl text-slate-400 hover:text-slate-600 font-semibold transition-all duration-200 active:scale-95 cursor-pointer touch-tactile"
         >
-          <div className="relative px-3 py-1 rounded-full text-slate-400 hover:bg-slate-50 transition-colors">
+          <div className="relative px-3.5 py-1 rounded-full text-slate-400 hover:bg-slate-50 transition-colors">
             <MessageCircle size={19} strokeWidth={2} />
-            <span className="absolute top-0.5 right-2 w-2 h-2 bg-[#00A3FF] rounded-full animate-pulse"></span>
+            <span className="absolute top-0.5 right-2 w-2 h-2 bg-[#00A3FF] rounded-full animate-pulse shadow-[0_0_8px_rgba(0,163,255,0.8)]"></span>
           </div>
           <span className="text-[10px] mt-0.5 tracking-tight">Tư vấn OA</span>
         </button>
@@ -94,20 +98,23 @@ export default function BottomNavBar({ activeTab, onChangeTab }: BottomNavBarPro
         {/* 👤 Cá nhân */}
         <button 
           onClick={() => onChangeTab('profile')}
-          className={`flex-1 flex flex-col items-center justify-center min-h-[46px] py-1 px-1 rounded-2xl transition-all duration-200 active:scale-95 cursor-pointer ${
+          className={`flex-1 flex flex-col items-center justify-center min-h-[48px] py-1 px-1 rounded-2xl transition-all duration-200 active:scale-95 cursor-pointer touch-tactile ${
             activeTab === 'profile' 
               ? 'text-[#1B3A6B] font-black' 
               : 'text-slate-400 hover:text-slate-600 font-semibold'
           }`}
         >
-          <div className={`relative px-3 py-1 rounded-full transition-all duration-300 ${
+          <div className={`relative px-3.5 py-1 rounded-full transition-all duration-300 ${
             activeTab === 'profile' 
-              ? 'bg-gradient-to-r from-sky-100/90 to-blue-100/80 text-[#0284C7] shadow-xs' 
+              ? 'bg-gradient-to-r from-sky-100 via-sky-50 to-blue-100 text-[#0284C7] shadow-[0_2px_10px_rgba(2,132,199,0.15)] ring-1 ring-sky-200/50' 
               : 'text-slate-400'
           }`}>
             <User size={19} strokeWidth={activeTab === 'profile' ? 2.5 : 2} />
           </div>
-          <span className="text-[10px] mt-0.5 tracking-tight">Cá nhân</span>
+          <span className="text-[10px] mt-0.5 tracking-tight flex items-center gap-1">
+            Cá nhân
+            {activeTab === 'profile' && <span className="w-1 h-1 rounded-full bg-[#0284C7]"></span>}
+          </span>
         </button>
       </nav>
     </div>

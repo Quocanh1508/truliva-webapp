@@ -120,16 +120,16 @@ export default function IotDeviceCard({ serialData, user, onBookMaintenance }: I
   const modelTitle = s.model || s.productLine || 'UR61096H';
 
   return (
-    <div className="bg-white rounded-3xl border border-sky-100 shadow-[0_4px_25px_rgba(27,58,107,0.08)] overflow-hidden transition-all">
+    <div className="bg-white rounded-[2rem] border border-sky-100/90 shadow-[0_6px_30px_rgba(27,58,107,0.07)] overflow-hidden transition-all">
       
       {/* ── TOP SEGMENTED CONTROL TABS (Máy của tôi | Cài đặt Wi-Fi) ── */}
-      <div className="p-2.5 pb-0 bg-slate-50/70 border-b border-slate-100">
+      <div className="p-2.5 pb-0 bg-slate-50/80 border-b border-slate-100">
         <div className="bg-slate-200/70 p-1 rounded-2xl flex items-center gap-1">
           <button
             onClick={() => setActiveSubTab('device')}
-            className={`flex-1 py-2 rounded-xl text-xs font-black transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+            className={`flex-1 min-h-[38px] py-1.5 rounded-xl text-xs font-black transition-all flex items-center justify-center gap-1.5 cursor-pointer touch-tactile ${
               activeSubTab === 'device'
-                ? 'bg-white text-[#1B3A6B] shadow-xs scale-[1.01]'
+                ? 'bg-white text-[#1B3A6B] shadow-sm scale-[1.01]'
                 : 'text-slate-500 hover:text-slate-800'
             }`}
           >
@@ -139,9 +139,9 @@ export default function IotDeviceCard({ serialData, user, onBookMaintenance }: I
 
           <button
             onClick={() => setActiveSubTab('wifi')}
-            className={`flex-1 py-2 rounded-xl text-xs font-black transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+            className={`flex-1 min-h-[38px] py-1.5 rounded-xl text-xs font-black transition-all flex items-center justify-center gap-1.5 cursor-pointer touch-tactile ${
               activeSubTab === 'wifi'
-                ? 'bg-white text-[#1B3A6B] shadow-xs scale-[1.01]'
+                ? 'bg-white text-[#1B3A6B] shadow-sm scale-[1.01]'
                 : 'text-slate-500 hover:text-slate-800'
             }`}
           >
@@ -223,21 +223,21 @@ export default function IotDeviceCard({ serialData, user, onBookMaintenance }: I
             </div>
           </div>
 
-          {/* Hộp Thông số Nước Tinh Khiết & Lõi RO tóm tắt */}
-          <div className="bg-gradient-to-r from-sky-50/90 via-blue-50/50 to-slate-50 rounded-2xl p-3 border border-sky-100 space-y-2">
+          {/* Hộp Thông số Nước Tinh Khiết & Lõi RO tóm tắt (UI/UX Pro Max Telemetry HUD) */}
+          <div className="bg-gradient-to-br from-sky-50/90 via-blue-50/40 to-slate-50/80 rounded-2xl p-3.5 border border-sky-100/90 space-y-2 shadow-xs">
             <div className="flex items-center justify-between text-xs">
-              <span className="text-slate-500 font-medium">TDS đầu ra (Sau màng RO)</span>
+              <span className="text-slate-600 font-semibold">TDS đầu ra (Sau màng RO)</span>
               <div className="flex items-baseline space-x-1">
-                <span className="text-lg font-black text-[#1B3A6B]">{tdsVal}</span>
+                <span className="text-xl font-black text-[#1B3A6B] tabular-num">{tdsVal}</span>
                 <span className="text-[10px] font-bold text-slate-500">ppm</span>
               </div>
             </div>
 
-            <div className="flex items-center justify-between text-xs pt-1.5 border-t border-sky-100/70">
-              <span className="text-slate-500 font-medium">Lõi RO còn lại</span>
+            <div className="flex items-center justify-between text-xs pt-1.5 border-t border-sky-100/80">
+              <span className="text-slate-600 font-semibold">Lõi RO còn lại</span>
               <div className="flex items-baseline space-x-1.5">
-                <span className="text-lg font-black text-emerald-600">{roHealth.val}%</span>
-                <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200">
+                <span className="text-xl font-black text-emerald-600 tabular-num">{roHealth.val}%</span>
+                <span className="text-[10px] font-black text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
                   Chuẩn tinh khiết
                 </span>
               </div>
@@ -251,7 +251,7 @@ export default function IotDeviceCard({ serialData, user, onBookMaintenance }: I
                 <Layers size={14} className="text-[#1B3A6B] shrink-0" />
                 <span>Tuổi Thọ 3 Lõi Lọc</span>
               </div>
-              <span className="text-[10px] text-slate-400 font-medium whitespace-nowrap">Đo thời gian thực</span>
+              <span className="text-[10px] text-slate-400 font-bold whitespace-nowrap">Đo thời gian thực</span>
             </div>
 
             {/* Lõi 1: PPC */}
@@ -270,7 +270,7 @@ export default function IotDeviceCard({ serialData, user, onBookMaintenance }: I
                 </div>
 
                 <div className="shrink-0 text-right">
-                  <div className="font-black text-sm text-slate-900 leading-none">{ppcHealth.val}%</div>
+                  <div className="font-black text-sm text-slate-900 leading-none tabular-num">{ppcHealth.val}%</div>
                   <span className={`inline-flex items-center justify-center mt-1 text-[9px] font-bold px-2 py-0.5 rounded-md border whitespace-nowrap ${ppcHealth.badgeClass}`}>
                     {ppcHealth.label}
                   </span>
@@ -293,7 +293,7 @@ export default function IotDeviceCard({ serialData, user, onBookMaintenance }: I
             </div>
 
             {/* Lõi 2: RO */}
-            <div className="bg-white p-3 rounded-2xl border border-sky-100/80 shadow-xs space-y-2 hover:border-sky-300 transition-colors bg-gradient-to-r from-sky-50/20 to-white">
+            <div className="bg-white p-3 rounded-2xl border border-sky-100/90 shadow-xs space-y-2 hover:border-sky-300 transition-colors bg-gradient-to-r from-sky-50/20 to-white">
               <div className="flex items-center justify-between gap-2">
                 <div className="flex items-center space-x-2.5 min-w-0 flex-1">
                   <div className="w-7 h-7 rounded-xl bg-sky-100 text-[#0284C7] font-black text-xs flex items-center justify-center border border-sky-200 shrink-0">
@@ -302,14 +302,14 @@ export default function IotDeviceCard({ serialData, user, onBookMaintenance }: I
                   <div className="min-w-0 flex-1">
                     <h4 className="font-extrabold text-xs text-slate-900 leading-none flex items-center gap-1">
                       <span>Lõi 2 (RO)</span>
-                      <span className="text-[9px] bg-sky-100 text-[#0284C7] px-1 rounded font-bold shrink-0">Trọng tâm</span>
+                      <span className="text-[9px] bg-sky-100 text-[#0284C7] px-1.5 py-0.2 rounded font-bold shrink-0">Trọng tâm</span>
                     </h4>
                     <p className="text-[10px] text-slate-400 mt-1">Màng lọc tinh RO 0.0001µm</p>
                   </div>
                 </div>
 
                 <div className="shrink-0 text-right">
-                  <div className="font-black text-sm text-sky-700 leading-none">{roHealth.val}%</div>
+                  <div className="font-black text-sm text-sky-700 leading-none tabular-num">{roHealth.val}%</div>
                   <span className={`inline-flex items-center justify-center mt-1 text-[9px] font-bold px-2 py-0.5 rounded-md border whitespace-nowrap ${roHealth.badgeClass}`}>
                     {roHealth.label}
                   </span>
@@ -347,7 +347,7 @@ export default function IotDeviceCard({ serialData, user, onBookMaintenance }: I
                 </div>
 
                 <div className="shrink-0 text-right">
-                  <div className="font-black text-sm text-slate-900 leading-none">{ctoHealth.val}%</div>
+                  <div className="font-black text-sm text-slate-900 leading-none tabular-num">{ctoHealth.val}%</div>
                   <span className={`inline-flex items-center justify-center mt-1 text-[9px] font-bold px-2 py-0.5 rounded-md border whitespace-nowrap ${ctoHealth.badgeClass}`}>
                     {ctoHealth.label}
                   </span>
@@ -370,20 +370,20 @@ export default function IotDeviceCard({ serialData, user, onBookMaintenance }: I
             </div>
           </div>
 
-          {/* ── CỤM NÚT HÀNH ĐỘNG (BẢO HÀNH & TIỆN ÍCH MÁY) ── */}
+          {/* ── CỤM NÚT HÀNH ĐỘNG (BẢO HÀNH & TIỆN ÍCH MÁY - 44px+ mobile touch standard) ── */}
           <div className="pt-2 space-y-2">
             {/* Nút Bảo Hành: Kích hoạt bảo hành / Đã kích hoạt bảo hành */}
             {isActivated ? (
               <button
                 onClick={handleOpenWarranty}
-                className="w-full py-2.5 px-3 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 rounded-xl text-xs font-bold flex items-center justify-between border border-emerald-200 transition-all cursor-pointer active:scale-[0.99]"
+                className="w-full min-h-[44px] py-2.5 px-3.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 rounded-2xl text-xs font-bold flex items-center justify-between border border-emerald-200 transition-all cursor-pointer active:scale-[0.99] touch-tactile"
               >
                 <div className="flex items-center space-x-1.5">
-                  <CheckCircle2 size={15} className="text-emerald-600 shrink-0" />
+                  <CheckCircle2 size={16} className="text-emerald-600 shrink-0" />
                   <span>Đã kích hoạt bảo hành</span>
                 </div>
                 {expiryDateStr && (
-                  <span className="text-[10px] font-semibold text-emerald-700 bg-white/90 px-2 py-0.5 rounded-md border border-emerald-200/60 font-mono">
+                  <span className="text-[10px] font-bold text-emerald-700 bg-white/90 px-2 py-0.5 rounded-lg border border-emerald-200/60 font-mono tabular-num">
                     Hạn: {expiryDateStr}
                   </span>
                 )}
@@ -391,7 +391,7 @@ export default function IotDeviceCard({ serialData, user, onBookMaintenance }: I
             ) : (
               <button
                 onClick={handleOpenWarranty}
-                className="w-full py-3 bg-gradient-to-r from-[#1B3A6B] to-[#0284C7] hover:from-[#152e55] hover:to-[#0274b3] text-white rounded-xl font-bold text-xs flex items-center justify-center space-x-2 shadow-md shadow-blue-900/15 active:scale-[0.99] transition-all cursor-pointer"
+                className="w-full min-h-[44px] py-3 bg-gradient-to-r from-[#1B3A6B] to-[#0284C7] hover:from-[#152e55] hover:to-[#0274b3] text-white rounded-2xl font-bold text-xs flex items-center justify-center space-x-2 shadow-md shadow-blue-900/15 active:scale-[0.99] transition-all cursor-pointer touch-tactile"
               >
                 <Sparkles size={15} className="text-[#00D2FF]" />
                 <span>Kích hoạt bảo hành</span>
@@ -402,17 +402,17 @@ export default function IotDeviceCard({ serialData, user, onBookMaintenance }: I
             <div className="grid grid-cols-2 gap-2 pt-0.5">
               <button
                 onClick={() => setActiveSubTab('wifi')}
-                className="py-2.5 bg-[#0F172A] hover:bg-[#1E293B] text-white rounded-xl font-bold text-xs flex items-center justify-center space-x-1.5 transition-all cursor-pointer shadow-xs active:scale-95"
+                className="min-h-[44px] py-2.5 bg-[#0F172A] hover:bg-[#1E293B] text-white rounded-2xl font-bold text-xs flex items-center justify-center space-x-1.5 transition-all cursor-pointer shadow-xs active:scale-95 touch-tactile"
               >
-                <Settings size={13} />
+                <Settings size={14} />
                 <span>Cài đặt lại Wi-Fi</span>
               </button>
 
               <button
                 onClick={handleCallHotline}
-                className="py-2.5 bg-sky-50 hover:bg-sky-100 text-[#0284C7] rounded-xl text-xs font-bold flex items-center justify-center space-x-1.5 transition-all cursor-pointer border border-sky-100 active:scale-95"
+                className="min-h-[44px] py-2.5 bg-sky-50 hover:bg-sky-100 text-[#0284C7] rounded-2xl text-xs font-bold flex items-center justify-center space-x-1.5 transition-all cursor-pointer border border-sky-100 active:scale-95 touch-tactile"
               >
-                <Wrench size={13} />
+                <Wrench size={14} />
                 <span>Yêu cầu KTV</span>
               </button>
             </div>

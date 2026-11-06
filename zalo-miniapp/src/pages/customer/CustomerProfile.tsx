@@ -221,30 +221,30 @@ export default function CustomerProfile({
             </div>
           </div>
 
-          {/* Quick Stats Grid: Thiết bị | Điểm tích lũy | Hotline */}
-          <div className="grid grid-cols-3 gap-2 bg-[#041426]/70 backdrop-blur-md rounded-2xl p-2.5 text-center border border-cyan-400/30 text-xs shadow-[0_4px_20px_rgba(0,210,255,0.15)]">
+          {/* Quick Stats Grid: Thiết bị | Điểm tích lũy | Hotline (UI/UX Pro Max Ocean Glass HUD) */}
+          <div className="grid grid-cols-3 gap-2 bg-[#041426]/75 backdrop-blur-xl rounded-3xl p-2.5 text-center border border-cyan-400/30 text-xs shadow-[0_6px_25px_rgba(0,210,255,0.18)]">
             <button 
               onClick={scrollToDevices}
-              className="p-1 rounded-xl hover:bg-white/10 active:scale-95 transition-all cursor-pointer group"
+              className="p-1.5 rounded-2xl hover:bg-white/10 active:scale-95 transition-all cursor-pointer group touch-tactile"
             >
-              <p className="text-[9px] text-sky-200 uppercase tracking-wider font-bold group-hover:text-white transition-colors">Thiết bị</p>
-              <p className="font-black text-white text-base mt-0.5">{(mySerials || []).length} máy</p>
+              <p className="text-[9px] text-sky-200 uppercase tracking-wider font-extrabold group-hover:text-white transition-colors">Thiết bị</p>
+              <p className="font-black text-white text-base mt-0.5 tabular-num">{(mySerials || []).length} máy</p>
             </button>
 
             <button 
               onClick={() => setShowLoyaltyModal(true)}
-              className="p-1 rounded-xl border-x border-cyan-400/20 hover:bg-white/10 active:scale-95 transition-all cursor-pointer group"
+              className="p-1.5 rounded-2xl border-x border-cyan-400/25 hover:bg-white/10 active:scale-95 transition-all cursor-pointer group touch-tactile"
             >
-              <p className="text-[9px] text-sky-200 uppercase tracking-wider font-bold group-hover:text-white transition-colors">Điểm tích lũy</p>
-              <p className="font-black text-amber-400 text-base mt-0.5 drop-shadow-xs">{userPoints.toLocaleString('vi-VN')}</p>
+              <p className="text-[9px] text-sky-200 uppercase tracking-wider font-extrabold group-hover:text-white transition-colors">Điểm tích lũy</p>
+              <p className="font-black text-amber-400 text-base mt-0.5 drop-shadow-xs tabular-num">{userPoints.toLocaleString('vi-VN')}</p>
             </button>
 
             <a 
               href="tel:1900638463"
-              className="p-1 rounded-xl hover:bg-white/10 active:scale-95 transition-all cursor-pointer group block"
+              className="p-1.5 rounded-2xl hover:bg-white/10 active:scale-95 transition-all cursor-pointer group block touch-tactile"
             >
-              <p className="text-[9px] text-sky-200 uppercase tracking-wider font-bold group-hover:text-white transition-colors">Hotline</p>
-              <p className="font-black text-cyan-300 text-sm mt-1">1900 638 463</p>
+              <p className="text-[9px] text-sky-200 uppercase tracking-wider font-extrabold group-hover:text-white transition-colors">Hotline</p>
+              <p className="font-black text-cyan-300 text-sm mt-1 tracking-tight">1900 638 463</p>
             </a>
           </div>
         </div>
@@ -322,13 +322,13 @@ export default function CustomerProfile({
           )}
         </div>
 
-        {/* 3. E-Commerce & Service Actions List */}
-        <div className="bg-white rounded-3xl border border-sky-100 shadow-[0_4px_20px_rgba(27,58,107,0.06)] divide-y divide-slate-100 text-xs overflow-hidden">
+        {/* 3. E-Commerce & Service Actions List (UI/UX Pro Max Soft Bento Card) */}
+        <div className="bg-white rounded-[2rem] border border-sky-100/90 shadow-[0_6px_30px_rgba(27,58,107,0.06)] divide-y divide-slate-100 text-xs overflow-hidden">
           {/* My Orders Button (Tạm ẩn khi disable ecommerce) */}
           {FEATURES.ENABLE_ECOMMERCE && onViewMyOrders && (
             <button 
               onClick={onViewMyOrders}
-              className="w-full p-3.5 flex items-center justify-between text-slate-800 font-semibold hover:bg-slate-50 active:bg-slate-100 transition-colors cursor-pointer"
+              className="w-full min-h-[56px] p-3.5 flex items-center justify-between text-slate-800 font-semibold hover:bg-slate-50/80 active:bg-slate-100 transition-colors cursor-pointer touch-tactile"
             >
               <div className="flex items-center space-x-3">
                 <div className="p-2.5 bg-blue-50 text-[#1B3A6B] rounded-2xl border border-blue-100">
@@ -347,7 +347,7 @@ export default function CustomerProfile({
           {FEATURES.ENABLE_MEMBER_RANKING && (
             <button 
               onClick={() => setShowVoucherModal(true)}
-              className="w-full p-3.5 flex items-center justify-between text-slate-800 font-semibold hover:bg-slate-50 active:bg-slate-100 transition-colors cursor-pointer"
+              className="w-full min-h-[56px] p-3.5 flex items-center justify-between text-slate-800 font-semibold hover:bg-slate-50/80 active:bg-slate-100 transition-colors cursor-pointer touch-tactile"
             >
               <div className="flex items-center space-x-3">
                 <div className="p-2.5 bg-cyan-50 text-[#00A3FF] rounded-2xl border border-cyan-100">
@@ -362,16 +362,16 @@ export default function CustomerProfile({
           {/* Điểm tích lũy Truliva */}
           <button 
             onClick={() => setShowLoyaltyModal(true)}
-            className="w-full p-3.5 flex items-center justify-between text-slate-800 font-semibold hover:bg-slate-50 active:bg-slate-100 transition-colors cursor-pointer"
+            className="w-full min-h-[56px] p-3.5 flex items-center justify-between text-slate-800 font-semibold hover:bg-amber-50/40 active:bg-amber-100/50 transition-colors cursor-pointer touch-tactile"
           >
             <div className="flex items-center space-x-3">
-              <div className="p-2.5 bg-amber-50 text-amber-600 rounded-2xl border border-amber-200">
-                <Coins size={18} />
+              <div className="p-2.5 bg-gradient-to-br from-amber-50 to-orange-50 text-amber-600 rounded-2xl border border-amber-200/80 shadow-xs">
+                <Coins size={18} className="text-amber-500" />
               </div>
               <div className="text-left">
                 <div className="font-bold flex items-center space-x-1.5">
-                  <span>Điểm tích lũy của tôi</span>
-                  <span className="text-[10px] bg-amber-100 text-amber-800 font-black px-1.5 py-0.5 rounded-full">
+                  <span className="text-slate-900">Điểm tích lũy của tôi</span>
+                  <span className="text-[10px] bg-amber-100 text-amber-800 font-black px-2 py-0.5 rounded-full border border-amber-200 tabular-num">
                     {userPoints.toLocaleString('vi-VN')} Điểm
                   </span>
                 </div>
@@ -385,7 +385,7 @@ export default function CustomerProfile({
 
           <button 
             onClick={() => setShowHistoryModal(true)}
-            className="w-full p-3.5 flex items-center justify-between text-slate-800 font-semibold hover:bg-slate-50 active:bg-slate-100 transition-colors cursor-pointer"
+            className="w-full min-h-[56px] p-3.5 flex items-center justify-between text-slate-800 font-semibold hover:bg-slate-50/80 active:bg-slate-100 transition-colors cursor-pointer touch-tactile"
           >
             <div className="flex items-center space-x-3">
               <div className="p-2.5 bg-sky-50 text-[#0284C7] rounded-2xl border border-sky-100">
@@ -398,7 +398,7 @@ export default function CustomerProfile({
 
           <button 
             onClick={handleOpenOaChat}
-            className="w-full p-3.5 flex items-center justify-between text-slate-800 font-semibold hover:bg-slate-50 active:bg-slate-100 transition-colors cursor-pointer"
+            className="w-full min-h-[56px] p-3.5 flex items-center justify-between text-slate-800 font-semibold hover:bg-slate-50/80 active:bg-slate-100 transition-colors cursor-pointer touch-tactile"
           >
             <div className="flex items-center space-x-3">
               <div className="p-2.5 bg-blue-50 text-[#1B3A6B] rounded-2xl border border-blue-100">
@@ -411,18 +411,18 @@ export default function CustomerProfile({
         </div>
 
         {/* 4. ⚖️ Khung Pháp Lý & Quy Chế TMĐT (Luật TMĐT 2025 & NĐ 248/2026) */}
-        <div className="bg-white rounded-3xl border border-sky-100 shadow-[0_4px_20px_rgba(27,58,107,0.06)] divide-y divide-slate-100 text-xs overflow-hidden">
-          <div className="p-3 bg-gray-50/70 border-b border-gray-100 flex items-center justify-between text-[11px] text-gray-500 font-bold uppercase tracking-wider">
+        <div className="bg-white rounded-[2rem] border border-sky-100/90 shadow-[0_6px_30px_rgba(27,58,107,0.06)] divide-y divide-slate-100 text-xs overflow-hidden">
+          <div className="p-3 bg-gray-50/80 border-b border-gray-100 flex items-center justify-between text-[11px] text-gray-500 font-bold uppercase tracking-wider">
             <span className="flex items-center gap-1.5">
               <Scale size={14} className="text-[#1B3A6B]" />
               Pháp Lý & Quy Chế Dịch Vụ Truliva
             </span>
-            <span className="text-[9px] px-1.5 py-0.5 rounded bg-blue-100 text-blue-800 font-extrabold">Luật 2025</span>
+            <span className="text-[9px] px-2 py-0.5 rounded-full bg-blue-100 text-blue-800 font-black">Luật 2025</span>
           </div>
 
           <button 
             onClick={() => handleOpenLegal('COMPANY')}
-            className="w-full p-3 flex items-center justify-between text-slate-800 hover:bg-slate-50 transition-colors cursor-pointer text-left"
+            className="w-full min-h-[46px] p-3 flex items-center justify-between text-slate-800 hover:bg-slate-50/80 transition-colors cursor-pointer text-left touch-tactile"
           >
             <div className="flex items-center space-x-2.5">
               <Building2 size={16} className="text-gray-400" />
@@ -433,7 +433,7 @@ export default function CustomerProfile({
 
           <button 
             onClick={() => handleOpenLegal('TERMS')}
-            className="w-full p-3 flex items-center justify-between text-slate-800 hover:bg-slate-50 transition-colors cursor-pointer text-left"
+            className="w-full min-h-[46px] p-3 flex items-center justify-between text-slate-800 hover:bg-slate-50/80 transition-colors cursor-pointer text-left touch-tactile"
           >
             <div className="flex items-center space-x-2.5">
               <FileText size={16} className="text-gray-400" />
@@ -444,7 +444,7 @@ export default function CustomerProfile({
 
           <button 
             onClick={() => handleOpenLegal('PRIVACY')}
-            className="w-full p-3 flex items-center justify-between text-slate-800 hover:bg-slate-50 transition-colors cursor-pointer text-left"
+            className="w-full min-h-[46px] p-3 flex items-center justify-between text-slate-800 hover:bg-slate-50/80 transition-colors cursor-pointer text-left touch-tactile"
           >
             <div className="flex items-center space-x-2.5">
               <Lock size={16} className="text-gray-400" />
@@ -455,7 +455,7 @@ export default function CustomerProfile({
 
           <button 
             onClick={() => handleOpenLegal('RETURN')}
-            className="w-full p-3 flex items-center justify-between text-slate-800 hover:bg-slate-50 transition-colors cursor-pointer text-left"
+            className="w-full min-h-[46px] p-3 flex items-center justify-between text-slate-800 hover:bg-slate-50/80 transition-colors cursor-pointer text-left touch-tactile"
           >
             <div className="flex items-center space-x-2.5">
               <Award size={16} className="text-gray-400" />
@@ -471,7 +471,7 @@ export default function CustomerProfile({
         {onLogout && (
           <button
             onClick={onLogout}
-            className="w-full py-3 bg-red-50 text-red-600 hover:bg-red-100 rounded-2xl font-bold text-xs flex items-center justify-center space-x-1.5 transition-colors cursor-pointer border border-red-100"
+            className="w-full min-h-[46px] py-3 bg-red-50 hover:bg-red-100 text-red-600 rounded-2xl font-bold text-xs flex items-center justify-center space-x-1.5 transition-colors cursor-pointer border border-red-100 touch-tactile"
           >
             <LogOut size={16} />
             <span>Đăng xuất khỏi Mini App</span>

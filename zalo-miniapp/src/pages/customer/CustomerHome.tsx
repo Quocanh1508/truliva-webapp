@@ -248,18 +248,18 @@ export default function CustomerHome({ user, mySerials = [], onOpenScanner, onOp
         </div>
       </P3ROceanHeader>
 
-      {/* 2. Floating Quick Nav Card */}
+      {/* 2. Floating Quick Nav Card (UI/UX Pro Max Modern Bento Quick Actions) */}
       <div className="max-w-md mx-auto px-4 -mt-10 relative z-10">
-        <div className="bg-white/95 backdrop-blur-md rounded-3xl shadow-[0_12px_36px_rgba(11,37,69,0.12)] p-3.5 border border-sky-100/90 grid grid-cols-4 gap-2 text-center">
+        <div className="bg-white/95 backdrop-blur-xl rounded-[2.2rem] shadow-[0_12px_36px_rgba(11,37,69,0.12)] p-3 border border-sky-100/90 grid grid-cols-4 gap-2 text-center">
           {/* 1. Cửa hàng / Sản phẩm */}
           <button 
             onClick={onGoToShop}
-            className="flex flex-col items-center justify-center space-y-1.5 p-2 rounded-2xl hover:bg-sky-50/80 active:scale-95 transition-all cursor-pointer group"
+            className="flex flex-col items-center justify-center space-y-1.5 p-2 rounded-2xl hover:bg-sky-50/80 active:scale-95 transition-all cursor-pointer group touch-tactile"
           >
-            <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-blue-50 to-indigo-100/80 text-[#1B3A6B] flex items-center justify-center border border-blue-200/60 shadow-xs group-hover:scale-105 transition-all">
+            <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-blue-50 to-indigo-100/90 text-[#1B3A6B] flex items-center justify-center border border-blue-200/60 shadow-xs group-hover:scale-105 transition-all">
               {FEATURES.ENABLE_ECOMMERCE ? <Store size={22} className="text-[#1B3A6B]" /> : <BookOpen size={22} className="text-[#1B3A6B]" />}
             </div>
-            <span className="text-[11px] font-bold text-slate-700 tracking-tight whitespace-nowrap">
+            <span className="text-[11px] font-extrabold text-slate-700 tracking-tight whitespace-nowrap">
               {FEATURES.ENABLE_ECOMMERCE ? 'Cửa hàng' : 'Sản phẩm'}
             </span>
           </button>
@@ -267,12 +267,15 @@ export default function CustomerHome({ user, mySerials = [], onOpenScanner, onOp
           {/* 2. Điểm tích lũy */}
           <button 
             onClick={() => setShowLoyaltyModal(true)}
-            className="flex flex-col items-center justify-center space-y-1.5 p-2 rounded-2xl hover:bg-amber-50/80 active:scale-95 transition-all cursor-pointer group"
+            className="flex flex-col items-center justify-center space-y-1.5 p-2 rounded-2xl hover:bg-amber-50/80 active:scale-95 transition-all cursor-pointer group touch-tactile"
           >
-            <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-amber-50 to-orange-100/80 text-amber-600 flex items-center justify-center border border-amber-200/60 shadow-xs group-hover:scale-105 transition-all">
+            <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-amber-50 to-orange-100/90 text-amber-600 flex items-center justify-center border border-amber-200/60 shadow-xs group-hover:scale-105 transition-all relative">
               <Coins size={22} className="text-amber-500" />
+              {userPoints > 0 && (
+                <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-amber-400 rounded-full border-2 border-white"></span>
+              )}
             </div>
-            <span className="text-[11px] font-bold text-slate-700 tracking-tight whitespace-nowrap">
+            <span className="text-[11px] font-extrabold text-slate-700 tracking-tight whitespace-nowrap">
               Điểm tích lũy
             </span>
           </button>
@@ -280,12 +283,12 @@ export default function CustomerHome({ user, mySerials = [], onOpenScanner, onOp
           {/* 3. Bảo hành (Kích hoạt & tra cứu bảo hành điện tử) */}
           <button 
             onClick={() => handleDirectWarranty()}
-            className="flex flex-col items-center justify-center space-y-1.5 p-2 rounded-2xl hover:bg-sky-50/80 active:scale-95 transition-all cursor-pointer group"
+            className="flex flex-col items-center justify-center space-y-1.5 p-2 rounded-2xl hover:bg-sky-50/80 active:scale-95 transition-all cursor-pointer group touch-tactile"
           >
-            <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-sky-50 to-blue-100/80 text-[#1B3A6B] flex items-center justify-center border border-blue-200/60 shadow-xs group-hover:scale-105 transition-all">
+            <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-sky-50 to-blue-100/90 text-[#1B3A6B] flex items-center justify-center border border-blue-200/60 shadow-xs group-hover:scale-105 transition-all">
               <FileText size={22} className="text-[#1B3A6B]" />
             </div>
-            <span className="text-[11px] font-bold text-slate-700 tracking-tight whitespace-nowrap">
+            <span className="text-[11px] font-extrabold text-slate-700 tracking-tight whitespace-nowrap">
               Bảo hành
             </span>
           </button>
@@ -299,12 +302,12 @@ export default function CustomerHome({ user, mySerials = [], onOpenScanner, onOp
                 window.location.href = 'tel:1900638463';
               }
             }}
-            className="flex flex-col items-center justify-center space-y-1.5 p-2 rounded-2xl hover:bg-emerald-50/80 active:scale-95 transition-all cursor-pointer group"
+            className="flex flex-col items-center justify-center space-y-1.5 p-2 rounded-2xl hover:bg-emerald-50/80 active:scale-95 transition-all cursor-pointer group touch-tactile"
           >
-            <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-emerald-50 to-teal-100/80 text-emerald-700 flex items-center justify-center border border-emerald-200/60 shadow-xs group-hover:scale-105 transition-all">
+            <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-emerald-50 to-teal-100/90 text-emerald-700 flex items-center justify-center border border-emerald-200/60 shadow-xs group-hover:scale-105 transition-all">
               <PhoneCall size={22} className="text-emerald-600" />
             </div>
-            <span className="text-[11px] font-bold text-slate-700 tracking-tight whitespace-nowrap">Hotline</span>
+            <span className="text-[11px] font-extrabold text-slate-700 tracking-tight whitespace-nowrap">Hotline</span>
           </button>
         </div>
       </div>

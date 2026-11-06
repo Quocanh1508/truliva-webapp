@@ -14,23 +14,20 @@ html, body {
    PERSONA 3 RELOAD (P3R) OCEAN & WATER EFFECT SYSTEM
    ═══════════════════════════════════════════════════════════════ */
 
-/* 1. Multi-Layer Wave Horizontal Flow & Undulation */
+/* 1. Multi-Layer Wave Horizontal Flow & Undulation (Silky Fluid Motion) */
 @keyframes p3rWaveBack {
-  0% { transform: translateX(0) scaleY(1); }
-  50% { transform: translateX(-25%) scaleY(1.2); }
-  100% { transform: translateX(-50%) scaleY(1); }
+  0%, 100% { transform: translateX(0); }
+  50% { transform: translateX(-20%); }
 }
 
 @keyframes p3rWaveMid {
-  0% { transform: translateX(-50%) scaleY(1); }
-  50% { transform: translateX(-25%) scaleY(0.85); }
-  100% { transform: translateX(0) scaleY(1); }
+  0%, 100% { transform: translateX(-20%); }
+  50% { transform: translateX(0); }
 }
 
 @keyframes p3rWaveFront {
-  0% { transform: translateX(0) scaleY(1); }
-  50% { transform: translateX(-30%) scaleY(1.15); }
-  100% { transform: translateX(-60%) scaleY(1); }
+  0%, 100% { transform: translateX(0); }
+  50% { transform: translateX(-15%); }
 }
 
 /* 2. Underwater Caustics & Light Ray Sweeps */
@@ -194,4 +191,47 @@ html, body {
 .p3r-slanted-badge > * {
   transform: skewX(12deg);
 }
+
+/* ═══════════════════════════════════════════════════════════════
+   UI/UX PRO MAX - MODERN MOBILE DESIGN SYSTEM UTILITIES
+   ═══════════════════════════════════════════════════════════════ */
+
+/* Glassmorphism & Soft Elevation Cards */
+.glass-panel-light {
+  background: rgba(255, 255, 255, 0.92);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.7);
+}
+
+.glass-hud-ocean {
+  background: rgba(4, 20, 38, 0.78);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(0, 210, 255, 0.28);
+  box-shadow: 0 8px 32px rgba(0, 163, 255, 0.12);
+}
+
+/* Gold Point Glow HUD */
+.gold-glow-hud {
+  background: radial-gradient(circle at 15% 20%, rgba(251, 191, 36, 0.12) 0%, rgba(255, 255, 255, 0.95) 70%);
+  border: 1px solid rgba(251, 191, 36, 0.35);
+  box-shadow: 0 4px 20px rgba(245, 158, 11, 0.08);
+}
+
+/* Tactile Tap Feedback on Mobile (44px+ touch standards) */
+.touch-tactile {
+  transition: transform 0.15s ease-out, opacity 0.15s ease-out, background-color 0.15s ease-out;
+  cursor: pointer;
+}
+.touch-tactile:active {
+  transform: scale(0.96);
+}
+
+/* Tabular Numerals for Anti-Jitter Numbers (TDS, Points, Percentages) */
+.tabular-num {
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+}
+
 

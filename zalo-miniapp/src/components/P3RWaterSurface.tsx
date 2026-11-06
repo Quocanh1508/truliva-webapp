@@ -4,197 +4,309 @@ interface P3RWaterSurfaceProps {
   className?: string;
 }
 
+interface Bubble {
+  x: number;
+  y: number;
+  radius: number;
+  speed: number;
+  wobbleSpeed: number;
+  wobbleAmp: number;
+  opacity: number;
+  phase: number;
+  isForeground: boolean;
+}
+
+interface Ripple {
+  x: number;
+  y: number;
+  radius: number;
+  maxRadius: number;
+  opacity: number;
+  speed: number;
+}
+
 export default function P3RWaterSurface({ className = '' }: P3RWaterSurfaceProps) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
-    const ctx = canvas.getContext('2d');
+    const ctx = canvas.getContext('2d', { alpha: false });
     if (!ctx) return;
 
     let animationFrameId: number;
-    let width = (canvas.width = canvas.offsetWidth || 400);
-    let height = (canvas.height = canvas.offsetHeight || 220);
+    let width = 0;
+    let height = 0;
 
-    const handleResize = () => {
+    const setupCanvasSize = () => {
       if (!canvas) return;
-      width = canvas.width = canvas.offsetWidth;
-      height = canvas.height = canvas.offsetHeight;
+      const rect = canvas.getBoundingClientRect();
+      width = rect.width || canvas.offsetWidth || 390;
+      height = rect.height || canvas.offsetHeight || 220;
+
+      const dpr = Math.min(window.devicePixelRatio || 1, 2);
+      canvas.width = Math.floor(width * dpr);
+      canvas.height = Math.floor(height * dpr);
+      ctx.resetTransform();
+      ctx.scale(dpr, dpr);
     };
-    window.addEventListener('resize', handleResize);
 
-    // Persona 3 Reload Organic Water Bubbles
-    interface Bubble {
-      x: number;
-      y: number;
-      radius: number;
-      speed: number;
-      wobbleSpeed: number;
-      wobbleAmp: number;
-      opacity: number;
-      phase: number;
-    }
+    setupCanvasSize();
+    window.addEventListener('resize', setupCanvasSize);
 
-    const bubbles: Bubble[] = Array.from({ length: 12 }, () => ({
-      x: Math.random() * width,
-      y: Math.random() * height,
-      radius: 4 + Math.random() * 9,
-      speed: 0.35 + Math.random() * 0.55,
-      wobbleSpeed: 0.02 + Math.random() * 0.03,
-      wobbleAmp: 6 + Math.random() * 12,
-      opacity: 0.25 + Math.random() * 0.5,
-      phase: Math.random() * Math.PI * 2
-    }));
+    // 2-Tier Natural Micro-Bubbles (Deep Bokeh + Crisp Foreground)
+    const bubbles: Bubble[] = Array.from({ length: 22 }, (_, idx) => {
+      const isForeground = idx % 2 === 0;
+      return {
+        x: Math.random() * (width || 390),
+        y: Math.random() * (height || 220),
+        radius: isForeground ? 2.2 + Math.random() * 3.5 : 5.5 + Math.random() * 5.5,
+        speed: isForeground ? 0.45 + Math.random() * 0.55 : 0.25 + Math.random() * 0.35,
+        wobbleSpeed: 0.015 + Math.random() * 0.025,
+        wobbleAmp: isForeground ? 3 + Math.random() * 6 : 6 + Math.random() * 10,
+        opacity: isForeground ? 0.45 + Math.random() * 0.45 : 0.18 + Math.random() * 0.22,
+        phase: Math.random() * Math.PI * 2,
+        isForeground
+      };
+    });
+
+    // Interactive Touch / Tap Water Ripples
+    const ripples: Ripple[] = [];
+
+    const handlePointerDown = (e: MouseEvent | TouchEvent) => {
+      if (!canvas) return;
+      const rect = canvas.getBoundingClientRect();
+      const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
+      const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY;
+      const x = clientX - rect.left;
+      const y = clientY - rect.top;
+
+      if (x >= 0 && x <= width && y >= 0 && y <= height) {
+        ripples.push({
+          x,
+          y,
+          radius: 4,
+          maxRadius: Math.min(width * 0.4, 90),
+          opacity: 0.65,
+          speed: 1.8
+        });
+      }
+    };
+
+    window.addEventListener('pointerdown', handlePointerDown);
 
     let time = 0;
+    let isVisible = true;
 
-    const render = () => {
-      time += 0.02;
+    const handleVisibilityChange = () => {
+      isVisible = !document.hidden;
+      if (isVisible) {
+        lastTime = performance.now();
+        animationFrameId = requestAnimationFrame(render);
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
 
-      // 1. Base Deep Ocean Persona 3 Gradient (Top Cyan -> Mid Royal Blue -> Deep Abyss)
+    let lastTime = performance.now();
+
+    const render = (now: number) => {
+      if (!isVisible) return;
+
+      const delta = Math.min((now - lastTime) / 1000, 0.1);
+      lastTime = now;
+      time += delta * 1.35;
+
+      // ── 1. BASE OCEANIC FLUID GRADIENT (Crystalline Aqua → Truliva Royal Navy → Midnight Abyss) ──
       const bgGrad = ctx.createLinearGradient(0, 0, 0, height);
-      bgGrad.addColorStop(0, '#00E8FF');     // Bright cyan water surface
-      bgGrad.addColorStop(0.18, '#0099FF');  // Aqua blue
-      bgGrad.addColorStop(0.42, '#0047B3');  // Vibrant Persona Royal Blue
-      bgGrad.addColorStop(0.75, '#002066');  // Deep ocean blue
-      bgGrad.addColorStop(1, '#000D2B');     // Midnight ocean abyss
+      bgGrad.addColorStop(0, '#00F0FF');      // Luminous glacier cyan water surface
+      bgGrad.addColorStop(0.16, '#00A8FF');   // Crystal aqua blue
+      bgGrad.addColorStop(0.42, '#0052D4');   // Truliva royal sapphire
+      bgGrad.addColorStop(0.72, '#0B2559');   // Deep ocean navy
+      bgGrad.addColorStop(1, '#040E24');      // Midnight oceanic abyss
       ctx.fillStyle = bgGrad;
       ctx.fillRect(0, 0, width, height);
 
-      // 2. Underwater Sun Ray Caustics (Tia sáng chiếu từ mặt nước)
+      // ── 2. ETHEREAL TOP SUNLIGHT BLOOM (Glow at surface) ──
+      const sunX = width * 0.38 + Math.sin(time * 0.3) * 25;
+      const sunBloom = ctx.createRadialGradient(sunX, -20, 10, sunX, 50, width * 0.65);
+      sunBloom.addColorStop(0, 'rgba(255, 255, 255, 0.32)');
+      sunBloom.addColorStop(0.35, 'rgba(0, 242, 254, 0.22)');
+      sunBloom.addColorStop(0.75, 'rgba(0, 168, 255, 0.08)');
+      sunBloom.addColorStop(1, 'rgba(0, 82, 212, 0)');
+      ctx.fillStyle = sunBloom;
+      ctx.fillRect(0, 0, width, height);
+
+      // ── 3. VOLUMETRIC CAUSTIC GOD RAYS (Screen Blend Mode for luminous realism) ──
       ctx.save();
-      for (let i = 0; i < 4; i++) {
-        const rayAngle = -0.35 + (i * 0.22) + Math.sin(time * 0.5 + i) * 0.05;
-        const rayX = (width * 0.2) + (i * (width * 0.22)) + Math.cos(time * 0.4 + i) * 20;
-        
-        const rayGrad = ctx.createLinearGradient(rayX, 0, rayX + Math.sin(rayAngle) * height, height);
-        rayGrad.addColorStop(0, 'rgba(255, 255, 255, 0.22)');
-        rayGrad.addColorStop(0.3, 'rgba(0, 240, 255, 0.12)');
-        rayGrad.addColorStop(1, 'rgba(0, 71, 179, 0)');
+      ctx.globalCompositeOperation = 'screen';
+
+      const rayCount = 4;
+      for (let i = 0; i < rayCount; i++) {
+        const rayAngle = -0.3 + (i * 0.18) + Math.sin(time * 0.4 + i * 1.5) * 0.04;
+        const originX = (width * 0.15) + (i * (width * 0.24)) + Math.cos(time * 0.35 + i) * 18;
+        const beamTopWidth = 18 + Math.sin(time * 0.5 + i) * 6;
+        const beamBottomWidth = 65 + Math.cos(time * 0.45 + i) * 15;
+        const endX = originX + Math.sin(rayAngle) * height;
+
+        const rayGrad = ctx.createLinearGradient(originX, 0, endX, height * 0.95);
+        rayGrad.addColorStop(0, 'rgba(255, 255, 255, 0.28)');
+        rayGrad.addColorStop(0.25, 'rgba(0, 240, 255, 0.18)');
+        rayGrad.addColorStop(0.65, 'rgba(0, 168, 255, 0.06)');
+        rayGrad.addColorStop(1, 'rgba(0, 82, 212, 0)');
 
         ctx.fillStyle = rayGrad;
         ctx.beginPath();
-        ctx.moveTo(rayX - 25, 0);
-        ctx.lineTo(rayX + 25, 0);
-        ctx.lineTo(rayX + Math.sin(rayAngle) * height + 70, height);
-        ctx.lineTo(rayX + Math.sin(rayAngle) * height - 70, height);
+        ctx.moveTo(originX - beamTopWidth, 0);
+        ctx.lineTo(originX + beamTopWidth, 0);
+        ctx.lineTo(endX + beamBottomWidth, height);
+        ctx.lineTo(endX - beamBottomWidth, height);
         ctx.closePath();
         ctx.fill();
       }
-      ctx.restore();
 
-      // 3. Top Water Surface Caustics Patches (Các mảng loang ánh sáng mặt nước P3R)
-      // Layer 1: Deep Cyan Caustic Blobs
-      ctx.fillStyle = 'rgba(0, 240, 255, 0.4)';
-      ctx.beginPath();
-      ctx.moveTo(0, 0);
-      for (let x = 0; x <= width; x += 15) {
-        const y = 35 + 
-          Math.sin(x * 0.02 + time * 1.2) * 12 + 
-          Math.cos(x * 0.04 - time * 0.8) * 8 +
-          Math.sin(x * 0.08 + time * 1.8) * 4;
-        ctx.lineTo(x, y);
-      }
-      ctx.lineTo(width, 0);
-      ctx.closePath();
-      ctx.fill();
-
-      // Layer 2: Bright Aqua Mid Surface Patches
-      ctx.fillStyle = 'rgba(128, 250, 255, 0.55)';
+      // ── 4. ORGANIC SURFACE CAUSTIC DISPERSION (Shimmering Light Ripples) ──
+      // Caustic Mesh Band 1: Cyan Shimmer
+      ctx.fillStyle = 'rgba(0, 240, 255, 0.35)';
       ctx.beginPath();
       ctx.moveTo(0, 0);
       for (let x = 0; x <= width; x += 12) {
-        const y = 22 + 
-          Math.sin(x * 0.025 - time * 1.5) * 10 + 
-          Math.cos(x * 0.05 + time * 1.1) * 6;
+        const y = 30 + 
+          Math.sin(x * 0.022 + time * 1.1) * 10 + 
+          Math.cos(x * 0.045 - time * 0.75) * 6 +
+          Math.sin(x * 0.08 + time * 1.6) * 3;
         ctx.lineTo(x, y);
       }
       ctx.lineTo(width, 0);
       ctx.closePath();
       ctx.fill();
 
-      // Layer 3: Cel-shaded Light Ripples (Mảng sáng khúc xạ trắng xanh)
-      ctx.fillStyle = 'rgba(255, 255, 255, 0.45)';
+      // Caustic Mesh Band 2: Bright White-Aqua Crest
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.38)';
       ctx.beginPath();
       ctx.moveTo(0, 0);
       for (let x = 0; x <= width; x += 10) {
-        const y = 12 + 
-          Math.sin(x * 0.035 + time * 2.0) * 6 + 
-          Math.cos(x * 0.06 - time * 1.4) * 4;
+        const y = 16 + 
+          Math.sin(x * 0.028 - time * 1.3) * 7 + 
+          Math.cos(x * 0.055 + time * 0.9) * 4;
         ctx.lineTo(x, y);
       }
       ctx.lineTo(width, 0);
       ctx.closePath();
       ctx.fill();
 
-      // Layer 4: Floating Organic Caustic Cells (Các vệt sáng nước lấp lánh nổi)
-      for (let i = 0; i < 7; i++) {
-        const cx = (width * 0.12) + (i * (width * 0.14)) + Math.sin(time + i * 1.5) * 15;
-        const cy = 25 + Math.cos(time * 1.3 + i * 2) * 12 + (i % 2 === 0 ? 10 : 0);
-        const rw = 22 + Math.sin(time * 0.8 + i) * 6;
-        const rh = 10 + Math.cos(time * 0.9 + i) * 4;
+      // Soft Floating Caustic Nodes (Sun Glints through water)
+      for (let i = 0; i < 6; i++) {
+        const cx = (width * 0.14) + (i * (width * 0.15)) + Math.sin(time * 0.7 + i * 1.8) * 20;
+        const cy = 24 + Math.cos(time * 0.9 + i * 2.2) * 12 + (i % 2 === 0 ? 8 : -4);
+        const rw = 26 + Math.sin(time * 0.6 + i) * 8;
+        const rh = 12 + Math.cos(time * 0.7 + i) * 4;
 
-        ctx.fillStyle = 'rgba(255, 255, 255, 0.32)';
+        const causticSpot = ctx.createRadialGradient(cx, cy, 2, cx, cy, rw);
+        causticSpot.addColorStop(0, 'rgba(255, 255, 255, 0.42)');
+        causticSpot.addColorStop(0.4, 'rgba(0, 242, 254, 0.25)');
+        causticSpot.addColorStop(1, 'rgba(0, 168, 255, 0)');
+
+        ctx.fillStyle = causticSpot;
         ctx.beginPath();
-        ctx.ellipse(cx, cy, rw, rh, Math.PI / 8, 0, Math.PI * 2);
+        ctx.ellipse(cx, cy, rw, rh, Math.PI / 10, 0, Math.PI * 2);
         ctx.fill();
-
-        ctx.strokeStyle = 'rgba(0, 240, 255, 0.45)';
-        ctx.lineWidth = 1.5;
-        ctx.stroke();
       }
 
-      // 4. Rising P3R Jelly-Like Wobble Bubbles
+      ctx.restore();
+
+      // ── 5. EXPANDING WATER RIPPLES (Interactive Touch Delight) ──
+      for (let rIdx = ripples.length - 1; rIdx >= 0; rIdx--) {
+        const rp = ripples[rIdx];
+        rp.radius += rp.speed;
+        rp.opacity -= 0.016;
+
+        if (rp.opacity <= 0 || rp.radius >= rp.maxRadius) {
+          ripples.splice(rIdx, 1);
+          continue;
+        }
+
+        ctx.save();
+        ctx.beginPath();
+        ctx.arc(rp.x, rp.y, rp.radius, 0, Math.PI * 2);
+        ctx.strokeStyle = `rgba(0, 240, 255, ${rp.opacity * 0.85})`;
+        ctx.lineWidth = 1.6;
+        ctx.stroke();
+
+        ctx.beginPath();
+        ctx.arc(rp.x, rp.y, Math.max(1, rp.radius * 0.65), 0, Math.PI * 2);
+        ctx.strokeStyle = `rgba(255, 255, 255, ${rp.opacity * 0.6})`;
+        ctx.lineWidth = 1;
+        ctx.stroke();
+        ctx.restore();
+      }
+
+      // ── 6. PRISMATIC MICRO-BUBBLES (Layered Depth & Specular Reflections) ──
       bubbles.forEach((b) => {
         b.y -= b.speed;
         b.phase += b.wobbleSpeed;
         const currentX = b.x + Math.sin(b.phase) * b.wobbleAmp;
 
-        // Reset bubble to bottom when reaching top
-        if (b.y < -20) {
-          b.y = height + 10;
+        // Reset bubble to bottom when reaching the top surface
+        if (b.y < -15) {
+          b.y = height + 10 + Math.random() * 15;
           b.x = Math.random() * width;
         }
 
-        // Draw translucent cel-shaded water bubble
         ctx.save();
         ctx.beginPath();
         ctx.arc(currentX, b.y, b.radius, 0, Math.PI * 2);
-        
-        // Bubble body
-        const bubbleGrad = ctx.createRadialGradient(
-          currentX - b.radius * 0.35,
-          b.y - b.radius * 0.35,
-          b.radius * 0.1,
-          currentX,
-          b.y,
-          b.radius
-        );
-        bubbleGrad.addColorStop(0, `rgba(255, 255, 255, ${b.opacity * 0.9})`);
-        bubbleGrad.addColorStop(0.4, `rgba(0, 240, 255, ${b.opacity * 0.5})`);
-        bubbleGrad.addColorStop(0.85, `rgba(0, 71, 179, ${b.opacity * 0.2})`);
-        bubbleGrad.addColorStop(1, `rgba(255, 255, 255, ${b.opacity * 0.4})`);
 
-        ctx.fillStyle = bubbleGrad;
-        ctx.fill();
+        if (b.isForeground) {
+          // Sharp Crystal Micro-Bubble
+          const bubbleGrad = ctx.createRadialGradient(
+            currentX - b.radius * 0.35,
+            b.y - b.radius * 0.35,
+            b.radius * 0.1,
+            currentX,
+            b.y,
+            b.radius
+          );
+          bubbleGrad.addColorStop(0, `rgba(255, 255, 255, ${b.opacity * 0.95})`);
+          bubbleGrad.addColorStop(0.35, `rgba(0, 242, 254, ${b.opacity * 0.6})`);
+          bubbleGrad.addColorStop(0.8, `rgba(0, 114, 255, ${b.opacity * 0.25})`);
+          bubbleGrad.addColorStop(1, `rgba(255, 255, 255, ${b.opacity * 0.5})`);
 
-        // Bubble glowing rim outline
-        ctx.strokeStyle = `rgba(0, 240, 255, ${b.opacity * 0.75})`;
-        ctx.lineWidth = 1.2;
-        ctx.stroke();
+          ctx.fillStyle = bubbleGrad;
+          ctx.fill();
 
-        // Bubble top-left glass reflection highlight
-        ctx.fillStyle = `rgba(255, 255, 255, ${b.opacity * 0.95})`;
-        ctx.beginPath();
-        ctx.arc(
-          currentX - b.radius * 0.32,
-          b.y - b.radius * 0.32,
-          b.radius * 0.25,
-          0,
-          Math.PI * 2
-        );
-        ctx.fill();
+          // Delicate Glowing Rim
+          ctx.strokeStyle = `rgba(0, 242, 254, ${b.opacity * 0.85})`;
+          ctx.lineWidth = 1;
+          ctx.stroke();
+
+          // Tiny Specular Diamond Highlight on top-left
+          ctx.fillStyle = `rgba(255, 255, 255, ${b.opacity * 0.98})`;
+          ctx.beginPath();
+          ctx.arc(
+            currentX - b.radius * 0.34,
+            b.y - b.radius * 0.34,
+            Math.max(0.8, b.radius * 0.25),
+            0,
+            Math.PI * 2
+          );
+          ctx.fill();
+        } else {
+          // Soft Ambient Bokeh Bubble (Deep Layer)
+          const bokehGrad = ctx.createRadialGradient(
+            currentX,
+            b.y,
+            b.radius * 0.15,
+            currentX,
+            b.y,
+            b.radius
+          );
+          bokehGrad.addColorStop(0, `rgba(255, 255, 255, ${b.opacity * 0.6})`);
+          bokehGrad.addColorStop(0.5, `rgba(0, 210, 255, ${b.opacity * 0.4})`);
+          bokehGrad.addColorStop(1, `rgba(0, 82, 212, 0)`);
+
+          ctx.fillStyle = bokehGrad;
+          ctx.fill();
+        }
 
         ctx.restore();
       });
@@ -202,10 +314,12 @@ export default function P3RWaterSurface({ className = '' }: P3RWaterSurfaceProps
       animationFrameId = requestAnimationFrame(render);
     };
 
-    render();
+    animationFrameId = requestAnimationFrame(render);
 
     return () => {
-      window.removeEventListener('resize', handleResize);
+      window.removeEventListener('resize', setupCanvasSize);
+      window.removeEventListener('pointerdown', handlePointerDown);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
       cancelAnimationFrame(animationFrameId);
     };
   }, []);
@@ -213,7 +327,7 @@ export default function P3RWaterSurface({ className = '' }: P3RWaterSurfaceProps
   return (
     <canvas 
       ref={canvasRef} 
-      className={`absolute inset-0 w-full h-full pointer-events-none ${className}`} 
+      className={`absolute inset-0 w-full h-full pointer-events-auto ${className}`} 
       style={{ display: 'block' }}
     />
   );
