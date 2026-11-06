@@ -375,8 +375,8 @@ export default function CustomerProfile({
                     {userPoints.toLocaleString('vi-VN')} Điểm
                   </span>
                 </div>
-                <div className="text-[10px] text-emerald-600 font-bold">
-                  ≈ {(userPoints * 1000).toLocaleString('vi-VN')}đ ưu đãi đơn hàng
+                <div className="text-[10px] text-slate-400">
+                  Xem chi tiết lịch sử tích điểm từ đơn hàng
                 </div>
               </div>
             </div>

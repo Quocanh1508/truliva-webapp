@@ -75,15 +75,6 @@ export default function CustomerLoyaltyModal({ isOpen, onClose, userPoints }: Cu
               </span>
               <span className="text-xs text-slate-500 font-bold uppercase">Điểm</span>
             </div>
-            <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-2.5 flex items-center justify-between">
-              <span className="text-[11px] text-emerald-800 font-semibold">Giá trị ưu đãi đơn hàng:</span>
-              <span className="text-[13px] font-black text-emerald-600">
-                ≈ {formatVND(currentPoints * 1000)}
-              </span>
-            </div>
-            <p className="text-[10px] text-slate-400 italic">
-              * Điểm được áp dụng để giảm giá trực tiếp cho các đơn hàng tiếp theo.
-            </p>
           </div>
 
           {/* 2. Lịch sử tích điểm từ đơn hàng Truliva */}
@@ -121,9 +112,6 @@ export default function CustomerLoyaltyModal({ isOpen, onClose, userPoints }: Cu
                     <div className="text-right shrink-0">
                       <span className="text-[12px] font-black text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200 block">
                         +{ord.pointsEarned.toLocaleString('vi-VN')} điểm
-                      </span>
-                      <span className="text-[9px] text-slate-400 block mt-0.5">
-                        ≈ +{formatVND(ord.pointValueVnd)}
                       </span>
                     </div>
                   </div>
