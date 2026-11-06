@@ -480,25 +480,23 @@ export default function CustomerProfile({
       </div>
 
       {/* Interactive Modals */}
-      {FEATURES.ENABLE_MEMBER_RANKING && (
-        <>
-          <CustomerVoucherModal
-            isOpen={showVoucherModal}
-            onClose={() => setShowVoucherModal(false)}
-            onUseVoucher={(_code) => {
-              setShowVoucherModal(false);
-              handleBookMaintenance();
-            }}
-          />
+      <CustomerLoyaltyModal
+        isOpen={showLoyaltyModal}
+        onClose={() => setShowLoyaltyModal(false)}
+        userPoints={userPoints}
+        rank={rank}
+        onOpenScanner={onOpenScanner}
+      />
 
-          <CustomerLoyaltyModal
-            isOpen={showLoyaltyModal}
-            onClose={() => setShowLoyaltyModal(false)}
-            userPoints={userPoints}
-            rank={rank}
-            onOpenScanner={onOpenScanner}
-          />
-        </>
+      {FEATURES.ENABLE_MEMBER_RANKING && (
+        <CustomerVoucherModal
+          isOpen={showVoucherModal}
+          onClose={() => setShowVoucherModal(false)}
+          onUseVoucher={(_code) => {
+            setShowVoucherModal(false);
+            handleBookMaintenance();
+          }}
+        />
       )}
 
       <CustomerHistoryModal
