@@ -167,17 +167,13 @@ export default function CustomerProfile({
               title="Nhấn để đồng bộ avatar và tên từ Zalo"
               className="relative cursor-pointer group"
             >
-              <div className={`w-16 h-16 rounded-full bg-[#0B2545] border-2 ring-2 flex items-center justify-center text-white font-black text-xl overflow-hidden transition-all group-hover:opacity-90 ${rank.ringColor}`}>
+              <div className="w-16 h-16 rounded-full bg-[#0B2545] border-2 border-white/85 shadow-md flex items-center justify-center text-white font-black text-xl overflow-hidden transition-all group-hover:opacity-90">
                 {user?.avatar ? (
                   <img src={user.avatar} alt="Avatar" className="w-full h-full object-cover" />
                 ) : (
                   <User size={32} className="text-cyan-200" />
                 )}
               </div>
-              <span 
-                className="absolute bottom-0 right-0 w-4 h-4 border-2 border-[#061226] rounded-full transition-all shadow-xs"
-                style={{ backgroundColor: rank.iconColor }}
-              ></span>
             </div>
             
             <div className="flex-1 min-w-0">

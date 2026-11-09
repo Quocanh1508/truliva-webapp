@@ -49,12 +49,12 @@ export const RANK_CONFIGS: Record<MemberTier, RankConfig> = {
   DIAMOND: {
     tier: 'DIAMOND',
     label: 'Thành viên Kim Cương',
-    badgeBg: 'bg-gradient-to-r from-[#E879F9]/40 via-[#C084FC]/35 to-[#6B21A8]/60',
-    borderColor: 'border-[#F0ABFC]',
-    textColor: 'text-[#FDF4FF]',
-    iconColor: '#F0ABFC',
-    ringColor: 'border-[#F0ABFC] ring-[#C084FC]/50 shadow-[0_0_18px_rgba(232,121,249,0.65)]',
-    shadowGlow: 'shadow-[0_0_15px_rgba(232,121,249,0.55)]',
+    badgeBg: 'bg-gradient-to-r from-[#38BDF8]/40 via-[#0284C7]/35 to-[#0369A1]/60',
+    borderColor: 'border-[#38BDF8]',
+    textColor: 'text-[#E0F2FE]',
+    iconColor: '#38BDF8',
+    ringColor: 'border-white/80 ring-[#38BDF8]/40 shadow-[0_0_15px_rgba(56,189,248,0.45)]',
+    shadowGlow: 'shadow-[0_0_12px_rgba(56,189,248,0.45)]',
     minPoints: 1000
   }
 };

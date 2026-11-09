@@ -199,17 +199,13 @@ export default function CustomerHome({ user, mySerials = [], onOpenScanner, onOp
         <div className="max-w-md mx-auto flex items-center justify-between">
           <div className="flex items-center space-x-3">
             <div className="relative">
-              <div className={`w-12 h-12 rounded-full bg-[#0B2545] border-2 ring-2 flex items-center justify-center text-white font-bold text-lg overflow-hidden transition-all ${rank.ringColor}`}>
+              <div className="w-12 h-12 rounded-full bg-[#0B2545] border-2 border-white/85 shadow-md flex items-center justify-center text-white font-bold text-lg overflow-hidden transition-all">
                 {user?.avatar ? (
                   <img src={user.avatar} alt="Avatar" className="w-full h-full object-cover" />
                 ) : (
                   <User size={26} className="text-cyan-200" />
                 )}
               </div>
-              <span 
-                className="absolute bottom-0 right-0 w-3.5 h-3.5 border-2 border-[#061226] rounded-full transition-all shadow-xs"
-                style={{ backgroundColor: rank.iconColor }}
-              ></span>
             </div>
             <div>
               <div className="flex items-center space-x-1.5">

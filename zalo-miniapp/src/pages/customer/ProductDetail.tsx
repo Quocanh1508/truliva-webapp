@@ -19,7 +19,10 @@ import {
   BookOpen,
   CheckCircle2,
   HelpCircle,
-  MessageCircle
+  MessageCircle,
+  ChevronDown,
+  ChevronUp,
+  Layers
 } from 'lucide-react';
 import { openWebview, openPhone, openChat } from 'zmp-sdk/apis';
 import { useCart } from '../../context/CartContext';
@@ -33,11 +36,117 @@ interface ProductDetailProps {
   onBuyNow: (product: any, quantity: number) => void;
 }
 
+interface DescSection {
+  title: string;
+  theme: 'sky' | 'blue' | 'emerald' | 'amber' | 'slate';
+  items: string[];
+}
+
+function detectSectionTheme(title: string): DescSection['theme'] {
+  const upper = title.toUpperCase();
+  if (/BẢO HÀNH|LẮP ĐẶT|AN TOÀN|HẬU MÃI/.test(upper)) return 'emerald';
+  if (/CÔNG NGHỆ|ƯU ĐIỂM|CRYSTAL|LÀM LẠNH|LÀM ĐÁ|ĐIỀU KHIỂN|LÝ DO|TẠI SAO|VÌ SAO|TÙY CHỈNH|THIẾT KẾ/.test(upper)) return 'blue';
+  if (/HƯỚNG DẪN|THAY THẾ|DIY|HẠN SỬ DỤNG|LƯU Ý/.test(upper)) return 'amber';
+  if (/THƯƠNG HIỆU|CHỨNG NHẬN|CHẤT LƯỢNG/.test(upper)) return 'slate';
+  return 'sky';
+}
+
+function parseProductDescription(raw: string): { sections: DescSection[]; footnotes: string[] } {
+  if (!raw) return { sections: [], footnotes: [] };
+
+  let text = raw
+    .replace(/&nbsp;/gi, ' ')
+    .replace(/&amp;/gi, '&')
+    .replace(/&lt;/gi, '<')
+    .replace(/&gt;/gi, '>')
+    .replace(/&quot;/gi, '"')
+    .trim();
+
+  // Remove duplicate "* Phân loại sản phẩm:" if raw unformatted text is passed
+  const dupMarker = '* Phân loại sản phẩm:';
+  const firstIdx = text.indexOf(dupMarker);
+  if (firstIdx !== -1) {
+    const secondIdx = text.indexOf(dupMarker, firstIdx + dupMarker.length);
+    if (secondIdx !== -1) {
+      const thIdx = text.indexOf('THÔNG TIN CHUNG', secondIdx);
+      if (thIdx !== -1) {
+        text = text.slice(0, secondIdx).trim() + '\n' + text.slice(thIdx).trim();
+      }
+    }
+  }
+
+  // If the text has very few newlines (unformatted blob), auto-insert breaks before headers & bullets
+  if (text.split('\n').length < 4 && text.length > 220) {
+    text = text
+      .replace(/^\*\s*Phân loại sản phẩm:\s*/i, 'PHÂN LOẠI SẢN PHẨM\n')
+      .replace(/\s+(THÔNG TIN CHUNG CỦA SẢN PHẨM|THÔNG TIN CHUNG VỀ SẢN PHẨM|ĐIỀU KIỆN LẮP ĐẶT & BẢO HÀNH|ƯU ĐIỂM NỔI BẬT|THÔNG TIN SẢN PHẨM|THÔNG TIN KỸ THUẬT|HƯỚNG DẪN THAY THẾ LÕI LỌC TẠI NHÀ\(DIY\)|HẠN SỬ DỤNG VÀ BẢO HÀNH)/g, '\n$1\n')
+      .replace(/\s+(TRULIVA là thương hiệu với hơn 25 năm kinh nghiệm)/g, '\nTHƯƠNG HIỆU & CHỨNG NHẬN QUỐC TẾ\n- $1')
+      .replace(/\s+-\s+/g, '\n- ')
+      .replace(/\s*([✅✔⭐])\s*/g, '\n- ');
+  }
+
+  const rawLines = text
+    .split('\n')
+    .map(l => l.trim())
+    .filter(l => l.length > 0 && l !== '-' && l !== '*');
+
+  const sections: DescSection[] = [];
+  const footnotes: string[] = [];
+  let currentSection: DescSection = {
+    title: 'Đặc điểm nổi bật',
+    theme: 'sky',
+    items: []
+  };
+
+  const isHeaderLine = (line: string): boolean => {
+    if (line.startsWith('-') || line.startsWith('•') || line.startsWith('(*')) return false;
+    if (/^\*\s*Phân loại sản phẩm:?$/i.test(line)) return true;
+    const clean = line.replace(/[:?🔥❄️🧊🚚⭐]/g, '').trim();
+    if (clean.length < 4 || clean.length > 75) return false;
+    // All-uppercase header check (Vietnamese aware)
+    return clean === clean.toUpperCase() && /[A-ZÀ-Ỹ]/.test(clean);
+  };
+
+  for (const line of rawLines) {
+    if (/^\(\*+\)/.test(line)) {
+      footnotes.push(line);
+      continue;
+    }
+
+    if (isHeaderLine(line)) {
+      const cleanTitle = line
+        .replace(/^\*\s*/, '')
+        .replace(/:$/, '')
+        .trim();
+      if (currentSection.items.length > 0) {
+        sections.push(currentSection);
+      }
+      currentSection = {
+        title: cleanTitle,
+        theme: detectSectionTheme(cleanTitle),
+        items: []
+      };
+    } else {
+      const cleanedItem = line.replace(/^[-•*]\s*/, '').trim();
+      if (cleanedItem) {
+        currentSection.items.push(cleanedItem);
+      }
+    }
+  }
+
+  if (currentSection.items.length > 0) {
+    sections.push(currentSection);
+  }
+
+  return { sections, footnotes };
+}
+
 export default function ProductDetail({ product, onBack, onGoToCart, onBuyNow }: ProductDetailProps) {
   const [quantity, setQuantity] = useState(1);
   const [selectedImgIdx, setSelectedImgIdx] = useState(0);
   const [showSuccessToast, setShowSuccessToast] = useState(false);
   const [showCartModal, setShowCartModal] = useState(false);
+  const [descExpanded, setDescExpanded] = useState(false);
 
   // Legal Modal
   const [showLegalModal, setShowLegalModal] = useState(false);
@@ -333,15 +442,220 @@ export default function ProductDetail({ product, onBack, onGoToCart, onBuyNow }:
         </div>
       )}
 
-      {/* Detailed Description */}
-      {product.description && (
-        <div className="bg-white p-4 mt-2 border-y border-gray-100 space-y-2">
-          <h3 className="font-bold text-sm text-gray-900">Mô Tả Sản Phẩm</h3>
-          <p className="text-xs text-gray-600 leading-relaxed whitespace-pre-line">
-            {product.description}
-          </p>
-        </div>
-      )}
+      {/* Detailed Description — Structured Bento Section Cards */}
+      {product.description && (() => {
+        const { sections: descSections, footnotes: descFootnotes } = parseProductDescription(product.description);
+        if (descSections.length === 0) return null;
+
+        const totalBulletCount = descSections.reduce((acc, s) => acc + s.items.length, 0);
+        const needsCollapse = descSections.length > 2 || totalBulletCount > 6;
+        const visibleSections = (!needsCollapse || descExpanded)
+          ? descSections
+          : descSections.slice(0, 2).map((sec, idx) => ({
+              ...sec,
+              items: idx === 0 ? sec.items.slice(0, 4) : sec.items.slice(0, 3)
+            }));
+
+        const themeStyles: Record<DescSection['theme'], {
+          cardBg: string;
+          cardBorder: string;
+          headerBg: string;
+          iconBg: string;
+          iconText: string;
+          titleText: string;
+          dotColor: string;
+        }> = {
+          sky: {
+            cardBg: 'bg-sky-50/45',
+            cardBorder: 'border-sky-100/90',
+            headerBg: 'border-sky-100/80',
+            iconBg: 'bg-sky-100/90',
+            iconText: 'text-[#00A3FF]',
+            titleText: 'text-[#1B3A6B]',
+            dotColor: 'bg-[#00A3FF]'
+          },
+          blue: {
+            cardBg: 'bg-blue-50/45',
+            cardBorder: 'border-blue-100/90',
+            headerBg: 'border-blue-100/80',
+            iconBg: 'bg-blue-100/90',
+            iconText: 'text-[#2563EB]',
+            titleText: 'text-[#1B3A6B]',
+            dotColor: 'bg-[#2563EB]'
+          },
+          emerald: {
+            cardBg: 'bg-emerald-50/45',
+            cardBorder: 'border-emerald-100/90',
+            headerBg: 'border-emerald-100/80',
+            iconBg: 'bg-emerald-100/90',
+            iconText: 'text-emerald-600',
+            titleText: 'text-emerald-950',
+            dotColor: 'bg-emerald-500'
+          },
+          amber: {
+            cardBg: 'bg-amber-50/45',
+            cardBorder: 'border-amber-100/90',
+            headerBg: 'border-amber-100/80',
+            iconBg: 'bg-amber-100/90',
+            iconText: 'text-amber-600',
+            titleText: 'text-amber-950',
+            dotColor: 'bg-amber-500'
+          },
+          slate: {
+            cardBg: 'bg-slate-50/75',
+            cardBorder: 'border-slate-200/80',
+            headerBg: 'border-slate-200/70',
+            iconBg: 'bg-slate-200/80',
+            iconText: 'text-[#1B3A6B]',
+            titleText: 'text-slate-800',
+            dotColor: 'bg-[#1B3A6B]'
+          }
+        };
+
+        const renderSectionIcon = (theme: DescSection['theme']) => {
+          switch (theme) {
+            case 'emerald':
+              return <ShieldCheck className="w-3.5 h-3.5" />;
+            case 'blue':
+              return <Sparkles className="w-3.5 h-3.5" />;
+            case 'amber':
+              return <BookOpen className="w-3.5 h-3.5" />;
+            case 'slate':
+              return <Award className="w-3.5 h-3.5" />;
+            default:
+              return <Layers className="w-3.5 h-3.5" />;
+          }
+        };
+
+        const renderFormattedItem = (item: string) => {
+          // Match "Bước 1: ..." or "Lưu ý: ..."
+          const stepMatch = item.match(/^(Bước\s*\d+|Lưu ý)\s*:\s*(.+)$/i);
+          if (stepMatch) {
+            return (
+              <div className="text-[12.5px] text-slate-700 leading-relaxed">
+                <span className="inline-flex items-center px-1.5 py-0.5 mr-1.5 rounded-md bg-[#1B3A6B] text-white text-[10px] font-bold uppercase tracking-wide">
+                  {stepMatch[1]}
+                </span>
+                <span>{stepMatch[2]}</span>
+              </div>
+            );
+          }
+
+          // Match "Label: Value" where label is concise (<= 42 chars)
+          const colonIdx = item.indexOf(':');
+          if (colonIdx > 1 && colonIdx <= 42) {
+            const label = item.slice(0, colonIdx).trim();
+            const value = item.slice(colonIdx + 1).trim();
+            if (value.length > 0) {
+              return (
+                <p className="text-[12.5px] text-slate-600 leading-relaxed">
+                  <span className="font-bold text-slate-800">{label}:</span>{' '}
+                  <span>{value}</span>
+                </p>
+              );
+            }
+          }
+
+          return (
+            <p className="text-[12.5px] text-slate-600 leading-relaxed">
+              {item}
+            </p>
+          );
+        };
+
+        return (
+          <div className="bg-white p-4 mt-2 border-y border-gray-100 space-y-3">
+            {/* Section Title Header */}
+            <div className="flex items-center justify-between pb-2 border-b border-gray-100">
+              <div className="flex items-center space-x-2">
+                <div className="p-1.5 bg-sky-100/80 text-[#00A3FF] rounded-lg">
+                  <Sparkles className="w-4 h-4 text-[#00A3FF]" />
+                </div>
+                <div>
+                  <h3 className="font-extrabold text-xs text-slate-800 tracking-tight uppercase">
+                    Mô Tả Chi Tiết Sản Phẩm
+                  </h3>
+                  <p className="text-[10px] text-slate-400 font-medium">
+                    {descSections.length} nhóm thông tin • Chuẩn công bố Truliva Việt Nam
+                  </p>
+                </div>
+              </div>
+              <span className="text-[10px] font-bold text-[#1B3A6B] bg-sky-50 border border-sky-200/70 px-2 py-0.5 rounded-full">
+                Chính hãng
+              </span>
+            </div>
+
+            {/* Structured Bento Cards */}
+            <div className="relative space-y-2.5">
+              {visibleSections.map((sec, sIdx) => {
+                const st = themeStyles[sec.theme];
+                return (
+                  <div
+                    key={sIdx}
+                    className={`rounded-2xl border ${st.cardBorder} ${st.cardBg} p-3 transition-all`}
+                  >
+                    <div className={`flex items-center gap-2 pb-2 mb-2 border-b ${st.headerBg}`}>
+                      <div className={`w-6 h-6 rounded-lg ${st.iconBg} ${st.iconText} flex items-center justify-center shrink-0`}>
+                        {renderSectionIcon(sec.theme)}
+                      </div>
+                      <h4 className={`text-[11.5px] font-extrabold uppercase tracking-tight leading-snug ${st.titleText}`}>
+                        {sec.title}
+                      </h4>
+                    </div>
+
+                    <ul className="space-y-2">
+                      {sec.items.map((item, iIdx) => (
+                        <li key={iIdx} className="flex items-start gap-2.5">
+                          <span className={`w-1.5 h-1.5 rounded-full ${st.dotColor} mt-[7px] shrink-0`} />
+                          <div className="flex-1 min-w-0">
+                            {renderFormattedItem(item)}
+                          </div>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                );
+              })}
+
+              {/* Footnotes Box (only when expanded or not needing collapse) */}
+              {(!needsCollapse || descExpanded) && descFootnotes.length > 0 && (
+                <div className="rounded-xl bg-slate-50 border border-slate-200/70 px-3 py-2 space-y-1">
+                  {descFootnotes.map((fn, fIdx) => (
+                    <p key={fIdx} className="text-[10.5px] text-slate-500 italic leading-snug">
+                      {fn}
+                    </p>
+                  ))}
+                </div>
+              )}
+
+              {/* Bottom Fade Gradient when collapsed */}
+              {needsCollapse && !descExpanded && (
+                <div className="pointer-events-none absolute inset-x-0 bottom-0 h-14 bg-gradient-to-t from-white via-white/80 to-transparent rounded-b-2xl" />
+              )}
+            </div>
+
+            {/* Progressive Disclosure Expand / Collapse Button (min-h 44px per UI Design System) */}
+            {needsCollapse && (
+              <button
+                type="button"
+                onClick={() => setDescExpanded(prev => !prev)}
+                className="w-full min-h-[44px] py-2.5 px-4 rounded-xl bg-slate-50 hover:bg-sky-50/70 active:scale-[0.99] border border-slate-200/80 text-[#1B3A6B] font-bold text-xs flex items-center justify-center gap-1.5 transition-all shadow-2xs"
+              >
+                <span>
+                  {descExpanded
+                    ? 'Thu gọn mô tả sản phẩm'
+                    : `Xem đầy đủ ${descSections.length} mục mô tả chi tiết`}
+                </span>
+                {descExpanded ? (
+                  <ChevronUp className="w-4 h-4 text-[#00A3FF]" />
+                ) : (
+                  <ChevronDown className="w-4 h-4 text-[#00A3FF]" />
+                )}
+              </button>
+            )}
+          </div>
+        );
+      })()}
 
       {/* User Manual & Safety Guide Section */}
       <div className="bg-white p-4 mt-2 border-y border-gray-100 space-y-3">

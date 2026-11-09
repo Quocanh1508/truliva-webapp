@@ -87,9 +87,9 @@ export default function ProductCatalog({ onSelectProduct, onGoToCart }: ProductC
         <div className="max-w-md mx-auto space-y-3">
           <div className="flex items-center justify-between gap-3">
             <div className="min-w-0">
-              <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-white/10 text-cyan-300 text-[10px] font-bold border border-white/15 backdrop-blur-xs mb-1.5">
-                <span className="w-1.5 h-1.5 rounded-full bg-[#00D2FF]"></span>
-                <span className="truncate">{FEATURES.ENABLE_ECOMMERCE ? 'Gian hàng chính hãng Truliva' : 'Thiết bị & Hướng dẫn sử dụng'}</span>
+              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#06182E]/80 text-white text-[10.5px] font-black border border-cyan-400/40 backdrop-blur-md mb-2 shadow-[0_2px_8px_rgba(6,24,46,0.35)]">
+                <span className="w-1.5 h-1.5 rounded-full bg-[#00D2FF] shadow-[0_0_8px_#00D2FF] shrink-0"></span>
+                <span className="tracking-wide">{FEATURES.ENABLE_ECOMMERCE ? 'Gian hàng chính hãng Truliva' : 'Thiết bị & Hướng dẫn sử dụng'}</span>
               </div>
               <h1 className="text-lg sm:text-xl font-black text-white tracking-tight leading-snug">
                 {FEATURES.ENABLE_ECOMMERCE ? 'Cửa Hàng Máy Lọc Nước' : 'Máy Lọc Nước Truliva'}
@@ -277,12 +277,8 @@ export default function ProductCatalog({ onSelectProduct, onGoToCart }: ProductC
                           </button>
                         </div>
                       ) : (
-                        <div className="w-full py-1.5 px-2.5 bg-sky-50 group-hover:bg-[#1B3A6B] text-[#0284C7] group-hover:text-white rounded-xl text-[11px] font-bold flex items-center justify-between border border-sky-100/70 transition-all cursor-pointer">
-                          <div className="flex items-center gap-1.5 min-w-0">
-                            <BookOpen size={12} className="shrink-0" />
-                            <span className="whitespace-nowrap">Thông số & HDSD</span>
-                          </div>
-                          <ChevronRight size={13} className="shrink-0 text-[#0284C7] group-hover:text-white transition-colors" />
+                        <div className="w-full py-2 px-3 bg-sky-50/90 group-hover:bg-[#1B3A6B] active:bg-[#152e55] text-[#0284C7] group-hover:text-white active:scale-[0.98] rounded-xl text-xs font-bold text-center border border-sky-100/80 transition-all cursor-pointer shadow-2xs">
+                          Thông số & HDSD
                         </div>
                       )}
                     </div>
