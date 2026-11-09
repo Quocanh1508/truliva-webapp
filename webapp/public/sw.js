@@ -1,5 +1,5 @@
 // Cache-busting version - change this value to force iOS PWA to reload all assets
-const SW_VERSION = '2026-10-21-v1';
+const SW_VERSION = '2026-11-09-v1';
 
 self.addEventListener('install', (event) => {
   console.log(`[SW ${SW_VERSION}] Installing...`);
