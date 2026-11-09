@@ -1,5 +1,5 @@
-import React, { useState, useRef, useEffect } from 'react';
-import { Camera, X, UploadCloud, Download } from 'lucide-react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
+import { Camera, X, UploadCloud, Download, ClipboardPaste, CheckCircle2 } from 'lucide-react';
 import { uploadImages, fetchApi } from '../api/client';
 import { compressImage } from '../utils/compressor';
 import { Capacitor } from '@capacitor/core';
@@ -24,7 +24,32 @@ export default function LabeledImageUploader({ imageSlots, workType, onUploadSuc
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgressText, setUploadProgressText] = useState('');
   const [error, setError] = useState('');
+  const [pasteNotice, setPasteNotice] = useState<string | null>(null);
+  const [activeSlotIndex, setActiveSlotIndex] = useState<number | null>(null);
+  const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
+
   const fileInputRefs = useRef<(HTMLInputElement | null)[]>([]);
+  const slotContainerRefs = useRef<(HTMLDivElement | null)[]>([]);
+  const hoveredSlotRef = useRef<number | null>(null);
+  const activeSlotRef = useRef<number | null>(null);
+  const slotPreviewsRef = useRef<(string | null)[]>(slotPreviews);
+  const noticeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    activeSlotRef.current = activeSlotIndex;
+  }, [activeSlotIndex]);
+
+  useEffect(() => {
+    slotPreviewsRef.current = slotPreviews;
+  }, [slotPreviews]);
+
+  const showPasteToast = useCallback((msg: string) => {
+    setPasteNotice(msg);
+    if (noticeTimerRef.current) clearTimeout(noticeTimerRef.current);
+    noticeTimerRef.current = setTimeout(() => {
+      setPasteNotice(null);
+    }, 3000);
+  }, []);
 
   // Ảnh mẫu tải từ server
   const [samples, setSamples] = useState<any[]>([]);
@@ -61,37 +86,168 @@ export default function LabeledImageUploader({ imageSlots, workType, onUploadSuc
       .catch(err => console.error('Lỗi tải ảnh mẫu:', err));
   }, [workType]);
 
+  // Hàm dùng chung xử lý File ảnh (từ chọn file, chụp ảnh, Paste Clipboard hoặc Drag & Drop)
+  const processAndSetFile = useCallback(async (index: number, rawFile: File, isFromPasteOrDrop = false) => {
+    if (index < 0 || index >= imageSlots.length) return;
+
+    // Hiển thị preview ngay lập tức bằng objectUrl (0ms)
+    const previewUrl = URL.createObjectURL(rawFile);
+    setSlotPreviews(prev => {
+      const next = [...prev];
+      if (next[index] && next[index]!.startsWith('blob:')) {
+        URL.revokeObjectURL(next[index]!);
+      }
+      next[index] = previewUrl;
+      slotPreviewsRef.current = next;
+      return next;
+    });
+    setError('');
+
+    if (isFromPasteOrDrop) {
+      const label = imageSlots[index]?.label || `Ô số ${index + 1}`;
+      showPasteToast(`Đã dán ảnh vào: ${index + 1}. ${label}`);
+      // Tự động nhảy sang ô trống tiếp theo để lần Ctrl+V kế tiếp điền luôn
+      setTimeout(() => {
+        const nextEmpty = slotPreviewsRef.current.findIndex((p, idx) => idx > index && !p);
+        const fallbackEmpty = slotPreviewsRef.current.findIndex(p => !p);
+        const nextTarget = nextEmpty !== -1 ? nextEmpty : (fallbackEmpty !== -1 ? fallbackEmpty : null);
+        setActiveSlotIndex(nextTarget);
+      }, 50);
+    }
+
+    // Nén ảnh tức thì trong nền ngay khi chụp/chọn/dán
+    try {
+      const compressed = await compressImage(rawFile);
+      setSlotFiles(prev => {
+        const u = [...prev];
+        u[index] = compressed;
+        return u;
+      });
+    } catch {
+      setSlotFiles(prev => {
+        const u = [...prev];
+        u[index] = rawFile;
+        return u;
+      });
+    }
+  }, [imageSlots, showPasteToast]);
+
   const handleFileSelect = async (index: number, e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
       const rawFile = e.target.files[0];
+      await processAndSetFile(index, rawFile, false);
+      e.target.value = '';
+    }
+  };
 
-      // Revoke old preview if exists
-      if (slotPreviews[index] && slotPreviews[index]!.startsWith('blob:')) {
-        URL.revokeObjectURL(slotPreviews[index]!);
+  // Trích xuất danh sách file ảnh từ ClipboardEvent
+  const extractImagesFromClipboardData = (clipboardData: DataTransfer | null): File[] => {
+    if (!clipboardData) return [];
+    const extracted: File[] = [];
+
+    if (clipboardData.items) {
+      for (let i = 0; i < clipboardData.items.length; i++) {
+        const item = clipboardData.items[i];
+        if (item.type.startsWith('image/')) {
+          const file = item.getAsFile();
+          if (file) {
+            const ext = item.type.split('/')[1] || 'png';
+            const namedFile = new File([file], `pasted_${Date.now()}_${i}.${ext}`, { type: item.type });
+            extracted.push(namedFile);
+          }
+        }
+      }
+    }
+
+    if (extracted.length === 0 && clipboardData.files) {
+      for (let i = 0; i < clipboardData.files.length; i++) {
+        const file = clipboardData.files[i];
+        if (file.type.startsWith('image/')) {
+          extracted.push(file);
+        }
+      }
+    }
+
+    return extracted;
+  };
+
+  // Lắng nghe sự kiện Ctrl + V (Paste) trên toàn màn hình khi ở bước Upload ảnh
+  useEffect(() => {
+    const handleGlobalPaste = async (e: ClipboardEvent) => {
+      if (isUploading) return;
+      const images = extractImagesFromClipboardData(e.clipboardData);
+      if (images.length === 0) return;
+
+      e.preventDefault();
+      e.stopPropagation();
+
+      // Xác định ô mục tiêu: Ưu tiên ô đang di chuột -> ô đang được chọn -> ô trống đầu tiên -> ô đầu tiên
+      let startIdx = hoveredSlotRef.current ?? activeSlotRef.current;
+      if (startIdx === null || startIdx === undefined) {
+        const firstEmpty = slotPreviewsRef.current.findIndex(p => !p);
+        startIdx = firstEmpty !== -1 ? firstEmpty : 0;
       }
 
-      // Hiển thị preview ngay lập tức bằng objectUrl (0ms)
-      const previewUrl = URL.createObjectURL(rawFile);
-      const newPreviews = [...slotPreviews];
-      newPreviews[index] = previewUrl;
-      setSlotPreviews(newPreviews);
-      setError('');
+      if (images.length === 1) {
+        await processAndSetFile(startIdx, images[0], true);
+      } else {
+        // Nếu người dùng copy nhiều ảnh cùng lúc, điền lần lượt từ ô startIdx sang các ô trống kế tiếp
+        let currentIdx = startIdx;
+        for (const imgFile of images) {
+          if (currentIdx >= imageSlots.length) break;
+          await processAndSetFile(currentIdx, imgFile, true);
+          currentIdx++;
+        }
+      }
+    };
 
-      // Nén ảnh tức thì trong nền ngay khi chụp/chọn
+    window.addEventListener('paste', handleGlobalPaste);
+    return () => window.removeEventListener('paste', handleGlobalPaste);
+  }, [isUploading, imageSlots.length, processAndSetFile]);
+
+  // Xử lý khi bấm trực tiếp nút "Dán ảnh" trên từng ô (sử dụng Clipboard API)
+  const handlePasteButtonClick = async (index: number, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (isUploading) return;
+
+    setActiveSlotIndex(index);
+    slotContainerRefs.current[index]?.focus();
+
+    if (navigator.clipboard && typeof navigator.clipboard.read === 'function') {
       try {
-        const compressed = await compressImage(rawFile);
-        setSlotFiles(prev => {
-          const u = [...prev];
-          u[index] = compressed;
-          return u;
-        });
-      } catch {
-        setSlotFiles(prev => {
-          const u = [...prev];
-          u[index] = rawFile;
-          return u;
-        });
+        const clipboardItems = await navigator.clipboard.read();
+        for (const item of clipboardItems) {
+          const imageType = item.types.find(t => t.startsWith('image/'));
+          if (imageType) {
+            const blob = await item.getType(imageType);
+            const ext = imageType.split('/')[1] || 'png';
+            const file = new File([blob], `zalo_paste_${index + 1}_${Date.now()}.${ext}`, { type: imageType });
+            await processAndSetFile(index, file, true);
+            return;
+          }
+        }
+        setError('Không tìm thấy hình ảnh trong Clipboard. Vui lòng chọn "Copy hình ảnh" từ Zalo trước rồi thử lại!');
+        return;
+      } catch (err: any) {
+        // Nếu trình duyệt chặn quyền đọc tự động hoặc chưa cấp quyền, hướng dẫn bấm Ctrl+V ngay khi ô đã được focus
+        showPasteToast(`Đã chọn ô số ${index + 1} — Hãy ấn Ctrl + V để dán ảnh!`);
+        return;
       }
+    } else {
+      showPasteToast(`Đã chọn ô số ${index + 1} — Hãy ấn Ctrl + V để dán ảnh!`);
+    }
+  };
+
+  // Xử lý Kéo - Thả (Drag & Drop) ảnh trực tiếp vào ô
+  const handleDrop = async (index: number, e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDragOverIndex(null);
+    if (isUploading) return;
+
+    const files = Array.from(e.dataTransfer?.files || []).filter(f => f.type.startsWith('image/'));
+    if (files.length > 0) {
+      await processAndSetFile(index, files[0], true);
     }
   };
 
@@ -317,16 +473,55 @@ export default function LabeledImageUploader({ imageSlots, workType, onUploadSuc
     <div>
       {error && <div className="alert alert-error mb-4">{error}</div>}
 
+      {/* Hướng dẫn nhanh Copy - Paste từ Zalo */}
+      <div className="mb-3 px-3.5 py-2.5 bg-blue-50/70 border border-blue-200 rounded-xl flex flex-wrap items-center justify-between gap-2 text-xs text-slate-700">
+        <div className="flex items-center gap-2">
+          <ClipboardPaste size={15} className="text-[#2563EB] shrink-0" />
+          <span>
+            <strong className="text-[#1B3A6B]">Dán ảnh nhanh từ Zalo:</strong> Copy hình ảnh (Ctrl+C) rồi bấm nút <strong>"Dán ảnh"</strong>, ấn <strong>Ctrl+V</strong> hoặc <strong>Kéo-Thả</strong> vào ô.
+          </span>
+        </div>
+        {pasteNotice && (
+          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-emerald-600 text-white font-semibold text-[11px] shadow-xs animate-fade-in">
+            <CheckCircle2 size={12} /> {pasteNotice}
+          </span>
+        )}
+      </div>
+
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 mb-6">
         {imageSlots.map((slot, index) => {
           const sample = samples.find(s => s.slotLabel === slot.label);
-          const hasImage = !!slotFiles[index];
+          const hasImage = !!slotFiles[index] || !!slotPreviews[index];
+          const isSlotActive = activeSlotIndex === index;
+          const isDraggingOver = dragOverIndex === index;
 
           return (
             <div 
-              key={index} 
-              className={`flex flex-col gap-2.5 p-3.5 rounded-xl border transition-all duration-200 ${
-                hasImage 
+              key={index}
+              ref={el => { slotContainerRefs.current[index] = el; }}
+              tabIndex={0}
+              onClick={() => setActiveSlotIndex(index)}
+              onMouseEnter={() => { hoveredSlotRef.current = index; }}
+              onMouseLeave={() => {
+                if (hoveredSlotRef.current === index) hoveredSlotRef.current = null;
+              }}
+              onDragOver={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                if (dragOverIndex !== index) setDragOverIndex(index);
+              }}
+              onDragLeave={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                if (dragOverIndex === index) setDragOverIndex(null);
+              }}
+              onDrop={(e) => handleDrop(index, e)}
+              className={`flex flex-col gap-2.5 p-3.5 rounded-xl border transition-all duration-200 outline-none ${
+                isDraggingOver
+                  ? 'bg-blue-50 border-[#00A3FF] ring-2 ring-[#00A3FF]/40 shadow-md'
+                  : isSlotActive
+                  ? 'bg-blue-50/40 border-[#2563EB] ring-2 ring-[#2563EB]/25 shadow-sm'
+                  : hasImage 
                   ? 'bg-emerald-50/30 border-emerald-300 shadow-sm' 
                   : 'bg-slate-50/50 border-slate-200 hover:border-slate-300 hover:bg-slate-50'
               }`}
@@ -334,7 +529,7 @@ export default function LabeledImageUploader({ imageSlots, workType, onUploadSuc
               {/* Label */}
               <div className="flex flex-col sm:min-h-[42px] justify-start">
                 <span className="text-[12px] font-semibold leading-normal flex items-start gap-1" style={{
-                  color: hasImage ? '#059669' : '#475569',
+                  color: hasImage ? '#059669' : isSlotActive ? '#1B3A6B' : '#475569',
                 }}>
                   <span className="shrink-0">{hasImage ? '✅ ' : `${index + 1}. `}</span>
                   <span>
@@ -354,7 +549,7 @@ export default function LabeledImageUploader({ imageSlots, workType, onUploadSuc
                   />
                   <button
                     type="button"
-                    onClick={() => removeFile(index)}
+                    onClick={(e) => { e.stopPropagation(); removeFile(index); }}
                     disabled={isUploading}
                     style={{
                       position: 'absolute', top: '6px', right: '6px',
@@ -363,12 +558,30 @@ export default function LabeledImageUploader({ imageSlots, workType, onUploadSuc
                       display: 'flex', alignItems: 'center', justifyContent: 'center',
                       zIndex: 2,
                     }}
+                    title="Xóa ảnh"
                   >
                     <X size={14} />
                   </button>
                   <button
                     type="button"
-                    onClick={() => handleDownloadPhoto(index)}
+                    onClick={(e) => handlePasteButtonClick(index, e)}
+                    disabled={isUploading}
+                    style={{
+                      position: 'absolute', bottom: '6px', left: '6px',
+                      background: 'rgba(37,99,235,0.9)', color: '#fff',
+                      borderRadius: '8px', padding: '4px 8px', border: 'none', cursor: 'pointer',
+                      display: 'flex', alignItems: 'center', gap: '4px',
+                      fontSize: '10px', fontWeight: 700,
+                      boxShadow: '0 2px 4px rgba(0,0,0,0.2)',
+                      zIndex: 2,
+                    }}
+                    title="Dán ảnh mới từ Clipboard đè vào ô này"
+                  >
+                    <ClipboardPaste size={12} /> Dán lại
+                  </button>
+                  <button
+                    type="button"
+                    onClick={(e) => { e.stopPropagation(); handleDownloadPhoto(index); }}
                     style={{
                       position: 'absolute', bottom: '6px', right: '6px',
                       background: 'rgba(27,58,107,0.85)', color: '#fff',
@@ -384,10 +597,15 @@ export default function LabeledImageUploader({ imageSlots, workType, onUploadSuc
                 </div>
               ) : (
                 <div
-                  onClick={() => handleChoosePhoto(index)}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setActiveSlotIndex(index);
+                    handleChoosePhoto(index);
+                  }}
                   style={{
                     width: '100%', paddingBottom: '100%', position: 'relative',
-                    borderRadius: '10px', border: '2px dashed #cbd5e1',
+                    borderRadius: '10px',
+                    border: isDraggingOver ? '2px dashed #00A3FF' : isSlotActive ? '2px dashed #2563EB' : '2px dashed #cbd5e1',
                     cursor: isUploading ? 'not-allowed' : 'pointer',
                     background: '#ffffff',
                     transition: 'border-color 0.2s, background 0.2s',
@@ -406,7 +624,7 @@ export default function LabeledImageUploader({ imageSlots, workType, onUploadSuc
                   onMouseLeave={(e) => {
                     if (!isUploading) {
                       const div = e.currentTarget as HTMLDivElement;
-                      div.style.borderColor = '#cbd5e1';
+                      div.style.borderColor = isSlotActive ? '#2563EB' : '#cbd5e1';
                       const overlay = div.querySelector('.upload-overlay') as HTMLDivElement;
                       if (overlay && sample?.imageUrl) {
                         overlay.style.backgroundColor = 'rgba(255, 255, 255, 0.65)';
@@ -435,22 +653,36 @@ export default function LabeledImageUploader({ imageSlots, workType, onUploadSuc
                       position: 'absolute', inset: 0,
                       display: 'flex', flexDirection: 'column',
                       alignItems: 'center', justifyContent: 'center',
-                      gap: '4px',
+                      gap: '6px',
                       backgroundColor: sample?.imageUrl ? 'rgba(255, 255, 255, 0.65)' : 'transparent',
                       transition: 'background-color 0.2s',
                       zIndex: 1,
+                      padding: '8px',
                     }}
                   >
-                    <div style={{ padding: '6px', borderRadius: '50%', background: 'rgba(255,255,255,0.85)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
-                      <Camera size={20} style={{ color: sample?.imageUrl ? '#1e293b' : '#94a3b8' }} />
+                    <div style={{ padding: '6px', borderRadius: '50%', background: 'rgba(255,255,255,0.9)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
+                      <Camera size={20} style={{ color: sample?.imageUrl ? '#1e293b' : '#64748b' }} />
                     </div>
                     <span style={{ 
-                      fontSize: '10px', 
+                      fontSize: '11px', 
                       color: '#1e293b', 
-                      fontWeight: 700 
+                      fontWeight: 700,
+                      background: 'rgba(255,255,255,0.85)',
+                      padding: '2px 8px',
+                      borderRadius: '6px',
                     }}>
-                      Chọn ảnh
+                      Chọn / Chụp ảnh
                     </span>
+                    <button
+                      type="button"
+                      onClick={(e) => handlePasteButtonClick(index, e)}
+                      disabled={isUploading}
+                      className="mt-0.5 inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-[#1B3A6B] hover:bg-[#2563EB] text-white text-[11px] font-bold shadow-sm transition-colors cursor-pointer border-none"
+                      title="Dán ảnh đã Copy từ Zalo (hoặc bấm Ctrl + V)"
+                    >
+                      <ClipboardPaste size={13} />
+                      <span>Dán ảnh (Ctrl+V)</span>
+                    </button>
                   </div>
                 </div>
               )}

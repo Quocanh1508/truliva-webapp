@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { fetchApi, deleteReportWithReason, updateReport, uploadImages, approveReport, rejectReport, getFiltersData } from '../../api/client';
-import { Download, X, ExternalLink, Image as ImageIcon, Loader, Search, Edit3, Save, Plus, Trash2, SlidersHorizontal, RotateCcw, Calendar, ChevronLeft, ChevronRight, ShieldCheck, CheckCircle, Loader2, Filter, XCircle } from 'lucide-react';
+import { Download, X, ExternalLink, Image as ImageIcon, Loader, Search, Edit3, Save, Plus, Trash2, SlidersHorizontal, RotateCcw, Calendar, ChevronLeft, ChevronRight, ShieldCheck, CheckCircle, Loader2, Filter, XCircle, ClipboardPaste } from 'lucide-react';
 import CategoryTreeSelect from '../../components/CategoryTreeSelect';
 import DateRangePicker from '../../components/DateRangePicker';
 import { formatOrderId, matchesSearchTerm } from '../../utils/text';
@@ -1333,6 +1333,61 @@ export default function ReportList() {
     if (editFileInputRef.current) editFileInputRef.current.value = '';
   };
 
+  // Hỗ trợ Ctrl+V và nút Dán ảnh từ Clipboard trong chế độ sửa báo cáo
+  useEffect(() => {
+    if (!isEditing || !selectedDetailReport) return;
+    const handleEditPaste = (e: ClipboardEvent) => {
+      if (editSaving) return;
+      const items = e.clipboardData?.items;
+      if (!items) return;
+      const pastedFiles: File[] = [];
+      for (let i = 0; i < items.length; i++) {
+        if (items[i].type.startsWith('image/')) {
+          const f = items[i].getAsFile();
+          if (f) {
+            const ext = items[i].type.split('/')[1] || 'png';
+            pastedFiles.push(new File([f], `pasted_${Date.now()}_${i}.${ext}`, { type: items[i].type }));
+          }
+        }
+      }
+      if (pastedFiles.length > 0) {
+        e.preventDefault();
+        setEditImageFiles(prev => [...prev, ...pastedFiles]);
+        setEditImagePreviews(prev => [...prev, ...pastedFiles.map(f => URL.createObjectURL(f))]);
+      }
+    };
+    window.addEventListener('paste', handleEditPaste);
+    return () => window.removeEventListener('paste', handleEditPaste);
+  }, [isEditing, selectedDetailReport, editSaving]);
+
+  const handlePasteNewImagesButton = async () => {
+    if (editSaving) return;
+    if (navigator.clipboard && typeof navigator.clipboard.read === 'function') {
+      try {
+        const clipboardItems = await navigator.clipboard.read();
+        const pastedFiles: File[] = [];
+        for (const item of clipboardItems) {
+          const imageType = item.types.find(t => t.startsWith('image/'));
+          if (imageType) {
+            const blob = await item.getType(imageType);
+            const ext = imageType.split('/')[1] || 'png';
+            pastedFiles.push(new File([blob], `zalo_paste_${Date.now()}.${ext}`, { type: imageType }));
+          }
+        }
+        if (pastedFiles.length > 0) {
+          setEditImageFiles(prev => [...prev, ...pastedFiles]);
+          setEditImagePreviews(prev => [...prev, ...pastedFiles.map(f => URL.createObjectURL(f))]);
+        } else {
+          alert('Không tìm thấy hình ảnh trong Clipboard. Hãy Copy hình ảnh từ Zalo trước!');
+        }
+      } catch {
+        alert('Hãy nhấn tổ hợp phím Ctrl + V để dán trực tiếp ảnh đã Copy!');
+      }
+    } else {
+      alert('Hãy nhấn tổ hợp phím Ctrl + V để dán trực tiếp ảnh đã Copy!');
+    }
+  };
+
   const handleRemoveNewImage = (idx: number) => {
     URL.revokeObjectURL(editImagePreviews[idx]);
     setEditImageFiles(prev => prev.filter((_, i) => i !== idx));
@@ -2644,15 +2699,26 @@ export default function ReportList() {
                         </div>
                       )}
 
-                      {/* Nút thêm ảnh */}
-                      <button
-                        type="button"
-                        onClick={() => editFileInputRef.current?.click()}
-                        disabled={editSaving}
-                        className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-blue-700 bg-blue-50 border border-blue-200 rounded-lg hover:bg-blue-100 transition-colors"
-                      >
-                        <Plus size={16} /> Thêm ảnh mới
-                      </button>
+                      {/* Nút thêm ảnh & Dán ảnh */}
+                      <div className="flex flex-wrap items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => editFileInputRef.current?.click()}
+                          disabled={editSaving}
+                          className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-blue-700 bg-blue-50 border border-blue-200 rounded-lg hover:bg-blue-100 transition-colors cursor-pointer"
+                        >
+                          <Plus size={16} /> Thêm ảnh mới
+                        </button>
+                        <button
+                          type="button"
+                          onClick={handlePasteNewImagesButton}
+                          disabled={editSaving}
+                          className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-white bg-[#1B3A6B] hover:bg-[#2563EB] rounded-lg transition-colors cursor-pointer"
+                          title="Dán ảnh đã Copy từ Zalo (hoặc ấn Ctrl + V)"
+                        >
+                          <ClipboardPaste size={15} /> Dán ảnh (Ctrl+V)
+                        </button>
+                      </div>
                       <input
                         type="file"
                         multiple
