@@ -127,7 +127,7 @@ router.get('/models', requireSerialAccess, getMachineModels);
 router.post('/models', requireSerialAccess, createMachineModel);
 router.put('/models/:id', requireSerialAccess, updateMachineModel);
 router.delete('/models/:id', requireSerialAccess, deleteMachineModel);
-router.get('/export', exportSerials);
+router.get('/export', requireSerialAccess, exportSerials);
 router.get('/policies', requireSerialAccess, getWarrantyPolicies);
 router.get('/:id', requireSerialAccess, getSerialDetail);
 router.post('/:id/activate', requireSerialAccess, activateSerialDirect);
@@ -136,7 +136,7 @@ router.patch('/:id', requireSerialAccess, updateSerial);
 router.post('/:id/restore', requireSerialAccess, restoreSerial);
 
 router.get('/zalo/status', requireSerialAccess, getZaloStatus);
-router.post('/zns-activate', activateZns);
+router.post('/zns-activate', requireSerialAccess, activateZns);
 router.post('/activate-manual', requireSerialAccess, activateManual);
 
 router.post('/zns/test-send', requireDev, testZnsSend);

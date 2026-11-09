@@ -53,30 +53,55 @@ app.use(compression());
 app.use(helmet({
   contentSecurityPolicy: false, // Cho phép load ảnh từ Cloudinary/Local
 }));
-const allowedOrigins = [
+const defaultAllowedOrigins = [
   'https://trulivaofficial.com',
   'https://www.trulivaofficial.com',
+  'https://trulivaofficial.com:8443',
   'https://h5.zdn.vn',
   'https://zalo.me',
-  'http://localhost:5173',
-  'http://localhost:3000',
-  'http://localhost',
   'capacitor://localhost'
 ];
 
+function isAllowedCorsOrigin(origin?: string): boolean {
+  // Permit requests with no Origin header (mobile apps, ESP32 IoT devices, server-to-server webhooks)
+  if (!origin) return true;
+
+  const envOrigins = (process.env.ALLOWED_ORIGINS || '')
+    .split(',')
+    .map((item) => item.trim())
+    .filter(Boolean);
+  const allowedOrigins = Array.from(new Set([...defaultAllowedOrigins, ...envOrigins]));
+
+  if (allowedOrigins.includes(origin)) {
+    return true;
+  }
+
+  if (
+    /^https:\/\/([a-z0-9-]+\.)?trulivaofficial\.com(?::\d+)?$/i.test(origin) ||
+    /^https:\/\/([a-z0-9-]+\.)?zdn\.vn$/i.test(origin) ||
+    /^https:\/\/([a-z0-9-]+\.)?zalo\.me$/i.test(origin) ||
+    origin.startsWith('zalo://')
+  ) {
+    return true;
+  }
+
+  // Permit localhost / 127.0.0.1 origins ONLY when NODE_ENV !== 'production'
+  if (process.env.NODE_ENV !== 'production') {
+    if (/^https?:\/\/(localhost|127\.0\.0\.1)(?::\d+)?$/i.test(origin)) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
 app.use(cors({
   origin: (origin, callback) => {
-    if (
-      !origin || 
-      allowedOrigins.includes(origin) || 
-      origin.endsWith('trulivaofficial.com') || 
-      origin.endsWith('zdn.vn') ||
-      origin.endsWith('zalo.me') ||
-      origin.startsWith('zalo://')
-    ) {
+    if (isAllowedCorsOrigin(origin)) {
       callback(null, true);
     } else {
-      callback(null, true);
+      logger.warn(`[CORS_BLOCKED] Rejected untrusted origin: ${origin}`);
+      callback(null, false);
     }
   },
   credentials: true,

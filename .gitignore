@@ -2,6 +2,8 @@ node_modules/
 dist/
 logs/
 .env
+.env.*
+!.env.example
 *.log
 test.js
 testPrisma.ts
@@ -11,6 +13,7 @@ tunnel.log
 KTV flow/
 scratch/
 firebase-service-account.json
+*firebase-adminsdk*.json
 /Truliva_technician.apk
 /app-debug.apk
 trulivatechniciansystem-firebase-adminsdk-fbsvc-f8fb54c1ed.json
@@ -18,3 +21,11 @@ serial_import_history/
 zalo-miniapp/www/
 backup_data/
 *.timestamp-*.mjs
+*.pem
+*.key
+*.p12
+*.pfx
+id_rsa*
+id_ed25519*
+scripts/*.local.js
+scripts/*secret*

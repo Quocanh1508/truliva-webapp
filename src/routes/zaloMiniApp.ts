@@ -1,7 +1,7 @@
 import { Router, Request, Response } from 'express';
 import prisma from '../config/database';
 import logger from '../utils/logger';
-import { requireAuth, optionalAuth } from '../middleware/authSession';
+import { requireAuth, requireCustomerAuth, optionalCustomerAuth } from '../middleware/authSession';
 import { authenticateZaloMiniAppUser } from '../services/zaloMiniAppService';
 import { activateSerialWarranty } from '../services/warrantyService';
 
@@ -22,12 +22,12 @@ router.post('/auth', async (req: Request, res: Response): Promise<void> => {
 
     const authResult = await authenticateZaloMiniAppUser(phoneToken, userAccessToken, zaloProfile);
 
-    // Thiết lập cookie session_token
-    res.cookie('session_token', authResult.token, {
+    // Thiết lập cookie zalo_session_token tách biệt với session_token nội bộ
+    res.cookie('zalo_session_token', authResult.token, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'lax',
-      maxAge: 90 * 24 * 60 * 60 * 1000 // 90 ngày
+      maxAge: 14 * 24 * 60 * 60 * 1000 // 14 ngày
     });
 
     res.json({
@@ -176,7 +176,7 @@ export async function calculateCustomerLoyalty(phoneNumber: string | null | unde
   };
 }
 
-router.get('/profile', requireAuth, async (req: Request, res: Response): Promise<void> => {
+router.get('/profile', requireCustomerAuth, async (req: Request, res: Response): Promise<void> => {
   try {
     const user = req.user;
     if (!user) {
@@ -224,7 +224,7 @@ router.get('/profile', requireAuth, async (req: Request, res: Response): Promise
  * GET /api/zalo-miniapp/loyalty
  * Lấy chi tiết lịch sử tích điểm và danh sách đơn hàng đã tích lũy từ Truliva App
  */
-router.get('/loyalty', requireAuth, async (req: Request, res: Response): Promise<void> => {
+router.get('/loyalty', requireCustomerAuth, async (req: Request, res: Response): Promise<void> => {
   try {
     const user = req.user;
     if (!user) {
@@ -251,7 +251,7 @@ router.get('/loyalty', requireAuth, async (req: Request, res: Response): Promise
  * POST /api/zalo-miniapp/profile/sync
  * Đồng bộ tên thật & avatar từ Zalo Mini App SDK lên tài khoản Truliva
  */
-router.post('/profile/sync', requireAuth, async (req: Request, res: Response): Promise<void> => {
+router.post('/profile/sync', requireCustomerAuth, async (req: Request, res: Response): Promise<void> => {
   try {
     const userId = req.user?.id;
     if (!userId) {
@@ -300,7 +300,7 @@ router.post('/profile/sync', requireAuth, async (req: Request, res: Response): P
  * GET /api/zalo-miniapp/my-serials
  * Lấy danh sách máy lọc nước / Serial của Khách Hàng theo Số Điện Thoại Zalo
  */
-router.get('/my-serials', requireAuth, async (req: Request, res: Response): Promise<void> => {
+router.get('/my-serials', requireCustomerAuth, async (req: Request, res: Response): Promise<void> => {
   try {
     const phone = req.user?.phoneNumber;
     if (!phone) {
@@ -615,7 +615,7 @@ router.get('/vouchers', async (_req: Request, res: Response): Promise<void> => {
  * GET /api/zalo-miniapp/service-history
  * Lấy lịch sử bảo trì, thay lõi và sửa chữa của khách hàng
  */
-router.get('/service-history', requireAuth, async (req: Request, res: Response): Promise<void> => {
+router.get('/service-history', requireCustomerAuth, async (req: Request, res: Response): Promise<void> => {
   try {
     const phone = req.user?.phoneNumber;
     if (!phone) {
@@ -812,8 +812,8 @@ router.get('/shop/products', getShopProducts);
 router.get('/shop/products/:slugOrId', getShopProductDetail);
 router.get('/shop/legal-docs', getLegalDocuments);
 router.get('/shop/legal-docs/:type', getLegalDocumentByType);
-router.post('/shop/orders', optionalAuth, createShopOrder);
-router.get('/shop/my-orders', optionalAuth, getMyShopOrders);
+router.post('/shop/orders', optionalCustomerAuth, createShopOrder);
+router.get('/shop/my-orders', optionalCustomerAuth, getMyShopOrders);
 router.get('/shop/orders/:orderCodeOrId', getShopOrderDetail);
 router.post('/shop/orders/:orderCodeOrId/switch-to-cod', switchOrderToCod);
 router.post('/shop/orders/:orderCodeOrId/confirm-payment', confirmShopOrderPayment);

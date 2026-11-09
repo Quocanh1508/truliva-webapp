@@ -205,18 +205,27 @@ export async function authenticateZaloMiniAppUser(
     logger.info('Created new Zalo Mini App Customer user', { userId: user.id, phone: cleanPhone, name: customerName, hasAvatar: !!zaloProfile?.avatar });
   }
 
-  // 3. Tạo JWT Token đăng nhập hệ thống Truliva (giới hạn an toàn 14 ngày)
-  const jwtSecret = process.env.JWT_SECRET || 'truliva-super-secret-jwt-key-2025';
+  // 3. Tạo JWT Token đăng nhập Zalo Mini App (giới hạn an toàn 14 ngày, phân tách độc lập với hệ thống nội bộ)
+  const miniAppJwtSecret = process.env.ZALO_MINIAPP_JWT_SECRET;
+  if (!miniAppJwtSecret) {
+    logger.error('ZALO_MINIAPP_JWT_SECRET is not configured in environment');
+    throw new Error('Lỗi cấu hình bảo mật máy chủ (thiếu ZALO_MINIAPP_JWT_SECRET)');
+  }
+
   const token = jwt.sign(
     {
       id: user.id,
       username: user.username,
-      role: user.role,
+      role: 'CUSTOMER',
+      group: 'CUSTOMER',
       fullName: user.fullName,
       phoneNumber: user.phoneNumber
     },
-    jwtSecret,
-    { expiresIn: '14d' }
+    miniAppJwtSecret,
+    {
+      expiresIn: '14d',
+      audience: 'truliva-miniapp'
+    }
   );
 
   return {
@@ -226,9 +235,15 @@ export async function authenticateZaloMiniAppUser(
       username: user.username,
       fullName: zaloProfile?.name || user.fullName,
       phoneNumber: user.phoneNumber || cleanPhone,
-      role: user.role,
+      role: 'CUSTOMER',
       avatar: user.avatar || zaloProfile?.avatar || null
     },
     isNewUser
   };
 }
+
+export const ZaloMiniAppService = {
+  authenticate: authenticateZaloMiniAppUser,
+  decodeZaloPhoneToken,
+  normalizePhone
+};

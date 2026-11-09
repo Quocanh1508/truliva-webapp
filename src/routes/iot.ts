@@ -3,7 +3,10 @@ import prisma from '../config/database';
 import { requireAuth, requireAdmin } from '../middleware/authSession';
 import { publishCommand } from '../services/mqttService';
 import logger from '../utils/logger';
-import { exec } from 'child_process';
+import { execFile } from 'child_process';
+
+const SAFE_SERIAL_REGEX = /^[A-Za-z0-9_-]{3,64}$/;
+const SAFE_MQTT_PASSWORD_REGEX = /^[^\0\r\n]{6,128}$/;
 
 const router = Router();
 
@@ -276,14 +279,27 @@ router.post('/devices', requireAuth, requireAdmin, async (req: Request, res: Res
   try {
     const { serialNumber, mqttPassword } = req.body;
 
-    if (!serialNumber) {
+    if (!serialNumber || typeof serialNumber !== 'string') {
       res.status(400).json({ error: 'Thiếu serialNumber' });
       return;
     }
 
+    const cleanSerial = serialNumber.trim();
+    if (!SAFE_SERIAL_REGEX.test(cleanSerial)) {
+      res.status(400).json({ error: 'serialNumber không hợp lệ (chỉ cho phép chữ cái, số, dấu gạch ngang và gạch dưới, độ dài 3-64 ký tự)' });
+      return;
+    }
+
+    if (mqttPassword !== undefined && mqttPassword !== null && mqttPassword !== '') {
+      if (typeof mqttPassword !== 'string' || !SAFE_MQTT_PASSWORD_REGEX.test(mqttPassword)) {
+        res.status(400).json({ error: 'mqttPassword không hợp lệ (độ dài 6-128 ký tự, không chứa ký tự điều khiển)' });
+        return;
+      }
+    }
+
     // Check if device already exists
     const existing = await prisma.iotDevice.findUnique({
-      where: { serialNumber: serialNumber as string }
+      where: { serialNumber: cleanSerial }
     });
 
     if (existing) {
@@ -294,25 +310,37 @@ router.post('/devices', requireAuth, requireAdmin, async (req: Request, res: Res
     // Create device in DB
     const device = await prisma.iotDevice.create({
       data: {
-        serialNumber: serialNumber as string,
-        mqttUsername: serialNumber as string,
+        serialNumber: cleanSerial,
+        mqttUsername: cleanSerial,
         isOnline: false,
       }
     });
 
-    // Create MQTT user on Mosquitto (if password provided)
+    // Create MQTT user on Mosquitto (if password provided) using execFile with shell: false
     if (mqttPassword) {
       await new Promise<void>((resolve, reject) => {
-        exec(
-          `mosquitto_passwd -b /etc/mosquitto/passwd "${serialNumber}" "${mqttPassword}" && (systemctl reload mosquitto || kill -HUP $(pidof mosquitto) || true)`,
+        execFile(
+          'mosquitto_passwd',
+          ['-b', '/etc/mosquitto/passwd', cleanSerial, mqttPassword],
+          { shell: false },
           (error) => {
             if (error) {
-              logger.error('IoT API: Failed to create MQTT user', { serial: serialNumber, error: error.message });
+              logger.error('IoT API: Failed to create MQTT user', { serial: cleanSerial, error: error.message });
               reject(error);
-            } else {
-              logger.info('IoT API: MQTT user created & broker reloaded', { serial: serialNumber });
-              resolve();
+              return;
             }
+
+            execFile('systemctl', ['reload', 'mosquitto'], { shell: false }, (reloadErr) => {
+              if (reloadErr) {
+                execFile('killall', ['-HUP', 'mosquitto'], { shell: false }, () => {
+                  logger.info('IoT API: MQTT user created & broker reloaded via HUP', { serial: cleanSerial });
+                  resolve();
+                });
+              } else {
+                logger.info('IoT API: MQTT user created & broker reloaded', { serial: cleanSerial });
+                resolve();
+              }
+            });
           }
         );
       });
@@ -324,8 +352,8 @@ router.post('/devices', requireAuth, requireAdmin, async (req: Request, res: Res
       mqttConfig: {
         broker: process.env.MQTT_PUBLIC_HOST || 'trulivaofficial.com',
         port: 1883,
-        username: serialNumber,
-        topic: `truliva/devices/${serialNumber}/telemetry`,
+        username: cleanSerial,
+        topic: `truliva/devices/${cleanSerial}/telemetry`,
       }
     });
   } catch (error: any) {

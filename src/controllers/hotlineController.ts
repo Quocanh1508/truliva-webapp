@@ -45,6 +45,9 @@ export async function searchCustomerHistory(req: Request, res: Response) {
     if (!user) {
       return res.status(401).json({ error: 'Chưa đăng nhập' });
     }
+    if (user.role === 'CUSTOMER' || user.group === 'CUSTOMER') {
+      return res.status(403).json({ error: 'Tài khoản khách hàng không có quyền tra cứu lịch sử khách hàng nội bộ' });
+    }
 
     const queryParam = (req.query.q || req.query.query || req.query.search || req.query.phone || req.query.serial || '').toString().trim();
     const phoneParam = req.query.phone ? req.query.phone.toString().replace(/\D/g, '') : '';
@@ -493,6 +496,9 @@ export async function getHotlineTickets(req: Request, res: Response) {
     const user = (req as any).user;
     if (!user) {
       return res.status(401).json({ error: 'Chưa đăng nhập' });
+    }
+    if (user.role === 'CUSTOMER' || user.group === 'CUSTOMER') {
+      return res.status(403).json({ error: 'Tài khoản khách hàng không có quyền tra cứu lịch sử khách hàng nội bộ' });
     }
     const isSuper = isHotlineSuperUser(user.role);
 

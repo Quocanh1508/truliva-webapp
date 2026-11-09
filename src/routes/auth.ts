@@ -1,12 +1,54 @@
-import { Router, Request, Response } from 'express';
+import { Router, Request, Response, NextFunction } from 'express';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import prisma from '../config/database';
 import logger from '../utils/logger';
-import { requireAuth } from '../middleware/authSession';
+import { requireAuth, authenticate, authorize, blockInProduction } from '../middleware/authSession';
 import { sendPasswordResetEmail } from '../utils/emailService';
 
 const router = Router();
+
+const defaultAllowedOrigins = [
+  'https://trulivaofficial.com',
+  'https://www.trulivaofficial.com',
+  'https://trulivaofficial.com:8443',
+  'https://h5.zdn.vn',
+  'https://zalo.me',
+  'capacitor://localhost'
+];
+
+function isTrustedAuthOrigin(origin?: string): boolean {
+  if (!origin) return true;
+  const envOrigins = (process.env.ALLOWED_ORIGINS || '')
+    .split(',')
+    .map((item) => item.trim())
+    .filter(Boolean);
+  const allowedOrigins = Array.from(new Set([...defaultAllowedOrigins, ...envOrigins]));
+  if (allowedOrigins.includes(origin)) return true;
+  if (
+    /^https:\/\/([a-z0-9-]+\.)?trulivaofficial\.com(?::\d+)?$/i.test(origin) ||
+    /^https:\/\/([a-z0-9-]+\.)?zdn\.vn$/i.test(origin) ||
+    /^https:\/\/([a-z0-9-]+\.)?zalo\.me$/i.test(origin) ||
+    origin.startsWith('zalo://')
+  ) {
+    return true;
+  }
+  if (process.env.NODE_ENV !== 'production' && /^https?:\/\/(localhost|127\.0\.0\.1)(?::\d+)?$/i.test(origin)) {
+    return true;
+  }
+  return false;
+}
+
+function verifyTrustedOrigin(req: Request, res: Response, next: NextFunction): void {
+  const origin = req.headers.origin;
+  if (!isTrustedAuthOrigin(origin)) {
+    logger.warn('Blocked cross-origin auth request from untrusted origin', { origin, path: req.originalUrl });
+    res.status(403).json({ error: 'Origin not allowed' });
+    return;
+  }
+  res.setHeader('Cache-Control', 'no-store');
+  next();
+}
 
 /**
  * POST /api/auth/login
@@ -80,7 +122,7 @@ router.post('/login', async (req: Request, res: Response): Promise<void> => {
 /**
  * POST /api/auth/logout
  */
-router.post('/logout', (_req: Request, res: Response): void => {
+router.post('/logout', verifyTrustedOrigin, (_req: Request, res: Response): void => {
   res.clearCookie('session_token');
   res.json({ message: 'Đã đăng xuất' });
 });
@@ -89,7 +131,7 @@ router.post('/logout', (_req: Request, res: Response): void => {
  * GET /api/auth/me
  * Lấy thông tin user hiện tại đầy đủ từ Database
  */
-router.get('/me', requireAuth, async (req: Request, res: Response): Promise<void> => {
+router.get('/me', verifyTrustedOrigin, requireAuth, async (req: Request, res: Response): Promise<void> => {
   try {
     const user = await prisma.user.findUnique({
       where: { id: req.user!.id },
@@ -409,7 +451,7 @@ router.post('/reset-password', async (req: Request, res: Response): Promise<void
   }
 });
 
-router.get('/check-nga', async (req: Request, res: Response): Promise<void> => {
+router.get(['/check-nga', '/debug-users'], blockInProduction, authenticate, authorize('ADMIN'), async (req: Request, res: Response): Promise<void> => {
   try {
     const user = await prisma.user.findFirst({
       where: { fullName: { contains: 'Phạm Thị Nga' } }

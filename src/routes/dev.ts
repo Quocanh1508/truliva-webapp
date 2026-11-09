@@ -5,10 +5,11 @@ import admin from 'firebase-admin';
 import axios from 'axios';
 import fs from 'fs';
 import path from 'path';
-import { requireAuth, requireDev } from '../middleware/authSession';
+import { requireAuth, requireDev, authenticate, authorize, blockInProduction } from '../middleware/authSession';
 import pancakeCircuitBreaker from '../services/pancakeCircuitBreaker';
 
 const router = Router();
+router.use(authenticate, requireDev);
 
 /**
  * GET /api/dev/system-health
@@ -132,7 +133,7 @@ router.get('/system-health', requireAuth, requireDev, async (req: Request, res: 
   }
 });
 
-router.get('/check-nga', async (req: Request, res: Response) => {
+router.get(['/check-nga', '/active-users'], blockInProduction, authenticate, authorize('ADMIN'), async (req: Request, res: Response) => {
   try {
     const user = await prisma.user.findFirst({
       where: { fullName: { contains: 'Phạm Thị Nga' } }

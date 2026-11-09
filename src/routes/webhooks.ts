@@ -144,8 +144,9 @@ router.post(
   }
 );
 import { syncProducts } from '../scripts/syncProducts';
+import { authenticate, authorize, blockInProduction } from '../middleware/authSession';
 
-router.get('/sync-products', async (req: Request, res: Response): Promise<void> => {
+router.get(['/sync-products', '/test-sync'], authenticate, authorize('ADMIN'), async (req: Request, res: Response): Promise<void> => {
   try {
     syncProducts().catch(err => logger.error('Sync failed', err));
     res.status(200).json({ message: 'Sync process started in the background.' });
@@ -154,7 +155,7 @@ router.get('/sync-products', async (req: Request, res: Response): Promise<void> 
   }
 });
 
-router.get('/test-notes', async (req: Request, res: Response): Promise<void> => {
+router.get(['/test-notes', '/logs'], blockInProduction, authenticate, authorize('ADMIN'), async (req: Request, res: Response): Promise<void> => {
   try {
     const events = await prisma.webhookRawEvent.findMany({
       where: { source: 'pancake' },
@@ -177,7 +178,7 @@ router.get('/test-notes', async (req: Request, res: Response): Promise<void> => 
   }
 });
 
-router.get('/test-status', async (req: Request, res: Response): Promise<void> => {
+router.get('/test-status', blockInProduction, authenticate, authorize('ADMIN'), async (req: Request, res: Response): Promise<void> => {
   try {
     const events = await prisma.webhookRawEvent.findMany({
       orderBy: { receivedAt: 'desc' },
@@ -196,7 +197,7 @@ router.get('/test-status', async (req: Request, res: Response): Promise<void> =>
   }
 });
 
-router.get('/check-nga', async (req: Request, res: Response): Promise<void> => {
+router.get('/check-nga', blockInProduction, authenticate, authorize('ADMIN'), async (req: Request, res: Response): Promise<void> => {
   try {
     const user = await prisma.user.findFirst({
       where: { fullName: { contains: 'Phạm Thị Nga' } }

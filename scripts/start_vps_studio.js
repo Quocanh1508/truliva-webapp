@@ -1,3 +1,5 @@
+require('dotenv').config();
+const fs = require('fs');
 const { Client } = require('ssh2');
 const net = require('net');
 const { exec } = require('child_process');
@@ -7,11 +9,27 @@ const isSandbox = envTarget === 'sandbox';
 const remoteDir = isSandbox ? '/var/www/truliva-sandbox' : '/var/www/truliva';
 const dbName = isSandbox ? 'truliva_sandbox (Sandbox)' : 'truliva_db (Production)';
 
+const vpsHost = process.env.VPS_HOST || process.env.VPS_SSH_HOST;
+const vpsPort = Number(process.env.VPS_PORT || process.env.VPS_SSH_PORT || 22);
+const vpsUser = process.env.VPS_USER || process.env.VPS_SSH_USER;
+const vpsKeyPath = process.env.VPS_SSH_KEY_PATH;
+const vpsPassword = process.env.VPS_PASSWORD || process.env.VPS_SSH_PASSWORD;
+
+if (!vpsHost || !vpsUser || (!vpsKeyPath && !vpsPassword)) {
+  console.error(
+    '❌ Thiếu cấu hình kết nối VPS trong biến môi trường.\n' +
+    'Vui lòng thiết lập VPS_HOST, VPS_USER và VPS_SSH_KEY_PATH (hoặc VPS_PASSWORD) trong file .env trước khi chạy.'
+  );
+  process.exit(1);
+}
+
 const sshConfig = {
-  host: '221.132.21.42',
-  port: 22,
-  username: 'root',
-  password: 'c3qwbwf2BU0PkTxW8wKM'
+  host: vpsHost,
+  port: vpsPort,
+  username: vpsUser,
+  ...(vpsKeyPath
+    ? { privateKey: fs.readFileSync(vpsKeyPath) }
+    : { password: vpsPassword })
 };
 
 console.log('====================================================');

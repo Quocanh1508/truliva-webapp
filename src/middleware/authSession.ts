@@ -4,7 +4,6 @@ import prisma from '../config/database';
 import logger from '../utils/logger';
 
 // Extend Express Request to include user info
-// Extend Express Request to include user info
 declare global {
   namespace Express {
     interface Request {
@@ -13,7 +12,7 @@ declare global {
         username: string;
         fullName: string;
         phoneNumber?: string | null;
-        role: 'KTV' | 'ADMIN' | 'DEV' | 'SALE_SUPERVISOR' | 'SALER' | 'HOTLINE' | 'COORDINATOR' | 'STAFF';
+        role: 'KTV' | 'ADMIN' | 'DEV' | 'SALE_SUPERVISOR' | 'SALER' | 'HOTLINE' | 'COORDINATOR' | 'STAFF' | 'CUSTOMER';
         group?: string | null;
         pancakeAccountName?: string | null;
       };
@@ -21,10 +20,16 @@ declare global {
   }
 }
 
+function isMiniAppAudience(aud: unknown): boolean {
+  if (aud === 'truliva-miniapp') return true;
+  if (Array.isArray(aud) && aud.includes('truliva-miniapp')) return true;
+  return false;
+}
+
 /**
- * Middleware xác thực session.
- * Kiểm tra cookie "session_token" (chứa JWT).
- * Nếu hợp lệ, gắn user vào req.user.
+ * Middleware xác thực session nội bộ (CRM / ERP / Admin / KTV).
+ * Kiểm tra cookie "session_token" hoặc Bearer JWT ký bằng JWT_SECRET.
+ * Từ chối mọi token có role === 'CUSTOMER', aud === 'truliva-miniapp', hoặc user.group === 'CUSTOMER'.
  */
 export async function requireAuth(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
@@ -61,6 +66,18 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
       return;
     }
 
+    // Chặn tuyệt đối token của khách hàng Zalo Mini App truy cập API nội bộ
+    if (decoded.role === 'CUSTOMER' || decoded.group === 'CUSTOMER' || isMiniAppAudience(decoded.aud)) {
+      logger.warn('Blocked Zalo Mini App customer token from accessing internal endpoint', {
+        userId: decoded.id,
+        path: req.originalUrl,
+        role: decoded.role,
+        aud: decoded.aud
+      });
+      res.status(403).json({ error: 'Tài khoản khách hàng không có quyền truy cập hệ thống nội bộ' });
+      return;
+    }
+
     const user = await prisma.user.findUnique({
       where: { id: decoded.id },
       select: { id: true, username: true, fullName: true, phoneNumber: true, role: true, isActive: true, group: true, pancakeAccountName: true },
@@ -68,6 +85,17 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
 
     if (!user || !user.isActive) {
       res.status(401).json({ error: 'Phiên đăng nhập không hợp lệ hoặc tài khoản đã bị vô hiệu hóa' });
+      return;
+    }
+
+    // Chặn tài khoản thuộc nhóm CUSTOMER trong DB truy cập API nội bộ
+    if (user.group === 'CUSTOMER' || (user.role as string) === 'CUSTOMER') {
+      logger.warn('Blocked DB CUSTOMER account from accessing internal endpoint', {
+        userId: user.id,
+        path: req.originalUrl,
+        group: user.group
+      });
+      res.status(403).json({ error: 'Tài khoản khách hàng không có quyền truy cập hệ thống nội bộ' });
       return;
     }
 
@@ -86,6 +114,34 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
     logger.error('Auth middleware error', { error: error.message });
     res.status(500).json({ error: 'Lỗi xác thực' });
   }
+}
+
+export const authenticate = requireAuth;
+export const requireAuthSession = requireAuth;
+
+/**
+ * Middleware kiểm tra quyền theo danh sách role cho phép.
+ * Phải dùng sau requireAuth / authenticate.
+ */
+export function authorize(...allowedRoles: string[]) {
+  return (req: Request, res: Response, next: NextFunction): void => {
+    if (!req.user || !allowedRoles.includes(req.user.role)) {
+      res.status(403).json({ error: 'Không có quyền truy cập' });
+      return;
+    }
+    next();
+  };
+}
+
+/**
+ * Middleware vô hiệu hóa các route debug thuần túy trên môi trường Production.
+ */
+export function blockInProduction(_req: Request, res: Response, next: NextFunction): void {
+  if (process.env.NODE_ENV === 'production') {
+    res.status(404).json({ error: 'Endpoint is disabled in production' });
+    return;
+  }
+  next();
 }
 
 /**
@@ -245,31 +301,99 @@ export async function requireSerialAccess(req: Request, res: Response, next: Nex
 }
 
 /**
- * Middleware tùy chọn xác thực session.
- * Nếu có session_token / Bearer JWT hợp lệ -> gán thông tin user vào req.user.
- * Nếu không có hoặc token lỗi -> vẫn tiếp tục (next()) để hỗ trợ cả khách vãng lai.
+ * Middleware xác thực dành riêng cho khách hàng Zalo Mini App.
+ * Xác minh JWT bằng ZALO_MINIAPP_JWT_SECRET và audience === 'truliva-miniapp'.
  */
-export async function optionalAuth(req: Request, res: Response, next: NextFunction): Promise<void> {
+export async function requireCustomerAuth(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
-    let sessionToken = req.cookies?.session_token;
+    let token = req.cookies?.zalo_session_token || req.cookies?.session_token;
 
     const authHeader = req.headers.authorization;
     if (authHeader && authHeader.startsWith('Bearer ')) {
-      sessionToken = authHeader.substring(7);
+      token = authHeader.substring(7);
     }
 
-    if (!sessionToken) {
+    if (!token) {
+      res.status(401).json({ error: 'Chưa đăng nhập Zalo Mini App' });
+      return;
+    }
+
+    const miniAppJwtSecret = process.env.ZALO_MINIAPP_JWT_SECRET;
+    if (!miniAppJwtSecret) {
+      logger.error('ZALO_MINIAPP_JWT_SECRET is not configured in environment');
+      res.status(500).json({ error: 'Lỗi cấu hình bảo mật máy chủ' });
+      return;
+    }
+
+    let decoded: any;
+    try {
+      decoded = jwt.verify(token, miniAppJwtSecret, { audience: 'truliva-miniapp' });
+    } catch (err: any) {
+      logger.warn('Invalid or expired Zalo Mini App token', { error: err.message });
+      res.status(401).json({ error: 'Phiên đăng nhập Zalo Mini App không hợp lệ hoặc đã hết hạn' });
+      return;
+    }
+
+    if (!decoded || !decoded.id) {
+      res.status(401).json({ error: 'Phiên đăng nhập không hợp lệ' });
+      return;
+    }
+
+    const user = await prisma.user.findUnique({
+      where: { id: decoded.id },
+      select: { id: true, username: true, fullName: true, phoneNumber: true, role: true, isActive: true, group: true, pancakeAccountName: true },
+    });
+
+    if (!user || !user.isActive) {
+      res.status(401).json({ error: 'Phiên đăng nhập không hợp lệ hoặc tài khoản đã bị vô hiệu hóa' });
+      return;
+    }
+
+    req.user = {
+      id: user.id,
+      username: user.username,
+      fullName: user.fullName,
+      phoneNumber: user.phoneNumber,
+      role: 'CUSTOMER',
+      group: 'CUSTOMER',
+      pancakeAccountName: null,
+    };
+
+    next();
+  } catch (error: any) {
+    logger.error('Customer auth middleware error', { error: error.message });
+    res.status(500).json({ error: 'Lỗi xác thực Zalo Mini App' });
+  }
+}
+
+export const requireMiniAppAuth = requireCustomerAuth;
+
+/**
+ * Middleware tùy chọn xác thực khách hàng Zalo Mini App.
+ * Nếu có Bearer JWT hợp lệ (ký bằng ZALO_MINIAPP_JWT_SECRET) -> gán thông tin khách hàng vào req.user.
+ * Nếu không có hoặc token lỗi -> vẫn tiếp tục (next()) để hỗ trợ khách vãng lai.
+ */
+export async function optionalCustomerAuth(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    let token = req.cookies?.zalo_session_token || req.cookies?.session_token;
+
+    const authHeader = req.headers.authorization;
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      token = authHeader.substring(7);
+    }
+
+    if (!token) {
       return next();
     }
 
-    const jwtSecret = process.env.JWT_SECRET;
-    if (!jwtSecret) {
+    const miniAppJwtSecret = process.env.ZALO_MINIAPP_JWT_SECRET;
+    if (!miniAppJwtSecret) {
       return next();
     }
 
     let decoded: any;
     try {
-      decoded = jwt.verify(sessionToken, jwtSecret);
+      decoded = jwt.verify(token, miniAppJwtSecret, { audience: 'truliva-miniapp' });
     } catch {
       return next();
     }
@@ -286,9 +410,9 @@ export async function optionalAuth(req: Request, res: Response, next: NextFuncti
           username: user.username,
           fullName: user.fullName,
           phoneNumber: user.phoneNumber,
-          role: user.role,
-          group: user.group,
-          pancakeAccountName: user.pancakeAccountName,
+          role: 'CUSTOMER',
+          group: 'CUSTOMER',
+          pancakeAccountName: null,
         };
       }
     }
@@ -298,4 +422,7 @@ export async function optionalAuth(req: Request, res: Response, next: NextFuncti
     next();
   }
 }
+
+export const optionalMiniAppAuth = optionalCustomerAuth;
+export const optionalAuth = optionalCustomerAuth;
 

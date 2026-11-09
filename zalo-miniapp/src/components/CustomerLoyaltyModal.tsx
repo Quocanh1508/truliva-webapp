@@ -55,7 +55,7 @@ export default function CustomerLoyaltyModal({ isOpen, onClose, userPoints }: Cu
                 <span>Ví Điểm Tích Lũy</span>
                 <span className="text-[9px] px-1.5 py-0.2 rounded-full font-bold bg-amber-400/20 text-amber-300 border border-amber-400/30">Truliva Care</span>
               </h3>
-              <p className="text-[10px] text-sky-200">1 Điểm = 1.000 VNĐ giảm giá đơn hàng</p>
+              <p className="text-[10px] text-sky-200">Đặc quyền chăm sóc & tri ân khách hàng</p>
             </div>
           </div>
           <button 
@@ -185,11 +185,11 @@ export default function CustomerLoyaltyModal({ isOpen, onClose, userPoints }: Cu
                     <CheckCircle2 size={14} />
                   </div>
                   <div>
-                    <p className="font-bold text-slate-800 text-[11px]">Tỷ lệ quy đổi điểm</p>
-                    <p className="text-[10px] text-slate-400">Trừ trực tiếp khi thanh toán đơn hàng</p>
+                    <p className="font-bold text-slate-800 text-[11px]">Đặc quyền Truliva Care</p>
+                    <p className="text-[10px] text-slate-400">Đổi quà tặng, voucher bảo dưỡng & nâng hạng</p>
                   </div>
                 </div>
-                <span className="text-[11px] font-black text-emerald-600 bg-emerald-50 px-2.5 py-1 rounded-lg border border-emerald-200 tabular-num">1 Điểm = 1.000đ</span>
+                <span className="text-[11px] font-black text-emerald-600 bg-emerald-50 px-2.5 py-1 rounded-lg border border-emerald-200 tabular-num">Ưu đãi độc quyền</span>
               </div>
             </div>
           </div>
