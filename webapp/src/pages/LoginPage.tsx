@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { LogIn, Download, Smartphone, X, Share2, PlusSquare, Monitor, ShieldCheck, AlertTriangle } from 'lucide-react';
+import { LogIn, Download, Smartphone, X, Share2, PlusSquare, Monitor, ShieldCheck, AlertTriangle, Eye, EyeOff } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { fetchApi } from '../api/client';
 import { Capacitor } from '@capacitor/core';
@@ -19,6 +19,7 @@ interface Particle {
 export default function LoginPage() {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   
@@ -475,14 +476,26 @@ export default function LoginPage() {
                 Quên mật khẩu?
               </Link>
             </div>
-            <input
-              type="password"
-              className="cyber-input"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="Nhập mật khẩu"
-              required
-            />
+            <div className="relative flex items-center">
+              <input
+                type={showPassword ? 'text' : 'password'}
+                className="cyber-input pr-11"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="Nhập mật khẩu"
+                required
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute right-3 text-slate-400 hover:text-white p-1 rounded-md transition-colors cursor-pointer focus:outline-none flex items-center justify-center select-none"
+                title={showPassword ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}
+                aria-label={showPassword ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}
+                tabIndex={-1}
+              >
+                {showPassword ? <EyeOff size={18} className="text-blue-400" /> : <Eye size={18} />}
+              </button>
+            </div>
           </div>
 
           <button
