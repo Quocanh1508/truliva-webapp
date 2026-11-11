@@ -119,7 +119,7 @@ export default function CustomerHistoryModal({ isOpen, onClose, onBookService }:
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/70 backdrop-blur-sm animate-fade-in">
       <div className="bg-white w-full max-w-sm rounded-[2rem] shadow-2xl overflow-hidden flex flex-col max-h-[85vh] border border-sky-100 animate-scale-up">
-        
+
         {/* Header (P3R Ocean Depth) */}
         <div className="bg-gradient-to-r from-[#061226] via-[#0B2545] to-[#0F3866] p-4 text-white flex items-center justify-between relative overflow-hidden">
           <div className="flex items-center space-x-2.5 relative z-10">
@@ -132,7 +132,7 @@ export default function CustomerHistoryModal({ isOpen, onClose, onBookService }:
             </div>
           </div>
           <div className="flex items-center space-x-1.5 relative z-10">
-            <button 
+            <button
               onClick={fetchHistory}
               disabled={loading}
               title="Làm mới realtime"
@@ -140,7 +140,7 @@ export default function CustomerHistoryModal({ isOpen, onClose, onBookService }:
             >
               <RefreshCw size={13} className={loading ? 'animate-spin text-cyan-300' : ''} />
             </button>
-            <button 
+            <button
               onClick={onClose}
               className="w-7 h-7 rounded-full bg-white/10 hover:bg-white/20 active:scale-95 flex items-center justify-center text-white transition-all cursor-pointer"
             >
@@ -184,7 +184,7 @@ export default function CustomerHistoryModal({ isOpen, onClose, onBookService }:
               const techName = item.technicianName || item.ktvUser?.fullName || 'Đang điều phối KTV';
 
               return (
-                <div 
+                <div
                   key={item.id}
                   className="bg-white rounded-2xl p-3.5 border border-slate-200 shadow-xs space-y-2.5 transition-all hover:shadow-sm"
                 >

@@ -14,6 +14,7 @@ import axios from 'axios';
 import { isSandboxEnvironment, logSandboxBlockedAction } from '../utils/sandboxGuard';
 import { PANCAKE_API_BASE } from '../config/pancake';
 import pancakeCircuitBreaker from '../services/pancakeCircuitBreaker';
+import { fetchPancakeWarehouses } from '../routes/inventory';
 
 import { buildOrderFilter, getNextManualOrderId } from '../services/orderService';
 import { normalizeProvince, getProvinceSearchVariants, PANCAKE_PROVINCES } from '../utils/provinces';
@@ -2243,69 +2244,77 @@ export async function updateOrder(req: Request, res: Response): Promise<void> {
         return;
       }
 
-      // Đơn hàng Pancake POS (pancakeOrderId > 0) luôn đồng bộ kho sang Pancake POS khi đổi kho trên Truliva App
+      // Đơn hàng Pancake POS (pancakeOrderId > 0) đồng bộ kho sang Pancake POS khi đổi kho trên Truliva App
       const shouldSyncWarehouseToPancake = !isManualOrder;
 
+      let warehouseName = 'Kho hàng';
       try {
-        let warehouseName = 'Kho hàng';
-        try {
-          const whResponse = await axios.get(`${PANCAKE_API_BASE}/api/v1/shops/${shopId}/warehouses`, {
-            params: { api_key: apiKey },
-            timeout: 5000
-          });
-          const whs = whResponse.data?.data || whResponse.data?.warehouses || [];
-          const matchedWh = whs.find((w: any) => String(w.id) === String(effectiveWarehouseId));
-          if (matchedWh) {
-            warehouseName = matchedWh.name;
-          }
-        } catch (whErr) {
-          logger.warn('Failed to fetch warehouse name from Pancake POS API, using default name', whErr);
+        const whs = await fetchPancakeWarehouses();
+        const matchedWh = whs.find((w: any) => String(w.id) === String(effectiveWarehouseId));
+        if (matchedWh) {
+          warehouseName = matchedWh.name;
         }
+      } catch (whErr) {
+        logger.warn('Failed to fetch warehouse name from cache/Pancake POS API, using default name', whErr);
+      }
 
-        if (shouldSyncWarehouseToPancake && effectiveWarehouseId) {
-          if (isSandboxEnvironment()) {
-            logSandboxBlockedAction('syncWarehouseChangeToPancake (updateOrder)', {
-              pancakeOrderId: oldOrder.pancakeOrderId,
-              warehouseId: effectiveWarehouseId
-            });
-          } else {
-            logger.info('Syncing warehouse change to Pancake POS', { pancakeOrderId: oldOrder.pancakeOrderId, warehouseId: effectiveWarehouseId });
-            // [PANCAKE COMPOSITE GUARD] Khi đổi kho, TUYỆT ĐỐI CHỈ gửi warehouse_id, KHÔNG gửi mảng items/products
-            // để tránh Pancake xóa tạo lại item và tự động bung nhân đôi bộ linh kiện con của Combo (is_composite: true)
-            const updateResponse = await axios.patch(
-              `${PANCAKE_API_BASE}/api/v1/shops/${shopId}/orders/${oldOrder.pancakeOrderId}`,
-              {
-                warehouse_id: effectiveWarehouseId
-              },
-              {
-                params: { api_key: apiKey },
-                headers: { 'Content-Type': 'application/json' },
-                timeout: 10000
-              }
-            );
+      // Kiểm tra xem kho trên Pancake POS thực chất đã là kho này chưa (trường hợp oldOrder.warehouseId null nhưng warehouseInfo đã có tên kho)
+      const oldWhInfo = (oldOrder.warehouseInfo as any) || {};
+      const oldRaw = (oldOrder.rawData as any) || {};
+      const oldPosWhId = oldOrder.warehouseId || oldWhInfo.id || oldRaw.warehouse_id || oldRaw.warehouseId;
+      const oldPosWhName = oldWhInfo.name || oldRaw.warehouse_name || oldRaw.warehouse_info?.name;
+      const isAlreadySameWarehouseOnPos =
+        Boolean(oldPosWhId && String(oldPosWhId) === String(effectiveWarehouseId)) ||
+        Boolean(oldPosWhName && warehouseName && oldPosWhName.trim() === warehouseName.trim());
 
-            if (!updateResponse.data || !updateResponse.data.success) {
-              throw new Error(updateResponse.data?.message || 'Yêu cầu đổi kho thất bại trên Pancake POS');
-            }
-          }
-        } else {
-          logger.info('Bypassed syncing warehouse change to Pancake POS (manual order)', {
+      updateData.warehouseId = effectiveWarehouseId;
+      updateData.warehouseInfo = { id: effectiveWarehouseId, name: warehouseName };
+      updateData.pancakeSyncStatus = 'SUCCESS';
+
+      changes.push({ field: 'warehouseId', from: oldOrder.warehouseId, to: effectiveWarehouseId });
+      changes.push({ field: 'warehouseInfo', from: oldOrder.warehouseInfo, to: updateData.warehouseInfo });
+
+      if (shouldSyncWarehouseToPancake && effectiveWarehouseId && !isAlreadySameWarehouseOnPos) {
+        if (isSandboxEnvironment()) {
+          logSandboxBlockedAction('syncWarehouseChangeToPancake (updateOrder)', {
             pancakeOrderId: oldOrder.pancakeOrderId,
             warehouseId: effectiveWarehouseId
           });
+        } else {
+          // Chạy đồng bộ kho sang Pancake POS bất đồng bộ ở background (non-blocking) để phản hồi tức thì cho Webapp
+          logger.info('Syncing warehouse change to Pancake POS (background)', {
+            pancakeOrderId: oldOrder.pancakeOrderId,
+            warehouseId: effectiveWarehouseId
+          });
+          axios.patch(
+            `${PANCAKE_API_BASE}/api/v1/shops/${shopId}/orders/${oldOrder.pancakeOrderId}`,
+            { warehouse_id: effectiveWarehouseId },
+            {
+              params: { api_key: apiKey },
+              headers: { 'Content-Type': 'application/json' },
+              timeout: 10000
+            }
+          ).then(updateResponse => {
+            if (!updateResponse.data || !updateResponse.data.success) {
+              throw new Error(updateResponse.data?.message || 'Yêu cầu đổi kho thất bại trên Pancake POS');
+            }
+          }).catch(err => {
+            logger.error('Failed to sync warehouse update to Pancake POS API in background', {
+              orderId: id,
+              pancakeOrderId: oldOrder.pancakeOrderId,
+              error: err.response?.data?.message || err.message
+            });
+            prisma.order.update({
+              where: { id },
+              data: { pancakeSyncStatus: 'FAILED' }
+            }).catch(() => {});
+          });
         }
-
-        updateData.warehouseId = effectiveWarehouseId;
-        updateData.warehouseInfo = { id: effectiveWarehouseId, name: warehouseName };
-        updateData.pancakeSyncStatus = 'SUCCESS';
-
-        changes.push({ field: 'warehouseId', from: oldOrder.warehouseId, to: effectiveWarehouseId });
-        changes.push({ field: 'warehouseInfo', from: oldOrder.warehouseInfo, to: updateData.warehouseInfo });
-      } catch (err: any) {
-        logger.error('Failed to sync warehouse update to Pancake POS API', { error: err.message });
-        const errorMsg = err.response?.data?.message || err.message || 'Lỗi không xác định từ Pancake POS';
-        res.status(400).json({ error: `Không thể đồng bộ thay đổi kho xuất hàng sang Pancake: ${errorMsg}` });
-        return;
+      } else {
+        logger.info('Bypassed syncing warehouse change to Pancake POS (manual order or already matching POS warehouse)', {
+          pancakeOrderId: oldOrder.pancakeOrderId,
+          warehouseId: effectiveWarehouseId
+        });
       }
     }
 
@@ -2324,7 +2333,13 @@ export async function updateOrder(req: Request, res: Response): Promise<void> {
       targetAdminStatus = 'chờ xử lý';
     }
 
-    if (targetAdminStatus !== undefined && targetAdminStatus !== oldOrder.adminStatus) {
+    // Chỉ gọi đồng bộ trạng thái sang Pancake POS khi thực sự có sự chuyển đổi trạng thái trên Pancake
+    // (Lưu ý: 'chờ xử lý' <-> 'đang thực hiện' là trạng thái điều phối nội bộ, không làm thay đổi trạng thái trên Pancake POS)
+    const isInternalDispatchTransition =
+      (oldOrder.adminStatus === 'chờ xử lý' && targetAdminStatus === 'đang thực hiện') ||
+      (oldOrder.adminStatus === 'đang thực hiện' && targetAdminStatus === 'chờ xử lý');
+
+    if (targetAdminStatus !== undefined && targetAdminStatus !== oldOrder.adminStatus && !isInternalDispatchTransition) {
       try {
         await syncOrderStatusToPancake(oldOrder.pancakeOrderId, targetAdminStatus);
         updateData.pancakeSyncStatus = 'SUCCESS';
@@ -2521,11 +2536,52 @@ export async function updateOrder(req: Request, res: Response): Promise<void> {
       }
     }
 
-    // Thực hiện cập nhật
+    // Thực hiện cập nhật và trả về đầy đủ quan hệ để Frontend cập nhật state tại chỗ (không cần reload cả bảng)
     const order = await prisma.order.update({
       where: { id },
       data: updateData,
+      include: {
+        customer: true,
+        items: true,
+        assignedKtv: {
+          select: { id: true, fullName: true, username: true, phoneNumber: true }
+        },
+        salesKtv: {
+          select: { id: true, fullName: true, username: true, phoneNumber: true }
+        },
+        mainStation: {
+          select: { id: true, name: true }
+        },
+        techStation: {
+          select: { id: true, name: true }
+        },
+        serials: {
+          select: {
+            id: true,
+            serialNumber: true,
+            model: true,
+            productLine: true,
+            status: true,
+            activationDate: true,
+            warrantyExpiryDate: true,
+            customerConfirmationDate: true,
+          }
+        },
+        serviceReports: {
+          where: { approvalStatus: { not: 'REJECTED' } },
+          orderBy: { createdAt: 'desc' },
+          select: {
+            id: true,
+            serialNumber: true,
+            createdAt: true,
+            updatedAt: true,
+            approvalStatus: true
+          }
+        }
+      }
     });
+
+    await enrichOrderItemsWithImages([order]);
 
     // [RULE 7 - ZERO HARD-DELETE POLICY] Khi chuyển sang hủy đơn, tuyệt đối không xóa báo cáo kỹ thuật
     if (adminStatus === 'hủy đơn') {
@@ -2536,33 +2592,27 @@ export async function updateOrder(req: Request, res: Response): Promise<void> {
       logger.info(`Preserved service reports for cancelled order under Zero Hard-Delete Policy`, { orderId: id });
     }
 
-    // Tích hợp đồng bộ tồn kho cục bộ
-    try {
-      const newOrderItems = await prisma.orderItem.findMany({
-        where: { orderId: id }
-      });
-      await syncOrderInventoryState(id, {
-        adminStatus: oldOrder.adminStatus,
-        warehouseId: oldOrder.warehouseId,
-        items: oldOrder.items.map(item => ({
-          productName: item.productName || '',
-          quantity: item.quantity || 1
-        }))
-      }, {
-        adminStatus: order.adminStatus,
-        warehouseId: order.warehouseId,
-        items: newOrderItems.map(item => ({
-          productName: item.productName || '',
-          quantity: item.quantity || 1
-        }))
-      });
-    } catch (invErr: any) {
+    // Ghi audit log và đồng bộ tồn kho cục bộ bất đồng bộ / song song
+    const newOrderItems = order.items || oldOrder.items || [];
+    syncOrderInventoryState(id, {
+      adminStatus: oldOrder.adminStatus,
+      warehouseId: oldOrder.warehouseId,
+      items: oldOrder.items.map(item => ({
+        productName: item.productName || '',
+        quantity: item.quantity || 1
+      }))
+    }, {
+      adminStatus: order.adminStatus,
+      warehouseId: order.warehouseId,
+      items: newOrderItems.map((item: any) => ({
+        productName: item.productName || '',
+        quantity: item.quantity || 1
+      }))
+    }).catch((invErr: any) => {
       logger.error('Lỗi khấu trừ kho khi cập nhật đơn hàng', { orderId: id, error: invErr.message });
-    }
+    });
 
-    // Ghi audit log
     if (changes.length > 0) {
-      // Xác định action
       let action = 'updated';
       if (adminStatus === 'hủy đơn') action = 'cancelled';
       if (assignedKtvId && !oldOrder.assignedKtvId) action = 'assigned';
@@ -2811,26 +2861,22 @@ export async function bulkAssignOrders(req: Request, res: Response): Promise<voi
       }
     }
 
-    // Fetch warehouse list once for Pancake sync if warehouseId is provided
+    // Fetch warehouse list from cache for Pancake sync if warehouseId is provided
     let warehouses: any[] = [];
     const apiKey = process.env.PANCAKE_API_KEY;
     const shopId = '1635300067';
     if (warehouseId && apiKey) {
       try {
-        const whResponse = await axios.get(`${PANCAKE_API_BASE}/api/v1/shops/${shopId}/warehouses`, {
-          params: { api_key: apiKey },
-          timeout: 5000
-        });
-        warehouses = whResponse.data?.data || whResponse.data?.warehouses || [];
+        warehouses = await fetchPancakeWarehouses();
       } catch (err) {
-        logger.warn('Failed to fetch warehouse list from Pancake POS API in bulk assign', err);
+        logger.warn('Failed to fetch warehouse list from cache/Pancake POS API in bulk assign', err);
       }
     }
 
     const results: any[] = [];
     const warnings: string[] = [];
 
-    // Loop through each order and update sequentially
+    // Loop through each order and update
     for (const oldOrder of oldOrders) {
       const updateData: any = {};
       const changes: any[] = [];
@@ -2892,46 +2938,55 @@ export async function bulkAssignOrders(req: Request, res: Response): Promise<voi
         const isManualOrder = oldOrder.pancakeOrderId < 0;
         const shouldSyncWarehouseToPancake = !isManualOrder;
 
-        try {
-          let warehouseName = 'Kho hàng';
-          const matchedWh = warehouses.find((w: any) => String(w.id) === String(warehouseId));
-          if (matchedWh) {
-            warehouseName = matchedWh.name;
-          }
+        let warehouseName = 'Kho hàng';
+        const matchedWh = warehouses.find((w: any) => String(w.id) === String(warehouseId));
+        if (matchedWh) {
+          warehouseName = matchedWh.name;
+        }
 
-          if (shouldSyncWarehouseToPancake && warehouseId && apiKey) {
-            if (isSandboxEnvironment()) {
-              logSandboxBlockedAction('syncWarehouseChangeToPancake (bulkAssignOrders)', {
+        const oldWhInfo = (oldOrder.warehouseInfo as any) || {};
+        const oldRaw = (oldOrder.rawData as any) || {};
+        const oldPosWhId = oldOrder.warehouseId || oldWhInfo.id || oldRaw.warehouse_id || oldRaw.warehouseId;
+        const oldPosWhName = oldWhInfo.name || oldRaw.warehouse_name || oldRaw.warehouse_info?.name;
+        const isAlreadySameWarehouseOnPos =
+          Boolean(oldPosWhId && String(oldPosWhId) === String(warehouseId)) ||
+          Boolean(oldPosWhName && warehouseName && oldPosWhName.trim() === warehouseName.trim());
+
+        updateData.warehouseId = warehouseId;
+        updateData.warehouseInfo = { id: warehouseId, name: warehouseName };
+        updateData.pancakeSyncStatus = 'SUCCESS';
+
+        changes.push({ field: 'warehouseId', from: oldOrder.warehouseId, to: warehouseId });
+        changes.push({ field: 'warehouseInfo', from: oldOrder.warehouseInfo, to: updateData.warehouseInfo });
+
+        if (shouldSyncWarehouseToPancake && warehouseId && apiKey && !isAlreadySameWarehouseOnPos) {
+          if (isSandboxEnvironment()) {
+            logSandboxBlockedAction('syncWarehouseChangeToPancake (bulkAssignOrders)', {
+              pancakeOrderId: oldOrder.pancakeOrderId,
+              warehouseId
+            });
+          } else {
+            axios.patch(
+              `${PANCAKE_API_BASE}/api/v1/shops/${shopId}/orders/${oldOrder.pancakeOrderId}`,
+              { warehouse_id: warehouseId },
+              {
+                params: { api_key: apiKey },
+                headers: { 'Content-Type': 'application/json' },
+                timeout: 10000
+              }
+            ).catch(err => {
+              logger.error('Failed to sync warehouse in bulk assign (background)', {
+                orderId: oldOrder.id,
                 pancakeOrderId: oldOrder.pancakeOrderId,
-                warehouseId
+                error: err.response?.data?.message || err.message
               });
-            } else {
-              await axios.patch(
-                `${PANCAKE_API_BASE}/api/v1/shops/${shopId}/orders/${oldOrder.pancakeOrderId}`,
-                { warehouse_id: warehouseId },
-                {
-                  params: { api_key: apiKey },
-                  headers: { 'Content-Type': 'application/json' },
-                  timeout: 10000
-                }
-              );
-            }
+            });
           }
-
-          updateData.warehouseId = warehouseId;
-          updateData.warehouseInfo = { id: warehouseId, name: warehouseName };
-          updateData.pancakeSyncStatus = 'SUCCESS';
-
-          changes.push({ field: 'warehouseId', from: oldOrder.warehouseId, to: warehouseId });
-          changes.push({ field: 'warehouseInfo', from: oldOrder.warehouseInfo, to: updateData.warehouseInfo });
-        } catch (err: any) {
-          const errorMsg = err.response?.data?.message || err.message || 'Lỗi không xác định từ Pancake POS';
-          warnings.push(`Đơn #${oldOrder.pancakeOrderId}: Lỗi đổi kho sang Pancake: ${errorMsg}`);
         }
       }
 
-      // Sync status to Pancake POS if it changed in bulk assign
-      if (updateData.adminStatus) {
+      // Sync status to Pancake POS only if it is not an internal dispatch transition ('chờ xử lý' -> 'đang thực hiện')
+      if (updateData.adminStatus && updateData.adminStatus !== 'đang thực hiện') {
         try {
           await syncOrderStatusToPancake(oldOrder.pancakeOrderId, updateData.adminStatus);
           updateData.pancakeSyncStatus = 'SUCCESS';
@@ -2949,29 +3004,22 @@ export async function bulkAssignOrders(req: Request, res: Response): Promise<voi
           data: updateData,
         });
 
-        // Local inventory sync logic
-        try {
-          const newOrderItems = await prisma.orderItem.findMany({
-            where: { orderId: oldOrder.id }
-          });
-          await syncOrderInventoryState(oldOrder.id, {
-            adminStatus: oldOrder.adminStatus,
-            warehouseId: oldOrder.warehouseId,
-            items: oldOrder.items.map(item => ({
-              productName: item.productName || '',
-              quantity: item.quantity || 1
-            }))
-          }, {
-            adminStatus: updatedOrder.adminStatus,
-            warehouseId: updatedOrder.warehouseId,
-            items: newOrderItems.map(item => ({
-              productName: item.productName || '',
-              quantity: item.quantity || 1
-            }))
-          });
-        } catch (invErr: any) {
+        // Local inventory sync logic (non-blocking, reuse oldOrder.items since bulk assign doesn't change items)
+        const orderItemsSnapshot = oldOrder.items.map(item => ({
+          productName: item.productName || '',
+          quantity: item.quantity || 1
+        }));
+        syncOrderInventoryState(oldOrder.id, {
+          adminStatus: oldOrder.adminStatus,
+          warehouseId: oldOrder.warehouseId,
+          items: orderItemsSnapshot
+        }, {
+          adminStatus: updatedOrder.adminStatus,
+          warehouseId: updatedOrder.warehouseId,
+          items: orderItemsSnapshot
+        }).catch((invErr: any) => {
           logger.error('Lỗi khấu trừ kho khi cập nhật đơn hàng hàng loạt', { orderId: oldOrder.id, error: invErr.message });
-        }
+        });
 
         // Audit Log
         let action = 'updated';

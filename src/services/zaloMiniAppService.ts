@@ -147,10 +147,10 @@ export async function authenticateZaloMiniAppUser(
   if (user) {
     const updateData: any = {};
     if (zaloProfile?.name) {
-      const isPlaceholder = !user.fullName || 
-        user.fullName === 'Admin Truliva' || 
-        user.fullName.startsWith('Khách hàng') || 
-        user.fullName === 'Khách Hàng Zalo' || 
+      const isPlaceholder = !user.fullName ||
+        user.fullName === 'Admin Truliva' ||
+        user.fullName.startsWith('Khách hàng') ||
+        user.fullName === 'Khách Hàng Zalo' ||
         user.fullName.startsWith('zalo_');
 
       if (isPlaceholder) {

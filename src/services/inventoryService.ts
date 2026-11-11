@@ -107,6 +107,39 @@ export async function syncOrderInventoryState(
   newState: OrderState
 ): Promise<void> {
   try {
+    const isActiveStatus = (status: string | null) => {
+      if (!status) return true; // Mặc định là chờ xử lý (Active)
+      const s = status.toLowerCase();
+      return s !== 'hoàn thành' && s !== 'hủy đơn';
+    };
+
+    const isCompletedStatus = (status: string | null) => {
+      return status?.toLowerCase() === 'hoàn thành';
+    };
+
+    // Fast path: nếu trạng thái kho (active/completed), warehouseId và danh sách items không hề thay đổi
+    // (ví dụ chuyển từ 'chờ xử lý' -> 'đang thực hiện' khi phân công KTV trên cùng 1 kho), bỏ qua ngay lập tức
+    // để tránh N+1 queries cộng rồi trừ lại đúng số lượng đó.
+    if (oldState) {
+      const oldIsActive = isActiveStatus(oldState.adminStatus);
+      const newIsActive = isActiveStatus(newState.adminStatus);
+      const oldIsCompleted = isCompletedStatus(oldState.adminStatus);
+      const newIsCompleted = isCompletedStatus(newState.adminStatus);
+
+      if (
+        oldIsActive === newIsActive &&
+        oldIsCompleted === newIsCompleted &&
+        (oldState.warehouseId || null) === (newState.warehouseId || null) &&
+        oldState.items.length === newState.items.length &&
+        oldState.items.every((it, idx) =>
+          it.productName === newState.items[idx]?.productName &&
+          it.quantity === newState.items[idx]?.quantity
+        )
+      ) {
+        return;
+      }
+    }
+
     // Lấy thông tin đầy đủ của đơn hàng từ DB để kiểm tra điều kiện đồng bộ sang Pancake POS
     const order = await prisma.order.findUnique({
       where: { id: orderId },
@@ -140,16 +173,6 @@ export async function syncOrderInventoryState(
         return;
       }
     }
-
-    const isActiveStatus = (status: string | null) => {
-      if (!status) return true; // Mặc định là chờ xử lý (Active)
-      const s = status.toLowerCase();
-      return s !== 'hoàn thành' && s !== 'hủy đơn';
-    };
-
-    const isCompletedStatus = (status: string | null) => {
-      return status?.toLowerCase() === 'hoàn thành';
-    };
 
     // 1. Đảo ngược các ảnh hưởng của trạng thái cũ (nếu có)
     if (oldState) {

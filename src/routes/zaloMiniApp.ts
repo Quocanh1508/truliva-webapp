@@ -416,7 +416,7 @@ router.get('/my-serials', requireCustomerAuth, async (req: Request, res: Respons
       }
 
       // c. Đơn có sản phẩm máy lọc nước nhưng chưa có serial lưu riêng
-      const purifierItem = order.items.find(i => 
+      const purifierItem = order.items.find(i =>
         (i.productName && (i.productName.toLowerCase().includes('máy lọc nước') || i.productName.toLowerCase().includes('máy nước nóng'))) ||
         (order.workType && (order.workType.includes('Lắp đặt') || order.workType.includes('Giao hàng và Lắp đặt')))
       );

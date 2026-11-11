@@ -14,10 +14,19 @@ const SHOP_ID = '1635300067';
 // Các API quản lý kho yêu cầu đăng nhập
 router.use(requireAuth);
 
+let cachedWarehouses: any[] | null = null;
+let cachedWarehousesAt = 0;
+const WAREHOUSE_CACHE_TTL_MS = 5 * 60 * 1000; // 5 phút
+
 /**
- * Helper để lấy danh sách kho hàng từ Pancake POS
+ * Helper để lấy danh sách kho hàng từ Pancake POS (có in-memory cache 5 phút)
  */
-async function fetchPancakeWarehouses(): Promise<any[]> {
+export async function fetchPancakeWarehouses(forceRefresh = false): Promise<any[]> {
+  const now = Date.now();
+  if (!forceRefresh && cachedWarehouses && cachedWarehouses.length > 0 && now - cachedWarehousesAt < WAREHOUSE_CACHE_TTL_MS) {
+    return cachedWarehouses;
+  }
+
   const apiKey = process.env.PANCAKE_API_KEY;
   if (!apiKey) {
     throw new Error('Missing PANCAKE_API_KEY in server environment');
@@ -30,12 +39,17 @@ async function fetchPancakeWarehouses(): Promise<any[]> {
     });
 
     if (response.data && response.data.success) {
-      return response.data.data || response.data.warehouses || [];
+      const list = response.data.data || response.data.warehouses || [];
+      if (Array.isArray(list) && list.length > 0) {
+        cachedWarehouses = list;
+        cachedWarehousesAt = now;
+      }
+      return list;
     }
-    return [];
+    return cachedWarehouses || [];
   } catch (error: any) {
     logger.error('Error fetching warehouses from Pancake POS API', { error: error.message });
-    return [];
+    return cachedWarehouses || [];
   }
 }
 
@@ -61,14 +75,14 @@ router.get('/stock', async (req: Request, res: Response): Promise<void> => {
     const role = req.user?.role;
     const isCoordinatorOrAdmin = role === 'ADMIN' || role === 'DEV' || role === 'COORDINATOR';
 
-    // 1. Lấy danh sách kho
-    const warehouses = await fetchPancakeWarehouses();
-    
-    // 2. Lấy toàn bộ sản phẩm ACTIVE có liên kết Pancake trong database
-    const dbProducts = await prisma.product.findMany({
-      where: { isActive: true },
-      orderBy: { name: 'asc' }
-    });
+    // 1 & 2. Lấy danh sách kho (từ cache) và sản phẩm ACTIVE song song
+    const [warehouses, dbProducts] = await Promise.all([
+      fetchPancakeWarehouses(),
+      prisma.product.findMany({
+        where: { isActive: true },
+        orderBy: { name: 'asc' }
+      })
+    ]);
 
     // 3. Chuẩn bị dữ liệu trả về
     const productsData = dbProducts.map((p) => {

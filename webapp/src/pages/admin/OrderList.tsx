@@ -543,6 +543,8 @@ export default function OrderList() {
 
   const [isAssignProductSelectOpen, setIsAssignProductSelectOpen] = useState(false);
   const [isAssignModalExpanded, setIsAssignModalExpanded] = useState(false);
+  const [isSubmittingAssign, setIsSubmittingAssign] = useState(false);
+  const lastInventoryFetchAtRef = useRef<number>(0);
   const isAssignModalWide = isAssignProductSelectOpen || isAssignModalExpanded;
   const skipFetchRef = useRef(false);
 
@@ -1492,16 +1494,7 @@ export default function OrderList() {
   };
 
   const openAssignModal = async (initialOrder: any) => {
-    let order = initialOrder;
-    try {
-      const freshRes = await fetchApi(`/orders/${initialOrder.id}`);
-      const freshOrder = freshRes?.id ? freshRes : freshRes?.order;
-      if (freshOrder) {
-        order = freshOrder;
-      }
-    } catch (e) {
-      console.warn('Could not fetch fresh order for assign modal, fallback to current state', e);
-    }
+    const order = initialOrder;
 
     let initialMain = order.mainStationId || '';
     let initialTech = order.techStationId || '';
@@ -1628,101 +1621,6 @@ export default function OrderList() {
     setSuggestedTech(matchedTech);
     setSuggestedKtv(bestKtv);
 
-    // Kéo thông tin tồn kho
-    setLoadingInventory(true);
-    fetchApi('/inventory/stock')
-      .then(invData => {
-        const whs = invData.warehouses || [];
-        const prods = invData.products || [];
-        setWarehouses(whs);
-        setProductsStock(prods);
-
-        // Thiết lập kho mặc định: BẮT BUỘC ưu tiên thông tin kho từ bên POS gửi qua
-        let defaultWhId = '';
-        let defaultWhName = '';
-
-        if (order.warehouseId) {
-          defaultWhId = String(order.warehouseId);
-          const matchedWh = whs.find((w: any) => String(w.id) === defaultWhId);
-          if (matchedWh) {
-            defaultWhName = matchedWh.name;
-          } else if (order.warehouseInfo?.name) {
-            defaultWhName = order.warehouseInfo.name;
-          }
-        } else if (order.warehouseInfo?.id) {
-          defaultWhId = String(order.warehouseInfo.id);
-          const matchedWh = whs.find((w: any) => String(w.id) === defaultWhId);
-          defaultWhName = matchedWh ? matchedWh.name : (order.warehouseInfo.name || '');
-        } else if (order.warehouseInfo?.name) {
-          // Đối chiếu tìm kho bằng tên từ danh sách kho của Pancake
-          const matchedWh = whs.find((w: any) => w.name === order.warehouseInfo.name);
-          if (matchedWh) {
-            defaultWhId = String(matchedWh.id);
-            defaultWhName = matchedWh.name;
-          } else {
-            defaultWhName = order.warehouseInfo.name;
-          }
-        }
-
-        // Kiểm tra thêm trong rawData nếu chưa có
-        if (!defaultWhId || !defaultWhName) {
-          try {
-            const raw = typeof order.rawData === 'string' ? JSON.parse(order.rawData) : order.rawData;
-            if (raw) {
-              if (!defaultWhId && (raw.warehouse_id || raw.warehouseId)) {
-                defaultWhId = String(raw.warehouse_id || raw.warehouseId);
-              }
-              if (!defaultWhName && (raw.warehouse_name || raw.warehouse_info?.name || raw.warehouseInfo?.name)) {
-                defaultWhName = raw.warehouse_name || raw.warehouse_info?.name || raw.warehouseInfo?.name;
-              }
-            }
-          } catch (e) {}
-        }
-
-        // Nếu defaultWhId có nhưng defaultWhName vẫn chưa có, tra cứu lại trong whs
-        if (defaultWhId && !defaultWhName) {
-          const matchedWh = whs.find((w: any) => String(w.id) === String(defaultWhId));
-          if (matchedWh) defaultWhName = matchedWh.name;
-        }
-
-        // Lưu trữ kho gốc của POS để hỗ trợ nút 1-chạm khôi phục lại kho gốc
-        if (defaultWhId || defaultWhName) {
-          setPosOriginalWarehouse({ id: defaultWhId, name: defaultWhName });
-        } else {
-          setPosOriginalWarehouse(null);
-        }
-
-        // Chỉ khi đơn hoàn toàn không có thông tin kho từ POS mới tìm theo trạm
-        if (!defaultWhId) {
-          const targetSearchName = matchedTech ? matchedTech.name : (matchedMain ? matchedMain.name : '');
-          if (targetSearchName) {
-            const cleanStationName = removeAccents(targetSearchName);
-            const foundWh = whs.find((w: any) => {
-              const cleanWhName = removeAccents(w.name);
-              return cleanWhName.includes(cleanStationName) || cleanStationName.includes(cleanWhName);
-            });
-            if (foundWh) {
-              defaultWhId = String(foundWh.id);
-              defaultWhName = foundWh.name;
-            }
-          }
-        }
-
-        setSelectedWarehouseId(defaultWhId);
-        if (defaultWhId) {
-          const matchedWh = whs.find((w: any) => String(w.id) === String(defaultWhId));
-          setWarehouseSearch(matchedWh ? matchedWh.name : defaultWhName);
-        } else {
-          setWarehouseSearch('');
-        }
-      })
-      .catch(err => {
-        console.error('Failed to load inventory stock info', err);
-      })
-      .finally(() => {
-        setLoadingInventory(false);
-      });
-
     setTempItems(order.items ? order.items.map((it: any) => ({
       productName: it.productName || it.rawData?.variation_info?.name || it.rawData?.name || 'Sản phẩm',
       sku: it.sku || it.rawData?.sku || '',
@@ -1731,15 +1629,131 @@ export default function OrderList() {
       discount: it.discount || 0
     })) : []);
 
+    // Mở modal ngay lập tức để phản hồi tức thì (< 16ms) khi bấm nút Phân công
     setAssignModal({ isOpen: true, orderId: order.id, order });
+
+    // Helper thiết lập kho mặc định theo đơn hàng và danh sách kho
+    const applyWarehouseSelection = (targetOrder: any, whs: any[]) => {
+      let defaultWhId = '';
+      let defaultWhName = '';
+
+      if (targetOrder.warehouseId) {
+        defaultWhId = String(targetOrder.warehouseId);
+        const matchedWh = whs.find((w: any) => String(w.id) === defaultWhId);
+        if (matchedWh) {
+          defaultWhName = matchedWh.name;
+        } else if (targetOrder.warehouseInfo?.name) {
+          defaultWhName = targetOrder.warehouseInfo.name;
+        }
+      } else if (targetOrder.warehouseInfo?.id) {
+        defaultWhId = String(targetOrder.warehouseInfo.id);
+        const matchedWh = whs.find((w: any) => String(w.id) === defaultWhId);
+        defaultWhName = matchedWh ? matchedWh.name : (targetOrder.warehouseInfo.name || '');
+      } else if (targetOrder.warehouseInfo?.name) {
+        const matchedWh = whs.find((w: any) => w.name === targetOrder.warehouseInfo.name);
+        if (matchedWh) {
+          defaultWhId = String(matchedWh.id);
+          defaultWhName = matchedWh.name;
+        } else {
+          defaultWhName = targetOrder.warehouseInfo.name;
+        }
+      }
+
+      if (!defaultWhId || !defaultWhName) {
+        try {
+          const raw = typeof targetOrder.rawData === 'string' ? JSON.parse(targetOrder.rawData) : targetOrder.rawData;
+          if (raw) {
+            if (!defaultWhId && (raw.warehouse_id || raw.warehouseId)) {
+              defaultWhId = String(raw.warehouse_id || raw.warehouseId);
+            }
+            if (!defaultWhName && (raw.warehouse_name || raw.warehouse_info?.name || raw.warehouseInfo?.name)) {
+              defaultWhName = raw.warehouse_name || raw.warehouse_info?.name || raw.warehouseInfo?.name;
+            }
+          }
+        } catch (e) {}
+      }
+
+      if (defaultWhId && !defaultWhName) {
+        const matchedWh = whs.find((w: any) => String(w.id) === String(defaultWhId));
+        if (matchedWh) defaultWhName = matchedWh.name;
+      }
+
+      if (defaultWhId || defaultWhName) {
+        setPosOriginalWarehouse({ id: defaultWhId, name: defaultWhName });
+      } else {
+        setPosOriginalWarehouse(null);
+      }
+
+      if (!defaultWhId) {
+        const targetSearchName = matchedTech ? matchedTech.name : (matchedMain ? matchedMain.name : '');
+        if (targetSearchName) {
+          const cleanStationName = removeAccents(targetSearchName);
+          const foundWh = whs.find((w: any) => {
+            const cleanWhName = removeAccents(w.name);
+            return cleanWhName.includes(cleanStationName) || cleanStationName.includes(cleanWhName);
+          });
+          if (foundWh) {
+            defaultWhId = String(foundWh.id);
+            defaultWhName = foundWh.name;
+          }
+        }
+      }
+
+      setSelectedWarehouseId(defaultWhId);
+      if (defaultWhId) {
+        const matchedWh = whs.find((w: any) => String(w.id) === String(defaultWhId));
+        setWarehouseSearch(matchedWh ? matchedWh.name : defaultWhName);
+      } else {
+        setWarehouseSearch('');
+      }
+    };
+
+    // Nếu đã có sẵn danh sách kho trong state, áp dụng ngay để UI không bị trễ
+    const now = Date.now();
+    const isInventoryFresh = warehouses.length > 0 && productsStock.length > 0 && (now - lastInventoryFetchAtRef.current < 60000);
+    if (warehouses.length > 0) {
+      applyWarehouseSelection(order, warehouses);
+    }
+
+    if (!isInventoryFresh) {
+      if (warehouses.length === 0) {
+        setLoadingInventory(true);
+      }
+      fetchApi('/inventory/stock')
+        .then(invData => {
+          const whs = invData.warehouses || [];
+          const prods = invData.products || [];
+          setWarehouses(whs);
+          setProductsStock(prods);
+          lastInventoryFetchAtRef.current = Date.now();
+          applyWarehouseSelection(order, whs);
+        })
+        .catch(err => {
+          console.error('Failed to load inventory stock info', err);
+        })
+        .finally(() => {
+          setLoadingInventory(false);
+        });
+    }
+
+    // Làm mới thông tin chi tiết đơn ngầm ở background (không chặn việc mở modal)
+    fetchApi(`/orders/${initialOrder.id}`)
+      .then(freshRes => {
+        const freshOrder = freshRes?.id ? freshRes : freshRes?.order;
+        if (freshOrder) {
+          setAssignModal(prev => (prev && prev.orderId === initialOrder.id ? { ...prev, order: freshOrder } : prev));
+        }
+      })
+      .catch(() => {});
   };
 
   const submitAssign = async () => {
-    if (!assignModal) return;
+    if (!assignModal || isSubmittingAssign) return;
 
     const isCompletedOrder = assignModal.order.adminStatus === 'hoàn thành';
 
     if (isCompletedOrder) {
+      setIsSubmittingAssign(true);
       try {
         const payload: any = {
           adminStatus: 'hoàn thành',
@@ -1761,16 +1775,21 @@ export default function OrderList() {
           payload.salesKtvId = assignModal.order.salesKtvId;
         }
 
-        await updateOrder(assignModal.orderId, payload);
+        const res = await updateOrder(assignModal.orderId, payload);
+        if (res?.order) {
+          setOrders(prev => prev.map(o => o.id === res.order.id ? { ...o, ...res.order } : o));
+        }
         alert('Cập nhật KTV bán hàng cho đơn hoàn thành thành công!');
         setAssignModal(null);
         setIsAssignProductSelectOpen(false);
         setIsAssignModalExpanded(false);
-        fetchOrdersData();
+        fetchOrdersData({ silent: true });
         return;
       } catch (err: any) {
         alert(err.message || 'Lỗi cập nhật KTV bán hàng');
         return;
+      } finally {
+        setIsSubmittingAssign(false);
       }
     }
 
@@ -1822,6 +1841,7 @@ export default function OrderList() {
       return;
     }
 
+    setIsSubmittingAssign(true);
     try {
       // Tự động khử trùng lặp linh kiện con nếu đã có gói Combo trong đơn & strip components
       const activeComboComponents = new Set<string>();
@@ -1877,6 +1897,7 @@ export default function OrderList() {
           finalWarehouseId = matched.id;
         } else if (!selectedWarehouseId) {
           alert(`Kho hàng "${warehouseSearch}" không tồn tại trong hệ thống. Vui lòng chọn một kho hàng hợp lệ trong danh sách.`);
+          setIsSubmittingAssign(false);
           return;
         }
       }
@@ -1939,13 +1960,19 @@ export default function OrderList() {
         }
       }
 
-      await updateOrder(assignModal.orderId, payload);
+      const res = await updateOrder(assignModal.orderId, payload);
+      if (res?.order) {
+        setOrders(prev => prev.map(o => o.id === res.order.id ? { ...o, ...res.order } : o));
+      }
       setAssignModal(null);
       setIsAssignProductSelectOpen(false);
       setIsAssignModalExpanded(false);
-      fetchOrdersData();
+      fetchOrdersData({ silent: true });
+      getKtvUsers().then(data => setAllKtvs(data)).catch(() => {});
     } catch (err: any) {
       alert(err.message);
+    } finally {
+      setIsSubmittingAssign(false);
     }
   };
   const toggleDropdown = (type: 'main' | 'pancakeOrderId' | 'adminStatuses' | 'ktvIds' | 'workTypes' | 'mainStationIds' | 'customerName' | 'customerPhone' | 'serviceTypes' | 'productCategories' | 'productNames' | 'techStationIds' | 'provinces' | 'appointmentTimeFilter' | 'completedTimeFilter' | 'createdTimeFilter' | 'updatedTimeFilter' | 'creator') => {
@@ -4704,23 +4731,33 @@ export default function OrderList() {
             <div className="px-6 py-4 border-t border-gray-200 bg-gray-50 flex justify-end gap-3">
               <button 
                 onClick={() => { 
+                  if (isSubmittingAssign) return;
                   setAssignModal(null); 
                   setIsAssignProductSelectOpen(false); 
                   setIsAssignModalExpanded(false); 
                 }} 
-                className="px-4 py-2 bg-white border rounded text-gray-700 hover:bg-gray-100"
+                disabled={isSubmittingAssign}
+                className="px-4 py-2 bg-white border rounded text-gray-700 hover:bg-gray-100 disabled:opacity-50"
               >
                 Hủy
               </button>
               <button 
                 onClick={submitAssign} 
-                className={`px-5 py-2 rounded-xl text-sm font-semibold shadow-xs transition-colors cursor-pointer text-white ${
+                disabled={isSubmittingAssign}
+                className={`px-5 py-2 rounded-xl text-sm font-semibold shadow-xs transition-colors cursor-pointer text-white flex items-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed ${
                   assignModal.order.adminStatus === 'hoàn thành'
                     ? 'bg-emerald-600 hover:bg-emerald-700'
                     : 'bg-blue-600 hover:bg-blue-700'
                 }`}
               >
-                {assignModal.order.adminStatus === 'hoàn thành' ? 'Cập nhật KTV bán hàng' : 'Lưu thông tin & Phân bổ'}
+                {isSubmittingAssign && <Loader2 size={16} className="animate-spin" />}
+                <span>
+                  {isSubmittingAssign
+                    ? 'Đang lưu...'
+                    : assignModal.order.adminStatus === 'hoàn thành'
+                      ? 'Cập nhật KTV bán hàng'
+                      : 'Lưu thông tin & Phân bổ'}
+                </span>
               </button>
             </div>
           </div>
