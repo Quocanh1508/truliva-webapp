@@ -38,7 +38,7 @@ const LEGAL_TABS: DocMeta[] = [
   { type: 'COMPANY', name: 'Thông tin doanh nghiệp', shortName: 'Công ty', icon: Building2 },
   { type: 'TERMS', name: 'Điều khoản giao dịch', shortName: 'Điều khoản', icon: FileText, badge: 'Luật TMĐT 2025' },
   { type: 'PRIVACY', name: 'Chính sách bảo mật', shortName: 'Bảo mật', icon: ShieldCheck, badge: 'NĐ 13/2023' },
-  { type: 'RETURN', name: 'Chính sách đổi trả', shortName: 'Đổi trả 7 ngày', icon: RotateCcw },
+  { type: 'RETURN', name: 'Chính sách đổi trả', shortName: 'Đổi trả 30 ngày', icon: RotateCcw, badge: '30 ngày' },
   { type: 'SHIPPING', name: 'Giao hàng & lắp đặt', shortName: 'Vận chuyển', icon: Truck },
   { type: 'WARRANTY', name: 'Chính sách bảo hành', shortName: 'Bảo hành', icon: Award },
   { type: 'COMPLAINT', name: 'Quy trình khiếu nại', shortName: 'Khiếu nại', icon: AlertCircle },
@@ -165,6 +165,24 @@ export default function LegalPagesModal({ isOpen, onClose, initialType = 'TERMS'
               </div>
 
               {/* Main HTML Content */}
+              <style>{`
+                .legal-content table {
+                  width: 100% !important;
+                  border-collapse: collapse !important;
+                  margin: 12px 0 !important;
+                  font-size: 12px !important;
+                }
+                .legal-content th, .legal-content td {
+                  border: 1px solid #e2e8f0 !important;
+                  padding: 8px 10px !important;
+                  text-align: left !important;
+                }
+                .legal-content tr:first-child td, .legal-content th {
+                  background-color: #f8fafc !important;
+                  font-weight: 700 !important;
+                  color: #1e293b !important;
+                }
+              `}</style>
               <div 
                 className="legal-content prose prose-sm max-w-none text-gray-700 space-y-3"
                 dangerouslySetInnerHTML={{ __html: docDetail.contentHtml }}
