@@ -160,12 +160,12 @@ Every telemetry message is a **full snapshot**: always send all fields. If a val
 | `pump` | integer \| null | **Yes** | enum | Pump state: `0` = OFF, `1` = RUNNING, `2` = ERROR. |
 | `err` | integer | **Yes** | enum | Device error code. `0` = no error; see Section 4.1.4. If several errors are active, report the highest-priority one. |
 | `total_l` | number \| null | **Yes** | L | Cumulative volume of water filtered (monotonic counter). |
-| `ppc` | integer \| null | **Yes** | % (0–100) | Remaining life of the PPC (sediment) filter. |
-| `ro` | integer \| null | **Yes** | % (0–100) | Remaining life of the RO membrane. |
-| `cto` | integer \| null | **Yes** | % (0–100) | Remaining life of the CTO (carbon) filter. |
-| `ppc_replace` | boolean \| null | **Yes** | – | `true` when the PPC filter must be replaced. |
-| `ro_replace` | boolean \| null | **Yes** | – | `true` when the RO membrane must be replaced. |
-| `cto_replace` | boolean \| null | **Yes** | – | `true` when the CTO filter must be replaced. |
+| `ppc` | integer \| null | **Yes** | % (0–100) | Remaining life of Filter 1: PPC/PGP filter (3-stage purifiers: UR5676, UR5840) or PCB filter (2-stage purifiers: UR61096H). (Field alias `pcb` also supported by platform). |
+| `ro` | integer \| null | **Yes** | % (0–100) | Remaining life of Filter 2: RO membrane (all models). |
+| `cto` | integer \| null | **Yes** | % (0–100) | Remaining life of Filter 3: CTO carbon filter (3-stage purifiers). For 2-stage purifiers (UR61096H), send `null`. |
+| `ppc_replace` | boolean \| null | **Yes** | – | `true` when Filter 1 (PPC/PGP/PCB) must be replaced. (Field alias `pcb_replace` also supported). |
+| `ro_replace` | boolean \| null | **Yes** | – | `true` when Filter 2 (RO) must be replaced. |
+| `cto_replace` | boolean \| null | **Yes** | – | `true` when Filter 3 (CTO) must be replaced. For 2-stage purifiers, send `null`. |
 | `uart_ok` | boolean | **Yes** | – | Health of the link between the IoT module and the purifier main board. `false` = no data from the main board. When `false`, all water/filter fields must be `null`. |
 
 #### 4.1.3 Diagnostic fields (stored for troubleshooting)
@@ -211,6 +211,14 @@ Firmware does not implement these rules, but they define which state changes mat
 | `OTA_ROLLBACK` | OTA response `status` = `"rolled_back"` | WARNING | – |
 
 The same alert type is not raised more than once per 15 minutes per device.
+
+#### 4.1.6 Filter Lifecycles & Indicator Mapping Specification (Thresholds & UI)
+
+| Model | Stages | Filter 1 | Filter 2 | Filter 3 | Indicator Type | Thresholds & Indicator Status |
+|---|---|---|---|---|---|---|
+| **UR5676** | 3 | **PGP**<br>(6–12 months) | **RO**<br>(24–36 months) | **CTO**<br>(6–12 months) | **BARS** (vạch) | • **> 25%**: 2, 3, 4 vạch xanh → *"Đang tốt"*<br>• **10%–25%**: 1 vạch xanh → *"Sắp thay"*<br>• **< 10%** (hoặc `replace=true`): 1 vạch nháy đỏ → *"Cần thay"* |
+| **UR5840** | 3 | **PGP**<br>(6–12 months) | **RO**<br>(24–36 months) | **CTO**<br>(6–12 months) | **BARS** (vạch) | • **> 25%**: 2, 3, 4 vạch xanh → *"Đang tốt"*<br>• **10%–25%**: 1 vạch xanh → *"Sắp thay"*<br>• **< 10%** (hoặc `replace=true`): 1 vạch nháy đỏ → *"Cần thay"* |
+| **UR61096H** | 2 | **PCB**<br>(6–12 months) | **RO**<br>(3–8 years / 36–96 months) | *N/A (send null)* | **LIGHT** (đèn) | • **> 25%**: PCB sáng đèn trắng → *"Đang tốt"*<br>• **10%–25%**: PCB sáng đèn trắng → *"Sắp thay"*<br>• **< 10%** (hoặc `replace=true`): PCB nháy đèn đỏ → *"Cần thay"* |
 
 ---
 

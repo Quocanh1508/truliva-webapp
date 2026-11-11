@@ -131,17 +131,19 @@ function getTdsQuality(tds?: number | null) {
   return { text: 'Cần kiểm tra màng RO', color: 'text-rose-700', bg: 'bg-rose-50', border: 'border-rose-200' };
 }
 
-function getFilterState(percent?: number | null, replace?: boolean) {
-  if (replace || (percent != null && percent <= 2)) {
-    return { text: 'Cần thay ngay', color: 'text-rose-700', bg: 'bg-rose-100', bar: 'bg-rose-600', isCritical: true };
+function getFilterState(percent?: number | null, replace?: boolean, indicatorType: 'BARS' | 'LIGHT' = 'BARS', customBars?: number | null) {
+  const val = percent ?? 80;
+  if (replace || (percent != null && percent < 10)) {
+    const ind = indicatorType === 'LIGHT' ? 'Nháy đèn đỏ' : '1 vạch nháy đỏ';
+    return { text: 'Cần thay', color: 'text-rose-700', bg: 'bg-rose-100', bar: 'bg-rose-600', isCritical: true, indicator: ind, bars: 1 };
   }
-  if (percent != null && percent <= 24) {
-    return { text: 'Sắp đến hạn thay', color: 'text-amber-700', bg: 'bg-amber-100', bar: 'bg-amber-500', isCritical: false };
+  if (percent != null && percent <= 25) {
+    const ind = indicatorType === 'LIGHT' ? 'Sáng đèn trắng' : '1 vạch xanh';
+    return { text: 'Sắp thay', color: 'text-amber-700', bg: 'bg-amber-100', bar: 'bg-amber-500', isCritical: false, indicator: ind, bars: 1 };
   }
-  if (percent != null && percent <= 50) {
-    return { text: 'Đã dùng 50%', color: 'text-blue-700', bg: 'bg-blue-100', bar: 'bg-blue-500', isCritical: false };
-  }
-  return { text: 'Tình trạng tốt', color: 'text-emerald-700', bg: 'bg-emerald-100', bar: 'bg-emerald-500', isCritical: false };
+  const calcBars = customBars ?? (val > 75 ? 4 : (val > 50 ? 3 : 2));
+  const ind = indicatorType === 'LIGHT' ? 'Sáng đèn trắng' : `${calcBars}/4 vạch`;
+  return { text: 'Đang tốt', color: 'text-emerald-700', bg: 'bg-emerald-100', bar: 'bg-emerald-500', isCritical: false, indicator: ind, bars: calcBars };
 }
 
 export default function IotMonitor() {
@@ -683,10 +685,18 @@ export default function IotMonitor() {
           ) : (
             filteredDevices.map((device) => {
               const tel = device.latestTelemetry;
+              const modelKey = (device.serialInfo?.model || device.serialInfo?.productLine || device.serialNumber || '').toUpperCase();
+              const isTwoFilter = modelKey.includes('61096') || (tel?.cto == null && (tel?.ppc != null || (tel as any)?.pcb != null));
+              const indicatorType: 'BARS' | 'LIGHT' = isTwoFilter ? 'LIGHT' : 'BARS';
+
+              const filter1Val = tel?.ppc ?? (tel as any)?.pcb;
+              const filter1Replace = tel?.ppcReplace || (tel as any)?.pcbReplace;
+              const filter1Bars = tel?.ppcBars ?? (tel as any)?.pcbBars;
+
               const tdsQuality = getTdsQuality(tel?.tdsOut);
-              const ppcState = getFilterState(tel?.ppc, tel?.ppcReplace);
-              const roState = getFilterState(tel?.ro, tel?.roReplace);
-              const ctoState = getFilterState(tel?.cto, tel?.ctoReplace);
+              const ppcState = getFilterState(filter1Val, filter1Replace, indicatorType, filter1Bars);
+              const roState = getFilterState(tel?.ro, tel?.roReplace, indicatorType, tel?.roBars);
+              const ctoState = getFilterState(tel?.cto, tel?.ctoReplace, indicatorType, tel?.ctoBars);
 
               return (
                 <div
@@ -821,29 +831,33 @@ export default function IotMonitor() {
                         </div>
                       </div>
 
-                      {/* ── BỘ 3 LÕI LỌC TRULIVA (PPC, RO, CTO) ── */}
+                      {/* ── BỘ LÕI LỌC TRULIVA (ĐỘNG 2 LÕI / 3 LÕI THEO DÒNG MÁY) ── */}
                       <div className="bg-slate-50/90 p-3 sm:p-3.5 rounded-xl border border-gray-100 space-y-2">
                         <div className="flex items-center justify-between">
                           <span className="text-xs font-bold text-gray-800 uppercase tracking-wider flex items-center gap-1.5">
                             <Layers size={14} className="text-[#1B3A6B]" />
-                            Tuổi Thọ 3 Lõi Lọc
+                            Tuổi Thọ {isTwoFilter ? '2' : '3'} Lõi Lọc
                           </span>
                           <span className="text-[11px] text-gray-400">Chuẩn máy Truliva</span>
                         </div>
 
-                        {/* Lõi 1: PPC */}
+                        {/* Lõi 1: PCB (dòng 2 lõi UR61096H) hoặc PGP/PPC (dòng 3 lõi UR5676/UR5840) */}
                         <div className="p-2 sm:p-2.5 rounded-xl bg-white border border-gray-100/90 shadow-2xs space-y-1.5">
                           <div className="flex items-center justify-between gap-1 text-xs">
                             <div className="flex items-center gap-1.5 min-w-0">
                               <span className="w-5 h-5 rounded-md bg-[#1B3A6B]/10 text-[#1B3A6B] font-bold text-[10px] flex items-center justify-center shrink-0">
                                 1
                               </span>
-                              <span className="font-bold text-gray-800 text-xs truncate">Lõi 1 (PPC)</span>
-                              <span className="text-[10px] text-gray-400 truncate">• Lọc thô</span>
+                              <span className="font-bold text-gray-800 text-xs truncate">
+                                Lõi 1 ({isTwoFilter ? 'PCB' : 'PGP'})
+                              </span>
+                              <span className="text-[10px] text-gray-400 truncate">
+                                {isTwoFilter ? '• Lõi phức hợp' : '• Lọc thô'}
+                              </span>
                             </div>
                             <div className="flex items-center gap-1.5 shrink-0">
                               <span className="font-extrabold text-xs sm:text-sm text-gray-900 font-mono">
-                                {tel.ppc != null ? `${tel.ppc}%` : '--%'}
+                                {filter1Val != null ? `${filter1Val}%` : '--%'}
                               </span>
                               <span className={`text-[10px] px-1.5 py-0.5 rounded font-semibold ${ppcState.bg} ${ppcState.color}`}>
                                 {ppcState.text}
@@ -853,12 +867,12 @@ export default function IotMonitor() {
                           <div className="w-full bg-gray-100 h-2 rounded-full overflow-hidden">
                             <div
                               className={`h-full transition-all duration-500 rounded-full ${ppcState.bar}`}
-                              style={{ width: `${Math.min(100, Math.max(0, tel.ppc ?? 0))}%` }}
+                              style={{ width: `${Math.min(100, Math.max(0, filter1Val ?? 0))}%` }}
                             />
                           </div>
                           <div className="flex justify-between items-center text-[10px] text-gray-400 px-0.5">
-                            <span>Lọc thô sơ cấp</span>
-                            <span className="font-medium text-gray-600">({tel.ppcBars ?? 4}/4 vạch)</span>
+                            <span>{isTwoFilter ? 'Chu kỳ 6 - 12 tháng' : 'Chu kỳ 6 - 12 tháng'}</span>
+                            <span className="font-medium text-gray-600">({ppcState.indicator})</span>
                           </div>
                         </div>
 
@@ -888,41 +902,43 @@ export default function IotMonitor() {
                             />
                           </div>
                           <div className="flex justify-between items-center text-[10px] text-gray-400 px-0.5">
-                            <span>Màng lọc tinh RO</span>
-                            <span className="font-medium text-gray-600">({tel.roBars ?? 4}/4 vạch)</span>
+                            <span>{isTwoFilter ? 'Chu kỳ 3 - 8 năm' : 'Chu kỳ 24 - 36 tháng'}</span>
+                            <span className="font-medium text-gray-600">({roState.indicator})</span>
                           </div>
                         </div>
 
-                        {/* Lõi 3: CTO */}
-                        <div className="p-2 sm:p-2.5 rounded-xl bg-white border border-gray-100/90 shadow-2xs space-y-1.5">
-                          <div className="flex items-center justify-between gap-1 text-xs">
-                            <div className="flex items-center gap-1.5 min-w-0">
-                              <span className="w-5 h-5 rounded-md bg-amber-500/15 text-amber-700 font-bold text-[10px] flex items-center justify-center shrink-0">
-                                3
-                              </span>
-                              <span className="font-bold text-gray-800 text-xs truncate">Lõi 3 (CTO)</span>
-                              <span className="text-[10px] text-gray-400 truncate">• Than hoạt tính</span>
+                        {/* Lõi 3: CTO (Chỉ hiển thị cho Dòng 3 lõi; ẩn trên dòng 2 lõi UR61096H) */}
+                        {!isTwoFilter && (
+                          <div className="p-2 sm:p-2.5 rounded-xl bg-white border border-gray-100/90 shadow-2xs space-y-1.5">
+                            <div className="flex items-center justify-between gap-1 text-xs">
+                              <div className="flex items-center gap-1.5 min-w-0">
+                                <span className="w-5 h-5 rounded-md bg-amber-500/15 text-amber-700 font-bold text-[10px] flex items-center justify-center shrink-0">
+                                  3
+                                </span>
+                                <span className="font-bold text-gray-800 text-xs truncate">Lõi 3 (CTO)</span>
+                                <span className="text-[10px] text-gray-400 truncate">• Than hoạt tính</span>
+                              </div>
+                              <div className="flex items-center gap-1.5 shrink-0">
+                                <span className="font-extrabold text-xs sm:text-sm text-gray-900 font-mono">
+                                  {tel.cto != null ? `${tel.cto}%` : '--%'}
+                                </span>
+                                <span className={`text-[10px] px-1.5 py-0.5 rounded font-semibold ${ctoState.bg} ${ctoState.color}`}>
+                                  {ctoState.text}
+                                </span>
+                              </div>
                             </div>
-                            <div className="flex items-center gap-1.5 shrink-0">
-                              <span className="font-extrabold text-xs sm:text-sm text-gray-900 font-mono">
-                                {tel.cto != null ? `${tel.cto}%` : '--%'}
-                              </span>
-                              <span className={`text-[10px] px-1.5 py-0.5 rounded font-semibold ${ctoState.bg} ${ctoState.color}`}>
-                                {ctoState.text}
-                              </span>
+                            <div className="w-full bg-gray-100 h-2 rounded-full overflow-hidden">
+                              <div
+                                className={`h-full transition-all duration-500 rounded-full ${ctoState.bar}`}
+                                style={{ width: `${Math.min(100, Math.max(0, tel.cto ?? 0))}%` }}
+                              />
+                            </div>
+                            <div className="flex justify-between items-center text-[10px] text-gray-400 px-0.5">
+                              <span>Chu kỳ 6 - 12 tháng</span>
+                              <span className="font-medium text-gray-600">({ctoState.indicator})</span>
                             </div>
                           </div>
-                          <div className="w-full bg-gray-100 h-2 rounded-full overflow-hidden">
-                            <div
-                              className={`h-full transition-all duration-500 rounded-full ${ctoState.bar}`}
-                              style={{ width: `${Math.min(100, Math.max(0, tel.cto ?? 0))}%` }}
-                            />
-                          </div>
-                          <div className="flex justify-between items-center text-[10px] text-gray-400 px-0.5">
-                            <span>Khử mùi & vị than gáo dừa</span>
-                            <span className="font-medium text-gray-600">({tel.ctoBars ?? 1}/4 vạch)</span>
-                          </div>
-                        </div>
+                        )}
                       </div>
                     </div>
                   ) : (

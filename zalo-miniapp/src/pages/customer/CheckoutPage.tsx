@@ -154,7 +154,7 @@ export default function CheckoutPage({ user, voucherCode, onBack, onOrderSuccess
   return (
     <div className="min-h-screen bg-[#F8FAFC] pb-32 font-sans text-gray-800 animate-fade-in">
       {/* Header */}
-      <div className="sticky top-0 z-30 bg-white/95 backdrop-blur-md px-4 py-3 border-b border-gray-100 flex items-center justify-between shadow-2xs">
+      <div className="sticky top-0 z-30 bg-white/95 backdrop-blur-md px-4 pt-[calc(env(safe-area-inset-top,38px)+12px)] pb-3 border-b border-gray-100 flex items-center justify-between shadow-2xs">
         <button onClick={onBack} className="w-9 h-9 rounded-full bg-gray-100 flex items-center justify-center text-gray-700">
           <ArrowLeft className="w-5 h-5" />
         </button>

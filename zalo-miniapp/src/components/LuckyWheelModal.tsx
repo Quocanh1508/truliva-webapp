@@ -149,7 +149,7 @@ export default function LuckyWheelModal({ isOpen, onClose, user }: LuckyWheelMod
                 <span>Nhận thêm 1 Lượt Quay Miễn Phí!</span>
               </div>
               <p className="text-slate-600 text-[11px]">
-                Quan tâm Zalo OA <strong>Pure Vita / Truliva</strong> để cập nhật lịch thay lõi và nhận lượt quay quà tặng.
+                Quan tâm Zalo OA <strong>Máy lọc nước Truliva</strong> để cập nhật lịch thay lõi và nhận lượt quay quà tặng.
               </p>
               <button
                 onClick={handleFollowOa}

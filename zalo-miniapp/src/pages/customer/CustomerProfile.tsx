@@ -159,7 +159,7 @@ export default function CustomerProfile({
   return (
     <div className="pb-28 bg-slate-50 min-h-screen font-sans">
       {/* 1. Header Profile Card with Persona 3 Reload Ocean Waves */}
-      <P3ROceanHeader className="p-5 pt-5 pb-10">
+      <P3ROceanHeader className="p-5 pt-[calc(env(safe-area-inset-top,38px)+24px)] pb-12">
         <div className="max-w-md mx-auto space-y-4">
           <div className="flex items-center space-x-4">
             <div 

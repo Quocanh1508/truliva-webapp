@@ -51,6 +51,29 @@ export default function IotDeviceCard({ serialData, user, onBookMaintenance }: I
     }
   };
 
+  // Điều hướng thẳng về form Hỗ Trợ Kỹ Thuật (auto-fill serial, phone, name, model)
+  const handleRequestKtv = async () => {
+    const sn = s?.serialNumber || '';
+    const phone = user?.phoneNumber || s?.customerPhone || '';
+    const name = user?.fullName || s?.customerName || '';
+    const model = s?.model || s?.productLine || modelTitle || '';
+
+    const params = new URLSearchParams();
+    params.set('mode', 'support');
+    if (sn) params.set('serial', sn);
+    if (phone) params.set('phone', phone);
+    if (name) params.set('name', name);
+    if (model) params.set('model', model);
+
+    const url = `https://trulivaofficial.com/warranty-activate?${params.toString()}`;
+
+    try {
+      await openWebview({ url });
+    } catch {
+      window.open(url, '_blank');
+    }
+  };
+
   // Mở trang Web Bảo hành Truliva với Serial được Auto-Fill tự động
   const handleOpenWarranty = async () => {
     const sn = s?.serialNumber || '';
@@ -71,42 +94,61 @@ export default function IotDeviceCard({ serialData, user, onBookMaintenance }: I
   const isActivated = s?.status === 'Đã kích hoạt' || s?.status === 'KH xác nhận' || Boolean(s?.activationDate);
   const expiryDateStr = s?.warrantyExpiryDate ? new Date(s.warrantyExpiryDate).toLocaleDateString('vi-VN') : null;
 
-  // Helper tính màu trạng thái lõi lọc
-  const getFilterHealth = (pct: number | null | undefined, isReplace?: boolean) => {
+  const modelTitle = s.model || s.productLine || 'UR61096H';
+  const modelUpper = (s.model || s.productLine || modelTitle || '').toUpperCase();
+  // Nhận diện dòng máy 2 lõi (UR61096H) vs 3 lõi (UR5676, UR5840)
+  const isTwoFilter = modelUpper.includes('61096') || (telemetry?.cto == null && (telemetry?.ppc != null || telemetry?.pcb != null));
+  const indicatorType: 'BARS' | 'LIGHT' = isTwoFilter ? 'LIGHT' : 'BARS';
+
+  // Helper tính màu & trạng thái chỉ báo (Vạch / Đèn) theo đặc tả kỹ thuật:
+  // - Dòng UR5676 / UR5840 (vạch): >25%: 2,3,4 vạch xanh ("Đang tốt") | 10%-25%: 1 vạch xanh ("Sắp thay") | <10%: 1 vạch nháy đỏ ("Cần thay")
+  // - Dòng UR61096H / lõi PCB (đèn): >25%: sáng đèn trắng ("Đang tốt") | 10%-25%: sáng đèn trắng ("Sắp thay") | <10%: nháy đèn đỏ ("Cần thay")
+  const getFilterHealth = (pct: number | null | undefined, isReplace?: boolean, customBars?: number | null) => {
     const val = pct ?? 80;
-    if (isReplace || val < 20) {
+    if (isReplace || val < 10) {
       return { 
         val,
         label: 'Cần thay', 
         color: 'bg-rose-500', 
         textColor: 'text-rose-600',
         badgeClass: 'bg-rose-50 text-rose-700 border-rose-200',
-        daysEstimate: 'Hết hạn sử dụng'
+        indicatorText: indicatorType === 'LIGHT' ? 'Nháy đèn đỏ' : '1 vạch nháy đỏ',
+        indicatorClass: 'text-rose-600 font-bold',
+        barsDisplay: indicatorType === 'LIGHT' ? 'Nháy đèn đỏ' : '(1 vạch nháy đỏ)'
       };
     }
-    if (val < 50) {
+    if (val <= 25) {
       return { 
         val,
         label: 'Sắp thay', 
         color: 'bg-amber-500', 
         textColor: 'text-amber-600',
         badgeClass: 'bg-amber-50 text-amber-700 border-amber-200',
-        daysEstimate: '~ 30 - 45 ngày nữa'
+        indicatorText: indicatorType === 'LIGHT' ? 'Sáng đèn trắng' : '1 vạch xanh',
+        indicatorClass: 'text-amber-700 font-semibold',
+        barsDisplay: indicatorType === 'LIGHT' ? 'Sáng đèn trắng' : '(1/4 vạch)'
       };
     }
+    const calcBars = customBars ?? (val > 75 ? 4 : (val > 50 ? 3 : 2));
     return { 
       val,
       label: 'Đang tốt', 
       color: 'bg-emerald-500', 
       textColor: 'text-emerald-600',
       badgeClass: 'bg-emerald-50 text-emerald-700 border-emerald-200',
-      daysEstimate: '~ 90 - 180 ngày nữa'
+      indicatorText: indicatorType === 'LIGHT' ? 'Sáng đèn trắng' : `${calcBars} vạch xanh`,
+      indicatorClass: 'text-emerald-700 font-semibold',
+      barsDisplay: indicatorType === 'LIGHT' ? 'Sáng đèn trắng' : `(${calcBars}/4 vạch)`
     };
   };
 
-  const ppcHealth = getFilterHealth(telemetry?.ppc ?? 79, telemetry?.ppcReplace);
-  const roHealth = getFilterHealth(telemetry?.ro ?? 85, telemetry?.roReplace);
-  const ctoHealth = getFilterHealth(telemetry?.cto ?? 80, telemetry?.ctoReplace);
+  const filter1Val = telemetry?.ppc ?? telemetry?.pcb ?? 79;
+  const filter1Replace = telemetry?.ppcReplace || telemetry?.pcbReplace;
+  const filter1Bars = telemetry?.ppcBars ?? telemetry?.pcbBars;
+
+  const filter1Health = getFilterHealth(filter1Val, filter1Replace, filter1Bars);
+  const roHealth = getFilterHealth(telemetry?.ro ?? 85, telemetry?.roReplace, telemetry?.roBars);
+  const ctoHealth = getFilterHealth(telemetry?.cto ?? 80, telemetry?.ctoReplace, telemetry?.ctoBars);
 
   const tdsVal = telemetry?.tdsOut ?? 12;
   // Chuẩn hóa trạng thái kết nối Wi-Fi thực tế (Nếu iot.isOnline === false thì hiển thị ngoại tuyến)
@@ -116,8 +158,6 @@ export default function IotDeviceCard({ serialData, user, onBookMaintenance }: I
   const ssidName = telemetry?.ssid || 'Truliva_Smart_WiFi';
   const ipAddress = telemetry?.ip || '192.168.1.135';
   const macAddress = telemetry?.mac || `TL-${(s?.serialNumber || '830F5').slice(-6)}`;
-
-  const modelTitle = s.model || s.productLine || 'UR61096H';
 
   return (
     <div className="bg-white rounded-[2rem] border border-sky-100/90 shadow-[0_6px_30px_rgba(27,58,107,0.07)] overflow-hidden transition-all">
@@ -244,17 +284,17 @@ export default function IotDeviceCard({ serialData, user, onBookMaintenance }: I
             </div>
           </div>
 
-          {/* ── BẢNG HIỂN THỊ 3 LÕI LỌC CHUYÊN NGHIỆP (3-STAGE FILTER LIFE MONITOR) ── */}
+          {/* ── BẢNG HIỂN THỊ LÕI LỌC CHUYÊN NGHIỆP (ĐỘNG THEO DÒNG MÁY 2 LÕI / 3 LÕI) ── */}
           <div className="space-y-2.5">
             <div className="flex items-center justify-between gap-2">
               <div className="flex items-center space-x-1.5 text-xs font-black text-slate-800 uppercase tracking-tight whitespace-nowrap">
                 <Layers size={14} className="text-[#1B3A6B] shrink-0" />
-                <span>Tuổi Thọ 3 Lõi Lọc</span>
+                <span>Tuổi Thọ {isTwoFilter ? '2' : '3'} Lõi Lọc</span>
               </div>
               <span className="text-[10px] text-slate-400 font-bold whitespace-nowrap">Đo thời gian thực</span>
             </div>
 
-            {/* Lõi 1: PGB */}
+            {/* Lõi 1: PCB (dòng 2 lõi UR61096H) hoặc PGP (dòng 3 lõi UR5676/UR5840) */}
             <div className="bg-white p-3 rounded-2xl border border-slate-100 shadow-xs space-y-2 hover:border-sky-200 transition-colors">
               <div className="flex items-center justify-between gap-2">
                 <div className="flex items-center space-x-2.5 min-w-0 flex-1">
@@ -263,16 +303,18 @@ export default function IotDeviceCard({ serialData, user, onBookMaintenance }: I
                   </div>
                   <div className="min-w-0 flex-1">
                     <h4 className="font-extrabold text-xs text-slate-900 leading-none">
-                      Lõi 1 (PGB)
+                      Lõi 1 ({isTwoFilter ? 'PCB' : 'PGP'})
                     </h4>
-                    <p className="text-[10px] text-slate-400 mt-1">Lọc thô cặn bẩn & gỉ sét</p>
+                    <p className="text-[10px] text-slate-400 mt-1">
+                      {isTwoFilter ? 'Bộ lọc phức hợp đa tầng (Polypropylene & Carbon Block)' : 'Lọc thô cặn bẩn & gỉ sét'}
+                    </p>
                   </div>
                 </div>
 
                 <div className="shrink-0 text-right">
-                  <div className="font-black text-sm text-slate-900 leading-none tabular-num">{ppcHealth.val}%</div>
-                  <span className={`inline-flex items-center justify-center mt-1 text-[9px] font-bold px-2 py-0.5 rounded-md border whitespace-nowrap ${ppcHealth.badgeClass}`}>
-                    {ppcHealth.label}
+                  <div className="font-black text-sm text-slate-900 leading-none tabular-num">{filter1Health.val}%</div>
+                  <span className={`inline-flex items-center justify-center mt-1 text-[9px] font-bold px-2 py-0.5 rounded-md border whitespace-nowrap ${filter1Health.badgeClass}`}>
+                    {filter1Health.label}
                   </span>
                 </div>
               </div>
@@ -281,13 +323,15 @@ export default function IotDeviceCard({ serialData, user, onBookMaintenance }: I
               <div className="space-y-1">
                 <div className="w-full bg-slate-100 rounded-full h-2 overflow-hidden">
                   <div 
-                    className={`h-full rounded-full transition-all duration-700 ${ppcHealth.color}`}
-                    style={{ width: `${Math.min(100, Math.max(8, ppcHealth.val))}%` }}
+                    className={`h-full rounded-full transition-all duration-700 ${filter1Health.color}`}
+                    style={{ width: `${Math.min(100, Math.max(8, filter1Health.val))}%` }}
                   ></div>
                 </div>
                 <div className="flex items-center justify-between text-[10px] text-slate-500 font-medium">
-                  <span className="text-slate-600 font-semibold">Chu kỳ: 3 - 6 tháng</span>
-                  <span className="text-slate-400">(4/4 vạch)</span>
+                  <span className="text-slate-600 font-semibold">Chu kỳ: 6 - 12 tháng</span>
+                  <span className={`text-[10px] font-semibold ${filter1Health.indicatorClass}`}>
+                    {filter1Health.barsDisplay}
+                  </span>
                 </div>
               </div>
             </div>
@@ -325,49 +369,57 @@ export default function IotDeviceCard({ serialData, user, onBookMaintenance }: I
                   ></div>
                 </div>
                 <div className="flex items-center justify-between text-[10px] text-slate-500 font-medium">
-                  <span className="text-slate-600 font-semibold">Chu kỳ: 24 - 36 tháng</span>
-                  <span className="text-slate-400">(4/4 vạch)</span>
-                </div>
-              </div>
-            </div>
-
-            {/* Lõi 3: CTO */}
-            <div className="bg-white p-3 rounded-2xl border border-slate-100 shadow-xs space-y-2 hover:border-amber-200 transition-colors">
-              <div className="flex items-center justify-between gap-2">
-                <div className="flex items-center space-x-2.5 min-w-0 flex-1">
-                  <div className="w-7 h-7 rounded-xl bg-amber-100 text-amber-800 font-black text-xs flex items-center justify-center border border-amber-200 shrink-0">
-                    3
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <h4 className="font-extrabold text-xs text-slate-900 leading-none">
-                      Lõi 3 (CTO)
-                    </h4>
-                    <p className="text-[10px] text-slate-400 mt-1">Khử mùi & vị than gáo dừa</p>
-                  </div>
-                </div>
-
-                <div className="shrink-0 text-right">
-                  <div className="font-black text-sm text-slate-900 leading-none tabular-num">{ctoHealth.val}%</div>
-                  <span className={`inline-flex items-center justify-center mt-1 text-[9px] font-bold px-2 py-0.5 rounded-md border whitespace-nowrap ${ctoHealth.badgeClass}`}>
-                    {ctoHealth.label}
+                  <span className="text-slate-600 font-semibold">
+                    {isTwoFilter ? 'Chu kỳ: 3 - 8 năm' : 'Chu kỳ: 24 - 36 tháng'}
+                  </span>
+                  <span className={`text-[10px] font-semibold ${roHealth.indicatorClass}`}>
+                    {roHealth.barsDisplay}
                   </span>
                 </div>
               </div>
+            </div>
 
-              {/* Progress bar */}
-              <div className="space-y-1">
-                <div className="w-full bg-slate-100 rounded-full h-2 overflow-hidden">
-                  <div 
-                    className={`h-full rounded-full transition-all duration-700 ${ctoHealth.color}`}
-                    style={{ width: `${Math.min(100, Math.max(8, ctoHealth.val))}%` }}
-                  ></div>
+            {/* Lõi 3: CTO (Chỉ hiển thị cho Dòng 3 lõi như UR5676, UR5840; ẩn hoàn toàn trên dòng 2 lõi UR61096H) */}
+            {!isTwoFilter && (
+              <div className="bg-white p-3 rounded-2xl border border-slate-100 shadow-xs space-y-2 hover:border-amber-200 transition-colors">
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center space-x-2.5 min-w-0 flex-1">
+                    <div className="w-7 h-7 rounded-xl bg-amber-100 text-amber-800 font-black text-xs flex items-center justify-center border border-amber-200 shrink-0">
+                      3
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <h4 className="font-extrabold text-xs text-slate-900 leading-none">
+                        Lõi 3 (CTO)
+                      </h4>
+                      <p className="text-[10px] text-slate-400 mt-1">Khử mùi & vị than gáo dừa</p>
+                    </div>
+                  </div>
+
+                  <div className="shrink-0 text-right">
+                    <div className="font-black text-sm text-slate-900 leading-none tabular-num">{ctoHealth.val}%</div>
+                    <span className={`inline-flex items-center justify-center mt-1 text-[9px] font-bold px-2 py-0.5 rounded-md border whitespace-nowrap ${ctoHealth.badgeClass}`}>
+                      {ctoHealth.label}
+                    </span>
+                  </div>
                 </div>
-                <div className="flex items-center justify-between text-[10px] text-slate-500 font-medium">
-                  <span className="text-slate-600 font-semibold">Chu kỳ: 6 - 9 tháng</span>
-                  <span className="text-slate-400">(4/4 vạch)</span>
+
+                {/* Progress bar */}
+                <div className="space-y-1">
+                  <div className="w-full bg-slate-100 rounded-full h-2 overflow-hidden">
+                    <div 
+                      className={`h-full rounded-full transition-all duration-700 ${ctoHealth.color}`}
+                      style={{ width: `${Math.min(100, Math.max(8, ctoHealth.val))}%` }}
+                    ></div>
+                  </div>
+                  <div className="flex items-center justify-between text-[10px] text-slate-500 font-medium">
+                    <span className="text-slate-600 font-semibold">Chu kỳ: 6 - 12 tháng</span>
+                    <span className={`text-[10px] font-semibold ${ctoHealth.indicatorClass}`}>
+                      {ctoHealth.barsDisplay}
+                    </span>
+                  </div>
                 </div>
               </div>
-            </div>
+            )}
           </div>
 
           {/* ── CỤM NÚT HÀNH ĐỘNG (BẢO HÀNH & TIỆN ÍCH MÁY - 44px+ mobile touch standard) ── */}
@@ -409,7 +461,7 @@ export default function IotDeviceCard({ serialData, user, onBookMaintenance }: I
               </button>
 
               <button
-                onClick={handleCallHotline}
+                onClick={handleRequestKtv}
                 className="min-h-[44px] py-2.5 bg-sky-50 hover:bg-sky-100 text-[#0284C7] rounded-2xl text-xs font-bold flex items-center justify-center space-x-1.5 transition-all cursor-pointer border border-sky-100 active:scale-95 touch-tactile"
               >
                 <Wrench size={14} />

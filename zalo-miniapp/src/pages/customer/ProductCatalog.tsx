@@ -26,17 +26,15 @@ interface ProductCatalogProps {
 }
 
 const CATEGORIES = [
-  { key: 'ALL', label: 'Tất cả' },
   { key: 'WATER_PURIFIER', label: 'Máy lọc nước' },
   { key: 'FILTER_CARTRIDGE', label: 'Lõi lọc nước' },
-  { key: 'FAUCET_FILTER', label: 'Lọc tại vòi' },
-  { key: 'ACCESSORY', label: 'Thiết bị khác' }
+  { key: 'ACCESSORY', label: 'Sản phẩm bếp khác' }
 ];
 
 export default function ProductCatalog({ onSelectProduct, onGoToCart }: ProductCatalogProps) {
   const [products, setProducts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [category, setCategory] = useState(FEATURES.ENABLE_ECOMMERCE ? 'ALL' : 'WATER_PURIFIER');
+  const [category, setCategory] = useState('WATER_PURIFIER');
   const [search, setSearch] = useState('');
   const [addedSku, setAddedSku] = useState<string | null>(null);
 
@@ -51,7 +49,9 @@ export default function ProductCatalog({ onSelectProduct, onGoToCart }: ProductC
     try {
       const res = await fetchZaloApi(`/zalo-miniapp/shop/products?category=${category}&search=${encodeURIComponent(search)}`);
       if (res && res.success) {
-        setProducts(res.products || []);
+        const excludedSkus = new Set(['COMBO-123', 'RO-MEMBRANE-800G']);
+        const list = (res.products || []).filter((p: any) => !excludedSkus.has(p.sku));
+        setProducts(list);
       }
     } catch (err) {
       console.error('Error loading shop products', err);
@@ -83,7 +83,7 @@ export default function ProductCatalog({ onSelectProduct, onGoToCart }: ProductC
   return (
     <div className="min-h-screen bg-[#F8FAFC] pb-24 font-sans text-gray-800 animate-fade-in">
       {/* Top Banner Header with Persona 3 Reload Ocean Waves */}
-      <P3ROceanHeader className="p-5 pt-6 pb-6">
+      <P3ROceanHeader className="p-5 pt-[calc(env(safe-area-inset-top,38px)+24px)] pb-8">
         <div className="max-w-md mx-auto space-y-3">
           <div className="flex items-center justify-between gap-3">
             <div className="min-w-0">
@@ -92,7 +92,11 @@ export default function ProductCatalog({ onSelectProduct, onGoToCart }: ProductC
                 <span className="tracking-wide">{FEATURES.ENABLE_ECOMMERCE ? 'Gian hàng chính hãng Truliva' : 'Thiết bị & Hướng dẫn sử dụng'}</span>
               </div>
               <h1 className="text-lg sm:text-xl font-black text-white tracking-tight leading-snug">
-                {FEATURES.ENABLE_ECOMMERCE ? 'Cửa Hàng Máy Lọc Nước' : 'Máy Lọc Nước Truliva'}
+                {category === 'FILTER_CARTRIDGE'
+                  ? 'Lõi Lọc Nước Truliva'
+                  : category === 'ACCESSORY'
+                  ? 'Sản Phẩm Bếp Khác'
+                  : 'Máy Lọc Nước Truliva'}
               </h1>
             </div>
 
@@ -122,45 +126,72 @@ export default function ProductCatalog({ onSelectProduct, onGoToCart }: ProductC
               type="text"
               value={search}
               onChange={e => setSearch(e.target.value)}
-              placeholder={FEATURES.ENABLE_ECOMMERCE ? 'Tìm kiếm máy lọc nước, lõi lọc, phụ kiện...' : 'Tìm kiếm dòng máy lọc nước, model...'}
+              placeholder={
+                category === 'FILTER_CARTRIDGE'
+                  ? 'Tìm kiếm lõi lọc nước theo mã máy, model...'
+                  : category === 'ACCESSORY'
+                  ? 'Tìm kiếm thiết bị nhà bếp Truliva...'
+                  : 'Tìm kiếm dòng máy lọc nước, model...'
+              }
               className="w-full h-10 pl-9 pr-4 rounded-xl bg-white text-slate-800 placeholder-slate-400 text-xs shadow-xs focus:outline-none focus:ring-2 focus:ring-[#00D2FF]"
             />
             <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
           </form>
 
-          {/* Trust Badges Strip (1 Hàng ngang ngăn nắp, không bị rớt dòng) */}
-          <div className="flex items-center justify-between text-[11px] text-sky-200/90 pt-2 border-t border-white/10 font-medium whitespace-nowrap">
-            <div className="flex items-center gap-1">
-              <Truck size={13} className="text-cyan-300" />
-              <span>Miễn phí giao lắp</span>
+          {/* Trust Badges Strip (Thay đổi theo từng lựa chọn danh mục) */}
+          {category === 'WATER_PURIFIER' && (
+            <div className="flex items-center justify-between text-[11px] text-sky-200/90 pt-2 border-t border-white/10 font-medium whitespace-nowrap">
+              <div className="flex items-center gap-1">
+                <Truck size={13} className="text-cyan-300" />
+                <span>Miễn phí giao lắp</span>
+              </div>
+              <span className="text-white/20">•</span>
+              <div className="flex items-center gap-1">
+                <Award size={13} className="text-amber-300" />
+                <span>Bảo hành 1-2 năm</span>
+              </div>
+              <span className="text-white/20">•</span>
+              <div className="flex items-center gap-1">
+                <RotateCcw size={13} className="text-emerald-300" />
+                <span>Đổi mới 30 ngày</span>
+              </div>
             </div>
-            <span className="text-white/20">•</span>
-            <div className="flex items-center gap-1">
-              <Award size={13} className="text-amber-300" />
-              <span>Bảo hành 1-2 năm</span>
+          )}
+
+          {category === 'FILTER_CARTRIDGE' && (
+            <div className="flex items-center justify-between text-[11px] text-sky-200/90 pt-2 border-t border-white/10 font-medium whitespace-nowrap">
+              <div className="flex items-center gap-1">
+                <ShieldCheck size={13} className="text-cyan-300" />
+                <span>Chính hãng 100%</span>
+              </div>
+              <span className="text-white/20">•</span>
+              <div className="flex items-center gap-1">
+                <Award size={13} className="text-amber-300" />
+                <span>Bảo hành 3 tháng</span>
+              </div>
+              <span className="text-white/20">•</span>
+              <div className="flex items-center gap-1">
+                <Flame size={13} className="text-emerald-300" />
+                <span>Luôn có ưu đãi</span>
+              </div>
             </div>
-            <span className="text-white/20">•</span>
-            <div className="flex items-center gap-1">
-              <RotateCcw size={13} className="text-emerald-300" />
-              <span>Đổi mới 7 ngày</span>
-            </div>
-          </div>
+          )}
         </div>
       </P3ROceanHeader>
 
-      {/* Category Tabs (Chỉ hiển thị khi bật bán hàng, hoặc chỉ hiện tab Máy lọc nước) */}
-      {FEATURES.ENABLE_ECOMMERCE && (
-        <div className="px-4 py-3 flex items-center gap-2 overflow-x-auto no-scrollbar sticky top-0 bg-[#F8FAFC]/95 backdrop-blur-md z-20 border-b border-gray-100">
+      {/* 3 Category Tabs (Luôn hiển thị 3 lựa chọn giống Website: Máy lọc nước | Lõi lọc nước | Sản phẩm bếp khác) */}
+      <div className="px-4 py-3 sticky top-0 bg-[#F8FAFC]/95 backdrop-blur-md z-20 border-b border-gray-100">
+        <div className="max-w-md mx-auto grid grid-cols-3 gap-2">
           {CATEGORIES.map(cat => {
             const isSelected = category === cat.key;
             return (
               <button
                 key={cat.key}
                 onClick={() => setCategory(cat.key)}
-                className={`px-4 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-all ${
+                className={`min-h-[40px] px-2 py-2 rounded-xl text-[11.5px] font-extrabold leading-tight text-center transition-all cursor-pointer ${
                   isSelected
-                    ? 'bg-[#1B3A6B] text-white shadow-sm shadow-[#1B3A6B]/20 scale-102'
-                    : 'bg-white text-gray-600 border border-gray-200/80 hover:bg-gray-50'
+                    ? 'bg-[#1B3A6B] text-white shadow-sm shadow-[#1B3A6B]/20 scale-[1.01]'
+                    : 'bg-white text-slate-600 border border-slate-200/90 hover:bg-sky-50/50'
                 }`}
               >
                 {cat.label}
@@ -168,7 +199,7 @@ export default function ProductCatalog({ onSelectProduct, onGoToCart }: ProductC
             );
           })}
         </div>
-      )}
+      </div>
 
       {/* Legal Compliance Fast-Notice Bar (chỉ hiện khi bật Ecommerce) */}
       {FEATURES.ENABLE_ECOMMERCE && (

@@ -14,12 +14,19 @@ const router = Router();
 function formatTelemetry(tel: any) {
   if (!tel) return null;
   const raw = (typeof tel.rawPayload === 'object' && tel.rawPayload !== null) ? tel.rawPayload : {};
+  const filter1Val = raw.ppc != null ? Number(raw.ppc) : (raw.pcb != null ? Number(raw.pcb) : null);
+  const filter1Bars = raw.ppc_bars != null ? Number(raw.ppc_bars) : (raw.pcb_bars != null ? Number(raw.pcb_bars) : null);
+  const filter1Replace = raw.ppc_replace === true || raw.pcb_replace === true;
+
   return {
     ...tel,
-    // Thông số 3 lõi lọc nước Truliva
-    ppc: raw.ppc != null ? Number(raw.ppc) : null,
-    ppcBars: raw.ppc_bars != null ? Number(raw.ppc_bars) : null,
-    ppcReplace: raw.ppc_replace === true,
+    // Thông số lõi lọc nước Truliva (tương thích cả dòng 3 lõi PPC/PGP và dòng 2 lõi PCB)
+    ppc: filter1Val,
+    ppcBars: filter1Bars,
+    ppcReplace: filter1Replace,
+    pcb: filter1Val,
+    pcbBars: filter1Bars,
+    pcbReplace: filter1Replace,
     ro: raw.ro != null ? Number(raw.ro) : null,
     roBars: raw.ro_bars != null ? Number(raw.ro_bars) : null,
     roReplace: raw.ro_replace === true,

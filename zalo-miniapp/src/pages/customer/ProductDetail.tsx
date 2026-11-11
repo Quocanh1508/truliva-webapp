@@ -144,6 +144,7 @@ function parseProductDescription(raw: string): { sections: DescSection[]; footno
 export default function ProductDetail({ product, onBack, onGoToCart, onBuyNow }: ProductDetailProps) {
   const [quantity, setQuantity] = useState(1);
   const [selectedImgIdx, setSelectedImgIdx] = useState(0);
+  const [selectedVariantIdx, setSelectedVariantIdx] = useState(0);
   const [showSuccessToast, setShowSuccessToast] = useState(false);
   const [showCartModal, setShowCartModal] = useState(false);
   const [descExpanded, setDescExpanded] = useState(false);
@@ -156,12 +157,20 @@ export default function ProductDetail({ product, onBack, onGoToCart, onBuyNow }:
 
   if (!product) return null;
 
+  const specs = product.specifications || {};
+  const variants: Array<{ title: string; price: number; compareAtPrice?: number | null }> =
+    Array.isArray(specs.variants) && specs.variants.length > 1 ? specs.variants : [];
+  const activeVariant = variants[selectedVariantIdx] || null;
+
+  const displayPrice = activeVariant ? activeVariant.price : product.price;
+  const displayOriginalPrice = activeVariant ? activeVariant.compareAtPrice : product.originalPrice;
+
   const images = product.images && product.images.length > 0
     ? product.images
     : ['https://images.unsplash.com/photo-1585771724684-38269d6639fd?w=800&auto=format&fit=crop&q=80'];
 
-  const discountPercent = product.originalPrice && product.originalPrice > product.price
-    ? Math.round(((product.originalPrice - product.price) / product.originalPrice) * 100)
+  const discountPercent = displayOriginalPrice && displayOriginalPrice > displayPrice
+    ? Math.round(((displayOriginalPrice - displayPrice) / displayOriginalPrice) * 100)
     : 0;
 
   const formatVND = (amount: number) => {
@@ -173,12 +182,10 @@ export default function ProductDetail({ product, onBack, onGoToCart, onBuyNow }:
     setShowCartModal(true);
   };
 
-  const specs = product.specifications || {};
-
   return (
     <div className="min-h-screen bg-[#F8FAFC] pb-28 font-sans text-gray-800 animate-fade-in">
       {/* Sticky Header Nav */}
-      <div className="sticky top-0 z-30 bg-white/95 backdrop-blur-md px-4 py-3 border-b border-gray-100 flex items-center justify-between shadow-2xs">
+      <div className="sticky top-0 z-30 bg-white/95 backdrop-blur-md px-4 pt-[calc(env(safe-area-inset-top,38px)+12px)] pb-3 border-b border-gray-100 flex items-center justify-between shadow-2xs">
         <button
           onClick={onBack}
           className="w-9 h-9 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center text-gray-700 active:scale-95 transition"
@@ -247,12 +254,14 @@ export default function ProductDetail({ product, onBack, onGoToCart, onBuyNow }:
       <div className="bg-white p-4 mt-2 border-y border-gray-100 space-y-3">
         <div className="flex items-center gap-2">
           <span className="text-[11px] font-bold px-2 py-0.5 rounded-md bg-blue-50 text-[#1B3A6B] border border-blue-200 uppercase tracking-wider">
-            Mã: {product.sku}
+            Mã: {activeVariant?.sku || product.sku}
           </span>
-          <span className="text-[11px] font-semibold px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-700 border border-emerald-200 flex items-center gap-1">
-            <Award className="w-3 h-3 text-emerald-600" />
-            Bảo hành {product.warrantyMonths || 12} tháng
-          </span>
+          {product.warrantyMonths ? (
+            <span className="text-[11px] font-semibold px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-700 border border-emerald-200 flex items-center gap-1">
+              <Award className="w-3 h-3 text-emerald-600" />
+              Bảo hành {product.warrantyMonths} tháng
+            </span>
+          ) : null}
         </div>
 
         <h1 className="text-lg font-extrabold text-gray-900 leading-snug">
@@ -262,12 +271,12 @@ export default function ProductDetail({ product, onBack, onGoToCart, onBuyNow }:
         {FEATURES.ENABLE_ECOMMERCE ? (
           <div className="flex items-baseline gap-3 pt-1">
             <span className="text-2xl font-black text-rose-600">
-              {formatVND(product.price)}
+              {formatVND(displayPrice)}
             </span>
-            {product.originalPrice && product.originalPrice > product.price && (
+            {displayOriginalPrice && displayOriginalPrice > displayPrice && (
               <div className="flex items-center gap-2">
                 <span className="text-sm text-gray-400 line-through">
-                  {formatVND(product.originalPrice)}
+                  {formatVND(displayOriginalPrice)}
                 </span>
                 <span className="text-xs font-bold px-1.5 py-0.5 rounded-md bg-amber-100 text-amber-800">
                   Tiết kiệm {discountPercent}%
@@ -276,185 +285,145 @@ export default function ProductDetail({ product, onBack, onGoToCart, onBuyNow }:
             )}
           </div>
         ) : (
-          <div className="flex items-baseline gap-2 pt-1">
-            <span className="text-xs font-bold text-slate-400">Giá niêm yết:</span>
-            <span className="text-lg font-black text-slate-800">
-              {formatVND(product.price)}
+          <div className="flex items-baseline gap-2 pt-1 flex-wrap">
+            <span className="text-xs font-bold text-slate-400">Giá bán:</span>
+            <span className="text-lg font-black text-rose-600">
+              {formatVND(displayPrice)}
             </span>
+            {displayOriginalPrice && displayOriginalPrice > displayPrice && (
+              <>
+                <span className="text-xs text-slate-400 line-through ml-1">
+                  {formatVND(displayOriginalPrice)}
+                </span>
+                <span className="text-[11px] font-bold px-1.5 py-0.5 rounded-md bg-rose-50 text-rose-600 border border-rose-200">
+                  -{discountPercent}%
+                </span>
+              </>
+            )}
           </div>
         )}
 
-        {product.shortDesc && (
-          <p className="text-xs text-gray-600 leading-relaxed bg-gray-50 p-3 rounded-xl border border-gray-100 mt-2">
-            {product.shortDesc}
-          </p>
-        )}
-
-        {/* Warranty & Standard Quality Badges */}
-        <div className="flex flex-wrap items-center gap-1.5 mt-2.5">
-          <span className="inline-flex items-center gap-1 text-[11px] font-bold px-2.5 py-1 rounded-xl bg-emerald-50 text-emerald-700 border border-emerald-200 shadow-2xs">
-            <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
-            Bảo hành chính hãng {product.warrantyMonths || specs.warrantyMonths || 12} tháng
-          </span>
-          <span className="inline-flex items-center gap-1 text-[11px] font-semibold px-2.5 py-1 rounded-xl bg-sky-50 text-sky-800 border border-sky-100">
-            <Award className="w-3.5 h-3.5 text-[#00A3FF]" />
-            Chuẩn nước uống QCVN 6-1:2010/BYT
-          </span>
-        </div>
-      </div>
-
-      {/* Commitments & Warranties 3-Box Strip */}
-      <div className="bg-white p-4 mt-2 border-y border-gray-100">
-        <div className="font-bold text-xs text-gray-900 uppercase tracking-wider mb-3">
-          Cam kết & Quyền lợi Truliva
-        </div>
-        <div className="grid grid-cols-3 gap-2 text-center text-xs">
-          <div 
-            onClick={() => { setLegalDocType('SHIPPING'); setShowLegalModal(true); }}
-            className="p-3 rounded-2xl bg-blue-50/60 border border-blue-100/80 cursor-pointer hover:bg-blue-50 transition"
-          >
-            <Truck className="w-5 h-5 text-[#1B3A6B] mx-auto mb-1" />
-            <div className="font-bold text-gray-900 text-[11px]">Giao & Lắp Đặt</div>
-            <div className="text-[10px] text-gray-500 mt-0.5">Miễn phí tại nhà</div>
-          </div>
-
-          <div 
-            onClick={() => { setLegalDocType('WARRANTY'); setShowLegalModal(true); }}
-            className="p-3 rounded-2xl bg-emerald-50/60 border border-emerald-100/80 cursor-pointer hover:bg-emerald-50 transition"
-          >
-            <ShieldCheck className="w-5 h-5 text-emerald-600 mx-auto mb-1" />
-            <div className="font-bold text-gray-900 text-[11px]">Bảo Hành Chính Hãng</div>
-            <div className="text-[10px] text-emerald-700 font-bold mt-0.5">
-              {product.warrantyMonths ? `${product.warrantyMonths} Tháng điện tử` : 'Điện tử qua Zalo'}
+        {/* Variant Selector (Chuẩn theo website cho sản phẩm có nhiều phân loại: ECO-600G, W6412) */}
+        {variants.length > 1 && (
+          <div className="pt-2 space-y-1.5">
+            <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wide">
+              Phân loại sản phẩm:
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {variants.map((v, idx) => {
+                const isSelected = idx === selectedVariantIdx;
+                return (
+                  <button
+                    key={idx}
+                    type="button"
+                    onClick={() => setSelectedVariantIdx(idx)}
+                    className={`px-3 py-2 rounded-xl text-xs font-bold border transition-all active:scale-95 ${
+                      isSelected
+                        ? 'bg-[#1B3A6B] text-white border-[#1B3A6B] shadow-xs'
+                        : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
+                    }`}
+                  >
+                    {v.title}
+                  </button>
+                );
+              })}
             </div>
           </div>
-
-          <div 
-            onClick={() => { setLegalDocType('RETURN'); setShowLegalModal(true); }}
-            className="p-3 rounded-2xl bg-amber-50/60 border border-amber-100/80 cursor-pointer hover:bg-amber-50 transition"
-          >
-            <RotateCcw className="w-5 h-5 text-amber-600 mx-auto mb-1" />
-            <div className="font-bold text-gray-900 text-[11px]">Đổi Mới 7 Ngày</div>
-            <div className="text-[10px] text-gray-500 mt-0.5">Nếu lỗi kỹ thuật</div>
-          </div>
-        </div>
+        )}
       </div>
 
-      {/* Specifications Table */}
-      {Object.keys(specs).length > 0 && (
+      {/* Commitments & Warranties 3-Box Strip (Chỉ hiển thị cho Máy lọc nước & Lõi lọc nước) */}
+      {product.category === 'WATER_PURIFIER' && (
         <div className="bg-white p-4 mt-2 border-y border-gray-100">
-          <h3 className="font-bold text-sm text-gray-900 mb-3 flex items-center gap-2">
-            <Info className="w-4 h-4 text-[#1B3A6B]" />
-            Thông Số Kỹ Thuật Chi Tiết
-          </h3>
-          <div className="rounded-2xl border border-gray-100 overflow-hidden text-xs">
-            <table className="w-full text-left border-collapse">
-              <tbody>
-                {specs.technology && (
-                  <tr className="border-b border-gray-50 bg-gray-50/50">
-                    <td className="p-2.5 font-semibold text-gray-500 w-1/3">Công nghệ lọc</td>
-                    <td className="p-2.5 font-bold text-gray-800">{specs.technology}</td>
-                  </tr>
-                )}
-                {specs.stages && (
-                  <tr className="border-b border-gray-50">
-                    <td className="p-2.5 font-semibold text-gray-500">Cấu hình cấp lọc</td>
-                    <td className="p-2.5 font-bold text-gray-800">{specs.stages}</td>
-                  </tr>
-                )}
-                {specs.flowRate && (
-                  <tr className="border-b border-gray-50 bg-gray-50/50">
-                    <td className="p-2.5 font-semibold text-gray-500">Lưu lượng nước</td>
-                    <td className="p-2.5 font-bold text-gray-800">{specs.flowRate}</td>
-                  </tr>
-                )}
-                {specs.recoveryRate && (
-                  <tr className="border-b border-gray-50">
-                    <td className="p-2.5 font-semibold text-gray-500">Tỷ lệ thu hồi</td>
-                    <td className="p-2.5 font-bold text-emerald-700">{specs.recoveryRate}</td>
-                  </tr>
-                )}
-                {specs.hotWater && (
-                  <tr className="border-b border-gray-50 bg-rose-50/30">
-                    <td className="p-2.5 font-semibold text-rose-700">Chế độ nước nóng</td>
-                    <td className="p-2.5 font-bold text-gray-800">{specs.hotWater}</td>
-                  </tr>
-                )}
-                {specs.coldWater && (
-                  <tr className="border-b border-gray-50 bg-cyan-50/30">
-                    <td className="p-2.5 font-semibold text-cyan-700">Chế độ làm lạnh</td>
-                    <td className="p-2.5 font-bold text-gray-800">{specs.coldWater}</td>
-                  </tr>
-                )}
-                {specs.iceMaking && (
-                  <tr className="border-b border-gray-50 bg-sky-50/30">
-                    <td className="p-2.5 font-semibold text-sky-700">Tính năng làm đá</td>
-                    <td className="p-2.5 font-bold text-gray-800">{specs.iceMaking}</td>
-                  </tr>
-                )}
-                {specs.safetyFeatures && (
-                  <tr className="border-b border-gray-50">
-                    <td className="p-2.5 font-semibold text-gray-500">Tính năng an toàn</td>
-                    <td className="p-2.5 font-bold text-gray-800">{specs.safetyFeatures}</td>
-                  </tr>
-                )}
-                {specs.lifespan && (
-                  <tr className="border-b border-gray-50 bg-amber-50/30">
-                    <td className="p-2.5 font-semibold text-amber-800">Tuổi thọ khuyến nghị</td>
-                    <td className="p-2.5 font-bold text-amber-900">{specs.lifespan}</td>
-                  </tr>
-                )}
-                {specs.compatibility && (
-                  <tr className="border-b border-gray-50">
-                    <td className="p-2.5 font-semibold text-gray-500">Dòng máy tương thích</td>
-                    <td className="p-2.5 font-bold text-gray-800">{specs.compatibility}</td>
-                  </tr>
-                )}
-                {specs.power && (
-                  <tr className="border-b border-gray-50 bg-gray-50/50">
-                    <td className="p-2.5 font-semibold text-gray-500">Công suất điện</td>
-                    <td className="p-2.5 font-bold text-gray-800">{specs.power}</td>
-                  </tr>
-                )}
-                {specs.dimensions && (
-                  <tr className="border-b border-gray-50">
-                    <td className="p-2.5 font-semibold text-gray-500">Kích thước</td>
-                    <td className="p-2.5 font-bold text-gray-800">{specs.dimensions}</td>
-                  </tr>
-                )}
-                {specs.origin && (
-                  <tr className="border-b border-gray-50 bg-gray-50/50">
-                    <td className="p-2.5 font-semibold text-gray-500">Tiêu chuẩn & Xuất xứ</td>
-                    <td className="p-2.5 font-bold text-gray-800">{specs.origin}</td>
-                  </tr>
-                )}
-                {(specs.warranty || product.warrantyMonths) && (
-                  <tr className="bg-emerald-50/40">
-                    <td className="p-2.5 font-semibold text-emerald-800">Bảo hành chính hãng</td>
-                    <td className="p-2.5 font-bold text-emerald-900">
-                      {specs.warranty || `${product.warrantyMonths} tháng (Bảo hành điện tử)`}
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
+          <div className="font-bold text-xs text-gray-900 uppercase tracking-wider mb-3">
+            Cam kết & Quyền lợi Truliva
+          </div>
+          <div className="grid grid-cols-3 gap-2 text-center text-xs">
+            <div 
+              onClick={() => { setLegalDocType('SHIPPING'); setShowLegalModal(true); }}
+              className="p-3 rounded-2xl bg-blue-50/60 border border-blue-100/80 cursor-pointer hover:bg-blue-50 transition"
+            >
+              <Truck className="w-5 h-5 text-[#1B3A6B] mx-auto mb-1" />
+              <div className="font-bold text-gray-900 text-[11px]">Giao & Lắp Đặt</div>
+              <div className="text-[10px] text-gray-500 mt-0.5">Miễn phí tại nhà</div>
+            </div>
+
+            <div 
+              onClick={() => { setLegalDocType('WARRANTY'); setShowLegalModal(true); }}
+              className="p-3 rounded-2xl bg-emerald-50/60 border border-emerald-100/80 cursor-pointer hover:bg-emerald-50 transition"
+            >
+              <ShieldCheck className="w-5 h-5 text-emerald-600 mx-auto mb-1" />
+              <div className="font-bold text-gray-900 text-[11px]">Bảo Hành 1-2 Năm</div>
+              <div className="text-[10px] text-emerald-700 font-bold mt-0.5">
+                {product.warrantyMonths ? `${product.warrantyMonths} Tháng điện tử` : 'Điện tử qua Zalo'}
+              </div>
+            </div>
+
+            <div 
+              onClick={() => { setLegalDocType('RETURN'); setShowLegalModal(true); }}
+              className="p-3 rounded-2xl bg-amber-50/60 border border-amber-100/80 cursor-pointer hover:bg-amber-50 transition"
+            >
+              <RotateCcw className="w-5 h-5 text-amber-600 mx-auto mb-1" />
+              <div className="font-bold text-gray-900 text-[11px]">Đổi Mới 30 Ngày</div>
+              <div className="text-[10px] text-gray-500 mt-0.5">Nếu lỗi kỹ thuật</div>
+            </div>
           </div>
         </div>
       )}
 
-      {/* Detailed Description — Structured Bento Section Cards */}
-      {product.description && (() => {
-        const { sections: descSections, footnotes: descFootnotes } = parseProductDescription(product.description);
-        if (descSections.length === 0) return null;
+      {product.category === 'FILTER_CARTRIDGE' && (
+        <div className="bg-white p-4 mt-2 border-y border-gray-100">
+          <div className="font-bold text-xs text-gray-900 uppercase tracking-wider mb-3">
+            Cam kết & Quyền lợi Truliva
+          </div>
+          <div className="grid grid-cols-3 gap-2 text-center text-xs">
+            <div 
+              onClick={() => { setLegalDocType('WARRANTY'); setShowLegalModal(true); }}
+              className="p-3 rounded-2xl bg-blue-50/60 border border-blue-100/80 cursor-pointer hover:bg-blue-50 transition"
+            >
+              <ShieldCheck className="w-5 h-5 text-[#1B3A6B] mx-auto mb-1" />
+              <div className="font-bold text-gray-900 text-[11px]">Chính Hãng 100%</div>
+              <div className="text-[10px] text-gray-500 mt-0.5">Chuẩn nhà máy</div>
+            </div>
+
+            <div 
+              onClick={() => { setLegalDocType('WARRANTY'); setShowLegalModal(true); }}
+              className="p-3 rounded-2xl bg-emerald-50/60 border border-emerald-100/80 cursor-pointer hover:bg-emerald-50 transition"
+            >
+              <Award className="w-5 h-5 text-emerald-600 mx-auto mb-1" />
+              <div className="font-bold text-gray-900 text-[11px]">Bảo Hành 3 Tháng</div>
+              <div className="text-[10px] text-emerald-700 font-bold mt-0.5">1 đổi 1 lỗi KT</div>
+            </div>
+
+            <div 
+              onClick={() => { setLegalDocType('TERMS'); setShowLegalModal(true); }}
+              className="p-3 rounded-2xl bg-amber-50/60 border border-amber-100/80 cursor-pointer hover:bg-amber-50 transition"
+            >
+              <Sparkles className="w-5 h-5 text-amber-600 mx-auto mb-1" />
+              <div className="font-bold text-gray-900 text-[11px]">Luôn Có Ưu Đãi</div>
+              <div className="text-[10px] text-gray-500 mt-0.5">Ưu đãi thay lõi</div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Detailed Description — 100% Verbatim Website Content + Official Infographics */}
+      {(() => {
+        const { sections: descSections, footnotes: descFootnotes } = parseProductDescription(product.description || '');
+        const descImages: string[] = Array.isArray(specs.descImages) ? specs.descImages : [];
+        if (descSections.length === 0 && descImages.length === 0) return null;
 
         const totalBulletCount = descSections.reduce((acc, s) => acc + s.items.length, 0);
-        const needsCollapse = descSections.length > 2 || totalBulletCount > 6;
+        const needsCollapse = descSections.length > 2 || totalBulletCount > 6 || descImages.length > 2;
         const visibleSections = (!needsCollapse || descExpanded)
           ? descSections
           : descSections.slice(0, 2).map((sec, idx) => ({
               ...sec,
               items: idx === 0 ? sec.items.slice(0, 4) : sec.items.slice(0, 3)
             }));
+        const visibleDescImages = (!needsCollapse || descExpanded)
+          ? descImages
+          : (descSections.length === 0 ? descImages.slice(0, 2) : []);
 
         const themeStyles: Record<DescSection['theme'], {
           cardBg: string;
@@ -573,10 +542,10 @@ export default function ProductDetail({ product, onBack, onGoToCart, onBuyNow }:
                 </div>
                 <div>
                   <h3 className="font-extrabold text-xs text-slate-800 tracking-tight uppercase">
-                    Mô Tả Chi Tiết Sản Phẩm
+                    Mô Tả Sản Phẩm
                   </h3>
                   <p className="text-[10px] text-slate-400 font-medium">
-                    {descSections.length} nhóm thông tin • Chuẩn công bố Truliva Việt Nam
+                    Thông tin chính thức từ trulivavietnam.com
                   </p>
                 </div>
               </div>
@@ -585,7 +554,7 @@ export default function ProductDetail({ product, onBack, onGoToCart, onBuyNow }:
               </span>
             </div>
 
-            {/* Structured Bento Cards */}
+            {/* Structured Bento Cards + Website Infographic Images */}
             <div className="relative space-y-2.5">
               {visibleSections.map((sec, sIdx) => {
                 const st = themeStyles[sec.theme];
@@ -628,6 +597,21 @@ export default function ProductDetail({ product, onBack, onGoToCart, onBuyNow }:
                 </div>
               )}
 
+              {/* Official Website Description Infographics */}
+              {visibleDescImages.length > 0 && (
+                <div className="space-y-2 pt-1">
+                  {visibleDescImages.map((imgUrl, idx) => (
+                    <img
+                      key={idx}
+                      src={imgUrl}
+                      alt={`${product.name} - Infographic ${idx + 1}`}
+                      loading="lazy"
+                      className="w-full h-auto rounded-xl border border-slate-100 block"
+                    />
+                  ))}
+                </div>
+              )}
+
               {/* Bottom Fade Gradient when collapsed */}
               {needsCollapse && !descExpanded && (
                 <div className="pointer-events-none absolute inset-x-0 bottom-0 h-14 bg-gradient-to-t from-white via-white/80 to-transparent rounded-b-2xl" />
@@ -644,7 +628,7 @@ export default function ProductDetail({ product, onBack, onGoToCart, onBuyNow }:
                 <span>
                   {descExpanded
                     ? 'Thu gọn mô tả sản phẩm'
-                    : `Xem đầy đủ ${descSections.length} mục mô tả chi tiết`}
+                    : 'Xem đầy đủ mô tả & hình ảnh chi tiết'}
                 </span>
                 {descExpanded ? (
                   <ChevronUp className="w-4 h-4 text-[#00A3FF]" />
@@ -656,95 +640,6 @@ export default function ProductDetail({ product, onBack, onGoToCart, onBuyNow }:
           </div>
         );
       })()}
-
-      {/* User Manual & Safety Guide Section */}
-      <div className="bg-white p-4 mt-2 border-y border-gray-100 space-y-3">
-        <div className="flex items-center space-x-2 pb-2 border-b border-gray-100">
-          <div className="p-1.5 bg-blue-100 text-[#1B3A6B] rounded-lg">
-            <BookOpen className="w-4 h-4 text-[#1B3A6B]" />
-          </div>
-          <h3 className="font-extrabold text-xs text-slate-800 tracking-tight uppercase">
-            {product.category === 'FILTER_CARTRIDGE' 
-              ? 'Hướng Dẫn Thay Thế & Bảo Dưỡng Lõi Lọc' 
-              : 'Hướng Dẫn Sử Dụng & Vận Hành Chuẩn Hãng'}
-          </h3>
-        </div>
-
-        <div className="space-y-2 text-xs text-slate-600">
-          <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-100 space-y-1">
-            <div className="font-bold text-slate-800 flex items-center gap-1.5">
-              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-              <span>1. Quy trình sục rửa khi mới thay/lắp đặt</span>
-            </div>
-            <p className="text-[11px] text-slate-500 pl-5">
-              Sau khi lắp máy mới hoặc thay lõi, khóa van xả hết khoảng 20 – 30 lít nước đầu tiên cho đến khi dòng nước trong hoàn toàn để rửa sạch bụi vi than và kích hoạt màng lọc.
-            </p>
-          </div>
-
-          <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-100 space-y-1">
-            <div className="font-bold text-slate-800 flex items-center gap-1.5">
-              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-              <span>2. Theo dõi chất lượng nước tinh khiết TDS</span>
-            </div>
-            <p className="text-[11px] text-slate-500 pl-5">
-              Chỉ số TDS sau màng RO đo độ tinh khiết. Nước đạt chuẩn uống trực tiếp tốt nhất khi TDS sau lọc đạt ngưỡng an toàn (dưới 50 PPM).
-            </p>
-          </div>
-
-          {/* Dynamic Filter Lifespan Table / Info */}
-          <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-100 space-y-1.5">
-            <div className="font-bold text-slate-800 flex items-center gap-1.5">
-              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-              <span>3. Chu kỳ khuyến cáo thay lõi định kỳ</span>
-            </div>
-            
-            {specs.filters && Array.isArray(specs.filters) && specs.filters.length > 0 ? (
-              <div className="space-y-1.5 pl-5 pt-1">
-                {specs.filters.map((f: any, idx: number) => (
-                  <div key={idx} className="bg-white p-2 rounded-lg border border-slate-200/80 text-[11px]">
-                    <div className="flex items-center justify-between">
-                      <span className="font-bold text-slate-900">{f.name}</span>
-                      <span className="font-extrabold text-[#0284C7] bg-sky-50 px-2 py-0.5 rounded border border-sky-100 tabular-num">
-                        {f.lifespan}
-                      </span>
-                    </div>
-                    {f.function && (
-                      <p className="text-[10px] text-slate-500 mt-1">{f.function}</p>
-                    )}
-                  </div>
-                ))}
-              </div>
-            ) : product.category === 'FILTER_CARTRIDGE' ? (
-              <div className="bg-white p-2 rounded-lg border border-slate-200/80 text-[11px] pl-2 ml-5">
-                <div className="font-bold text-slate-900">{product.name}</div>
-                <div className="text-[#0284C7] font-semibold mt-0.5">
-                  Chu kỳ khuyến cáo: {specs.lifespan || '6 – 12 tháng (tùy mật độ sử dụng thực tế)'}
-                </div>
-                <p className="text-[10px] text-slate-500 mt-1">
-                  {specs.compatibility ? `Tương thích: ${specs.compatibility}. ` : ''}
-                  Khi chưa tiếp xúc với nước, lõi lọc nguyên seal không có hạn sử dụng.
-                </p>
-              </div>
-            ) : (
-              <ul className="text-[11px] text-slate-500 pl-5 list-disc list-inside space-y-0.5">
-                <li>Lõi 1 (PGB Lọc thô): 3 – 6 tháng (10.000L)</li>
-                <li>Lõi 2 (Màng tinh RO): 24 – 36 tháng</li>
-                <li>Lõi 3 (CTO Than hoạt tính): 6 – 9 tháng (15.000L)</li>
-              </ul>
-            )}
-          </div>
-
-          <div className="p-2.5 rounded-xl bg-amber-50/70 border border-amber-200/70 space-y-1 text-amber-900">
-            <div className="font-bold flex items-center gap-1.5">
-              <HelpCircle className="w-3.5 h-3.5 text-amber-600 shrink-0" />
-              <span>4. Hỗ trợ kỹ thuật & Bảo hành tận nhà</span>
-            </div>
-            <p className="text-[11px] pl-5">
-              Nếu gặp hiện tượng rò rỉ hoặc máy báo còi, vui lòng ngắt nguồn điện, khóa van cấp nước và liên hệ tổng đài Truliva: <strong>1900 638 463</strong> để KTV đến tận nơi kiểm tra miễn phí.
-            </p>
-          </div>
-        </div>
-      </div>
 
       {/* Official Website Link */}
       {specs?.productUrl && (

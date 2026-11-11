@@ -1,10 +1,12 @@
 module.exports = {
   app: {
-    title: "Truliva System",
-    headerTitle: "Truliva Service",
-    headerColor: "#2563EB",
+    title: "Máy lọc nước Truliva",
+    headerTitle: "Máy lọc nước Truliva",
+    headerColor: "#061226",
     textColor: "white",
-    leftButton: "back",
-    statusBarColor: "#1D4ED8"
+    navigationStyle: "custom",
+    statusBar: "transparent",
+    statusBarColor: "transparent",
+    leftButton: "none"
   }
 };

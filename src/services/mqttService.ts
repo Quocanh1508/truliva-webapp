@@ -129,9 +129,10 @@ async function handleTelemetryMessage(topic: string, payload: Buffer) {
 
     const now = Date.now();
     const lastSaved = lastTelemetrySaveMap.get(device.id);
+    const filter1Val = data.ppc != null ? Number(data.ppc) : (data.pcb != null ? Number(data.pcb) : null);
     const hasChanged = !lastSaved ||
       lastSaved.tdsOut !== tdsOut ||
-      lastSaved.ppc !== (data.ppc ?? null) ||
+      lastSaved.ppc !== filter1Val ||
       lastSaved.ro !== (data.ro ?? null) ||
       lastSaved.cto !== (data.cto ?? null) ||
       lastSaved.errorCode !== errorCode ||
@@ -156,12 +157,12 @@ async function handleTelemetryMessage(topic: string, payload: Buffer) {
       lastTelemetrySaveMap.set(device.id, {
         time: now,
         tdsOut,
-        ppc: data.ppc ?? null,
+        ppc: filter1Val,
         ro: data.ro ?? null,
         cto: data.cto ?? null,
         errorCode
       });
-      logger.debug('MQTT: Telemetry stored', { serial: topicSerial, tdsIn, tdsOut, ppc: data.ppc, ro: data.ro, cto: data.cto });
+      logger.debug('MQTT: Telemetry stored', { serial: topicSerial, tdsIn, tdsOut, ppc: filter1Val, ro: data.ro, cto: data.cto });
     }
 
     // 4. Check alert thresholds
@@ -203,20 +204,24 @@ async function autoResolveAlerts(deviceId: string, serial: string, data: any, td
       });
     }
 
-    // 4. Auto-resolve Filter alerts when replaced
-    if (data.ppc_replace === false) {
+    // 4. Auto-resolve Filter alerts when replaced (hỗ trợ cả chuẩn 3 lõi PPC/PGP và 2 lõi PCB)
+    const f1Replace = data.ppc_replace === true || data.pcb_replace === true;
+    const f1Val = data.ppc != null ? Number(data.ppc) : (data.pcb != null ? Number(data.pcb) : null);
+    if (!f1Replace && (f1Val === null || f1Val >= 10)) {
       await prisma.iotAlert.updateMany({
-        where: { deviceId, alertType: 'FILTER_PPC_REPLACE', isResolved: false },
+        where: { deviceId, alertType: { in: ['FILTER_PPC_REPLACE', 'FILTER_PCB_REPLACE'] }, isResolved: false },
         data: { isResolved: true, resolvedAt: new Date() }
       });
     }
-    if (data.ro_replace === false) {
+    const roVal = data.ro != null ? Number(data.ro) : null;
+    if (data.ro_replace === false || (data.ro_replace !== true && (roVal === null || roVal >= 10))) {
       await prisma.iotAlert.updateMany({
         where: { deviceId, alertType: 'FILTER_RO_REPLACE', isResolved: false },
         data: { isResolved: true, resolvedAt: new Date() }
       });
     }
-    if (data.cto_replace === false) {
+    const ctoVal = data.cto != null ? Number(data.cto) : null;
+    if (data.cto_replace === false || (data.cto_replace !== true && (ctoVal === null || ctoVal >= 10))) {
       await prisma.iotAlert.updateMany({
         where: { deviceId, alertType: 'FILTER_CTO_REPLACE', isResolved: false },
         data: { isResolved: true, resolvedAt: new Date() }
@@ -260,31 +265,58 @@ async function checkAlerts(
     });
   }
 
-  // Filter 1: PPC replacement alert
-  if (data.ppc_replace === true) {
-    alerts.push({
-      type: 'FILTER_PPC_REPLACE',
-      severity: 'WARNING',
-      message: `⚠️ Máy ${serial}: Lõi lọc thô PPC đã hết hạn (${data.ppc ?? 0}%). Cần thay lõi!`
-    });
-  }
+  // ── Xử lý thông báo lõi lọc theo cấu hình dòng máy (2 lõi UR61096H vs 3 lõi UR5676/UR5840) ──
+  const is2FilterModel = serial.toUpperCase().includes('61096');
+  const filter1Val = data.ppc != null ? Number(data.ppc) : (data.pcb != null ? Number(data.pcb) : null);
+  const filter1Replace = data.ppc_replace === true || data.pcb_replace === true;
+  const roVal = data.ro != null ? Number(data.ro) : null;
+  const ctoVal = data.cto != null ? Number(data.cto) : null;
 
-  // Filter 2: RO membrane replacement alert
-  if (data.ro_replace === true) {
-    alerts.push({
-      type: 'FILTER_RO_REPLACE',
-      severity: 'CRITICAL',
-      message: `⚠️ Máy ${serial}: Màng lọc RO đã hết hạn (${data.ro ?? 0}%). Cần thay màng RO!`
-    });
-  }
+  if (is2FilterModel) {
+    // ── Dòng 2 lõi (UR61096H): Lõi 1 (PCB) & Lõi 2 (RO) ──
+    // Quy chuẩn chỉ báo: < 10% hoặc flag replace -> Nháy đèn đỏ -> Cần thay
+    if (filter1Replace || (filter1Val !== null && filter1Val < 10)) {
+      alerts.push({
+        type: 'FILTER_PCB_REPLACE',
+        severity: 'WARNING',
+        message: `⚠️ Máy ${serial}: Lõi lọc PCB đã hết hạn (${filter1Val ?? 0}% - Nháy đèn đỏ). Cần thay lõi!`
+      });
+    }
 
-  // Filter 3: CTO carbon replacement alert
-  if (data.cto_replace === true) {
-    alerts.push({
-      type: 'FILTER_CTO_REPLACE',
-      severity: 'WARNING',
-      message: `⚠️ Máy ${serial}: Lõi than CTO đã hết hạn (${data.cto ?? 0}%). Cần thay lõi CTO!`
-    });
+    if (data.ro_replace === true || (roVal !== null && roVal < 10)) {
+      alerts.push({
+        type: 'FILTER_RO_REPLACE',
+        severity: 'CRITICAL',
+        message: `⚠️ Máy ${serial}: Màng lọc RO đã hết hạn (${roVal ?? 0}% - Nháy đèn đỏ). Cần thay màng RO!`
+      });
+    }
+    // Dòng 2 lõi không có Lõi 3 (CTO), không phát cảnh báo CTO
+  } else {
+    // ── Dòng 3 lõi (UR5676, UR5840): Lõi 1 (PGP), Lõi 2 (RO), Lõi 3 (CTO) ──
+    // Quy chuẩn chỉ báo: < 10% hoặc flag replace -> 1 vạch nháy đỏ -> Cần thay
+    if (filter1Replace || (filter1Val !== null && filter1Val < 10)) {
+      alerts.push({
+        type: 'FILTER_PPC_REPLACE',
+        severity: 'WARNING',
+        message: `⚠️ Máy ${serial}: Lõi lọc PGP đã hết hạn (${filter1Val ?? 0}% - 1 vạch nháy đỏ). Cần thay lõi PGP!`
+      });
+    }
+
+    if (data.ro_replace === true || (roVal !== null && roVal < 10)) {
+      alerts.push({
+        type: 'FILTER_RO_REPLACE',
+        severity: 'CRITICAL',
+        message: `⚠️ Máy ${serial}: Màng lọc RO đã hết hạn (${roVal ?? 0}% - 1 vạch nháy đỏ). Cần thay màng RO!`
+      });
+    }
+
+    if (data.cto_replace === true || (ctoVal !== null && ctoVal < 10)) {
+      alerts.push({
+        type: 'FILTER_CTO_REPLACE',
+        severity: 'WARNING',
+        message: `⚠️ Máy ${serial}: Lõi than CTO đã hết hạn (${ctoVal ?? 0}% - 1 vạch nháy đỏ). Cần thay lõi CTO!`
+      });
+    }
   }
 
   // UART connection lost between ESP32 and Water Purifier mainboard

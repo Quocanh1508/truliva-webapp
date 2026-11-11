@@ -1,10 +1,27 @@
 import React, { Component, ErrorInfo, ReactNode } from 'react';
 import ReactDOM from 'react-dom/client';
 import { App, ZMPRouter, AnimationRoutes, Route, Page } from 'zmp-ui';
+import { configAppView } from 'zmp-sdk/apis';
 import 'zmp-ui/zaui.css';
 import './app.css';
 import IndexPage from './pages/index';
 import { CartProvider } from './context/CartContext';
+
+// Ẩn thanh header mặc định của Zalo Mini App và đồng bộ trạng thái status bar trong suốt
+try {
+  configAppView({
+    headerColor: '#061226',
+    headerTextColor: 'white',
+    statusBarType: 'transparent',
+    actionBar: {
+      hide: true,
+      title: 'Máy lọc nước Truliva',
+      leftButton: 'none'
+    }
+  }).catch((err) => {
+    console.warn('configAppView error:', err);
+  });
+} catch (_) {}
 
 interface Props {
   children: ReactNode;

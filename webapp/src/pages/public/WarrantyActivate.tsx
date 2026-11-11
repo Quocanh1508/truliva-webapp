@@ -379,9 +379,13 @@ export default function WarrantyActivate() {
   const serialFromUrl = searchParams.get('serial') || '';
   const phoneFromUrl = searchParams.get('phone') || '';
   const nameFromUrl = searchParams.get('name') || '';
+  const modeFromUrl = (searchParams.get('mode') || searchParams.get('tab') || '').toLowerCase().trim();
+  const modelFromUrl = searchParams.get('model') || '';
 
-  // Step tracking: 0 = Landing, 1 = Enter Details & Invoice, 2 = Check/Confirm Details, 3 = Success
-  const [step, setStep] = useState(serialFromUrl ? 1 : 0);
+  const isSupportDirect = modeFromUrl === 'support' || modeFromUrl === 'ktv' || modeFromUrl === 'hotline' || searchParams.get('step') === '10';
+
+  // Step tracking: 0 = Landing, 1 = Enter Details & Invoice, 2 = Check/Confirm Details, 3 = Success, 10 = Support Form, 11 = Support Success
+  const [step, setStep] = useState(isSupportDirect ? 10 : (serialFromUrl ? 1 : 0));
 
   // Form states
   const [serialInput, setSerialInput] = useState(formatSerialNumber(serialFromUrl));
@@ -503,19 +507,25 @@ export default function WarrantyActivate() {
   );
 
   // Tech Support Form states (step 10 & 11)
-  const [supportName, setSupportName] = useState('');
-  const [supportPhone, setSupportPhone] = useState('');
+  const matchedSupportProduct = useMemo(() => {
+    if (!modelFromUrl) return '';
+    const visual = getProductVisualByModelOrName(modelFromUrl, modelFromUrl);
+    return visual.name || modelFromUrl;
+  }, [modelFromUrl]);
+
+  const [supportName, setSupportName] = useState(nameFromUrl);
+  const [supportPhone, setSupportPhone] = useState(phoneFromUrl);
   const [supportSecondaryPhones, setSupportSecondaryPhones] = useState('');
   const [supportEmail, setSupportEmail] = useState('');
   const [supportProvince, setSupportProvince] = useState('');
   const [supportAddress, setSupportAddress] = useState('');
-  const [supportProduct, setSupportProduct] = useState('');
+  const [supportProduct, setSupportProduct] = useState(matchedSupportProduct);
   const [customSupportProduct, setCustomSupportProduct] = useState('');
   const [deviceTreeData, setDeviceTreeData] = useState<{ categories: string[]; products: any[] }>({
     categories: [],
     products: []
   });
-  const [supportSerial, setSupportSerial] = useState('');
+  const [supportSerial, setSupportSerial] = useState(formatSerialNumber(serialFromUrl));
   const [supportServiceType, setSupportServiceType] = useState('Bảo Hành - Bảo Trì');
   const [supportDetail, setSupportDetail] = useState('');
   const [supportError, setSupportError] = useState('');
@@ -617,19 +627,40 @@ export default function WarrantyActivate() {
     }
   };
 
+  const hasInitializedUrlRef = useRef(false);
+
   // Auto-fill serial, phone, name if provided in URL
   useEffect(() => {
-    if (serialFromUrl) {
-      setSerialInput(formatSerialNumber(serialFromUrl));
-      setStep(1);
+    if (hasInitializedUrlRef.current) return;
+    hasInitializedUrlRef.current = true;
+
+    if (isSupportDirect) {
+      setStep(10);
+      if (serialFromUrl) {
+        setSupportSerial(formatSerialNumber(serialFromUrl));
+      }
+      if (phoneFromUrl) {
+        setSupportPhone(phoneFromUrl);
+      }
+      if (nameFromUrl) {
+        setSupportName(nameFromUrl);
+      }
+      if (matchedSupportProduct) {
+        setSupportProduct(matchedSupportProduct);
+      }
+    } else {
+      if (serialFromUrl) {
+        setSerialInput(formatSerialNumber(serialFromUrl));
+        setStep(1);
+      }
+      if (phoneFromUrl) {
+        setCustomerPhone(phoneFromUrl);
+      }
+      if (nameFromUrl) {
+        setCustomerName(nameFromUrl);
+      }
     }
-    if (phoneFromUrl) {
-      setCustomerPhone(phoneFromUrl);
-    }
-    if (nameFromUrl) {
-      setCustomerName(nameFromUrl);
-    }
-  }, [serialFromUrl, phoneFromUrl, nameFromUrl]);
+  }, [serialFromUrl, phoneFromUrl, nameFromUrl, isSupportDirect, matchedSupportProduct]);
 
   // Validate serial when input reaches at least 10 chars (without prefilling any personal data)
   useEffect(() => {

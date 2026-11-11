@@ -4,6 +4,7 @@ import logger from '../utils/logger';
 import { requireAuth, requireCustomerAuth, optionalCustomerAuth } from '../middleware/authSession';
 import { authenticateZaloMiniAppUser } from '../services/zaloMiniAppService';
 import { activateSerialWarranty } from '../services/warrantyService';
+import { getPurifierConfig } from '../config/waterPurifiers';
 
 const router = Router();
 
@@ -478,15 +479,18 @@ router.get('/my-serials', requireCustomerAuth, async (req: Request, res: Respons
           totalLiters: tel.totalLiters,
           errorCode: tel.errorCode,
           recordedAt: tel.recordedAt,
-          // 3 Lõi lọc Truliva
-          ppc: raw.ppc != null ? Number(raw.ppc) : null,
-          ppcBars: raw.ppc_bars != null ? Number(raw.ppc_bars) : 4,
-          ppcReplace: raw.ppc_replace === true,
+          // Thông số lõi lọc nước Truliva (hỗ trợ cả chuẩn PPC/PGP 3 lõi và PCB 2 lõi)
+          ppc: raw.ppc != null ? Number(raw.ppc) : (raw.pcb != null ? Number(raw.pcb) : null),
+          ppcBars: raw.ppc_bars != null ? Number(raw.ppc_bars) : (raw.pcb_bars != null ? Number(raw.pcb_bars) : null),
+          ppcReplace: raw.ppc_replace === true || raw.pcb_replace === true,
+          pcb: raw.pcb != null ? Number(raw.pcb) : (raw.ppc != null ? Number(raw.ppc) : null),
+          pcbBars: raw.pcb_bars != null ? Number(raw.pcb_bars) : (raw.ppc_bars != null ? Number(raw.ppc_bars) : null),
+          pcbReplace: raw.pcb_replace === true || raw.ppc_replace === true,
           ro: raw.ro != null ? Number(raw.ro) : null,
-          roBars: raw.ro_bars != null ? Number(raw.ro_bars) : 4,
+          roBars: raw.ro_bars != null ? Number(raw.ro_bars) : null,
           roReplace: raw.ro_replace === true,
           cto: raw.cto != null ? Number(raw.cto) : null,
-          ctoBars: raw.cto_bars != null ? Number(raw.cto_bars) : 4,
+          ctoBars: raw.cto_bars != null ? Number(raw.cto_bars) : null,
           ctoReplace: raw.cto_replace === true,
           // Phần cứng / Mạng
           rssi: raw.rssi != null ? Number(raw.rssi) : null,
@@ -502,9 +506,11 @@ router.get('/my-serials', requireCustomerAuth, async (req: Request, res: Respons
 
     const enhancedSerials = allSerials.map(s => {
       const iot = iotMap.get(s.serialNumber) || null;
+      const modelConfig = getPurifierConfig(s.model || s.productLine || s.serialNumber);
       return {
         ...s,
-        iot
+        iot,
+        modelConfig
       };
     });
 

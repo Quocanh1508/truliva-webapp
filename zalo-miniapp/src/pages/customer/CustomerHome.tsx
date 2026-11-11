@@ -11,15 +11,12 @@ import {
   User, 
   MessageSquare,
   QrCode,
-  CheckCircle2,
   Calendar,
   Crown,
   Award,
   Gem,
   ShoppingBag,
   Store,
-  Truck,
-  RotateCcw,
   Scale,
   Droplets,
   BookOpen,
@@ -195,11 +192,11 @@ export default function CustomerHome({ user, mySerials = [], onOpenScanner, onOp
   return (
     <div className="pb-28 bg-slate-50 min-h-screen font-sans">
       {/* 1. Header Profile Card with Persona 3 Reload Ocean Waves */}
-      <P3ROceanHeader className="p-4 pt-5 pb-12">
+      <P3ROceanHeader className="p-4 pt-[calc(env(safe-area-inset-top,38px)+28px)] pb-16">
         <div className="max-w-md mx-auto flex items-center justify-between">
-          <div className="flex items-center space-x-3">
+          <div className="flex items-center space-x-3.5">
             <div className="relative">
-              <div className="w-12 h-12 rounded-full bg-[#0B2545] border-2 border-white/85 shadow-md flex items-center justify-center text-white font-bold text-lg overflow-hidden transition-all">
+              <div className="w-13 h-13 rounded-full bg-[#0B2545] border-2 border-white/85 shadow-md flex items-center justify-center text-white font-bold text-lg overflow-hidden transition-all">
                 {user?.avatar ? (
                   <img src={user.avatar} alt="Avatar" className="w-full h-full object-cover" />
                 ) : (
@@ -245,17 +242,17 @@ export default function CustomerHome({ user, mySerials = [], onOpenScanner, onOp
       </P3ROceanHeader>
 
       {/* 2. Floating Quick Nav Card (UI/UX Pro Max Modern Bento Quick Actions) */}
-      <div className="max-w-md mx-auto px-4 -mt-10 relative z-10">
-        <div className="bg-white/95 backdrop-blur-xl rounded-[2.2rem] shadow-[0_12px_36px_rgba(11,37,69,0.12)] p-3 border border-sky-100/90 grid grid-cols-4 gap-2 text-center">
+      <div className="max-w-md mx-auto px-4 -mt-7 relative z-10">
+        <div className="bg-white/95 backdrop-blur-xl rounded-[2.2rem] shadow-[0_12px_36px_rgba(11,37,69,0.12)] p-3 border border-sky-100/90 grid grid-cols-4 gap-1.5 text-center items-start">
           {/* 1. Cửa hàng / Sản phẩm */}
           <button 
             onClick={onGoToShop}
-            className="flex flex-col items-center justify-center space-y-1.5 p-2 rounded-2xl hover:bg-sky-50/80 active:scale-95 transition-all cursor-pointer group touch-tactile"
+            className="flex flex-col items-center justify-start space-y-1.5 px-1 py-2 rounded-2xl hover:bg-sky-50/80 active:scale-95 transition-all cursor-pointer group touch-tactile"
           >
             <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-blue-50 to-indigo-100/90 text-[#1B3A6B] flex items-center justify-center border border-blue-200/60 shadow-xs group-hover:scale-105 transition-all">
               {FEATURES.ENABLE_ECOMMERCE ? <Store size={22} className="text-[#1B3A6B]" /> : <BookOpen size={22} className="text-[#1B3A6B]" />}
             </div>
-            <span className="text-[11px] font-extrabold text-slate-700 tracking-tight whitespace-nowrap">
+            <span className="text-[11px] font-extrabold text-slate-700 tracking-tight leading-tight">
               {FEATURES.ENABLE_ECOMMERCE ? 'Cửa hàng' : 'Sản phẩm'}
             </span>
           </button>
@@ -263,7 +260,7 @@ export default function CustomerHome({ user, mySerials = [], onOpenScanner, onOp
           {/* 2. Điểm tích lũy */}
           <button 
             onClick={() => setShowLoyaltyModal(true)}
-            className="flex flex-col items-center justify-center space-y-1.5 p-2 rounded-2xl hover:bg-amber-50/80 active:scale-95 transition-all cursor-pointer group touch-tactile"
+            className="flex flex-col items-center justify-start space-y-1.5 px-1 py-2 rounded-2xl hover:bg-amber-50/80 active:scale-95 transition-all cursor-pointer group touch-tactile"
           >
             <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-amber-50 to-orange-100/90 text-amber-600 flex items-center justify-center border border-amber-200/60 shadow-xs group-hover:scale-105 transition-all relative">
               <Coins size={22} className="text-amber-500" />
@@ -271,21 +268,21 @@ export default function CustomerHome({ user, mySerials = [], onOpenScanner, onOp
                 <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-amber-400 rounded-full border-2 border-white"></span>
               )}
             </div>
-            <span className="text-[11px] font-extrabold text-slate-700 tracking-tight whitespace-nowrap">
+            <span className="text-[11px] font-extrabold text-slate-700 tracking-tight leading-tight">
               Điểm tích lũy
             </span>
           </button>
 
-          {/* 3. Bảo hành (Kích hoạt & tra cứu bảo hành điện tử) */}
+          {/* 3. Kích hoạt bảo hành (Kích hoạt & tra cứu bảo hành điện tử) */}
           <button 
             onClick={() => handleDirectWarranty()}
-            className="flex flex-col items-center justify-center space-y-1.5 p-2 rounded-2xl hover:bg-sky-50/80 active:scale-95 transition-all cursor-pointer group touch-tactile"
+            className="flex flex-col items-center justify-start space-y-1.5 px-1 py-2 rounded-2xl hover:bg-sky-50/80 active:scale-95 transition-all cursor-pointer group touch-tactile"
           >
             <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-sky-50 to-blue-100/90 text-[#1B3A6B] flex items-center justify-center border border-blue-200/60 shadow-xs group-hover:scale-105 transition-all">
               <FileText size={22} className="text-[#1B3A6B]" />
             </div>
-            <span className="text-[11px] font-extrabold text-slate-700 tracking-tight whitespace-nowrap">
-              Bảo hành
+            <span className="text-[10.5px] font-extrabold text-slate-700 tracking-tight leading-tight text-center">
+              Kích hoạt bảo hành
             </span>
           </button>
 
@@ -298,12 +295,12 @@ export default function CustomerHome({ user, mySerials = [], onOpenScanner, onOp
                 window.location.href = 'tel:1900638463';
               }
             }}
-            className="flex flex-col items-center justify-center space-y-1.5 p-2 rounded-2xl hover:bg-emerald-50/80 active:scale-95 transition-all cursor-pointer group touch-tactile"
+            className="flex flex-col items-center justify-start space-y-1.5 px-1 py-2 rounded-2xl hover:bg-emerald-50/80 active:scale-95 transition-all cursor-pointer group touch-tactile"
           >
             <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-emerald-50 to-teal-100/90 text-emerald-700 flex items-center justify-center border border-emerald-200/60 shadow-xs group-hover:scale-105 transition-all">
               <PhoneCall size={22} className="text-emerald-600" />
             </div>
-            <span className="text-[11px] font-extrabold text-slate-700 tracking-tight whitespace-nowrap">Hotline</span>
+            <span className="text-[11px] font-extrabold text-slate-700 tracking-tight leading-tight">Hotline</span>
           </button>
         </div>
       </div>
@@ -437,28 +434,8 @@ export default function CustomerHome({ user, mySerials = [], onOpenScanner, onOp
         )}
       </div>
 
-      {/* 5. Trust Guarantee Strip */}
-      <div className="max-w-md mx-auto px-4 mt-4">
-        <div className="bg-sky-50/80 border border-sky-100/90 rounded-2xl py-2.5 px-3 flex items-center justify-between text-[10px] text-slate-600 font-semibold">
-          <div className="flex items-center space-x-1">
-            <CheckCircle2 size={13} className="text-[#0284C7]" />
-            <span>Chính hãng 100%</span>
-          </div>
-          <span className="text-slate-300">•</span>
-          <div className="flex items-center space-x-1">
-            <Truck size={13} className="text-emerald-600" />
-            <span>Miễn phí giao lắp</span>
-          </div>
-          <span className="text-slate-300">•</span>
-          <div className="flex items-center space-x-1">
-            <RotateCcw size={13} className="text-amber-600" />
-            <span>Đổi mới 7 ngày</span>
-          </div>
-        </div>
-      </div>
-
       {/* 6. Section Tin Tức & Kiến Thức Nước Sạch */}
-      <div id="tin-tuc-noi-bat" className="max-w-md mx-auto px-4 mt-6 space-y-3 scroll-mt-6">
+      <div id="tin-tuc-noi-bat" className="max-w-md mx-auto px-4 mt-5 space-y-3 scroll-mt-6">
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-2">
             <div className="p-1.5 bg-blue-100 text-[#1B3A6B] rounded-lg">
@@ -546,7 +523,7 @@ export default function CustomerHome({ user, mySerials = [], onOpenScanner, onOp
         <div className="bg-slate-100/80 p-3.5 rounded-2xl border border-slate-200/80 text-center text-[10px] text-gray-500 space-y-1.5">
           <div className="flex items-center justify-center gap-1.5 font-bold text-gray-700">
             <Scale size={13} className="text-[#1B3A6B]" />
-            <span>Hệ Thống TMĐT Chính Thức - Công Ty TNHH Truliva</span>
+            <span>Hệ Thống TMĐT Chính Thức - Máy lọc nước Truliva</span>
           </div>
           <p className="text-[10px] text-gray-400">
             Tuân thủ Luật TMĐT 2025 & Nghị định 248/2026/NĐ-CP • MST: 0317582910
