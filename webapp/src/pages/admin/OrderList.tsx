@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { getOrders, updateOrder, getKtvUsers, getStations, getOrderAuditLog, syncOrders, syncSingleOrder, getFiltersData, fetchApi, createOrder, searchCustomers, bulkAssignOrders, bulkCancelOrders } from '../../api/client';
-import { Search, ChevronLeft, ChevronRight, History, XCircle, Filter, RefreshCw, FileText, CheckCircle2, ClipboardCheck, Copy, UserPlus, Download, Wrench, Settings, FolderOpen, Building2, MapPin, Users, Calendar, Plus, AlertTriangle, ExternalLink, RotateCcw, Edit3, Tag, Trash2, User, Maximize2, Minimize2 } from 'lucide-react';
+import { Search, ChevronLeft, ChevronRight, History, XCircle, Filter, RefreshCw, FileText, CheckCircle2, ClipboardCheck, Copy, UserPlus, Download, Wrench, Settings, FolderOpen, Building2, MapPin, Users, Calendar, Plus, AlertTriangle, ExternalLink, RotateCcw, Edit3, Tag, Trash2, User, Maximize2, Minimize2, Loader2, ShoppingBag } from 'lucide-react';
 import { WARRANTY_SERVICE_GROUPS, REPAIR_SERVICE_GROUPS, WORK_TYPE_SERVICES } from '../../utils/workTypes';
 import { useConfirm } from '../../context/ConfirmContext';
 import DateRangePicker from '../../components/DateRangePicker';
@@ -644,12 +644,28 @@ export default function OrderList() {
   }, []);
 
   const [customerSuggestions, setCustomerSuggestions] = useState<any[]>([]);
+  const [customerSearching, setCustomerSearching] = useState(false);
+  const [showCustomerSuggestions, setShowCustomerSuggestions] = useState(false);
+  const phoneSuggestionRef = useRef<HTMLDivElement>(null);
+
+  // Click ngoài container số điện thoại -> đóng dropdown gợi ý
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (phoneSuggestionRef.current && !phoneSuggestionRef.current.contains(e.target as Node)) {
+        setShowCustomerSuggestions(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   useEffect(() => {
     const digits = newOrderForm.customerPhone.replace(/\D/g, '').trim();
     // Phải gõ đủ 10 ký tự số liền kề nhau và bắt đầu bằng số 0 mới hiện kết quả gợi ý
     if (!/^0\d{9}$/.test(digits)) {
       setCustomerSuggestions([]);
+      setShowCustomerSuggestions(false);
+      setCustomerSearching(false);
       return;
     }
     if (skipFetchRef.current) {
@@ -657,12 +673,19 @@ export default function OrderList() {
       return;
     }
 
+    setCustomerSearching(true);
     const delayDebounceFn = setTimeout(async () => {
       try {
         const results = await searchCustomers(digits);
-        setCustomerSuggestions(Array.isArray(results) ? results : []);
+        const list = Array.isArray(results) ? results : [];
+        setCustomerSuggestions(list);
+        setShowCustomerSuggestions(list.length > 0);
       } catch (err) {
         console.error('Lỗi tìm kiếm khách hàng:', err);
+        setCustomerSuggestions([]);
+        setShowCustomerSuggestions(false);
+      } finally {
+        setCustomerSearching(false);
       }
     }, 250);
 
@@ -671,14 +694,55 @@ export default function OrderList() {
 
   const handleSelectCustomer = (cust: any) => {
     skipFetchRef.current = true;
-    setNewOrderForm(prev => ({
-      ...prev,
-      customerName: cust.fullName || prev.customerName,
-      customerPhone: cust.phoneNumber || prev.customerPhone,
-      address: cust.fullAddress || cust.address || prev.address,
-      province: cust.provinceName || prev.province,
-    }));
+    setShowCustomerSuggestions(false);
     setCustomerSuggestions([]);
+
+    setNewOrderForm(prev => {
+      const next = { ...prev };
+      if (cust.fullName) next.customerName = cust.fullName;
+      if (cust.phoneNumber) next.customerPhone = cust.phoneNumber;
+      const addr = cust.fullAddress || cust.address;
+      if (addr) next.address = addr;
+      
+      // Chuẩn hóa Tỉnh/Thành
+      if (cust.provinceName) {
+        next.province = normalizeProvince(cust.provinceName) || cust.provinceName;
+      }
+
+      // Tự động điền Serial vào note nếu có
+      if (cust.serialNumber) {
+        const serialTag = `[Serial máy: ${cust.serialNumber}]`;
+        if (!next.note.includes(cust.serialNumber)) {
+          next.note = next.note ? `${next.note} - ${serialTag}` : serialTag;
+        }
+      }
+
+      // Tự động điền sản phẩm nếu khách hàng có máy/sản phẩm và form chưa chọn sản phẩm nào
+      if (cust.productName && next.items.length === 0) {
+        const cleanProdName = cust.productName.trim();
+        const matched = productsStock.find(p => 
+          p.name.toLowerCase() === cleanProdName.toLowerCase() ||
+          (p.sku && cleanProdName.toLowerCase().includes(p.sku.toLowerCase()))
+        );
+        if (matched) {
+          next.items = [{
+            productName: matched.name,
+            sku: matched.sku || '',
+            quantity: 1,
+            price: matched.sellingPrice || 0
+          }];
+        } else {
+          next.items = [{
+            productName: cleanProdName,
+            sku: '',
+            quantity: 1,
+            price: 0
+          }];
+        }
+      }
+
+      return next;
+    });
   };
 
   const [syncingPosProducts, setSyncingPosProducts] = useState(false);
@@ -704,6 +768,8 @@ export default function OrderList() {
     setEditingOrderId(null);
     setOriginalAppointmentDate('');
     setCustomerSuggestions([]);
+    setShowCustomerSuggestions(false);
+    setCustomerSearching(false);
     skipFetchRef.current = false;
     setNewOrderForm({
       customerName: '',
@@ -735,6 +801,8 @@ export default function OrderList() {
 
   const openEditManualOrderModal = (order: any) => {
     setCustomerSuggestions([]);
+    setShowCustomerSuggestions(false);
+    setCustomerSearching(false);
     skipFetchRef.current = true;
 
     // Parse appointmentDate and appointmentTime from order.appointmentTime
@@ -1755,10 +1823,10 @@ export default function OrderList() {
     }
 
     try {
-      // Tự động khử trùng lặp linh kiện con nếu đã có gói Combo trong đơn
+      // Tự động khử trùng lặp linh kiện con nếu đã có gói Combo trong đơn & strip components
       const activeComboComponents = new Set<string>();
       for (const it of tempItems) {
-        const comps = getComboComponents(it.productName, it.sku);
+        const comps = getComboComponents(it.productName, it.sku, it);
         if (comps) {
           comps.forEach(c => {
             activeComboComponents.add(c.name.trim().toLowerCase());
@@ -1766,13 +1834,37 @@ export default function OrderList() {
           });
         }
       }
-      const cleanTempItems = tempItems.filter(it => {
-        const comps = getComboComponents(it.productName, it.sku);
-        if (comps) return true;
-        const iName = (it.productName || '').trim().toLowerCase();
-        const iSku = (it.sku || '').trim().toLowerCase();
-        return !activeComboComponents.has(iName) && (!iSku || !activeComboComponents.has(iSku));
-      });
+      const cleanTempItems = tempItems
+        .filter(it => {
+          const comps = getComboComponents(it.productName, it.sku, it);
+          if (comps) return true;
+          const iName = (it.productName || '').trim().toLowerCase();
+          const iSku = (it.sku || '').trim().toLowerCase();
+          return !activeComboComponents.has(iName) && (!iSku || !activeComboComponents.has(iSku));
+        })
+        .map(it => {
+          const clone = { ...it };
+          delete clone.components;
+          delete clone.composite_products;
+          return clone;
+        });
+
+      // Kiểm tra xem danh sách sản phẩm có thực sự bị thay đổi so với đơn gốc hay không
+      const originalItems = assignModal.order.items || [];
+      const isItemsChanged = (() => {
+        if (cleanTempItems.length !== originalItems.length) return true;
+        for (let i = 0; i < cleanTempItems.length; i++) {
+          const t = cleanTempItems[i];
+          const o = originalItems[i];
+          if (!o) return true;
+          if ((t.productName || '').trim().toLowerCase() !== (o.productName || '').trim().toLowerCase()) return true;
+          if ((t.sku || '').trim().toLowerCase() !== (o.sku || '').trim().toLowerCase()) return true;
+          if (Number(t.quantity || 1) !== Number(o.quantity || 1)) return true;
+          if (Number(t.price || 0) !== Number(o.price || 0)) return true;
+          if (Number(t.discount || 0) !== Number(o.discount || 0)) return true;
+        }
+        return false;
+      })();
 
       // Auto match kho hàng từ input tìm kiếm nếu chưa chọn hoặc gõ text
       let finalWarehouseId: string | null = selectedWarehouseId || null;
@@ -1796,9 +1888,16 @@ export default function OrderList() {
         serviceType: serviceType || null,
         appointmentTime: appointmentDateObj.toISOString(),
         rescheduleReason: rescheduleReason || null,
-        items: cleanTempItems,
         promoCode: assignPromoCode || null
       };
+
+      // [CRITICAL FIX - COMBO DUPLICATION PREVENTION]
+      // Chỉ gửi trường `items` khi người dùng THỰC SỰ có chỉnh sửa danh sách sản phẩm.
+      // Nếu chỉ đổi kho (warehouseId), phân công KTV hoặc đổi lịch hẹn, KHÔNG gửi trường `items`
+      // để tránh việc hệ thống xóa đi tạo lại các item và làm Pancake POS auto-expand nhân đôi linh kiện con của Combo.
+      if (isItemsChanged) {
+        payload.items = cleanTempItems;
+      }
 
       if (hasAssignPermission) {
         payload.mainStationId = selectedMain || null;
@@ -4910,6 +5009,9 @@ export default function OrderList() {
                     setEditingOrderId(null); 
                     setIsCreateProductSelectOpen(false); 
                     setIsManualCreateModalExpanded(false); 
+                    setCustomerSuggestions([]);
+                    setShowCustomerSuggestions(false);
+                    setCustomerSearching(false);
                   }} 
                   className="text-gray-400 hover:text-gray-600 transition-colors p-1 hover:bg-gray-100 rounded-lg"
                 >
@@ -4935,59 +5037,70 @@ export default function OrderList() {
                   />
                 </div>
 
-                <div className="relative">
+                <div className="relative" ref={phoneSuggestionRef}>
                   <label className="block text-sm text-gray-600 mb-1">Số điện thoại *</label>
-                  <input
-                    type="text"
-                    required
-                    maxLength={10}
-                    className={`w-full border rounded p-2 text-sm outline-none focus:border-blue-500 text-gray-800 bg-white ${
-                      newOrderForm.customerPhone && !/^0\d{9}$/.test(newOrderForm.customerPhone)
-                        ? 'border-amber-300 bg-amber-50/20'
-                        : 'border-gray-300'
-                    }`}
-                    placeholder="Nhập 10 số (bắt đầu bằng 0)..."
-                    value={newOrderForm.customerPhone}
-                    onChange={e => {
-                      const digits = e.target.value.replace(/\D/g, '').slice(0, 10);
-                      setNewOrderForm(prev => ({ ...prev, customerPhone: digits }));
-                      if (!/^0\d{9}$/.test(digits)) {
-                        setCustomerSuggestions([]);
-                      }
-                    }}
-                    onBlur={() => setTimeout(() => setCustomerSuggestions([]), 200)}
-                  />
+                  <div className="relative">
+                    <input
+                      type="text"
+                      required
+                      maxLength={10}
+                      className={`w-full border rounded p-2 text-sm outline-none focus:border-blue-500 text-gray-800 bg-white ${
+                        newOrderForm.customerPhone && !/^0\d{9}$/.test(newOrderForm.customerPhone)
+                          ? 'border-amber-300 bg-amber-50/20'
+                          : 'border-gray-300'
+                      }`}
+                      placeholder="Nhập 10 số (bắt đầu bằng 0)..."
+                      value={newOrderForm.customerPhone}
+                      onChange={e => {
+                        const digits = e.target.value.replace(/\D/g, '').slice(0, 10);
+                        setNewOrderForm(prev => ({ ...prev, customerPhone: digits }));
+                        if (!/^0\d{9}$/.test(digits)) {
+                          setCustomerSuggestions([]);
+                          setShowCustomerSuggestions(false);
+                        }
+                      }}
+                      onFocus={() => {
+                        if (/^0\d{9}$/.test(newOrderForm.customerPhone) && customerSuggestions.length > 0) {
+                          setShowCustomerSuggestions(true);
+                        }
+                      }}
+                    />
+                    {customerSearching && (
+                      <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none">
+                        <Loader2 size={16} className="animate-spin text-blue-500" />
+                      </div>
+                    )}
+                  </div>
                   {newOrderForm.customerPhone && newOrderForm.customerPhone.length > 0 && newOrderForm.customerPhone.length < 10 && (
                     <p className="text-xs text-amber-500 mt-0.5">Cần nhập đủ 10 số ({newOrderForm.customerPhone.length}/10)</p>
                   )}
                   {newOrderForm.customerPhone && newOrderForm.customerPhone.length === 10 && !/^0\d{9}$/.test(newOrderForm.customerPhone) && (
                     <p className="text-xs text-red-500 mt-0.5">SĐT phải bắt đầu bằng số 0</p>
                   )}
-                  {customerSuggestions.length > 0 && (
+                  {showCustomerSuggestions && customerSuggestions.length > 0 && (
                     <div className="absolute left-0 right-0 z-50 mt-1 bg-white border border-gray-200 rounded-xl shadow-xl max-h-60 overflow-y-auto">
                       <div className="px-3 py-1.5 bg-gray-50 border-b border-gray-200 text-[11px] text-gray-500 font-semibold uppercase">
                         Gợi ý từ lịch sử ({customerSuggestions.length})
                       </div>
                       {customerSuggestions.map((cust, idx) => (
-                        <button
+                        <div
                           key={`${cust.type || 'c'}-${cust.id || idx}`}
-                          type="button"
-                          className="w-full text-left px-3 py-2 text-sm hover:bg-blue-50 hover:text-blue-700 transition-colors border-b border-gray-100 last:border-0 cursor-pointer flex items-center justify-between gap-2"
-                          onMouseDown={(e) => {
-                            e.preventDefault();
-                            handleSelectCustomer(cust);
-                          }}
-                          onClick={(e) => {
-                            e.preventDefault();
-                            handleSelectCustomer(cust);
-                          }}
+                          onClick={() => handleSelectCustomer(cust)}
+                          className="px-3 py-2.5 hover:bg-blue-50 cursor-pointer border-b border-gray-100 last:border-b-0 flex items-center gap-2.5 transition-colors"
                         >
+                          <div className="shrink-0">
+                            {cust.type === 'customer' && <User size={16} className="text-blue-600" />}
+                            {cust.type === 'order' && <ShoppingBag size={16} className="text-purple-600" />}
+                            {cust.type === 'serial' && <span className="text-xs font-mono font-bold text-emerald-600 px-1 py-0.5 bg-emerald-50 rounded">SN</span>}
+                            {!cust.type && <User size={16} className="text-blue-600" />}
+                          </div>
                           <div className="min-w-0 flex-1">
-                            <div className="font-semibold text-gray-800 truncate">{cust.fullName}</div>
-                            <div className="text-xs text-gray-500 flex items-center gap-2">
-                              <span>SĐT: {cust.phoneNumber}</span>
+                            <div className="text-sm font-medium text-gray-800 truncate">{cust.fullName}</div>
+                            <div className="text-xs text-gray-500 flex flex-wrap items-center gap-1.5 mt-0.5">
+                              <span>{cust.phoneNumber}</span>
                               {cust.provinceName && <span>• 📍 {cust.provinceName}</span>}
-                              {cust.productName && <span className="text-blue-600 truncate">• 📦 {cust.productName}</span>}
+                              {cust.productName && <span className="text-blue-600 font-medium truncate">• 📦 {cust.productName}</span>}
+                              {cust.serialNumber && <span className="text-emerald-600 font-mono font-medium truncate">• 🏷️ {cust.serialNumber}</span>}
                             </div>
                             {(cust.fullAddress || cust.address) && (
                               <div className="text-[11px] text-gray-400 truncate mt-0.5">
@@ -4996,14 +5109,14 @@ export default function OrderList() {
                             )}
                           </div>
                           {cust.type && (
-                            <span className={`text-[10px] px-1.5 py-0.5 rounded font-semibold shrink-0 ${
+                            <span className={`text-[10px] px-2 py-0.5 rounded font-semibold shrink-0 ${
                               cust.type === 'customer' ? 'bg-blue-100 text-blue-700' :
                               cust.type === 'order' ? 'bg-purple-100 text-purple-700' : 'bg-emerald-100 text-emerald-700'
                             }`}>
                               {cust.type === 'customer' ? 'KH' : cust.type === 'order' ? 'ĐH' : 'Serial'}
                             </span>
                           )}
-                        </button>
+                        </div>
                       ))}
                     </div>
                   )}
@@ -5367,6 +5480,9 @@ export default function OrderList() {
                   setEditingOrderId(null); 
                   setIsCreateProductSelectOpen(false); 
                   setIsManualCreateModalExpanded(false); 
+                  setCustomerSuggestions([]);
+                  setShowCustomerSuggestions(false);
+                  setCustomerSearching(false);
                 }} 
                 className="px-4 py-2 bg-white border rounded text-gray-700 hover:bg-gray-100 text-sm font-semibold transition-colors"
               >

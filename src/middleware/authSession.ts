@@ -318,7 +318,7 @@ export async function requireCustomerAuth(req: Request, res: Response, next: Nex
       return;
     }
 
-    const miniAppJwtSecret = process.env.ZALO_MINIAPP_JWT_SECRET;
+    const miniAppJwtSecret = process.env.ZALO_MINIAPP_JWT_SECRET || process.env.JWT_SECRET;
     if (!miniAppJwtSecret) {
       logger.error('ZALO_MINIAPP_JWT_SECRET is not configured in environment');
       res.status(500).json({ error: 'Lỗi cấu hình bảo mật máy chủ' });
@@ -386,7 +386,7 @@ export async function optionalCustomerAuth(req: Request, res: Response, next: Ne
       return next();
     }
 
-    const miniAppJwtSecret = process.env.ZALO_MINIAPP_JWT_SECRET;
+    const miniAppJwtSecret = process.env.ZALO_MINIAPP_JWT_SECRET || process.env.JWT_SECRET;
     if (!miniAppJwtSecret) {
       return next();
     }

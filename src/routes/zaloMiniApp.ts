@@ -618,8 +618,115 @@ router.get('/vouchers', async (_req: Request, res: Response): Promise<void> => {
 });
 
 /**
+ * Helper chuẩn hóa trạng thái ca kỹ thuật từ Truliva App
+ */
+function mapServiceStatus(adminStatus?: string | null, statusName?: string | null, approvalStatus?: string | null): { label: string; code: 'completed' | 'in_progress' | 'pending' | 'rescheduled' | 'cancelled' } {
+  const s = (adminStatus || statusName || approvalStatus || '').toLowerCase().trim();
+
+  if (s.includes('hoàn thành') || s.includes('completed') || s.includes('delivered') || s.includes('approved') || s.includes('received_money')) {
+    return { label: 'Hoàn thành', code: 'completed' };
+  }
+  if (s.includes('hủy') || s.includes('cancel') || s.includes('rejected') || s.includes('từ chối')) {
+    return { label: 'Hủy đơn', code: 'cancelled' };
+  }
+  if (s.includes('hẹn lại') || s.includes('reschedule')) {
+    return { label: 'Hẹn lại', code: 'rescheduled' };
+  }
+  if (s.includes('đang') || s.includes('processing') || s.includes('phân công') || s.includes('assigned') || s.includes('shipping') || s.includes('confirmed')) {
+    return { label: 'Đang thực hiện', code: 'in_progress' };
+  }
+  return { label: 'Chờ xử lý', code: 'pending' };
+}
+
+/**
+ * Helper chuẩn hóa loại công việc
+ */
+function formatWorkType(workType?: string | null): string {
+  if (!workType) return 'Bảo trì & Thay lõi';
+  const w = workType.toLowerCase().trim();
+  if (w === 'lap_dat' || w === 'lắp đặt') return 'Lắp đặt';
+  if (w === 'giao_hang' || w === 'giao hàng') return 'Giao hàng';
+  if (w.includes('giao') && w.includes('lắp')) return 'Giao hàng & Lắp đặt';
+  if (w === 'sua_chua' || w === 'sửa chữa') return 'Sửa chữa';
+  if (w === 'thay_loi' || w.includes('thay lõi') || w.includes('thay loc')) return 'Thay lõi lọc';
+  if (w === 'bao_hanh' || w === 'bảo hành') return 'Bảo hành';
+  if (w === 'bao_tri' || w === 'bảo trì' || w === 'bảo dưỡng') return 'Bảo trì & Bảo dưỡng';
+  return workType;
+}
+
+/**
+ * Helper tạo đối tượng ServiceHistoryItem chuẩn 7 trường cho Zalo Mini App
+ */
+function mapToServiceHistoryItem(params: {
+  id: string;
+  adminStatus?: string | null;
+  statusName?: string | null;
+  approvalStatus?: string | null;
+  updatedAt?: Date | string | null;
+  completedAt?: Date | string | null;
+  scheduledAt?: Date | string | null;
+  createdAt: Date | string;
+  productName?: string | null;
+  serial?: string | null;
+  jobType?: string | null;
+  serviceType?: string | null;
+  technicianName?: string | null;
+}) {
+  const { label: status, code: statusCode } = mapServiceStatus(
+    params.adminStatus,
+    params.statusName,
+    params.approvalStatus
+  );
+
+  const formattedJobType = formatWorkType(params.jobType);
+
+  // Loại dịch vụ: null nếu rỗng hoặc generic như 'Công việc đã bao gồm dịch vụ' hoặc trùng jobType
+  let cleanServiceType: string | null = null;
+  if (params.serviceType && params.serviceType.trim()) {
+    const st = params.serviceType.trim();
+    const stLower = st.toLowerCase();
+    if (
+      stLower !== 'công việc đã bao gồm dịch vụ' &&
+      stLower !== formattedJobType.toLowerCase() &&
+      !stLower.includes('đã bao gồm')
+    ) {
+      cleanServiceType = st;
+    }
+  }
+
+  const effectiveUpdatedAt = params.updatedAt ? new Date(params.updatedAt).toISOString() : new Date(params.createdAt).toISOString();
+  const effectiveScheduledAt = params.scheduledAt ? new Date(params.scheduledAt).toISOString() : null;
+  const isCompleted = statusCode === 'completed';
+  const effectiveCompletedAt = params.completedAt
+    ? new Date(params.completedAt).toISOString()
+    : (isCompleted ? effectiveUpdatedAt : null);
+
+  const cleanSerial = params.serial && params.serial !== 'XXXXX' ? params.serial.trim() : null;
+  const cleanProductName = params.productName ? params.productName.trim() : 'Máy lọc nước Truliva';
+
+  return {
+    id: params.id,
+    status, // 1. Trạng thái ca hiện tại: 'Chờ xử lý', 'Đang thực hiện', 'Hoàn thành', 'Hẹn lại', 'Hủy đơn'
+    statusCode,
+    updatedAt: effectiveUpdatedAt, // 2. Thời gian cập nhật theo trạng thái thực tế
+    completedAt: effectiveCompletedAt,
+    scheduledAt: effectiveScheduledAt,
+    createdAt: new Date(params.createdAt).toISOString(),
+    productName: cleanProductName, // 3. Tên sản phẩm
+    modelName: cleanProductName,
+    serial: cleanSerial, // 4. Mã Serial máy
+    serialNumber: cleanSerial,
+    jobType: formattedJobType, // 5. Loại công việc
+    workType: formattedJobType,
+    serviceType: cleanServiceType, // 6. Loại dịch vụ (null nếu rỗng)
+    technicianName: params.technicianName ? params.technicianName.trim() : null, // 7. Tên KTV phụ trách (KHÔNG có SĐT)
+    ktvUser: params.technicianName ? { fullName: params.technicianName.trim() } : null
+  };
+}
+
+/**
  * GET /api/zalo-miniapp/service-history
- * Lấy lịch sử bảo trì, thay lõi và sửa chữa của khách hàng
+ * Lấy danh sách lịch sử bảo trì, thay lõi và ca kỹ thuật realtime từ Truliva App
  */
 router.get('/service-history', requireCustomerAuth, async (req: Request, res: Response): Promise<void> => {
   try {
@@ -637,14 +744,18 @@ router.get('/service-history', requireCustomerAuth, async (req: Request, res: Re
       standardPhone.startsWith('0') ? standardPhone.substring(1) : standardPhone
     ]));
 
-    // Tìm các serial liên kết
+    // Tìm các serial liên kết với khách hàng
     const serials = await prisma.serial.findMany({
       where: { customerPhone: { in: phoneVariants } },
-      select: { serialNumber: true }
+      select: { serialNumber: true, model: true }
     });
     const serialNumbers = serials.map(s => s.serialNumber);
+    const serialModelMap = new Map<string, string>();
+    serials.forEach(s => {
+      if (s.serialNumber && s.model) serialModelMap.set(s.serialNumber, s.model);
+    });
 
-    // 1. Lấy báo cáo dịch vụ từ KTV (ServiceReport)
+    // 1. Lấy báo cáo dịch vụ từ KTV (ServiceReport) kèm đơn hàng liên kết
     const reports = await prisma.serviceReport.findMany({
       where: {
         OR: [
@@ -654,53 +765,60 @@ router.get('/service-history', requireCustomerAuth, async (req: Request, res: Re
       },
       include: {
         ktvUser: {
-          select: { fullName: true, phoneNumber: true }
+          select: { fullName: true }
+        },
+        order: {
+          select: {
+            id: true,
+            adminStatus: true,
+            statusName: true,
+            workType: true,
+            serviceType: true,
+            appointmentTime: true,
+            updatedAt: true,
+            createdAt: true,
+            items: { select: { productName: true } },
+            serials: { select: { serialNumber: true, model: true } },
+            assignedKtv: { select: { fullName: true } }
+          }
         }
       },
       orderBy: { createdAt: 'desc' }
     });
 
-    const reportedOrderIds = new Set(reports.map(r => r.orderId).filter(Boolean));
-
-    // 2. Tự động nạp thêm các Đơn hàng Dịch vụ Hoàn thành đã phân công KTV
-    // Tiêu chí:
-    // - Đã phân công KTV: assignedKtvId != null
-    // - Trạng thái hoàn thành: adminStatus in ['hoàn thành', 'completed'] hoặc statusName in ['completed', 'delivered', 'received_money']
-    // - Loại trừ giao hàng đơn tự tạo: NOT (workType in ['Giao hàng', 'giao_hang'] AND pancakeOrderId < 0)
-    // - Không lấy đơn ecom: NOT (orderSource in ['zalo_shop', 'ecom', 'Ecom', 'Zalo Shop'])
-    // - Khớp SĐT: billPhoneNumber in phoneVariants hoặc customer.phoneNumber in phoneVariants
-    const completedOrders = await prisma.order.findMany({
+    // 2. Lấy các ca dịch vụ kỹ thuật / Đơn hàng KTV từ Truliva App
+    const serviceOrders = await prisma.order.findMany({
       where: {
-        assignedKtvId: { not: null },
         OR: [
           { billPhoneNumber: { in: phoneVariants } },
-          { customer: { phoneNumber: { in: phoneVariants } } }
+          { customer: { phoneNumber: { in: phoneVariants } } },
+          ...(serialNumbers.length > 0 ? [{ serials: { some: { serialNumber: { in: serialNumbers } } } }] : [])
         ],
         AND: [
           {
             OR: [
-              { adminStatus: { in: ['hoàn thành', 'completed', 'Hoàn thành', 'Đã hoàn thành'] } },
-              { statusName: { in: ['completed', 'delivered', 'received_money', 'hoàn thành'] } }
+              { assignedKtvId: { not: null } },
+              { workType: { not: null } },
+              { serviceType: { not: null } },
+              { hotlineTickets: { some: {} } }
             ]
           },
           {
             NOT: {
               AND: [
-                { workType: { in: ['Giao hàng', 'giao_hang'] } },
-                { pancakeOrderId: { lt: 0 } }
+                { orderSource: { in: ['zalo_shop', 'ecom', 'Ecom', 'Zalo Shop'] } },
+                { assignedKtvId: null }
               ]
             }
           },
           {
-            NOT: {
-              orderSource: { in: ['zalo_shop', 'ecom', 'Ecom', 'Zalo Shop'] }
-            }
+            adminStatus: { not: 'đã ẩn' }
           }
         ]
       },
       include: {
         assignedKtv: {
-          select: { fullName: true, phoneNumber: true }
+          select: { fullName: true }
         },
         items: {
           select: { productName: true, quantity: true, sku: true }
@@ -709,38 +827,109 @@ router.get('/service-history', requireCustomerAuth, async (req: Request, res: Re
           select: { serialNumber: true, model: true }
         }
       },
+      orderBy: { updatedAt: 'desc' }
+    });
+
+    // 3. Lấy yêu cầu hỗ trợ kỹ thuật từ HotlineTicket (nếu có)
+    const tickets = await prisma.hotlineTicket.findMany({
+      where: {
+        OR: [
+          { customerPhone: { in: phoneVariants } },
+          ...(phoneVariants.map(pv => ({ secondaryPhones: { contains: pv } }))),
+          ...(serialNumbers.length > 0 ? [{ serialNumber: { in: serialNumbers } }] : [])
+        ]
+      },
+      include: {
+        handlerUser: {
+          select: { fullName: true }
+        }
+      },
       orderBy: { createdAt: 'desc' }
     });
 
-    // Khử bỏ ghi chú nội bộ của Sales/KTV/Hotline trước khi trả về cho khách hàng
-    const sanitizedReports = reports.map(r => {
-      const { notes, ...rest } = r;
-      return rest;
-    });
+    const historyList: any[] = [];
+    const reportedOrderIds = new Set<string>();
+    const seenOrderIds = new Set<string>();
 
-    // 3. Ghép danh sách lịch sử dịch vụ không trùng lặp
-    const historyList: any[] = [...sanitizedReports];
+    // Ghép 1: ServiceReports đã nghiệm thu hoặc đã nộp
+    for (const rep of reports) {
+      if (rep.orderId) {
+        reportedOrderIds.add(rep.orderId);
+      }
 
-    for (const ord of completedOrders) {
-      if (reportedOrderIds.has(ord.id)) continue;
+      const matchedSerial = rep.serialNumber && rep.serialNumber !== 'XXXXX'
+        ? rep.serialNumber
+        : (rep.order?.serials?.[0]?.serialNumber || null);
 
-      historyList.push({
-        id: `ord-${ord.id}`,
-        workType: ord.workType || 'Dịch vụ KTV',
-        serviceType: ord.serviceType || ord.workType || 'Bảo dưỡng / Lắp đặt máy',
-        createdAt: ord.updatedAt || ord.createdAt,
-        serialNumber: ord.serials[0]?.serialNumber || null,
-        tdsIn: null,
-        tdsOut: null,
-        ktvUser: ord.assignedKtv ? {
-          fullName: ord.assignedKtv.fullName,
-          phoneNumber: ord.assignedKtv.phoneNumber
-        } : null
-      });
+      const prodName = (rep.products && rep.products.length > 0 && rep.products[0])
+        ? rep.products[0]
+        : (rep.order?.items?.[0]?.productName || (matchedSerial ? serialModelMap.get(matchedSerial) : null) || 'Máy lọc nước Truliva');
+
+      const adminStat = rep.order?.adminStatus || rep.order?.statusName;
+
+      historyList.push(mapToServiceHistoryItem({
+        id: `rep-${rep.id}`,
+        adminStatus: adminStat,
+        approvalStatus: rep.approvalStatus,
+        updatedAt: rep.updatedAt,
+        completedAt: rep.createdAt,
+        scheduledAt: rep.order?.appointmentTime,
+        createdAt: rep.createdAt,
+        productName: prodName,
+        serial: matchedSerial,
+        jobType: rep.workType || rep.order?.workType,
+        serviceType: rep.serviceType || rep.order?.serviceType,
+        technicianName: rep.ktvUser?.fullName || rep.order?.assignedKtv?.fullName || null
+      }));
     }
 
-    // Sắp xếp theo ngày giảm dần
-    historyList.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    // Ghép 2: Đơn dịch vụ KTV chưa có ServiceReport (Đang thực hiện, Chờ xử lý, Đã phân công, Hẹn lại...)
+    for (const ord of serviceOrders) {
+      if (reportedOrderIds.has(ord.id)) continue;
+      seenOrderIds.add(ord.id);
+
+      const matchedSerial = ord.serials?.[0]?.serialNumber || null;
+      const prodName = ord.items?.[0]?.productName
+        || ord.serials?.[0]?.model
+        || (matchedSerial ? serialModelMap.get(matchedSerial) : null)
+        || 'Máy lọc nước Truliva';
+
+      historyList.push(mapToServiceHistoryItem({
+        id: `ord-${ord.id}`,
+        adminStatus: ord.adminStatus,
+        statusName: ord.statusName,
+        updatedAt: ord.updatedAt,
+        scheduledAt: ord.appointmentTime,
+        createdAt: ord.createdAt,
+        productName: prodName,
+        serial: matchedSerial,
+        jobType: ord.workType || 'Bảo trì & Dịch vụ KTV',
+        serviceType: ord.serviceType,
+        technicianName: ord.assignedKtv?.fullName || null
+      }));
+    }
+
+    // Ghép 3: Phiếu HotlineTicket chưa chuyển thành đơn hoặc đang xử lý
+    for (const ticket of tickets) {
+      if (ticket.convertedOrderId && (reportedOrderIds.has(ticket.convertedOrderId) || seenOrderIds.has(ticket.convertedOrderId))) {
+        continue;
+      }
+
+      historyList.push(mapToServiceHistoryItem({
+        id: `hl-${ticket.id}`,
+        adminStatus: ticket.status,
+        updatedAt: ticket.updatedAt,
+        createdAt: ticket.createdAt,
+        productName: ticket.productName || 'Máy lọc nước Truliva',
+        serial: ticket.serialNumber || null,
+        jobType: ticket.serviceRequestType || 'Hỗ trợ kỹ thuật',
+        serviceType: ticket.phase3ServiceType || null,
+        technicianName: ticket.handlerUser?.fullName || null
+      }));
+    }
+
+    // Sắp xếp theo ngày cập nhật mới nhất lên đầu (Realtime LIFO)
+    historyList.sort((a, b) => new Date(b.updatedAt || b.createdAt).getTime() - new Date(a.updatedAt || a.createdAt).getTime());
 
     res.json({
       success: true,

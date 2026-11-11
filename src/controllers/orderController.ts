@@ -19,13 +19,14 @@ import { buildOrderFilter, getNextManualOrderId } from '../services/orderService
 import { normalizeProvince, getProvinceSearchVariants, PANCAKE_PROVINCES } from '../utils/provinces';
 
 // ── Combo types & functions: Import & Re-export từ ComboService (Dynamic DB-driven) ──
-import { 
-  getComboComponents, 
+import {
+  getComboComponents,
   getComboMappingsForInventory,
-  ComboComponent, 
-  ComboDefinition 
+  sanitizeItemsForPancake,
+  ComboComponent,
+  ComboDefinition
 } from '../services/comboService';
-export { ComboComponent, ComboDefinition, getComboComponents, getComboMappingsForInventory };
+export { ComboComponent, ComboDefinition, getComboComponents, getComboMappingsForInventory, sanitizeItemsForPancake };
 
 
 
@@ -46,10 +47,10 @@ export async function enrichOrderItemsWithImages(orders: any[]): Promise<void> {
     (order.items || []).forEach((item: any) => {
       const varInfo = item.variationInfo as any;
       const raw = item.rawData as any;
-      const directImg = 
-        varInfo?.images?.[0] || 
-        raw?.variation_info?.images?.[0] || 
-        raw?.images?.[0] || 
+      const directImg =
+        varInfo?.images?.[0] ||
+        raw?.variation_info?.images?.[0] ||
+        raw?.images?.[0] ||
         null;
 
       if (directImg) {
@@ -84,11 +85,11 @@ export async function enrichOrderItemsWithImages(orders: any[]): Promise<void> {
 
     productRecords.forEach(p => {
       const raw = p.rawData as any;
-      const img = 
-        p.imageUrl || 
-        raw?.images?.[0] || 
-        raw?.variation_info?.images?.[0] || 
-        raw?.product?.images?.[0] || 
+      const img =
+        p.imageUrl ||
+        raw?.images?.[0] ||
+        raw?.variation_info?.images?.[0] ||
+        raw?.product?.images?.[0] ||
         null;
 
       if (img) {
@@ -124,8 +125,8 @@ export async function enrichOrderItemsWithImages(orders: any[]): Promise<void> {
  */
 export async function getOrders(req: Request, res: Response): Promise<void> {
   try {
-    const { 
-      page = '1', 
+    const {
+      page = '1',
       limit = '50',
       sortBy = 'createdAt', // appointmentTime, createdAt, updatedAt
       sortOrder = 'desc',   // asc, desc
@@ -173,7 +174,7 @@ export async function getOrders(req: Request, res: Response): Promise<void> {
         { pancakeOrderId: { lt: 0 } } // Đơn thủ công (luôn hiện, bất kể statusCode)
       ]
     });
-    
+
     const iamFilter = await buildOrderFilter(req.user);
     if (iamFilter) {
       conditions.push(iamFilter);
@@ -244,7 +245,7 @@ export async function getOrders(req: Request, res: Response): Promise<void> {
       if (ktvIdsList.length > 0) {
         const hasNullKtv = ktvIdsList.includes('null') || ktvIdsList.includes('');
         const actualKtvIds = ktvIdsList.filter(id => id && id !== 'null');
-        
+
         if (hasNullKtv && actualKtvIds.length > 0) {
           conditions.push({
             OR: [
@@ -276,7 +277,7 @@ export async function getOrders(req: Request, res: Response): Promise<void> {
       if (workTypesList.length > 0) {
         const hasNullWorkType = workTypesList.includes('null') || workTypesList.includes('');
         const actualWorkTypes = workTypesList.filter(w => w && w !== 'null');
-        
+
         if (hasNullWorkType && actualWorkTypes.length > 0) {
           conditions.push({
             OR: [
@@ -297,7 +298,7 @@ export async function getOrders(req: Request, res: Response): Promise<void> {
       if (mainStationIdsList.length > 0) {
         const hasNullStation = mainStationIdsList.includes('null') || mainStationIdsList.includes('');
         const actualStationIds = mainStationIdsList.filter(id => id && id !== 'null');
-        
+
         if (hasNullStation && actualStationIds.length > 0) {
           conditions.push({
             OR: [
@@ -329,7 +330,7 @@ export async function getOrders(req: Request, res: Response): Promise<void> {
       if (endDate) {
         dateCond.lte = new Date(endDate as string);
       }
-      
+
       const type = (dateType as string) || 'createdAt';
       if (type === 'appointmentTime') {
         conditions.push({ appointmentTime: dateCond });
@@ -401,7 +402,7 @@ export async function getOrders(req: Request, res: Response): Promise<void> {
         });
         const skus = matchedProducts.map(p => p.sku).filter(Boolean) as string[];
         const names = matchedProducts.map(p => p.name).filter(Boolean) as string[];
-        
+
         conditions.push({
           items: {
             some: {
@@ -462,7 +463,7 @@ export async function getOrders(req: Request, res: Response): Promise<void> {
       const pancakeId = parseInt(searchStr.replace(/^#/, ''), 10);
       const manualMatch = searchStr.match(/^m(\d+)$/i);
       const finalPancakeId = manualMatch ? -parseInt(manualMatch[1], 10) : pancakeId;
-      
+
       const MAX_INT32 = 2147483647;
       const MIN_INT32 = -2147483648;
       if (!isNaN(finalPancakeId) && finalPancakeId <= MAX_INT32 && finalPancakeId >= MIN_INT32) {
@@ -509,7 +510,7 @@ export async function getOrders(req: Request, res: Response): Promise<void> {
           );
         }
         const uniqueVariations = Array.from(new Set(variations));
-        
+
         return {
           OR: [
             ...uniqueVariations.map(val => ({
@@ -541,7 +542,7 @@ export async function getOrders(req: Request, res: Response): Promise<void> {
     // Xây dựng điều kiện sắp xếp
     const orderDirection = sortOrder === 'asc' ? 'asc' : 'desc';
     const orderByList: Prisma.OrderOrderByWithRelationInput[] = [];
-    
+
     if (sortBy === 'appointmentTime') {
       orderByList.push({ appointmentTime: orderDirection });
       orderByList.push({ createdAt: orderDirection });
@@ -1105,7 +1106,7 @@ export async function exportOrdersExcel(req: Request, res: Response): Promise<vo
   try {
     const role = req.user?.role;
     const group = req.user?.group;
-    const isAllowed = 
+    const isAllowed =
       role === 'ADMIN' ||
       role === 'DEV' ||
       role === 'COORDINATOR' ||
@@ -1115,7 +1116,7 @@ export async function exportOrdersExcel(req: Request, res: Response): Promise<vo
       res.status(403).json({ error: 'Bạn không có quyền xuất file Excel' });
       return;
     }
-    const { 
+    const {
       sortBy = 'createdAt',
       sortOrder = 'desc',
       status,
@@ -1206,7 +1207,7 @@ export async function exportOrdersExcel(req: Request, res: Response): Promise<vo
       if (ktvIdsList.length > 0) {
         const hasNullKtv = ktvIdsList.includes('null') || ktvIdsList.includes('');
         const actualKtvIds = ktvIdsList.filter(id => id && id !== 'null');
-        
+
         if (hasNullKtv && actualKtvIds.length > 0) {
           conditions.push({
             OR: [
@@ -1238,7 +1239,7 @@ export async function exportOrdersExcel(req: Request, res: Response): Promise<vo
       if (workTypesList.length > 0) {
         const hasNullWorkType = workTypesList.includes('null') || workTypesList.includes('');
         const actualWorkTypes = workTypesList.filter(w => w && w !== 'null');
-        
+
         if (hasNullWorkType && actualWorkTypes.length > 0) {
           conditions.push({
             OR: [
@@ -1259,7 +1260,7 @@ export async function exportOrdersExcel(req: Request, res: Response): Promise<vo
       if (mainStationIdsList.length > 0) {
         const hasNullStation = mainStationIdsList.includes('null') || mainStationIdsList.includes('');
         const actualStationIds = mainStationIdsList.filter(id => id && id !== 'null');
-        
+
         if (hasNullStation && actualStationIds.length > 0) {
           conditions.push({
             OR: [
@@ -1283,7 +1284,7 @@ export async function exportOrdersExcel(req: Request, res: Response): Promise<vo
       if (endDate) {
         dateCond.lte = new Date(endDate as string);
       }
-      
+
       const type = (dateType as string) || 'createdAt';
       if (type === 'appointmentTime') {
         conditions.push({ appointmentTime: dateCond });
@@ -1347,7 +1348,7 @@ export async function exportOrdersExcel(req: Request, res: Response): Promise<vo
         });
         const skus = matchedProducts.map(p => p.sku).filter(Boolean) as string[];
         const names = matchedProducts.map(p => p.name).filter(Boolean) as string[];
-        
+
         conditions.push({
           items: {
             some: {
@@ -1422,7 +1423,7 @@ export async function exportOrdersExcel(req: Request, res: Response): Promise<vo
           str.split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(' ')
         ];
         const uniqueVariations = Array.from(new Set(variations));
-        
+
         return {
           OR: [
             ...uniqueVariations.map(val => ({
@@ -1454,7 +1455,7 @@ export async function exportOrdersExcel(req: Request, res: Response): Promise<vo
 
     const orderDirection = sortOrder === 'asc' ? 'asc' : 'desc';
     const orderByList: Prisma.OrderOrderByWithRelationInput[] = [];
-    
+
     if (sortBy === 'appointmentTime') {
       orderByList.push({ appointmentTime: orderDirection });
     } else if (sortBy === 'updatedAt') {
@@ -1573,24 +1574,24 @@ export async function exportOrdersExcel(req: Request, res: Response): Promise<vo
       const customerName = o.billFullName || o.customer?.fullName || 'Khách lẻ';
       const phone = o.billPhoneNumber || o.customer?.phoneNumber || '';
       const address = o.shippingAddress?.full_address || o.customer?.fullAddress || '';
-      const provinceName = 
-        o.shippingAddress?.province_name || 
-        o.shippingAddress?.province || 
-        o.customer?.provinceName || 
-        o.customer?.province || 
+      const provinceName =
+        o.shippingAddress?.province_name ||
+        o.shippingAddress?.province ||
+        o.customer?.provinceName ||
+        o.customer?.province ||
         (typeof o.rawData === 'string' ? JSON.parse(o.rawData)?.shipping_address?.province_name : o.rawData?.shipping_address?.province_name) ||
         '';
       const productsList = o.items.map((i: any) => i.productName).join(', ');
 
-      const mainStationName = 
-        o.mainStation?.name || 
-        o.techStation?.mainStation?.name || 
-        o.assignedKtv?.techStation?.mainStation?.name || 
+      const mainStationName =
+        o.mainStation?.name ||
+        o.techStation?.mainStation?.name ||
+        o.assignedKtv?.techStation?.mainStation?.name ||
         '';
 
-      const techStationName = 
-        o.techStation?.name || 
-        o.assignedKtv?.techStation?.name || 
+      const techStationName =
+        o.techStation?.name ||
+        o.assignedKtv?.techStation?.name ||
         '';
 
       const latestReport = o.serviceReports && o.serviceReports.length > 0 ? o.serviceReports[0] : null;
@@ -1753,6 +1754,13 @@ export async function searchCustomers(req: Request, res: Response): Promise<void
           provinceId: true,
           districtId: true,
           communeId: true,
+          orders: {
+            take: 1,
+            orderBy: { createdAt: 'desc' },
+            select: {
+              items: { select: { productName: true }, take: 1 }
+            }
+          }
         }
       }),
       prisma.order.findMany({
@@ -1790,7 +1798,7 @@ export async function searchCustomers(req: Request, res: Response): Promise<void
     const seen = new Set<string>();
 
     dbCustomers.forEach(c => {
-      const key = `${(c.phoneNumber || '').trim()}_${(c.fullName || '').trim()}`.toLowerCase();
+      const key = `customer_${(c.phoneNumber || '').trim()}_${(c.fullName || '').trim()}`.toLowerCase();
       if (!seen.has(key)) {
         seen.add(key);
         suggestions.push({
@@ -1802,13 +1810,15 @@ export async function searchCustomers(req: Request, res: Response): Promise<void
           provinceName: c.provinceName || '',
           districtName: c.districtName || '',
           communeName: c.communeName || '',
+          productName: c.orders?.[0]?.items?.[0]?.productName || '',
           type: 'customer'
         });
       }
     });
 
     dbOrders.forEach(o => {
-      const key = `${(o.billPhoneNumber || '').trim()}_${(o.billFullName || '').trim()}`.toLowerCase();
+      const prodName = o.items?.[0]?.productName || '';
+      const key = `order_${(o.billPhoneNumber || '').trim()}_${(o.billFullName || '').trim()}_${prodName}`.toLowerCase();
       if (!seen.has(key)) {
         seen.add(key);
         const sAddr = o.shippingAddress as any;
@@ -1819,14 +1829,14 @@ export async function searchCustomers(req: Request, res: Response): Promise<void
           address: sAddr?.address || '',
           fullAddress: sAddr?.full_address || sAddr?.address || '',
           provinceName: sAddr?.province_name || sAddr?.province || '',
-          productName: o.items?.[0]?.productName || '',
+          productName: prodName,
           type: 'order'
         });
       }
     });
 
     dbSerials.forEach(s => {
-      const key = `${(s.customerPhone || '').trim()}_${(s.customerName || '').trim()}`.toLowerCase();
+      const key = `serial_${(s.customerPhone || '').trim()}_${(s.serialNumber || s.id)}`.toLowerCase();
       if (!seen.has(key)) {
         seen.add(key);
         suggestions.push({
@@ -1836,6 +1846,8 @@ export async function searchCustomers(req: Request, res: Response): Promise<void
           address: s.address,
           fullAddress: s.address || '',
           provinceName: s.province || '',
+          productLine: s.productLine || '',
+          model: s.model || '',
           productName: [s.productLine, s.model].filter(Boolean).join(' ') || s.serialNumber,
           serialNumber: s.serialNumber,
           type: 'serial'
@@ -2258,6 +2270,8 @@ export async function updateOrder(req: Request, res: Response): Promise<void> {
             });
           } else {
             logger.info('Syncing warehouse change to Pancake POS', { pancakeOrderId: oldOrder.pancakeOrderId, warehouseId: effectiveWarehouseId });
+            // [PANCAKE COMPOSITE GUARD] Khi đổi kho, TUYỆT ĐỐI CHỈ gửi warehouse_id, KHÔNG gửi mảng items/products
+            // để tránh Pancake xóa tạo lại item và tự động bung nhân đôi bộ linh kiện con của Combo (is_composite: true)
             const updateResponse = await axios.patch(
               `${PANCAKE_API_BASE}/api/v1/shops/${shopId}/orders/${oldOrder.pancakeOrderId}`,
               {
@@ -2315,17 +2329,17 @@ export async function updateOrder(req: Request, res: Response): Promise<void> {
         await syncOrderStatusToPancake(oldOrder.pancakeOrderId, targetAdminStatus);
         updateData.pancakeSyncStatus = 'SUCCESS';
       } catch (err: any) {
-        logger.warn('Failed to sync status update to Pancake POS API (non-blocking)', { 
+        logger.warn('Failed to sync status update to Pancake POS API (non-blocking)', {
           pancakeOrderId: oldOrder.pancakeOrderId,
           error: err.message,
           response: err.response?.data
         });
-        
+
         updateData.pancakeSyncStatus = 'FAILED';
-        
+
         const errorMsg = err.response?.data?.message || err.response?.data?.errors?.order || err.message || 'Lỗi không xác định từ Pancake POS';
         const isTransitionError = err.response?.status === 422;
-        
+
         if (isTransitionError) {
           (req as any).pancakeSyncWarning = `Đơn hàng trên Pancake POS đang ở trạng thái đã Hủy hoặc đã Hoàn thành, do đó API Pancake không cho phép tự động khôi phục ngược về 'Đã xác nhận'. Trạng thái trên Truliva vẫn được cập nhật thành công.`;
         } else {
@@ -2392,7 +2406,7 @@ export async function updateOrder(req: Request, res: Response): Promise<void> {
       if (customerPhone !== undefined || customerName !== undefined) {
         const phoneToUse = customerPhone !== undefined ? customerPhone.trim() : oldOrder.billPhoneNumber;
         const nameToUse = customerName !== undefined ? customerName.trim() : oldOrder.billFullName;
-        
+
         let customerId = oldOrder.customerId;
         const normProvince = province !== undefined ? (province ? (normalizeProvince(province) || province.trim()) : '') : undefined;
         if (phoneToUse) {
@@ -2428,7 +2442,7 @@ export async function updateOrder(req: Request, res: Response): Promise<void> {
             customerId = newCustomer.id;
           }
         }
-        
+
         if (customerId !== oldOrder.customerId) {
           updateData.customerId = customerId;
           changes.push({ field: 'customerId', from: oldOrder.customerId, to: customerId });
@@ -2468,34 +2482,8 @@ export async function updateOrder(req: Request, res: Response): Promise<void> {
     }
 
     if (items !== undefined && Array.isArray(items)) {
-      // Tự động khử trùng lặp (Deduplicate): Nếu đơn hàng có gói Combo/Giải pháp, loại bỏ các máy con trùng lặp cấu thành gói đó
-      const sanitizedItems: any[] = [];
-      const activeComboComponents = new Set<string>();
-
-      for (const it of items) {
-        const comps = getComboComponents(it.productName, it.sku);
-        if (comps) {
-          comps.forEach(c => {
-            activeComboComponents.add(c.name.trim().toLowerCase());
-            if (c.sku) activeComboComponents.add(c.sku.trim().toLowerCase());
-          });
-        }
-      }
-
-      for (const it of items) {
-        const comps = getComboComponents(it.productName, it.sku);
-        if (comps) {
-          sanitizedItems.push(it);
-        } else {
-          const itName = (it.productName || '').trim().toLowerCase();
-          const itSku = (it.sku || '').trim().toLowerCase();
-          if (activeComboComponents.has(itName) || (itSku && activeComboComponents.has(itSku))) {
-            logger.warn('Stripped duplicate combo component from order items', { orderId: id, productName: it.productName, sku: it.sku });
-            continue;
-          }
-          sanitizedItems.push(it);
-        }
-      }
+      // Tự động khử trùng lặp (Deduplicate) & strip components khỏi combo cha bằng sanitizeItemsForPancake
+      const sanitizedItems = sanitizeItemsForPancake(items);
 
       // Xóa các items cũ
       await prisma.orderItem.deleteMany({
@@ -2621,9 +2609,9 @@ export async function updateOrder(req: Request, res: Response): Promise<void> {
 
     logger.info('Order updated by admin', { orderId: id, by: req.user?.id, changes });
     broadcastEvent('ORDER_UPDATED', { orderId: order.id, pancakeOrderId: order.pancakeOrderId });
-    res.json({ 
-      order, 
-      warning: (req as any).pancakeSyncWarning || null 
+    res.json({
+      order,
+      warning: (req as any).pancakeSyncWarning || null
     });
   } catch (error: any) {
     logger.error('Update order error', { error: error.message });
@@ -2638,7 +2626,7 @@ export async function updateOrder(req: Request, res: Response): Promise<void> {
 export async function syncSingleOrder(req: Request, res: Response): Promise<void> {
   try {
     const id = req.params.id as string;
-    
+
     // Check permissions
     const role = req.user?.role;
     const group = req.user?.group;
@@ -2674,7 +2662,7 @@ export async function syncSingleOrder(req: Request, res: Response): Promise<void
       const orderPayload = response.data.data;
       // Re-use processOrderEvent to parse and update the order
       await processOrderEvent(null, orderPayload);
-      
+
       const updatedOrder = await prisma.order.findUnique({
         where: { id },
         include: {
@@ -2715,8 +2703,8 @@ export async function syncOrders(req: Request, res: Response): Promise<void> {
     // 🛡️ Kiểm tra trạng thái Cầu chì tự ngắt Circuit Breaker
     const cbStatus = pancakeCircuitBreaker.getStatus();
     if (cbStatus.isLocked) {
-      res.status(423).json({ 
-        error: 'Cầu chì bảo vệ Pancake POS đang KHÓA HẲN (do xác thực thất bại liên tiếp). Vui lòng cập nhật PANCAKE_API_KEY mới trong .env hoặc Reset cầu chì trước khi đồng bộ.' 
+      res.status(423).json({
+        error: 'Cầu chì bảo vệ Pancake POS đang KHÓA HẲN (do xác thực thất bại liên tiếp). Vui lòng cập nhật PANCAKE_API_KEY mới trong .env hoặc Reset cầu chì trước khi đồng bộ.'
       });
       return;
     }
@@ -2734,9 +2722,9 @@ export async function syncOrders(req: Request, res: Response): Promise<void> {
       reconcileDraftOrders(30)
     ]);
     broadcastEvent('ORDER_UPDATED', { action: 'manual_sync', count, reconciledCount });
-    res.json({ 
-      success: true, 
-      message: `Đồng bộ thành công ${count} đơn hàng gần đây và cập nhật trạng thái ${reconciledCount} đơn vừa xác nhận từ Pancake.` 
+    res.json({
+      success: true,
+      message: `Đồng bộ thành công ${count} đơn hàng gần đây và cập nhật trạng thái ${reconciledCount} đơn vừa xác nhận từ Pancake.`
     });
   } catch (error: any) {
     logger.error('Manual orders sync failed', { error: error.message });
@@ -2891,7 +2879,7 @@ export async function bulkAssignOrders(req: Request, res: Response): Promise<voi
         if (String(newAppTime) !== String(oldAppTime)) {
           updateData.appointmentTime = newAppTime;
           changes.push({ field: 'appointmentTime', from: oldOrder.appointmentTime, to: newAppTime });
-          
+
           if (rescheduleReason) {
             updateData.rescheduleReason = rescheduleReason;
             changes.push({ field: 'rescheduleReason', from: oldOrder.rescheduleReason, to: rescheduleReason });

@@ -197,6 +197,92 @@ export function getComboComponents(productName: string, sku?: string | null): Co
 }
 
 /**
+ * Làm sạch danh sách sản phẩm trước khi gửi sang Pancake POS hoặc lưu trữ:
+ * 1. Nhận diện các sản phẩm Combo cha (dựa vào is_composite === true, có mảng components, hoặc khớp getComboComponents).
+ * 2. Thu thập danh sách các linh kiện con (tên và SKU) của các combo cha đó.
+ * 3. Loại bỏ mảng `components` đính kèm bên trong combo cha (strip components property) để tránh Pancake POS tự nhân đôi.
+ * 4. Lọc bỏ các dòng sản phẩm con sinh ra từ combo (có giá 0đ hoặc tên/SKU nằm trong activeComboComponents hoặc có composite_item_id).
+ * 5. Giữ nguyên 100% các sản phẩm đơn lẻ thông thường hoặc quà tặng độc lập.
+ */
+export function sanitizeItemsForPancake<T extends Record<string, any>>(items: T[]): T[] {
+  if (!items || !Array.isArray(items) || items.length === 0) return [];
+
+  const activeComboComponentNames = new Set<string>();
+  const activeComboComponentSkus = new Set<string>();
+
+  // Bước 1: Quét tất cả combo cha trong danh sách
+  for (const it of items) {
+    const raw = (it as any).rawData || it;
+    const name = (it as any).productName || (it as any).name || raw?.variation_info?.name || raw?.name || '';
+    const sku = (it as any).sku || (it as any).product_sku || raw?.variation_info?.display_id || raw?.sku || '';
+
+    // Lấy components từ database/cache combo service
+    const defComps = getComboComponents(name, sku);
+    if (defComps && defComps.length > 0) {
+      defComps.forEach(c => {
+        if (c.name) activeComboComponentNames.add(c.name.trim().toLowerCase());
+        if (c.sku) activeComboComponentSkus.add(c.sku.trim().toLowerCase());
+      });
+    }
+
+    // Lấy components từ rawData nếu có (từ webhook/API Pancake)
+    const rawComps = raw?.components || (it as any).components;
+    if (Array.isArray(rawComps) && rawComps.length > 0) {
+      rawComps.forEach((c: any) => {
+        const cName = c.variation_info?.name || c.name || '';
+        const cSku = c.variation_info?.display_id || c.variation_info?.id || c.sku || '';
+        if (cName) activeComboComponentNames.add(cName.trim().toLowerCase());
+        if (cSku) activeComboComponentSkus.add(cSku.trim().toLowerCase());
+      });
+    }
+  }
+
+  // Bước 2: Lọc và làm sạch từng phần tử
+  const result: T[] = [];
+  for (const it of items) {
+    const raw = (it as any).rawData || it;
+    const name = (it as any).productName || (it as any).name || raw?.variation_info?.name || raw?.name || '';
+    const sku = (it as any).sku || (it as any).product_sku || raw?.variation_info?.display_id || raw?.sku || '';
+    const cleanName = name.trim().toLowerCase();
+    const cleanSku = sku.trim().toLowerCase();
+
+    const isCombo = Boolean(
+      (it as any).is_composite ||
+      raw?.is_composite ||
+      getComboComponents(name, sku) ||
+      (Array.isArray((it as any).components) && (it as any).components.length > 0) ||
+      (Array.isArray(raw?.components) && raw.components.length > 0)
+    );
+
+    if (isCombo) {
+      // Là combo cha: Strip mảng components ra khỏi object trước khi gửi sang Pancake
+      const clone = { ...it };
+      delete (clone as any).components;
+      delete (clone as any).composite_products;
+      if ((clone as any).rawData && typeof (clone as any).rawData === 'object') {
+        const rawClone = { ...(clone as any).rawData };
+        delete rawClone.components;
+        delete rawClone.composite_products;
+        (clone as any).rawData = rawClone;
+      }
+      result.push(clone);
+    } else {
+      // Không phải combo cha: Kiểm tra xem có phải là sản phẩm con thuộc combo không
+      const isChildComponent = activeComboComponentNames.has(cleanName) || (cleanSku && activeComboComponentSkus.has(cleanSku));
+      const isZeroPrice = Number((it as any).price ?? (it as any).retail_price ?? raw?.retail_price ?? raw?.price ?? 0) === 0;
+
+      // Nếu là sản phẩm con thuộc combo (hoặc sản phẩm con giá 0đ phát sinh từ combo), loại bỏ
+      if (isChildComponent && (isZeroPrice || (it as any).composite_item_id || raw?.composite_item_id)) {
+        continue;
+      }
+      result.push(it);
+    }
+  }
+
+  return result;
+}
+
+/**
  * Trả danh sách combo mappings cho Inventory UI grouping.
  * Giữ nguyên signature cũ.
  */

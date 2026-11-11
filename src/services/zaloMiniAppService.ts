@@ -206,7 +206,7 @@ export async function authenticateZaloMiniAppUser(
   }
 
   // 3. Tạo JWT Token đăng nhập Zalo Mini App (giới hạn an toàn 14 ngày, phân tách độc lập với hệ thống nội bộ)
-  const miniAppJwtSecret = process.env.ZALO_MINIAPP_JWT_SECRET;
+  const miniAppJwtSecret = process.env.ZALO_MINIAPP_JWT_SECRET || process.env.JWT_SECRET;
   if (!miniAppJwtSecret) {
     logger.error('ZALO_MINIAPP_JWT_SECRET is not configured in environment');
     throw new Error('Lỗi cấu hình bảo mật máy chủ (thiếu ZALO_MINIAPP_JWT_SECRET)');
