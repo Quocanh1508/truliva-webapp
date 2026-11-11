@@ -715,7 +715,7 @@ export default function ProductDetail({ product, onBack, onGoToCart, onBuyNow }:
               className="flex-1 h-12 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold text-xs flex items-center justify-center gap-2 border border-slate-200 active:scale-98 transition cursor-pointer"
             >
               <PhoneCall className="w-4 h-4 text-emerald-600" />
-              <span>Hotline 1900 638 463</span>
+              <span>Hotline 1900 63 84 63</span>
             </button>
 
             {/* Chat Tư Vấn OA */}

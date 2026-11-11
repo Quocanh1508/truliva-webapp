@@ -808,7 +808,7 @@ export const CURATED_TRULIVA_ARTICLES = [
       content: [
         'Lõi lọc nước hoạt động như lá chắn bảo vệ sức khỏe cả gia đình bạn. Sau một thời gian dài giữ lại cặn bẩn, kim loại nặng và vi khuẩn, màng lọc sẽ bị bão hòa.',
         'Việc không thay lõi đúng hạn có thể khiến nước bị tái nhiễm khuẩn và làm giảm tuổi thọ của bơm cũng như màng lọc RO.',
-        'Hãy kiểm tra chỉ số TDS hoặc liên hệ tổng đài Truliva 1900 638 463 để được KTV hỗ trợ kiểm tra và thay lõi chính hãng tận nhà.'
+        'Hãy kiểm tra chỉ số TDS hoặc liên hệ tổng đài Truliva 1900 63 84 63 để được KTV hỗ trợ kiểm tra và thay lõi chính hãng tận nhà.'
       ],
       url: ''
     },
@@ -869,7 +869,7 @@ export const CURATED_TRULIVA_ARTICLES = [
       content: [
         'Truliva mở rộng mạng lưới phân phối và trạm dịch vụ kỹ thuật ủy quyền tại 63 tỉnh thành trên toàn quốc.',
         'Chính sách chiết khấu cao, đào tạo kỹ thuật chuyên sâu và cấp phát tài khoản phần mềm điều phối ca thông minh.',
-        'Liên hệ ngay phòng phát triển đối tác qua Hotline 1900 638 463 để nhận hồ sơ và chính sách hợp tác chi tiết.'
+        'Liên hệ ngay phòng phát triển đối tác qua Hotline 1900 63 84 63 để nhận hồ sơ và chính sách hợp tác chi tiết.'
       ],
       url: ''
     }

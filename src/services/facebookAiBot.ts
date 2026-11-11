@@ -44,7 +44,7 @@ PHONG CÁCH VÀ NGUYÊN TẮC TƯ VẤN:
    - Xưng hô: "Dạ em / Truliva", gọi khách là "anh/chị" hoặc "bạn".
 
 2. KHÔNG LẠM DỤNG HOẶC ĐẨY KHÁCH SANG HOTLINE:
-   - Khách hàng đang nhắn tin để được tư vấn trực tiếp tại đây. TUYỆT ĐỐI KHÔNG kết thúc câu trả lời bằng câu rập khuôn mời gọi hotline: "vui lòng liên hệ Hotline 1900 638 463...".
+   - Khách hàng đang nhắn tin để được tư vấn trực tiếp tại đây. TUYỆT ĐỐI KHÔNG kết thúc câu trả lời bằng câu rập khuôn mời gọi hotline: "vui lòng liên hệ Hotline 1900 63 84 63...".
    - Chỉ cung cấp số Hotline khi:
      + Khách chủ động hỏi số điện thoại hỗ trợ hoặc thông tin liên hệ.
      + Khách có sự cố rò rỉ nước khẩn cấp hoặc yêu cầu kỹ thuật viên đến tận nhà khảo sát/lắp đặt gấp.
@@ -66,9 +66,12 @@ PHONG CÁCH VÀ NGUYÊN TẮC TƯ VẤN:
    - Lõi lọc tiêuaho: Định kỳ thay thế (Lõi thô: 3-6 tháng, Lõi than: 6-9 tháng, Lõi RO: 24-36 tháng).
 
 6. THÔNG TIN DOANH NGHIỆP TRULIVA:
-   - Hotline hỗ trợ: 1900 638 463 (08:00 - 18:00)
+   - Hotline hỗ trợ: 1900 63 84 63 (08:00 - 18:00)
    - Kích hoạt bảo hành điện tử: https://trulivavietnam.com/warranty-activate hoặc Zalo Mini App "Truliva"
    - Website chính thức: https://trulivavietnam.com
+   - Đơn vị chủ quản: CÔNG TY TNHH THƯƠNG MẠI VÀ DỊCH VỤ PURE VITA (MST: 0318892577)
+   - Trụ sở chính: 65 Đường 42-AP, Phường Bình Trưng, Thành phố Hồ Chí Minh, Việt Nam
+   - Email: cskh@truliva.com.vn
 
 7. QUY TẮC BẢNG GIÁ & CHỐNG ẢO GIÁC (ANTI-HALLUCINATION):
    - CHỈ được báo giá các sản phẩm và phụ kiện CÓ MẶT trong mục "BẢNG GIÁ & DANH MỤC SẢN PHẨM TRULIVA CHÍNH THỨC" hoặc trong tài liệu RAG chính thức được cung cấp.
@@ -108,7 +111,7 @@ async function getDynamicSystemInstruction(): Promise<{ instruction: string; isE
         faqs.map(f => `Hỏi: ${f.question}\nĐáp: ${f.answer}`).join('\n\n');
     }
 
-    const full = `${systemPrompt}\n\nTHÔNG TIN LIÊN HỆ:\n- Hotline: ${config?.hotline || '1900 638 463'}\n- Giờ làm việc: ${config?.workingHours || '08:00 - 18:00'}\n- Địa chỉ: ${config?.address || '65 Đường 42-AP, Phường An Phú, TP. Thủ Đức, TP. HCM'}\n\n${knowledgeText}${faqContext}`;
+    const full = `${systemPrompt}\n\nTHÔNG TIN LIÊN HỆ:\n- Hotline: ${config?.hotline || '1900 63 84 63'}\n- Giờ làm việc: ${config?.workingHours || '08:00 - 18:00'}\n- Địa chỉ: ${config?.address || '65 Đường 42-AP, Phường Bình Trưng, Thành phố Hồ Chí Minh, Việt Nam'}\n\n${knowledgeText}${faqContext}`;
     
     cachedInstruction = full;
     cachedSyncCatalog = syncCatalog;

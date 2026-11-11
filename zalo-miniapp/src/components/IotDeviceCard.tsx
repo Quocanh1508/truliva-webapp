@@ -613,7 +613,7 @@ export default function IotDeviceCard({ serialData, user, onBookMaintenance }: I
               className="w-full py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold flex items-center justify-center space-x-1.5 transition-colors cursor-pointer"
             >
               <Phone size={13} className="text-[#0284C7]" />
-              <span>Hotline Hỗ Trợ Kỹ Thuật: 1900 638 463</span>
+              <span>Hotline Hỗ Trợ Kỹ Thuật: 1900 63 84 63</span>
             </button>
           </div>
         </div>
@@ -655,7 +655,7 @@ export default function IotDeviceCard({ serialData, user, onBookMaintenance }: I
                 className="w-full py-3 bg-[#1B3A6B] text-white rounded-xl font-bold text-xs flex items-center justify-center space-x-1.5 shadow-md active:scale-95 transition-all cursor-pointer"
               >
                 <Phone size={14} />
-                <span>Gặp Kỹ Thuật Viên Hướng Dẫn (1900 638 463)</span>
+                <span>Gặp Kỹ Thuật Viên Hướng Dẫn (1900 63 84 63)</span>
               </button>
 
               <button

@@ -205,7 +205,7 @@ export default function CheckoutPage({ user, voucherCode, onBack, onOrderSuccess
                 type="text"
                 value={address}
                 onChange={e => setAddress(e.target.value)}
-                placeholder="Số 65 Đường 42-AP, Phường An Phú..."
+                placeholder="Số 65 Đường 42-AP, Phường Bình Trưng..."
                 required
                 className="w-full h-10 px-3.5 rounded-xl bg-gray-50 border border-gray-200 text-xs focus:outline-none focus:ring-2 focus:ring-[#00A3FF]"
               />

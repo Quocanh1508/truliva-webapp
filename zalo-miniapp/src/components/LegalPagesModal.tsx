@@ -194,15 +194,15 @@ export default function LegalPagesModal({ isOpen, onClose, initialType = 'TERMS'
                   <div className="font-bold text-[#1B3A6B] text-sm">Liên hệ trực tiếp với Truliva:</div>
                   <div className="flex items-center gap-2 text-gray-700">
                     <PhoneCall className="w-4 h-4 text-emerald-600 shrink-0" />
-                    <span>Hotline CSKH: <strong>1900 638 463</strong> (Miễn cước)</span>
+                    <span>Hotline CSKH: <strong>1900 63 84 63</strong></span>
                   </div>
                   <div className="flex items-center gap-2 text-gray-700">
                     <Mail className="w-4 h-4 text-blue-600 shrink-0" />
-                    <span>Email: <strong>support@truliva.vn</strong></span>
+                    <span>Email: <a href="mailto:cskh@truliva.com.vn" className="font-bold text-blue-600 underline">cskh@truliva.com.vn</a></span>
                   </div>
                   <div className="flex items-center gap-2 text-gray-700">
                     <MapPin className="w-4 h-4 text-rose-600 shrink-0" />
-                    <span>Trụ sở chính: 65 Đường 42-AP, Phường An Phú, TP. Thủ Đức, TP. Hồ Chí Minh</span>
+                    <span>Trụ sở chính: 65 Đường 42-AP, Phường Bình Trưng, Thành phố Hồ Chí Minh, Việt Nam</span>
                   </div>
                 </div>
               )}

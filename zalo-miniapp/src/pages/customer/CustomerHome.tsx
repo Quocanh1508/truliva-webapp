@@ -523,10 +523,10 @@ export default function CustomerHome({ user, mySerials = [], onOpenScanner, onOp
         <div className="bg-slate-100/80 p-3.5 rounded-2xl border border-slate-200/80 text-center text-[10px] text-gray-500 space-y-1.5">
           <div className="flex items-center justify-center gap-1.5 font-bold text-gray-700">
             <Scale size={13} className="text-[#1B3A6B]" />
-            <span>Hệ Thống TMĐT Chính Thức - Máy lọc nước Truliva</span>
+            <span>Hệ Thống TMĐT Chính Thức - CÔNG TY TNHH THƯƠNG MẠI VÀ DỊCH VỤ PURE VITA</span>
           </div>
           <p className="text-[10px] text-gray-400">
-            Tuân thủ Luật TMĐT 2025 & Nghị định 248/2026/NĐ-CP • MST: 0317582910
+            Tuân thủ Luật TMĐT 2025 & Nghị định 248/2026/NĐ-CP • MST: 0318892577
           </p>
           <div className="flex items-center justify-center gap-3 pt-1 text-[11px] font-semibold text-[#1B3A6B]">
             <button onClick={() => { setLegalDocType('COMPANY'); setShowLegalModal(true); }} className="hover:underline">

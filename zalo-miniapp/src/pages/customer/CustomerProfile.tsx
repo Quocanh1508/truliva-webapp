@@ -240,7 +240,7 @@ export default function CustomerProfile({
               className="p-1.5 rounded-2xl hover:bg-white/10 active:scale-95 transition-all cursor-pointer group block touch-tactile"
             >
               <p className="text-[9px] text-sky-200 uppercase tracking-wider font-extrabold group-hover:text-white transition-colors">Hotline</p>
-              <p className="font-black text-cyan-300 text-sm mt-1 tracking-tight">1900 638 463</p>
+              <p className="font-black text-cyan-300 text-sm mt-1 tracking-tight">1900 63 84 63</p>
             </a>
           </div>
         </div>
