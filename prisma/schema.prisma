@@ -244,6 +244,18 @@ model UserPermission {
   @@map("user_permissions")
 }
 
+// ── Registry tính năng phân quyền đã được đồng bộ vào DB ──
+// Do permissionSync tự quản lý (CREATE TABLE IF NOT EXISTS + INSERT ... ON CONFLICT DO NOTHING).
+// reviewedAt = null  → tính năng mới, Admin chưa duyệt (hiện badge "MỚI" trên ma trận).
+model PermissionFeature {
+  featureKey     String    @id @map("feature_key")
+  firstSyncedAt  DateTime  @default(now()) @map("first_synced_at")
+  reviewedAt     DateTime? @map("reviewed_at")
+  reviewedBy     String?   @map("reviewed_by")
+
+  @@map("permission_features")
+}
+
 // ── Tài khoản người dùng (KTV + Admin) ──
 model User {
   id              String       @id @default(uuid())

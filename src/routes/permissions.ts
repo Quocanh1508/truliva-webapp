@@ -1,116 +1,117 @@
 import { Router, Request, Response } from 'express';
 import prisma from '../config/database';
 import logger from '../utils/logger';
-import { requireAuth, requireAdmin } from '../middleware/authSession';
-import { SYSTEM_FEATURES, SYSTEM_MODULES, SYSTEM_ROLES, getDefaultPermission } from '../config/permissions';
+import { requireAuth, requireAdmin, checkDynamicPermission } from '../middleware/authSession';
+import { SYSTEM_FEATURES, SYSTEM_MODULES, SYSTEM_ROLES, FEATURE_BY_KEY, getDefaultPermission } from '../config/permissions';
+import {
+  ensurePermissionCatalogSynced,
+  syncPermissionCatalog,
+  getUnreviewedFeatureKeys,
+  markFeaturesReviewed,
+  getLastPermissionSyncReport
+} from '../services/permissionSync';
 import { UserRole } from '@prisma/client';
 
 const router = Router();
 
 const PREDEFINED_GROUPS: string[] = ['DTC', 'eCom', 'Service', 'DT South', 'DT North', 'Marketing', 'Admin'];
+const VALID_ROLES = new Set<string>(Object.values(UserRole));
+
+function reviewerOf(req: Request): string {
+  return req.user?.username || req.user?.id || 'admin';
+}
+
+/** Admin bấm vào 1 ô của tính năng MỚI → tự động coi như đã duyệt tính năng đó */
+async function autoReview(req: Request, featureKeys: string[]): Promise<void> {
+  try {
+    await markFeaturesReviewed(featureKeys, reviewerOf(req));
+  } catch (err: any) {
+    logger.warn('[Permissions] autoReview failed', { error: err.message });
+  }
+}
 
 /**
  * GET /api/permissions
- * Trả về danh sách nhóm tính năng, các vai trò, danh sách groups và ma trận phân quyền hiện tại (Role-level & Group-level)
+ * Danh mục tính năng + ma trận 3 tầng (Role → Group → User).
+ * - matrix:               quyền hiệu lực theo Role
+ * - groupMatrix:          quyền hiệu lực theo Role::Group (đã gộp kế thừa)
+ * - groupOverrideMatrix:  CHỈ các ô Group được ghi đè riêng (để UI phân biệt Kế thừa / Ghi đè)
+ * - userPermMatrix:       CHỈ các ô User được ghi đè riêng
  */
 router.get('/', requireAuth, async (req: Request, res: Response): Promise<void> => {
   try {
-    // 1. Lấy danh sách Group thực tế trong hệ thống (Loại trừ CUSTOMER Zalo)
+    await ensurePermissionCatalogSynced();
+
+    const role = req.user?.role || '';
+    const canManage = role === 'ADMIN' ||
+      await checkDynamicPermission(role, 'USER_PERMISSIONS_MATRIX', req.user?.group, req.user?.id);
+
+    // 1. Danh sách Group thực tế (loại trừ khách Zalo)
     const dbUsersWithGroup = await prisma.user.findMany({
-      where: { 
+      where: {
         group: { not: null },
-        NOT: [
-          { group: 'CUSTOMER' },
-          { username: { startsWith: 'zalo_' } }
-        ]
+        NOT: [{ group: 'CUSTOMER' }, { username: { startsWith: 'zalo_' } }]
       },
       select: { group: true },
       distinct: ['group']
     });
     const dbGroups = dbUsersWithGroup.map(u => u.group?.trim()).filter(Boolean) as string[];
-    const allGroups = Array.from(new Set([...PREDEFINED_GROUPS, ...dbGroups]));
 
-    // 2. Lấy tất cả bản ghi tùy chỉnh từ DB
+    // 2. Toàn bộ bản ghi Role/Group
     const dbPermissions = await prisma.rolePermission.findMany();
-    
-    // Map cho Role-level: "ROLE:FEATURE_KEY" -> isAllowed
     const rolePermMap = new Map<string, boolean>();
-    // Map cho Group-level: "ROLE::GROUP:FEATURE_KEY" -> isAllowed
-    const groupPermMap = new Map<string, boolean>();
-
+    const groupOverrideMatrix: Record<string, Record<string, boolean>> = {};
     dbPermissions.forEach(p => {
       const grp = (p.group || '').trim();
       if (!grp) {
         rolePermMap.set(`${p.role}:${p.featureKey}`, p.isAllowed);
       } else {
-        groupPermMap.set(`${p.role}::${grp}:${p.featureKey}`, p.isAllowed);
+        const gk = `${p.role}::${grp}`;
+        (groupOverrideMatrix[gk] ||= {})[p.featureKey] = p.isAllowed;
       }
     });
+    const overrideGroups = Object.keys(groupOverrideMatrix).map(k => k.split('::')[1]);
+    const allGroups = Array.from(new Set([...PREDEFINED_GROUPS, ...dbGroups, ...overrideGroups]));
 
-    // 3. Xây dựng Ma trận Phân quyền Role-level
+    // 3. Ma trận Role-level (DB → mặc định trong code)
     const matrix: Record<string, Record<string, boolean>> = {};
     SYSTEM_ROLES.forEach(r => {
       matrix[r.key] = {};
       SYSTEM_FEATURES.forEach(f => {
-        const key = `${r.key}:${f.key}`;
-        if (rolePermMap.has(key)) {
-          matrix[r.key][f.key] = rolePermMap.get(key)!;
-        } else {
-          matrix[r.key][f.key] = getDefaultPermission(r.key, f.key);
-        }
+        const v = rolePermMap.get(`${r.key}:${f.key}`);
+        matrix[r.key][f.key] = v !== undefined ? v : getDefaultPermission(r.key, f.key);
       });
     });
 
-    // 4. Xây dựng Ma trận Phân quyền Group-level: groupMatrix["ROLE::GROUP"][featureKey]
+    // 4. Ma trận Group-level hiệu lực (ghi đè nhóm → kế thừa Role)
     const groupMatrix: Record<string, Record<string, boolean>> = {};
     SYSTEM_ROLES.forEach(r => {
       allGroups.forEach(grp => {
-        const groupKey = `${r.key}::${grp}`;
-        groupMatrix[groupKey] = {};
+        const gk = `${r.key}::${grp}`;
+        const ov = groupOverrideMatrix[gk] || {};
+        groupMatrix[gk] = {};
         SYSTEM_FEATURES.forEach(f => {
-          const directKey = `${r.key}::${grp}:${f.key}`;
-          if (groupPermMap.has(directKey)) {
-            // Có cấu hình riêng cho nhóm
-            groupMatrix[groupKey][f.key] = groupPermMap.get(directKey)!;
-          } else {
-            // Thừa kế từ Role
-            groupMatrix[groupKey][f.key] = matrix[r.key][f.key];
-          }
+          groupMatrix[gk][f.key] = ov[f.key] !== undefined ? ov[f.key] : matrix[r.key][f.key];
         });
       });
     });
+    const customGroupKeys = Object.keys(groupOverrideMatrix);
 
-    // Trả về cả danh sách các key nhóm có cấu hình riêng để UI đánh dấu badge
-    const customGroupKeys = Array.from(groupPermMap.keys()).map(k => {
-      const lastColon = k.lastIndexOf(':');
-      return k.slice(0, lastColon); // "ROLE::GROUP"
-    });
-    const customGroupKeysSet = Array.from(new Set(customGroupKeys));
+    // 5. Tính năng mới chờ duyệt (registry permission_features)
+    const newFeatureKeys = await getUnreviewedFeatureKeys();
 
-    // 5. Phát hiện tính năng mới chưa được Admin review
-    // Logic: Feature có addedAt !== 'v1.0' và chưa có bất kỳ RolePermission nào trong DB
-    const allDbFeatureKeys = new Set(dbPermissions.map(p => p.featureKey));
-    const newFeatureKeys = SYSTEM_FEATURES
-      .filter(f => f.addedAt !== 'v1.0' && !allDbFeatureKeys.has(f.key))
-      .map(f => f.key);
-
-    // 6. Lấy tất cả User-Level Permission Overrides
+    // 6. User-level overrides — người không có quyền quản trị chỉ nhận dữ liệu của chính mình
     const userPermissions = await prisma.userPermission.findMany({
+      where: canManage ? undefined : { userId: req.user?.id || '__none__' },
       include: { user: { select: { id: true, username: true, fullName: true, role: true, group: true } } }
     });
-
-    // Tạo userPermMatrix: { userId: { featureKey: isAllowed } }
     const userPermMatrix: Record<string, Record<string, boolean>> = {};
-    userPermissions.forEach((up: any) => {
-      if (!userPermMatrix[up.userId]) userPermMatrix[up.userId] = {};
-      userPermMatrix[up.userId][up.featureKey] = up.isAllowed;
+    const userInfoMap = new Map<string, any>();
+    userPermissions.forEach(up => {
+      (userPermMatrix[up.userId] ||= {})[up.featureKey] = up.isAllowed;
+      if (up.user) userInfoMap.set(up.userId, up.user);
     });
-
-    // Danh sách users đã có cấu hình riêng
-    const usersWithOverrides = Object.keys(userPermMatrix).map(uid => {
-      const up = userPermissions.find((p: any) => p.userId === uid);
-      return up?.user || null;
-    }).filter(Boolean);
+    const usersWithOverrides = canManage ? Array.from(userInfoMap.values()) : [];
 
     res.json({
       success: true,
@@ -120,10 +121,12 @@ router.get('/', requireAuth, async (req: Request, res: Response): Promise<void> 
       groups: allGroups,
       matrix,
       groupMatrix,
-      customGroupKeys: customGroupKeysSet,
+      groupOverrideMatrix,
+      customGroupKeys,
       newFeatureKeys,
       userPermMatrix,
-      usersWithOverrides
+      usersWithOverrides,
+      syncReport: canManage ? getLastPermissionSyncReport() : null
     });
   } catch (error: any) {
     logger.error('Failed to get permissions matrix', { error: error.message });
@@ -132,53 +135,88 @@ router.get('/', requireAuth, async (req: Request, res: Response): Promise<void> 
 });
 
 /**
- * POST /api/permissions/update
- * Cập nhật bật/tắt 1 quyền (hoặc nhiều quyền) cho Role hoặc Group (Chỉ Admin)
+ * POST /api/permissions/sync  (Admin)
+ * Quét danh mục tính năng trong code → INSERT quyền mặc định cho key mới. Không ghi đè key cũ.
+ */
+router.post('/sync', requireAuth, requireAdmin, async (req: Request, res: Response): Promise<void> => {
+  try {
+    const report = await syncPermissionCatalog();
+    logger.info('[Permissions] Manual sync', { by: reviewerOf(req), newlyRegistered: report.newlyRegistered });
+    res.json({ success: true, report });
+  } catch (error: any) {
+    logger.error('Failed to sync permission catalog', { error: error.message });
+    res.status(500).json({ error: 'Lỗi khi đồng bộ danh mục phân quyền' });
+  }
+});
+
+/**
+ * POST /api/permissions/acknowledge  (Admin)
+ * body: { featureKeys?: string[] } — bỏ trống = duyệt toàn bộ tính năng mới.
+ * Chỉ đánh dấu "đã duyệt" trên registry; quyền mặc định đã được seed sẵn khi sync.
+ */
+router.post('/acknowledge', requireAuth, requireAdmin, async (req: Request, res: Response): Promise<void> => {
+  try {
+    const requested: string[] = Array.isArray(req.body?.featureKeys) ? req.body.featureKeys.map(String) : [];
+    const keys = requested.length ? requested.filter(k => FEATURE_BY_KEY[k]) : await getUnreviewedFeatureKeys();
+    const count = await markFeaturesReviewed(keys, reviewerOf(req));
+    logger.info('[Permissions] Acknowledged new features', { keys, count, by: reviewerOf(req) });
+    res.json({ success: true, acknowledged: count, newFeatureKeys: await getUnreviewedFeatureKeys() });
+  } catch (error: any) {
+    logger.error('Failed to acknowledge features', { error: error.message });
+    res.status(500).json({ error: 'Lỗi khi đánh dấu đã duyệt' });
+  }
+});
+
+/**
+ * POST /api/permissions/update  (Admin)
+ * - { role, group?, featureKey, isAllowed }      → bật/tắt 1 ô Role hoặc Group
+ * - { updates: [...] }                            → hàng loạt
+ * - { action: 'clear_group_override', role, group, featureKey } → bỏ ghi đè 1 ô nhóm (quay về kế thừa Role)
+ * - { action: 'reset_group', role, group }        → bỏ toàn bộ ghi đè của nhóm
  */
 router.post('/update', requireAuth, requireAdmin, async (req: Request, res: Response): Promise<void> => {
   try {
     const { role, group, featureKey, isAllowed, updates, action } = req.body;
 
-    // Reset toàn bộ quyền riêng của 1 group về Role default
+    if (role && !VALID_ROLES.has(role)) {
+      res.status(400).json({ error: `Role không hợp lệ: ${role}` });
+      return;
+    }
+
+    if (action === 'clear_group_override' && role && group && featureKey) {
+      const grp = String(group).trim();
+      // Xóa đúng 1 ô ghi đè do Admin chủ động yêu cầu (không ảnh hưởng ô nào khác)
+      await prisma.rolePermission.deleteMany({ where: { role: role as UserRole, group: grp, featureKey } });
+      logger.info('Cleared group override cell', { role, group: grp, featureKey, updatedBy: reviewerOf(req) });
+      await autoReview(req, [featureKey]);
+      res.json({ success: true });
+      return;
+    }
+
     if (action === 'reset_group' && role && group) {
       const grp = String(group).trim();
-      await prisma.rolePermission.deleteMany({
-        where: {
-          role: role as UserRole,
-          group: grp
-        }
-      });
-      logger.info('Reset group permissions to role default', { role, group: grp, updatedBy: req.user?.username });
+      if (!grp) {
+        res.status(400).json({ error: 'Thiếu tên nhóm' });
+        return;
+      }
+      await prisma.rolePermission.deleteMany({ where: { role: role as UserRole, group: grp } });
+      logger.info('Reset group permissions to role default', { role, group: grp, updatedBy: reviewerOf(req) });
       res.json({ success: true, message: `Đã khôi phục quyền nhóm ${grp} về mặc định của ${role}` });
       return;
     }
 
     if (updates && Array.isArray(updates)) {
-      // Cập nhật hàng loạt
-      for (const item of updates) {
-        if (!item.role || !item.featureKey) continue;
+      const valid = updates.filter((u: any) => u?.role && VALID_ROLES.has(u.role) && FEATURE_BY_KEY[u.featureKey]);
+      await prisma.$transaction(valid.map((item: any) => {
         const grp = (item.group || '').trim();
-        await prisma.rolePermission.upsert({
-          where: {
-            role_group_featureKey: {
-              role: item.role as UserRole,
-              group: grp,
-              featureKey: item.featureKey
-            }
-          },
-          update: {
-            isAllowed: Boolean(item.isAllowed)
-          },
-          create: {
-            role: item.role as UserRole,
-            group: grp,
-            featureKey: item.featureKey,
-            isAllowed: Boolean(item.isAllowed)
-          }
+        return prisma.rolePermission.upsert({
+          where: { role_group_featureKey: { role: item.role as UserRole, group: grp, featureKey: item.featureKey } },
+          update: { isAllowed: Boolean(item.isAllowed) },
+          create: { role: item.role as UserRole, group: grp, featureKey: item.featureKey, isAllowed: Boolean(item.isAllowed) }
         });
-      }
-
-      logger.info('Bulk updated role/group permissions', { count: updates.length, updatedBy: req.user?.username });
+      }));
+      await autoReview(req, Array.from(new Set(valid.map((u: any) => u.featureKey))));
+      logger.info('Bulk updated role/group permissions', { count: valid.length, updatedBy: reviewerOf(req) });
       res.json({ success: true, message: 'Cập nhật phân quyền hàng loạt thành công!' });
       return;
     }
@@ -187,29 +225,20 @@ router.post('/update', requireAuth, requireAdmin, async (req: Request, res: Resp
       res.status(400).json({ error: 'Thiếu thông tin role hoặc featureKey' });
       return;
     }
+    if (!FEATURE_BY_KEY[featureKey]) {
+      res.status(400).json({ error: `Tính năng không tồn tại: ${featureKey}` });
+      return;
+    }
 
     const grp = (group || '').trim();
-
     const updated = await prisma.rolePermission.upsert({
-      where: {
-        role_group_featureKey: {
-          role: role as UserRole,
-          group: grp,
-          featureKey
-        }
-      },
-      update: {
-        isAllowed: Boolean(isAllowed)
-      },
-      create: {
-        role: role as UserRole,
-        group: grp,
-        featureKey,
-        isAllowed: Boolean(isAllowed)
-      }
+      where: { role_group_featureKey: { role: role as UserRole, group: grp, featureKey } },
+      update: { isAllowed: Boolean(isAllowed) },
+      create: { role: role as UserRole, group: grp, featureKey, isAllowed: Boolean(isAllowed) }
     });
+    await autoReview(req, [featureKey]);
 
-    logger.info('Updated role/group permission', { role, group: grp, featureKey, isAllowed, updatedBy: req.user?.username });
+    logger.info('Updated role/group permission', { role, group: grp, featureKey, isAllowed, updatedBy: reviewerOf(req) });
     res.json({ success: true, permission: updated });
   } catch (error: any) {
     logger.error('Failed to update permission', { error: error.message });
@@ -218,17 +247,26 @@ router.post('/update', requireAuth, requireAdmin, async (req: Request, res: Resp
 });
 
 /**
- * POST /api/permissions/user-update
- * Cập nhật quyền cấp cá nhân cho 1 user (Chỉ Admin)
+ * POST /api/permissions/user-update  (Admin)
+ * - { userId, featureKey, isAllowed }                     → tạo/đổi ghi đè cá nhân
+ * - { action: 'clear_user_override', userId, featureKey } → bỏ ghi đè 1 ô (quay về kế thừa Role/Nhóm)
+ * - { action: 'reset_user', userId }                      → bỏ toàn bộ ghi đè của user
  */
 router.post('/user-update', requireAuth, requireAdmin, async (req: Request, res: Response): Promise<void> => {
   try {
     const { userId, featureKey, isAllowed, action } = req.body;
 
-    // Reset toàn bộ quyền riêng của user về Role/Group default
+    if (action === 'clear_user_override' && userId && featureKey) {
+      await prisma.userPermission.deleteMany({ where: { userId, featureKey } });
+      logger.info('Cleared user override cell', { userId, featureKey, updatedBy: reviewerOf(req) });
+      await autoReview(req, [featureKey]);
+      res.json({ success: true });
+      return;
+    }
+
     if (action === 'reset_user' && userId) {
       await prisma.userPermission.deleteMany({ where: { userId } });
-      logger.info('Reset user permissions to role default', { userId, updatedBy: req.user?.username });
+      logger.info('Reset user permissions to role default', { userId, updatedBy: reviewerOf(req) });
       res.json({ success: true, message: 'Đã xóa toàn bộ quyền riêng của user' });
       return;
     }
@@ -237,16 +275,19 @@ router.post('/user-update', requireAuth, requireAdmin, async (req: Request, res:
       res.status(400).json({ error: 'Thiếu thông tin userId hoặc featureKey' });
       return;
     }
+    if (!FEATURE_BY_KEY[featureKey]) {
+      res.status(400).json({ error: `Tính năng không tồn tại: ${featureKey}` });
+      return;
+    }
 
     const updated = await prisma.userPermission.upsert({
-      where: {
-        userId_featureKey: { userId, featureKey }
-      },
+      where: { userId_featureKey: { userId, featureKey } },
       update: { isAllowed: Boolean(isAllowed) },
       create: { userId, featureKey, isAllowed: Boolean(isAllowed) }
     });
+    await autoReview(req, [featureKey]);
 
-    logger.info('Updated user permission', { userId, featureKey, isAllowed, updatedBy: req.user?.username });
+    logger.info('Updated user permission', { userId, featureKey, isAllowed, updatedBy: reviewerOf(req) });
     res.json({ success: true, permission: updated });
   } catch (error: any) {
     logger.error('Failed to update user permission', { error: error.message });
@@ -255,8 +296,7 @@ router.post('/user-update', requireAuth, requireAdmin, async (req: Request, res:
 });
 
 /**
- * GET /api/permissions/users-search?q=xxx
- * Tìm kiếm users để thêm vào phân quyền cá nhân (Chỉ Admin)
+ * GET /api/permissions/users-search?q=xxx  (Admin)
  */
 router.get('/users-search', requireAuth, requireAdmin, async (req: Request, res: Response): Promise<void> => {
   try {

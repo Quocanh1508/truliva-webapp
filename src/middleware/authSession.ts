@@ -156,11 +156,11 @@ export function requireAdmin(req: Request, res: Response, next: NextFunction): v
   next();
 }
 
-import { getDefaultPermission, SYSTEM_FEATURES } from '../config/permissions';
+import { getDefaultPermission, FEATURE_BY_KEY } from '../config/permissions';
 import { UserRole } from '@prisma/client';
 
 export async function checkDynamicPermission(role: string, featureKey: string, group?: string | null, userId?: string): Promise<boolean> {
-  const feat = SYSTEM_FEATURES.find(f => f.key === featureKey);
+  const feat = FEATURE_BY_KEY[featureKey];
   // Admin luôn có tất cả quyền thông thường (trừ devOnly cần được cấp trong phân quyền)
   if (role === 'ADMIN' && !feat?.devOnly) return true;
   try {
@@ -273,9 +273,9 @@ export async function requireDev(req: Request, res: Response, next: NextFunction
     next();
     return;
   }
-  const hasZns = await checkDynamicPermission(role, 'DEV_ZNS_MANAGE', req.user?.group);
-  const hasMap = await checkDynamicPermission(role, 'DEV_SYSTEM_MAP', req.user?.group);
-  const hasFb = await checkDynamicPermission(role, 'DEV_FEEDBACK_MANAGE', req.user?.group);
+  const hasZns = await checkDynamicPermission(role, 'DEV_ZNS_MANAGE', req.user?.group, req.user?.id);
+  const hasMap = await checkDynamicPermission(role, 'DEV_SYSTEM_MAP', req.user?.group, req.user?.id);
+  const hasFb = await checkDynamicPermission(role, 'DEV_FEEDBACK_MANAGE', req.user?.group, req.user?.id);
   if (hasZns || hasMap || hasFb) {
     next();
     return;
@@ -292,7 +292,7 @@ export async function requireSerialAccess(req: Request, res: Response, next: Nex
     res.status(401).json({ error: 'Chưa đăng nhập' });
     return;
   }
-  const isAllowed = await checkDynamicPermission(role, 'SERIAL_VIEW');
+  const isAllowed = await checkDynamicPermission(role, 'SERIAL_VIEW', req.user?.group, req.user?.id);
   if (isAllowed || role === 'ADMIN' || role === 'DEV') {
     next();
     return;

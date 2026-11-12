@@ -37,6 +37,7 @@ import { startPancakeRetryScheduler } from './services/pancakeRetryScheduler';
 import { startProductSyncScheduler } from './services/productSyncScheduler';
 import { initWebSocketServer } from './services/websocketService';
 import { startMqttService } from './services/mqttService';
+import { syncPermissionCatalog } from './services/permissionSync';
 import { apiLimiter, loginLimiter } from './middleware/rateLimiter';
 import { securityMiddleware } from './middleware/security';
 
@@ -284,6 +285,18 @@ const server = app.listen(PORT, () => {
       'GET  /api/reports',
       'GET  /uploads',
     ],
+  });
+
+  // Đồng bộ danh mục phân quyền (NON-DESTRUCTIVE: chỉ INSERT key mới, không ghi đè cấu hình cũ)
+  syncPermissionCatalog().then(report => {
+    logger.info('[PermissionSync] Startup sync done', {
+      catalogSize: report.catalogSize,
+      newlyRegistered: report.newlyRegistered.length,
+      seededRoleRows: report.seededRoleRows,
+      unreviewed: report.unreviewedKeys.length
+    });
+  }).catch((err: any) => {
+    logger.error('[PermissionSync] Startup sync failed', { error: err.message });
   });
 
   // Khởi tạo cache Combo definitions từ Database

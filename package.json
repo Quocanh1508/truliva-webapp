@@ -5,9 +5,9 @@
   "main": "dist/index.js",
   "scripts": {
     "dev:backend": "nodemon --watch src --ext ts --exec ts-node src/index.ts",
-    "dev:frontend": "cd webapp && npm run dev",
+    "dev:frontend": "node scripts/gen_frontend_permissions.js && cd webapp && npm run dev",
     "dev": "concurrently \"npm run dev:backend\" \"npm run dev:frontend\"",
-    "build": "cd webapp && npm install --include=dev --legacy-peer-deps && npm run build && cd .. && npx prisma generate && tsc",
+    "build": "node scripts/gen_frontend_permissions.js && cd webapp && npm install --include=dev --legacy-peer-deps && npm run build && cd .. && npx prisma generate && tsc",
     "start": "node dist/index.js",
     "postinstall": "npx prisma generate",
     "prisma:generate": "prisma generate",
@@ -17,7 +17,12 @@
     "studio:sandbox": "node scripts/start_vps_studio.js sandbox",
     "audit:permissions": "node scripts/audit_permissions.js",
     "test": "echo \"Error: no test specified\" && exit 1",
-    "test:security": "node scripts/security/run-strix-scan.js"
+    "test:security": "node scripts/security/run-strix-scan.js",
+    "perm:gen": "node scripts/gen_frontend_permissions.js",
+    "perm:check": "node scripts/gen_frontend_permissions.js --check",
+    "perm:backup": "node scripts/permissions_snapshot.js backup",
+    "perm:verify": "node scripts/permissions_snapshot.js verify",
+    "perm:sync": "node scripts/run_permission_sync.js"
   },
   "keywords": [],
   "author": "",
