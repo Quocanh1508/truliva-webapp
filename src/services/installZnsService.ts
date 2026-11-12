@@ -72,12 +72,18 @@ interface ProductPick {
 async function pickFromSerial(serial: { model: string; productLine: string | null }): Promise<ProductPick> {
   const keys = [serial.productLine, serial.model].filter((k): k is string => !!k && k.trim().length >= 3);
   for (const key of keys) {
-    const p = await prisma.product.findFirst({
+    // Model ngắn (VD "UR61096H") có thể khớp cả linh kiện/lõi lọc/cảm biến → chỉ nhận sản phẩm nhóm thiết bị
+    const candidates = await prisma.product.findMany({
       where: { name: { contains: key.trim(), mode: 'insensitive' }, category: { not: null } },
       select: { name: true, category: true }
     });
-    if (p) {
-      return { name: serial.productLine || p.name, category: p.category, isWaterPurifier: isPurifierCategory(p.category) };
+    const purifier = candidates.find(c => isPurifierCategory(c.category));
+    if (purifier) {
+      return { name: serial.productLine || purifier.name, category: purifier.category, isWaterPurifier: true };
+    }
+    const device = candidates.find(c => (c.category || '').toLowerCase().includes('device'));
+    if (device) {
+      return { name: serial.productLine || device.name, category: device.category, isWaterPurifier: false };
     }
   }
   // Không khớp được sản phẩm nào: serial bảo hành điện tử chủ yếu là máy lọc nước / nóng lạnh
