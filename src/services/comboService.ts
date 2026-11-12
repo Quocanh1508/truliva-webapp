@@ -282,6 +282,140 @@ export function sanitizeItemsForPancake<T extends Record<string, any>>(items: T[
   return result;
 }
 
+// ═══════════════════════════════════════════════════════
+// CHỐT CHẶN CUỐI: Lọc dòng sản phẩm con của Combo trong payload `products` gửi Pancake
+// ═══════════════════════════════════════════════════════
+
+export interface PancakeProductLine {
+  variation_id: string | number | null;
+  quantity: number;
+  price?: number;
+  [key: string]: any;
+}
+
+interface CompositeChildSpec {
+  variationId?: string;
+  name?: string;
+  sku?: string;
+  quantity: number;
+}
+
+const norm = (v: any): string => (v === undefined || v === null ? '' : String(v).trim().toLowerCase());
+
+/** Đọc danh sách sản phẩm con từ rawData variation Pancake (hỗ trợ nhiều tên trường). */
+function readCompositeChildrenFromRaw(raw: any): CompositeChildSpec[] {
+  if (!raw || typeof raw !== 'object') return [];
+  const list = raw.composite_products || raw.components || raw.composite_variations || raw.product_composites;
+  if (!Array.isArray(list)) return [];
+  return list.map((c: any) => ({
+    variationId: norm(c?.variation_id ?? c?.variation_info?.id ?? c?.variation?.id) || undefined,
+    name: norm(c?.variation_info?.name ?? c?.name ?? c?.product?.name) || undefined,
+    sku: norm(c?.variation_info?.display_id ?? c?.display_id ?? c?.sku) || undefined,
+    quantity: Number(c?.quantity) || 1
+  }));
+}
+
+/**
+ * Lọc payload `products` cuối cùng trước khi PATCH sang Pancake POS.
+ *
+ * Pancake tự bung (auto-expand) sản phẩm con khi nhận 1 dòng Combo (`is_composite`).
+ * Nếu payload chứa cả dòng Combo cha lẫn các dòng máy con → đơn bị nhân đôi máy con.
+ *
+ * Nhận diện Combo cha dựa vào dữ liệu catalog Pancake (Product.rawData: is_composite /
+ * composite_products) và bảng Combo nội bộ (getComboComponents), KHÔNG phụ thuộc giá 0đ
+ * hay `composite_item_id` (dữ liệu báo cáo KTV/đơn đã lưu không có các trường này).
+ *
+ * Với mỗi Combo cha, trừ đi đúng số lượng máy con mà Pancake sẽ tự bung
+ * (qty combo × qty linh kiện). Phần dư (khách mua thêm lẻ / quà tặng độc lập) được giữ nguyên.
+ */
+export async function stripComboChildLinesFromPancakePayload<T extends PancakeProductLine>(lines: T[]): Promise<T[]> {
+  if (!Array.isArray(lines) || lines.length === 0) return lines || [];
+
+  const ids = Array.from(new Set(lines.map(l => String(l.variation_id ?? '')).filter(Boolean)));
+  let products: Array<{ pancakeProductId: string | null; name: string; sku: string | null; rawData: any }> = [];
+  try {
+    products = await prisma.product.findMany({
+      where: { pancakeProductId: { in: ids } },
+      select: { pancakeProductId: true, name: true, sku: true, rawData: true }
+    });
+  } catch (err: any) {
+    logger.warn('[ComboService] Không tải được catalog sản phẩm để lọc combo, dùng bảng combo nội bộ', { error: err.message });
+  }
+  const byId = new Map(products.map(p => [String(p.pancakeProductId), p]));
+
+  const describe = (line: T) => {
+    const p = byId.get(String(line.variation_id));
+    const raw: any = p?.rawData || {};
+    return {
+      id: norm(line.variation_id),
+      name: norm(p?.name ?? raw?.name ?? raw?.product?.name),
+      sku: norm(p?.sku ?? raw?.display_id),
+      raw
+    };
+  };
+
+  // Bước 1: Xác định các dòng Combo cha và ngân sách số lượng máy con Pancake sẽ tự bung
+  const budget: Array<CompositeChildSpec & { remaining: number }> = [];
+  const parentIdx = new Set<number>();
+
+  lines.forEach((line, idx) => {
+    const d = describe(line);
+    let children = readCompositeChildrenFromRaw(d.raw);
+    if (children.length === 0) {
+      const defComps = getComboComponents(d.name, d.sku);
+      if (defComps && defComps.length > 0) {
+        children = defComps.map(c => ({ name: norm(c.name) || undefined, sku: norm(c.sku) || undefined, quantity: Number(c.quantity) || 1 }));
+      }
+    }
+    const isParent = d.raw?.is_composite === true || children.length > 0;
+    if (!isParent) return;
+
+    parentIdx.add(idx);
+    const parentQty = Number(line.quantity) || 1;
+    for (const c of children) {
+      budget.push({ ...c, remaining: c.quantity * parentQty });
+    }
+  });
+
+  if (parentIdx.size === 0 || budget.length === 0) return lines;
+
+  // Bước 2: Trừ số lượng các dòng máy con tương ứng
+  const result: T[] = [];
+  const stripped: Array<{ variation_id: any; quantity: number }> = [];
+
+  lines.forEach((line, idx) => {
+    if (parentIdx.has(idx)) {
+      result.push(line);
+      return;
+    }
+    const d = describe(line);
+    let qty = Number(line.quantity) || 0;
+
+    for (const spec of budget) {
+      if (qty <= 0) break;
+      if (spec.remaining <= 0) continue;
+      const matches =
+        (spec.variationId && d.id && spec.variationId === d.id) ||
+        (spec.sku && d.sku && spec.sku === d.sku) ||
+        (spec.name && d.name && spec.name === d.name);
+      if (!matches) continue;
+      const take = Math.min(spec.remaining, qty);
+      spec.remaining -= take;
+      qty -= take;
+    }
+
+    const removed = (Number(line.quantity) || 0) - qty;
+    if (removed > 0) stripped.push({ variation_id: line.variation_id, quantity: removed });
+    if (qty > 0) result.push(qty === line.quantity ? line : { ...line, quantity: qty });
+  });
+
+  if (stripped.length > 0) {
+    logger.info('[ComboService] Stripped combo child lines from Pancake payload (Pancake auto-expands combos)', { stripped });
+  }
+
+  return result;
+}
+
 /**
  * Trả danh sách combo mappings cho Inventory UI grouping.
  * Giữ nguyên signature cũ.

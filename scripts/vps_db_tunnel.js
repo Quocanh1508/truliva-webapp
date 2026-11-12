@@ -24,10 +24,10 @@ if (!cmd.length) {
 }
 const remoteDir = target === 'sandbox' ? '/var/www/truliva-sandbox' : '/var/www/truliva';
 
-const vpsHost = process.env.VPS_HOST || process.env.VPS_SSH_HOST || '221.132.21.42';
-const vpsUser = process.env.VPS_USER || process.env.VPS_SSH_USER || 'root';
+const vpsHost = process.env.VPS_HOST || process.env.VPS_SSH_HOST;
+const vpsUser = process.env.VPS_USER || process.env.VPS_SSH_USER;
 const vpsKeyPath = process.env.VPS_SSH_KEY_PATH;
-const vpsPassword = process.env.VPS_PASSWORD || process.env.VPS_SSH_PASSWORD || 'c3qwbwf2BU0PkTxW8wKM';
+const vpsPassword = process.env.VPS_PASSWORD || process.env.VPS_SSH_PASSWORD;
 if (!vpsHost || !vpsUser || (!vpsKeyPath && !vpsPassword)) {
   console.error('❌ Thiếu VPS_HOST / VPS_USER / VPS_SSH_KEY_PATH|VPS_PASSWORD trong .env');
   process.exit(1);

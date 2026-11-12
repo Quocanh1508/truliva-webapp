@@ -10,7 +10,7 @@ import ExcelJS from 'exceljs';
 import axios from 'axios';
 import { formatOrderCode, buildReportFilter } from '../services/reportService';
 import { getComboComponents, ComboComponent } from './orderController';
-import { sanitizeItemsForPancake } from '../services/comboService';
+import { sanitizeItemsForPancake, stripComboChildLinesFromPancakePayload } from '../services/comboService';
 import { isSandboxEnvironment, logSandboxBlockedAction } from '../utils/sandboxGuard';
 import { PANCAKE_API_BASE } from '../config/pancake';
 import { normalizeProvince, PANCAKE_PROVINCES } from '../utils/provinces';
@@ -491,14 +491,14 @@ export async function createReport(req: Request, res: Response): Promise<void> {
               if (apiKey) {
                 const sanitizedReportItems = sanitizeItemsForPancake(reportItems);
 
-                const pancakeProducts = sanitizedReportItems.map((item: any) => {
+                const pancakeProducts = await stripComboChildLinesFromPancakePayload(sanitizedReportItems.map((item: any) => {
                   const prod = matchedProducts.find(p => p.name === item.productName);
                   return {
                     variation_id: prod?.pancakeProductId || null,
                     quantity: item.quantity,
                     price: isWarranty ? 0 : (prod?.sellingPrice || 0)
                   };
-                }).filter((p: any) => p.variation_id);
+                }).filter((p: any) => p.variation_id));
 
                 if (isSandboxEnvironment()) {
                   logSandboxBlockedAction('patchProductsToPancake (createReport)', {
@@ -1573,14 +1573,14 @@ export async function updateReport(req: Request, res: Response): Promise<void> {
             if (apiKey) {
               const sanitizedReportItems = sanitizeItemsForPancake(reportItems);
 
-              const pancakeProducts = sanitizedReportItems.map((item: any) => {
+              const pancakeProducts = await stripComboChildLinesFromPancakePayload(sanitizedReportItems.map((item: any) => {
                 const prod = matchedProducts.find(p => p.name === item.productName);
                 return {
                   variation_id: prod?.pancakeProductId || null,
                   quantity: item.quantity,
                   price: isWarranty ? 0 : (prod?.sellingPrice || 0)
                 };
-              }).filter((p: any) => p.variation_id);
+              }).filter((p: any) => p.variation_id));
 
               if (isSandboxEnvironment()) {
                 logSandboxBlockedAction('patchProductsToPancake (updateReport)', {
@@ -2010,7 +2010,7 @@ export async function approveReport(req: Request, res: Response): Promise<void> 
         if (apiKey) {
           const sanitizedReportItems = sanitizeItemsForPancake(reportItems);
 
-          const pancakeProducts = sanitizedReportItems.map((item: any) => {
+          const pancakeProducts = await stripComboChildLinesFromPancakePayload(sanitizedReportItems.map((item: any) => {
             const prod = matchedProducts.find(p => p.name === item.productName);
             const itemPrice = isWarranty ? 0 : (item.price !== undefined && item.price !== null ? item.price : (prod?.sellingPrice || 0));
             return {
@@ -2018,7 +2018,7 @@ export async function approveReport(req: Request, res: Response): Promise<void> 
               quantity: item.quantity,
               price: itemPrice
             };
-          }).filter((p: any) => p.variation_id);
+          }).filter((p: any) => p.variation_id));
 
           if (isSandboxEnvironment()) {
             logSandboxBlockedAction('patchProductsToPancakeOnApproval (approveReport)', {

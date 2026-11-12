@@ -1,6 +1,6 @@
 import axios from 'axios';
 import prisma from '../config/database';
-import { getComboComponents, ComboComponent, sanitizeItemsForPancake } from '../controllers/orderController';
+import { sanitizeItemsForPancake, stripComboChildLinesFromPancakePayload } from './comboService';
 import { syncOrderStatusToPancake } from './orderProcessor';
 import logger from '../utils/logger';
 import { isSandboxEnvironment, logSandboxBlockedAction } from '../utils/sandboxGuard';
@@ -58,14 +58,14 @@ export async function retryPancakeSync(orderId: string): Promise<void> {
     });
 
     const isWarranty = (order.workType || '').toLowerCase() === 'bảo hành';
-    const pancakeProducts = sanitizedItems.map(item => {
+    const pancakeProducts = await stripComboChildLinesFromPancakePayload(sanitizedItems.map(item => {
       const prod = matchedProducts.find(p => p.name === item.productName);
       return {
         variation_id: prod?.pancakeProductId || null,
         quantity: item.quantity || 1,
         price: isWarranty ? 0 : (prod?.sellingPrice || 0)
       };
-    }).filter(p => p.variation_id);
+    }).filter(p => p.variation_id));
 
     if (pancakeProducts.length > 0) {
       logger.info(`[RetrySync] Syncing products and warehouse to Pancake POS for order ${order.pancakeOrderId}`);
