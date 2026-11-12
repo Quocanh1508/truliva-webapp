@@ -48,8 +48,46 @@ interface ZnsDispatch {
   raw?: string;
 }
 
+// Mẫu tin đang/đã sử dụng trong hệ thống
+const TEMPLATE_INFO: Record<string, { label: string; channel: 'ZALO' | 'FNS' | 'LEGACY' }> = {
+  '666024': { label: 'Lắp đặt – Máy lọc nước', channel: 'ZALO' },
+  '666039': { label: 'Lắp đặt – Sản phẩm khác', channel: 'ZALO' },
+  '10233': { label: 'Hoàn thành dịch vụ (TL/BH/SC)', channel: 'FNS' },
+  '10232': { label: 'Lắp đặt – FNS dự phòng', channel: 'FNS' },
+  '617366': { label: 'Mẫu cũ – đã ngừng', channel: 'LEGACY' }
+};
+
+function gatewayBadge(gateway?: string, templateId?: string): { text: string; cls: string } {
+  const g = (gateway || '').toLowerCase();
+  const isSandbox = g.includes('sandbox');
+  if (g.includes('zalo oa')) {
+    return { text: `🔵 Zalo OA${isSandbox ? ' (Sandbox)' : ''}`, cls: 'bg-blue-50 text-blue-700 border-blue-200' };
+  }
+  if (g.includes('fns') || templateId === '10232' || templateId === '10233') {
+    return { text: `🟣 FPT FNS${isSandbox ? ' (Sandbox)' : ''}`, cls: 'bg-purple-50 text-purple-700 border-purple-200' };
+  }
+  return { text: '⚪ Zalo Direct cũ (đã ngừng)', cls: 'bg-gray-100 text-gray-500 border-gray-200' };
+}
+
+interface ZnsTemplateRow {
+  templateId: number | string;
+  templateName: string;
+  status: string;
+  templateQuality?: string | null;
+  createdTime?: number;
+}
+
 export default function ZnsManage() {
-  const [activeTab, setActiveTab] = useState<'list' | 'lookup' | 'tester' | 'logs'>('list');
+  const [activeTab, setActiveTab] = useState<'list' | 'lookup' | 'tester' | 'logs' | 'templates'>('list');
+
+  // Tab Mẫu ZNS (đọc trực tiếp từ Zalo OA)
+  const [templates, setTemplates] = useState<ZnsTemplateRow[]>([]);
+  const [templatesLoading, setTemplatesLoading] = useState(false);
+  const [templatesError, setTemplatesError] = useState('');
+  const [templateStatusFilter, setTemplateStatusFilter] = useState<'ENABLE' | 'ALL'>('ENABLE');
+  const [templateDetail, setTemplateDetail] = useState<{ id: string; loading: boolean; data: any; error: string } | null>(null);
+  const [filterTemplate, setFilterTemplate] = useState<string>('ALL');
+  const [testTemplate, setTestTemplate] = useState<string>('666024');
   const [loading, setLoading] = useState(false);
   
   // State Danh sách ZNS Dispatches & Phân trang
@@ -101,7 +139,7 @@ export default function ZnsManage() {
     name: '',
     product: '',
     expiry: '',
-    gatewayMode: 'FNS_GATEWAY',
+    gatewayMode: 'AUTO',
     loading: false,
     result: null
   });
@@ -165,6 +203,7 @@ export default function ZnsManage() {
         search: search.trim(),
         status: filterStatus,
         model: filterModel,
+        templateId: filterTemplate,
         startDate: filterStartDate,
         endDate: filterEndDate
       });
@@ -190,11 +229,41 @@ export default function ZnsManage() {
     } finally {
       setLoading(false);
     }
-  }, [pagination.page, pagination.limit, search, filterStatus, filterModel, filterStartDate, filterEndDate]);
+  }, [pagination.page, pagination.limit, search, filterStatus, filterModel, filterTemplate, filterStartDate, filterEndDate]);
 
   useEffect(() => {
     fetchData(1);
-  }, [filterStatus, filterModel, filterStartDate, filterEndDate]);
+  }, [filterStatus, filterModel, filterTemplate, filterStartDate, filterEndDate]);
+
+  // Tải danh sách mẫu ZNS từ Zalo OA khi mở tab
+  const loadTemplates = useCallback(async () => {
+    setTemplatesLoading(true);
+    setTemplatesError('');
+    try {
+      const res = await fetchApi('/serials/zns/templates');
+      setTemplates(res.templates || []);
+    } catch (err: any) {
+      setTemplatesError(err.message || 'Không tải được danh sách mẫu từ Zalo OA');
+    } finally {
+      setTemplatesLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (activeTab === 'templates' && templates.length === 0 && !templatesLoading) {
+      loadTemplates();
+    }
+  }, [activeTab]);
+
+  const openTemplateDetail = async (id: string) => {
+    setTemplateDetail({ id, loading: true, data: null, error: '' });
+    try {
+      const res = await fetchApi(`/serials/zns/templates?id=${encodeURIComponent(id)}`);
+      setTemplateDetail({ id, loading: false, data: res.template, error: '' });
+    } catch (err: any) {
+      setTemplateDetail({ id, loading: false, data: null, error: err.message || 'Lỗi tải chi tiết mẫu' });
+    }
+  };
 
   // Debounced search
   useEffect(() => {
@@ -262,7 +331,7 @@ export default function ZnsManage() {
       name: d.customerName || 'Quý Khách',
       product: d.model || 'Máy lọc nước Truliva',
       expiry: expiryStr,
-      gatewayMode: 'FNS_GATEWAY',
+      gatewayMode: 'AUTO',
       loading: false,
       result: null
     });
@@ -372,7 +441,9 @@ export default function ZnsManage() {
           serialNumber: testSerial.trim(),
           customerName: testName.trim(),
           productName: testProduct.trim(),
-          expiryDate: testExpiry.trim()
+          expiryDate: testExpiry.trim(),
+          templateId: testTemplate,
+          gatewayMode: testTemplate === '10232' ? 'FNS_GATEWAY' : undefined
         })
       });
       setTestResult(data);
@@ -426,12 +497,14 @@ export default function ZnsManage() {
             <ShieldCheck size={24} />
           </div>
           <div>
-            <p className="text-xs font-medium text-gray-500">Cổng phát tin ZNS</p>
-            <p className="text-sm font-bold text-gray-900 mt-0.5">FPT FNS Gateway</p>
-            <span className="inline-flex items-center text-[11px] text-purple-600 font-semibold mt-0.5">
-              <span className="w-1.5 h-1.5 bg-purple-500 rounded-full mr-1.5 animate-pulse"></span>
-              Template: 10232 (Lắp đặt) & 10233 (Dịch vụ)
-            </span>
+            <p className="text-xs font-medium text-gray-500">Cổng phát tin</p>
+            <p className="text-sm font-bold text-gray-900 mt-0.5">Zalo OA + FPT FNS</p>
+            <p className="text-[11px] text-blue-600 font-semibold mt-0.5 leading-snug">
+              Lắp đặt: 666024 (máy lọc nước) · 666039 (SP khác)
+            </p>
+            <p className="text-[11px] text-purple-600 font-semibold leading-snug">
+              Dịch vụ: FNS 10233 · Dự phòng: FNS 10232
+            </p>
           </div>
         </div>
 
@@ -464,13 +537,19 @@ export default function ZnsManage() {
         </div>
 
         <div className="bg-white p-4 rounded-2xl border border-gray-200/80 shadow-sm flex items-center space-x-3.5">
-          <div className="p-3 bg-indigo-50 text-indigo-600 rounded-xl border border-indigo-100">
-            <Activity size={24} />
+          <div className="p-3 bg-red-50 text-red-600 rounded-xl border border-red-100">
+            <AlertTriangle size={24} />
           </div>
           <div>
-            <p className="text-xs font-medium text-gray-500">Tốc độ gửi trung bình</p>
-            <p className="text-sm font-bold text-indigo-600 mt-0.5">~145 ms (Tức thì)</p>
-            <p className="text-[11px] text-gray-400">Truyền trực tiếp Real-time</p>
+            <p className="text-xs font-medium text-gray-500">Gửi lỗi</p>
+            <p className="text-sm font-bold text-red-600 mt-0.5">{stats.totalFailed} tin</p>
+            <button
+              type="button"
+              onClick={() => { setActiveTab('list'); setFilterStatus('FAILED'); }}
+              className="text-[11px] text-red-600 hover:underline font-medium"
+            >
+              Xem các tin lỗi →
+            </button>
           </div>
         </div>
       </div>
@@ -525,6 +604,18 @@ export default function ZnsManage() {
             <Clock size={16} />
             <span>Nhật ký Server Logs ({serverZnsLogs.length})</span>
           </button>
+
+          <button
+            onClick={() => setActiveTab('templates')}
+            className={`pb-3 px-3 text-xs font-bold flex items-center space-x-2 border-b-2 transition-all whitespace-nowrap ${
+              activeTab === 'templates'
+                ? 'border-blue-600 text-blue-600 bg-white/70 rounded-t-lg'
+                : 'border-transparent text-gray-500 hover:text-gray-700'
+            }`}
+          >
+            <MessageSquare size={16} />
+            <span>Mẫu ZNS (Zalo OA)</span>
+          </button>
         </div>
 
         {/* TAB 1: DANH SÁCH LỊCH SỬ BẮN TIN (CHỈ CÁC ĐƠN ĐÃ PHÁT ZNS) */}
@@ -534,7 +625,7 @@ export default function ZnsManage() {
             <div className="bg-gray-50 p-3.5 rounded-xl border border-gray-200/80 space-y-3">
               <div className="grid grid-cols-1 md:grid-cols-12 gap-3">
                 {/* Ô tìm kiếm thông minh */}
-                <div className="md:col-span-4 relative">
+                <div className="md:col-span-12 relative">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
                   <input
                     type="text"
@@ -554,7 +645,7 @@ export default function ZnsManage() {
                 </div>
 
                 {/* Lọc Trạng thái */}
-                <div className="md:col-span-2">
+                <div className="md:col-span-3">
                   <select
                     value={filterStatus}
                     onChange={(e) => setFilterStatus(e.target.value)}
@@ -563,6 +654,20 @@ export default function ZnsManage() {
                     <option value="ALL">Tất cả trạng thái ZNS</option>
                     <option value="SUCCESS">Đã gửi thành công (SUCCESS)</option>
                     <option value="FAILED">Lỗi phát tin (FAILED)</option>
+                  </select>
+                </div>
+
+                {/* Lọc Mẫu tin */}
+                <div className="md:col-span-3">
+                  <select
+                    value={filterTemplate}
+                    onChange={(e) => setFilterTemplate(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-xl text-xs outline-none focus:ring-2 focus:ring-blue-500 bg-white font-medium shadow-sm"
+                  >
+                    <option value="ALL">Tất cả mẫu tin</option>
+                    {Object.entries(TEMPLATE_INFO).map(([id, t]) => (
+                      <option key={id} value={id}>{id} – {t.label}</option>
+                    ))}
                   </select>
                 </div>
 
@@ -603,7 +708,7 @@ export default function ZnsManage() {
               </div>
 
               {/* Reset filter buttons */}
-              {(search || filterStatus !== 'ALL' || filterModel !== 'ALL' || filterStartDate || filterEndDate) && (
+              {(search || filterStatus !== 'ALL' || filterModel !== 'ALL' || filterTemplate !== 'ALL' || filterStartDate || filterEndDate) && (
                 <div className="flex justify-between items-center text-xs pt-1 border-t border-gray-200">
                   <span className="text-gray-500">
                     Đang áp dụng bộ lọc ({pagination.total} lượt bắn tin)
@@ -613,6 +718,7 @@ export default function ZnsManage() {
                       setSearch('');
                       setFilterStatus('ALL');
                       setFilterModel('ALL');
+                      setFilterTemplate('ALL');
                       setFilterStartDate('');
                       setFilterEndDate('');
                     }}
@@ -762,22 +868,26 @@ export default function ZnsManage() {
                                 </span>
                               )}
 
-                              {d.gateway && (
-                                <span
-                                  className={`inline-flex items-center text-[10px] font-bold px-2 py-0.5 rounded-md border ${
-                                    d.gateway.includes('Fallback') || d.gateway.includes('FNS')
-                                      ? 'bg-purple-50 text-purple-700 border-purple-200'
-                                      : 'bg-gray-100 text-gray-500 border-gray-200'
-                                  }`}
-                                  title={d.gateway}
-                                >
-                                  {d.gateway.includes('Fallback')
-                                    ? '🟣 FNS (Fallback 10232)'
-                                    : d.gateway.includes('FNS')
-                                    ? '🟣 FNS Gateway'
-                                    : '⚪ Zalo Direct 617366 (Đã ngừng)'}
-                                </span>
-                              )}
+                              {(() => {
+                                const badge = gatewayBadge(d.gateway, d.templateId);
+                                const tpl = d.templateId ? TEMPLATE_INFO[d.templateId] : undefined;
+                                return (
+                                  <>
+                                    <span
+                                      className={`inline-flex items-center text-[10px] font-bold px-2 py-0.5 rounded-md border ${badge.cls}`}
+                                      title={d.gateway}
+                                    >
+                                      {badge.text}
+                                    </span>
+                                    {d.templateId && (
+                                      <span className="text-[10px] text-gray-500" title={`Mẫu ${d.templateId}`}>
+                                        <span className="font-mono font-semibold text-gray-700">{d.templateId}</span>
+                                        {tpl ? ` · ${tpl.label}` : ''}
+                                      </span>
+                                    )}
+                                  </>
+                                );
+                              })()}
                             </div>
                           </td>
 
@@ -1091,11 +1201,36 @@ export default function ZnsManage() {
             <div className="bg-gradient-to-r from-indigo-50 to-blue-50 border border-indigo-200/80 rounded-2xl p-4 flex items-start space-x-3 text-xs text-indigo-950">
               <Send size={20} className="text-indigo-600 flex-shrink-0 mt-0.5" />
               <div>
-                <p className="font-bold text-sm text-indigo-950">Công cụ thử nghiệm phát tin ZNS Sandbox (Dev Live Test)</p>
+                <p className="font-bold text-sm text-indigo-950">Công cụ bắn thử tin ZNS</p>
                 <p className="mt-1 text-indigo-800 leading-relaxed">
-                  Nhập số điện thoại và thông tin để bắn ngay 1 tin nhắn ZNS xác nhận bảo hành đến Zalo cá nhân. Hệ thống sẽ đo đạc tốc độ phản hồi (latency ms) và trả về log chi tiết từ Zalo OpenAPI.
+                  Chọn mẫu, nhập dữ liệu và bắn 1 tin tới số Zalo thử nghiệm. Mẫu 666024 / 666039 gửi thẳng qua Zalo OA đúng dữ liệu bạn nhập; 10232 / 10233 gửi qua FPT FNS.
+                  Trên môi trường Sandbox, tin chỉ được mô phỏng và ghi log, không gửi thật.
                 </p>
               </div>
+            </div>
+
+            {/* Chọn mẫu tin */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2 text-xs">
+              {(['666024', '666039', '10232', '10233'] as const).map(id => {
+                const t = TEMPLATE_INFO[id];
+                const active = testTemplate === id;
+                return (
+                  <button
+                    key={id}
+                    type="button"
+                    onClick={() => setTestTemplate(id)}
+                    className={`text-left p-3 rounded-xl border transition-colors ${
+                      active ? 'border-blue-500 bg-blue-50 ring-2 ring-blue-200' : 'border-gray-200 bg-white hover:bg-gray-50'
+                    }`}
+                  >
+                    <span className="block font-mono font-bold text-gray-900">{id}</span>
+                    <span className="block text-gray-600 mt-0.5">{t.label}</span>
+                    <span className={`inline-block mt-1 text-[10px] font-bold px-1.5 py-0.5 rounded ${t.channel === 'ZALO' ? 'bg-blue-100 text-blue-700' : 'bg-purple-100 text-purple-700'}`}>
+                      {t.channel === 'ZALO' ? 'Zalo OA' : 'FPT FNS'}
+                    </span>
+                  </button>
+                );
+              })}
             </div>
 
             {/* Quick Template Presets */}
@@ -1335,7 +1470,175 @@ export default function ZnsManage() {
             </div>
           </div>
         )}
+
+        {/* TAB 5: DANH SÁCH MẪU ZNS TRÊN ZALO OA */}
+        {activeTab === 'templates' && (
+          <div className="p-4 md:p-5 space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+              <div className="text-xs text-gray-600 leading-relaxed">
+                Danh sách mẫu đọc trực tiếp từ Zalo OA. Các mẫu <strong>đang được hệ thống sử dụng</strong> được đánh dấu.
+                Bấm vào một mẫu để xem tham số, nút bấm và link xem trước nội dung.
+              </div>
+              <div className="flex items-center gap-2 shrink-0">
+                <select
+                  value={templateStatusFilter}
+                  onChange={(e) => setTemplateStatusFilter(e.target.value as any)}
+                  className="px-3 py-2 border border-gray-300 rounded-xl text-xs bg-white font-medium"
+                >
+                  <option value="ENABLE">Chỉ mẫu đang hoạt động</option>
+                  <option value="ALL">Tất cả mẫu</option>
+                </select>
+                <button
+                  type="button"
+                  onClick={loadTemplates}
+                  disabled={templatesLoading}
+                  className="flex items-center gap-1.5 px-3 py-2 text-xs font-semibold bg-gray-50 text-gray-700 border border-gray-200 rounded-xl hover:bg-gray-100"
+                >
+                  <RefreshCw size={14} className={templatesLoading ? 'animate-spin' : ''} />
+                  Tải lại
+                </button>
+              </div>
+            </div>
+
+            {templatesError && (
+              <div className="p-3 rounded-xl bg-red-50 border border-red-200 text-xs text-red-700 flex items-center gap-2">
+                <AlertTriangle size={14} /> {templatesError}
+              </div>
+            )}
+
+            <div className="overflow-x-auto border border-gray-200 rounded-2xl">
+              <table className="w-full text-xs text-left text-gray-700">
+                <thead className="bg-gray-100 text-gray-700 uppercase font-bold text-[11px] border-b border-gray-200">
+                  <tr>
+                    <th className="px-3.5 py-3">Mã mẫu</th>
+                    <th className="px-3.5 py-3">Tên mẫu</th>
+                    <th className="px-3.5 py-3">Trạng thái</th>
+                    <th className="px-3.5 py-3">Sử dụng trong hệ thống</th>
+                    <th className="px-3.5 py-3 text-right">Chi tiết</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100 bg-white">
+                  {templatesLoading && templates.length === 0 ? (
+                    <tr><td colSpan={5} className="text-center py-10 text-gray-400">
+                      <RefreshCw className="h-5 w-5 animate-spin mx-auto text-blue-600 mb-2" /> Đang tải mẫu từ Zalo OA...
+                    </td></tr>
+                  ) : (
+                    templates
+                      .filter(t => templateStatusFilter === 'ALL' || t.status === 'ENABLE')
+                      .sort((a, b) => Number(!!TEMPLATE_INFO[String(b.templateId)]) - Number(!!TEMPLATE_INFO[String(a.templateId)]))
+                      .map(t => {
+                        const id = String(t.templateId);
+                        const used = TEMPLATE_INFO[id];
+                        return (
+                          <tr key={id} className={used ? 'bg-blue-50/40' : ''}>
+                            <td className="px-3.5 py-2.5 font-mono font-bold text-gray-900">{id}</td>
+                            <td className="px-3.5 py-2.5 font-medium text-gray-800">{t.templateName}</td>
+                            <td className="px-3.5 py-2.5">
+                              <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
+                                t.status === 'ENABLE' ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                                  : t.status === 'REJECT' ? 'bg-red-50 text-red-700 border-red-200'
+                                  : 'bg-gray-100 text-gray-600 border-gray-200'
+                              }`}>
+                                {t.status === 'ENABLE' ? 'Đang hoạt động' : t.status === 'REJECT' ? 'Bị từ chối' : t.status}
+                              </span>
+                            </td>
+                            <td className="px-3.5 py-2.5">
+                              {used ? (
+                                <span className="text-[11px] font-semibold text-blue-700">✔ {used.label}</span>
+                              ) : (
+                                <span className="text-[11px] text-gray-400">—</span>
+                              )}
+                            </td>
+                            <td className="px-3.5 py-2.5 text-right">
+                              <button
+                                type="button"
+                                onClick={() => openTemplateDetail(id)}
+                                className="px-2.5 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-[11px] font-semibold"
+                              >
+                                Xem
+                              </button>
+                            </td>
+                          </tr>
+                        );
+                      })
+                  )}
+                </tbody>
+              </table>
+            </div>
+            <p className="text-[11px] text-gray-400">
+              Mẫu 10232 / 10233 là mã của cổng FPT FNS nên không nằm trong danh sách Zalo OA.
+            </p>
+          </div>
+        )}
       </div>
+
+      {/* Modal chi tiết mẫu ZNS */}
+      {templateDetail && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={() => setTemplateDetail(null)}>
+          <div className="bg-white rounded-2xl w-full max-w-lg max-h-[85vh] overflow-y-auto shadow-2xl" onClick={(e) => e.stopPropagation()}>
+            <div className="p-4 border-b border-gray-100 flex items-center justify-between">
+              <h3 className="font-bold text-gray-900 text-sm">
+                Mẫu {templateDetail.id}{templateDetail.data?.templateName ? ` – ${templateDetail.data.templateName}` : ''}
+              </h3>
+              <button type="button" onClick={() => setTemplateDetail(null)} className="text-gray-400 hover:text-gray-600 text-lg font-bold px-2">×</button>
+            </div>
+            <div className="p-4 space-y-4 text-xs">
+              {templateDetail.loading && (
+                <div className="text-center py-6 text-gray-400"><RefreshCw className="h-5 w-5 animate-spin mx-auto text-blue-600 mb-2" />Đang tải...</div>
+              )}
+              {templateDetail.error && <div className="p-3 rounded-xl bg-red-50 text-red-700 border border-red-200">{templateDetail.error}</div>}
+              {templateDetail.data && (
+                <>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div><span className="text-gray-500">Trạng thái:</span> <strong>{templateDetail.data.status}</strong></div>
+                    <div><span className="text-gray-500">Loại:</span> <strong>{templateDetail.data.templateTag || '—'}</strong></div>
+                    <div><span className="text-gray-500">Giá / tin:</span> <strong>{templateDetail.data.price ? `${Number(templateDetail.data.price).toLocaleString('vi-VN')}đ` : '—'}</strong></div>
+                    <div><span className="text-gray-500">Chất lượng:</span> <strong>{templateDetail.data.templateQuality || '—'}</strong></div>
+                  </div>
+                  <div>
+                    <p className="font-bold text-gray-700 mb-1.5">Tham số</p>
+                    <table className="w-full border border-gray-200 rounded-lg overflow-hidden">
+                      <thead className="bg-gray-50 text-[11px] text-gray-600">
+                        <tr><th className="px-2 py-1.5 text-left">Tên</th><th className="px-2 py-1.5 text-left">Kiểu</th><th className="px-2 py-1.5 text-left">Tối đa</th></tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-100">
+                        {(templateDetail.data.listParams || []).map((p: any) => (
+                          <tr key={p.name}>
+                            <td className="px-2 py-1.5 font-mono">{p.name}</td>
+                            <td className="px-2 py-1.5">{p.type}</td>
+                            <td className="px-2 py-1.5">{p.maxLength}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                  {(templateDetail.data.listButtons || []).length > 0 && (
+                    <div>
+                      <p className="font-bold text-gray-700 mb-1.5">Nút bấm</p>
+                      {(templateDetail.data.listButtons || []).map((b: any, i: number) => (
+                        <p key={i} className="text-gray-700">• {b.title} <span className="text-gray-400 break-all">({b.content})</span></p>
+                      ))}
+                    </div>
+                  )}
+                  {templateDetail.data.reason && (
+                    <p className="text-gray-500"><span className="font-semibold">Ghi chú duyệt:</span> {templateDetail.data.reason}</p>
+                  )}
+                  {templateDetail.data.previewUrl && (
+                    <a
+                      href={templateDetail.data.previewUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1.5 px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-semibold"
+                    >
+                      Xem trước nội dung mẫu ↗
+                    </a>
+                  )}
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Modal Bắn Lại ZNS Nhanh */}
       {resendModal.isOpen && (
@@ -1414,12 +1717,13 @@ export default function ZnsManage() {
                   onChange={(e) => setResendModal(prev => ({ ...prev, gatewayMode: e.target.value as any }))}
                   className="w-full px-3 py-2 border border-gray-300 rounded-xl font-medium bg-white focus:ring-2 focus:ring-blue-500 text-xs"
                 >
-                  <option value="FNS_GATEWAY">🟣 FPT FNS Gateway (Template 10232 - Chuẩn hiện hành)</option>
-                  <option value="AUTO">⚙️ Tự động (Mặc định FPT FNS Gateway)</option>
-                  <option value="ZALO_DIRECT" disabled>⚪ Zalo Direct OpenAPI (Template 617366 - Đã ngừng áp dụng)</option>
+                  <option value="AUTO">🔵 Tự động theo danh mục – Zalo OA 666024 / 666039 (dự phòng FNS)</option>
+                  <option value="FNS_GATEWAY">🟣 FPT FNS – mẫu 10232</option>
                 </select>
                 <p className="text-[11px] text-gray-500 mt-1">
-                  Chương trình Template 617366 đã ngừng hoạt động. Toàn bộ tin ZNS được phát qua cổng FPT FNS Gateway (10232/10233).
+                  {resendModal.gatewayMode === 'AUTO'
+                    ? 'Hệ thống tự chọn mẫu theo danh mục sản phẩm của serial; tên sản phẩm và ngày hết hạn lấy từ dữ liệu bảo hành (bỏ qua 2 ô nhập tay ở trên).'
+                    : 'Gửi qua FPT FNS mẫu 10232 với tên sản phẩm và ngày hết hạn bạn nhập.'}
                 </p>
               </div>
             </div>

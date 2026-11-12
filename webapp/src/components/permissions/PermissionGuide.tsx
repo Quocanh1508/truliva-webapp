@@ -380,7 +380,7 @@ export const PermissionGuide: React.FC<PermissionGuideProps> = ({ open, initialS
             <Steps items={[
               <>Khai báo tính năng trong <code className="text-[11px] bg-slate-100 px-1 rounded">src/config/permissions.ts</code> (nguồn duy nhất): <code className="text-[11px] bg-slate-100 px-1 rounded">key</code>, <code className="text-[11px] bg-slate-100 px-1 rounded">module</code>, <code className="text-[11px] bg-slate-100 px-1 rounded">defaultRoles</code>, <code className="text-[11px] bg-slate-100 px-1 rounded">addedAt</code> = ngày phát hành.</>,
               <>Chạy <code className="text-[11px] bg-slate-100 px-1 rounded">npm run perm:gen</code> để sinh bản cho webapp (tự chạy khi <code className="text-[11px] bg-slate-100 px-1 rounded">npm run build</code>/<code className="text-[11px] bg-slate-100 px-1 rounded">dev</code>).</>,
-              <>Frontend: dùng <code className="text-[11px] bg-slate-100 px-1 rounded">hasPermission('KEY')</code> hoặc <code className="text-[11px] bg-slate-100 px-1 rounded">{'<ProtectedRoute featureKey="KEY" />'}</code>. Backend: <code className="text-[11px] bg-slate-100 px-1 rounded">requirePermission('KEY')</code>.</>,
+              <>Frontend: dùng <code className="text-[11px] bg-slate-100 px-1 rounded">{"hasPermission('<KEY>')"}</code> hoặc <code className="text-[11px] bg-slate-100 px-1 rounded">{'<ProtectedRoute featureKey="<KEY>" />'}</code>. Backend: <code className="text-[11px] bg-slate-100 px-1 rounded">{"requirePermission('<KEY>')"}</code>.</>,
               <>Deploy & khởi động lại backend → quyền mặc định được tự thêm, banner "tính năng mới" xuất hiện cho Admin duyệt.</>
             ]} />
             <div className="grid sm:grid-cols-2 gap-2 pt-1">

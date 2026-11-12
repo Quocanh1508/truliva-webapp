@@ -771,6 +771,7 @@ export default function ReportList() {
     productName?: string;
     workType?: string;
     orderId?: string | null;
+    originalSerialNumber?: string;
   } | null>(null);
   const [znsPhone, setZnsPhone] = useState('');
   const [warrantyDurationText, setWarrantyDurationText] = useState('12 tháng');
@@ -799,8 +800,9 @@ export default function ReportList() {
       productName: modelName,
       workType: report.workType,
       orderId: report.orderId,
+      originalSerialNumber: serial,
     });
-    setZnsPhone(report.customerPhone || '');
+    setZnsPhone(report.znsPhone || report.customerPhone || '');
     setActivationStep(1);
     setShowActivationModal(true);
 
@@ -860,22 +862,44 @@ export default function ReportList() {
     }
     setZnsSending(true);
     try {
-      await fetchApi('/serials/zns-activate', {
-        method: 'POST',
-        body: JSON.stringify({
-          serialNumber: activationData.serialNumber.trim(),
-          recipientPhone: znsPhone.trim(),
-          productName: activationData.productName || activationData.model,
-          warrantyMonths: activationData.workType?.trim().toLowerCase() === 'thay lọc' ? 3 : 12,
-          workType: activationData.workType,
-          customerName: activationData.customerName,
-          expiryDateStr: warrantyExpiryDateStr
-        })
-      });
+      const serialEdited = activationData.serialNumber.trim() !== (activationData.originalSerialNumber || '').trim();
+      if (activationData.reportId && !serialEdited) {
+        // Gửi theo báo cáo: server tự lấy mã đơn, số tiền thực thu, serial → đúng nội dung mẫu 10232/10233 + chống gửi trùng
+        const send = (force: boolean) => fetchApi(`/reports/${activationData.reportId}/send-zns`, {
+          method: 'POST',
+          body: JSON.stringify({ phone: znsPhone.trim(), force })
+        });
+        try {
+          await send(false);
+        } catch (err: any) {
+          if (err.status === 409 && window.confirm(`${err.message}\n\nBạn có chắc muốn gửi lại tin nhắn cho khách hàng?`)) {
+            await send(true);
+          } else {
+            throw err;
+          }
+        }
+      } else {
+        // Admin sửa serial ngay trong hộp thoại → giữ luồng cũ (kích hoạt serial mới + gửi tin)
+        await fetchApi('/serials/zns-activate', {
+          method: 'POST',
+          body: JSON.stringify({
+            serialNumber: activationData.serialNumber.trim(),
+            recipientPhone: znsPhone.trim(),
+            productName: activationData.productName || activationData.model,
+            warrantyMonths: activationData.workType?.trim().toLowerCase() === 'thay lọc' ? 3 : 12,
+            workType: activationData.workType,
+            customerName: activationData.customerName,
+            expiryDateStr: warrantyExpiryDateStr,
+            orderId: activationData.orderId || undefined
+          })
+        });
+      }
       setActivationStep(2);
       loadReports();
     } catch (err: any) {
-      alert(err.message || 'Lỗi khi gửi yêu cầu kích hoạt ZNS.');
+      if (err.status !== 409) {
+        alert(err.message || 'Lỗi khi gửi yêu cầu kích hoạt ZNS.');
+      }
     } finally {
       setZnsSending(false);
     }

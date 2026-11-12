@@ -5,7 +5,7 @@ import { fetchApi, getOrders, getFiltersData, getOrderDetails } from '../../api/
 import LabeledImageUploader from '../../components/LabeledImageUploader';
 import { useAuth } from '../../context/AuthContext';
 import { isValidPhone, PHONE_ERROR_MSG } from '../../utils/phone';
-import { CheckCircle, ChevronLeft, Send, AlertCircle, Camera, Loader2, ChevronDown, X, ShieldCheck } from 'lucide-react';
+import { CheckCircle, ChevronLeft, Send, AlertCircle, Camera, Loader2, ChevronDown, X, ShieldCheck, Clock } from 'lucide-react';
 import { Html5Qrcode } from 'html5-qrcode';
 import { enqueueReport } from '../../utils/offlineStorage';
 import CategoryTreeSelect from '../../components/CategoryTreeSelect';
@@ -116,8 +116,10 @@ export default function ReportForm() {
   const [showActivationModal, setShowActivationModal] = useState(false);
   const [activationData, setActivationData] = useState<any>(null);
   const [znsPhone, setZnsPhone] = useState('');
-  const [activationStep, setActivationStep] = useState(1); // 1: Confirm details, 2: Success
+  const [activationStep, setActivationStep] = useState(1); // 1: Xác nhận số Zalo (trước khi nộp), 2: Kết quả
   const [znsSending, setZnsSending] = useState(false);
+  const [pendingPayload, setPendingPayload] = useState<any>(null); // Báo cáo chờ KTV xác nhận số Zalo rồi mới nộp
+  const [znsResult, setZnsResult] = useState<{ status: string; message: string } | null>(null);
   const [warrantyDurationText, setWarrantyDurationText] = useState('12 tháng');
   const [warrantyExpiryDateStr, setWarrantyExpiryDateStr] = useState('');
   const [showScanner, setShowScanner] = useState(false);
@@ -666,33 +668,29 @@ export default function ReportForm() {
     return true;
   };
 
+  // KTV xác nhận số Zalo → nộp báo cáo kèm znsPhone. Server tự gửi tin (hoặc chờ duyệt rồi mới gửi).
   const handleSendZns = async () => {
     if (!isValidPhone(znsPhone)) {
       alert(PHONE_ERROR_MSG);
       return;
     }
+    if (!pendingPayload) return;
     setZnsSending(true);
     try {
-      await fetchApi('/serials/zns-activate', {
-        method: 'POST',
-        body: JSON.stringify({
-          serialNumber: activationData.serialNumber,
-          recipientPhone: znsPhone.trim(),
-          productName: activationData.productName,
-          warrantyMonths: activationData.workType?.trim().toLowerCase() === 'thay lọc' ? 3 : (activationData.totalMonths || 12),
-          workType: activationData.workType,
-          customerName: activationData.customerName,
-          expiryDateStr: warrantyExpiryDateStr,
-          orderId: activationData.orderId,
-          serviceCode: activationData.serviceCode,
-          totalCollected: activationData.totalCollected
-        })
-      });
+      const result = await saveReport({ ...pendingPayload, znsPhone: znsPhone.trim() });
+      if (result.offline) {
+        setZnsResult({
+          status: 'OFFLINE',
+          message: 'Báo cáo đã lưu tạm do mất mạng. Tin nhắn Zalo sẽ tự gửi khi thiết bị có mạng và báo cáo được đồng bộ.'
+        });
+      } else {
+        setZnsResult(result.zns || { status: 'FAILED', message: 'Không nhận được kết quả gửi tin Zalo từ máy chủ.' });
+      }
       setActivationStep(2);
     } catch (err: any) {
-      alert(err.message || 'Lỗi khi gửi yêu cầu gửi tin nhắn Zalo. Hệ thống vẫn lưu báo cáo.');
+      // Lưu báo cáo thất bại → đóng hộp thoại, hiện lỗi trên form để KTV sửa và nộp lại
       setShowActivationModal(false);
-      navigate(reportsRedirectPath);
+      setError(err.message || 'Lỗi khi nộp báo cáo');
     } finally {
       setZnsSending(false);
     }
@@ -871,40 +869,25 @@ export default function ReportForm() {
         }
       }
 
-      if (editReportId) {
-        if (!navigator.onLine) {
-          setError('Không thể chỉnh sửa báo cáo khi ngoại tuyến. Vui lòng kết nối mạng và thử lại.');
-          setLoading(false);
-          return;
-        }
-
-        await fetchApi(`/reports/${editReportId}`, {
-          method: 'PUT',
-          body: JSON.stringify(payload)
-        });
-        const isZnsJob = ['lắp đặt', 'giao hàng và lắp đặt', 'thay lọc', 'bảo hành', 'sửa chữa'].includes(payload.workType?.trim().toLowerCase() || '');
-        if (isZnsJob) {
-          triggerActivationModal(payload);
-        } else {
-          navigate(reportsRedirectPath);
-        }
+      if (editReportId && !navigator.onLine) {
+        setError('Không thể chỉnh sửa báo cáo khi ngoại tuyến. Vui lòng kết nối mạng và thử lại.');
+        setLoading(false);
         return;
       }
 
-      if (!navigator.onLine) {
-        await enqueueReport(selectedOrderId, payload, reportFiles);
-        alert('Báo cáo đã được lưu tạm ngoại tuyến và sẽ tự động đồng bộ khi thiết bị của bạn có kết nối mạng.');
-        navigate(jobsRedirectPath);
-        return;
-      }
-
-      await fetchApi('/reports', {
-        method: 'POST',
-        body: JSON.stringify(payload)
-      });
+      // Ca có gửi tin Zalo: KTV phải xác nhận số Zalo nhận tin TRƯỚC khi nộp báo cáo
       const isZnsJob = ['lắp đặt', 'giao hàng và lắp đặt', 'thay lọc', 'bảo hành', 'sửa chữa'].includes(payload.workType?.trim().toLowerCase() || '');
       if (isZnsJob) {
+        setPendingPayload(payload);
+        setZnsResult(null);
         triggerActivationModal(payload);
+        return;
+      }
+
+      const result = await saveReport(payload);
+      if (result.offline) {
+        alert('Báo cáo đã được lưu tạm ngoại tuyến và sẽ tự động đồng bộ khi thiết bị của bạn có kết nối mạng.');
+        navigate(jobsRedirectPath);
       } else {
         navigate(reportsRedirectPath);
       }
@@ -912,6 +895,28 @@ export default function ReportForm() {
       setError(err.message);
       setLoading(false);
     }
+  };
+
+  // Lưu báo cáo (tạo mới / chỉnh sửa / xếp hàng offline). Trả về phản hồi server (có `zns` nếu đã gửi tin).
+  const saveReport = async (payload: any): Promise<{ offline?: boolean; zns?: any }> => {
+    if (editReportId) {
+      const res = await fetchApi(`/reports/${editReportId}`, {
+        method: 'PUT',
+        body: JSON.stringify(payload)
+      });
+      return { zns: res?.zns };
+    }
+
+    if (!navigator.onLine) {
+      await enqueueReport(selectedOrderId, payload, reportFiles);
+      return { offline: true };
+    }
+
+    const res = await fetchApi('/reports', {
+      method: 'POST',
+      body: JSON.stringify(payload)
+    });
+    return { zns: res?.zns };
   };
 
   const totalSteps = 3;
@@ -1633,7 +1638,8 @@ export default function ReportForm() {
                     <button 
                       type="button" 
                       className="p-1.5 rounded-lg hover:bg-gray-200 text-gray-400 hover:text-gray-600 transition-colors"
-                      onClick={() => { setShowActivationModal(false); navigate(reportsRedirectPath); }}
+                      onClick={() => { if (!znsSending) { setShowActivationModal(false); setPendingPayload(null); } }}
+                      title="Quay lại chỉnh sửa báo cáo (chưa nộp)"
                     >
                       <X size={18} />
                     </button>
@@ -1736,31 +1742,35 @@ export default function ReportForm() {
                       <p className="text-[10px] text-gray-400 leading-relaxed mt-1">
                         ⚠️ KTV có thể thay đổi SĐT này nếu khách hàng dùng số Zalo khác SĐT đăng ký đơn hàng.
                       </p>
+                      <p className="text-[11px] text-blue-700 bg-blue-50 border border-blue-100 rounded-lg px-2.5 py-2 leading-relaxed">
+                        Bấm xác nhận để <strong>nộp báo cáo</strong>. Tin nhắn Zalo sẽ tự động gửi tới số trên; nếu báo cáo cần Admin/Điều phối duyệt, tin sẽ gửi sau khi được duyệt.
+                      </p>
                     </div>
                   </div>
 
-                  <div className="p-4 bg-gray-50 border-t border-gray-100 shrink-0 flex">
+                  <div className="p-4 bg-gray-50 border-t border-gray-100 shrink-0 flex gap-3">
                     <button
                       type="button"
-                      className="btn btn-primary w-full py-2.5 text-sm flex justify-center items-center gap-1.5 font-bold shadow-md rounded-xl"
+                      className="btn btn-outline flex-1 py-2.5 text-sm rounded-xl font-medium"
+                      onClick={() => { setShowActivationModal(false); setPendingPayload(null); }}
+                      disabled={znsSending}
+                    >
+                      Quay lại
+                    </button>
+                    <button
+                      type="button"
+                      className="btn btn-primary flex-[2] py-2.5 text-sm flex justify-center items-center gap-1.5 font-bold shadow-md rounded-xl"
                       onClick={handleSendZns}
                       disabled={znsSending}
                     >
                       {znsSending ? (
                         <>
-                          <Loader2 size={16} className="animate-spin" /> Đang phát tin...
+                          <Loader2 size={16} className="animate-spin" /> Đang nộp báo cáo...
                         </>
                       ) : (
                         <>
-                          {activationData.isServiceJob ? (
-                            <>
-                              <Send size={18} /> Xác nhận & Gửi tin nhắn Zalo
-                            </>
-                          ) : (
-                            <>
-                              <ShieldCheck size={18} /> Kích hoạt bảo hành
-                            </>
-                          )}
+                          {activationData.isServiceJob ? <Send size={18} /> : <ShieldCheck size={18} />}
+                          Xác nhận & Nộp báo cáo
                         </>
                       )}
                     </button>
@@ -1768,31 +1778,48 @@ export default function ReportForm() {
                 </>
               ) : (
                 <>
-                  {/* Step 2: Gửi tin nhắn thành công! */}
-                  <div className="p-6 text-center space-y-4 overflow-y-auto flex-1 min-h-0">
-                    <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto text-green-600 shadow-sm shrink-0">
-                      <CheckCircle size={36} />
-                    </div>
-                    
-                    <div className="space-y-1">
-                      <h3 className="font-bold text-gray-800 text-lg">
-                        {activationData.isServiceJob ? 'Gửi tin nhắn dịch vụ thành công!' : 'Kích hoạt bảo hành thành công!'}
-                      </h3>
-                      <p className="text-xs text-gray-500 px-4 leading-relaxed">
-                        {activationData.isServiceJob 
-                          ? `Tin nhắn xác nhận hoàn thành dịch vụ (Mã ${activationData.serviceCode || ''}) đã gửi đến Zalo:`
-                          : 'Tin nhắn thông báo kích hoạt bảo hành đã được gửi đến số Zalo:'}
-                      </p>
-                      <p className="text-base font-bold text-blue-600 tracking-wider mt-1">{znsPhone}</p>
-                    </div>
+                  {/* Step 2: Báo cáo đã nộp + kết quả gửi tin Zalo */}
+                  {(() => {
+                    const st = znsResult?.status;
+                    const isOk = st === 'SENT' || st === 'ALREADY_SENT';
+                    const isWaiting = st === 'PENDING_APPROVAL' || st === 'OFFLINE';
+                    const title = st === 'SENT'
+                      ? (activationData.isServiceJob ? 'Đã gửi tin nhắn dịch vụ!' : 'Kích hoạt bảo hành thành công!')
+                      : st === 'ALREADY_SENT'
+                        ? 'Tin nhắn đã được gửi trước đó'
+                        : st === 'PENDING_APPROVAL'
+                          ? 'Báo cáo đang chờ duyệt'
+                          : st === 'OFFLINE'
+                            ? 'Đã lưu báo cáo ngoại tuyến'
+                            : 'Đã nộp báo cáo – gửi tin Zalo chưa thành công';
+                    return (
+                      <div className="p-6 text-center space-y-4 overflow-y-auto flex-1 min-h-0">
+                        <div className={`w-16 h-16 rounded-full flex items-center justify-center mx-auto shadow-sm shrink-0 ${isOk ? 'bg-green-100 text-green-600' : isWaiting ? 'bg-amber-100 text-amber-600' : 'bg-red-100 text-red-600'}`}>
+                          {isOk ? <CheckCircle size={36} /> : isWaiting ? <Clock size={36} /> : <AlertCircle size={36} />}
+                        </div>
 
-                    <div className="bg-emerald-50 border border-emerald-100 rounded-xl p-4 text-left text-xs text-emerald-900 leading-relaxed max-w-sm mx-auto space-y-1">
-                      <p className="font-medium">
-                        KTV hướng dẫn khách hàng kiểm tra tin nhắn Zalo từ OA <strong>Pure Vita</strong>.
-                      </p>
-                      <p className="font-semibold text-emerald-800 pt-1">Xin cảm ơn!</p>
-                    </div>
-                  </div>
+                        <div className="space-y-1">
+                          <h3 className="font-bold text-gray-800 text-lg">{title}</h3>
+                          <p className="text-xs text-gray-500 px-4 leading-relaxed">{znsResult?.message}</p>
+                          <p className="text-base font-bold text-blue-600 tracking-wider mt-1">{znsPhone}</p>
+                        </div>
+
+                        {isOk && (
+                          <div className="bg-emerald-50 border border-emerald-100 rounded-xl p-4 text-left text-xs text-emerald-900 leading-relaxed max-w-sm mx-auto space-y-1">
+                            <p className="font-medium">
+                              KTV hướng dẫn khách hàng kiểm tra tin nhắn Zalo từ OA <strong>Pure Vita</strong>.
+                            </p>
+                            <p className="font-semibold text-emerald-800 pt-1">Xin cảm ơn!</p>
+                          </div>
+                        )}
+                        {!isOk && !isWaiting && (
+                          <div className="bg-red-50 border border-red-100 rounded-xl p-4 text-left text-xs text-red-800 leading-relaxed max-w-sm mx-auto">
+                            Báo cáo đã được lưu. Vui lòng kiểm tra lại số Zalo và bấm <strong>gửi lại tin Zalo</strong> trong mục "Báo cáo của tôi".
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })()}
 
                   <div className="p-4 bg-gray-50 border-t border-gray-100 shrink-0 flex gap-3">
                     <button

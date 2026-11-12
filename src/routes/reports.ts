@@ -12,7 +12,8 @@ import {
   updateReport,
   deleteReport,
   approveReport,
-  rejectReport
+  rejectReport,
+  sendReportZnsManual
 } from '../controllers/reportController';
 
 const router = Router();
@@ -31,5 +32,6 @@ router.put('/:id', updateReport);
 router.delete('/:id', requireCoordinatorOrAdmin, deleteReport);
 router.post('/:id/approve', approveReport);
 router.post('/:id/reject', rejectReport);
+router.post('/:id/send-zns', sendReportZnsManual);
 
 export default router;

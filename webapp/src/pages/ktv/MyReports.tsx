@@ -103,7 +103,7 @@ export default function MyReports() {
       totalCollected: totalCollectedVal,
       isServiceJob
     });
-    setZnsPhone(report.customerPhone);
+    setZnsPhone(report.znsPhone || report.customerPhone);
     setActivationStep(1);
     setShowActivationModal(true);
 
@@ -154,25 +154,26 @@ export default function MyReports() {
       return;
     }
     setZnsSending(true);
+    const send = (force: boolean) => fetchApi(`/reports/${activationData.reportId}/send-zns`, {
+      method: 'POST',
+      body: JSON.stringify({ phone: znsPhone.trim(), force })
+    });
     try {
-      await fetchApi('/serials/zns-activate', {
-        method: 'POST',
-        body: JSON.stringify({
-          serialNumber: activationData.serialNumber,
-          recipientPhone: znsPhone.trim(),
-          productName: activationData.productName,
-          warrantyMonths: activationData.workType?.trim().toLowerCase() === 'thay lọc' ? 3 : (activationData.totalMonths || 12),
-          workType: activationData.workType,
-          customerName: activationData.customerName,
-          expiryDateStr: warrantyExpiryDateStr,
-          orderId: activationData.orderId,
-          serviceCode: activationData.serviceCode,
-          totalCollected: activationData.totalCollected
-        })
-      });
+      try {
+        await send(false);
+      } catch (err: any) {
+        // 409 = đã gửi tin cho báo cáo này trước đó → hỏi KTV có chắc muốn gửi lại không
+        if (err.status === 409 && window.confirm(`${err.message}\n\nBạn có chắc muốn gửi lại tin nhắn cho khách hàng?`)) {
+          await send(true);
+        } else {
+          throw err;
+        }
+      }
       setActivationStep(2);
     } catch (err: any) {
-      alert(err.message || 'Lỗi khi gửi yêu cầu gửi tin Zalo.');
+      if (err.status !== 409) {
+        alert(err.message || 'Lỗi khi gửi yêu cầu gửi tin Zalo.');
+      }
     } finally {
       setZnsSending(false);
     }

@@ -198,6 +198,148 @@ export function formatZaloPhone(phone: string): string {
 }
 
 /**
+ * Lỗi gửi ZNS qua Zalo OA.
+ * `definitive = true`  → Zalo chắc chắn KHÔNG gửi tin (trả mã lỗi, thiếu/hết hạn token...) → được phép chuyển FNS dự phòng.
+ * `definitive = false` → không rõ tin đã đi hay chưa (timeout, mất kết nối) → KHÔNG gửi dự phòng để tránh khách nhận 2 tin.
+ */
+export class ZaloZnsError extends Error {
+  constructor(message: string, public definitive: boolean, public code?: number | string, public details?: any) {
+    super(message);
+    this.name = 'ZaloZnsError';
+  }
+}
+
+/**
+ * Gửi 1 tin ZNS trực tiếp qua Zalo OA (business.openapi.zalo.me) và ghi ZnsMessageLog.
+ * Trên Sandbox chỉ mô phỏng, không gửi thật.
+ */
+export async function sendZaloDirectZns(params: {
+  phone: string;
+  templateId: string;
+  templateData: Record<string, string | number>;
+  trackingId: string;
+  log: {
+    serialNumber?: string | null;
+    customerName?: string | null;
+    productName?: string | null;
+    orderNumber?: string | null;
+    reportId?: string | null;
+  };
+}): Promise<{ messageId: string | null; gateway: string; raw: any }> {
+  const formattedPhone = formatZaloPhone(params.phone.trim());
+  const gatewayName = 'Zalo OA (ZNS)';
+  const baseLog = {
+    phone: formattedPhone,
+    serialNumber: params.log.serialNumber || null,
+    customerName: params.log.customerName || null,
+    productName: params.log.productName || null,
+    orderNumber: params.log.orderNumber || null,
+    reportId: params.log.reportId || null,
+    templateId: String(params.templateId)
+  };
+
+  if (isSandboxEnvironment()) {
+    logSandboxBlockedAction('sendZaloDirectZns', { ...baseLog, templateData: params.templateData });
+    const mockId = `SANDBOX_MOCK_ZALO_${Date.now()}`;
+    try {
+      await prisma.znsMessageLog.create({
+        data: {
+          ...baseLog,
+          messageId: mockId,
+          status: 'SUCCESS',
+          durationMs: '1ms',
+          gateway: `${gatewayName} (Sandbox Simulation)`,
+          sentAt: new Date(),
+          rawData: { simulated: true, environment: 'SANDBOX', template_id: params.templateId, template_data: params.templateData } as any
+        }
+      });
+    } catch (dbErr: any) {
+      logger.warn('Failed to write mock Zalo ZNS log in sandbox', { error: dbErr.message });
+    }
+    return { messageId: mockId, gateway: `${gatewayName} (Sandbox Simulation)`, raw: { simulated: true } };
+  }
+
+  const startTime = Date.now();
+  const writeFailedLog = async (err: ZaloZnsError) => {
+    try {
+      await prisma.znsMessageLog.create({
+        data: {
+          ...baseLog,
+          status: 'FAILED',
+          error: err.message,
+          durationMs: `${Date.now() - startTime}ms`,
+          gateway: gatewayName,
+          sentAt: new Date(),
+          rawData: { template_data: params.templateData, code: err.code ?? null, details: err.details ?? null, definitive: err.definitive } as any
+        }
+      });
+    } catch (dbErr: any) {}
+  };
+
+  let accessToken: string;
+  try {
+    accessToken = await getValidAccessToken();
+  } catch (tokenErr: any) {
+    const err = new ZaloZnsError(`Không lấy được access token Zalo OA: ${tokenErr.message}`, true, 'TOKEN');
+    await writeFailedLog(err);
+    throw err;
+  }
+
+  let data: any;
+  try {
+    const response = await axios.post('https://business.openapi.zalo.me/message/template', {
+      phone: formattedPhone,
+      template_id: String(params.templateId),
+      template_data: params.templateData,
+      tracking_id: params.trackingId.substring(0, 48)
+    }, {
+      headers: { 'Content-Type': 'application/json', 'access_token': accessToken },
+      timeout: 15000
+    });
+    data = response.data;
+  } catch (httpErr: any) {
+    // Có phản hồi HTTP lỗi → Zalo đã từ chối. Không có phản hồi (timeout/mạng) → không chắc chắn.
+    const definitive = !!httpErr.response;
+    const err = new ZaloZnsError(
+      definitive ? `Zalo OA trả lỗi HTTP ${httpErr.response.status}` : `Không nhận được phản hồi từ Zalo OA: ${httpErr.message}`,
+      definitive,
+      httpErr.response?.status,
+      httpErr.response?.data
+    );
+    await writeFailedLog(err);
+    throw err;
+  }
+
+  if (!data || data.error !== 0) {
+    const err = new ZaloZnsError(`Zalo ZNS lỗi: ${data?.message || 'không rõ'} (Code: ${data?.error})`, true, data?.error, data);
+    await writeFailedLog(err);
+    throw err;
+  }
+
+  const durationMs = Date.now() - startTime;
+  const messageId = data.data?.msg_id || data.data?.message_id || null;
+  logger.info('ZNS sent via Zalo OA', { phone: formattedPhone, templateId: params.templateId, messageId, durationMs: `${durationMs}ms` });
+
+  try {
+    await prisma.znsMessageLog.create({
+      data: {
+        ...baseLog,
+        messageId,
+        status: 'SUCCESS',
+        durationMs: `${durationMs}ms`,
+        gateway: gatewayName,
+        sentAt: new Date(),
+        rawData: { zaloData: data, template_data: params.templateData } as any
+      }
+    });
+  } catch (dbErr: any) {
+    logger.warn('Failed to save Zalo ZNS log', { error: dbErr.message });
+  }
+
+  return { messageId, gateway: gatewayName, raw: data };
+}
+
+/**
  * Gửi tin nhắn ZNS xác nhận kích hoạt bảo hành
  * QUY CHUẨN MỚI: Chỉ gửi qua FPT FNS Gateway (Template 10232 - Lắp đặt & Bảo hành)
  * Template 617366 (Zalo Direct) ĐÃ NGỪNG ÁP DỤNG theo yêu cầu chương trình mới.
@@ -211,9 +353,13 @@ export async function sendZnsWarrantyActivation(
     productName?: string;
     expiryDateStr?: string;
     gatewayMode?: 'AUTO' | 'ZALO_DIRECT' | 'FNS_GATEWAY';
+    reportId?: string;
+    orderNumber?: string;
   }
 ): Promise<any> {
   const cleanSerial = serialNumber.trim().replace(/[^a-zA-Z0-9_]/g, '').toUpperCase();
+  const reportId = options?.reportId || null;
+  const logOrderNumber = options?.orderNumber || null;
   const formattedPhone = formatZaloPhone(recipientPhone.trim());
   const fnsTemplateId = Number(process.env.FNS_TEMPLATE_ID_LAP_DAT || '10232');
   const fnsAppId = process.env.FNS_APP_ID || '';
@@ -284,6 +430,8 @@ export async function sendZnsWarrantyActivation(
           messageId: mockMsgId,
           phone: formattedPhone,
           serialNumber: cleanSerial,
+          reportId,
+          orderNumber: logOrderNumber,
           customerName,
           productName,
           templateId: String(fnsTemplateId),
@@ -361,6 +509,8 @@ export async function sendZnsWarrantyActivation(
           messageId: data.data?.message_id || null,
           phone: formattedPhone,
           serialNumber: cleanSerial,
+          reportId,
+          orderNumber: logOrderNumber,
           customerName,
           productName,
           templateId: String(fnsTemplateId),
@@ -398,6 +548,8 @@ export async function sendZnsWarrantyActivation(
         data: {
           phone: formattedPhone,
           serialNumber: cleanSerial,
+          reportId,
+          orderNumber: logOrderNumber,
           customerName,
           productName,
           templateId: String(fnsTemplateId),
@@ -431,6 +583,7 @@ export async function sendFnsServiceCompletion(params: {
   orderId?: string;
   workType?: string;
   allowRealSend?: boolean;
+  reportId?: string;
 }): Promise<any> {
   const {
     recipientPhone,
@@ -442,6 +595,7 @@ export async function sendFnsServiceCompletion(params: {
     workType = 'Dịch vụ',
     allowRealSend = false
   } = params;
+  const reportId = params.reportId || null;
 
   const formattedPhone = formatZaloPhone(recipientPhone.trim());
   const fnsTemplateId = Number(process.env.FNS_TEMPLATE_ID_DICH_VU || '10233');
@@ -481,6 +635,7 @@ export async function sendFnsServiceCompletion(params: {
           messageId: mockMsgId,
           phone: formattedPhone,
           serialNumber: serialNumber || null,
+          reportId,
           customerName,
           productName: `Dịch vụ ${workType}: ${serviceCode}`,
           templateId: String(fnsTemplateId),
@@ -556,6 +711,7 @@ export async function sendFnsServiceCompletion(params: {
           messageId: data.data?.message_id || null,
           phone: formattedPhone,
           serialNumber: serialNumber || null,
+          reportId,
           customerName,
           productName: `Dịch vụ ${workType}: ${serviceCode}`,
           templateId: String(fnsTemplateId),
@@ -589,6 +745,7 @@ export async function sendFnsServiceCompletion(params: {
         data: {
           phone: formattedPhone,
           serialNumber: serialNumber || null,
+          reportId,
           customerName,
           productName: `Dịch vụ ${workType}: ${serviceCode}`,
           templateId: String(fnsTemplateId),

@@ -31,6 +31,7 @@ import {
   checkZnsStatus,
   getZnsLogs,
   updateZnsLog,
+  getZnsTemplates,
   getMachineModels,
   createMachineModel,
   updateMachineModel,
@@ -143,5 +144,6 @@ router.post('/zns/test-send', requireDev, testZnsSend);
 router.post('/zns/check-status', requireDev, checkZnsStatus);
 router.get('/zns/logs', requireDev, getZnsLogs);
 router.put('/zns/logs/:id', requireDev, updateZnsLog);
+router.get('/zns/templates', requireDev, getZnsTemplates);
 
 export default router;

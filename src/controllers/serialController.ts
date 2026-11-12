@@ -18,13 +18,15 @@ import { activateSerialWarranty } from '../services/warrantyService';
 import { 
   getZaloConfig, 
   exchangeAuthorizationCode, 
-  sendZnsWarrantyActivation, 
+  sendZnsWarrantyActivation,
   sendFnsServiceCompletion,
-  getValidAccessToken 
+  sendZaloDirectZns,
+  getValidAccessToken
 } from '../services/zaloService';
 import { sendPushNotification } from '../services/notificationService';
 import { sendWebPushNotification } from '../services/webPushService';
 import { PANCAKE_PROVINCES } from '../utils/provinces';
+import { sendInstallWarrantyZns, ZNS_TEMPLATE_INSTALL_WATER, ZNS_TEMPLATE_INSTALL_OTHER } from '../services/installZnsService';
 
 export async function uploadInvoiceResponse(req: Request, res: Response): Promise<void> {
   try {
@@ -123,7 +125,11 @@ export async function activatePublicSerial(req: Request, res: Response): Promise
 
     let znsResult = null;
     try {
-      znsResult = await sendZnsWarrantyActivation(cleaned, customerPhone.trim());
+      znsResult = await sendInstallWarrantyZns({
+        phone: customerPhone.trim(),
+        customerName: customerName.trim(),
+        serialNumber: serial.serialNumber
+      });
     } catch (znsError: any) {
       logger.error('Lỗi gửi tin nhắn ZNS khi khách hàng tự kích hoạt', { serialNumber: cleaned, phone: customerPhone, error: znsError.message });
     }
@@ -188,7 +194,9 @@ export async function activatePublicSerial(req: Request, res: Response): Promise
 
     res.json({
       success: true,
-      message: 'Kích hoạt bảo hành thành công! Tin nhắn xác nhận đã được gửi đến số Zalo của Quý khách.',
+      message: znsResult
+        ? 'Kích hoạt bảo hành thành công! Tin nhắn xác nhận đã được gửi đến số Zalo của Quý khách.'
+        : 'Kích hoạt bảo hành thành công! Hiện chưa gửi được tin nhắn Zalo xác nhận, bộ phận CSKH Truliva sẽ liên hệ hỗ trợ Quý khách.',
       serial: {
         serialNumber: updated.serialNumber,
         model: updated.model,
@@ -1506,7 +1514,12 @@ export async function activateSerialDirect(req: Request, res: Response): Promise
     // Tự động gửi tin nhắn ZNS thông báo kích hoạt bảo hành thành công cho khách hàng
     if (customerPhone && customerPhone.trim() !== '') {
       try {
-        await sendZnsWarrantyActivation(serial.serialNumber, customerPhone.trim());
+        await sendInstallWarrantyZns({
+          phone: customerPhone.trim(),
+          customerName: customerName.trim(),
+          serialNumber: serial.serialNumber,
+          orderId: updated?.orderId || serial.orderId
+        });
       } catch (znsErr: any) {
         logger.error('Lỗi gửi ZNS sau khi Admin kích hoạt trực tiếp', {
           serialNumber: serial.serialNumber,
@@ -1578,7 +1591,12 @@ export async function approveWarranty(req: Request, res: Response): Promise<void
     // Tự động gửi tin nhắn ZNS thông báo kích hoạt bảo hành thành công cho khách hàng
     if (serial.customerPhone) {
       try {
-        await sendZnsWarrantyActivation(serial.serialNumber, serial.customerPhone);
+        await sendInstallWarrantyZns({
+          phone: serial.customerPhone,
+          customerName: serial.customerName,
+          serialNumber: serial.serialNumber,
+          orderId: serial.orderId
+        });
       } catch (znsErr: any) {
         logger.error('Lỗi gửi ZNS sau khi Admin phê duyệt bảo hành', { serialNumber: serial.serialNumber, phone: serial.customerPhone, error: znsErr.message });
       }
@@ -1736,7 +1754,12 @@ export async function updateSerial(req: Request, res: Response): Promise<void> {
 
     if (isNewActive && (phoneChanged || !isOldActive) && targetPhone.length >= 10) {
       try {
-        await sendZnsWarrantyActivation(updated.serialNumber, targetPhone);
+        await sendInstallWarrantyZns({
+          phone: targetPhone,
+          customerName: updated.customerName,
+          serialNumber: updated.serialNumber,
+          orderId: updated.orderId
+        });
         logger.info('ZNS warranty activation triggered from updateSerial', {
           serialNumber: updated.serialNumber,
           phone: targetPhone,
@@ -1985,16 +2008,13 @@ export async function activateZns(req: Request, res: Response): Promise<void> {
       );
     }
 
-    const znsResult = await sendZnsWarrantyActivation(
-      cleanSerial, 
-      recipientPhone, 
-      monthsToApply,
-      {
-        customerName: finalCustomerName,
-        productName: finalProductName,
-        expiryDateStr: expiryDateStr
-      }
-    );
+    void monthsToApply; void finalProductName; void expiryDateStr; // Hạn & tên SP nay lấy từ DB / danh mục sản phẩm
+    const znsResult = await sendInstallWarrantyZns({
+      phone: recipientPhone.trim(),
+      customerName: finalCustomerName,
+      serialNumber: cleanSerial,
+      orderId: orderId || existingSerial?.orderId || null
+    });
 
     res.json({
       success: true,
@@ -2089,6 +2109,36 @@ export async function testZnsSend(req: Request, res: Response): Promise<void> {
       return;
     }
 
+    // Bắn thử trực tiếp mẫu Zalo OA 666024 / 666039 với đúng dữ liệu nhập tay
+    if ([ZNS_TEMPLATE_INSTALL_WATER, ZNS_TEMPLATE_INSTALL_OTHER].includes(String(templateId))) {
+      const templateData = {
+        _TEN_KHACH_HANG_: String(customerName || 'Quý Khách').substring(0, 30),
+        _TEN_SAN_PHAM_: String(productName || 'Sản phẩm Truliva').substring(0, 200),
+        _ID_BAO_HANH_: String(serialNumber).trim().substring(0, 30),
+        _NGAY_BAO_HANH_: String(expiryDate || '').trim().substring(0, 30)
+      };
+      if (!templateData._NGAY_BAO_HANH_) {
+        res.status(400).json({ error: 'Vui lòng nhập ngày hết hạn bảo hành (dd/mm/yyyy)' });
+        return;
+      }
+      const direct = await sendZaloDirectZns({
+        phone,
+        templateId: String(templateId),
+        templateData,
+        trackingId: `TEST-${Date.now()}`,
+        log: { serialNumber: templateData._ID_BAO_HANH_, customerName: templateData._TEN_KHACH_HANG_, productName: templateData._TEN_SAN_PHAM_ }
+      });
+      res.json({ success: true, templateId: String(templateId), gateway: direct.gateway, data: { message_id: direct.messageId }, template_data: templateData });
+      return;
+    }
+
+    // Bắn lại "Tự động": chọn mẫu theo danh mục sản phẩm, hạn bảo hành theo DB, dự phòng FNS
+    if (gatewayMode === 'AUTO') {
+      const auto = await sendInstallWarrantyZns({ phone, customerName, serialNumber });
+      res.json({ success: true, ...auto, data: { message_id: auto.messageId } });
+      return;
+    }
+
     const result = await sendZnsWarrantyActivation(
       serialNumber,
       phone,
@@ -2097,7 +2147,7 @@ export async function testZnsSend(req: Request, res: Response): Promise<void> {
         customerName,
         productName,
         expiryDateStr: expiryDate,
-        gatewayMode: gatewayMode || 'AUTO'
+        gatewayMode: 'FNS_GATEWAY'
       }
     );
 
@@ -2254,6 +2304,7 @@ export async function getZnsLogs(req: Request, res: Response): Promise<void> {
     const search = (req.query.search as string || '').trim();
     const status = (req.query.status as string || 'ALL').trim();
     const model = (req.query.model as string || 'ALL').trim();
+    const templateFilter = (req.query.templateId as string || 'ALL').trim();
     const startDate = (req.query.startDate as string || '').trim();
     const endDate = (req.query.endDate as string || '').trim();
     const page = Math.max(1, parseInt(req.query.page as string || '1', 10));
@@ -2268,6 +2319,10 @@ export async function getZnsLogs(req: Request, res: Response): Promise<void> {
 
     if (model !== 'ALL') {
       where.productName = { contains: model, mode: 'insensitive' };
+    }
+
+    if (templateFilter !== 'ALL') {
+      where.templateId = templateFilter;
     }
 
     if (startDate || endDate) {
@@ -2442,5 +2497,50 @@ export async function updateZnsLog(req: Request, res: Response): Promise<void> {
   } catch (error: any) {
     logger.error('Error updating ZNS log', { error: error.message });
     res.status(500).json({ error: error.message });
+  }
+}
+
+/**
+ * Danh sách mẫu ZNS của Zalo OA (chỉ đọc). ?id=<templateId> → chi tiết 1 mẫu (tham số, nút, link xem trước).
+ */
+export async function getZnsTemplates(req: Request, res: Response): Promise<void> {
+  try {
+    const accessToken = await getValidAccessToken();
+    const headers = { access_token: accessToken };
+    const id = String(req.query.id || '').trim();
+
+    if (id) {
+      const r = await axios.get('https://business.openapi.zalo.me/template/info/v2', { headers, params: { template_id: id }, timeout: 15000 });
+      if (r.data?.error !== 0) {
+        res.status(502).json({ error: `Zalo trả lỗi: ${r.data?.message} (Code: ${r.data?.error})` });
+        return;
+      }
+      res.json({ success: true, template: r.data.data });
+      return;
+    }
+
+    const templates: any[] = [];
+    for (let offset = 0; offset < 1000; offset += 100) {
+      const r = await axios.get('https://business.openapi.zalo.me/template/all', { headers, params: { offset, limit: 100 }, timeout: 15000 });
+      if (r.data?.error !== 0) {
+        res.status(502).json({ error: `Zalo trả lỗi: ${r.data?.message} (Code: ${r.data?.error})` });
+        return;
+      }
+      const items = r.data.data || [];
+      templates.push(...items);
+      if (items.length < 100) break;
+    }
+
+    res.json({
+      success: true,
+      templates,
+      inUse: {
+        [ZNS_TEMPLATE_INSTALL_WATER]: 'Lắp đặt – Máy lọc nước (Zalo OA)',
+        [ZNS_TEMPLATE_INSTALL_OTHER]: 'Lắp đặt – Sản phẩm khác (Zalo OA)'
+      }
+    });
+  } catch (error: any) {
+    logger.error('Get ZNS templates error', { error: error.message });
+    res.status(500).json({ error: error.message || 'Lỗi lấy danh sách mẫu ZNS' });
   }
 }

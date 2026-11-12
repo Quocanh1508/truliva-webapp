@@ -349,6 +349,7 @@ model ServiceReport {
   handlingMethod    String?   @map("handling_method")      // Cách xử lý của KTV
   approvalStatus    String    @default("APPROVED") @map("approval_status")
   rejectReason      String?   @map("reject_reason")
+  znsPhone          String?   @map("zns_phone")            // SĐT Zalo nhận tin ZNS/FNS do KTV xác nhận khi nộp báo cáo (null = không tự động gửi)
   createdAt         DateTime  @default(now()) @map("created_at")
   updatedAt         DateTime  @updatedAt @map("updated_at")
 
@@ -697,6 +698,7 @@ model ZnsMessageLog {
   durationMs      String?       @map("duration_ms")
   gateway         String?       @default("Zalo Direct ZBS OpenAPI")
   orderNumber     String?       @map("order_number")
+  reportId        String?       @map("report_id")       // Báo cáo KTV đã kích hoạt việc gửi tin (nếu có)
   sentAt          DateTime      @default(now()) @map("sent_at")
   rawData         Json?         @map("raw_data")
   createdAt       DateTime      @default(now()) @map("created_at")
@@ -705,6 +707,8 @@ model ZnsMessageLog {
   @@index([serialNumber])
   @@index([messageId])
   @@index([sentAt])
+  @@index([reportId])
+  @@index([orderNumber])
   @@map("zns_message_logs")
 }
 

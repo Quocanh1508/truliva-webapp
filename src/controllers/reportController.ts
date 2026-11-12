@@ -14,6 +14,8 @@ import { sanitizeItemsForPancake, stripComboChildLinesFromPancakePayload } from 
 import { isSandboxEnvironment, logSandboxBlockedAction } from '../utils/sandboxGuard';
 import { PANCAKE_API_BASE } from '../config/pancake';
 import { normalizeProvince, PANCAKE_PROVINCES } from '../utils/provinces';
+import { sendReportZns, getReportZnsKind, isValidZnsPhone, ReportZnsResult } from '../services/reportZnsService';
+import { checkDynamicPermission } from '../middleware/authSession';
 
 export async function createReport(req: Request, res: Response): Promise<void> {
   try {
@@ -45,6 +47,7 @@ export async function createReport(req: Request, res: Response): Promise<void> {
       mainStationId,
       techStationId,
       assignedKtvId,
+      znsPhone,
     } = req.body;
 
     if (!customerName || !customerPhone) {
@@ -236,6 +239,12 @@ export async function createReport(req: Request, res: Response): Promise<void> {
       }
     }
 
+    const cleanZnsPhone = znsPhone ? String(znsPhone).trim() : '';
+    if (cleanZnsPhone && !isValidZnsPhone(cleanZnsPhone)) {
+      res.status(400).json({ error: `Số Zalo nhận tin "${cleanZnsPhone}" không hợp lệ. Vui lòng kiểm tra lại.` });
+      return;
+    }
+
     const report = await prisma.serviceReport.create({
       data: {
         month: reportMonth,
@@ -265,6 +274,7 @@ export async function createReport(req: Request, res: Response): Promise<void> {
         issueType: issueType || null,
         handlingMethod: handlingMethod || null,
         approvalStatus: isApprovalRequired ? 'PENDING' : 'APPROVED',
+        znsPhone: cleanZnsPhone || null,
       } as any,
       include: {
         ktvUser: { select: { fullName: true } },
@@ -635,8 +645,14 @@ export async function createReport(req: Request, res: Response): Promise<void> {
       }
     }
 
-    logger.info('Report created', { reportId: report.id, ktvId: req.user!.id });
-    res.status(201).json({ report });
+    // Tự động gửi tin Zalo (ZNS/FNS) nếu KTV đã xác nhận số Zalo. Báo cáo PENDING sẽ gửi khi được duyệt.
+    let zns: ReportZnsResult | null = null;
+    if (cleanZnsPhone && getReportZnsKind(workType || oldOrder?.workType)) {
+      zns = await sendReportZns(report.id, { trigger: 'CREATE' });
+    }
+
+    logger.info('Report created', { reportId: report.id, ktvId: req.user!.id, znsStatus: zns?.status });
+    res.status(201).json({ report, zns });
   } catch (error: any) {
     logger.error('Create report error', { error: error.message });
     res.status(500).json({ error: 'Lỗi tạo báo cáo' });
@@ -1372,7 +1388,14 @@ export async function updateReport(req: Request, res: Response): Promise<void> {
       spareParts, issueType, handlingMethod,
       imageUrls,
       items,
+      znsPhone,
     } = req.body;
+
+    const cleanZnsPhone = znsPhone ? String(znsPhone).trim() : '';
+    if (cleanZnsPhone && !isValidZnsPhone(cleanZnsPhone)) {
+      res.status(400).json({ error: `Số Zalo nhận tin "${cleanZnsPhone}" không hợp lệ. Vui lòng kiểm tra lại.` });
+      return;
+    }
 
     if (imageUrls !== undefined && (!imageUrls || !Array.isArray(imageUrls) || imageUrls.length === 0)) {
       res.status(400).json({ error: 'Báo cáo bắt buộc phải có hình ảnh xác nhận' });
@@ -1487,6 +1510,7 @@ export async function updateReport(req: Request, res: Response): Promise<void> {
     if (handlingMethod !== undefined) updateData.handlingMethod = handlingMethod || null;
 
     if (imageUrls !== undefined) updateData.imageUrls = imageUrls || [];
+    if (cleanZnsPhone) updateData.znsPhone = cleanZnsPhone;
 
     const report = await prisma.serviceReport.update({
       where: { id: req.params.id as string },
@@ -1684,8 +1708,15 @@ export async function updateReport(req: Request, res: Response): Promise<void> {
       }
     }
 
-    logger.info('Report updated by admin', { reportId: report.id, by: req.user!.id, fieldsUpdated: Object.keys(updateData) });
-    res.json({ report });
+    // Chỉ tự gửi khi lần sửa này có xác nhận số Zalo (luồng KTV sửa báo cáo trên form).
+    // Admin sửa báo cáo cũ ở màn hình khác sẽ KHÔNG bắn tin. Chống trùng nằm trong sendReportZns.
+    let zns: ReportZnsResult | null = null;
+    if (cleanZnsPhone && getReportZnsKind(report.workType)) {
+      zns = await sendReportZns(report.id, { trigger: 'UPDATE' });
+    }
+
+    logger.info('Report updated by admin', { reportId: report.id, by: req.user!.id, fieldsUpdated: Object.keys(updateData), znsStatus: zns?.status });
+    res.json({ report, zns });
   } catch (error: any) {
     logger.error('Update report error', { error: error.message });
     res.status(500).json({ error: 'Lỗi cập nhật' });
@@ -2166,9 +2197,20 @@ export async function approveReport(req: Request, res: Response): Promise<void> 
       }
     }
 
+    // Báo cáo vừa được duyệt → gửi tin Zalo tới số KTV đã xác nhận lúc nộp báo cáo
+    let zns: ReportZnsResult | null = null;
+    if (report.znsPhone && getReportZnsKind(report.workType || report.order?.workType)) {
+      zns = await sendReportZns(reportId, { trigger: 'APPROVE' });
+    }
+
     const orderCode = formatOrderCode(report.order?.pancakeOrderId);
     const ktvTitle = 'Báo cáo đã được phê duyệt';
-    const ktvContent = `Báo cáo của đơn hàng ${orderCode} đã được phê duyệt.`;
+    let ktvContent = `Báo cáo của đơn hàng ${orderCode} đã được phê duyệt.`;
+    if (zns?.status === 'SENT') {
+      ktvContent += ` Tin nhắn Zalo đã được gửi tới khách hàng (${zns.phone}).`;
+    } else if (zns?.status === 'FAILED') {
+      ktvContent += ` Gửi tin nhắn Zalo cho khách thất bại, vui lòng gửi lại trong mục "Báo cáo của tôi".`;
+    }
 
     await prisma.notification.create({
       data: {
@@ -2193,8 +2235,8 @@ export async function approveReport(req: Request, res: Response): Promise<void> 
       pancakeOrderId: pancakeOrderCode
     }).catch(err => logger.error('Web push notification failed on approval', { error: err.message }));
 
-    logger.info('Report approved successfully', { reportId, approvedBy: req.user!.id });
-    res.json({ success: true, message: 'Phê duyệt báo cáo thành công' });
+    logger.info('Report approved successfully', { reportId, approvedBy: req.user!.id, znsStatus: zns?.status });
+    res.json({ success: true, message: 'Phê duyệt báo cáo thành công', zns });
   } catch (error: any) {
     logger.error('Approve report error', { error: error.message });
     res.status(500).json({ error: 'Lỗi phê duyệt báo cáo' });
@@ -2315,5 +2357,63 @@ export async function rejectReport(req: Request, res: Response): Promise<void> {
   } catch (error: any) {
     logger.error('Reject report error', { error: error.message });
     res.status(500).json({ error: 'Lỗi từ chối phê duyệt báo cáo' });
+  }
+}
+
+/**
+ * Gửi lại tin Zalo (ZNS/FNS) cho một báo cáo — nút "Gửi tin Zalo" trong "Báo cáo của tôi" / Quản lý báo cáo.
+ * Body: { phone?: string, force?: boolean }
+ *  - Đã gửi trước đó → 409 (kèm thời điểm gửi). Gửi lại với force=true sau khi người dùng xác nhận.
+ */
+export async function sendReportZnsManual(req: Request, res: Response): Promise<void> {
+  try {
+    const reportId = req.params.id as string;
+    const { phone, force } = req.body || {};
+
+    const report = await prisma.serviceReport.findUnique({
+      where: { id: reportId },
+      select: { id: true, ktvUserId: true, reportedById: true }
+    });
+    if (!report) {
+      res.status(404).json({ error: 'Không tìm thấy báo cáo' });
+      return;
+    }
+
+    const user = req.user!;
+    const isOwner = report.ktvUserId === user.id || report.reportedById === user.id;
+    const isManager = ['ADMIN', 'COORDINATOR', 'DEV'].includes(user.role);
+    const hasSerialAccess = !isOwner && !isManager
+      ? await checkDynamicPermission(user.role, 'SERIAL_VIEW', user.group, user.id)
+      : false;
+    if (!isOwner && !isManager && !hasSerialAccess) {
+      res.status(403).json({ error: 'Bạn không có quyền gửi tin Zalo cho báo cáo này' });
+      return;
+    }
+
+    const cleanPhone = phone ? String(phone).trim() : '';
+    if (!cleanPhone) {
+      res.status(400).json({ error: 'Vui lòng nhập số Zalo nhận tin' });
+      return;
+    }
+
+    const zns = await sendReportZns(reportId, { trigger: 'MANUAL', phoneOverride: cleanPhone, force: Boolean(force) });
+
+    const httpStatus: Record<string, number> = {
+      SENT: 200,
+      ALREADY_SENT: 409,
+      PENDING_APPROVAL: 400,
+      NOT_APPLICABLE: 400,
+      NO_PHONE: 400,
+      FAILED: 502
+    };
+    const code = httpStatus[zns.status] || 500;
+    if (code === 200) {
+      res.json({ success: true, message: zns.message, zns });
+    } else {
+      res.status(code).json({ success: false, error: zns.message, zns });
+    }
+  } catch (error: any) {
+    logger.error('Manual report ZNS error', { error: error.message });
+    res.status(500).json({ error: 'Lỗi hệ thống khi gửi tin Zalo' });
   }
 }
