@@ -1,9 +1,12 @@
 name: Deploy Truliva System
 
+# TẠM TẮT tự động deploy khi push lên main (13/11/2026):
+#  - /var/www/truliva trên VPS không còn đồng bộ git (lệch ~298 commit, ~178 file deploy qua SFTP)
+#    → `git pull` lỗi nhưng script vẫn chạy tiếp `prisma db push` với schema cũ trên VPS.
+#  - Secret VPS_PASSWORD đã cũ sau khi đổi mật khẩu root ngày 12/11.
+# Chỉ chạy thủ công (Actions → Run workflow) sau khi đã sửa lại quy trình deploy.
 on:
-  push:
-    branches:
-      - main
+  workflow_dispatch:
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
