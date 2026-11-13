@@ -38,9 +38,6 @@ export default function IndexPage() {
   const [orderSuccessData, setOrderSuccessData] = useState<any>(null);
   const [vietQrInfo, setVietQrInfo] = useState<any>(null);
 
-  // Dev simulation state
-  const [testPhone, setTestPhone] = useState('0915185982');
-
   const { addToCart } = useCart();
 
   const authenticateWithToken = async (phoneToken: string, userAccessToken?: string, zaloProfile?: any) => {
@@ -121,20 +118,14 @@ export default function IndexPage() {
 
       if (data && data.token) {
         await authenticateWithToken(data.token, userAccessToken, zaloProfile);
-      } else if (data && data.number) {
-        await authenticateWithToken(data.number, userAccessToken, zaloProfile);
       } else {
         throw new Error('Không lấy được mã xác thực Số điện thoại từ Zalo');
       }
     } catch (err: any) {
       console.error('Zalo Auth SDK Error:', err);
-      // Fallback dev test
-      if (testPhone) {
-        await authenticateWithToken(testPhone);
-      } else {
-        setError(err.message || 'Lỗi cấp quyền Zalo');
-        setLoading(false);
-      }
+      // Không có fallback đăng nhập bằng SĐT thô: bắt buộc xác thực qua Zalo SDK
+      setError(err.message || 'Lỗi cấp quyền Zalo. Vui lòng cho phép chia sẻ số điện thoại để đăng nhập.');
+      setLoading(false);
     }
   };
 
@@ -363,36 +354,6 @@ export default function IndexPage() {
               <Phone size={16} />
               <span>Đăng Nhập Bằng Số Điện Thoại</span>
             </button>
-
-            {/* Nhập số điện thoại thủ công */}
-            <div className="pt-2 border-t border-white/10 space-y-2 text-left">
-              <p className="text-[11px] text-sky-200 font-semibold">Hoặc nhập số điện thoại trực tiếp:</p>
-              <div className="flex gap-2">
-                <input 
-                  type="tel"
-                  value={testPhone}
-                  onChange={(e) => setTestPhone(e.target.value)}
-                  placeholder="Nhập SĐT (VD: 0915185982)"
-                  className="flex-1 bg-white/10 border border-white/20 rounded-xl px-3 py-2 text-xs text-white placeholder-slate-400 focus:outline-none focus:border-[#00D2FF]"
-                />
-                <button
-                  onClick={async () => {
-                    let zaloProfile: any = undefined;
-                    try {
-                      const info: any = await getUserInfo({ avatarType: 'normal', autoRequestPermission: true });
-                      const u = info?.userInfo || info?.data || info;
-                      if (u && (u.name || u.avatar)) {
-                        zaloProfile = { id: u.id, name: u.name, avatar: u.avatar };
-                      }
-                    } catch (_) {}
-                    authenticateWithToken(testPhone, undefined, zaloProfile);
-                  }}
-                  className="px-4 py-2 bg-[#0284C7] hover:bg-[#00D2FF] hover:text-[#061226] text-white font-bold rounded-xl text-xs transition-colors cursor-pointer"
-                >
-                  Vào
-                </button>
-              </div>
-            </div>
           </div>
 
           {/* Home preview */}

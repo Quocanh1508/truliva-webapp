@@ -5,6 +5,7 @@ import { requireAuth, requireCustomerAuth, optionalCustomerAuth } from '../middl
 import { authenticateZaloMiniAppUser } from '../services/zaloMiniAppService';
 import { activateSerialWarranty } from '../services/warrantyService';
 import { getPurifierConfig } from '../config/waterPurifiers';
+import { buildPhoneVariants, getRedeemedPoints } from '../services/shopPricing';
 
 const router = Router();
 
@@ -47,20 +48,7 @@ router.post('/auth', async (req: Request, res: Response): Promise<void> => {
  * GET /api/zalo-miniapp/profile
  * Lấy thông tin cá nhân & vai trò hiện tại của tài khoản Zalo Mini App
  */
-/**
- * Chuẩn hóa và tạo các biến thể số điện thoại để truy vấn chính xác
- */
-export function buildPhoneVariants(phone: string): string[] {
-  if (!phone) return [];
-  const cleanPhone = phone.replace(/[^0-9]/g, '');
-  const standardPhone = cleanPhone.startsWith('84') ? '0' + cleanPhone.substring(2) : cleanPhone;
-  return Array.from(new Set([
-    standardPhone,
-    standardPhone.startsWith('0') ? '84' + standardPhone.substring(1) : standardPhone,
-    standardPhone.startsWith('0') ? standardPhone.substring(1) : standardPhone,
-    standardPhone.startsWith('0') ? '+84' + standardPhone.substring(1) : standardPhone
-  ]));
-}
+export { buildPhoneVariants };
 
 /**
  * Tính điểm tích lũy khách hàng từ các đơn hàng Truliva App
@@ -68,7 +56,7 @@ export function buildPhoneVariants(phone: string): string[] {
  * - Đơn > 5.000.000đ: 5% giá trị đơn (làm tròn lên)
  * - Quy đổi: 1 điểm = 1.000 VNĐ (tương tự cơ chế Shopee Xu)
  */
-export async function calculateCustomerLoyalty(phoneNumber: string | null | undefined) {
+export async function calculateCustomerLoyalty(phoneNumber: string | null | undefined, userId?: string | null) {
   if (!phoneNumber) {
     return {
       points: 0,
@@ -151,7 +139,11 @@ export async function calculateCustomerLoyalty(phoneNumber: string | null | unde
     });
   }
 
-  // Xác định hạng thành viên theo điểm tích lũy
+  // Điểm khả dụng = điểm tích lũy - điểm đã dùng trừ tiền trên các đơn Shop chưa hủy
+  const redeemedPoints = await getRedeemedPoints(phoneVariants, userId);
+  const availablePoints = Math.max(0, totalPoints - redeemedPoints);
+
+  // Xác định hạng thành viên theo tổng điểm tích lũy (không giảm khi tiêu điểm)
   let tier = 'BRONZE';
   let rankLabel = 'Thành viên Đồng';
   if (totalPoints >= 1000) {
@@ -166,9 +158,11 @@ export async function calculateCustomerLoyalty(phoneNumber: string | null | unde
   }
 
   return {
-    points: totalPoints,
-    rewardPoints: totalPoints,
-    pointValueVnd: totalPoints * 1000,
+    points: availablePoints,
+    rewardPoints: availablePoints,
+    pointValueVnd: availablePoints * 1000,
+    earnedPoints: totalPoints,
+    redeemedPoints,
     tier,
     rankLabel,
     completedOrdersCount: historyOrders.length,
@@ -202,7 +196,7 @@ router.get('/profile', requireCustomerAuth, async (req: Request, res: Response):
       }
     });
 
-    const loyalty = await calculateCustomerLoyalty(fullUser?.phoneNumber || (user as any).phone);
+    const loyalty = await calculateCustomerLoyalty(fullUser?.phoneNumber || (user as any).phone, user.id);
 
     res.json({
       success: true,
@@ -238,7 +232,7 @@ router.get('/loyalty', requireCustomerAuth, async (req: Request, res: Response):
       select: { phoneNumber: true }
     });
 
-    const loyalty = await calculateCustomerLoyalty(fullUser?.phoneNumber || (user as any).phone);
+    const loyalty = await calculateCustomerLoyalty(fullUser?.phoneNumber || (user as any).phone, user.id);
     res.json({
       success: true,
       ...loyalty
@@ -1007,11 +1001,13 @@ router.get('/shop/products', getShopProducts);
 router.get('/shop/products/:slugOrId', getShopProductDetail);
 router.get('/shop/legal-docs', getLegalDocuments);
 router.get('/shop/legal-docs/:type', getLegalDocumentByType);
-router.post('/shop/orders', optionalCustomerAuth, createShopOrder);
-router.get('/shop/my-orders', optionalCustomerAuth, getMyShopOrders);
-router.get('/shop/orders/:orderCodeOrId', getShopOrderDetail);
-router.post('/shop/orders/:orderCodeOrId/switch-to-cod', switchOrderToCod);
-router.post('/shop/orders/:orderCodeOrId/confirm-payment', confirmShopOrderPayment);
+// Mọi thao tác trên đơn hàng đều bắt buộc đăng nhập Mini App và chỉ được truy cập đơn của chính mình
+router.post('/shop/orders', requireCustomerAuth, createShopOrder);
+router.get('/shop/my-orders', requireCustomerAuth, getMyShopOrders);
+router.get('/shop/orders/:orderCodeOrId', requireCustomerAuth, getShopOrderDetail);
+router.post('/shop/orders/:orderCodeOrId/switch-to-cod', requireCustomerAuth, switchOrderToCod);
+// confirm-payment: Sandbox → chủ đơn (optionalCustomerAuth); Production → kiểm tra ADMIN nội bộ bên trong controller
+router.post('/shop/orders/:orderCodeOrId/confirm-payment', optionalCustomerAuth, confirmShopOrderPayment);
 router.post('/shop/payment/webhook', handlePaymentWebhook);
 
 export default router;

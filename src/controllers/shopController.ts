@@ -4,6 +4,7 @@ import jwt from 'jsonwebtoken';
 import prisma from '../config/database';
 import logger from '../utils/logger';
 import { getNextManualOrderId } from '../services/orderService';
+import { VOUCHER_FIXED_DISCOUNTS, buildPhoneVariants, isShopOrderOwner } from '../services/shopPricing';
 
 // ══════════════════════════════════════════════════════════════════════════
 //  Shop & Legal Compliance Controller for Zalo Mini App
@@ -198,6 +199,11 @@ export async function createShopOrder(req: Request, res: Response): Promise<void
     }
 
     const cleanPhone = customerPhone.trim();
+    const authUser = (req as any).user as { id: string; phoneNumber?: string | null } | undefined;
+    if (!authUser?.id) {
+      res.status(401).json({ success: false, error: 'Vui lòng đăng nhập Zalo Mini App trước khi đặt hàng' });
+      return;
+    }
     const ipAddress = (req.headers['x-forwarded-for'] as string || req.socket.remoteAddress || '127.0.0.1').split(',')[0].trim();
 
     // 1. Tính toán giá trị đơn hàng thực tế
@@ -241,12 +247,20 @@ export async function createShopOrder(req: Request, res: Response): Promise<void
     if (voucherCode?.trim()) {
       const vCode = voucherCode.trim().toUpperCase();
 
-      // Kiểm tra số lần sử dụng voucher của SĐT này (chống lạm dụng khuyến mãi)
+      // Kiểm tra số lần sử dụng voucher (chống lạm dụng khuyến mãi):
+      // đếm theo mọi định dạng SĐT nhận hàng + SĐT tài khoản + ID tài khoản để không lách được bằng cách đổi định dạng số
+      const voucherPhoneVariants = Array.from(new Set([
+        ...buildPhoneVariants(cleanPhone),
+        ...buildPhoneVariants(authUser?.phoneNumber)
+      ]));
       const usedVoucherCount = await prisma.shopOrder.count({
         where: {
-          customerPhone: cleanPhone,
           voucherCode: vCode,
-          orderStatus: { not: 'CANCELLED' }
+          orderStatus: { not: 'CANCELLED' },
+          OR: [
+            { customerPhone: { in: voucherPhoneVariants } },
+            ...(authUser?.id ? [{ zaloUserId: authUser.id }] : [])
+          ]
         }
       });
 
@@ -259,7 +273,7 @@ export async function createShopOrder(req: Request, res: Response): Promise<void
           res.status(400).json({ success: false, error: 'Mã ưu đãi TRULIVA500 chỉ áp dụng tối đa 01 lần cho mỗi khách hàng' });
           return;
         }
-        discountAmount = 500000;
+        discountAmount = VOUCHER_FIXED_DISCOUNTS.TRULIVA500;
         appliedVoucherCode = vCode;
       } else if (vCode === 'GIAM100K') {
         if (totalAmount < 1000000) {
@@ -270,7 +284,7 @@ export async function createShopOrder(req: Request, res: Response): Promise<void
           res.status(400).json({ success: false, error: 'Quý khách đã sử dụng hết lượt cho mã giảm giá GIAM100K' });
           return;
         }
-        discountAmount = 100000;
+        discountAmount = VOUCHER_FIXED_DISCOUNTS.GIAM100K;
         appliedVoucherCode = vCode;
       } else if (vCode === '12THANGBH') {
         // Tặng thêm 12 tháng bảo hành
@@ -286,7 +300,9 @@ export async function createShopOrder(req: Request, res: Response): Promise<void
     let actualPointsUsed = 0;
     const requestedPoints = Math.max(0, parseInt(pointsUsed, 10) || 0);
     if (requestedPoints > 0) {
-      const userLoyalty = await calculateCustomerLoyalty(cleanPhone);
+      // Điểm chỉ được lấy từ tài khoản đã xác thực (không theo SĐT nhập tay trong form),
+      // và đã trừ phần điểm tiêu ở các đơn trước (xem getRedeemedPoints)
+      const userLoyalty = await calculateCustomerLoyalty(authUser.phoneNumber, authUser.id);
       const availablePoints = userLoyalty.points;
       actualPointsUsed = Math.min(requestedPoints, availablePoints);
       
@@ -308,7 +324,7 @@ export async function createShopOrder(req: Request, res: Response): Promise<void
     const privacyDoc = await prisma.legalDocument.findUnique({ where: { type: 'PRIVACY' } });
 
     // 5. Thực thi Transaction tạo Đơn hàng Shop + Consent + Ca dịch vụ nội bộ
-    const authenticatedUserId = (req as any).user?.id || (req as any).zaloUser?.id || null;
+    const authenticatedUserId = authUser.id;
     const result = await prisma.$transaction(async (tx) => {
       // 5.1 Tạo ShopOrder
       const shopOrder = await tx.shopOrder.create({
@@ -464,28 +480,18 @@ export async function createShopOrder(req: Request, res: Response): Promise<void
  */
 export async function getMyShopOrders(req: Request, res: Response): Promise<void> {
   try {
-    const user = (req as any).user;
-    const phone = (req.query.phone as string || user?.phoneNumber || (req as any).zaloUser?.phoneNumber || '').trim();
-    const userId = user?.id || null;
-
-    if (!phone && !userId) {
-      res.json({ success: true, orders: [] });
+    // CHỈ dựa vào tài khoản đã xác thực. Không nhận ?phone= từ client
+    // (trước đây ?phone=0 + so khớp "contains" làm lộ toàn bộ đơn hàng của mọi khách).
+    const user = (req as any).user as { id: string; phoneNumber?: string | null } | undefined;
+    if (!user?.id) {
+      res.status(401).json({ success: false, error: 'Chưa đăng nhập Zalo Mini App' });
       return;
     }
 
-    const whereConditions: any[] = [];
-    if (userId) {
-      whereConditions.push({ zaloUserId: userId });
-    }
-    if (phone) {
-      const cleanPhone = phone.replace(/[^0-9]/g, '');
-      const searchPhones = [cleanPhone];
-      if (cleanPhone.startsWith('84')) {
-        searchPhones.push('0' + cleanPhone.slice(2));
-      } else if (cleanPhone.startsWith('0')) {
-        searchPhones.push('84' + cleanPhone.slice(1));
-      }
-      searchPhones.forEach(p => whereConditions.push({ customerPhone: { contains: p } }));
+    const whereConditions: any[] = [{ zaloUserId: user.id }];
+    const phoneVariants = buildPhoneVariants(user.phoneNumber);
+    if (phoneVariants.length > 0) {
+      whereConditions.push({ customerPhone: { in: phoneVariants } });
     }
 
     const orders = await prisma.shopOrder.findMany({
@@ -548,7 +554,8 @@ export async function getShopOrderDetail(req: Request, res: Response): Promise<v
       }
     });
 
-    if (!order) {
+    // Trả 404 (không phải 403) khi không phải chủ đơn để không lộ việc mã đơn có tồn tại
+    if (!order || !isShopOrderOwner(order, (req as any).user)) {
       res.status(404).json({ success: false, error: 'Không tìm thấy đơn hàng' });
       return;
     }
@@ -571,13 +578,19 @@ export async function getShopOrderDetail(req: Request, res: Response): Promise<v
 export async function handlePaymentWebhook(req: Request, res: Response): Promise<void> {
   try {
     // 1. Kiểm tra Secret Token bảo vệ Webhook (Chống giả mạo request)
-    const expectedSecret = (process.env.PAYMENT_WEBHOOK_SECRET || process.env.SEPAY_WEBHOOK_KEY || 'truliva_secure_pay_2026').trim();
+    // Không có secret mặc định trong source: thiếu cấu hình → từ chối toàn bộ webhook
+    const expectedSecret = (process.env.PAYMENT_WEBHOOK_SECRET || process.env.SEPAY_WEBHOOK_KEY || '').trim();
+    if (!expectedSecret) {
+      logger.error('PAYMENT_WEBHOOK_SECRET is not configured; rejecting payment webhook');
+      res.status(503).json({ success: false, error: 'Payment webhook is not configured' });
+      return;
+    }
     const authHeader = String(req.headers['authorization'] || '').trim();
     const secureTokenHeader = String(req.headers['secure-token'] || '').trim();
     const apiKeyHeader = String(req.headers['x-api-key'] || req.headers['api-key'] || '').trim();
-    const querySecret = String(req.query.secret || req.query.token || '').trim();
 
-    let providedSecret = secureTokenHeader || apiKeyHeader || querySecret;
+    // Chỉ nhận secret qua header (query string dễ bị ghi vào access log / lịch sử proxy)
+    let providedSecret = secureTokenHeader || apiKeyHeader;
     if (!providedSecret && authHeader) {
       if (authHeader.toLowerCase().startsWith('bearer ')) {
         providedSecret = authHeader.substring(7).trim();
@@ -588,7 +601,7 @@ export async function handlePaymentWebhook(req: Request, res: Response): Promise
       }
     }
 
-    if (expectedSecret && providedSecret !== expectedSecret) {
+    if (providedSecret !== expectedSecret) {
       logger.warn('Payment webhook received invalid secret token', {
         ip: req.ip || req.socket.remoteAddress,
         providedSecretPrefix: providedSecret ? providedSecret.substring(0, 4) + '***' : 'none'
@@ -614,6 +627,12 @@ export async function handlePaymentWebhook(req: Request, res: Response): Promise
     const results: any[] = [];
 
     for (const item of transactionList) {
+      // Bỏ qua giao dịch tiền RA (SePay: transferType='out'; Casso/khác: amount âm)
+      const transferType = String(item.transferType || payload.transferType || '').toLowerCase();
+      if (transferType === 'out') {
+        continue;
+      }
+
       const content = String(
         item.content || 
         item.description || 
@@ -633,11 +652,16 @@ export async function handlePaymentWebhook(req: Request, res: Response): Promise
       );
 
       // Trích xuất mã đơn hàng TRU-... từ nội dung chuyển khoản
-      const match = content.match(/TRU[-_]?[0-9A-Z-]+/i) || content.match(/TRU\s*[0-9A-Z-]+/i);
-      let extractedOrderCode = match ? match[0].replace(/\s+/g, '-').toUpperCase() : '';
+      // Mã đơn chuẩn: TRU-YYMMDD-NNNN. Ngân hàng hay bỏ/đổi dấu "-" (TRU2608281234, TRU 260828 1234...)
+      // nên chuẩn hóa về đúng định dạng rồi mới tra cứu chính xác.
+      const extractCode = (text: string): string => {
+        const m = text.match(/TRU[\s_-]*(\d{6})[\s_-]*(\d{4})(?!\d)/i);
+        return m ? `TRU-${m[1]}-${m[2]}` : '';
+      };
+      let extractedOrderCode = extractCode(content);
 
       if (!extractedOrderCode && (item.orderCode || payload.orderCode)) {
-        extractedOrderCode = String(item.orderCode || payload.orderCode).toUpperCase();
+        extractedOrderCode = extractCode(String(item.orderCode || payload.orderCode));
       }
 
       if (!extractedOrderCode) {
@@ -645,14 +669,14 @@ export async function handlePaymentWebhook(req: Request, res: Response): Promise
         continue;
       }
 
-      // Tìm đơn hàng trong DB
-      const shopOrder = await prisma.shopOrder.findFirst({
-        where: {
-          OR: [
-            { orderCode: extractedOrderCode },
-            { orderCode: { contains: extractedOrderCode, mode: 'insensitive' } }
-          ]
-        }
+      if (!(transferAmount > 0)) {
+        logger.warn('Payment transaction item has non-positive amount, skipped', { extractedOrderCode, transferAmount });
+        continue;
+      }
+
+      // Tìm đơn hàng trong DB: khớp CHÍNH XÁC mã đơn (không dùng "contains" để tránh khớp nhầm đơn khác)
+      const shopOrder = await prisma.shopOrder.findUnique({
+        where: { orderCode: extractedOrderCode }
       });
 
       if (!shopOrder) {
@@ -792,7 +816,7 @@ export async function switchOrderToCod(req: Request, res: Response): Promise<voi
       }
     });
 
-    if (!order) {
+    if (!order || !isShopOrderOwner(order, (req as any).user)) {
       res.status(404).json({ success: false, error: 'Không tìm thấy đơn hàng' });
       return;
     }
@@ -811,11 +835,16 @@ export async function switchOrderToCod(req: Request, res: Response): Promise<voi
 
     if (order.internalOrderId) {
       try {
+        // Ghi nối vào ghi chú cũ (không ghi đè, tránh mất thông tin mặt hàng/địa chỉ cho điều phối)
+        const existingOrder = await prisma.order.findUnique({
+          where: { id: order.internalOrderId },
+          select: { note: true }
+        });
         await prisma.order.update({
           where: { id: order.internalOrderId },
           data: {
             moneyToCollect: order.finalAmount,
-            note: `[ĐƠN ZALO MINI APP - ĐỔI SANG COD] Khách hàng chọn thanh toán khi nhận hàng & lắp đặt (COD)`
+            note: `${existingOrder?.note || ''} | [ĐỔI SANG COD] Khách hàng chọn thanh toán khi nhận hàng & lắp đặt (COD): thu ${order.finalAmount.toLocaleString('vi-VN')}đ`
           }
         });
       } catch (err: any) {
@@ -858,7 +887,11 @@ export async function confirmShopOrderPayment(req: Request, res: Response): Prom
       if (sessionToken && jwtSecret) {
         try {
           const decoded: any = jwt.verify(sessionToken, jwtSecret);
-          if (decoded?.id) {
+          // Không chấp nhận token Mini App (kể cả khi SĐT trùng tài khoản ADMIN và dùng chung secret)
+          const aud = decoded?.aud;
+          const isMiniAppToken = aud === 'truliva-miniapp' || (Array.isArray(aud) && aud.includes('truliva-miniapp'))
+            || decoded?.role === 'CUSTOMER' || decoded?.group === 'CUSTOMER';
+          if (decoded?.id && !isMiniAppToken) {
             const user = await prisma.user.findUnique({
               where: { id: decoded.id },
               select: { role: true, isActive: true }
@@ -898,7 +931,8 @@ export async function confirmShopOrderPayment(req: Request, res: Response): Prom
       }
     });
 
-    if (!order) {
+    // Sandbox: chỉ chủ đơn (đăng nhập Mini App) mới được giả lập thanh toán đơn của mình
+    if (!order || (isSandboxEnv && !isShopOrderOwner(order, (req as any).user))) {
       res.status(404).json({ success: false, error: 'Không tìm thấy đơn hàng' });
       return;
     }

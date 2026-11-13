@@ -218,7 +218,7 @@ export default function CustomerProfile({
           </div>
 
           {/* Quick Stats Grid: Thiết bị | Điểm tích lũy | Hotline (UI/UX Pro Max Ocean Glass HUD) */}
-          <div className="grid grid-cols-3 gap-2 bg-[#041426]/75 backdrop-blur-xl rounded-3xl p-2.5 text-center border border-cyan-400/30 text-xs shadow-[0_6px_25px_rgba(0,210,255,0.18)]">
+          <div className={`grid ${FEATURES.ENABLE_MEMBER_RANKING ? 'grid-cols-3' : 'grid-cols-2'} gap-2 bg-[#041426]/75 backdrop-blur-xl rounded-3xl p-2.5 text-center border border-cyan-400/30 text-xs shadow-[0_6px_25px_rgba(0,210,255,0.18)]`}>
             <button 
               onClick={scrollToDevices}
               className="p-1.5 rounded-2xl hover:bg-white/10 active:scale-95 transition-all cursor-pointer group touch-tactile"
@@ -227,13 +227,15 @@ export default function CustomerProfile({
               <p className="font-black text-white text-base mt-0.5 tabular-num">{(mySerials || []).length} máy</p>
             </button>
 
-            <button 
+            {FEATURES.ENABLE_MEMBER_RANKING && (
+            <button
               onClick={() => setShowLoyaltyModal(true)}
               className="p-1.5 rounded-2xl border-x border-cyan-400/25 hover:bg-white/10 active:scale-95 transition-all cursor-pointer group touch-tactile"
             >
               <p className="text-[9px] text-sky-200 uppercase tracking-wider font-extrabold group-hover:text-white transition-colors">Điểm tích lũy</p>
               <p className="font-black text-amber-400 text-base mt-0.5 drop-shadow-xs tabular-num">{userPoints.toLocaleString('vi-VN')}</p>
             </button>
+            )}
 
             <a 
               href="tel:1900638463"
@@ -355,8 +357,9 @@ export default function CustomerProfile({
             </button>
           )}
 
-          {/* Điểm tích lũy Truliva */}
-          <button 
+          {/* Điểm tích lũy Truliva (Tạm ẩn theo yêu cầu: tính năng điểm đang pending) */}
+          {FEATURES.ENABLE_MEMBER_RANKING && (
+          <button
             onClick={() => setShowLoyaltyModal(true)}
             className="w-full min-h-[56px] p-3.5 flex items-center justify-between text-slate-800 font-semibold hover:bg-amber-50/40 active:bg-amber-100/50 transition-colors cursor-pointer touch-tactile"
           >
@@ -378,6 +381,7 @@ export default function CustomerProfile({
             </div>
             <ChevronRight size={16} className="text-slate-400" />
           </button>
+          )}
 
           <button 
             onClick={() => setShowHistoryModal(true)}
@@ -476,13 +480,15 @@ export default function CustomerProfile({
       </div>
 
       {/* Interactive Modals */}
-      <CustomerLoyaltyModal
-        isOpen={showLoyaltyModal}
-        onClose={() => setShowLoyaltyModal(false)}
-        userPoints={userPoints}
-        rank={rank}
-        onOpenScanner={onOpenScanner}
-      />
+      {FEATURES.ENABLE_MEMBER_RANKING && (
+        <CustomerLoyaltyModal
+          isOpen={showLoyaltyModal}
+          onClose={() => setShowLoyaltyModal(false)}
+          userPoints={userPoints}
+          rank={rank}
+          onOpenScanner={onOpenScanner}
+        />
+      )}
 
       {FEATURES.ENABLE_MEMBER_RANKING && (
         <CustomerVoucherModal
