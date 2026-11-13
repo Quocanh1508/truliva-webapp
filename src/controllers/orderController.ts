@@ -15,6 +15,7 @@ import { isSandboxEnvironment, logSandboxBlockedAction } from '../utils/sandboxG
 import { PANCAKE_API_BASE } from '../config/pancake';
 import pancakeCircuitBreaker from '../services/pancakeCircuitBreaker';
 import { fetchPancakeWarehouses } from '../routes/inventory';
+import { syncOrderWarehouseToPancake } from '../services/pancakeWarehouseSync';
 
 import { buildOrderFilter, getNextManualOrderId } from '../services/orderService';
 import { normalizeProvince, getProvinceSearchVariants, PANCAKE_PROVINCES } from '../utils/provinces';
@@ -2285,33 +2286,22 @@ export async function updateOrder(req: Request, res: Response): Promise<void> {
         } else {
           // Chạy đồng bộ kho sang Pancake POS bất đồng bộ ở background (non-blocking) để phản hồi tức thì cho Webapp
           pendingWarehouseSync = () => {
-          logger.info('Syncing warehouse change to Pancake POS (background)', {
-            pancakeOrderId: oldOrder.pancakeOrderId,
-            warehouseId: effectiveWarehouseId
-          });
-          axios.patch(
-            `${PANCAKE_API_BASE}/api/v1/shops/${shopId}/orders/${oldOrder.pancakeOrderId}`,
-            { warehouse_id: effectiveWarehouseId },
-            {
-              params: { api_key: apiKey },
-              headers: { 'Content-Type': 'application/json' },
-              timeout: 10000
-            }
-          ).then(updateResponse => {
-            if (!updateResponse.data || !updateResponse.data.success) {
-              throw new Error(updateResponse.data?.message || 'Yêu cầu đổi kho thất bại trên Pancake POS');
-            }
-          }).catch(err => {
-            logger.error('Failed to sync warehouse update to Pancake POS API in background', {
-              orderId: id,
+            logger.info('Syncing warehouse change to Pancake POS (background)', {
               pancakeOrderId: oldOrder.pancakeOrderId,
-              error: err.response?.data?.message || err.message
+              warehouseId: effectiveWarehouseId
             });
-            prisma.order.update({
-              where: { id },
-              data: { pancakeSyncStatus: 'FAILED' }
-            }).catch(() => {});
-          });
+            // Đơn có combo phải gửi kèm items, nếu không POS nhân đôi dòng thành phần (xem pancakeWarehouseSync.ts)
+            syncOrderWarehouseToPancake(oldOrder.pancakeOrderId, String(effectiveWarehouseId)).catch(err => {
+              logger.error('Failed to sync warehouse update to Pancake POS API in background', {
+                orderId: id,
+                pancakeOrderId: oldOrder.pancakeOrderId,
+                error: err.response?.data?.message || err.message
+              });
+              prisma.order.update({
+                where: { id },
+                data: { pancakeSyncStatus: 'FAILED' }
+              }).catch(() => {});
+            });
           };
         }
       } else {
@@ -2976,19 +2966,7 @@ export async function bulkAssignOrders(req: Request, res: Response): Promise<voi
           } else {
             // Chạy SAU khi lưu DB để cờ FAILED không bị lần update chính ghi đè
             pendingWarehouseSync = () => {
-              axios.patch(
-                `${PANCAKE_API_BASE}/api/v1/shops/${shopId}/orders/${oldOrder.pancakeOrderId}`,
-                { warehouse_id: warehouseId },
-                {
-                  params: { api_key: apiKey },
-                  headers: { 'Content-Type': 'application/json' },
-                  timeout: 10000
-                }
-              ).then(resp => {
-                if (!resp.data || !resp.data.success) {
-                  throw new Error(resp.data?.message || 'Yêu cầu đổi kho thất bại trên Pancake POS');
-                }
-              }).catch(err => {
+              syncOrderWarehouseToPancake(oldOrder.pancakeOrderId, String(warehouseId)).catch(err => {
                 logger.error('Failed to sync warehouse in bulk assign (background)', {
                   orderId: oldOrder.id,
                   pancakeOrderId: oldOrder.pancakeOrderId,
