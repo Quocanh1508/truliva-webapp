@@ -27,6 +27,7 @@ import { sendPushNotification } from '../services/notificationService';
 import { sendWebPushNotification } from '../services/webPushService';
 import { PANCAKE_PROVINCES } from '../utils/provinces';
 import { sendInstallWarrantyZns, ZNS_TEMPLATE_INSTALL_WATER, ZNS_TEMPLATE_INSTALL_OTHER } from '../services/installZnsService';
+import { sendFilterServiceZns, computeFilterExpiry, toVndAmount, ZNS_TEMPLATE_FILTER_SERVICE } from '../services/filterServiceZnsService';
 
 export async function uploadInvoiceResponse(req: Request, res: Response): Promise<void> {
   try {
@@ -1896,7 +1897,7 @@ export async function activateZns(req: Request, res: Response): Promise<void> {
     const isServiceJob = ['thay lọc', 'bảo hành', 'sửa chữa'].includes(workTypeClean);
 
     // ─────────────────────────────────────────────────────────────
-    // 1. NẾU LÀ CA DỊCH VỤ (THAY LỌC, BẢO HÀNH, SỬA CHỮA) -> FNS 10233
+    // 1. NẾU LÀ CA DỊCH VỤ: THAY LỌC -> Zalo OA 643643 (dự phòng FNS 10233); BẢO HÀNH, SỬA CHỮA -> FNS 10233
     // ─────────────────────────────────────────────────────────────
     if (isServiceJob) {
       let resolvedServiceCode = (serviceCode || '').trim();
@@ -1945,6 +1946,27 @@ export async function activateZns(req: Request, res: Response): Promise<void> {
 
       if (!finalCustomerName) {
         finalCustomerName = order?.billFullName || 'Quý Khách';
+      }
+
+      if (workTypeClean === 'thay lọc') {
+        const filterResult = await sendFilterServiceZns({
+          phone: recipientPhone.trim(),
+          customerName: finalCustomerName,
+          serviceCode: resolvedServiceCode,
+          totalCollected: resolvedTotalCollected,
+          serialNumber: serialNumber ? cleanSerialNumber(serialNumber) : null,
+          orderId,
+          expiryDate: expiryDateStr || null
+        });
+        res.json({
+          success: true,
+          message: `Đã phát tin hoàn thành thay lọc (Mẫu ${filterResult.templateId}${filterResult.fallbackUsed ? ' - dự phòng FNS' : ''}) thành công!`,
+          result: { ...filterResult, data: { message_id: filterResult.messageId } },
+          templateId: filterResult.templateId,
+          serviceCode: resolvedServiceCode,
+          totalCollected: resolvedTotalCollected
+        });
+        return;
       }
 
       const fnsResult = await sendFnsServiceCompletion({
@@ -2101,6 +2123,31 @@ export async function testZnsSend(req: Request, res: Response): Promise<void> {
         templateId: 10233,
         ...result
       });
+      return;
+    }
+
+    // Bắn thử trực tiếp mẫu Zalo OA 643643 (hoàn thành thay lọc) với đúng dữ liệu nhập tay, không dự phòng
+    if (String(templateId) === ZNS_TEMPLATE_FILTER_SERVICE) {
+      const code = String(serviceCode || serialNumber || '').trim();
+      if (!code) {
+        res.status(400).json({ error: 'Vui lòng nhập mã dịch vụ / mã đơn' });
+        return;
+      }
+      const amount = toVndAmount(totalCollected ?? 150000);
+      const templateData = {
+        _TEN_KHACH_HANG_: String(customerName || 'Quý Khách').substring(0, 30),
+        _ID_DON_HANG_: code.substring(0, 30),
+        _TONG_TIEN_: amount,
+        _NGAY_BAO_HANH_: (String(expiryDate || '').trim() || computeFilterExpiry()).substring(0, 30)
+      };
+      const direct = await sendZaloDirectZns({
+        phone,
+        templateId: ZNS_TEMPLATE_FILTER_SERVICE,
+        templateData,
+        trackingId: `TEST-${Date.now()}`,
+        log: { customerName: templateData._TEN_KHACH_HANG_, productName: `Dịch vụ Thay lọc: ${code}`, orderNumber: code }
+      });
+      res.json({ success: true, templateId: ZNS_TEMPLATE_FILTER_SERVICE, gateway: direct.gateway, data: { message_id: direct.messageId }, template_data: templateData });
       return;
     }
 
