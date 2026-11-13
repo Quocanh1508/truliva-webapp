@@ -1,16 +1,16 @@
 import prisma from '../config/database';
 import logger from '../utils/logger';
-import { formatZaloPhone, sendFnsServiceCompletion } from './zaloService';
+import { formatZaloPhone } from './zaloService';
 import { sendInstallWarrantyZns, InstallZnsResult, INSTALL_TEMPLATE_IDS, ZNS_TEMPLATE_INSTALL_WATER } from './installZnsService';
-import { sendFilterServiceZns, FilterServiceZnsResult, FILTER_SERVICE_TEMPLATE_IDS, ZNS_TEMPLATE_FILTER_SERVICE } from './filterServiceZnsService';
+import { sendServiceCompletionZns, ServiceZnsResult, getServiceZnsKind, serviceTemplateId, serviceTemplateIds } from './serviceZnsService';
 
 /**
  * GỬI TIN ZALO (ZNS/FNS) THEO BÁO CÁO KTV
  *
  * Quy tắc:
- *  - Ca Lắp đặt / Giao hàng và lắp đặt  → Template 10232 (kích hoạt bảo hành)
+ *  - Ca Lắp đặt / Giao hàng và lắp đặt  → Zalo OA 666024 / 666039 (kích hoạt bảo hành), dự phòng FNS 10232
  *  - Ca Thay lọc                         → Zalo OA 643643 (hoàn thành thay lọc + hạn BH lõi), dự phòng FNS 10233
- *  - Ca Bảo hành / Sửa chữa              → Template 10233 (xác nhận hoàn thành dịch vụ)
+ *  - Ca Bảo hành / Sửa chữa              → Zalo OA 663746 (xác nhận hoàn thành dịch vụ), dự phòng FNS 10233
  *  - Chỉ gửi khi báo cáo đã APPROVED. Báo cáo PENDING sẽ tự gửi khi Admin/Điều phối duyệt.
  *  - Số nhận tin là `znsPhone` do KTV xác nhận khi nộp báo cáo. Không có `znsPhone` → không tự động gửi.
  *  - Chống gửi trùng: đã có tin SUCCESS cùng mẫu + cùng SĐT cho cùng báo cáo / mã đơn / serial thì bỏ qua,
@@ -50,10 +50,6 @@ export function getReportZnsKind(workType?: string | null): ReportZnsKind | null
   return null;
 }
 
-export function isFilterWorkType(workType?: string | null): boolean {
-  return (workType || '').trim().toLowerCase() === 'thay lọc';
-}
-
 export function isValidZnsPhone(phone?: string | null): boolean {
   const formatted = formatZaloPhone((phone || '').trim());
   return /^84\d{9}$/.test(formatted);
@@ -69,11 +65,6 @@ function buildServiceCode(order: { id: string; pancakeOrderId: number | null } |
   return fallback;
 }
 
-function templateIdFor(kind: ReportZnsKind, isFilter: boolean): string {
-  if (kind === 'INSTALL') return ZNS_TEMPLATE_INSTALL_WATER; // mẫu thực tế (666024/666039 hoặc FNS dự phòng) do installZnsService quyết định
-  if (isFilter) return ZNS_TEMPLATE_FILTER_SERVICE;          // 643643, hoặc FNS 10233 nếu phải dự phòng
-  return String(process.env.FNS_TEMPLATE_ID_DICH_VU || '10233');
-}
 
 /**
  * Gửi tin Zalo cho một báo cáo. Không bao giờ throw — mọi lỗi trả về dạng `status: 'FAILED'`.
@@ -129,8 +120,9 @@ export async function sendReportZns(
     }
 
     const formattedPhone = formatZaloPhone(rawPhone);
-    const isFilter = kind === 'SERVICE' && isFilterWorkType(workType);
-    let templateId = templateIdFor(kind, isFilter);
+    // Mẫu thực tế (666024/666039, hoặc FNS dự phòng) do service con quyết định sau khi gửi
+    const serviceKind = kind === 'SERVICE' ? getServiceZnsKind(workType) : null;
+    let templateId = serviceKind ? serviceTemplateId(serviceKind) : ZNS_TEMPLATE_INSTALL_WATER;
     const serial = (report.serialNumber || '').trim();
     const hasValidSerial = !!serial && !/^X+$/i.test(serial);
     const serviceCode = buildServiceCode(report.order, hasValidSerial ? serial : 'SRV');
@@ -138,14 +130,10 @@ export async function sendReportZns(
     // ── Chống gửi trùng ──
     if (!opts.force) {
       const sameTarget: any[] = [{ reportId: report.id }];
-      if (kind === 'SERVICE') sameTarget.push({ orderNumber: serviceCode });
-      if (kind === 'INSTALL') {
-        if (report.order) sameTarget.push({ orderNumber: serviceCode });
-        if (hasValidSerial) sameTarget.push({ serialNumber: serial });
-      }
-      const templateFilter = kind === 'INSTALL'
-        ? { in: INSTALL_TEMPLATE_IDS }
-        : isFilter ? { in: FILTER_SERVICE_TEMPLATE_IDS } : templateId;
+      // Chỉ so mã đơn khi báo cáo gắn đơn thật — mã dự phòng ('SRV' / serial) không định danh được 1 ca
+      if (report.order) sameTarget.push({ orderNumber: serviceCode });
+      if (kind === 'INSTALL' && hasValidSerial) sameTarget.push({ serialNumber: serial });
+      const templateFilter = { in: serviceKind ? serviceTemplateIds(serviceKind) : INSTALL_TEMPLATE_IDS };
 
       const previous = await prisma.znsMessageLog.findFirst({
         where: { status: 'SUCCESS', templateId: templateFilter, phone: formattedPhone, OR: sameTarget },
@@ -168,7 +156,7 @@ export async function sendReportZns(
 
     let result: any;
     let installInfo: InstallZnsResult | null = null;
-    let filterInfo: FilterServiceZnsResult | null = null;
+    let serviceInfo: ServiceZnsResult | null = null;
     if (kind === 'INSTALL') {
       installInfo = await sendInstallWarrantyZns({
         phone: rawPhone,
@@ -181,30 +169,20 @@ export async function sendReportZns(
       });
       templateId = installInfo.templateId;
       result = { data: { message_id: installInfo.messageId } };
-    } else if (isFilter) {
-      filterInfo = await sendFilterServiceZns({
+    } else {
+      serviceInfo = await sendServiceCompletionZns({
+        kind: serviceKind || 'REPAIR',
         phone: rawPhone,
         customerName: report.customerName,
         serviceCode,
         totalCollected: report.actualAmount ?? report.order?.totalPrice ?? 0,
         serialNumber: hasValidSerial ? serial : null,
         orderId: report.orderId,
-        reportId: report.id
+        reportId: report.id,
+        workType
       });
-      templateId = filterInfo.templateId;
-      result = { data: { message_id: filterInfo.messageId } };
-    } else {
-      const totalCollected = report.actualAmount ?? report.order?.totalPrice ?? 0;
-      result = await sendFnsServiceCompletion({
-        recipientPhone: rawPhone,
-        customerName: report.customerName || 'Quý Khách',
-        serviceCode,
-        totalCollected,
-        serialNumber: hasValidSerial ? serial : undefined,
-        orderId: report.orderId || undefined,
-        workType,
-        reportId: report.id
-      });
+      templateId = serviceInfo.templateId;
+      result = { data: { message_id: serviceInfo.messageId } };
     }
 
     logger.info('Report ZNS sent', { reportId: report.id, trigger: opts.trigger, kind, templateId, phone: formattedPhone, force: !!opts.force });
@@ -213,9 +191,9 @@ export async function sendReportZns(
       status: 'SENT',
       message: kind === 'INSTALL'
         ? `Đã gửi tin kích hoạt bảo hành (${installInfo?.productName}, hạn ${installInfo?.expiryDate}) tới Zalo ${rawPhone}${installInfo?.fallbackUsed ? ' qua kênh dự phòng FNS' : ''}.`
-        : filterInfo
-          ? `Đã gửi tin hoàn thành thay lọc (Mã ${serviceCode}, bảo hành lõi đến ${filterInfo.expiryDate}) tới Zalo ${rawPhone}${filterInfo.fallbackUsed ? ' qua kênh dự phòng FNS' : ''}.`
-          : `Đã gửi tin xác nhận hoàn thành dịch vụ (Mã ${serviceCode}) tới Zalo ${rawPhone}.`,
+        : serviceKind === 'FILTER'
+          ? `Đã gửi tin hoàn thành thay lọc (Mã ${serviceCode}, bảo hành lõi đến ${serviceInfo?.expiryDate}) tới Zalo ${rawPhone}${serviceInfo?.fallbackUsed ? ' qua kênh dự phòng FNS' : ''}.`
+          : `Đã gửi tin xác nhận hoàn thành dịch vụ (Mã ${serviceCode}) tới Zalo ${rawPhone}${serviceInfo?.fallbackUsed ? ' qua kênh dự phòng FNS' : ''}.`,
       phone: rawPhone,
       templateId,
       serviceCode,

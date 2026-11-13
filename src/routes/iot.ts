@@ -1,7 +1,8 @@
 import { Router, Request, Response } from 'express';
 import prisma from '../config/database';
-import { requireAuth, requireAdmin } from '../middleware/authSession';
-import { publishCommand } from '../services/mqttService';
+import { requireAuth, requirePermission } from '../middleware/authSession';
+import { publishCommand, SUPPORTED_COMMANDS, DeviceCommand } from '../services/mqttService';
+import { resolveIotModel } from '../config/waterPurifiers';
 import logger from '../utils/logger';
 import { execFile } from 'child_process';
 
@@ -9,6 +10,46 @@ const SAFE_SERIAL_REGEX = /^[A-Za-z0-9_-]{3,64}$/;
 const SAFE_MQTT_PASSWORD_REGEX = /^[^\0\r\n]{6,128}$/;
 
 const router = Router();
+
+// ── Kiểm tra lệnh theo spec đối tác (docs/IOT_PARTNER_INTEGRATION_GUIDE.md §4.4) ──
+function validateCommand(
+  command: string,
+  input: Record<string, any>
+): { command: DeviceCommand; params: Record<string, any> } | { error: string } {
+  if (!(SUPPORTED_COMMANDS as readonly string[]).includes(command)) {
+    return { error: `Lệnh không được hỗ trợ: "${command}". Chỉ chấp nhận: ${SUPPORTED_COMMANDS.join(', ')}` };
+  }
+  const cmd = command as DeviceCommand;
+
+  if (cmd === 'set_interval') {
+    const raw = input.interval ?? input.interval_s;
+    const sec = Number(raw);
+    if (raw === undefined || raw === null || raw === '' || !Number.isInteger(sec) || sec < 1 || sec > 3600) {
+      return { error: 'interval phải là số nguyên từ 1 đến 3600 giây' };
+    }
+    return { command: cmd, params: { interval: sec } };
+  }
+
+  if (cmd === 'ota') {
+    const { url, version, sha256, force } = input;
+    if (typeof url !== 'string' || !/^https?:\/\/\S+$/i.test(url) || url.length > 255) {
+      return { error: 'url phải là địa chỉ http(s) hợp lệ, tối đa 255 ký tự' };
+    }
+    if (typeof version !== 'string' || !/^[0-9A-Za-z._-]{1,32}$/.test(version)) {
+      return { error: 'version không hợp lệ (1-32 ký tự: chữ, số, dấu chấm, gạch)' };
+    }
+    if (typeof sha256 !== 'string' || !/^[0-9a-fA-F]{64}$/.test(sha256)) {
+      return { error: 'sha256 phải gồm 64 ký tự hex' };
+    }
+    if (force !== undefined && typeof force !== 'boolean') {
+      return { error: 'force phải là true/false' };
+    }
+    return { command: cmd, params: { url, version, sha256: sha256.toLowerCase(), ...(force ? { force: true } : {}) } };
+  }
+
+  // ping, reboot: không có tham số
+  return { command: cmd, params: {} };
+}
 
 // ── Helper format telemetry bóc tách lõi lọc và thông số phần cứng ──
 function formatTelemetry(tel: any) {
@@ -48,9 +89,12 @@ function formatTelemetry(tel: any) {
  * GET /api/iot/devices
  * Danh sách tất cả thiết bị IoT
  */
-router.get('/devices', requireAuth, requireAdmin, async (_req: Request, res: Response): Promise<void> => {
+router.get('/devices', requireAuth, requirePermission('IOT_MONITOR_VIEW'), async (req: Request, res: Response): Promise<void> => {
   try {
+    // Mặc định ẩn máy đã lưu trữ; ?includeArchived=true để xem cả máy đã lưu trữ
+    const includeArchived = req.query.includeArchived === 'true';
     const devices = await prisma.iotDevice.findMany({
+      where: includeArchived ? {} : { isArchived: false },
       orderBy: { lastSeenAt: 'desc' },
       include: {
         _count: {
@@ -86,10 +130,9 @@ router.get('/devices', requireAuth, requireAdmin, async (_req: Request, res: Res
           orderBy: { recordedAt: 'desc' }
         });
 
-        // Đọc live payload mới nhất từ configJson để UI luôn cập nhật realtime
-        const liveData = (typeof device.configJson === 'object' && device.configJson !== null && (device.configJson as any).latestLivePayload)
-          ? (device.configJson as any).latestLivePayload
-          : null;
+        // Đọc live payload mới nhất để UI luôn cập nhật realtime
+        const { latestPayload, latestPayloadAt, _count, ...deviceFields } = device;
+        const liveData = (typeof latestPayload === 'object' && latestPayload !== null) ? (latestPayload as any) : null;
 
         const effectiveTelemetry = liveData
           ? {
@@ -98,14 +141,16 @@ router.get('/devices', requireAuth, requireAdmin, async (_req: Request, res: Res
               rawPayload: liveData,
               tdsOut: liveData.tdsOut != null ? Number(liveData.tdsOut) : latestTelemetry?.tdsOut,
               tdsIn: liveData.tdsIn != null ? Number(liveData.tdsIn) : latestTelemetry?.tdsIn,
-              recordedAt: (device.configJson as any).latestLivePayloadAt || latestTelemetry?.recordedAt || device.lastSeenAt || new Date().toISOString()
+              recordedAt: latestPayloadAt || latestTelemetry?.recordedAt || device.lastSeenAt || new Date().toISOString()
             }
           : latestTelemetry;
 
         return {
-          ...device,
-          isMuted: Boolean((device.configJson as any)?.isMuted),
+          ...deviceFields,
+          _count,
           serialInfo: serialMap.get(device.serialNumber) || null,
+          // Dòng máy (2/3 lõi) — nguồn duy nhất dùng chung với logic cảnh báo trong mqttService
+          modelConfig: resolveIotModel(serialMap.get(device.serialNumber), device.serialNumber, liveData ?? latestTelemetry?.rawPayload),
           latestTelemetry: formatTelemetry(effectiveTelemetry),
           unresolvedAlerts: device._count.alerts,
           totalReadings: device._count.telemetryData,
@@ -124,7 +169,7 @@ router.get('/devices', requireAuth, requireAdmin, async (_req: Request, res: Res
  * GET /api/iot/devices/:serialNumber
  * Chi tiết 1 thiết bị + telemetry gần nhất
  */
-router.get('/devices/:serialNumber', requireAuth, requireAdmin, async (req: Request, res: Response): Promise<void> => {
+router.get('/devices/:serialNumber', requireAuth, requirePermission('IOT_MONITOR_VIEW'), async (req: Request, res: Response): Promise<void> => {
   try {
     const serialNumber = req.params.serialNumber as string;
 
@@ -164,9 +209,8 @@ router.get('/devices/:serialNumber', requireAuth, requireAdmin, async (req: Requ
       }
     });
 
-    const liveData = (typeof device.configJson === 'object' && device.configJson !== null && (device.configJson as any).latestLivePayload)
-      ? (device.configJson as any).latestLivePayload
-      : null;
+    const { latestPayload, latestPayloadAt, ...deviceFields } = device;
+    const liveData = (typeof latestPayload === 'object' && latestPayload !== null) ? (latestPayload as any) : null;
 
     const formattedRecent = recentTelemetry.map(formatTelemetry);
     if (liveData && formattedRecent.length > 0) {
@@ -174,15 +218,15 @@ router.get('/devices/:serialNumber', requireAuth, requireAdmin, async (req: Requ
         ...formattedRecent[0],
         rawPayload: liveData,
         tdsOut: liveData.tdsOut != null ? Number(liveData.tdsOut) : formattedRecent[0].tdsOut,
-        recordedAt: (device.configJson as any).latestLivePayloadAt || formattedRecent[0].recordedAt
+        recordedAt: latestPayloadAt || formattedRecent[0].recordedAt
       });
     }
 
     res.json({
       device: {
-        ...device,
-        isMuted: Boolean((device.configJson as any)?.isMuted),
-        serialInfo
+        ...deviceFields,
+        serialInfo,
+        modelConfig: resolveIotModel(serialInfo, device.serialNumber, liveData ?? recentTelemetry[0]?.rawPayload),
       },
       recentTelemetry: formattedRecent
     });
@@ -197,7 +241,7 @@ router.get('/devices/:serialNumber', requireAuth, requireAdmin, async (req: Requ
  * Lịch sử telemetry (có filter by time range)
  * Query params: from (ISO date), to (ISO date), limit (number, default 100)
  */
-router.get('/devices/:serialNumber/telemetry', requireAuth, requireAdmin, async (req: Request, res: Response): Promise<void> => {
+router.get('/devices/:serialNumber/telemetry', requireAuth, requirePermission('IOT_MONITOR_VIEW'), async (req: Request, res: Response): Promise<void> => {
   try {
     const serialNumber = req.params.serialNumber as string;
     const { from, to, limit } = req.query;
@@ -238,11 +282,12 @@ router.get('/devices/:serialNumber/telemetry', requireAuth, requireAdmin, async 
  * GET /api/iot/alerts
  * Danh sách cảnh báo (filter by type, severity, resolved)
  */
-router.get('/alerts', requireAuth, requireAdmin, async (req: Request, res: Response): Promise<void> => {
+router.get('/alerts', requireAuth, requirePermission('IOT_MONITOR_VIEW'), async (req: Request, res: Response): Promise<void> => {
   try {
     const { type, severity, resolved, limit } = req.query;
 
-    const where: any = {};
+    // Không hiển thị cảnh báo của máy đã lưu trữ
+    const where: any = { device: { isArchived: false } };
     if (type) where.alertType = type as string;
     if (severity) where.severity = severity as string;
     if (resolved !== undefined) where.isResolved = resolved === 'true';
@@ -251,27 +296,18 @@ router.get('/alerts', requireAuth, requireAdmin, async (req: Request, res: Respo
       where,
       include: {
         device: {
-          select: { serialNumber: true, firmwareVersion: true, configJson: true }
+          select: { serialNumber: true, firmwareVersion: true, isMuted: true }
         }
       },
       orderBy: { createdAt: 'desc' },
       take: Math.min(Number(limit) || 50, 200),
     });
 
-    const formattedAlerts = alerts.map((a) => ({
-      ...a,
-      device: a.device ? {
-        serialNumber: a.device.serialNumber,
-        firmwareVersion: a.device.firmwareVersion,
-        isMuted: Boolean((a.device.configJson as any)?.isMuted)
-      } : null
-    }));
-
     const unresolvedCount = await prisma.iotAlert.count({
-      where: { isResolved: false }
+      where: { isResolved: false, device: { isArchived: false } }
     });
 
-    res.json({ alerts: formattedAlerts, unresolvedCount });
+    res.json({ alerts, unresolvedCount });
   } catch (error: any) {
     logger.error('IoT API: Get alerts error', { error: error.message });
     res.status(500).json({ error: 'Lỗi khi lấy danh sách cảnh báo' });
@@ -282,7 +318,7 @@ router.get('/alerts', requireAuth, requireAdmin, async (req: Request, res: Respo
  * POST /api/iot/devices
  * Đăng ký thiết bị mới + tạo MQTT credentials
  */
-router.post('/devices', requireAuth, requireAdmin, async (req: Request, res: Response): Promise<void> => {
+router.post('/devices', requireAuth, requirePermission('IOT_DEVICE_CONTROL'), async (req: Request, res: Response): Promise<void> => {
   try {
     const { serialNumber, mqttPassword } = req.body;
 
@@ -309,19 +345,30 @@ router.post('/devices', requireAuth, requireAdmin, async (req: Request, res: Res
       where: { serialNumber: cleanSerial }
     });
 
-    if (existing) {
+    if (existing && !existing.isArchived) {
       res.status(409).json({ error: 'Thiết bị đã tồn tại', device: existing });
       return;
     }
 
-    // Create device in DB
-    const device = await prisma.iotDevice.create({
-      data: {
-        serialNumber: cleanSerial,
-        mqttUsername: cleanSerial,
-        isOnline: false,
-      }
-    });
+    // Máy đã lưu trữ trước đó → khôi phục (giữ nguyên lịch sử telemetry & cảnh báo cũ)
+    const isRestore = Boolean(existing);
+    const device = existing
+      ? await prisma.iotDevice.update({
+          where: { id: existing.id },
+          data: {
+            isArchived: false,
+            archivedAt: null,
+            archivedBy: null,
+            isOnline: false,
+          }
+        })
+      : await prisma.iotDevice.create({
+          data: {
+            serialNumber: cleanSerial,
+            mqttUsername: cleanSerial,
+            isOnline: false,
+          }
+        });
 
     // Create MQTT user on Mosquitto (if password provided) using execFile with shell: false
     if (mqttPassword) {
@@ -353,8 +400,9 @@ router.post('/devices', requireAuth, requireAdmin, async (req: Request, res: Res
       });
     }
 
-    res.status(201).json({
-      message: 'Thiết bị đã được đăng ký',
+    res.status(isRestore ? 200 : 201).json({
+      message: isRestore ? 'Thiết bị đã được khôi phục từ lưu trữ' : 'Thiết bị đã được đăng ký',
+      restored: isRestore,
       device,
       mqttConfig: {
         broker: process.env.MQTT_PUBLIC_HOST || 'trulivaofficial.com',
@@ -373,14 +421,21 @@ router.post('/devices', requireAuth, requireAdmin, async (req: Request, res: Res
  * POST /api/iot/devices/:serialNumber/command
  * Gửi lệnh xuống ESP32 qua MQTT (reboot, set_interval, ping, ota)
  */
-router.post('/devices/:serialNumber/command', requireAuth, requireAdmin, async (req: Request, res: Response): Promise<void> => {
+router.post('/devices/:serialNumber/command', requireAuth, requirePermission('IOT_DEVICE_CONTROL'), async (req: Request, res: Response): Promise<void> => {
   try {
     const serialNumber = req.params.serialNumber as string;
-    const { command, cmd, params, ...rest } = req.body;
+    const { command, cmd, params, ...rest } = req.body || {};
     const targetCommand = command || cmd;
 
     if (!targetCommand) {
       res.status(400).json({ error: 'Thiếu command (hoặc cmd)' });
+      return;
+    }
+
+    // Chỉ nhận tham số được khai báo cho từng lệnh (field lạ bị bỏ qua, không chuyển xuống thiết bị)
+    const validated = validateCommand(String(targetCommand), { ...(rest || {}), ...(params || {}) });
+    if ('error' in validated) {
+      res.status(400).json({ error: validated.error });
       return;
     }
 
@@ -393,14 +448,36 @@ router.post('/devices/:serialNumber/command', requireAuth, requireAdmin, async (
       return;
     }
 
-    const mergedParams = { ...(params || {}), ...rest };
-    const success = publishCommand(serialNumber, targetCommand, mergedParams);
-
-    if (success) {
-      res.json({ message: `Lệnh "${targetCommand}" đã gửi tới ${serialNumber}`, command: targetCommand, params: mergedParams });
-    } else {
-      res.status(503).json({ error: 'MQTT chưa kết nối, không thể gửi lệnh' });
+    if (device.isArchived) {
+      res.status(409).json({ error: 'Thiết bị đã được lưu trữ, không thể gửi lệnh' });
+      return;
     }
+
+    const sentBy = (req as any).user?.username || null;
+    const result = await publishCommand(device, validated.command, validated.params, sentBy);
+
+    if (!result.ok) {
+      const errors: Record<string, [number, string]> = {
+        not_connected: [503, 'MQTT chưa kết nối, không thể gửi lệnh'],
+        too_long: [400, 'Lệnh vượt quá 767 byte cho phép'],
+        timeout: [504, 'Broker MQTT không xác nhận lệnh trong 5 giây'],
+        publish_failed: [502, 'Broker MQTT từ chối lệnh'],
+      };
+      const [status, msg] = errors[result.reason] || [500, 'Lỗi khi gửi lệnh'];
+      res.status(status).json({ error: msg, reason: result.reason });
+      return;
+    }
+
+    // Broker đã nhận lệnh; thiết bị xác nhận sau qua topic command/response (xem configJson.lastCommand)
+    res.json({
+      message: device.isOnline
+        ? `Lệnh "${validated.command}" đã gửi tới ${serialNumber}, đang chờ máy phản hồi`
+        : `Lệnh "${validated.command}" đã gửi tới broker, nhưng máy ${serialNumber} đang OFFLINE nên có thể không nhận được`,
+      command: validated.command,
+      params: validated.params,
+      requestId: result.requestId,
+      deviceOnline: device.isOnline,
+    });
   } catch (error: any) {
     logger.error('IoT API: Send command error', { error: error.message });
     res.status(500).json({ error: 'Lỗi khi gửi lệnh' });
@@ -411,7 +488,7 @@ router.post('/devices/:serialNumber/command', requireAuth, requireAdmin, async (
  * PATCH /api/iot/alerts/:id/resolve
  * Đánh dấu cảnh báo đã xử lý
  */
-router.patch('/alerts/:id/resolve', requireAuth, requireAdmin, async (req: Request, res: Response): Promise<void> => {
+router.patch('/alerts/:id/resolve', requireAuth, requirePermission('IOT_DEVICE_CONTROL'), async (req: Request, res: Response): Promise<void> => {
   try {
     const id = req.params.id as string;
 
@@ -434,7 +511,7 @@ router.patch('/alerts/:id/resolve', requireAuth, requireAdmin, async (req: Reque
  * POST /api/iot/alerts/resolve-all
  * Đánh dấu đã xử lý tất cả cảnh báo chưa giải quyết (tuân thủ Rule 7: Zero Hard-Delete Policy)
  */
-router.post('/alerts/resolve-all', requireAuth, requireAdmin, async (req: Request, res: Response): Promise<void> => {
+router.post('/alerts/resolve-all', requireAuth, requirePermission('IOT_DEVICE_CONTROL'), async (req: Request, res: Response): Promise<void> => {
   try {
     const { serialNumber } = req.body;
 
@@ -474,7 +551,7 @@ router.post('/alerts/resolve-all', requireAuth, requireAdmin, async (req: Reques
  * PATCH /api/iot/devices/:serialNumber/mute
  * Bật/tắt chế độ tắt thông báo (Mute / Do Not Disturb) cho thiết bị IoT
  */
-router.patch('/devices/:serialNumber/mute', requireAuth, requireAdmin, async (req: Request, res: Response): Promise<void> => {
+router.patch('/devices/:serialNumber/mute', requireAuth, requirePermission('IOT_DEVICE_CONTROL'), async (req: Request, res: Response): Promise<void> => {
   try {
     const serialNumber = req.params.serialNumber as string;
     const { muted = true, resolveExisting = true } = req.body;
@@ -488,21 +565,16 @@ router.patch('/devices/:serialNumber/mute', requireAuth, requireAdmin, async (re
       return;
     }
 
-    const currentConfig = (typeof device.configJson === 'object' && device.configJson !== null)
-      ? (device.configJson as Record<string, any>)
-      : {};
-
     const isMuted = Boolean(muted);
-    const updatedConfig = {
-      ...currentConfig,
-      isMuted,
-      mutedAt: isMuted ? new Date().toISOString() : null,
-      mutedBy: (req as any).user?.username || 'admin'
-    };
 
+    // Ghi vào cột riêng — không đụng tới configJson nên không bị telemetry ghi đè
     await prisma.iotDevice.update({
       where: { id: device.id },
-      data: { configJson: updatedConfig }
+      data: {
+        isMuted,
+        mutedAt: isMuted ? new Date() : null,
+        mutedBy: (req as any).user?.username || 'admin'
+      }
     });
 
     let resolvedCount = 0;
@@ -544,7 +616,7 @@ router.patch('/devices/:serialNumber/mute', requireAuth, requireAdmin, async (re
  * DELETE /api/iot/devices/:serialNumber
  * Lưu trữ và hủy kích hoạt thiết bị IoT (TUÂN THỦ NGUYÊN TẮC ZERO HARD-DELETE)
  */
-router.delete('/devices/:serialNumber', requireAuth, requireAdmin, async (req: Request, res: Response): Promise<void> => {
+router.delete('/devices/:serialNumber', requireAuth, requirePermission('IOT_DEVICE_CONTROL'), async (req: Request, res: Response): Promise<void> => {
   try {
     const serialNumber = req.params.serialNumber as string;
 
@@ -557,25 +629,35 @@ router.delete('/devices/:serialNumber', requireAuth, requireAdmin, async (req: R
       return;
     }
 
-    // Soft-archive device (tuân thủ Rule 7: Zero Hard-Delete Policy)
-    const currentConfig = (typeof device.configJson === 'object' && device.configJson !== null)
-      ? (device.configJson as Record<string, any>)
-      : {};
+    if (device.isArchived) {
+      res.json({ message: `Thiết bị ${serialNumber} đã được lưu trữ trước đó`, resolvedCount: 0 });
+      return;
+    }
 
-    await prisma.iotDevice.update({
-      where: { id: device.id },
-      data: {
-        isOnline: false,
-        configJson: {
-          ...currentConfig,
+    // Soft-archive device (tuân thủ Rule 7: Zero Hard-Delete Policy).
+    // Máy đã lưu trữ: bị ẩn khỏi danh sách, telemetry/status gửi lên bị bỏ qua, không phát sinh cảnh báo.
+    // Đăng ký lại cùng serial (POST /devices) sẽ khôi phục máy.
+    const now = new Date();
+    const [, resolved] = await prisma.$transaction([
+      prisma.iotDevice.update({
+        where: { id: device.id },
+        data: {
+          isOnline: false,
           isArchived: true,
-          archivedAt: new Date().toISOString(),
+          archivedAt: now,
           archivedBy: (req as any).user?.username || 'admin'
         }
-      }
-    });
+      }),
+      prisma.iotAlert.updateMany({
+        where: { deviceId: device.id, isResolved: false },
+        data: { isResolved: true, resolvedAt: now }
+      })
+    ]);
 
-    res.json({ message: `Đã lưu trữ và ngắt kích hoạt thiết bị ${serialNumber}` });
+    res.json({
+      message: `Đã lưu trữ và ngắt kích hoạt thiết bị ${serialNumber}`,
+      resolvedCount: resolved.count
+    });
   } catch (error: any) {
     logger.error('IoT API: Archive device error', { error: error.message });
     res.status(500).json({ error: 'Lỗi khi xử lý thiết bị' });

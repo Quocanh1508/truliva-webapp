@@ -36,7 +36,7 @@ interface ZnsDispatch {
   productName?: string | null;
   productLine?: string | null;
   messageId?: string | null;
-  durationMs?: string;
+  durationMs?: string | null;
   status: 'SUCCESS' | 'FAILED' | 'SENT';
   error?: string | null;
   templateId?: string;
@@ -45,6 +45,8 @@ interface ZnsDispatch {
   warrantyExpiryDate?: string | null;
   activationDate?: string | null;
   assignedKtv?: { fullName: string; phoneNumber?: string | null } | null;
+  reportId?: string | null;
+  templateData?: Record<string, any> | null;
   raw?: string;
 }
 
@@ -53,10 +55,16 @@ const TEMPLATE_INFO: Record<string, { label: string; channel: 'ZALO' | 'FNS' | '
   '666024': { label: 'Lắp đặt – Máy lọc nước', channel: 'ZALO' },
   '666039': { label: 'Lắp đặt – Sản phẩm khác', channel: 'ZALO' },
   '643643': { label: 'Hoàn thành Thay lọc', channel: 'ZALO' },
-  '10233': { label: 'Hoàn thành dịch vụ (BH/SC, dự phòng TL)', channel: 'FNS' },
+  '663746': { label: 'Hoàn thành Bảo hành / Sửa chữa', channel: 'ZALO' },
+  '10233': { label: 'Hoàn thành dịch vụ – FNS dự phòng', channel: 'FNS' },
   '10232': { label: 'Lắp đặt – FNS dự phòng', channel: 'FNS' },
   '617366': { label: 'Mẫu cũ – đã ngừng', channel: 'LEGACY' }
 };
+
+// Mẫu tin hoàn thành dịch vụ (dữ liệu: mã đơn + tổng tiền), khác mẫu kích hoạt bảo hành (serial + sản phẩm)
+const SERVICE_TEMPLATES = ['643643', '663746', '10233'];
+const isServiceDispatch = (d: { templateId?: string; productName?: string | null }) =>
+  SERVICE_TEMPLATES.includes(String(d.templateId || '')) || /^Dịch vụ /i.test(d.productName || '');
 
 function gatewayBadge(gateway?: string, templateId?: string): { text: string; cls: string } {
   const g = (gateway || '').toLowerCase();
@@ -131,6 +139,10 @@ export default function ZnsManage() {
     product: string;
     expiry: string;
     gatewayMode: 'AUTO' | 'ZALO_DIRECT' | 'FNS_GATEWAY';
+    isService: boolean;
+    serviceTemplate: '643643' | '663746';
+    serviceCode: string;
+    amount: string;
     loading: boolean;
     result: any;
   }>({
@@ -142,6 +154,10 @@ export default function ZnsManage() {
     product: '',
     expiry: '',
     gatewayMode: 'AUTO',
+    isService: false,
+    serviceTemplate: '643643',
+    serviceCode: '',
+    amount: '',
     loading: false,
     result: null
   });
@@ -315,25 +331,41 @@ export default function ZnsManage() {
 
   // Mở modal bắn lại ZNS cho một Dispatch
   const handleOpenResend = (d: ZnsDispatch) => {
+    const fmt = (dateObj: Date) =>
+      `${String(dateObj.getDate()).padStart(2, '0')}/${String(dateObj.getMonth() + 1).padStart(2, '0')}/${dateObj.getFullYear()}`;
+    const td = d.templateData || {};
+    const isService = isServiceDispatch(d);
+
     let expiryStr = '';
-    if (d.warrantyExpiryDate) {
-      const dateObj = new Date(d.warrantyExpiryDate);
-      expiryStr = `${String(dateObj.getDate()).padStart(2, '0')}/${String(dateObj.getMonth() + 1).padStart(2, '0')}/${dateObj.getFullYear()}`;
+    if (isService) {
+      // Thay lọc: hạn bảo hành lõi = hôm nay + 3 tháng (giống luồng gửi tự động)
+      const dateObj = new Date();
+      dateObj.setMonth(dateObj.getMonth() + 3);
+      expiryStr = td._NGAY_BAO_HANH_ || fmt(dateObj);
+    } else if (d.warrantyExpiryDate) {
+      expiryStr = fmt(new Date(d.warrantyExpiryDate));
     } else {
       const dateObj = new Date();
       dateObj.setMonth(dateObj.getMonth() + 12);
-      expiryStr = `${String(dateObj.getDate()).padStart(2, '0')}/${String(dateObj.getMonth() + 1).padStart(2, '0')}/${dateObj.getFullYear()}`;
+      expiryStr = fmt(dateObj);
     }
+
+    // Tin dịch vụ cũ (FNS 10233) không ghi loại ca riêng → đoán theo nội dung đã ghi
+    const isFilter = d.templateId === '643643' || /thay lọc/i.test(d.productName || '');
 
     setResendModal({
       isOpen: true,
       dispatch: d,
       phone: d.phone !== 'N/A' ? d.phone : '',
       serialNumber: d.serialNumber !== 'N/A' ? d.serialNumber : '',
-      name: d.customerName || 'Quý Khách',
+      name: td._TEN_KHACH_HANG_ || td.Ten_Khach_Hang || d.customerName || 'Quý Khách',
       product: d.model || 'Máy lọc nước Truliva',
       expiry: expiryStr,
       gatewayMode: 'AUTO',
+      isService,
+      serviceTemplate: isFilter ? '643643' : '663746',
+      serviceCode: String(td._ID_DON_HANG_ || td.Ma_Dich_Vu || d.orderNumber || ''),
+      amount: String(td._TONG_TIEN_ ?? td.Tong_Tien_Thu ?? ''),
       loading: false,
       result: null
     });
@@ -341,7 +373,12 @@ export default function ZnsManage() {
 
   // Thực hiện bắn lại ZNS
   const handleExecuteResend = async () => {
-    if (!resendModal.phone || !resendModal.serialNumber) {
+    if (resendModal.isService) {
+      if (!resendModal.phone.trim() || !resendModal.serviceCode.trim()) {
+        alert('Vui lòng kiểm tra lại số điện thoại và mã dịch vụ / mã đơn');
+        return;
+      }
+    } else if (!resendModal.phone || !resendModal.serialNumber) {
       alert('Vui lòng kiểm tra lại số điện thoại và Serial');
       return;
     }
@@ -349,7 +386,14 @@ export default function ZnsManage() {
     try {
       const res = await fetchApi('/serials/zns/test-send', {
         method: 'POST',
-        body: JSON.stringify({
+        body: JSON.stringify(resendModal.isService ? {
+          phone: resendModal.phone.trim(),
+          templateId: resendModal.serviceTemplate,
+          customerName: resendModal.name.trim(),
+          serviceCode: resendModal.serviceCode.trim(),
+          totalCollected: resendModal.amount.trim() || '0',
+          expiryDate: resendModal.serviceTemplate === '643643' ? resendModal.expiry.trim() : undefined
+        } : {
           phone: resendModal.phone.trim(),
           serialNumber: resendModal.serialNumber.trim(),
           customerName: resendModal.name.trim(),
@@ -426,7 +470,7 @@ export default function ZnsManage() {
     }
   };
 
-  const isServiceTemplate = testTemplate === '643643' || testTemplate === '10233';
+  const isServiceTemplate = SERVICE_TEMPLATES.includes(testTemplate);
 
   // Xử lý gửi Sandbox test
   const handleTestSend = async (e: React.FormEvent) => {
@@ -509,7 +553,10 @@ export default function ZnsManage() {
               Lắp đặt: 666024 (máy lọc nước) · 666039 (SP khác)
             </p>
             <p className="text-[11px] text-purple-600 font-semibold leading-snug">
-              Thay lọc: 643643 · BH/SC: FNS 10233 · Dự phòng: FNS 10232/10233
+              Thay lọc: 643643 · BH/SC: 663746
+            </p>
+            <p className="text-[11px] text-purple-600 font-semibold leading-snug">
+              Dự phòng FNS: 10232 (lắp đặt) · 10233 (dịch vụ)
             </p>
           </div>
         </div>
@@ -596,7 +643,7 @@ export default function ZnsManage() {
             }`}
           >
             <Zap size={16} />
-            <span>Công cụ Bắn Thử Nghiệm (Sandbox)</span>
+            <span>Bắn thử tin</span>
           </button>
 
           <button
@@ -745,8 +792,8 @@ export default function ZnsManage() {
                     <th className="px-3.5 py-3 text-center w-12">#</th>
                     <th className="px-3.5 py-3">Thời gian phát tin</th>
                     <th className="px-3.5 py-3">Số ĐT nhận ZNS</th>
-                    <th className="px-3.5 py-3">Số Serial / ID máy</th>
-                    <th className="px-3.5 py-3">Khách hàng & Thiết bị</th>
+                    <th className="px-3.5 py-3">Serial / Mã đơn</th>
+                    <th className="px-3.5 py-3">Khách hàng & Nội dung</th>
                     <th className="px-3.5 py-3">Mã tin (Message ID)</th>
                     <th className="px-3.5 py-3">Tốc độ</th>
                     <th className="px-3.5 py-3 text-center">Trạng thái phát</th>
@@ -815,8 +862,13 @@ export default function ZnsManage() {
                                   {copiedKey === `serial_${d.id}` ? <Check size={12} className="text-emerald-600" /> : <Copy size={12} />}
                                 </button>
                               </div>
-                            ) : (
+                            ) : !d.orderNumber ? (
                               <span className="text-gray-400 text-[11px] italic">Chưa gắn Serial</span>
+                            ) : null}
+                            {d.orderNumber && (
+                              <span className="block mt-1 text-[11px] text-gray-600">
+                                Mã đơn: <span className="font-mono font-semibold text-gray-800">{d.orderNumber}</span>
+                              </span>
                             )}
                           </td>
 
@@ -824,9 +876,15 @@ export default function ZnsManage() {
                           <td className="px-3.5 py-3">
                             <div>
                               <p className="font-bold text-gray-900">{d.customerName || 'Quý Khách'}</p>
-                              <p className="text-[11px] text-gray-500 mt-0.5 truncate max-w-[180px]" title={d.model}>
+                              <p className="text-[11px] text-gray-500 mt-0.5 truncate max-w-[200px]" title={d.model}>
                                 {d.model || 'Máy lọc nước Truliva'}
                               </p>
+                              {isServiceDispatch(d) && (d.templateData?._TONG_TIEN_ ?? d.templateData?.Tong_Tien_Thu) != null && (
+                                <p className="text-[11px] text-emerald-700 font-semibold mt-0.5">
+                                  {Number(d.templateData?._TONG_TIEN_ ?? d.templateData?.Tong_Tien_Thu).toLocaleString('vi-VN')}đ
+                                  {d.templateData?._NGAY_BAO_HANH_ ? ` · BH lõi đến ${d.templateData._NGAY_BAO_HANH_}` : ''}
+                                </p>
+                              )}
                             </div>
                           </td>
 
@@ -852,7 +910,7 @@ export default function ZnsManage() {
 
                           {/* Tốc độ (Latency) */}
                           <td className="px-3.5 py-3 font-semibold text-indigo-600 whitespace-nowrap">
-                            {d.durationMs || '~145ms'}
+                            {d.durationMs || <span className="text-gray-300">—</span>}
                           </td>
 
                           {/* Trạng thái phát & Cổng Gateway */}
@@ -1209,16 +1267,16 @@ export default function ZnsManage() {
               <div>
                 <p className="font-bold text-sm text-indigo-950">Công cụ bắn thử tin ZNS</p>
                 <p className="mt-1 text-indigo-800 leading-relaxed">
-                  Chọn mẫu, nhập dữ liệu và bắn 1 tin tới số Zalo thử nghiệm. Mẫu 666024 / 666039 / 643643 gửi thẳng qua Zalo OA đúng dữ liệu bạn nhập; 10232 / 10233 gửi qua FPT FNS.
-                  Với mẫu 643643 / 10233: ô Serial dùng làm Mã dịch vụ, ô Ngày hết hạn là hạn bảo hành lõi lọc.
-                  Trên môi trường Sandbox, tin chỉ được mô phỏng và ghi log, không gửi thật.
+                  Chọn mẫu, nhập dữ liệu và bắn 1 tin tới số Zalo thử nghiệm. Mẫu 666024 / 666039 / 643643 / 663746 gửi thẳng qua Zalo OA đúng dữ liệu bạn nhập (không dự phòng); 10232 / 10233 gửi qua FPT FNS.
+                  Trên Production đây là tin thật và có tính phí.
+                  Trên môi trường Sandbox, tin chỉ được mô phỏng và ghi log.
                 </p>
               </div>
             </div>
 
             {/* Chọn mẫu tin */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-2 text-xs">
-              {(['666024', '666039', '643643', '10232', '10233'] as const).map(id => {
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 text-xs">
+              {(['666024', '666039', '643643', '663746', '10232', '10233'] as const).map(id => {
                 const t = TEMPLATE_INFO[id];
                 const active = testTemplate === id;
                 return (
@@ -1240,7 +1298,8 @@ export default function ZnsManage() {
               })}
             </div>
 
-            {/* Quick Template Presets */}
+            {/* Quick Template Presets (chỉ cho mẫu kích hoạt bảo hành) */}
+            {!isServiceTemplate && (
             <div className="flex flex-wrap gap-2 text-xs items-center">
               <span className="text-gray-500 font-semibold">Mẫu nhanh:</span>
               <button
@@ -1277,6 +1336,7 @@ export default function ZnsManage() {
                 Mẫu Thay Lọc (3 tháng)
               </button>
             </div>
+            )}
 
             <form onSubmit={handleTestSend} className="space-y-4 bg-gray-50 p-4 rounded-2xl border border-gray-200 text-xs">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -1334,8 +1394,8 @@ export default function ZnsManage() {
                     />
                   </div>
                 )}
-                <div>
-                  <label className="block font-semibold text-gray-700 mb-1">Ngày hết hạn (DD/MM/YYYY)</label>
+                <div className={testTemplate === '663746' || testTemplate === '10233' ? 'hidden' : ''}>
+                  <label className="block font-semibold text-gray-700 mb-1">{testTemplate === '643643' ? 'Hạn BH lõi lọc (DD/MM/YYYY)' : 'Ngày hết hạn (DD/MM/YYYY)'}</label>
                   <input
                     type="text"
                     value={testExpiry}
@@ -1667,7 +1727,7 @@ export default function ZnsManage() {
             <div className="flex justify-between items-center border-b pb-3">
               <h3 className="font-bold text-gray-900 text-sm flex items-center gap-2">
                 <Send size={16} className="text-blue-600" />
-                <span>Bắn Lại Tin Nhắn Zalo ZNS Xác Nhận Bảo Hành</span>
+                <span>{resendModal.isService ? 'Bắn Lại Tin Hoàn Thành Dịch Vụ' : 'Bắn Lại Tin Kích Hoạt Bảo Hành'}</span>
               </h3>
               <button
                 onClick={() => setResendModal(prev => ({ ...prev, isOpen: false }))}
@@ -1677,6 +1737,87 @@ export default function ZnsManage() {
               </button>
             </div>
 
+            {resendModal.isService ? (
+            <div className="space-y-3 text-xs">
+              <div>
+                <label className="block font-semibold text-gray-700 mb-1">Mẫu tin</label>
+                <div className="grid grid-cols-2 gap-2">
+                  {(['643643', '663746'] as const).map(id => (
+                    <button
+                      key={id}
+                      type="button"
+                      onClick={() => setResendModal(prev => ({ ...prev, serviceTemplate: id }))}
+                      className={`text-left p-2.5 rounded-xl border transition-colors ${
+                        resendModal.serviceTemplate === id ? 'border-blue-500 bg-blue-50 ring-2 ring-blue-200' : 'border-gray-200 bg-white hover:bg-gray-50'
+                      }`}
+                    >
+                      <span className="block font-mono font-bold text-gray-900">{id}</span>
+                      <span className="block text-gray-600 mt-0.5">{TEMPLATE_INFO[id].label}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <label className="block font-semibold text-gray-700 mb-1">Số điện thoại khách hàng nhận tin *</label>
+                <input
+                  type="text"
+                  value={resendModal.phone}
+                  onChange={(e) => setResendModal(prev => ({ ...prev, phone: e.target.value }))}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-xl font-mono bg-white focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block font-semibold text-gray-700 mb-1">Tên khách hàng</label>
+                  <input
+                    type="text"
+                    value={resendModal.name}
+                    onChange={(e) => setResendModal(prev => ({ ...prev, name: e.target.value }))}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-xl bg-white focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+                <div>
+                  <label className="block font-semibold text-gray-700 mb-1">Mã dịch vụ / Mã đơn *</label>
+                  <input
+                    type="text"
+                    value={resendModal.serviceCode}
+                    onChange={(e) => setResendModal(prev => ({ ...prev, serviceCode: e.target.value }))}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-xl font-mono bg-white focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block font-semibold text-gray-700 mb-1">Tổng tiền thu (VNĐ)</label>
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    value={resendModal.amount}
+                    onChange={(e) => setResendModal(prev => ({ ...prev, amount: e.target.value }))}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-xl font-mono bg-white focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+                {resendModal.serviceTemplate === '643643' && (
+                  <div>
+                    <label className="block font-semibold text-gray-700 mb-1">Hạn BH lõi lọc (DD/MM/YYYY)</label>
+                    <input
+                      type="text"
+                      value={resendModal.expiry}
+                      onChange={(e) => setResendModal(prev => ({ ...prev, expiry: e.target.value }))}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-xl font-mono bg-white focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+                )}
+              </div>
+
+              <p className="text-[11px] text-gray-500">
+                Gửi trực tiếp qua Zalo OA mẫu {resendModal.serviceTemplate} với đúng dữ liệu trên (không chống trùng, không dự phòng FNS).
+              </p>
+            </div>
+            ) : (
             <div className="space-y-3 text-xs">
               <div>
                 <label className="block font-semibold text-gray-700 mb-1">Số Serial máy *</label>
@@ -1747,6 +1888,7 @@ export default function ZnsManage() {
                 </p>
               </div>
             </div>
+            )}
 
             {resendModal.result && (
               <div className={`p-3 rounded-xl text-xs font-mono ${

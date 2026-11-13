@@ -28,8 +28,8 @@ export default function MyOrdersPage({ user, onBack, onExploreProducts }: MyOrde
   const loadOrders = async () => {
     setLoading(true);
     try {
-      const phone = user?.phoneNumber || '';
-      const res = await fetchZaloApi(`/zalo-miniapp/shop/my-orders?phone=${encodeURIComponent(phone)}`);
+      // Server xác định khách hàng từ token đăng nhập, không gửi SĐT qua query
+      const res = await fetchZaloApi('/zalo-miniapp/shop/my-orders');
       if (res && res.success) {
         setOrders(res.orders || []);
       }

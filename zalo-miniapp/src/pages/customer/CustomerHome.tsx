@@ -243,7 +243,7 @@ export default function CustomerHome({ user, mySerials = [], onOpenScanner, onOp
 
       {/* 2. Floating Quick Nav Card (UI/UX Pro Max Modern Bento Quick Actions) */}
       <div className="max-w-md mx-auto px-4 -mt-7 relative z-10">
-        <div className="bg-white/95 backdrop-blur-xl rounded-[2.2rem] shadow-[0_12px_36px_rgba(11,37,69,0.12)] p-3 border border-sky-100/90 grid grid-cols-4 gap-1.5 text-center items-start">
+        <div className={`bg-white/95 backdrop-blur-xl rounded-[2.2rem] shadow-[0_12px_36px_rgba(11,37,69,0.12)] p-3 border border-sky-100/90 grid ${FEATURES.ENABLE_MEMBER_RANKING ? 'grid-cols-4' : 'grid-cols-3'} gap-1.5 text-center items-start`}>
           {/* 1. Cửa hàng / Sản phẩm */}
           <button 
             onClick={onGoToShop}
@@ -257,8 +257,9 @@ export default function CustomerHome({ user, mySerials = [], onOpenScanner, onOp
             </span>
           </button>
 
-          {/* 2. Điểm tích lũy */}
-          <button 
+          {/* 2. Điểm tích lũy (Tạm ẩn theo yêu cầu: tính năng điểm đang pending) */}
+          {FEATURES.ENABLE_MEMBER_RANKING && (
+          <button
             onClick={() => setShowLoyaltyModal(true)}
             className="flex flex-col items-center justify-start space-y-1.5 px-1 py-2 rounded-2xl hover:bg-amber-50/80 active:scale-95 transition-all cursor-pointer group touch-tactile"
           >
@@ -272,6 +273,7 @@ export default function CustomerHome({ user, mySerials = [], onOpenScanner, onOp
               Điểm tích lũy
             </span>
           </button>
+          )}
 
           {/* 3. Kích hoạt bảo hành (Kích hoạt & tra cứu bảo hành điện tử) */}
           <button 
@@ -548,18 +550,22 @@ export default function CustomerHome({ user, mySerials = [], onOpenScanner, onOp
         </div>
       </div>
 
-      {/* Modals */}
-      <CustomerLoyaltyModal
-        isOpen={showLoyaltyModal}
-        onClose={() => setShowLoyaltyModal(false)}
-        userPoints={Number(user?.rewardPoints ?? user?.points ?? 0)}
-      />
+      {/* Modals (Điểm tích lũy & Vòng quay: tạm ẩn khi tắt ENABLE_MEMBER_RANKING) */}
+      {FEATURES.ENABLE_MEMBER_RANKING && (
+        <>
+          <CustomerLoyaltyModal
+            isOpen={showLoyaltyModal}
+            onClose={() => setShowLoyaltyModal(false)}
+            userPoints={Number(user?.rewardPoints ?? user?.points ?? 0)}
+          />
 
-      <LuckyWheelModal 
-        isOpen={showWheelModal} 
-        onClose={() => setShowWheelModal(false)} 
-        user={user} 
-      />
+          <LuckyWheelModal
+            isOpen={showWheelModal}
+            onClose={() => setShowWheelModal(false)}
+            user={user}
+          />
+        </>
+      )}
 
       <NewsDetailModal 
         article={selectedArticle} 

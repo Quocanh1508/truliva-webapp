@@ -31,14 +31,21 @@ export function normalizePhone(phone: string): string {
  * Giải mã phoneToken từ Zalo SDK thông qua Zalo Graph API
  */
 export async function decodeZaloPhoneToken(phoneToken: string, userAccessToken?: string): Promise<{ phone: string; isVerified: boolean }> {
-  const isDev = process.env.NODE_ENV !== 'production';
+  // Bypass SĐT thô CHỈ bật khi chủ động cấu hình ZALO_DEV_PHONE_BYPASS=true và KHÔNG phải production.
+  // (Trước đây chỉ dựa vào NODE_ENV !== 'production' → sandbox chứa dữ liệu thật bị đăng nhập hộ bằng SĐT bất kỳ.)
+  const allowDevPhoneBypass =
+    process.env.NODE_ENV !== 'production' && process.env.ZALO_DEV_PHONE_BYPASS === 'true';
 
+  // Secret key chỉ đọc từ biến môi trường (không hardcode trong source).
+  // ZALO_MINI_APP_SECRET_FALLBACKS: danh sách phân tách dấu phẩy, dùng tạm khi đang xoay vòng khóa.
   const candidateKeys = Array.from(new Set([
     process.env.ZALO_MINI_APP_SECRET,
-    '43687accf260a48eb6b4ef247813b0dd',
-    '5S82319D2tB5Z2X3ZqRZ',
-    'DYAiHF0BqLb9M2FtGLW4'
+    ...(process.env.ZALO_MINI_APP_SECRET_FALLBACKS || '').split(',').map(k => k.trim())
   ].filter(Boolean))) as string[];
+
+  if (candidateKeys.length === 0) {
+    logger.error('ZALO_MINI_APP_SECRET is not configured in environment');
+  }
 
   let lastError: any = null;
 
@@ -81,8 +88,8 @@ export async function decodeZaloPhoneToken(phoneToken: string, userAccessToken?:
     }
   }
 
-  // Fallback CHỈ CHO PHÉP trong môi trường Development / Local Testing
-  if (isDev) {
+  // Fallback CHỈ CHO PHÉP khi bật rõ ràng ZALO_DEV_PHONE_BYPASS=true trên máy local
+  if (allowDevPhoneBypass) {
     const cleanStr = phoneToken.replace(/[^0-9]/g, '');
     if ((cleanStr.startsWith('0') && cleanStr.length === 10) || (cleanStr.startsWith('84') && cleanStr.length >= 11)) {
       logger.warn('DEVELOPMENT ONLY: Bypassing Zalo Token for local testing phone', { phone: cleanStr });

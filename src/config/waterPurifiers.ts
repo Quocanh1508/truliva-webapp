@@ -137,12 +137,61 @@ export const PURIFIER_MODEL_CONFIGS: Record<string, PurifierModelConfig> = {
  * Trả về cấu hình dòng máy dựa trên Model / ProductLine / Serial
  */
 export function getPurifierConfig(modelOrSerial?: string | null): PurifierModelConfig {
-  if (!modelOrSerial) return PURIFIER_MODEL_CONFIGS['UR5840'];
-  const upper = modelOrSerial.toUpperCase();
-  if (upper.includes('61096')) return PURIFIER_MODEL_CONFIGS['UR61096H'];
-  if (upper.includes('5676')) return PURIFIER_MODEL_CONFIGS['UR5676'];
-  if (upper.includes('5840')) return PURIFIER_MODEL_CONFIGS['UR5840'];
-  return PURIFIER_MODEL_CONFIGS['UR5840']; // Mặc định 3 lõi nếu chưa rõ dòng máy
+  return PURIFIER_MODEL_CONFIGS[detectPurifierModelKey(modelOrSerial) || 'UR5840']; // Mặc định 3 lõi nếu chưa rõ dòng máy
+}
+
+/**
+ * Nhận diện mã dòng máy từ 1 chuỗi (model / productLine / serial). Trả về null nếu không nhận ra.
+ */
+export function detectPurifierModelKey(text?: string | null): string | null {
+  if (!text) return null;
+  const upper = text.toUpperCase();
+  if (upper.includes('61096')) return 'UR61096H';
+  if (upper.includes('5676')) return 'UR5676';
+  if (upper.includes('5840')) return 'UR5840';
+  return null;
+}
+
+export type IotModelSource = 'serial_record' | 'serial_number' | 'payload' | 'default';
+
+export interface IotModelInfo {
+  model: string;
+  filterCount: 2 | 3;
+  indicatorType: 'BARS' | 'LIGHT';
+  source: IotModelSource; // Căn cứ nhận diện — để UI/admin biết độ tin cậy
+}
+
+/**
+ * Xác định dòng máy cho thiết bị IoT — NGUỒN DUY NHẤT cho cả backend (cảnh báo lõi lọc) và frontend (hiển thị).
+ * Thứ tự ưu tiên:
+ *  1. Bảng Serial (model / productLine) — chính xác nhất
+ *  2. Số serial của thiết bị (nếu có chứa mã dòng máy)
+ *  3. Dấu hiệu từ payload: UART hoạt động, có lõi 1 nhưng CTO = null → dòng 2 lõi (spec: UR61096H gửi cto = null)
+ *  4. Mặc định dòng 3 lõi UR5840
+ */
+export function resolveIotModel(
+  serialInfo: { model?: string | null; productLine?: string | null } | null | undefined,
+  serialNumber: string,
+  payload?: any
+): IotModelInfo {
+  const pick = (key: string, source: IotModelSource): IotModelInfo => {
+    const cfg = PURIFIER_MODEL_CONFIGS[key];
+    return { model: cfg.model, filterCount: cfg.filterCount, indicatorType: cfg.indicatorType, source };
+  };
+
+  const fromRecord = detectPurifierModelKey(serialInfo?.model) || detectPurifierModelKey(serialInfo?.productLine);
+  if (fromRecord) return pick(fromRecord, 'serial_record');
+
+  const fromSerial = detectPurifierModelKey(serialNumber);
+  if (fromSerial) return pick(fromSerial, 'serial_number');
+
+  if (payload && typeof payload === 'object' && payload.uart_ok !== false) {
+    const hasFilter1 = payload.ppc != null || payload.pcb != null;
+    if (hasFilter1 && payload.cto == null) return pick('UR61096H', 'payload');
+    if (payload.cto != null) return pick('UR5840', 'payload');
+  }
+
+  return pick('UR5840', 'default');
 }
 
 /**

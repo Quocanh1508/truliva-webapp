@@ -480,7 +480,7 @@ export const SYSTEM_FEATURES: SystemFeature[] = [
     key: 'IOT_DEVICE_CONTROL',
     module: 'iot',
     name: 'Điều khiển thiết bị IoT từ xa qua MQTT',
-    description: 'Gửi lệnh đóng/ngắt van nước điện từ, tắt còi cảnh báo và reset chu kỳ lõi lọc từ xa',
+    description: 'Gửi lệnh tới ESP32 (đổi tần suất gửi dữ liệu, ping, khởi động lại, OTA), đăng ký/lưu trữ thiết bị, tắt thông báo và xử lý cảnh báo',
     defaultRoles: ['ADMIN', 'DEV'],
     addedAt: '2026-11-03'
   },

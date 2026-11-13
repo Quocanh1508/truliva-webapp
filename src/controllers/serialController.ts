@@ -27,7 +27,7 @@ import { sendPushNotification } from '../services/notificationService';
 import { sendWebPushNotification } from '../services/webPushService';
 import { PANCAKE_PROVINCES } from '../utils/provinces';
 import { sendInstallWarrantyZns, ZNS_TEMPLATE_INSTALL_WATER, ZNS_TEMPLATE_INSTALL_OTHER } from '../services/installZnsService';
-import { sendFilterServiceZns, computeFilterExpiry, toVndAmount, ZNS_TEMPLATE_FILTER_SERVICE } from '../services/filterServiceZnsService';
+import { sendServiceCompletionZns, buildServiceTemplateData, getServiceZnsKind, ZNS_TEMPLATE_FILTER_SERVICE, ZNS_TEMPLATE_REPAIR_SERVICE, ServiceZnsKind } from '../services/serviceZnsService';
 
 export async function uploadInvoiceResponse(req: Request, res: Response): Promise<void> {
   try {
@@ -1897,7 +1897,7 @@ export async function activateZns(req: Request, res: Response): Promise<void> {
     const isServiceJob = ['thay lọc', 'bảo hành', 'sửa chữa'].includes(workTypeClean);
 
     // ─────────────────────────────────────────────────────────────
-    // 1. NẾU LÀ CA DỊCH VỤ: THAY LỌC -> Zalo OA 643643 (dự phòng FNS 10233); BẢO HÀNH, SỬA CHỮA -> FNS 10233
+    // 1. NẾU LÀ CA DỊCH VỤ: THAY LỌC -> Zalo OA 643643; BẢO HÀNH, SỬA CHỮA -> Zalo OA 663746 (cùng dự phòng FNS 10233)
     // ─────────────────────────────────────────────────────────────
     if (isServiceJob) {
       let resolvedServiceCode = (serviceCode || '').trim();
@@ -1948,8 +1948,11 @@ export async function activateZns(req: Request, res: Response): Promise<void> {
         finalCustomerName = order?.billFullName || 'Quý Khách';
       }
 
-      if (workTypeClean === 'thay lọc') {
-        const filterResult = await sendFilterServiceZns({
+      const serviceKind = getServiceZnsKind(workTypeClean);
+      if (serviceKind) {
+        const filterResult = await sendServiceCompletionZns({
+          kind: serviceKind,
+          workType,
           phone: recipientPhone.trim(),
           customerName: finalCustomerName,
           serviceCode: resolvedServiceCode,
@@ -1960,7 +1963,7 @@ export async function activateZns(req: Request, res: Response): Promise<void> {
         });
         res.json({
           success: true,
-          message: `Đã phát tin hoàn thành thay lọc (Mẫu ${filterResult.templateId}${filterResult.fallbackUsed ? ' - dự phòng FNS' : ''}) thành công!`,
+          message: `Đã phát tin hoàn thành ${serviceKind === 'FILTER' ? 'thay lọc' : 'dịch vụ'} (Mẫu ${filterResult.templateId}${filterResult.fallbackUsed ? ' - dự phòng FNS' : ''}) thành công!`,
           result: { ...filterResult, data: { message_id: filterResult.messageId } },
           templateId: filterResult.templateId,
           serviceCode: resolvedServiceCode,
@@ -2126,28 +2129,34 @@ export async function testZnsSend(req: Request, res: Response): Promise<void> {
       return;
     }
 
-    // Bắn thử trực tiếp mẫu Zalo OA 643643 (hoàn thành thay lọc) với đúng dữ liệu nhập tay, không dự phòng
-    if (String(templateId) === ZNS_TEMPLATE_FILTER_SERVICE) {
+    // Bắn thử trực tiếp mẫu Zalo OA 643643 (thay lọc) / 663746 (BH/SC) với đúng dữ liệu nhập tay, không dự phòng
+    const testServiceKind: ServiceZnsKind | null =
+      String(templateId) === ZNS_TEMPLATE_FILTER_SERVICE ? 'FILTER' : String(templateId) === ZNS_TEMPLATE_REPAIR_SERVICE ? 'REPAIR' : null;
+    if (testServiceKind) {
       const code = String(serviceCode || serialNumber || '').trim();
       if (!code) {
         res.status(400).json({ error: 'Vui lòng nhập mã dịch vụ / mã đơn' });
         return;
       }
-      const amount = toVndAmount(totalCollected ?? 150000);
-      const templateData = {
-        _TEN_KHACH_HANG_: String(customerName || 'Quý Khách').substring(0, 30),
-        _ID_DON_HANG_: code.substring(0, 30),
-        _TONG_TIEN_: amount,
-        _NGAY_BAO_HANH_: (String(expiryDate || '').trim() || computeFilterExpiry()).substring(0, 30)
-      };
+      const { templateData } = buildServiceTemplateData({
+        kind: testServiceKind,
+        customerName,
+        serviceCode: code,
+        totalCollected: totalCollected ?? 150000,
+        expiryDate
+      });
       const direct = await sendZaloDirectZns({
         phone,
-        templateId: ZNS_TEMPLATE_FILTER_SERVICE,
+        templateId: String(templateId),
         templateData,
         trackingId: `TEST-${Date.now()}`,
-        log: { customerName: templateData._TEN_KHACH_HANG_, productName: `Dịch vụ Thay lọc: ${code}`, orderNumber: code }
+        log: {
+          customerName: String(templateData._TEN_KHACH_HANG_),
+          productName: `Dịch vụ ${testServiceKind === 'FILTER' ? 'Thay lọc' : 'Bảo hành / Sửa chữa'}: ${templateData._ID_DON_HANG_}`,
+          orderNumber: String(templateData._ID_DON_HANG_)
+        }
       });
-      res.json({ success: true, templateId: ZNS_TEMPLATE_FILTER_SERVICE, gateway: direct.gateway, data: { message_id: direct.messageId }, template_data: templateData });
+      res.json({ success: true, templateId: String(templateId), gateway: direct.gateway, data: { message_id: direct.messageId }, template_data: templateData });
       return;
     }
 
@@ -2421,15 +2430,21 @@ export async function getZnsLogs(req: Request, res: Response): Promise<void> {
       model: log.productName || 'Máy lọc nước Truliva',
       productName: log.productName,
       messageId: log.messageId,
-      durationMs: log.durationMs || '~145ms',
+      durationMs: log.durationMs || null,
       status: log.status,
       error: log.error,
       templateId: log.templateId || '10232',
       gateway: log.gateway || 'FPT FNS Gateway',
-      orderNumber: log.orderNumber
+      orderNumber: log.orderNumber,
+      reportId: log.reportId,
+      // Dữ liệu đã điền vào mẫu (để bắn lại đúng nội dung)
+      templateData: ((log.rawData as any)?.template_data ?? null) as Record<string, any> | null
     }));
 
-    const availableModels = distinctProducts.map(p => p.productName).filter(Boolean);
+    // Bộ lọc "Dòng máy": bỏ các bản ghi tin dịch vụ ("Dịch vụ Thay lọc: 12345"...) — mỗi mã đơn là 1 giá trị riêng
+    const availableModels = distinctProducts
+      .map(p => p.productName)
+      .filter((n): n is string => !!n && !/^Dịch vụ /i.test(n));
 
     res.json({
       success: true,
