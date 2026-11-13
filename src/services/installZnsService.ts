@@ -48,7 +48,8 @@ function isValidSerial(sn?: string | null): sn is string {
   return !!s && !/^X+$/i.test(s);
 }
 
-function formatDate(d: Date): string {
+/** DD/MM/YYYY theo giờ Việt Nam */
+export function formatVnDate(d: Date): string {
   const vn = new Date(d.toLocaleString('en-US', { timeZone: 'Asia/Ho_Chi_Minh' }));
   return `${String(vn.getDate()).padStart(2, '0')}/${String(vn.getMonth() + 1).padStart(2, '0')}/${vn.getFullYear()}`;
 }
@@ -190,7 +191,7 @@ export async function resolveInstallZnsPlan(input: InstallZnsInput) {
 
   const warrantyId = serial?.serialNumber || (isValidSerial(serialInput) ? serialInput : '') || input.orderCode || 'N/A';
   const expiry = serial?.warrantyExpiryDate ? new Date(serial.warrantyExpiryDate) : await computeExpiryFromPolicy(productName);
-  const expiryDate = formatDate(expiry);
+  const expiryDate = formatVnDate(expiry);
   const customerName = (input.customerName || serial?.customerName || 'Quý Khách').trim();
 
   const templateData = {

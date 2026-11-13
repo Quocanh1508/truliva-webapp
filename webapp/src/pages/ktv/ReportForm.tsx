@@ -1631,7 +1631,7 @@ export default function ReportForm() {
                       </h3>
                       <p className="text-[11px] text-gray-500 mt-0.5">
                         {activationData.isServiceJob 
-                          ? `Xác nhận gửi tin nhắn Zalo cho Khách hàng (Mẫu FNS 10233)`
+                          ? `Xác nhận gửi tin nhắn Zalo cho Khách hàng (${activationData.workType?.trim().toLowerCase() === 'thay lọc' ? 'Mẫu Zalo OA 643643' : 'Mẫu FNS 10233'})`
                           : 'Xác nhận gửi tin nhắn ZNS cho Khách hàng'}
                       </p>
                     </div>
@@ -1654,7 +1654,7 @@ export default function ReportForm() {
                             THÔNG TIN DỊCH VỤ HOÀN THÀNH
                           </h4>
                           <span className="text-[10px] font-bold text-blue-700 bg-blue-100 px-2 py-0.5 rounded-full">
-                            FNS 10233
+                            {activationData.workType?.trim().toLowerCase() === 'thay lọc' ? 'Zalo OA 643643' : 'FNS 10233'}
                           </span>
                         </div>
                         <div className="grid grid-cols-3 gap-1.5 text-xs text-gray-600 pt-1">

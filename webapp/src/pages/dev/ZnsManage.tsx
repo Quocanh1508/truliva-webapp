@@ -52,7 +52,8 @@ interface ZnsDispatch {
 const TEMPLATE_INFO: Record<string, { label: string; channel: 'ZALO' | 'FNS' | 'LEGACY' }> = {
   '666024': { label: 'Lắp đặt – Máy lọc nước', channel: 'ZALO' },
   '666039': { label: 'Lắp đặt – Sản phẩm khác', channel: 'ZALO' },
-  '10233': { label: 'Hoàn thành dịch vụ (TL/BH/SC)', channel: 'FNS' },
+  '643643': { label: 'Hoàn thành Thay lọc', channel: 'ZALO' },
+  '10233': { label: 'Hoàn thành dịch vụ (BH/SC, dự phòng TL)', channel: 'FNS' },
   '10232': { label: 'Lắp đặt – FNS dự phòng', channel: 'FNS' },
   '617366': { label: 'Mẫu cũ – đã ngừng', channel: 'LEGACY' }
 };
@@ -116,6 +117,7 @@ export default function ZnsManage() {
   const [testName, setTestName] = useState('Khách Hàng Test');
   const [testProduct, setTestProduct] = useState('Máy lọc nước Truliva UR61096H');
   const [testExpiry, setTestExpiry] = useState('20/08/2027');
+  const [testAmount, setTestAmount] = useState('150000');
   const [testResult, setTestResult] = useState<any>(null);
   const [loadingTest, setLoadingTest] = useState(false);
 
@@ -424,6 +426,8 @@ export default function ZnsManage() {
     }
   };
 
+  const isServiceTemplate = testTemplate === '643643' || testTemplate === '10233';
+
   // Xử lý gửi Sandbox test
   const handleTestSend = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -443,6 +447,8 @@ export default function ZnsManage() {
           productName: testProduct.trim(),
           expiryDate: testExpiry.trim(),
           templateId: testTemplate,
+          serviceCode: isServiceTemplate ? testSerial.trim() : undefined,
+          totalCollected: isServiceTemplate ? testAmount.trim() : undefined,
           gatewayMode: testTemplate === '10232' ? 'FNS_GATEWAY' : undefined
         })
       });
@@ -503,7 +509,7 @@ export default function ZnsManage() {
               Lắp đặt: 666024 (máy lọc nước) · 666039 (SP khác)
             </p>
             <p className="text-[11px] text-purple-600 font-semibold leading-snug">
-              Dịch vụ: FNS 10233 · Dự phòng: FNS 10232
+              Thay lọc: 643643 · BH/SC: FNS 10233 · Dự phòng: FNS 10232/10233
             </p>
           </div>
         </div>
@@ -1203,15 +1209,16 @@ export default function ZnsManage() {
               <div>
                 <p className="font-bold text-sm text-indigo-950">Công cụ bắn thử tin ZNS</p>
                 <p className="mt-1 text-indigo-800 leading-relaxed">
-                  Chọn mẫu, nhập dữ liệu và bắn 1 tin tới số Zalo thử nghiệm. Mẫu 666024 / 666039 gửi thẳng qua Zalo OA đúng dữ liệu bạn nhập; 10232 / 10233 gửi qua FPT FNS.
+                  Chọn mẫu, nhập dữ liệu và bắn 1 tin tới số Zalo thử nghiệm. Mẫu 666024 / 666039 / 643643 gửi thẳng qua Zalo OA đúng dữ liệu bạn nhập; 10232 / 10233 gửi qua FPT FNS.
+                  Với mẫu 643643 / 10233: ô Serial dùng làm Mã dịch vụ, ô Ngày hết hạn là hạn bảo hành lõi lọc.
                   Trên môi trường Sandbox, tin chỉ được mô phỏng và ghi log, không gửi thật.
                 </p>
               </div>
             </div>
 
             {/* Chọn mẫu tin */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2 text-xs">
-              {(['666024', '666039', '10232', '10233'] as const).map(id => {
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-2 text-xs">
+              {(['666024', '666039', '643643', '10232', '10233'] as const).map(id => {
                 const t = TEMPLATE_INFO[id];
                 const active = testTemplate === id;
                 return (
@@ -1284,7 +1291,7 @@ export default function ZnsManage() {
                   />
                 </div>
                 <div>
-                  <label className="block font-semibold text-gray-700 mb-1">Số Serial *</label>
+                  <label className="block font-semibold text-gray-700 mb-1">{isServiceTemplate ? 'Mã dịch vụ / Mã đơn *' : 'Số Serial *'}</label>
                   <input
                     type="text"
                     value={testSerial}
@@ -1305,15 +1312,28 @@ export default function ZnsManage() {
                     className="w-full px-3.5 py-2 border border-gray-300 rounded-xl outline-none focus:ring-2 focus:ring-blue-500 bg-white font-medium"
                   />
                 </div>
-                <div>
-                  <label className="block font-semibold text-gray-700 mb-1">Tên sản phẩm</label>
-                  <input
-                    type="text"
-                    value={testProduct}
-                    onChange={(e) => setTestProduct(e.target.value)}
-                    className="w-full px-3.5 py-2 border border-gray-300 rounded-xl outline-none focus:ring-2 focus:ring-blue-500 bg-white font-medium"
-                  />
-                </div>
+                {isServiceTemplate ? (
+                  <div>
+                    <label className="block font-semibold text-gray-700 mb-1">Tổng tiền thu (VNĐ)</label>
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      value={testAmount}
+                      onChange={(e) => setTestAmount(e.target.value)}
+                      className="w-full px-3.5 py-2 border border-gray-300 rounded-xl outline-none focus:ring-2 focus:ring-blue-500 bg-white font-mono"
+                    />
+                  </div>
+                ) : (
+                  <div>
+                    <label className="block font-semibold text-gray-700 mb-1">Tên sản phẩm</label>
+                    <input
+                      type="text"
+                      value={testProduct}
+                      onChange={(e) => setTestProduct(e.target.value)}
+                      className="w-full px-3.5 py-2 border border-gray-300 rounded-xl outline-none focus:ring-2 focus:ring-blue-500 bg-white font-medium"
+                    />
+                  </div>
+                )}
                 <div>
                   <label className="block font-semibold text-gray-700 mb-1">Ngày hết hạn (DD/MM/YYYY)</label>
                   <input
