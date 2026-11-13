@@ -546,7 +546,20 @@ model IotDevice {
   firmwareVersion String?   @map("firmware_version")
   lastSeenAt      DateTime? @map("last_seen_at")              // Lần cuối gửi data
   isOnline        Boolean   @default(false) @map("is_online")
-  configJson      Json?     @map("config_json")               // Cấu hình gửi xuống device
+  configJson      Json?     @map("config_json")               // Cấu hình/trạng thái lệnh (interval, OTA, phản hồi lệnh cuối)
+
+  // Trạng thái quản lý — cột riêng (không lưu trong configJson để tránh ghi đè lẫn nhau)
+  isMuted         Boolean   @default(false) @map("is_muted")  // Tắt thông báo (Do Not Disturb)
+  mutedAt         DateTime? @map("muted_at")
+  mutedBy         String?   @map("muted_by")
+  isArchived      Boolean   @default(false) @map("is_archived") // Đã lưu trữ (soft-delete) — bỏ qua telemetry & cảnh báo
+  archivedAt      DateTime? @map("archived_at")
+  archivedBy      String?   @map("archived_by")
+
+  // Payload live mới nhất (cập nhật mỗi gói telemetry, độc lập với lịch sử iot_telemetry)
+  latestPayload   Json?     @map("latest_payload")
+  latestPayloadAt DateTime? @map("latest_payload_at")
+
   createdAt       DateTime  @default(now()) @map("created_at")
   updatedAt       DateTime  @updatedAt @map("updated_at")
 
@@ -554,6 +567,7 @@ model IotDevice {
   telemetryData   IotTelemetry[]
   alerts          IotAlert[]
 
+  @@index([isArchived])
   @@map("iot_devices")
 }
 
@@ -594,6 +608,7 @@ model IotAlert {
   device          IotDevice @relation(fields: [deviceId], references: [id])
 
   @@index([deviceId, createdAt])
+  @@index([deviceId, alertType, isResolved])
   @@map("iot_alerts")
 }
 

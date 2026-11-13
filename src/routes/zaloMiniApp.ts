@@ -4,7 +4,7 @@ import logger from '../utils/logger';
 import { requireAuth, requireCustomerAuth, optionalCustomerAuth } from '../middleware/authSession';
 import { authenticateZaloMiniAppUser } from '../services/zaloMiniAppService';
 import { activateSerialWarranty } from '../services/warrantyService';
-import { getPurifierConfig } from '../config/waterPurifiers';
+import { getPurifierConfig, resolveIotModel } from '../config/waterPurifiers';
 import { buildPhoneVariants, getRedeemedPoints } from '../services/shopPricing';
 
 const router = Router();
@@ -444,7 +444,8 @@ router.get('/my-serials', requireCustomerAuth, async (req: Request, res: Respons
       where: {
         serialNumber: {
           in: serialNumbers
-        }
+        },
+        isArchived: false
       },
       include: {
         telemetryData: {
@@ -455,9 +456,15 @@ router.get('/my-serials', requireCustomerAuth, async (req: Request, res: Respons
     });
 
     const iotMap = new Map<string, any>();
+    const serialByNumber = new Map(allSerials.map((s: any) => [s.serialNumber, s]));
+    const num = (v: any) => (v != null && v !== '' && !isNaN(Number(v)) ? Number(v) : null);
     for (const dev of iotDevices) {
       const tel = dev.telemetryData[0];
-      const raw = (typeof tel?.rawPayload === 'object' && tel?.rawPayload !== null) ? (tel.rawPayload as any) : {};
+      // Ưu tiên payload live mới nhất (cùng nguồn với trang admin), fallback bản ghi lịch sử gần nhất
+      const live = (typeof dev.latestPayload === 'object' && dev.latestPayload !== null) ? (dev.latestPayload as any) : null;
+      const stored = (typeof tel?.rawPayload === 'object' && tel?.rawPayload !== null) ? (tel.rawPayload as any) : null;
+      const raw = live || stored || {};
+      const hasData = Boolean(live || tel);
       const config = (typeof dev.configJson === 'object' && dev.configJson !== null) ? (dev.configJson as any) : {};
 
       iotMap.set(dev.serialNumber, {
@@ -465,35 +472,37 @@ router.get('/my-serials', requireCustomerAuth, async (req: Request, res: Respons
         isOnline: dev.isOnline,
         firmwareVersion: dev.firmwareVersion || raw.fw || null,
         lastSeenAt: dev.lastSeenAt,
-        isMuted: config.isMuted ?? false,
-        telemetry: tel ? {
-          tdsOut: tel.tdsOut != null ? Number(tel.tdsOut) : (raw.tdsOut != null ? Number(raw.tdsOut) : null),
-          tdsIn: tel.tdsIn != null ? Number(tel.tdsIn) : (raw.tdsIn != null ? Number(raw.tdsIn) : null),
-          waterFlowLpm: tel.waterFlowLpm,
-          totalLiters: tel.totalLiters,
-          errorCode: tel.errorCode,
-          recordedAt: tel.recordedAt,
+        isMuted: dev.isMuted,
+        // Dòng máy dùng chung logic với backend cảnh báo & trang admin
+        model: resolveIotModel(serialByNumber.get(dev.serialNumber) as any, dev.serialNumber, raw),
+        // CHỈ trả dữ liệu thật từ thiết bị — không có thì để null cho UI hiển thị "--"
+        telemetry: hasData ? {
+          tdsOut: num(raw.tdsOut ?? raw.tds_out) ?? (live ? null : num(tel?.tdsOut)),
+          tdsIn: num(raw.tdsIn ?? raw.tds_in) ?? (live ? null : num(tel?.tdsIn)),
+          waterFlowLpm: tel?.waterFlowLpm ?? null,
+          totalLiters: tel?.totalLiters ?? null,
+          errorCode: num(raw.err) ?? tel?.errorCode ?? 0,
+          recordedAt: (live && dev.latestPayloadAt) || tel?.recordedAt || null,
           // Thông số lõi lọc nước Truliva (hỗ trợ cả chuẩn PPC/PGP 3 lõi và PCB 2 lõi)
-          ppc: raw.ppc != null ? Number(raw.ppc) : (raw.pcb != null ? Number(raw.pcb) : null),
-          ppcBars: raw.ppc_bars != null ? Number(raw.ppc_bars) : (raw.pcb_bars != null ? Number(raw.pcb_bars) : null),
+          ppc: num(raw.ppc ?? raw.pcb),
+          ppcBars: num(raw.ppc_bars ?? raw.pcb_bars),
           ppcReplace: raw.ppc_replace === true || raw.pcb_replace === true,
-          pcb: raw.pcb != null ? Number(raw.pcb) : (raw.ppc != null ? Number(raw.ppc) : null),
-          pcbBars: raw.pcb_bars != null ? Number(raw.pcb_bars) : (raw.ppc_bars != null ? Number(raw.ppc_bars) : null),
+          pcb: num(raw.pcb ?? raw.ppc),
+          pcbBars: num(raw.pcb_bars ?? raw.ppc_bars),
           pcbReplace: raw.pcb_replace === true || raw.ppc_replace === true,
-          ro: raw.ro != null ? Number(raw.ro) : null,
-          roBars: raw.ro_bars != null ? Number(raw.ro_bars) : null,
+          ro: num(raw.ro),
+          roBars: num(raw.ro_bars),
           roReplace: raw.ro_replace === true,
-          cto: raw.cto != null ? Number(raw.cto) : null,
-          ctoBars: raw.cto_bars != null ? Number(raw.cto_bars) : null,
+          cto: num(raw.cto),
+          ctoBars: num(raw.cto_bars),
           ctoReplace: raw.cto_replace === true,
-          // Phần cứng / Mạng
-          rssi: raw.rssi != null ? Number(raw.rssi) : null,
-          uartOk: raw.uart_ok !== undefined ? raw.uart_ok : true,
-          uptime: raw.uptime != null ? Number(raw.uptime) : null,
-          ip: raw.ip || '192.168.1.135',
-          ssid: raw.ssid || config.ssid || 'Truliva_Smart_WiFi',
-          mac: raw.mac || config.mac || `TL-${dev.id.slice(0, 6).toUpperCase()}`,
-          band: '2.4 GHz (802.11 b/g/n)'
+          // Phần cứng / Mạng (null nếu firmware không gửi)
+          rssi: num(raw.rssi),
+          uartOk: raw.uart_ok === false ? false : (raw.uart_ok === true ? true : null),
+          uptime: num(raw.uptime),
+          ip: raw.ip || null,
+          ssid: raw.ssid || config.ssid || null,
+          mac: raw.mac || config.mac || null,
         } : null
       });
     }

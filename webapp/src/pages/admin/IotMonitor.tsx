@@ -37,6 +37,7 @@ import {
   Legend,
 } from 'recharts';
 import { fetchApi } from '../../api/client';
+import { usePermission } from '../../context/PermissionContext';
 
 interface Telemetry {
   id: string;
@@ -104,9 +105,68 @@ interface IotDevice {
   isMuted?: boolean;
   latestTelemetry: Telemetry | null;
   serialInfo?: SerialInfo | null;
+  // Dòng máy do backend xác định (dùng chung với logic cảnh báo lõi lọc)
+  modelConfig?: { model: string; filterCount: 2 | 3; indicatorType: 'BARS' | 'LIGHT'; source: string } | null;
+  configJson?: { lastCommand?: LastCommand; [key: string]: any } | null;
   unresolvedAlerts: number;
   totalReadings: number;
   createdAt: string;
+}
+
+interface LastCommand {
+  id: string;
+  cmd: string;
+  params?: Record<string, any>;
+  status: 'sent' | 'acknowledged' | 'in_progress' | 'failed' | 'publish_failed';
+  error?: string | null;
+  sentAt: string;
+  sentBy?: string | null;
+  respondedAt?: string;
+  // Xác minh bằng telemetry sau lệnh (backend: verifyLastCommand)
+  verified?: boolean;
+  verifiedAt?: string;
+  evidence?: { bootAt?: string; uptime?: number; resetReason?: string | null; firstTelemetryAfterSec?: number; interval?: number; telemetryAfterSec?: number };
+}
+
+const COMMAND_LABELS: Record<string, string> = {
+  set_interval: 'Đổi tần suất gửi',
+  ping: 'Ping',
+  reboot: 'Khởi động lại',
+  ota: 'Cập nhật firmware (OTA)',
+};
+
+function describeLastCommand(c: LastCommand): { text: string; className: string } {
+  // Đã đối chiếu được với dữ liệu thật từ chip → mạnh hơn "máy xác nhận"
+  if (c.verified && c.evidence) {
+    const e = c.evidence;
+    if (c.cmd === 'reboot' && e.bootAt) {
+      const boot = new Date(e.bootAt).toLocaleTimeString('vi-VN');
+      return {
+        text: `✔ Chip đã khởi động lại lúc ${boot}${e.resetReason ? ` (reset_reason: ${e.resetReason})` : ''}${e.firstTelemetryAfterSec != null ? ` · có dữ liệu lại sau ${e.firstTelemetryAfterSec}s` : ''}`,
+        className: 'text-emerald-700',
+      };
+    }
+    if (c.cmd === 'set_interval' && e.interval != null) return { text: `✔ Chip đang gửi dữ liệu mỗi ${e.interval}s`, className: 'text-emerald-700' };
+    if (c.cmd === 'ping' && e.telemetryAfterSec != null) return { text: `✔ Chip gửi dữ liệu mới sau ${e.telemetryAfterSec}s`, className: 'text-emerald-700' };
+  }
+  const ageMs = Date.now() - new Date(c.sentAt).getTime();
+  const verifiable = ['reboot', 'set_interval', 'ping'].includes(c.cmd);
+  switch (c.status) {
+    case 'acknowledged':
+      if (!verifiable) return { text: 'Máy đã xác nhận', className: 'text-emerald-700' };
+      return ageMs > 60 * 60_000
+        ? { text: 'Máy đã nhận lệnh nhưng chưa xác minh được tác động', className: 'text-amber-700' }
+        : { text: 'Máy đã nhận lệnh, đang chờ dữ liệu để xác minh…', className: 'text-blue-700' };
+    case 'in_progress': return { text: 'Đang thực hiện', className: 'text-blue-700' };
+    case 'failed': return { text: `Máy báo lỗi${c.error ? `: ${c.error}` : ''}`, className: 'text-rose-700' };
+    case 'publish_failed': return { text: `Không gửi được${c.error ? ` (${c.error})` : ''}`, className: 'text-rose-700' };
+    default: {
+      const ageMs = Date.now() - new Date(c.sentAt).getTime();
+      return ageMs > 60_000
+        ? { text: 'Chưa thấy máy phản hồi', className: 'text-amber-700' }
+        : { text: 'Đang chờ máy phản hồi…', className: 'text-gray-600' };
+    }
+  }
 }
 
 // ── Helpers ──
@@ -147,6 +207,9 @@ function getFilterState(percent?: number | null, replace?: boolean, indicatorTyp
 }
 
 export default function IotMonitor() {
+  // Quyền điều khiển (gửi lệnh, đăng ký, tắt chuông, xử lý cảnh báo) — khớp với kiểm tra ở backend
+  const { hasPermission } = usePermission();
+  const canControl = hasPermission('IOT_DEVICE_CONTROL');
   const [devices, setDevices] = useState<IotDevice[]>([]);
   const [alerts, setAlerts] = useState<Alert[]>([]);
   const [loading, setLoading] = useState(true);
@@ -198,8 +261,11 @@ export default function IotMonitor() {
         fetchApi('/iot/alerts?resolved=false')
       ]);
 
-      setDevices(devicesData?.devices || []);
+      const nextDevices: IotDevice[] = devicesData?.devices || [];
+      setDevices(nextDevices);
       setAlerts(alertData?.alerts || []);
+      // Đồng bộ máy đang mở chi tiết với dữ liệu mới (trạng thái lệnh, online, chỉ số live)
+      setSelectedDevice((prev) => (prev ? nextDevices.find((d) => d.serialNumber === prev.serialNumber) || prev : prev));
     } catch (error) {
       console.error('Error fetching IoT data:', error);
     } finally {
@@ -265,8 +331,12 @@ export default function IotMonitor() {
     try {
       let params: Record<string, any> = {};
       if (selectedCommand === 'set_interval') {
-        const sec = Number(commandParam) || 60;
-        params = { interval: sec, interval_s: sec };
+        const sec = Number(commandParam);
+        if (!Number.isInteger(sec) || sec < 1 || sec > 3600) {
+          alert('❌ Tần suất phải là số nguyên từ 1 đến 3600 giây');
+          return;
+        }
+        params = { interval: sec };
       }
 
       const data = await fetchApi(`/iot/devices/${commandDevice.serialNumber}/command`, {
@@ -425,6 +495,7 @@ export default function IotMonitor() {
             <RefreshCw size={14} className={refreshing ? 'animate-spin text-blue-600' : 'sm:w-4 sm:h-4'} />
             Làm mới
           </button>
+          {canControl && (
           <button
             onClick={() => {
               setNewSerial('');
@@ -437,6 +508,7 @@ export default function IotMonitor() {
             <Plus size={16} className="sm:w-4.5 sm:h-4.5" />
             Đăng ký IoT
           </button>
+          )}
         </div>
       </div>
 
@@ -581,6 +653,7 @@ export default function IotMonitor() {
                 <h4 className="font-bold text-gray-800 text-sm">Danh Sách Cảnh Báo Thiết Bị</h4>
                 <p className="text-xs text-gray-500">Có {alerts.length} cảnh báo đang chờ xử lý.</p>
               </div>
+              {canControl && (
               <button
                 onClick={() => handleResolveAllAlerts()}
                 disabled={resolvingAll}
@@ -589,6 +662,7 @@ export default function IotMonitor() {
                 {resolvingAll ? <Loader2 size={14} className="animate-spin" /> : <CheckCheck size={14} />}
                 Đánh dấu đã xử lý toàn bộ ({alerts.length})
               </button>
+              )}
             </div>
           )}
 
@@ -645,6 +719,7 @@ export default function IotMonitor() {
                   </div>
                 </div>
 
+                {canControl && (
                 <div className="flex items-center gap-2 shrink-0 self-end sm:self-center">
                   {alert.device?.serialNumber && !alert.device.isMuted && (
                     <button
@@ -669,6 +744,7 @@ export default function IotMonitor() {
                     Đã xử lý
                   </button>
                 </div>
+                )}
               </div>
             ))
           )}
@@ -685,8 +761,11 @@ export default function IotMonitor() {
           ) : (
             filteredDevices.map((device) => {
               const tel = device.latestTelemetry;
+              // Dòng máy do backend xác định (cùng logic với cảnh báo lõi lọc); fallback cho API cũ
               const modelKey = (device.serialInfo?.model || device.serialInfo?.productLine || device.serialNumber || '').toUpperCase();
-              const isTwoFilter = modelKey.includes('61096') || (tel?.cto == null && (tel?.ppc != null || (tel as any)?.pcb != null));
+              const isTwoFilter = device.modelConfig
+                ? device.modelConfig.filterCount === 2
+                : modelKey.includes('61096') || (tel?.cto == null && (tel?.ppc != null || (tel as any)?.pcb != null));
               const indicatorType: 'BARS' | 'LIGHT' = isTwoFilter ? 'LIGHT' : 'BARS';
 
               const filter1Val = tel?.ppc ?? (tel as any)?.pcb;
@@ -957,6 +1036,7 @@ export default function IotMonitor() {
                           Có <strong className="text-rose-950 font-bold">{device.unresolvedAlerts}</strong> cảnh báo chưa xử lý
                         </span>
                       </span>
+                      {canControl && (
                       <button
                         onClick={() => handleResolveAllAlerts(device.serialNumber)}
                         disabled={resolvingAll}
@@ -965,6 +1045,7 @@ export default function IotMonitor() {
                       >
                         Đã xử lý xong
                       </button>
+                      )}
                     </div>
                   )}
 
@@ -990,7 +1071,9 @@ export default function IotMonitor() {
                     </div>
 
                     {/* Actions Row: 3 Touch-Friendly Buttons */}
-                    <div className="grid grid-cols-3 gap-1.5 sm:gap-2">
+                    <div className={`grid ${canControl ? 'grid-cols-3' : 'grid-cols-1'} gap-1.5 sm:gap-2`}>
+                      {canControl && (
+                      <>
                       <button
                         onClick={() => handleToggleMute(device.serialNumber, !!device.isMuted)}
                         disabled={mutingSerial === device.serialNumber}
@@ -1028,6 +1111,8 @@ export default function IotMonitor() {
                         <Send size={13} className="shrink-0" />
                         <span className="truncate">Gửi lệnh</span>
                       </button>
+                      </>
+                      )}
 
                       <button
                         onClick={() => handleSelectDevice(device)}
@@ -1076,6 +1161,7 @@ export default function IotMonitor() {
               </div>
 
               <div className="flex items-center justify-between sm:justify-end gap-2 w-full sm:w-auto">
+                {canControl && (
                 <button
                   onClick={() => handleToggleMute(selectedDevice.serialNumber, !!selectedDevice.isMuted)}
                   disabled={mutingSerial === selectedDevice.serialNumber}
@@ -1100,6 +1186,7 @@ export default function IotMonitor() {
                     </>
                   )}
                 </button>
+                )}
 
                 <button
                   onClick={() => setSelectedDevice(null)}
@@ -1277,6 +1364,23 @@ export default function IotMonitor() {
                         <span className="font-bold text-gray-800">{selectedDevice.latestTelemetry?.interval ? `${selectedDevice.latestTelemetry.interval} giây` : '5 giây'}</span>
                       </div>
                     </div>
+
+                    {selectedDevice.configJson?.lastCommand && (() => {
+                      const lc = selectedDevice.configJson!.lastCommand!;
+                      const st = describeLastCommand(lc);
+                      return (
+                        <div className="bg-white p-3 rounded-lg border border-gray-100 text-xs flex flex-wrap items-center justify-between gap-2">
+                          <span className="text-gray-500">
+                            Lệnh gần nhất: <strong className="text-gray-800">{COMMAND_LABELS[lc.cmd] || lc.cmd}</strong>
+                            {lc.cmd === 'set_interval' && lc.params?.interval ? ` (${lc.params.interval}s)` : ''}
+                            {' • '}
+                            {new Date(lc.sentAt).toLocaleString('vi-VN')}
+                            {lc.sentBy ? ` • ${lc.sentBy}` : ''}
+                          </span>
+                          <span className={`font-bold ${st.className}`}>{st.text}</span>
+                        </div>
+                      );
+                    })()}
 
                     <div className="text-[11px] text-gray-400 bg-white p-2.5 rounded-lg border border-gray-100 space-y-0.5">
                       <p>• <strong>Cảm biến TDS nước thô đầu vào:</strong> Không trang bị trên phần cứng dòng máy này.</p>

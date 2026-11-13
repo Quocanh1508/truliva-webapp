@@ -94,17 +94,35 @@ export default function IotDeviceCard({ serialData, user, onBookMaintenance }: I
   const isActivated = s?.status === 'Đã kích hoạt' || s?.status === 'KH xác nhận' || Boolean(s?.activationDate);
   const expiryDateStr = s?.warrantyExpiryDate ? new Date(s.warrantyExpiryDate).toLocaleDateString('vi-VN') : null;
 
-  const modelTitle = s.model || s.productLine || 'UR61096H';
-  const modelUpper = (s.model || s.productLine || modelTitle || '').toUpperCase();
-  // Nhận diện dòng máy 2 lõi (UR61096H) vs 3 lõi (UR5676, UR5840)
-  const isTwoFilter = modelUpper.includes('61096') || (telemetry?.cto == null && (telemetry?.ppc != null || telemetry?.pcb != null));
+  const modelTitle = s.model || s.productLine || 'Máy lọc nước Truliva';
+  const modelUpper = (s.model || s.productLine || '').toUpperCase();
+  // Nhận diện dòng máy 2 lõi (UR61096H) vs 3 lõi (UR5676, UR5840):
+  // ưu tiên kết quả backend (iot.model — cùng logic với cảnh báo), rồi modelConfig, cuối cùng mới đoán theo tên/payload
+  const isTwoFilter = iot?.model?.filterCount
+    ? iot.model.filterCount === 2
+    : s?.modelConfig?.filterCount
+      ? s.modelConfig.filterCount === 2
+      : modelUpper.includes('61096') || (telemetry?.cto == null && (telemetry?.ppc != null || telemetry?.pcb != null));
   const indicatorType: 'BARS' | 'LIGHT' = isTwoFilter ? 'LIGHT' : 'BARS';
 
   // Helper tính màu & trạng thái chỉ báo (Vạch / Đèn) theo đặc tả kỹ thuật:
   // - Dòng UR5676 / UR5840 (vạch): >25%: 2,3,4 vạch xanh ("Đang tốt") | 10%-25%: 1 vạch xanh ("Sắp thay") | <10%: 1 vạch nháy đỏ ("Cần thay")
   // - Dòng UR61096H / lõi PCB (đèn): >25%: sáng đèn trắng ("Đang tốt") | 10%-25%: sáng đèn trắng ("Sắp thay") | <10%: nháy đèn đỏ ("Cần thay")
   const getFilterHealth = (pct: number | null | undefined, isReplace?: boolean, customBars?: number | null) => {
-    const val = pct ?? 80;
+    // Không có số liệu thật từ máy → không bịa số, hiển thị "--"
+    if (pct == null && !isReplace) {
+      return {
+        val: null as number | null,
+        label: 'Chưa có dữ liệu',
+        color: 'bg-slate-300',
+        textColor: 'text-slate-400',
+        badgeClass: 'bg-slate-50 text-slate-500 border-slate-200',
+        indicatorText: '--',
+        indicatorClass: 'text-slate-400 font-medium',
+        barsDisplay: ''
+      };
+    }
+    const val = pct ?? 0;
     if (isReplace || val < 10) {
       return { 
         val,
@@ -142,22 +160,43 @@ export default function IotDeviceCard({ serialData, user, onBookMaintenance }: I
     };
   };
 
-  const filter1Val = telemetry?.ppc ?? telemetry?.pcb ?? 79;
+  const filter1Val = telemetry?.ppc ?? telemetry?.pcb ?? null;
   const filter1Replace = telemetry?.ppcReplace || telemetry?.pcbReplace;
   const filter1Bars = telemetry?.ppcBars ?? telemetry?.pcbBars;
 
   const filter1Health = getFilterHealth(filter1Val, filter1Replace, filter1Bars);
-  const roHealth = getFilterHealth(telemetry?.ro ?? 85, telemetry?.roReplace, telemetry?.roBars);
-  const ctoHealth = getFilterHealth(telemetry?.cto ?? 80, telemetry?.ctoReplace, telemetry?.ctoBars);
+  const roHealth = getFilterHealth(telemetry?.ro, telemetry?.roReplace, telemetry?.roBars);
+  const ctoHealth = getFilterHealth(telemetry?.cto, telemetry?.ctoReplace, telemetry?.ctoBars);
+  const pctText = (v: number | null) => (v != null ? `${v}%` : '--');
 
-  const tdsVal = telemetry?.tdsOut ?? 12;
+  const tdsVal: number | null = telemetry?.tdsOut ?? null;
   // Chuẩn hóa trạng thái kết nối Wi-Fi thực tế (Nếu iot.isOnline === false thì hiển thị ngoại tuyến)
   const isOnline = Boolean(iot && iot.isOnline);
-  const fwVersion = iot?.firmwareVersion ?? 'FW 1.2.0';
-  const rssi = telemetry?.rssi ?? -47;
-  const ssidName = telemetry?.ssid || 'Truliva_Smart_WiFi';
-  const ipAddress = telemetry?.ip || '192.168.1.135';
-  const macAddress = telemetry?.mac || `TL-${(s?.serialNumber || '830F5').slice(-6)}`;
+  const fwVersion = iot?.firmwareVersion ? `FW ${iot.firmwareVersion}` : 'FW --';
+  const rssi: number | null = telemetry?.rssi ?? null;
+  // Đánh giá sóng theo RSSI thật (dBm)
+  const rssiLabel = rssi == null ? '' : rssi >= -60 ? 'Mạnh' : rssi >= -70 ? 'Khá' : rssi >= -80 ? 'Yếu' : 'Rất yếu';
+  const ssidName: string | null = telemetry?.ssid || null;
+  const ipAddress: string | null = telemetry?.ip || null;
+  const macAddress: string | null = telemetry?.mac || null;
+
+  // Trạng thái dữ liệu để giải thích cho khách vì sao không có số liệu / số liệu cũ
+  const hasIot = Boolean(iot);
+  const hasTelemetry = Boolean(telemetry);
+  const uartLost = telemetry?.uartOk === false;
+  const updatedAt = telemetry?.recordedAt || iot?.lastSeenAt || null;
+  const updatedAtText = updatedAt
+    ? new Date(updatedAt).toLocaleString('vi-VN', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit' })
+    : null;
+  const dataNotice: string | null = !hasIot
+    ? 'Máy chưa được gắn module IoT nên chưa có số liệu theo dõi từ xa.'
+    : !hasTelemetry
+      ? 'Module IoT chưa gửi dữ liệu lên hệ thống.'
+      : uartLost
+        ? 'Module IoT đang mất kết nối với bo mạch máy lọc, chưa đọc được chỉ số.'
+        : !isOnline && updatedAtText
+          ? `Máy đang ngoại tuyến — số liệu dưới đây cập nhật lần cuối lúc ${updatedAtText}.`
+          : null;
 
   return (
     <div className="bg-white rounded-[2rem] border border-sky-100/90 shadow-[0_6px_30px_rgba(27,58,107,0.07)] overflow-hidden transition-all">
@@ -260,7 +299,17 @@ export default function IotDeviceCard({ serialData, user, onBookMaintenance }: I
               <span className="whitespace-nowrap">
                 {isOnline ? 'Đang kết nối Wi-Fi' : 'Chưa kết nối Wi-Fi'}
               </span>
+              {hasTelemetry && updatedAtText && (
+                <span className="text-[10px] text-slate-400 font-medium whitespace-nowrap">• Cập nhật {updatedAtText}</span>
+              )}
             </div>
+
+            {dataNotice && (
+              <div className="mt-1.5 p-2.5 rounded-xl bg-slate-50 border border-slate-200 text-[11px] text-slate-600 flex items-start gap-1.5">
+                <Info size={13} className="text-slate-400 shrink-0 mt-0.5" />
+                <span>{dataNotice}</span>
+              </div>
+            )}
           </div>
 
           {/* Hộp Thông số Nước Tinh Khiết & Lõi RO tóm tắt (UI/UX Pro Max Telemetry HUD) */}
@@ -268,7 +317,7 @@ export default function IotDeviceCard({ serialData, user, onBookMaintenance }: I
             <div className="flex items-center justify-between text-xs">
               <span className="text-slate-600 font-semibold">TDS đầu ra (Sau màng RO)</span>
               <div className="flex items-baseline space-x-1">
-                <span className="text-xl font-black text-[#1B3A6B] tabular-num">{tdsVal}</span>
+                <span className="text-xl font-black text-[#1B3A6B] tabular-num">{tdsVal ?? '--'}</span>
                 <span className="text-[10px] font-bold text-slate-500">ppm</span>
               </div>
             </div>
@@ -276,7 +325,7 @@ export default function IotDeviceCard({ serialData, user, onBookMaintenance }: I
             <div className="flex items-center justify-between text-xs pt-1.5 border-t border-sky-100/80">
               <span className="text-slate-600 font-semibold">Lõi RO còn lại</span>
               <div className="flex items-baseline space-x-1.5">
-                <span className="text-xl font-black text-emerald-600 tabular-num">{roHealth.val}%</span>
+                <span className={`text-xl font-black tabular-num ${roHealth.val != null ? 'text-emerald-600' : 'text-slate-400'}`}>{pctText(roHealth.val)}</span>
                 <span className="text-[10px] font-black text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
                   Chuẩn tinh khiết
                 </span>
@@ -312,7 +361,7 @@ export default function IotDeviceCard({ serialData, user, onBookMaintenance }: I
                 </div>
 
                 <div className="shrink-0 text-right">
-                  <div className="font-black text-sm text-slate-900 leading-none tabular-num">{filter1Health.val}%</div>
+                  <div className="font-black text-sm text-slate-900 leading-none tabular-num">{pctText(filter1Health.val)}</div>
                   <span className={`inline-flex items-center justify-center mt-1 text-[9px] font-bold px-2 py-0.5 rounded-md border whitespace-nowrap ${filter1Health.badgeClass}`}>
                     {filter1Health.label}
                   </span>
@@ -324,7 +373,7 @@ export default function IotDeviceCard({ serialData, user, onBookMaintenance }: I
                 <div className="w-full bg-slate-100 rounded-full h-2 overflow-hidden">
                   <div 
                     className={`h-full rounded-full transition-all duration-700 ${filter1Health.color}`}
-                    style={{ width: `${Math.min(100, Math.max(8, filter1Health.val))}%` }}
+                    style={{ width: `${filter1Health.val != null ? Math.min(100, Math.max(8, filter1Health.val)) : 0}%` }}
                   ></div>
                 </div>
                 <div className="flex items-center justify-between text-[10px] text-slate-500 font-medium">
@@ -353,7 +402,7 @@ export default function IotDeviceCard({ serialData, user, onBookMaintenance }: I
                 </div>
 
                 <div className="shrink-0 text-right">
-                  <div className="font-black text-sm text-sky-700 leading-none tabular-num">{roHealth.val}%</div>
+                  <div className="font-black text-sm text-sky-700 leading-none tabular-num">{pctText(roHealth.val)}</div>
                   <span className={`inline-flex items-center justify-center mt-1 text-[9px] font-bold px-2 py-0.5 rounded-md border whitespace-nowrap ${roHealth.badgeClass}`}>
                     {roHealth.label}
                   </span>
@@ -365,7 +414,7 @@ export default function IotDeviceCard({ serialData, user, onBookMaintenance }: I
                 <div className="w-full bg-slate-100 rounded-full h-2 overflow-hidden">
                   <div 
                     className={`h-full rounded-full transition-all duration-700 ${roHealth.color}`}
-                    style={{ width: `${Math.min(100, Math.max(8, roHealth.val))}%` }}
+                    style={{ width: `${roHealth.val != null ? Math.min(100, Math.max(8, roHealth.val)) : 0}%` }}
                   ></div>
                 </div>
                 <div className="flex items-center justify-between text-[10px] text-slate-500 font-medium">
@@ -396,7 +445,7 @@ export default function IotDeviceCard({ serialData, user, onBookMaintenance }: I
                   </div>
 
                   <div className="shrink-0 text-right">
-                    <div className="font-black text-sm text-slate-900 leading-none tabular-num">{ctoHealth.val}%</div>
+                    <div className="font-black text-sm text-slate-900 leading-none tabular-num">{pctText(ctoHealth.val)}</div>
                     <span className={`inline-flex items-center justify-center mt-1 text-[9px] font-bold px-2 py-0.5 rounded-md border whitespace-nowrap ${ctoHealth.badgeClass}`}>
                       {ctoHealth.label}
                     </span>
@@ -408,7 +457,7 @@ export default function IotDeviceCard({ serialData, user, onBookMaintenance }: I
                   <div className="w-full bg-slate-100 rounded-full h-2 overflow-hidden">
                     <div 
                       className={`h-full rounded-full transition-all duration-700 ${ctoHealth.color}`}
-                      style={{ width: `${Math.min(100, Math.max(8, ctoHealth.val))}%` }}
+                      style={{ width: `${ctoHealth.val != null ? Math.min(100, Math.max(8, ctoHealth.val)) : 0}%` }}
                     ></div>
                   </div>
                   <div className="flex items-center justify-between text-[10px] text-slate-500 font-medium">
@@ -511,21 +560,21 @@ export default function IotDeviceCard({ serialData, user, onBookMaintenance }: I
               <div className="bg-white/10 p-2.5 rounded-xl border border-white/10 min-w-0">
                 <span className="text-[10px] text-sky-200 block truncate">Tên Wi-Fi (SSID)</span>
                 <span className={`font-bold block mt-0.5 truncate ${isOnline ? 'text-white' : 'text-slate-300'}`}>
-                  {isOnline ? ssidName : (ssidName || 'Chưa thiết lập')}
+                  {ssidName || '--'}
                 </span>
               </div>
 
               <div className="bg-white/10 p-2.5 rounded-xl border border-white/10 min-w-0">
                 <span className="text-[10px] text-sky-200 block truncate">Tín hiệu sóng (RSSI)</span>
                 <span className={`font-bold block mt-0.5 truncate ${isOnline ? 'text-cyan-300' : 'text-slate-400'}`}>
-                  {isOnline ? `${rssi} dBm (Mạnh)` : '-- (Ngoại tuyến)'}
+                  {isOnline && rssi != null ? `${rssi} dBm (${rssiLabel})` : isOnline ? '--' : '-- (Ngoại tuyến)'}
                 </span>
               </div>
 
               <div className="bg-white/10 p-2.5 rounded-xl border border-white/10 min-w-0">
                 <span className="text-[10px] text-sky-200 block truncate">Địa chỉ IP máy</span>
                 <span className={`font-mono text-[11px] block mt-0.5 truncate ${isOnline ? 'text-white' : 'text-slate-400'}`}>
-                  {isOnline ? ipAddress : '-- (Chưa cấp)'}
+                  {isOnline && ipAddress ? ipAddress : '--'}
                 </span>
               </div>
 
@@ -536,7 +585,7 @@ export default function IotDeviceCard({ serialData, user, onBookMaintenance }: I
             </div>
 
             <div className="flex items-center justify-between text-[10px] text-sky-300/80 pt-1 border-t border-white/10">
-              <span className="truncate">MAC: {macAddress}</span>
+              <span className="truncate">MAC: {macAddress || '--'}</span>
               <span className="shrink-0 font-mono">{fwVersion}</span>
             </div>
           </div>
