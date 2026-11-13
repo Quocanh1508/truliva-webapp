@@ -602,7 +602,7 @@ export default function MyReports() {
                         onClick={() => handleOpenActivation(r)}
                         className="w-full flex items-center justify-center gap-1.5 text-xs text-white bg-blue-600 hover:bg-blue-700 font-bold py-2 rounded-lg transition-colors border border-blue-500 shadow-sm"
                       >
-                        <Send className="w-3.5 h-3.5" /> Gửi tin Zalo hoàn thành dịch vụ (FNS)
+                        <Send className="w-3.5 h-3.5" /> Gửi tin Zalo hoàn thành dịch vụ
                       </button>
                     )}
                     <div className="flex items-center gap-3 w-full">
@@ -1020,7 +1020,7 @@ export default function MyReports() {
                   </h3>
                   <p className="text-[11px] text-gray-500 mt-0.5">
                     {activationData.isServiceJob 
-                      ? `Xác nhận gửi tin nhắn Zalo cho Khách hàng (${activationData.workType?.trim().toLowerCase() === 'thay lọc' ? 'Mẫu Zalo OA 643643' : 'Mẫu FNS 10233'})`
+                      ? `Xác nhận gửi tin nhắn Zalo cho Khách hàng (${activationData.workType?.trim().toLowerCase() === 'thay lọc' ? 'Mẫu Zalo OA 643643' : 'Mẫu Zalo OA 663746'})`
                       : 'Xác nhận thông tin gửi tin nhắn Zalo ZNS'}
                   </p>
                 </div>
@@ -1042,7 +1042,7 @@ export default function MyReports() {
                         THÔNG TIN DỊCH VỤ HOÀN THÀNH
                       </h4>
                       <span className="text-[10px] font-bold text-blue-700 bg-blue-100 px-2 py-0.5 rounded-full">
-                        {activationData.workType?.trim().toLowerCase() === 'thay lọc' ? 'Zalo OA 643643' : 'FNS 10233'}
+                        {activationData.workType?.trim().toLowerCase() === 'thay lọc' ? 'Zalo OA 643643' : 'Zalo OA 663746'}
                       </span>
                     </div>
                     <div className="grid grid-cols-3 gap-1.5 text-xs text-gray-600 pt-1">

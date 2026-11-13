@@ -864,7 +864,7 @@ export default function ReportList() {
     try {
       const serialEdited = activationData.serialNumber.trim() !== (activationData.originalSerialNumber || '').trim();
       if (activationData.reportId && !serialEdited) {
-        // Gửi theo báo cáo: server tự lấy mã đơn, số tiền thực thu, serial → đúng nội dung mẫu 10232/10233 + chống gửi trùng
+        // Gửi theo báo cáo: server tự lấy mã đơn, số tiền thực thu, serial → đúng nội dung mẫu (666024/666039, 643643, 663746) + chống gửi trùng
         const send = (force: boolean) => fetchApi(`/reports/${activationData.reportId}/send-zns`, {
           method: 'POST',
           body: JSON.stringify({ phone: znsPhone.trim(), force })
