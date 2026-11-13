@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import prisma from '../config/database';
 import logger from '../utils/logger';
+import { syncOrderWarehouseToPancake } from '../services/pancakeWarehouseSync';
 import { syncOrderStatusToPancake } from '../services/orderProcessor';
 import { sendPushNotification } from '../services/notificationService';
 import { sendWebPushNotification } from '../services/webPushService';
@@ -517,12 +518,24 @@ export async function createReport(req: Request, res: Response): Promise<void> {
                     warehouseId: targetWarehouseId
                   });
                 } else {
+                  // Đổi kho (nếu lệch với POS) bằng hàm chuyên dụng. KHÔNG gửi warehouse_id chung lệnh products:
+                  // POS bỏ qua "products" và xử lý như lệnh chỉ đổi kho -> nhân đôi dòng thành phần của đơn combo.
+                  if (targetWarehouseId) {
+                    try {
+                      await syncOrderWarehouseToPancake(oldOrder.pancakeOrderId, String(targetWarehouseId));
+                    } catch (whErr: any) {
+                      logger.error('Failed to sync warehouse to Pancake POS on report flow', {
+                        pancakeOrderId: oldOrder.pancakeOrderId,
+                        warehouseId: targetWarehouseId,
+                        error: whErr.response?.data?.message || whErr.message
+                      });
+                    }
+                  }
                   try {
                     const updateResponse = await axios.patch(
                       `${PANCAKE_API_BASE}/api/v1/shops/${shopId}/orders/${oldOrder.pancakeOrderId}`,
                       {
                         products: pancakeProducts,
-                        warehouse_id: targetWarehouseId || undefined
                       },
                       {
                         params: { api_key: apiKey },
@@ -1613,12 +1626,24 @@ export async function updateReport(req: Request, res: Response): Promise<void> {
                   warehouseId: targetWarehouseId
                 });
               } else {
+                // Đổi kho (nếu lệch với POS) bằng hàm chuyên dụng. KHÔNG gửi warehouse_id chung lệnh products:
+                // POS bỏ qua "products" và xử lý như lệnh chỉ đổi kho -> nhân đôi dòng thành phần của đơn combo.
+                if (targetWarehouseId) {
+                  try {
+                    await syncOrderWarehouseToPancake(oldOrder.pancakeOrderId, String(targetWarehouseId));
+                  } catch (whErr: any) {
+                    logger.error('Failed to sync warehouse to Pancake POS on report flow', {
+                      pancakeOrderId: oldOrder.pancakeOrderId,
+                      warehouseId: targetWarehouseId,
+                      error: whErr.response?.data?.message || whErr.message
+                    });
+                  }
+                }
                 try {
                   await axios.patch(
                     `${PANCAKE_API_BASE}/api/v1/shops/${shopId}/orders/${oldOrder.pancakeOrderId}`,
                     {
                       products: pancakeProducts,
-                      warehouse_id: targetWarehouseId || undefined
                     },
                     {
                       params: { api_key: apiKey },
@@ -2060,12 +2085,24 @@ export async function approveReport(req: Request, res: Response): Promise<void> 
               cod: newMoneyToCollect
             });
           } else {
+            // Đổi kho (nếu lệch với POS) bằng hàm chuyên dụng. KHÔNG gửi warehouse_id chung lệnh products:
+            // POS bỏ qua "products" và xử lý như lệnh chỉ đổi kho -> nhân đôi dòng thành phần của đơn combo.
+            if (order.warehouseId) {
+              try {
+                await syncOrderWarehouseToPancake(order.pancakeOrderId, String(order.warehouseId));
+              } catch (whErr: any) {
+                logger.error('Failed to sync warehouse to Pancake POS on report flow', {
+                  pancakeOrderId: order.pancakeOrderId,
+                  warehouseId: order.warehouseId,
+                  error: whErr.response?.data?.message || whErr.message
+                });
+              }
+            }
             try {
               await axios.patch(
                 `${PANCAKE_API_BASE}/api/v1/shops/${shopId}/orders/${order.pancakeOrderId}`,
                 {
                   products: pancakeProducts,
-                  warehouse_id: order.warehouseId || undefined,
                   discount: totalDiscount,
                   cod: newMoneyToCollect
                 },

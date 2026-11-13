@@ -6,6 +6,7 @@ import logger from '../utils/logger';
 import { isSandboxEnvironment, logSandboxBlockedAction } from '../utils/sandboxGuard';
 import { PANCAKE_API_BASE } from '../config/pancake';
 import pancakeCircuitBreaker from './pancakeCircuitBreaker';
+import { syncOrderWarehouseToPancake } from './pancakeWarehouseSync';
 
 const SHOP_ID = '1635300067';
 
@@ -47,22 +48,11 @@ export async function retryPancakeSync(orderId: string): Promise<void> {
 
   const isProductSyncStatus = ['hoàn thành', 'chờ duyệt'].includes(order.adminStatus || '');
 
-  // 0. Đồng bộ lại kho hàng cho các đơn chưa tới bước đồng bộ sản phẩm
+  // 0. Đồng bộ lại kho hàng bằng hàm chuyên dụng (không gửi warehouse_id chung lệnh products: POS sẽ nhân đôi dòng thành phần combo)
   //    (đổi kho trên Truliva nhưng PATCH sang POS lỗi -> tránh bị đồng bộ POS ghi đè ngược kho cũ)
-  if (!isProductSyncStatus && order.warehouseId && !['hủy đơn'].includes(order.adminStatus || '')) {
+  if (order.warehouseId && !['hủy đơn'].includes(order.adminStatus || '')) {
     logger.info(`[RetrySync] Syncing warehouse to Pancake POS for order ${order.pancakeOrderId} -> ${order.warehouseId}`);
-    const whResponse = await axios.patch(
-      `${PANCAKE_API_BASE}/api/v1/shops/${SHOP_ID}/orders/${order.pancakeOrderId}`,
-      { warehouse_id: order.warehouseId },
-      {
-        params: { api_key: apiKey },
-        headers: { 'Content-Type': 'application/json' },
-        timeout: 10000
-      }
-    );
-    if (!whResponse.data || !whResponse.data.success) {
-      throw new Error(whResponse.data?.message || 'Yêu cầu đổi kho thất bại trên Pancake POS');
-    }
+    await syncOrderWarehouseToPancake(order.pancakeOrderId, order.warehouseId);
   }
 
   // 1. Đồng bộ sản phẩm & kho hàng nếu trạng thái là 'hoàn thành' hoặc 'chờ duyệt'
@@ -88,12 +78,11 @@ export async function retryPancakeSync(orderId: string): Promise<void> {
     }).filter(p => p.variation_id));
 
     if (pancakeProducts.length > 0) {
-      logger.info(`[RetrySync] Syncing products and warehouse to Pancake POS for order ${order.pancakeOrderId}`);
+      logger.info(`[RetrySync] Syncing products to Pancake POS for order ${order.pancakeOrderId}`);
       const updateResponse = await axios.patch(
         `${PANCAKE_API_BASE}/api/v1/shops/${SHOP_ID}/orders/${order.pancakeOrderId}`,
         {
-          products: pancakeProducts,
-          warehouse_id: order.warehouseId || undefined
+          products: pancakeProducts
         },
         {
           params: { api_key: apiKey },

@@ -307,10 +307,12 @@ function readCompositeChildrenFromRaw(raw: any): CompositeChildSpec[] {
   if (!raw || typeof raw !== 'object') return [];
   const list = raw.composite_products || raw.components || raw.composite_variations || raw.product_composites;
   if (!Array.isArray(list)) return [];
+  // Lưu ý: trong `composite_products` của Pancake, `variation_id` là mã của CHÍNH combo cha;
+  // mã thành phần nằm ở `component_id` / `component.id` (tên ở `component.product.name`, SKU ở `component.display_id`).
   return list.map((c: any) => ({
-    variationId: norm(c?.variation_id ?? c?.variation_info?.id ?? c?.variation?.id) || undefined,
-    name: norm(c?.variation_info?.name ?? c?.name ?? c?.product?.name) || undefined,
-    sku: norm(c?.variation_info?.display_id ?? c?.display_id ?? c?.sku) || undefined,
+    variationId: norm(c?.component_id ?? c?.component?.id ?? c?.variation_info?.id ?? c?.variation?.id) || undefined,
+    name: norm(c?.component?.product?.name ?? c?.component?.name ?? c?.variation_info?.name ?? c?.name ?? c?.product?.name) || undefined,
+    sku: norm(c?.component?.display_id ?? c?.variation_info?.display_id ?? c?.display_id ?? c?.sku) || undefined,
     quantity: Number(c?.quantity) || 1
   }));
 }
