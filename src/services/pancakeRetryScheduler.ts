@@ -45,8 +45,28 @@ export async function retryPancakeSync(orderId: string): Promise<void> {
     throw new Error('PANCAKE_API_KEY is not defined in env');
   }
 
+  const isProductSyncStatus = ['hoàn thành', 'chờ duyệt'].includes(order.adminStatus || '');
+
+  // 0. Đồng bộ lại kho hàng cho các đơn chưa tới bước đồng bộ sản phẩm
+  //    (đổi kho trên Truliva nhưng PATCH sang POS lỗi -> tránh bị đồng bộ POS ghi đè ngược kho cũ)
+  if (!isProductSyncStatus && order.warehouseId && !['hủy đơn'].includes(order.adminStatus || '')) {
+    logger.info(`[RetrySync] Syncing warehouse to Pancake POS for order ${order.pancakeOrderId} -> ${order.warehouseId}`);
+    const whResponse = await axios.patch(
+      `${PANCAKE_API_BASE}/api/v1/shops/${SHOP_ID}/orders/${order.pancakeOrderId}`,
+      { warehouse_id: order.warehouseId },
+      {
+        params: { api_key: apiKey },
+        headers: { 'Content-Type': 'application/json' },
+        timeout: 10000
+      }
+    );
+    if (!whResponse.data || !whResponse.data.success) {
+      throw new Error(whResponse.data?.message || 'Yêu cầu đổi kho thất bại trên Pancake POS');
+    }
+  }
+
   // 1. Đồng bộ sản phẩm & kho hàng nếu trạng thái là 'hoàn thành' hoặc 'chờ duyệt'
-  if (['hoàn thành', 'chờ duyệt'].includes(order.adminStatus || '') && order.items.length > 0) {
+  if (isProductSyncStatus && order.items.length > 0) {
     const sanitizedItems = sanitizeItemsForPancake(order.items);
 
     const itemNames = sanitizedItems.map(i => i.productName).filter(Boolean) as string[];

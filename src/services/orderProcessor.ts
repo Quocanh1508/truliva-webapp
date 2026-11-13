@@ -162,6 +162,8 @@ export async function processOrderEvent(rawEventId: string | null, payload: any)
         warehouseInfo: true,
         workType: true,
         checkoutLink: true,
+        rawData: true,
+        pancakeUpdatedAt: true,
         items: {
           select: {
             productName: true,
@@ -362,12 +364,63 @@ export async function processOrderEvent(rawEventId: string | null, payload: any)
         trulivaWarehouseId: existingOrder.warehouseId
       });
     } else if (payload.warehouse_id && existingOrder && existingOrder.warehouseId && String(payload.warehouse_id) !== existingOrder.warehouseId) {
-      // Người dùng đã đổi kho trên Pancake POS -> Cập nhật kho mới vào Truliva App
-      logger.info('Updated warehouse from Pancake POS webhook change', {
-        pancakeOrderId: systemId,
-        oldWarehouseId: existingOrder.warehouseId,
-        newWarehouseId: String(payload.warehouse_id)
-      });
+      // Kho trên snapshot POS khác kho đang lưu trên Truliva. Phân biệt 3 trường hợp:
+      //  (a) Snapshot cũ (updated_at cũ hơn bản đã xử lý) -> bỏ qua, giữ kho Truliva.
+      //  (b) POS CHƯA áp dụng lệnh đổi kho từ Truliva (PATCH lỗi / đang chạy / webhook đến trễ):
+      //      kho POS ở snapshot trước == kho POS ở snapshot này, và khác kho Truliva -> giữ kho Truliva,
+      //      đánh dấu FAILED để retry scheduler đẩy lại kho sang POS.
+      //  (c) Người dùng thực sự đổi kho trên POS -> nhận kho mới và GHI LỊCH SỬ thay đổi.
+      const incomingWhId = String(payload.warehouse_id);
+      const prevPosWhIdRaw = (existingOrder.rawData as any)?.warehouse_id;
+      const prevPosWhId = prevPosWhIdRaw !== undefined && prevPosWhIdRaw !== null && prevPosWhIdRaw !== '' ? String(prevPosWhIdRaw) : null;
+
+      const isStaleSnapshot = Boolean(
+        pancakeUpdatedAt && existingOrder.pancakeUpdatedAt &&
+        pancakeUpdatedAt.getTime() < existingOrder.pancakeUpdatedAt.getTime()
+      );
+      const isPosNotYetSynced = Boolean(
+        prevPosWhId && prevPosWhId !== existingOrder.warehouseId && incomingWhId === prevPosWhId
+      );
+
+      if (isStaleSnapshot || isPosNotYetSynced) {
+        orderData.warehouseId = existingOrder.warehouseId;
+        orderData.warehouseInfo = existingOrder.warehouseInfo;
+        if (isPosNotYetSynced) {
+          orderData.pancakeSyncStatus = 'FAILED';
+        }
+        logger.warn('Kept Truliva assigned warehouse: Pancake snapshot is stale or POS has not applied Truliva warehouse change yet', {
+          pancakeOrderId: systemId,
+          trulivaWarehouseId: existingOrder.warehouseId,
+          posWarehouseId: incomingWhId,
+          prevPosWarehouseId: prevPosWhId,
+          isStaleSnapshot,
+          isPosNotYetSynced
+        });
+      } else {
+        // Người dùng đã đổi kho trên Pancake POS -> Cập nhật kho mới vào Truliva App và ghi lịch sử
+        logger.info('Updated warehouse from Pancake POS change', {
+          pancakeOrderId: systemId,
+          oldWarehouseId: existingOrder.warehouseId,
+          newWarehouseId: incomingWhId
+        });
+        try {
+          await prisma.auditLog.create({
+            data: {
+              entityType: 'Order',
+              entityId: existingOrder.id,
+              action: 'updated',
+              changes: [
+                { field: 'warehouseId', from: existingOrder.warehouseId, to: incomingWhId },
+                { field: 'warehouseInfo', from: existingOrder.warehouseInfo as any, to: orderData.warehouseInfo }
+              ],
+              userId: 'system',
+              userName: 'Đồng bộ Pancake POS'
+            }
+          });
+        } catch (auditErr: any) {
+          logger.warn('Failed to write audit log for POS warehouse change', { pancakeOrderId: systemId, error: auditErr.message });
+        }
+      }
     }
 
     // ══════════════════════════════════════
