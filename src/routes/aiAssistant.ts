@@ -634,7 +634,7 @@ router.get('/documents', requireAuth, async (req: Request, res: Response): Promi
         file_size AS "fileSize", total_chunks AS "totalChunks",
         status, uploaded_by AS "uploadedBy", is_active AS "isActive",
         created_at AS "createdAt", updated_at AS "updatedAt"
-      FROM document_sources
+      FROM rag.document_sources
       WHERE is_active = true
       ORDER BY created_at DESC;
     `);
@@ -753,7 +753,7 @@ router.delete('/documents/:id', requireAuth, requireAdmin, async (req: Request, 
   try {
     const { id } = req.params;
     await prisma.$executeRawUnsafe(`
-      UPDATE document_sources 
+      UPDATE rag.document_sources 
       SET is_active = false, updated_at = NOW() 
       WHERE id = $1::uuid;
     `, id);

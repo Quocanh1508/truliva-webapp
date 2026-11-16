@@ -448,7 +448,7 @@ export async function ingestDocument(
 
   // 1. Tạo bản ghi Document Source với status PROCESSING
   const docSource: any = await prisma.$queryRawUnsafe(`
-    INSERT INTO document_sources (title, file_name, file_type, file_size, status, uploaded_by, is_active)
+    INSERT INTO rag.document_sources (title, file_name, file_type, file_size, status, uploaded_by, is_active)
     VALUES ($1, $2, $3, $4, 'PROCESSING', $5, true)
     RETURNING id, title, file_name;
   `, title, fileName, fileType, fileSize, uploadedBy);
@@ -485,7 +485,7 @@ export async function ingestDocument(
 
     if (chunks.length === 0) {
       await prisma.$executeRawUnsafe(`
-        UPDATE document_sources SET status = 'FAILED', total_chunks = 0, updated_at = NOW() WHERE id = $1;
+        UPDATE rag.document_sources SET status = 'FAILED', total_chunks = 0, updated_at = NOW() WHERE id = $1;
       `, documentId);
       return {
         documentId,
@@ -516,12 +516,12 @@ export async function ingestDocument(
 
       if (embStr) {
         await prisma.$executeRawUnsafe(`
-          INSERT INTO document_chunks (document_id, chunk_index, section_title, content, metadata, embedding)
+          INSERT INTO rag.document_chunks (document_id, chunk_index, section_title, content, metadata, embedding)
           VALUES ($1, $2, $3, $4, $5::jsonb, $6::vector);
         `, documentId, c.chunkIndex, c.sectionTitle || '', c.content, metadata, embStr);
       } else {
         await prisma.$executeRawUnsafe(`
-          INSERT INTO document_chunks (document_id, chunk_index, section_title, content, metadata)
+          INSERT INTO rag.document_chunks (document_id, chunk_index, section_title, content, metadata)
           VALUES ($1, $2, $3, $4, $5::jsonb);
         `, documentId, c.chunkIndex, c.sectionTitle || '', c.content, metadata);
       }
@@ -529,7 +529,7 @@ export async function ingestDocument(
 
     // 5. Cập nhật document_sources thành READY
     await prisma.$executeRawUnsafe(`
-      UPDATE document_sources 
+      UPDATE rag.document_sources 
       SET status = 'READY', total_chunks = $1, updated_at = NOW() 
       WHERE id = $2;
     `, chunks.length, documentId);
@@ -551,7 +551,7 @@ export async function ingestDocument(
   } catch (error: any) {
     logger.error('Failed to ingest document', { documentId, error: error.message });
     await prisma.$executeRawUnsafe(`
-      UPDATE document_sources SET status = 'FAILED', updated_at = NOW() WHERE id = $1;
+      UPDATE rag.document_sources SET status = 'FAILED', updated_at = NOW() WHERE id = $1;
     `, documentId);
     throw error;
   }
@@ -604,8 +604,8 @@ export async function searchHybridRAG(
               END
           ) AS "rrfScore",
           s.title AS "sourceTitle", s.file_name AS "fileName"
-        FROM document_chunks c
-        JOIN document_sources s ON s.id = c.document_id
+        FROM rag.document_chunks c
+        JOIN rag.document_sources s ON s.id = c.document_id
         WHERE s.is_active = true
           AND (
             ($2 <> '' AND (c.content ILIKE ('%' || $2 || '%') OR c.section_title ILIKE ('%' || $2 || '%')))
@@ -626,8 +626,8 @@ export async function searchHybridRAG(
           c.id, c.document_id, c.chunk_index, c.section_title, c.content, c.metadata,
           (1 - (c.embedding <=> $1::vector)) AS vector_similarity,
           ROW_NUMBER() OVER (ORDER BY c.embedding <=> $1::vector) AS rank_vec
-        FROM document_chunks c
-        JOIN document_sources s ON s.id = c.document_id
+        FROM rag.document_chunks c
+        JOIN rag.document_sources s ON s.id = c.document_id
         WHERE s.is_active = true AND c.embedding IS NOT NULL
         ORDER BY c.embedding <=> $1::vector
         LIMIT 25
@@ -647,8 +647,8 @@ export async function searchHybridRAG(
               CASE WHEN $4 <> '' AND c.content ILIKE ('%' || $4 || '%') THEN 0.8 ELSE 0.0 END
             ) DESC
           ) AS rank_text
-        FROM document_chunks c
-        JOIN document_sources s ON s.id = c.document_id
+        FROM rag.document_chunks c
+        JOIN rag.document_sources s ON s.id = c.document_id
         WHERE s.is_active = true 
           AND (
             c.tsv_content @@ to_tsquery('simple', $2)
@@ -672,7 +672,7 @@ export async function searchHybridRAG(
         s.file_name AS "fileName"
       FROM vector_matches v
       FULL OUTER JOIN keyword_matches k ON v.id = k.id
-      JOIN document_sources s ON s.id = COALESCE(v.document_id, k.document_id)
+      JOIN rag.document_sources s ON s.id = COALESCE(v.document_id, k.document_id)
       WHERE s.is_active = true
       ORDER BY "rrfScore" DESC
       LIMIT $5;
