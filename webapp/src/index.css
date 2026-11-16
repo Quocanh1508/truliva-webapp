@@ -275,3 +275,60 @@ button {
     max-width: 1440px;
   }
 }
+
+/* ══════════════════════════════════════════════════════════════════
+   MOBILE ONLY (< 768px). Mọi rule ở đây nằm trong media query nên
+   giao diện desktop/tablet không thay đổi.
+   ══════════════════════════════════════════════════════════════════ */
+@media (max-width: 767px) {
+  html {
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+  }
+
+  /* Chặn cả trang bị trượt ngang khi có phần tử tràn (bảng có
+     overflow-x-auto riêng nên vẫn vuốt ngang được bên trong).
+     Dùng `clip` thay vì `hidden` để không làm hỏng position: sticky. */
+  html, body {
+    overflow-x: clip;
+  }
+  .app-main {
+    min-width: 0;
+  }
+
+  /* iOS Safari tự zoom khi focus ô nhập có font < 16px. */
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]),
+  select,
+  textarea {
+    font-size: 16px !important;
+  }
+
+  /* Chữ siêu nhỏ: nâng nhẹ cho dễ đọc trên điện thoại. */
+  .text-\[9px\]  { font-size: 10px; }
+  .text-\[10px\] { font-size: 11px; }
+
+  /* 100vh trên mobile tính cả thanh địa chỉ → modal/khung cao hơn phần
+     nhìn thấy, nút ở đáy bị che. Dùng dvh (chiều cao nhìn thấy thật). */
+  @supports (height: 100dvh) {
+    .h-screen       { height: 100dvh; }
+    .min-h-screen   { min-height: 100dvh; }
+    .max-h-\[55vh\] { max-height: 55dvh; }
+    .max-h-\[65vh\] { max-height: 65dvh; }
+    .max-h-\[70vh\] { max-height: 70dvh; }
+    .max-h-\[85vh\] { max-height: 85dvh; }
+    .max-h-\[88vh\] { max-height: 88dvh; }
+    .max-h-\[90vh\] { max-height: 90dvh; }
+    .max-h-\[92vh\] { max-height: 92dvh; }
+    .min-h-\[60vh\] { min-height: 60dvh; }
+    /* Header mobile cao 64px + padding .app-main 16px×2 = 96px */
+    .h-\[calc\(100vh-80px\)\]          { height: calc(100dvh - 96px); }
+    .max-h-\[calc\(100vh-200px\)\]     { max-height: calc(100dvh - 200px); }
+  }
+
+  /* Popup/dropdown có chiều rộng cố định không được rộng hơn màn hình. */
+  .w-\[280px\], .min-w-\[280px\] {
+    max-width: calc(100vw - 24px);
+  }
+  .w-\[280px\] { width: min(280px, calc(100vw - 24px)); }
+  .min-w-\[280px\] { min-width: min(280px, calc(100vw - 24px)); }
+}
