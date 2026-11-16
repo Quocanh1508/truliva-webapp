@@ -452,6 +452,17 @@ export default function OrderList() {
   const [showWarehouseDropdown, setShowWarehouseDropdown] = useState(false);
   const [tempItems, setTempItems] = useState<any[]>([]);
 
+  // Ảnh chụp giá trị form lúc mở modal sửa đơn:
+  // - assignInitialForm: giá trị form ban đầu -> phát hiện người dùng có thay đổi để nhắc bấm Lưu.
+  // - assignDispatchOrigRef: kho/trạm/KTV thật trong DB lúc mở -> chỉ gửi trường điều phối thực sự đổi,
+  //   tránh form cũ ghi đè phân công vừa được người khác lưu (sự cố đơn #6788).
+  const [assignInitialForm, setAssignInitialForm] = useState<Record<string, string> | null>(null);
+  const assignDispatchOrigRef = useRef<{ orderId: string; main: string; tech: string; ktv: string; warehouseId: string } | null>(null);
+  const assignInitialFormRef = useRef<Record<string, string> | null>(null);
+  assignInitialFormRef.current = assignInitialForm;
+  const assignFormLiveRef = useRef<Record<string, string>>({});
+  const requestCloseAssignModalRef = useRef<() => void>(() => {});
+
   // Bulk Assign States
   const [selectedOrderIds, setSelectedOrderIds] = useState<string[]>([]);
   const [isBulkAssignOpen, setIsBulkAssignOpen] = useState(false);
@@ -1065,9 +1076,8 @@ export default function OrderList() {
           return;
         }
         if (assignModal?.isOpen) {
-          setAssignModal(null);
-          setIsAssignModalExpanded(false);
-          setIsAssignProductSelectOpen(false);
+          // Hỏi lại nếu form có thay đổi chưa lưu (hàm đọc state mới nhất qua ref)
+          requestCloseAssignModalRef.current();
           return;
         }
         if (activeDropdown !== null) {
@@ -1494,29 +1504,96 @@ export default function OrderList() {
     }
   };
 
-  const openAssignModal = async (initialOrder: any) => {
-    const order = initialOrder;
+  // Chữ ký danh sách sản phẩm để so sánh form có bị đổi hay không
+  const assignItemsSignature = (items: any[]) => JSON.stringify((items || []).map((it: any) => [
+    (it.productName || '').trim(), (it.sku || '').trim(),
+    Number(it.quantity || 1), Number(it.price || 0), Number(it.discount || 0)
+  ]));
 
-    let initialMain = order.mainStationId || '';
-    let initialTech = order.techStationId || '';
-    const initialKtv = order.assignedKtvId || '';
+  // Giá trị hiện tại của form sửa đơn (cùng key với assignInitialForm)
+  const currentAssignForm: Record<string, string> = {
+    main: selectedMain || '',
+    tech: selectedTech || '',
+    ktv: selectedKtv || '',
+    warehouseId: selectedWarehouseId || '',
+    salesKtv: selectedSalesKtv || '',
+    workType: workType || '',
+    serviceType: serviceType || '',
+    appointmentDate: appointmentDate || '',
+    appointmentTime: appointmentTime || '',
+    rescheduleReason: rescheduleReason || '',
+    promoCode: assignPromoCode || '',
+    items: assignItemsSignature(tempItems)
+  };
+  assignFormLiveRef.current = currentAssignForm;
+  const isAssignFormDirty = !!assignModal?.isOpen && !!assignInitialForm &&
+    Object.keys(assignInitialForm).some(k => assignInitialForm[k] !== currentAssignForm[k]);
 
-    if (initialKtv && (!initialMain || !initialTech)) {
-      const ktvObj = allKtvs.find(k => k.id === initialKtv);
+  const closeAssignModal = () => {
+    setAssignModal(null);
+    setIsAssignProductSelectOpen(false);
+    setIsAssignModalExpanded(false);
+    setAssignInitialForm(null);
+    assignDispatchOrigRef.current = null;
+  };
+
+  // Đóng modal: nếu có thay đổi chưa lưu thì nhắc người dùng trước
+  const requestCloseAssignModal = async () => {
+    if (isSubmittingAssign) return;
+    if (isAssignFormDirty) {
+      const ok = await confirm({
+        title: 'Thay đổi chưa được lưu',
+        message: 'Bạn đã chỉnh sửa thông tin đơn nhưng chưa bấm "Lưu thông tin & Phân bổ". Đóng cửa sổ sẽ bỏ các thay đổi này.',
+        confirmText: 'Đóng, không lưu',
+        cancelText: 'Quay lại để lưu',
+        type: 'warning'
+      });
+      if (!ok) return;
+    }
+    closeAssignModal();
+  };
+  requestCloseAssignModalRef.current = requestCloseAssignModal;
+
+  // Trạm/KTV hiển thị ban đầu trên form: lấy từ đơn, thiếu trạm thì suy ra từ KTV đã gán
+  const computeInitialDispatch = (order: any) => {
+    let main = order.mainStationId || '';
+    let tech = order.techStationId || '';
+    const ktv = order.assignedKtvId || '';
+
+    if (ktv && (!main || !tech)) {
+      const ktvObj = allKtvs.find(k => k.id === ktv);
       if (ktvObj) {
-        if (!initialTech && ktvObj.techStationId) {
-          initialTech = ktvObj.techStationId;
+        if (!tech && ktvObj.techStationId) {
+          tech = ktvObj.techStationId;
         }
-        if (initialTech && !initialMain) {
+        if (tech && !main) {
           const mainObj = stations.find(s =>
-            s.techStations && s.techStations.some((ts: any) => ts.id === initialTech)
+            s.techStations && s.techStations.some((ts: any) => ts.id === tech)
           );
           if (mainObj) {
-            initialMain = mainObj.id;
+            main = mainObj.id;
           }
         }
       }
     }
+    return { main, tech, ktv };
+  };
+
+  // Giá trị kho/trạm/KTV thật trong DB của đơn (dùng để chỉ gửi trường điều phối thực sự đổi)
+  const getOrderDispatchValues = (order: any) => ({
+    orderId: String(order.id),
+    main: order.mainStationId || '',
+    tech: order.techStationId || '',
+    ktv: order.assignedKtvId || '',
+    warehouseId: order.warehouseId ? String(order.warehouseId) : ''
+  });
+
+  const openAssignModal = async (initialOrder: any) => {
+    const order = initialOrder;
+    // Bản đơn dùng để chọn kho mặc định; được thay bằng bản mới nhất khi làm mới từ server
+    let latestOrderForWarehouse: any = order;
+
+    const { main: initialMain, tech: initialTech, ktv: initialKtv } = computeInitialDispatch(order);
 
     setSelectedMain(initialMain);
     setSelectedTech(initialTech);
@@ -1622,13 +1699,31 @@ export default function OrderList() {
     setSuggestedTech(matchedTech);
     setSuggestedKtv(bestKtv);
 
-    setTempItems(order.items ? order.items.map((it: any) => ({
+    const initialTempItems = order.items ? order.items.map((it: any) => ({
       productName: it.productName || it.rawData?.variation_info?.name || it.rawData?.name || 'Sản phẩm',
       sku: it.sku || it.rawData?.sku || '',
       quantity: it.quantity || 1,
       price: it.price || 0,
       discount: it.discount || 0
-    })) : []);
+    })) : [];
+    setTempItems(initialTempItems);
+
+    // Chụp giá trị ban đầu: kho được bổ sung trong applyWarehouseSelection bên dưới
+    assignDispatchOrigRef.current = getOrderDispatchValues(order);
+    setAssignInitialForm({
+      main: initialMain,
+      tech: initialTech,
+      ktv: initialKtv,
+      warehouseId: '',
+      salesKtv: order.salesKtvId || '',
+      workType: order.workType || '',
+      serviceType: order.serviceType || '',
+      appointmentDate: appDateStr,
+      appointmentTime: appTimeStr,
+      rescheduleReason: order.rescheduleReason || '',
+      promoCode: order.promoCode || '',
+      items: assignItemsSignature(initialTempItems)
+    });
 
     // Mở modal ngay lập tức để phản hồi tức thì (< 16ms) khi bấm nút Phân công
     setAssignModal({ isOpen: true, orderId: order.id, order });
@@ -1707,6 +1802,8 @@ export default function OrderList() {
       } else {
         setWarehouseSearch('');
       }
+      // Kho mặc định do hệ thống điền không tính là "người dùng thay đổi"
+      setAssignInitialForm(prev => (prev ? { ...prev, warehouseId: defaultWhId } : prev));
     };
 
     // Nếu đã có sẵn danh sách kho trong state, áp dụng ngay để UI không bị trễ
@@ -1727,7 +1824,10 @@ export default function OrderList() {
           setWarehouses(whs);
           setProductsStock(prods);
           lastInventoryFetchAtRef.current = Date.now();
-          applyWarehouseSelection(order, whs);
+          // Modal đã đóng / chuyển sang đơn khác thì không áp kho nữa
+          if (assignDispatchOrigRef.current?.orderId !== String(order.id)) return;
+          // Dùng bản đơn mới nhất (nếu đã được làm mới từ server) để không áp lại kho cũ
+          applyWarehouseSelection(latestOrderForWarehouse, whs);
         })
         .catch(err => {
           console.error('Failed to load inventory stock info', err);
@@ -1743,6 +1843,28 @@ export default function OrderList() {
         const freshOrder = freshRes?.id ? freshRes : freshRes?.order;
         if (freshOrder) {
           setAssignModal(prev => (prev && prev.orderId === initialOrder.id ? { ...prev, order: freshOrder } : prev));
+
+          // Dữ liệu danh sách có thể đã cũ (vd: ĐPV vừa phân công). Nếu kho/trạm/KTV trên server khác
+          // giá trị form đang hiển thị VÀ người dùng chưa đụng vào các ô điều phối -> nạp giá trị mới vào form.
+          const orig = assignDispatchOrigRef.current;
+          const init = assignInitialFormRef.current;
+          const live = assignFormLiveRef.current;
+          const fresh = getOrderDispatchValues(freshOrder);
+          const serverChanged = !!orig && orig.orderId === fresh.orderId &&
+            (['main', 'tech', 'ktv', 'warehouseId'] as const).some(k => fresh[k] !== orig[k]);
+          const userTouchedDispatch = !init || (['main', 'tech', 'ktv', 'warehouseId'] as const).some(k => live[k] !== init[k]);
+          if (serverChanged && !userTouchedDispatch) {
+            const d = computeInitialDispatch(freshOrder);
+            setSelectedMain(d.main);
+            setSelectedTech(d.tech);
+            setSelectedKtv(d.ktv);
+            assignDispatchOrigRef.current = fresh;
+            setAssignInitialForm(prev => (prev ? { ...prev, main: d.main, tech: d.tech, ktv: d.ktv } : prev));
+            latestOrderForWarehouse = freshOrder;
+            if (fresh.warehouseId !== orig!.warehouseId) {
+              applyWarehouseSelection(freshOrder, warehousesRef.current);
+            }
+          }
         }
       })
       .catch(() => {});
@@ -1756,15 +1878,10 @@ export default function OrderList() {
     if (isCompletedOrder) {
       setIsSubmittingAssign(true);
       try {
+        // Đơn hoàn thành chỉ cho đổi KTV bán hàng: không gửi lại kho/trạm/KTV/lịch hẹn
+        // (gửi lại giá trị cũ có thể ghi đè dữ liệu vừa được người khác cập nhật)
         const payload: any = {
           adminStatus: 'hoàn thành',
-          workType: assignModal.order.workType || null,
-          serviceType: assignModal.order.serviceType || null,
-          appointmentTime: assignModal.order.appointmentTime || null,
-          mainStationId: assignModal.order.mainStationId || null,
-          techStationId: assignModal.order.techStationId || null,
-          assignedKtvId: assignModal.order.assignedKtvId || null,
-          warehouseId: assignModal.order.warehouseId || null,
         };
 
         if (selectedSalesKtv) {
@@ -1781,9 +1898,7 @@ export default function OrderList() {
           setOrders(prev => prev.map(o => o.id === res.order.id ? { ...o, ...res.order } : o));
         }
         alert('Cập nhật KTV bán hàng cho đơn hoàn thành thành công!');
-        setAssignModal(null);
-        setIsAssignProductSelectOpen(false);
-        setIsAssignModalExpanded(false);
+        closeAssignModal();
         fetchOrdersData({ silent: true });
         return;
       } catch (err: any) {
@@ -1921,15 +2036,31 @@ export default function OrderList() {
         payload.items = cleanTempItems;
       }
 
+      // Chỉ gửi kho/trạm/KTV khi người dùng THỰC SỰ đổi so với lúc form được nạp.
+      // Trường không đổi -> không gửi -> backend giữ nguyên giá trị đang có trong DB,
+      // kể cả khi người khác vừa phân công trong lúc form này đang mở (sự cố đơn #6788).
+      const dispatchOrig = assignDispatchOrigRef.current?.orderId === String(assignModal.orderId)
+        ? assignDispatchOrigRef.current
+        : getOrderDispatchValues(assignModal.order);
+      const isWarehouseChanged = (finalWarehouseId || '') !== dispatchOrig.warehouseId;
+
       if (hasAssignPermission) {
-        payload.mainStationId = selectedMain || null;
-        payload.techStationId = selectedTech || null;
-        payload.assignedKtvId = selectedKtv || null;
-        payload.adminStatus = selectedKtv ? 'đang thực hiện' : 'chờ xử lý';
-        payload.warehouseId = finalWarehouseId;
-        // Nếu trước đó đơn đã có KTV và ĐPV cố tình gỡ KTV:
-        if (assignModal.order.assignedKtvId && !selectedKtv) {
-          payload.isExplicitUnassign = true;
+        if ((selectedMain || '') !== dispatchOrig.main) {
+          payload.mainStationId = selectedMain || null;
+        }
+        if ((selectedTech || '') !== dispatchOrig.tech) {
+          payload.techStationId = selectedTech || null;
+        }
+        if ((selectedKtv || '') !== dispatchOrig.ktv) {
+          payload.assignedKtvId = selectedKtv || null;
+          payload.adminStatus = selectedKtv ? 'đang thực hiện' : 'chờ xử lý';
+          // Trước đó đơn đã có KTV và ĐPV cố tình gỡ KTV:
+          if (dispatchOrig.ktv && !selectedKtv) {
+            payload.isExplicitUnassign = true;
+          }
+        }
+        if (isWarehouseChanged) {
+          payload.warehouseId = finalWarehouseId;
         }
 
         // Bảo tồn và xử lý KTV bán hàng:
@@ -1944,14 +2075,9 @@ export default function OrderList() {
         }
       } else {
         // Tài khoản không có quyền phân bổ KTV (Sale / Hotline / Staff) chỉ sửa dịch vụ/sản phẩm:
-        // Bảo tồn nguyên vẹn KTV, Trạm, Kho và trạng thái ĐPV đã gán
-        if (assignModal.order.assignedKtvId) {
-          payload.assignedKtvId = assignModal.order.assignedKtvId;
-          payload.mainStationId = assignModal.order.mainStationId;
-          payload.techStationId = assignModal.order.techStationId;
-          payload.adminStatus = assignModal.order.adminStatus;
-          payload.warehouseId = assignModal.order.warehouseId;
-        } else {
+        // không gửi KTV/Trạm/trạng thái -> backend giữ nguyên phân bổ của ĐPV.
+        // Kho chỉ được đổi khi đơn chưa có KTV và người dùng thực sự chọn kho khác.
+        if (!dispatchOrig.ktv && isWarehouseChanged) {
           payload.warehouseId = finalWarehouseId;
         }
         if (selectedSalesKtv) {
@@ -1965,9 +2091,7 @@ export default function OrderList() {
       if (res?.order) {
         setOrders(prev => prev.map(o => o.id === res.order.id ? { ...o, ...res.order } : o));
       }
-      setAssignModal(null);
-      setIsAssignProductSelectOpen(false);
-      setIsAssignModalExpanded(false);
+      closeAssignModal();
       fetchOrdersData({ silent: true });
       getKtvUsers().then(data => setAllKtvs(data)).catch(() => {});
     } catch (err: any) {
@@ -4062,12 +4186,8 @@ export default function OrderList() {
                 >
                   {isAssignModalWide ? <Minimize2 size={18} /> : <Maximize2 size={18} />}
                 </button>
-                <button 
-                  onClick={() => { 
-                    setAssignModal(null); 
-                    setIsAssignProductSelectOpen(false); 
-                    setIsAssignModalExpanded(false); 
-                  }} 
+                <button
+                  onClick={() => { requestCloseAssignModal(); }}
                   className="text-gray-400 hover:text-gray-600 transition-colors p-1 hover:bg-gray-100 rounded-lg"
                 >
                   <XCircle size={22} />
@@ -4729,26 +4849,37 @@ export default function OrderList() {
               </div>
             </div>
 
-            <div className="px-6 py-4 border-t border-gray-200 bg-gray-50 flex justify-end gap-3">
-              <button 
-                onClick={() => { 
-                  if (isSubmittingAssign) return;
-                  setAssignModal(null); 
-                  setIsAssignProductSelectOpen(false); 
-                  setIsAssignModalExpanded(false); 
-                }} 
+            <div className={`px-6 py-4 border-t flex flex-wrap items-center justify-end gap-3 transition-colors ${
+              isAssignFormDirty ? 'border-amber-300 bg-amber-50' : 'border-gray-200 bg-gray-50'
+            }`}>
+              {isAssignFormDirty && !isSubmittingAssign && (
+                <div className="mr-auto flex items-center gap-2 text-[13px] font-medium text-amber-800">
+                  <AlertTriangle size={16} className="text-amber-600 shrink-0" />
+                  <span>
+                    Bạn có thay đổi chưa lưu. Nhấn <strong>
+                      {assignModal.order.adminStatus === 'hoàn thành' ? 'Cập nhật KTV bán hàng' : 'Lưu thông tin & Phân bổ'}
+                    </strong> để áp dụng.
+                  </span>
+                </div>
+              )}
+              <button
+                onClick={() => { requestCloseAssignModal(); }}
                 disabled={isSubmittingAssign}
                 className="px-4 py-2 bg-white border rounded text-gray-700 hover:bg-gray-100 disabled:opacity-50"
               >
                 Hủy
               </button>
-              <button 
-                onClick={submitAssign} 
+              <button
+                onClick={submitAssign}
                 disabled={isSubmittingAssign}
-                className={`px-5 py-2 rounded-xl text-sm font-semibold shadow-xs transition-colors cursor-pointer text-white flex items-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed ${
+                className={`px-5 py-2 rounded-xl text-sm font-semibold shadow-xs transition-all cursor-pointer text-white flex items-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed ${
                   assignModal.order.adminStatus === 'hoàn thành'
                     ? 'bg-emerald-600 hover:bg-emerald-700'
                     : 'bg-blue-600 hover:bg-blue-700'
+                } ${
+                  isAssignFormDirty && !isSubmittingAssign
+                    ? 'ring-4 ring-amber-300 ring-offset-1 animate-pulse hover:animate-none'
+                    : ''
                 }`}
               >
                 {isSubmittingAssign && <Loader2 size={16} className="animate-spin" />}

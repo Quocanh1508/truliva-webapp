@@ -2201,8 +2201,20 @@ export async function updateOrder(req: Request, res: Response): Promise<void> {
         // (xảy ra khi modal submit thiếu KTV hoặc form stale state):
         if (!assignedKtvId && !isExplicitUnassign) {
           effectiveAssignedKtvId = oldOrder.assignedKtvId;
-          effectiveMainStationId = mainStationId !== undefined ? mainStationId : oldOrder.mainStationId;
-          effectiveTechStationId = techStationId !== undefined ? techStationId : oldOrder.techStationId;
+          // KTV được giữ nguyên thì trạm cũng phải giữ nguyên: payload gửi trạm rỗng/null ở đây
+          // gần như luôn là form cũ (mở trước khi ĐPV phân công), không phải ý định gỡ trạm.
+          // Gỡ trạm thật sự luôn đi kèm gỡ KTV (UI reset KTV khi đổi trạm) -> có cờ isExplicitUnassign.
+          effectiveMainStationId = mainStationId ? mainStationId : oldOrder.mainStationId;
+          effectiveTechStationId = techStationId ? techStationId : oldOrder.techStationId;
+          if ((mainStationId !== undefined && !mainStationId && oldOrder.mainStationId) ||
+              (techStationId !== undefined && !techStationId && oldOrder.techStationId)) {
+            logger.info('Protected assigned stations from being cleared without explicit unassign flag', {
+              orderId: id,
+              role,
+              preservedMainStationId: oldOrder.mainStationId,
+              preservedTechStationId: oldOrder.techStationId
+            });
+          }
           if (effectiveAdminStatus === 'chờ xử lý') {
             effectiveAdminStatus = oldOrder.adminStatus;
           }
