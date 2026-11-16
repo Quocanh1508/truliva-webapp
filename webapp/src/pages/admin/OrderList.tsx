@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { getOrders, updateOrder, getKtvUsers, getStations, getOrderAuditLog, syncOrders, syncSingleOrder, getFiltersData, fetchApi, createOrder, searchCustomers, bulkAssignOrders, bulkCancelOrders } from '../../api/client';
-import { Search, ChevronLeft, ChevronRight, History, XCircle, Filter, RefreshCw, FileText, CheckCircle2, ClipboardCheck, Copy, UserPlus, Download, Wrench, Settings, FolderOpen, Building2, MapPin, Users, Calendar, Plus, AlertTriangle, ExternalLink, RotateCcw, Edit3, Tag, Trash2, User, Maximize2, Minimize2, Loader2, ShoppingBag } from 'lucide-react';
+import { Search, ChevronLeft, ChevronRight, History, XCircle, Filter, RefreshCw, FileText, CheckCircle2, ClipboardCheck, Copy, UserPlus, Download, Wrench, Settings, FolderOpen, Building2, MapPin, Users, Calendar, Plus, AlertTriangle, ExternalLink, RotateCcw, Edit3, Tag, Trash2, User, Maximize2, Minimize2, Loader2, ShoppingBag, Phone } from 'lucide-react';
 import { WARRANTY_SERVICE_GROUPS, REPAIR_SERVICE_GROUPS, WORK_TYPE_SERVICES } from '../../utils/workTypes';
 import { useConfirm } from '../../context/ConfirmContext';
 import DateRangePicker from '../../components/DateRangePicker';
@@ -3437,7 +3437,7 @@ export default function OrderList() {
       {/* Floating Sticky Table Header */}
       {isStickyHeaderVisible && (
         <div
-          className="fixed z-40 bg-[#f8f9fa] shadow-md border-b border-gray-300 overflow-hidden pointer-events-auto select-none"
+          className="hidden md:block fixed z-40 bg-[#f8f9fa] shadow-md border-b border-gray-300 overflow-hidden pointer-events-auto select-none"
           style={{
             top: `${stickyTopOffset}px`,
             left: `${tableBounds.left}px`,
@@ -3538,7 +3538,223 @@ export default function OrderList() {
             {orders.length === 0 ? (
               <div className="text-center py-12 text-gray-400">Không tìm thấy yêu cầu nào</div>
             ) : (
-              <table ref={tableRef} className="min-w-[1300px] lg:w-full text-left text-[13px] border-collapse">
+              <>
+              {/* ── MOBILE (< 768px): danh sách dạng thẻ. Desktop vẫn dùng bảng bên dưới. ── */}
+              <div className="md:hidden flex flex-col gap-2.5 p-2.5 bg-gray-50">
+                {(currentUser?.role === 'ADMIN' || currentUser?.role === 'DEV' || currentUser?.role === 'COORDINATOR') && (
+                  <label className="flex items-center gap-2 px-1 text-[13px] text-gray-600 font-medium">
+                    <input
+                      type="checkbox"
+                      className="w-5 h-5 rounded text-blue-600"
+                      checked={orders.length > 0 && orders.every(o => selectedOrderIds.includes(o.id))}
+                      onChange={(e) => setSelectedOrderIds(e.target.checked ? orders.map(o => o.id) : [])}
+                    />
+                    Chọn tất cả ({orders.length})
+                  </label>
+                )}
+                {orders.map((order) => {
+                  const customerName = order.billFullName || order.customer?.fullName || 'Khách lẻ';
+                  const phone = order.billPhoneNumber || order.customer?.phoneNumber || '';
+                  const address = order.shippingAddress?.full_address || order.customer?.fullAddress || '';
+                  const rawProvince =
+                    order.shippingAddress?.province_name ||
+                    order.shippingAddress?.province ||
+                    order.customer?.provinceName ||
+                    order.customer?.province ||
+                    '';
+                  const provinceName = normalizeProvince(rawProvince) || rawProvince;
+                  const ktvName = order.assignedKtv?.fullName || 'Chưa gán';
+                  const stationName = order.mainStation?.name || order.assignedKtv?.techStation?.mainStation?.name || '';
+                  const techStationName = order.techStation?.name || order.assignedKtv?.techStation?.name || '';
+                  const hasKtv = !!(order.assignedKtvId || order.assignedKtv);
+                  const isPendingStatus = !order.adminStatus || order.adminStatus === 'chờ xử lý';
+                  const displayStatus = (hasKtv && isPendingStatus) ? 'đang thực hiện' : (order.adminStatus || 'chờ xử lý');
+                  const isClosed = order.adminStatus === 'hoàn thành' || order.adminStatus === 'hủy đơn';
+                  const isOverdue = !!order.appointmentTime && new Date(order.appointmentTime) < new Date() && !isClosed;
+                  const canSelect = currentUser?.role === 'ADMIN' || currentUser?.role === 'DEV' || currentUser?.role === 'COORDINATOR';
+                  const actionBtn = 'flex items-center justify-center gap-1.5 min-h-[40px] px-3 rounded-lg border text-[13px] font-semibold active:scale-95 transition';
+
+                  return (
+                    <div key={order.id} className={`bg-white rounded-xl border shadow-sm overflow-hidden ${selectedOrderIds.includes(order.id) ? 'border-blue-400 ring-1 ring-blue-200' : 'border-gray-200'}`}>
+                      {/* Đầu thẻ: chọn + mã đơn + trạng thái */}
+                      <div className="flex items-center gap-2 px-3 py-2 border-b border-gray-100 bg-gray-50/70">
+                        {canSelect && (
+                          <input
+                            type="checkbox"
+                            className="w-5 h-5 rounded text-blue-600 shrink-0"
+                            checked={selectedOrderIds.includes(order.id)}
+                            onChange={(e) => setSelectedOrderIds(e.target.checked
+                              ? [...selectedOrderIds, order.id]
+                              : selectedOrderIds.filter(id => id !== order.id))}
+                          />
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const idStr = formatOrderId(order.pancakeOrderId);
+                            copyToClipboard(idStr);
+                            alert(`Đã sao chép mã đơn: ${idStr}`);
+                          }}
+                          className="font-bold text-[14px] text-gray-900 bg-transparent"
+                        >
+                          {formatOrderId(order.pancakeOrderId)}
+                        </button>
+                        {order.promoCode && (
+                          <span className="inline-flex items-center gap-1 text-[11px] font-bold text-amber-700 bg-amber-50 border border-amber-200 rounded px-1.5 py-0.5">
+                            <Tag size={11} /> {order.promoCode}
+                          </span>
+                        )}
+                        <span className={`ml-auto shrink-0 text-[12px] font-bold px-2 py-0.5 rounded text-white capitalize ${getStatusStyle(displayStatus)}`}>
+                          {displayStatus === 'đang thực hiện' ? 'đã phân công' : displayStatus}
+                        </span>
+                      </div>
+
+                      <div className="px-3 py-2.5 space-y-2 text-[13px] text-gray-700">
+                        {/* Khách hàng */}
+                        <div>
+                          <div className="font-bold text-[15px] text-gray-900 break-words">{customerName}</div>
+                          {phone && (
+                            <div className="flex items-center gap-2 mt-1">
+                              <a href={`tel:${phone}`} className="inline-flex items-center gap-1.5 font-bold text-blue-700 text-[14px]">
+                                <Phone size={14} /> {phone}
+                              </a>
+                              <button
+                                type="button"
+                                onClick={() => { copyToClipboard(phone); alert(`Đã sao chép SĐT: ${phone}`); }}
+                                className="p-1.5 text-gray-400 bg-transparent"
+                                aria-label="Sao chép số điện thoại"
+                              >
+                                <Copy size={14} />
+                              </button>
+                            </div>
+                          )}
+                          {address && <div className="text-gray-500 text-[12px] leading-snug mt-0.5 break-words">{address}</div>}
+                          {provinceName && (
+                            <span className="inline-flex items-center gap-1 mt-1 text-[11px] font-bold text-blue-700 bg-blue-50 border border-blue-200/60 rounded px-1.5 py-0.5">
+                              📍 {provinceName}
+                            </span>
+                          )}
+                        </div>
+
+                        {/* Lịch hẹn */}
+                        <div className={`text-[13px] font-semibold ${order.appointmentTime ? (isOverdue ? 'text-red-600' : 'text-blue-700') : 'text-gray-400 italic font-normal'}`}>
+                          {order.appointmentTime
+                            ? <>📅 {new Date(order.appointmentTime).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })} {new Date(order.appointmentTime).toLocaleDateString('vi-VN')}{isOverdue && ' (quá hẹn)'}</>
+                            : 'Chưa hẹn lịch'}
+                        </div>
+                        {order.rescheduleReason && (
+                          <div className="text-[12px] text-amber-800 bg-amber-50 border border-amber-200/60 rounded px-2 py-1 break-words">
+                            ⚠️ <b>Lý do hẹn lại:</b> {order.rescheduleReason}
+                          </div>
+                        )}
+                        {order.adminStatus === 'hủy đơn' && order.cancelReason && (
+                          <div className="text-[12px] text-red-800 bg-red-50 border border-red-200/60 rounded px-2 py-1 break-words">
+                            🚫 <b>Lý do hủy:</b> {order.cancelReason}
+                          </div>
+                        )}
+
+                        {/* Công việc & sản phẩm */}
+                        <div className="text-[12px] leading-snug">
+                          <span className="text-gray-500">CV: </span>
+                          <span className="font-semibold text-blue-800">{order.workType || 'Chưa xác định'}</span>
+                          {order.serviceType && order.serviceType !== 'Công việc đã bao gồm dịch vụ' && (
+                            <span className="text-gray-500"> ({order.serviceType})</span>
+                          )}
+                          {order.items && order.items.length > 0 && (
+                            <div className="mt-1 space-y-0.5 text-gray-800">
+                              {order.items.map((item: any, i: number) => (
+                                <div key={item.id || i} className="break-words">
+                                  📦 {item.productName || item.rawData?.variation_info?.name || item.rawData?.name || 'Sản phẩm'} (x{item.quantity})
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                          {order.moneyToCollect > 0 && (
+                            <div className="text-emerald-700 font-bold text-[13px] mt-1">
+                              Thu: {order.moneyToCollect.toLocaleString('vi-VN')} đ
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Trạm - KTV */}
+                        <div className="text-[12px] bg-gray-50 rounded-lg px-2.5 py-1.5">
+                          <div><span className="text-gray-500">Trạm:</span> <b className="text-gray-800">{stationName || 'Chưa phân trạm'}</b>{techStationName && <span className="text-gray-600"> · {techStationName}</span>}</div>
+                          <div><span className="text-gray-500">KTV:</span> <b className="text-gray-800">{ktvName}</b></div>
+                          {order.salesKtv && <div><span className="text-gray-500">Bán:</span> <b className="text-emerald-800">{order.salesKtv.fullName}</b></div>}
+                          {order.ktvCalledAt && (
+                            <div className="text-emerald-700">📞 Đã gọi khách {new Date(order.ktvCalledAt).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })} {new Date(order.ktvCalledAt).toLocaleDateString('vi-VN')}</div>
+                          )}
+                        </div>
+
+                        {/* Ghi chú */}
+                        {order.note && (
+                          <div className="text-[12px] text-gray-700 italic whitespace-pre-wrap break-words leading-relaxed border-l-2 border-gray-200 pl-2 line-clamp-4">
+                            {order.note}
+                          </div>
+                        )}
+
+                        {order.pancakeCreatedAt && (
+                          <div className="text-[11px] text-gray-400">
+                            Tạo lúc {new Date(order.pancakeCreatedAt).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })} - {new Date(order.pancakeCreatedAt).toLocaleDateString('vi-VN')}
+                            {order.rawData?.creator?.name && <> · {order.rawData.creator.name}</>}
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Thao tác: nút lớn, dễ bấm */}
+                      <div className="flex flex-col gap-2 px-3 py-2.5 border-t border-gray-100">
+                        {!isViewOnlyStaff && (
+                          <div className="flex gap-2">
+                            <button onClick={() => openAssignModal(order)} className={`${actionBtn} flex-1 whitespace-nowrap bg-blue-600 border-blue-600 text-white`}>
+                              <UserPlus size={16} /> Phân công
+                            </button>
+                            {!isClosed && ['ADMIN', 'COORDINATOR', 'DEV', 'SALER'].includes(currentUser?.role || '') && (
+                              <button onClick={() => navigate('/ktv/report', { state: { order } })} className={`${actionBtn} flex-1 whitespace-nowrap bg-emerald-50 border-emerald-200 text-emerald-700`}>
+                                <ClipboardCheck size={16} /> Báo cáo
+                              </button>
+                            )}
+                          </div>
+                        )}
+                        <div className="flex gap-2 [&>button]:flex-1">
+                        <button onClick={() => handleCopyOrderInfo(order)} className={`${actionBtn} bg-white border-gray-200 text-indigo-600`} aria-label="Copy thông tin">
+                          <Copy size={16} />
+                        </button>
+                        {!isViewOnlyStaff && order.pancakeOrderId < 0 && (
+                          <button onClick={() => openEditManualOrderModal(order)} className={`${actionBtn} bg-white border-gray-200 text-amber-600`} aria-label="Chỉnh sửa ca tự tạo">
+                            <Edit3 size={16} />
+                          </button>
+                        )}
+                        {order.pancakeOrderId > 0 && !isViewOnlyStaff && (
+                          <button onClick={() => handleSyncSingle(order.id)} disabled={syncing} className={`${actionBtn} bg-white border-gray-200 text-blue-600`} aria-label="Đồng bộ lại từ Pancake">
+                            <RefreshCw size={16} className={syncing ? 'animate-spin' : ''} />
+                          </button>
+                        )}
+                        {order.serviceReports && order.serviceReports.length > 0 && (
+                          <button onClick={() => navigate(`/admin/reports?search=${order.pancakeOrderId}`)} className={`${actionBtn} bg-white border-gray-200 text-teal-600`} aria-label="Xem báo cáo của KTV">
+                            <FileText size={16} />
+                          </button>
+                        )}
+                        <button onClick={() => openAuditModal(order.id)} className={`${actionBtn} bg-white border-gray-200 text-gray-500`} aria-label="Lịch sử thay đổi đơn">
+                          <History size={16} />
+                        </button>
+                        {!isViewOnlyStaff && !isClosed && (
+                          <button onClick={() => handleStatusChange(order.id, 'hủy đơn')} className={`${actionBtn} bg-white border-red-200 text-red-600`} aria-label="Hủy đơn hàng">
+                            <XCircle size={16} />
+                          </button>
+                        )}
+                        {!isViewOnlyStaff && isClosed && (
+                          <button onClick={() => handleReopenOrder(order)} className={`${actionBtn} bg-white border-amber-200 text-amber-600`} aria-label="Mở lại đơn">
+                            <RotateCcw size={16} />
+                          </button>
+                        )}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              <table ref={tableRef} className="hidden md:table min-w-[1300px] lg:w-full text-left text-[13px] border-collapse">
             <thead ref={realTheadRef} className="bg-[#f8f9fa] border-b border-gray-200">
               <tr className="bg-[#f8f9fa] text-gray-700 font-bold border-b border-gray-200">
                 {(currentUser?.role === 'ADMIN' || currentUser?.role === 'DEV' || currentUser?.role === 'COORDINATOR') && (
@@ -4035,6 +4251,7 @@ export default function OrderList() {
               })}
             </tbody>
           </table>
+              </>
         )}
           </div>
         )}
