@@ -1,7 +1,27 @@
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
 # Truliva — ghi chú cho Claude
 
 Backend Express + Prisma (PostgreSQL), webapp React (`webapp/`), Zalo Mini App (`zalo-miniapp/`).
 Quy tắc deploy/kiểm thử bắt buộc: xem `DEPLOY_AND_TESTING_RULES.md` (không báo "xong" khi chưa verify trên VPS).
+
+## Lệnh thường dùng
+- `npm run dev`: chạy backend (nodemon + ts-node `src/index.ts`, port 3000) và webapp (Vite, proxy `/api`, `/webhooks`, ws sang `localhost:3000`).
+- Typecheck backend: `npx tsc --noEmit`. Webapp: `cd webapp && npx tsc --noEmit -p tsconfig.app.json`; lint: `cd webapp && npm run lint`.
+- **Không có test tự động** (`npm test` chỉ báo lỗi). Kiểm chứng bằng các script `scripts/verify_*.js` chạy với API thật (xem bên dưới).
+- `npm run prisma:migrate` (`prisma migrate dev`) **không dùng được**: dự án đồng bộ schema bằng `db push`, không có thư mục migrations.
+- `npm run studio` / `studio:sandbox`: Prisma Studio trỏ tới DB trên VPS.
+- Phân quyền: `npm run perm:gen` (sinh lại file quyền cho frontend), `perm:check` (exit 1 nếu lệch), `audit:permissions`.
+
+## Kiến trúc backend
+- `src/index.ts` gắn các router `src/routes/*` vào `/api/<tên>` (và `/webhooks`), rồi khởi động các tiến trình nền: `orderSyncScheduler` (quét đơn Pancake định kỳ), `pancakeRetryScheduler` (đẩy lại đơn lỗi sang Pancake, có cầu chì `pancakeCircuitBreaker` + email cảnh báo), `productSyncScheduler`, `reportCleanupScheduler`, WebSocket (`websocketService`), MQTT, `syncPermissionCatalog`.
+- Luồng đơn từ Pancake POS: `POST /webhooks/pancake?secret=…` (`verifyPancakeToken` trong `middleware/auth.ts`) → chống trùng theo `externalEventId`, lưu `webhookRawEvent` → `eventRouter.routeEvent` (chạy ngầm, phân loại theo nội dung payload chứ không theo `event_type`) → `orderProcessor` / `customerProcessor`. Đổi trạng thái/kho trên Truliva được đồng bộ ngược sang Pancake (`syncOrderStatusToPancake`, `pancakeWarehouseSync`).
+- Sandbox nhận diện bằng `isSandboxEnvironment()` (`src/utils/sandboxGuard.ts`: `DATABASE_URL` chứa "sandbox", `NODE_ENV=staging|sandbox` hoặc `IS_SANDBOX=true`). Các thao tác ra ngoài (đẩy Pancake…) bị chặn ở sandbox qua guard này.
+- Xác thực nằm ở `src/middleware/authSession.ts` (`requireAuth`/`authenticate`, `authorize(role…)`, `requirePermission(featureKey)`, `requireCustomerAuth` cho Mini App, `blockInProduction` cho route debug). `middleware/auth.ts` chỉ dùng cho webhook Pancake.
+- Phân quyền: nguồn duy nhất là `src/config/permissions.ts` (`SYSTEM_FEATURES`, file này không được import thư viện nào). `webapp/src/config/permissions.ts` là file **sinh tự động**, không sửa tay. Thêm tính năng mới thì thêm object vào `SYSTEM_FEATURES`. Khi backend khởi động, `permissionSync` tự INSERT quyền mặc định cho key mới. Role phải khớp enum `UserRole` trong `schema.prisma`.
+- Webapp gọi API qua `fetchApi` trong `webapp/src/api/client.ts` (Bearer token lấy từ `localStorage.session_token`). Webapp cũng được đóng gói Android bằng Capacitor (`webapp/android`).
 
 ## Deploy lên VPS
 
@@ -43,6 +63,12 @@ Upload `webapp/src/...` → `exec … -- "cd webapp && npm run build"` → kiể
 ### Lặt vặt
 - Cột `TIMESTAMP(3)` lưu giờ UTC không kèm múi giờ, còn session Postgres trên VPS chạy giờ +7. Query thô kiểu `recorded_at > NOW() - interval …` sẽ lệch 7 tiếng, nên truyền mốc thời gian từ JS vào.
 - Error log PM2 có lỗi cũ (`logger_1.default.error is not a function`, `@napi-rs/canvas`). Khi đánh giá một lần deploy, chỉ xét log sau thời điểm restart.
+
+## Chatbot AI / RAG
+- Luồng: Messenger → `POST /webhooks/facebook` → `src/services/facebookAiBot.ts` (gom tin 5s, Gemini) ; playground/admin: `src/routes/aiAssistant.ts` ; RAG: `src/services/ragService.ts`.
+- Bảng RAG nằm ở **schema Postgres `rag`** (`rag.document_sources`, `rag.document_chunks`: vector(768) + tsvector + HNSW/GIN + trigger `rag.update_chunk_tsv`), **ngoài Prisma** để `db push` không xoá. Ngày 12/11/2026 bảng cũ ở `public` đã bị `db push` xoá, khôi phục từ `/var/backups/truliva_db/hourly/` (có backup DB production theo giờ). Không đưa lại các bảng này vào `public`/`schema.prisma`.
+- `searchHybridRAG` nuốt lỗi và trả `[]` → RAG hỏng thì bot vẫn trả lời, không báo lỗi. Kiểm tra bằng `node scripts/verify_rag_api.js` (chỉ đọc) hoặc cột `retrieved_chunks` trong `ai_chat_messages`.
+- `GEMINI_API_KEY` đang là **Free Tier**: embed giới hạn 100 request/phút (mỗi đoạn trong batch tính 1). Nạp tài liệu lớn sẽ mất embedding; bù bằng `node scripts/rag_reembed.js [--apply]`.
 
 ## IoT (ESP32/MQTT)
 - Luồng: ESP32 → Mosquitto → `src/services/mqttService.ts` → bảng `iot_devices` / `iot_telemetry` / `iot_alerts` → `src/routes/iot.ts` → `webapp/src/pages/admin/IotMonitor.tsx`; Mini App đọc qua `/my-serials` trong `src/routes/zaloMiniApp.ts`.
