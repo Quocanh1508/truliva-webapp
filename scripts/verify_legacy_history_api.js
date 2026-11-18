@@ -91,7 +91,19 @@ async function main() {
     console.log('   (không tìm thấy user nào thiếu quyền HOTLINE_SEARCH_CUSTOMER để test)');
   }
 
-  // 7. Không lọt vào orders
+  // 7. Tài khoản khách hàng (group CUSTOMER) bị chặn 403 ở tra cứu và danh sách phiếu Hotline
+  const cust = await prisma.user.findFirst({ where: { isActive: true, group: 'CUSTOMER' }, select: { id: true, role: true, group: true } });
+  if (cust) {
+    const t3 = jwt.sign({ id: cust.id, role: cust.role, group: cust.group }, process.env.JWT_SECRET, { expiresIn: '5m' });
+    for (const p of [`/search-customer?q=${withPhone.customerPhone}`, '/']) {
+      const r = await fetch(`${BASE}${p}`, { headers: { Authorization: `Bearer ${t3}` } });
+      check(r.status === 403, `tài khoản CUSTOMER gọi ${p.split('?')[0]} → 403 (HTTP ${r.status})`);
+    }
+  } else {
+    console.log('   (không có tài khoản group CUSTOMER đang hoạt động để test chặn 403)');
+  }
+
+  // 8. Không lọt vào orders
   const leaked = await prisma.order.count({ where: { note: { contains: 'Ghi chú KTV:' } } });
   console.log(`   (orders có "Ghi chú KTV:" trong note: ${leaked}, kỳ vọng 0 nếu không ai nhập tay)`);
 }
