@@ -190,6 +190,12 @@ export default function HotlineManage() {
   const [badgeCounts, setBadgeCounts] = useState<BadgeCounts>({});
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
+  // Giá trị search thực sự gửi lên API — trễ 400ms sau lần gõ cuối để không gọi API mỗi phím
+  const [debouncedSearch, setDebouncedSearch] = useState('');
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedSearch(searchQuery.trim()), 400);
+    return () => clearTimeout(t);
+  }, [searchQuery]);
   const [activeStatus, setActiveStatus] = useState('ALL');
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
@@ -362,7 +368,7 @@ export default function HotlineManage() {
       } else if (filterStatuses.length > 0) {
         params.set('statuses', filterStatuses.join(','));
       }
-      if (searchQuery.trim()) params.set('search', searchQuery.trim());
+      if (debouncedSearch) params.set('search', debouncedSearch);
       if (filterServiceRequestTypes.length > 0) params.set('serviceRequestTypes', filterServiceRequestTypes.join(','));
       if (filterProductNames.length > 0) params.set('productNames', filterProductNames.join(','));
       if (filterPhase3RequestTypes.length > 0) params.set('phase3RequestTypes', filterPhase3RequestTypes.join(','));
@@ -391,7 +397,7 @@ export default function HotlineManage() {
   }, [
     activeStatus,
     filterStatuses,
-    searchQuery,
+    debouncedSearch,
     filterServiceRequestTypes,
     filterProductNames,
     filterPhase3RequestTypes,
@@ -406,8 +412,12 @@ export default function HotlineManage() {
     page
   ]);
 
-  // ── Xuất Excel theo bộ lọc hiện tại ──
-  const handleExportExcel = () => {
+  // ── Xuất Excel: exportAll=true bỏ qua mọi bộ lọc/tìm kiếm, ngược lại xuất theo bộ lọc hiện tại ──
+  const handleExportExcel = (exportAll = false) => {
+    if (exportAll) {
+      window.open('/api/hotlines/export', '_blank');
+      return;
+    }
     const params = new URLSearchParams();
     if (activeStatus !== 'ALL' && filterStatuses.length === 0) {
       params.set('status', activeStatus);
@@ -717,50 +727,57 @@ export default function HotlineManage() {
   return (
     <div className="space-y-6">
       {/* ── Top Navigation Tabs & Header ── */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-gray-200 pb-4">
-        <div className="flex items-center gap-2 bg-gray-100 p-1 rounded-xl">
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 sm:gap-4 border-b border-gray-200 pb-4">
+        <div className="flex sm:inline-flex items-center gap-1 sm:gap-2 bg-gray-100 p-1 rounded-xl w-full sm:w-auto">
           <button
             onClick={() => setActiveMainTab('tickets')}
-            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-bold transition-all ${
+            className={`flex-1 sm:flex-none flex items-center justify-center gap-1.5 sm:gap-2 px-2 sm:px-4 py-2 rounded-lg text-xs sm:text-sm font-bold whitespace-nowrap transition-all ${
               activeMainTab === 'tickets'
                 ? 'bg-white text-[#1B3A6B] shadow-sm'
                 : 'text-gray-500 hover:text-gray-800'
             }`}
           >
-            <PhoneCall size={16} /> Danh sách Yêu cầu Hotline
+            <PhoneCall size={15} className="shrink-0" />
+            <span className="sm:hidden">Yêu cầu Hotline</span>
+            <span className="hidden sm:inline">Danh sách Yêu cầu Hotline</span>
           </button>
           {hasPermission('HOTLINE_SEARCH_CUSTOMER') && (
             <button
               onClick={() => setActiveMainTab('history')}
-              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-bold transition-all ${
+              className={`flex-1 sm:flex-none flex items-center justify-center gap-1.5 sm:gap-2 px-2 sm:px-4 py-2 rounded-lg text-xs sm:text-sm font-bold whitespace-nowrap transition-all ${
                 activeMainTab === 'history'
                   ? 'bg-white text-[#1B3A6B] shadow-sm'
                   : 'text-gray-500 hover:text-gray-800'
               }`}
             >
-              <Search size={16} /> Tra cứu Lịch sử Khách hàng
+              <Search size={15} className="shrink-0" />
+              <span className="sm:hidden">Tra cứu Lịch sử</span>
+              <span className="hidden sm:inline">Tra cứu Lịch sử Khách hàng</span>
             </button>
           )}
         </div>
 
         {activeMainTab === 'tickets' && (
-          <div className="flex items-center gap-2">
+          <div className="grid grid-cols-2 sm:flex sm:items-center gap-2 w-full sm:w-auto min-w-0">
             {hasPermission('HOTLINE_EXPORT_EXCEL') && (
               <button
-                onClick={handleExportExcel}
-                className="flex items-center gap-2 px-4 py-2.5 bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 rounded-xl font-semibold text-sm shadow-xs transition-all cursor-pointer"
-                title="Xuất file Excel danh sách hotline theo bộ lọc hiện tại"
+                onClick={() => handleExportExcel(true)}
+                className="min-w-0 flex items-center justify-center gap-1.5 sm:gap-2 px-2 sm:px-4 py-2.5 bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 rounded-xl font-semibold text-xs sm:text-sm shadow-xs transition-all cursor-pointer"
+                title="Xuất toàn bộ danh sách hotline ra Excel (bỏ qua bộ lọc và tìm kiếm)"
               >
-                <Download size={17} className="text-[#1B3A6B]" />
-                <span>Xuất Excel</span>
+                <Download size={16} className="text-[#1B3A6B] shrink-0" />
+                <span className="truncate sm:hidden">Xuất toàn bộ</span>
+                <span className="hidden sm:inline whitespace-nowrap">Xuất toàn bộ thông tin</span>
               </button>
             )}
             {hasPermission('HOTLINE_TICKET_CREATE') && (
               <button
                 onClick={() => { setSelectedTicket(null); setShowCreateModal(true); }}
-                className="flex items-center gap-2 px-4 py-2.5 bg-[#00A3FF] hover:bg-[#0090E0] text-white rounded-xl font-semibold text-sm shadow-sm transition-all cursor-pointer"
+                className="min-w-0 flex items-center justify-center gap-1.5 sm:gap-2 px-2 sm:px-4 py-2.5 bg-[#00A3FF] hover:bg-[#0090E0] text-white rounded-xl font-semibold text-xs sm:text-sm shadow-sm transition-all cursor-pointer"
               >
-                <Plus size={18} /> Thêm mới Ticket
+                <Plus size={17} className="shrink-0" />
+                <span className="truncate sm:hidden">Thêm Ticket</span>
+                <span className="hidden sm:inline whitespace-nowrap">Thêm mới Ticket</span>
               </button>
             )}
           </div>
@@ -1427,17 +1444,22 @@ export default function HotlineManage() {
       {activeMainTab === 'tickets' && (
         <div className="space-y-4">
           {/* ── Toolbar: Search & Filter Button ── */}
-          <div className="flex flex-wrap items-center justify-between gap-3 bg-white p-3.5 rounded-xl border border-gray-200 shadow-sm">
-            {/* Search Input */}
-            <div className="relative flex-1 min-w-[260px] max-w-md">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={17} />
+          <div className="flex flex-col sm:flex-row sm:flex-wrap sm:items-center justify-between gap-2.5 sm:gap-3 bg-white p-3 sm:p-3.5 rounded-xl border border-gray-200 shadow-sm">
+            {/* Search Input — tự động tìm sau khi ngừng gõ */}
+            <div className="relative w-full sm:flex-1 sm:min-w-[260px] sm:max-w-md">
+              {loading && searchQuery.trim() ? (
+                <Loader2 className="absolute left-3 top-1/2 -translate-y-1/2 text-blue-500 animate-spin" size={16} />
+              ) : (
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={17} />
+              )}
               <input
-                type="text"
+                type="search"
+                enterKeyHint="search"
                 placeholder="Tìm mã ticket, tên khách, SĐT, địa chỉ, serial, ghi chú..."
                 value={searchQuery}
                 onChange={(e) => { setSearchQuery(e.target.value); setPage(1); }}
-                onKeyDown={(e) => e.key === 'Enter' && fetchTickets()}
-                className="w-full pl-9 pr-8 py-2 border border-gray-300 rounded-lg text-xs focus:ring-2 focus:ring-blue-200 focus:border-blue-500 outline-none transition-all"
+                onKeyDown={(e) => { if (e.key === 'Enter') setDebouncedSearch(searchQuery.trim()); }}
+                className="w-full pl-9 pr-8 py-2.5 sm:py-2 border border-gray-300 rounded-lg text-sm sm:text-xs focus:ring-2 focus:ring-blue-200 focus:border-blue-500 outline-none transition-all [&::-webkit-search-cancel-button]:hidden"
               />
               {searchQuery && (
                 <button
@@ -1450,36 +1472,30 @@ export default function HotlineManage() {
             </div>
 
             {/* Action Buttons */}
-            <div className="flex items-center gap-2">
+            <div className="grid grid-cols-2 sm:flex sm:flex-wrap sm:items-center gap-2 min-w-0">
               {!isSuperHotlineUser && (
-                <div className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-50 text-amber-800 border border-amber-200/90 rounded-lg text-xs font-medium shrink-0">
+                <div className="col-span-2 flex items-center gap-1.5 px-3 py-1.5 bg-amber-50 text-amber-800 border border-amber-200/90 rounded-lg text-xs font-medium shrink-0">
                   <User size={13} className="text-amber-600" />
                   <span>Chỉ hiển thị đơn bạn tự tạo</span>
                 </div>
               )}
-              <button
-                onClick={() => { setPage(1); fetchTickets(); }}
-                className="px-4 py-2 bg-[#00A3FF] text-white rounded-lg text-xs font-semibold hover:bg-[#0090E0] transition-all shadow-sm cursor-pointer"
-              >
-                Tìm kiếm
-              </button>
 
               {hasPermission('HOTLINE_EXPORT_EXCEL') && (
                 <button
-                  onClick={handleExportExcel}
-                  className="flex items-center gap-1.5 px-3 py-2 text-xs font-semibold bg-white text-gray-700 border border-gray-300 hover:bg-gray-50 rounded-lg transition-all shadow-xs cursor-pointer"
-                  title="Xuất file Excel danh sách hotline theo bộ lọc hiện tại"
+                  onClick={() => handleExportExcel(false)}
+                  className="min-w-0 flex items-center justify-center gap-1.5 px-2 sm:px-3 py-2 text-xs font-semibold bg-white text-gray-700 border border-gray-300 hover:bg-gray-50 rounded-lg transition-all shadow-xs cursor-pointer"
+                  title="Xuất Excel các yêu cầu đang hiển thị (theo tìm kiếm & bộ lọc hiện tại)"
                 >
-                  <Download size={14} className="text-[#1B3A6B]" />
-                  <span>Xuất Excel</span>
+                  <Download size={14} className="text-[#1B3A6B] shrink-0" />
+                  <span className="truncate sm:whitespace-nowrap">Xuất Excel khách hàng</span>
                 </button>
               )}
 
               {/* ── BỘ LỌC BUTTON & POPOVER ── */}
-              <div className="relative z-50" ref={dropdownRef}>
+              <div className={`relative z-50 min-w-0 ${hasPermission('HOTLINE_EXPORT_EXCEL') ? '' : 'col-span-2'}`} ref={dropdownRef}>
                 <button
                   onClick={() => toggleDropdown('main')}
-                  className={`flex items-center gap-1.5 px-3 py-2 text-xs font-semibold border rounded-lg transition-all ${
+                  className={`w-full sm:w-auto min-w-0 flex items-center justify-center gap-1.5 px-2 sm:px-3 py-2 text-xs font-semibold border rounded-lg whitespace-nowrap transition-all ${
                     activeFiltersCount > 0
                       ? 'bg-blue-50 text-blue-700 border-blue-300 shadow-sm'
                       : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
@@ -2189,7 +2205,7 @@ export default function HotlineManage() {
           )}
 
           {/* ── Status Pills ── */}
-          <div className="flex flex-wrap gap-2">
+          <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1 sm:mx-0 sm:px-0 sm:pb-0 sm:flex-wrap sm:overflow-visible">
             {STATUS_PILLS.map(pill => {
               const count = pill.key === 'ALL'
                 ? (badgeCounts['TỔNG YÊU CẦU'] || 0)
@@ -2208,7 +2224,7 @@ export default function HotlineManage() {
                     }
                     setPage(1);
                   }}
-                  className={`px-3 py-1.5 rounded-md text-xs font-bold border transition-all ${
+                  className={`shrink-0 whitespace-nowrap px-3 py-1.5 rounded-md text-xs font-bold border transition-all ${
                     isActive
                       ? `${pill.bgColor} ${pill.color} ${pill.borderColor} ring-2 ring-offset-1 ring-blue-300`
                       : `${pill.bgColor} ${pill.color} ${pill.borderColor} hover:opacity-80`
@@ -2225,8 +2241,96 @@ export default function HotlineManage() {
             Có <span className="font-semibold text-gray-700">{totalCount.toLocaleString()}</span> dòng
           </div>
 
-          {/* ── Data Table ── */}
-          <div className="overflow-x-auto border border-gray-200 rounded-xl bg-white shadow-sm">
+          {/* ── Mobile: danh sách dạng thẻ ── */}
+          <div className="md:hidden space-y-2.5">
+            {loading ? (
+              <div className="py-12 bg-white border border-gray-200 rounded-xl"><Loader2 className="mx-auto animate-spin text-blue-500" size={28} /></div>
+            ) : tickets.length === 0 ? (
+              <div className="py-12 text-center text-sm text-gray-400 bg-white border border-gray-200 rounded-xl">Không có yêu cầu hotline nào khớp với bộ lọc</div>
+            ) : tickets.map(ticket => {
+              const statusBadge = STATUS_BADGE_MAP[ticket.status] || { bg: 'bg-gray-100', text: 'text-gray-700' };
+              const product = (ticket.productName || '').replace(/^PROD:\s*/i, '');
+              return (
+                <div
+                  key={ticket.id}
+                  onClick={() => { setSelectedTicket(ticket); setShowDetailModal(true); }}
+                  className="bg-white border border-gray-200 rounded-xl p-3 shadow-sm active:bg-gray-50"
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <div className="font-mono text-blue-600 font-bold text-[13px]">{ticket.ticketCode}</div>
+                      <div className="flex items-center gap-1 text-[11px] text-gray-500 mt-0.5">
+                        <Clock size={11} className="shrink-0" />
+                        <span>{formatDateTime(ticket.requestTime)}</span>
+                      </div>
+                    </div>
+                    <span className={`shrink-0 inline-flex px-2 py-0.5 rounded-md text-[11px] font-bold ${statusBadge.bg} ${statusBadge.text}`}>
+                      {ticket.status}
+                    </span>
+                  </div>
+
+                  <div className="mt-2 space-y-1 text-sm">
+                    <div className="flex items-center gap-1.5">
+                      <User size={13} className="text-gray-400 shrink-0" />
+                      <span className="font-semibold text-gray-800 truncate">{ticket.customerName}</span>
+                    </div>
+                    <div
+                      onClick={(e) => handleCopyPhone(ticket.customerPhone, e)}
+                      className="flex items-center gap-1.5 w-fit text-gray-700"
+                    >
+                      <Phone size={13} className="text-gray-400 shrink-0" />
+                      <span className="font-medium">{ticket.customerPhone}</span>
+                      <Copy size={11} className="text-gray-400" />
+                    </div>
+                    {(ticket.address || ticket.provinceName) && (
+                      <div className="flex items-start gap-1.5 text-xs text-gray-500">
+                        <MapPin size={13} className="text-gray-400 shrink-0 mt-0.5" />
+                        <span className="line-clamp-2">{[ticket.address, ticket.provinceName].filter(Boolean).join(', ')}</span>
+                      </div>
+                    )}
+                    {(product || ticket.serialNumber) && (
+                      <div className="text-xs text-gray-600">
+                        {product}{ticket.serialNumber && <span className="font-mono text-gray-500"> · {ticket.serialNumber}</span>}
+                      </div>
+                    )}
+                    {(ticket.serviceRequestType || ticket.customerSupportDetail) && (
+                      <div className="text-xs text-gray-700 bg-gray-50 rounded-lg px-2 py-1.5">
+                        {ticket.serviceRequestType && <span className="font-semibold text-blue-600">{ticket.serviceRequestType}: </span>}
+                        <span className="line-clamp-2 inline">{ticket.customerSupportDetail}</span>
+                      </div>
+                    )}
+                    <div className="text-[11px] text-gray-500">
+                      Xử lý: <span className="font-medium text-gray-700">{ticket.handlerUser?.fullName || ticket.targetTeam || 'Chưa có người xử lý'}</span>
+                    </div>
+                  </div>
+
+                  <div className="mt-2 pt-2 border-t border-gray-100 flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+                    <button
+                      onClick={() => openAssignModal(ticket)}
+                      className="flex-1 flex items-center justify-center gap-1 py-1.5 rounded-lg text-xs font-semibold text-blue-600 hover:bg-blue-50"
+                    >
+                      <UserPlus size={15} /> Phân bổ
+                    </button>
+                    <button
+                      onClick={() => handleConvertToOrder(ticket)}
+                      className="flex-1 flex items-center justify-center gap-1 py-1.5 rounded-lg text-xs font-semibold text-blue-600 hover:bg-blue-50"
+                    >
+                      <ArrowRightCircle size={15} /> Ca dịch vụ
+                    </button>
+                    <button
+                      onClick={() => handlePOSNotice()}
+                      className="flex-1 flex items-center justify-center gap-1 py-1.5 rounded-lg text-xs font-semibold text-blue-600 hover:bg-blue-50"
+                    >
+                      <ShoppingCart size={15} /> Đơn POS
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* ── Data Table (desktop) ── */}
+          <div className="hidden md:block overflow-x-auto border border-gray-200 rounded-xl bg-white shadow-sm">
             <table className="w-full text-sm">
               <thead>
                 <tr className="bg-gray-50 border-b border-gray-200">

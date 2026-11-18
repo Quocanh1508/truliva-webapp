@@ -2300,16 +2300,17 @@ export default function OrderList() {
             )}
           </form>
 
-          <div className="flex flex-wrap items-center gap-2 md:gap-3">
+          <div className="flex flex-wrap items-center gap-1.5 md:gap-3">
             {/* Tạo mới ca dịch vụ */}
             {hasPermission('ORDER_CREATE') && (
               <button
                 onClick={openCreateModal}
-                className="flex items-center space-x-1.5 px-3 py-2 text-[13px] border border-transparent rounded-md bg-blue-600 text-white hover:bg-blue-700 focus:outline-none font-semibold shadow-sm transition-colors"
+                className="flex items-center justify-center gap-1 md:gap-1.5 px-2 md:px-3 py-1.5 md:py-2 text-xs md:text-[13px] border border-transparent rounded-md bg-blue-600 text-white hover:bg-blue-700 focus:outline-none font-semibold shadow-sm transition-colors whitespace-nowrap"
                 title="Tạo mới ca dịch vụ thủ công"
               >
-                <Plus size={15} />
-                <span>Tạo ca dịch vụ</span>
+                <Plus size={14} className="shrink-0" />
+                <span className="md:hidden">Tạo ca</span>
+                <span className="hidden md:inline">Tạo ca dịch vụ</span>
               </button>
             )}
  
@@ -2318,11 +2319,12 @@ export default function OrderList() {
               <button
                 onClick={handleSync}
                 disabled={syncing}
-                className={`flex items-center space-x-1.5 px-3 py-2 text-[13px] border border-gray-300 rounded-md bg-white text-gray-700 hover:bg-gray-50 focus:outline-none font-medium transition-colors h-[38px] ${syncing ? 'opacity-60 cursor-not-allowed' : ''}`}
+                className={`flex items-center justify-center gap-1 md:gap-1.5 px-2 md:px-3 py-1.5 md:py-2 text-xs md:text-[13px] border border-gray-300 rounded-md bg-white text-gray-700 hover:bg-gray-50 focus:outline-none font-medium transition-colors whitespace-nowrap ${syncing ? 'opacity-60 cursor-not-allowed' : ''}`}
                 title="Đồng bộ thủ công các đơn hàng mới nhất từ Pancake POS"
               >
-                <RefreshCw size={15} className={syncing ? 'animate-spin text-blue-600' : 'text-gray-500'} />
-                <span>{syncing ? 'Đang đồng bộ...' : 'Đồng bộ Pancake'}</span>
+                <RefreshCw size={14} className={`shrink-0 ${syncing ? 'animate-spin text-blue-600' : 'text-gray-500'}`} />
+                <span className="md:hidden">{syncing ? 'Đang sync' : 'Đồng bộ'}</span>
+                <span className="hidden md:inline">{syncing ? 'Đang đồng bộ...' : 'Đồng bộ Pancake'}</span>
               </button>
             )}
  
@@ -2330,11 +2332,12 @@ export default function OrderList() {
             {canExportExcel && (
               <button
                 onClick={handleExportExcel}
-                className="flex items-center space-x-1.5 px-3 py-2 text-[13px] border border-gray-300 rounded-md bg-white text-gray-700 hover:bg-gray-50 focus:outline-none font-medium transition-colors"
+                className="flex items-center justify-center gap-1 md:gap-1.5 px-2 md:px-3 py-1.5 md:py-2 text-xs md:text-[13px] border border-gray-300 rounded-md bg-white text-gray-700 hover:bg-gray-50 focus:outline-none font-medium transition-colors whitespace-nowrap"
                 title="Xuất file Excel danh sách đơn hàng theo bộ lọc đang chọn"
               >
-                <Download size={15} className="text-gray-500" />
-                <span>Xuất Excel</span>
+                <Download size={14} className="shrink-0 text-gray-500" />
+                <span className="md:hidden">Excel</span>
+                <span className="hidden md:inline">Xuất Excel</span>
               </button>
             )}
 
@@ -2342,14 +2345,14 @@ export default function OrderList() {
             <div className="relative z-50">
               <button
                 onClick={() => toggleDropdown('main')}
-                className={`flex items-center space-x-1.5 px-3 py-2 text-[13px] border rounded-md font-medium transition-colors ${
+                className={`flex items-center justify-center gap-1 md:gap-1.5 px-2 md:px-3 py-1.5 md:py-2 text-xs md:text-[13px] border rounded-md font-medium transition-colors whitespace-nowrap ${
                   hasActiveFilters
                     ? 'border-blue-500 bg-blue-50 text-blue-700 font-semibold shadow-xs'
                     : 'border-gray-300 bg-white text-gray-700 hover:bg-gray-50'
                 }`}
               >
-                <Filter size={15} />
-                <span>Bộ lọc</span>
+                <Filter size={14} className="shrink-0" />
+                <span>Lọc</span>
                 {hasActiveFilters && (
                   <span className="w-2 h-2 rounded-full bg-blue-600 ml-0.5"></span>
                 )}
@@ -3267,16 +3270,14 @@ export default function OrderList() {
             </div>
           </div>
         ) : (
-          <div className="flex items-center justify-between px-4 py-2 bg-gray-50/80 border-t border-gray-200 text-xs text-gray-500">
-            <div className="flex items-center gap-2">
-              <Filter size={13} className="text-gray-400" />
-              <span className="font-medium text-gray-600">Bộ lọc hiện tại:</span>
-              <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold bg-gray-200/80 text-gray-700">
-                Tất cả đơn hàng (Không áp dụng lọc)
-              </span>
+          <div className="flex items-center justify-between gap-2 px-4 py-1.5 bg-gray-50/80 border-t border-gray-200 text-xs text-gray-500">
+            <div className="flex items-center gap-1.5 min-w-0">
+              <Filter size={13} className="shrink-0 text-gray-400" />
+              <span className="font-medium text-gray-600 whitespace-nowrap">Bộ lọc:</span>
+              <span className="truncate text-gray-700 font-semibold">Tất cả đơn hàng</span>
             </div>
-            <div className="text-[11px] text-gray-400">
-              Hiển thị toàn bộ <b className="text-gray-700 font-semibold">{stats.total}</b> đơn hàng trong hệ thống
+            <div className="shrink-0 whitespace-nowrap text-[11px] text-gray-400">
+              <b className="text-gray-700 font-semibold">{stats.total}</b> đơn
             </div>
           </div>
         )}
