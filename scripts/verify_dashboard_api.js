@@ -67,7 +67,10 @@ async function main() {
   console.log(`     ${JSON.stringify(s)}`);
   check(s.totalEvaluated === s.totalOnTime + s.totalLate, '  totalEvaluated = đúng + trễ');
   if (s.totalEvaluated > 0) check(s.onTimeRate === Math.round(s.totalOnTime / s.totalEvaluated * 100), '  onTimeRate = đúng / (đúng + trễ)');
-  check((da.body?.provinceStats || []).every(p => 'onTimeRate' in p), '  provinceStats[] có onTimeRate');
+  check((da.body?.provinceStats || []).every(p => 'onTimeRate' in p && 'open' in p && 'cancelled' in p), '  provinceStats[] có onTimeRate, open, cancelled');
+  const ps = da.body?.provinceStats || [];
+  check(sum(ps.map(p => p.onTime)) === s.totalOnTime && sum(ps.map(p => p.late)) === s.totalLate, '  Σ đúng/trễ theo tỉnh = summary (cùng loại trừ Giao hàng)');
+  check(ps.every(p => p.open + p.cancelled <= p.total), '  mỗi tỉnh: mở + hủy ≤ tổng');
   check((da.body?.stationPerformanceStats || []).every(p => p.onTimeRate === null || (p.onTimeRate >= 0 && p.onTimeRate <= 100)), '  stationPerformanceStats onTimeRate ∈ [0,100] | null');
   const late = da.body?.lateOrders || [];
   check(late.every(o => o.id && 'pancakeOrderId' in o), `  lateOrders (${late.length}) có id + pancakeOrderId`);

@@ -644,18 +644,23 @@ router.get('/dispatch-analysis', async (req: Request, res: Response): Promise<vo
 
     // Helper function để gom nhóm theo một trường
     const groupByField = (field: 'workType' | 'province' | 'techStationName' | 'ktvName') => {
-      const map: Record<string, { name: string; onTime: number; late: number; total: number; totalLeadTimeDays: number; completedCount: number }> = {};
-      
+      const map: Record<string, { name: string; onTime: number; late: number; total: number; open: number; cancelled: number; totalLeadTimeDays: number; completedCount: number }> = {};
+
       filteredOrders.forEach(o => {
         const val = o[field];
         if (!map[val]) {
-          map[val] = { name: val, onTime: 0, late: 0, total: 0, totalLeadTimeDays: 0, completedCount: 0 };
+          map[val] = { name: val, onTime: 0, late: 0, total: 0, open: 0, cancelled: 0, totalLeadTimeDays: 0, completedCount: 0 };
         }
         map[val].total++;
+        if (o.isCancelled && !o.isCompleted) map[val].cancelled++;
+        else if (!o.isCompleted && !CLOSED_STATUSES.includes(o.adminStatus)) map[val].open++;
+
+        // Đúng/trễ: không tính đơn Giao hàng (đơn vị vận chuyển) — cùng quy ước với summary
+        if (isDeliveryOnly(o.workType)) return;
         if (o.isOnTime) map[val].onTime++;
         if (o.isLate) map[val].late++;
-        
-        // Tính thời gian xử lý trung bình đối với ca đã hoàn thành (chỉ tính khi đã xếp lịch hẹn)
+
+        // Chênh lệch ngày nghiệm thu so với ngày hẹn (chỉ ca đã hoàn thành có lịch hẹn)
         if (o.isCompleted && o.completionDateStr && o.appointmentDateStr !== 'Chưa xếp lịch') {
           map[val].totalLeadTimeDays += diffDaysStr(o.appointmentDateStr, o.completionDateStr);
           map[val].completedCount++;
@@ -667,6 +672,8 @@ router.get('/dispatch-analysis', async (req: Request, res: Response): Promise<vo
         onTime: item.onTime,
         late: item.late,
         total: item.total,
+        open: item.open,
+        cancelled: item.cancelled,
         onTimeRate: item.onTime + item.late > 0 ? Math.round((item.onTime / (item.onTime + item.late)) * 100) : null,
         avgLeadTimeDays: item.completedCount > 0 ? Math.round((item.totalLeadTimeDays / item.completedCount) * 10) / 10 : 0
       }));

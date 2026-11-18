@@ -1,40 +1,19 @@
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { fetchApi, getDashboardStats, getStations, getDispatchAnalysis, getKtvUsers, getProductQualityAnalysis, getRevenueAnalysis, getDashboardOverview } from '../../api/client';
+import { getStations, getDispatchAnalysis, getKtvUsers, getProductQualityAnalysis, getRevenueAnalysis, getDashboardOverview } from '../../api/client';
 import OverviewTab, { type OverviewData } from './dashboard/OverviewTab';
+import ProvinceMapTab from './dashboard/ProvinceMapTab';
 import {
   FileText, CheckCircle, Clock, Building, MapPin,
   AlertTriangle, Info, Filter, AlertCircle, RefreshCw, TrendingUp,
-  ClipboardList, UserCheck, XCircle, DollarSign, ArrowUpRight, ArrowDownRight, Award,
-  Compass
+  ClipboardList, DollarSign, ArrowUpRight, ArrowDownRight, Award
 } from 'lucide-react';
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip as RechartsTooltip, Legend,
   ResponsiveContainer, CartesianGrid, AreaChart, Area,
   LineChart, Line, PieChart, Pie, Cell
 } from 'recharts';
-import { ComposableMap, Geographies, Geography, ZoomableGroup, Marker } from 'react-simple-maps';
-import { scaleQuantile } from 'd3-scale';
 import DateRangePicker from '../../components/DateRangePicker';
-
-function removeVietnameseTones(str: string) {
-  if (!str) return '';
-  str = str.replace(/à|á|ạ|ả|ã|â|ầ|ấ|ậ|ẩ|ẫ|ă|ằ|ắ|ặ|ẳ|ẵ/g, "a");
-  str = str.replace(/è|é|ẹ|ẻ|ẽ|ê|ề|ế|ệ|ể|ễ/g, "e");
-  str = str.replace(/ì|í|ị|ỉ|ĩ/g, "i");
-  str = str.replace(/ò|ó|ọ|ỏ|õ|ô|ồ|ố|ộ|ổ|ỗ|ơ|ờ|ớ|ợ|ở|ỡ/g, "o");
-  str = str.replace(/ù|ú|ụ|ủ|ũ|ư|ừ|ứ|ự|ử|ữ/g, "u");
-  str = str.replace(/ỳ|ý|ỵ|ỷ|ỹ/g, "y");
-  str = str.replace(/đ/g, "d");
-  str = str.replace(/À|Á|Ạ|Ả|Ã|Â|Ầ|Ấ|Ậ|Ẩ|Ẫ|Ă|Ằ|Ắ|Ặ|Ẳ|Ẵ/g, "A");
-  str = str.replace(/È|É|Ẹ|Ẻ|Ẽ|Ê|Ề|Ế|Ệ|Ể|Ễ/g, "E");
-  str = str.replace(/Ì|Í|Ị|Ỉ|Ĩ/g, "I");
-  str = str.replace(/Ò|Ó|Ọ|Ỏ|Õ|Ô|Ồ|Ố|Ộ|Ổ|Ỗ|Ơ|Ờ|Ớ|Ợ|Ở|Ỡ/g, "O");
-  str = str.replace(/Ù|Ú|Ụ|Ủ|Ũ|Ư|Ừ|Ứ|Ự|Ử|Ữ/g, "U");
-  str = str.replace(/Ỳ|Ý|Ỵ|Ỷ|Ỹ/g, "Y");
-  str = str.replace(/Đ/g, "D");
-  return str;
-}
 
 function formatLocalDate(d: Date): string {
   const year = d.getFullYear();
@@ -116,30 +95,6 @@ const getGroupedStats = (dailyStats: any[], mode: 'day' | 'week' | 'month') => {
     };
   }).sort((a, b) => a.key.localeCompare(b.key));
 };
-
-const geoUrl = '/vn-provinces.json';
-
-const REGION_PRESETS = [
-  { id: 'all', label: 'Toàn quốc', center: [106.3, 16.2] as [number, number], zoom: 1 },
-  { id: 'north', label: 'Miền Bắc', center: [105.85, 20.95] as [number, number], zoom: 2.7 },
-  { id: 'central', label: 'Miền Trung', center: [108.2, 15.9] as [number, number], zoom: 2.7 },
-  { id: 'south', label: 'Miền Nam', center: [106.7, 10.75] as [number, number], zoom: 2.7 },
-];
-
-const TRULIVA_STATION_COORDS = [
-  { name: 'Trạm TP. Hồ Chí Minh', shortName: 'TP.HCM', keywords: ['tp.ho chi minh', 'ho chi minh', 'hcm'], coords: [106.6602, 10.7626] as [number, number], region: 'south' },
-  { name: 'Trạm Hà Nội', shortName: 'Hà Nội', keywords: ['ha noi', 'hn'], coords: [105.8048, 21.0285] as [number, number], region: 'north' },
-  { name: 'Trạm Đà Nẵng', shortName: 'Đà Nẵng', keywords: ['da nang', 'dn'], coords: [108.2022, 16.0544] as [number, number], region: 'central' },
-  { name: 'Trạm Đồng Nai', shortName: 'Đồng Nai', keywords: ['dong nai', 'bien hoa', 'long khanh', 'dinh quan', 'tran bien'], coords: [106.8427, 10.9574] as [number, number], region: 'south' },
-  { name: 'Trạm Bình Dương', shortName: 'Bình Dương', keywords: ['binh duong', 'thu dau mot', 'thuan an'], coords: [106.6519, 10.9804] as [number, number], region: 'south' },
-  { name: 'Trạm Bà Rịa - Vũng Tàu', shortName: 'Vũng Tàu', keywords: ['ba ria', 'vung tau'], coords: [107.0843, 10.3460] as [number, number], region: 'south' },
-  { name: 'Trạm Hải Phòng', shortName: 'Hải Phòng', keywords: ['hai phong'], coords: [106.6881, 20.8449] as [number, number], region: 'north' },
-  { name: 'Trạm Bắc Ninh', shortName: 'Bắc Ninh', keywords: ['bac ninh'], coords: [106.0763, 21.1861] as [number, number], region: 'north' },
-  { name: 'Trạm Cần Thơ', shortName: 'Cần Thơ', keywords: ['can tho'], coords: [105.7469, 10.0452] as [number, number], region: 'south' },
-  { name: 'Trạm Khánh Hòa', shortName: 'Khánh Hòa', keywords: ['khanh hoa', 'nha trang'], coords: [109.1967, 12.2388] as [number, number], region: 'central' },
-  { name: 'Trạm Nghệ An', shortName: 'Nghệ An', keywords: ['nghe an', 'vinh'], coords: [105.6667, 18.6667] as [number, number], region: 'central' },
-  { name: 'Trạm Đắk Lắk', shortName: 'Đắk Lắk', keywords: ['dak lak', 'dac lac', 'buon ma thuot'], coords: [108.0383, 12.6675] as [number, number], region: 'central' }
-];
 
 const WORK_TYPE_OPTIONS = ['Giao hàng và Lắp đặt', 'Lắp đặt', 'Giao hàng', 'Thay lọc', 'Bảo hành', 'Sửa chữa'];
 const STATUS_OPTIONS = [
@@ -304,8 +259,6 @@ export default function Dashboard() {
   };
 
   // Data States
-  const [stats, setStats] = useState<any>(null);
-  const [dashStats, setDashStats] = useState<any>(null);
   const [stationsList, setStationsList] = useState<any[]>([]);
   const [analysisData, setAnalysisData] = useState<any>(null);
   const [qualityData, setQualityData] = useState<any>(null);
@@ -316,19 +269,11 @@ export default function Dashboard() {
   const [loadingRevenue, setLoadingRevenue] = useState(false);
 
   // Loading & Tooltip States
-  const [loadingOverview, setLoadingOverview] = useState(true);
   const [loadingAnalysis, setLoadingAnalysis] = useState(true);
-  const [tooltipContent, setTooltipContent] = useState<React.ReactNode>('');
   const [chartType, setChartType] = useState<'stackedBar' | 'line'>('stackedBar');
   const [lateChartScale, setLateChartScale] = useState<'day' | 'week' | 'month'>('day');
   const [selectedLateProvince, setSelectedLateProvince] = useState<string>('');
 
-  // Map Navigation & Interaction States
-  const [mapCenter, setMapCenter] = useState<[number, number]>([106.3, 16.2]);
-  const [mapZoom, setMapZoom] = useState<number>(1);
-  const [selectedRegion, setSelectedRegion] = useState<string>('all');
-  const [hoveredStation, setHoveredStation] = useState<string | null>(null);
-  const [stationViewMode, setStationViewMode] = useState<'tech' | 'main'>('tech');
 
   // Filter States
   // Mặc định: tháng hiện tại (phân tích theo từng tháng, so với tháng trước)
@@ -351,19 +296,11 @@ export default function Dashboard() {
   const [revenueScope, setRevenueScope] = useState<'all' | 'service'>('all');
   const [revenueMetricType, setRevenueMetricType] = useState<'moneyToCollect' | 'totalPrice'>('moneyToCollect');
 
-  // Fetch static data (stations, overview stats) once on mount
+  // Danh sách trạm cho bộ lọc (tải 1 lần). Lỗi ở đây không chặn cả dashboard.
   useEffect(() => {
-    setLoadingOverview(true);
-    Promise.all([
-      fetchApi('/reports/stats'),
-      getDashboardStats(),
-      getStations()
-    ]).then(([reportsData, dashData, stationsData]) => {
-      setStats(reportsData);
-      setDashStats(dashData);
-      setStationsList(stationsData);
-    }).catch(console.error)
-      .finally(() => setLoadingOverview(false));
+    getStations()
+      .then(stationsData => setStationsList(stationsData || []))
+      .catch(console.error);
   }, []);
 
   // Click outside to close active dropdown
@@ -403,20 +340,6 @@ export default function Dashboard() {
   useEffect(() => {
     setLoadingAnalysis(true);
 
-    getDashboardStats({
-      startDate,
-      endDate,
-      province: selectedProvinces,
-      mainStationId: selectedMainStations,
-      techStationId: selectedTechStations,
-      workType: selectedWorkTypes,
-      assignedKtvId: selectedKtvIds
-    })
-      .then(data => {
-        setDashStats(data);
-      })
-      .catch(console.error);
-
     getDispatchAnalysis({
       startDate,
       endDate,
@@ -453,47 +376,6 @@ export default function Dashboard() {
       .finally(() => setLoadingQuality(false));
   }, [activeTab, startDate, endDate, selectedProvinces, selectedMainStations, selectedTechStations, selectedProducts]);
 
-  // Flatten tech stations from dashStats.stationStats and analysisData.techStationStats
-  const allTechStations = useMemo(() => {
-    const map: Record<string, { name: string; orders: number; mainStationName: string }> = {};
-    if (dashStats?.stationStats) {
-      dashStats.stationStats.forEach((main: any) => {
-        (main.techStations || []).forEach((ts: any) => {
-          const cleanName = ts.name.trim();
-          if (!map[cleanName]) {
-            map[cleanName] = { name: cleanName, orders: 0, mainStationName: main.name };
-          }
-          map[cleanName].orders += (ts.orders || 0);
-        });
-      });
-    }
-    if (analysisData?.techStationStats) {
-      analysisData.techStationStats.forEach((ts: any) => {
-        if (!map[ts.name]) {
-          map[ts.name] = { name: ts.name, orders: ts.total, mainStationName: 'Hệ thống' };
-        }
-      });
-    }
-    return Object.values(map).sort((a, b) => b.orders - a.orders);
-  }, [dashStats, analysisData]);
-
-  const totalTechStationOrders = useMemo(() => {
-    return allTechStations.reduce((sum, ts) => sum + ts.orders, 0) || 1;
-  }, [allTechStations]);
-
-  const getTechStationOrders = (keywords: string[]) => {
-    let count = 0;
-    keywords.forEach(kw => {
-      const cleanKw = removeVietnameseTones(kw).toLowerCase();
-      allTechStations.forEach(ts => {
-        const cleanTs = removeVietnameseTones(ts.name).toLowerCase();
-        if (cleanTs === cleanKw || cleanTs.includes(cleanKw) || cleanKw.includes(cleanTs)) {
-          count += ts.orders;
-        }
-      });
-    });
-    return count;
-  };
 
   useEffect(() => {
     if (activeTab !== 'revenue') return;
@@ -542,19 +424,6 @@ export default function Dashboard() {
   useEffect(() => {
     setSelectedLateProvince('');
   }, [analysisData]);
-
-  if (loadingOverview) {
-    return (
-      <div className="flex flex-col items-center justify-center py-20 gap-4">
-        <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-600"></div>
-        <p className="text-gray-500 font-medium text-sm">Đang tải dữ liệu tổng quan...</p>
-      </div>
-    );
-  }
-
-  if (!stats || !dashStats) return <div className="alert alert-error">Lỗi tải dữ liệu hệ thống</div>;
-
-
 
   // Expose province options dynamically from tech stations to clean up filter inputs
   const availableProvinces = Array.from(new Set(
@@ -921,584 +790,14 @@ export default function Dashboard() {
         />
       )}
 
-      {/* TAB CONTENT 1: SUMMARY & MAP */}
+      {/* TAB CONTENT 1: BẢN ĐỒ & KHU VỰC */}
       {activeTab === 'summary' && (
-        <div className="space-y-6 animate-fade-in">
-          {/* KPI Overview Cards */}
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
-            <div
-              onClick={() => navigateToOrdersWithStatus([], startDate, endDate)}
-              className="bg-white p-5 rounded-xl border border-gray-200 border-l-4 border-l-blue-500 shadow-sm flex flex-col justify-between cursor-pointer hover:shadow-md hover:-translate-y-0.5 transition-all group"
-              title="Nhấp để xem danh sách tất cả đơn hàng theo khoảng ngày đang chọn"
-            >
-              <div className="text-blue-600 font-semibold text-xs flex items-center justify-between uppercase">
-                <span className="flex items-center gap-1.5"><ClipboardList size={15} /> Tổng số đơn</span>
-                <span className="text-[10px] text-gray-400 group-hover:text-blue-600 transition-colors">Xem ngay →</span>
-              </div>
-              <div className="text-3xl font-bold text-gray-900 mt-2">{dashStats.orderStats?.total ?? 0}</div>
-            </div>
-
-            <div
-              onClick={() => navigateToOrdersWithStatus(['chờ xử lý'], startDate, endDate)}
-              className="bg-white p-5 rounded-xl border border-gray-200 border-l-4 border-l-amber-500 shadow-sm flex flex-col justify-between cursor-pointer hover:shadow-md hover:-translate-y-0.5 transition-all group"
-              title="Nhấp để xem danh sách đơn chờ xử lý theo khoảng ngày đang chọn"
-            >
-              <div className="text-amber-600 font-semibold text-xs flex items-center justify-between uppercase">
-                <span className="flex items-center gap-1.5"><Clock size={15} /> Đơn chờ xử lý</span>
-                <span className="text-[10px] text-gray-400 group-hover:text-amber-600 transition-colors">Xem ngay →</span>
-              </div>
-              <div className="text-3xl font-bold text-gray-900 mt-2">{dashStats.orderStats?.pending ?? 0}</div>
-            </div>
-
-            <div
-              onClick={() => navigateToOrdersWithStatus(['đang thực hiện'], startDate, endDate)}
-              className="bg-white p-5 rounded-xl border border-gray-200 border-l-4 border-l-indigo-500 shadow-sm flex flex-col justify-between cursor-pointer hover:shadow-md hover:-translate-y-0.5 transition-all group"
-              title="Nhấp để xem danh sách đơn đã phân công theo khoảng ngày đang chọn"
-            >
-              <div className="text-indigo-600 font-semibold text-xs flex items-center justify-between uppercase">
-                <span className="flex items-center gap-1.5"><UserCheck size={15} /> Đơn đã phân công</span>
-                <span className="text-[10px] text-gray-400 group-hover:text-indigo-600 transition-colors">Xem ngay →</span>
-              </div>
-              <div className="text-3xl font-bold text-gray-900 mt-2">{dashStats.orderStats?.assigned ?? 0}</div>
-            </div>
-
-            <div
-              onClick={() => navigateToOrdersWithStatus(['hoàn thành'], startDate, endDate)}
-              className="bg-white p-5 rounded-xl border border-gray-200 border-l-4 border-l-emerald-500 shadow-sm flex flex-col justify-between cursor-pointer hover:shadow-md hover:-translate-y-0.5 transition-all group"
-              title="Nhấp để xem danh sách đơn đã hoàn thành theo khoảng ngày đang chọn"
-            >
-              <div className="text-emerald-600 font-semibold text-xs flex items-center justify-between uppercase">
-                <span className="flex items-center gap-1.5"><CheckCircle size={15} /> Đơn hoàn thành</span>
-                <span className="text-[10px] text-gray-400 group-hover:text-emerald-600 transition-colors">Xem ngay →</span>
-              </div>
-              <div className="text-3xl font-bold text-gray-900 mt-2">{dashStats.orderStats?.completed ?? 0}</div>
-            </div>
-
-            <div
-              onClick={() => navigateToOrdersWithStatus(['hủy đơn'], startDate, endDate)}
-              className="bg-white p-5 rounded-xl border border-gray-200 border-l-4 border-l-rose-500 shadow-sm flex flex-col justify-between cursor-pointer hover:shadow-md hover:-translate-y-0.5 transition-all group"
-              title="Nhấp để xem danh sách đơn bị hủy theo khoảng ngày đang chọn"
-            >
-              <div className="text-rose-600 font-semibold text-xs flex items-center justify-between uppercase">
-                <span className="flex items-center gap-1.5"><XCircle size={15} /> Đơn bị hủy</span>
-                <span className="text-[10px] text-gray-400 group-hover:text-rose-600 transition-colors">Xem ngay →</span>
-              </div>
-              <div className="text-3xl font-bold text-gray-900 mt-2">{dashStats.orderStats?.cancelled ?? 0}</div>
-            </div>
-          </div>
-
-          {loadingAnalysis || !analysisData ? (
-            <div className="flex flex-col items-center justify-center py-20 gap-3">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-              <p className="text-gray-500 text-xs">Đang tải dữ liệu bản đồ & khu vực...</p>
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 xl:grid-cols-12 gap-6">
-              {/* CỘT TRÁI (7 CỘT): BẢN ĐỒ MẬT ĐỘ & TRẠM KỸ THUẬT TƯƠNG TÁC */}
-              <div className="xl:col-span-7 bg-white p-5 rounded-2xl border border-gray-200 shadow-sm flex flex-col min-h-[580px] relative">
-                {/* Header bản đồ & Bộ điều hướng vùng */}
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4 pb-3 border-b border-gray-100">
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <div className="w-7 h-7 rounded-lg bg-blue-50 text-[#1B3A6B] flex items-center justify-center font-bold">
-                        <MapPin size={16} />
-                      </div>
-                      <h3 className="font-bold text-base text-gray-800">Bản đồ Mật độ & Mạng lưới Trạm</h3>
-                    </div>
-                    <p className="text-xs text-gray-500 mt-0.5">Phân bố đơn hàng và trạm kỹ thuật Truliva toàn quốc</p>
-                  </div>
-
-                  {/* 4 Nút Zoom Vùng trọng điểm */}
-                  <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl border border-slate-200/80 self-start sm:self-auto">
-                    {REGION_PRESETS.map(reg => {
-                      const isActive = selectedRegion === reg.id;
-                      return (
-                        <button
-                          key={reg.id}
-                          type="button"
-                          onClick={() => {
-                            setSelectedRegion(reg.id);
-                            setMapCenter(reg.center);
-                            setMapZoom(reg.zoom);
-                          }}
-                          className={`px-2.5 py-1 text-xs font-semibold rounded-lg transition-all ${
-                            isActive
-                              ? 'bg-[#1B3A6B] text-white shadow-sm'
-                              : 'text-slate-600 hover:text-slate-900 hover:bg-white/70'
-                          }`}
-                        >
-                          {reg.label}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-
-                {/* Khung chứa Bản đồ */}
-                <div className="flex-1 w-full bg-gradient-to-b from-blue-50/40 to-slate-50/50 rounded-xl overflow-hidden flex items-center justify-center relative border border-blue-100/60 min-h-[440px]">
-                  <ComposableMap
-                    projection="geoMercator"
-                    projectionConfig={{
-                      scale: 2200,
-                      center: [106.3, 16.2]
-                    }}
-                    style={{ width: "100%", height: "100%" }}
-                  >
-                    <ZoomableGroup
-                      center={mapCenter}
-                      zoom={mapZoom}
-                      minZoom={0.8}
-                      maxZoom={5}
-                      onMoveEnd={({ coordinates, zoom }) => {
-                        setMapCenter(coordinates);
-                        setMapZoom(zoom);
-                      }}
-                    >
-                      <Geographies geography={geoUrl}>
-                        {({ geographies }) => {
-                          const densityMap = dashStats.mapDensity || {};
-                          const mapProvinceData = Object.entries(densityMap).map(([name, total]) => ({ name, total: total as number }));
-                          const totalOrdersAll = mapProvinceData.reduce((acc, curr) => acc + curr.total, 0) || 1;
-
-                          const colorScale = scaleQuantile<string>()
-                            .domain(mapProvinceData.map((d: any) => d.total).length > 0 ? mapProvinceData.map((d: any) => d.total) : [0, 1])
-                            .range([
-                              "#e0f2fe",
-                              "#bae6fd",
-                              "#7dd3fc",
-                              "#38bdf8",
-                              "#0ea5e9",
-                              "#0284c7",
-                              "#0369a1",
-                              "#075985"
-                            ]);
-
-                          return geographies.map(geo => {
-                            const geoName = geo.properties.Name || geo.properties.name || geo.properties.ten_tinh;
-
-                            let matchedValue = 0;
-                            let cleanGeoName = '';
-                            if (geoName) {
-                              cleanGeoName = removeVietnameseTones(geoName)
-                                .replace(/ Province| City/gi, '')
-                                .trim()
-                                .toLowerCase();
-
-                              const found = mapProvinceData.find((d: any) => {
-                                const cleanDbName = removeVietnameseTones(d.name)
-                                  .replace(/^(Tỉnh |Thành phố |TP |TP\. )/i, '')
-                                  .trim()
-                                  .toLowerCase();
-                                return cleanGeoName === cleanDbName || cleanGeoName.includes(cleanDbName) || cleanDbName.includes(cleanGeoName);
-                              });
-                              if (found) matchedValue = found.total;
-                            }
-
-                            // Match on-time performance from analysisData.provinceStats if available
-                            const provStat = analysisData?.provinceStats?.find((p: any) => {
-                              const cleanP = removeVietnameseTones(p.name).replace(/^(Tỉnh |Thành phố |TP |TP\. )/i, '').trim().toLowerCase();
-                              return cleanGeoName === cleanP || cleanGeoName.includes(cleanP) || cleanP.includes(cleanGeoName);
-                            });
-
-                            // Tỷ lệ chỉ tính trên các ca đã đến hạn đánh giá (đúng + trễ)
-                            const onTimeRate: number | undefined = provStat && provStat.onTimeRate != null
-                              ? provStat.onTimeRate
-                              : undefined;
-
-                            const percentShare = totalOrdersAll > 0
-                              ? ((matchedValue / totalOrdersAll) * 100).toFixed(1)
-                              : '0';
-
-                            return (
-                              <Geography
-                                key={geo.rsmKey}
-                                geography={geo}
-                                fill={matchedValue ? colorScale(matchedValue) : "#f8fafc"}
-                                stroke="#cbd5e1"
-                                strokeWidth={0.5}
-                                onMouseEnter={() => {
-                                  setTooltipContent(
-                                    <div className="space-y-1">
-                                      <div className="font-bold text-sm text-white flex items-center justify-between gap-3 border-b border-gray-700/60 pb-1">
-                                        <span>{geoName || 'Không rõ'}</span>
-                                        <span className="text-amber-400 font-extrabold">{matchedValue} ca</span>
-                                      </div>
-                                      <div className="text-[11px] text-gray-300 flex justify-between gap-4">
-                                        <span>Tỷ trọng toàn quốc:</span>
-                                        <span className="font-semibold text-white">{percentShare}%</span>
-                                      </div>
-                                      {onTimeRate !== undefined && (
-                                        <div className="text-[11px] text-gray-300 flex justify-between gap-4">
-                                          <span>Tỷ lệ đúng hẹn:</span>
-                                          <span className={`font-semibold ${onTimeRate >= 90 ? 'text-emerald-400' : onTimeRate >= 80 ? 'text-amber-400' : 'text-rose-400'}`}>
-                                            {onTimeRate}%
-                                          </span>
-                                        </div>
-                                      )}
-                                    </div>
-                                  );
-                                }}
-                                onMouseLeave={() => {
-                                  setTooltipContent("");
-                                }}
-                                style={{
-                                  default: { outline: "none" },
-                                  hover: { fill: "#f59e0b", outline: "none", cursor: "pointer", transition: "all 0.2s" },
-                                  pressed: { fill: "#d97706", outline: "none" }
-                                }}
-                              />
-                            );
-                          });
-                        }}
-                      </Geographies>
-
-                      {/* GHIM CÁC TRẠM KỸ THUẬT CỦA TRULIVA */}
-                      {TRULIVA_STATION_COORDS.map(st => {
-                        const orderCount = getTechStationOrders(st.keywords);
-                        const isHovered = hoveredStation === st.name;
-                        // Dynamic scale factor: inverse to mapZoom so size remains constant on screen
-                        const scaleFactor = Math.max(0.35, 1 / mapZoom);
-
-                        return (
-                          <Marker key={st.name} coordinates={st.coords}>
-                            <g
-                              transform={`scale(${scaleFactor})`}
-                              className="cursor-pointer"
-                              onMouseEnter={() => {
-                                setHoveredStation(st.name);
-                                setTooltipContent(
-                                  <div className="text-xs">
-                                    <div className="font-bold text-amber-300 flex items-center gap-1">
-                                      <Building size={12} /> {st.name}
-                                    </div>
-                                    <div className="text-gray-200 mt-0.5">
-                                      Trạm kỹ thuật phụ trách: <strong className="text-white font-bold">{orderCount}</strong> đơn hàng
-                                    </div>
-                                  </div>
-                                );
-                              }}
-                              onMouseLeave={() => {
-                                setHoveredStation(null);
-                                setTooltipContent("");
-                              }}
-                            >
-                              {/* Pulse Effect */}
-                              <circle r={isHovered ? 12 : 7} fill="#00A3FF" fillOpacity={0.35} className="animate-ping" />
-                              <circle r={isHovered ? 7 : 5} fill="#1B3A6B" stroke="#ffffff" strokeWidth={1.4} />
-                              <circle r={2} fill="#00A3FF" />
-
-                              {/* Label Pill */}
-                              <g transform="translate(0, -11)">
-                                <rect
-                                  x="-26"
-                                  y="-11"
-                                  width="52"
-                                  height="12"
-                                  rx="6"
-                                  fill="#1B3A6B"
-                                  fillOpacity={0.92}
-                                  stroke="#ffffff"
-                                  strokeWidth={0.6}
-                                />
-                                <text
-                                  textAnchor="middle"
-                                  y="-2.5"
-                                  fill="#ffffff"
-                                  fontSize="6"
-                                  fontWeight="bold"
-                                  fontFamily="sans-serif"
-                                >
-                                  {st.shortName} {orderCount > 0 ? `(${orderCount})` : ''}
-                                </text>
-                              </g>
-                            </g>
-                          </Marker>
-                        );
-                      })}
-                    </ZoomableGroup>
-                  </ComposableMap>
-
-                  {/* Tooltip Kính mờ nổi bật */}
-                  {tooltipContent && (
-                    <div className="absolute top-4 right-4 bg-gray-900/90 text-white p-3 rounded-xl shadow-xl pointer-events-none z-20 backdrop-blur-md border border-gray-700/50 animate-fade-in min-w-[180px]">
-                      {tooltipContent}
-                    </div>
-                  )}
-
-                  {/* THƯỚC ĐO DẢI MÀU (COLOR SCALE LEGEND) */}
-                  <div className="absolute bottom-3 left-3 bg-white/95 backdrop-blur-sm px-3 py-2 rounded-xl border border-slate-200/80 shadow-sm text-xs z-10 select-none">
-                    <div className="text-[11px] font-semibold text-slate-700 mb-1.5 flex items-center justify-between gap-2">
-                      <span className="flex items-center gap-1.5">
-                        <span className="w-2 h-2 rounded-full bg-[#00A3FF]"></span>
-                        Mật độ đơn hàng
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-1">
-                      <div className="flex flex-col items-center">
-                        <div className="w-6 h-2 rounded-sm bg-[#f8fafc] border border-slate-300"></div>
-                        <span className="text-[9px] text-slate-500 mt-0.5">0</span>
-                      </div>
-                      <div className="flex flex-col items-center">
-                        <div className="w-6 h-2 rounded-sm bg-[#bae6fd]"></div>
-                        <span className="text-[9px] text-slate-500 mt-0.5">1-50</span>
-                      </div>
-                      <div className="flex flex-col items-center">
-                        <div className="w-6 h-2 rounded-sm bg-[#38bdf8]"></div>
-                        <span className="text-[9px] text-slate-500 mt-0.5">51-200</span>
-                      </div>
-                      <div className="flex flex-col items-center">
-                        <div className="w-6 h-2 rounded-sm bg-[#0284c7]"></div>
-                        <span className="text-[9px] text-slate-500 mt-0.5">201-500</span>
-                      </div>
-                      <div className="flex flex-col items-center">
-                        <div className="w-6 h-2 rounded-sm bg-[#075985]"></div>
-                        <span className="text-[9px] text-slate-500 mt-0.5">&gt;500</span>
-                      </div>
-                    </div>
-                    <div className="text-[9px] text-slate-400 mt-1.5 flex items-center gap-1">
-                      <span className="inline-block w-2 h-2 rounded-full bg-[#1B3A6B] border border-white"></span>
-                      <span>Chấm tròn: Trạm kỹ thuật Truliva</span>
-                    </div>
-                  </div>
-
-                  {/* Nút Reset Zoom */}
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setSelectedRegion('all');
-                      setMapCenter([106.3, 16.2]);
-                      setMapZoom(1);
-                    }}
-                    className="absolute bottom-3 right-3 text-[11px] text-slate-600 bg-white/95 hover:bg-blue-50 px-2.5 py-1 rounded-lg border border-slate-200 shadow-sm flex items-center gap-1 font-medium transition-colors"
-                  >
-                    <Compass size={13} className="text-[#00A3FF]" />
-                    <span>Mặc định (100%)</span>
-                  </button>
-                </div>
-
-                {/* Footer thông số bao quát */}
-                <div className="mt-3 pt-3 border-t border-gray-100 flex flex-wrap items-center justify-between gap-3 text-xs text-gray-500">
-                  <div className="flex items-center gap-2">
-                    <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
-                    <span>Độ phủ: <strong className="text-gray-800">{Object.keys(dashStats.mapDensity || {}).length}</strong> Tỉnh/Thành phố</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span>Mạng lưới trạm: <strong className="text-gray-800">{TRULIVA_STATION_COORDS.length}</strong> Trạm kỹ thuật</span>
-                  </div>
-                  <div className="text-[11px] text-gray-400 italic">
-                    * Dữ liệu phân tích dựa trên thông tin địa chỉ đơn hàng
-                  </div>
-                </div>
-              </div>
-
-              {/* CỘT PHẢI (5 CỘT): TRUNG TÂM GIÁM SÁT TẢI TRỌNG & NĂNG LỰC TRẠM */}
-              <div className="xl:col-span-5 flex flex-col space-y-4">
-                {/* Card 1: Năng lực & Tải trọng theo Trạm (Hỗ trợ chuyển đổi Trạm Kỹ thuật vs Trạm Chính) */}
-                <div className="bg-white p-5 rounded-2xl border border-gray-200 shadow-sm flex flex-col">
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3 pb-2 border-b border-gray-100">
-                    <div className="flex items-center gap-2">
-                      <div className="w-7 h-7 rounded-lg bg-indigo-50 text-indigo-700 flex items-center justify-center font-bold">
-                        <Building size={16} />
-                      </div>
-                      <div>
-                        <h3 className="font-bold text-sm text-gray-800">
-                          {stationViewMode === 'tech' ? 'Tải trọng theo Trạm Kỹ thuật' : 'Tải trọng theo Trạm Chính (Đối tác)'}
-                        </h3>
-                        <p className="text-[11px] text-gray-400">
-                          {stationViewMode === 'tech' ? 'Khối lượng đơn theo địa bàn KTV trực tiếp thi công' : 'Khối lượng đơn theo đơn vị đối tác quản lý'}
-                        </p>
-                      </div>
-                    </div>
-
-                    {/* Bộ chuyển đổi Trạm Kỹ thuật vs Trạm Chính */}
-                    <div className="flex items-center bg-slate-100 p-0.5 rounded-lg border border-slate-200 text-[11px] self-start sm:self-auto">
-                      <button
-                        type="button"
-                        onClick={() => setStationViewMode('tech')}
-                        className={`px-2 py-1 rounded-md font-semibold transition-all ${
-                          stationViewMode === 'tech'
-                            ? 'bg-[#1B3A6B] text-white shadow-xs'
-                            : 'text-slate-600 hover:text-slate-900'
-                        }`}
-                      >
-                        📍 Trạm Kỹ thuật
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setStationViewMode('main')}
-                        className={`px-2 py-1 rounded-md font-semibold transition-all ${
-                          stationViewMode === 'main'
-                            ? 'bg-[#1B3A6B] text-white shadow-xs'
-                            : 'text-slate-600 hover:text-slate-900'
-                        }`}
-                      >
-                        🏢 Trạm Chính
-                      </button>
-                    </div>
-                  </div>
-
-                  <div className="space-y-2.5 max-h-[230px] overflow-y-auto pr-1 custom-scrollbar">
-                    {stationViewMode === 'tech' ? (
-                      /* DANH SÁCH THEO TRẠM KỸ THUẬT (ĐỊA BÀN) */
-                      allTechStations.length === 0 ? (
-                        <div className="py-8 text-center text-gray-400 text-xs">Chưa có dữ liệu trạm kỹ thuật</div>
-                      ) : (
-                        allTechStations.map((ts, idx) => {
-                          const pct = Math.round((ts.orders / totalTechStationOrders) * 100);
-                          return (
-                            <div key={idx} className="p-2.5 rounded-xl border border-gray-100 bg-gray-50/60 hover:bg-blue-50/40 transition-colors">
-                              <div className="flex items-center justify-between text-xs mb-1.5">
-                                <div className="flex items-center gap-1.5">
-                                  <span className="w-5 h-5 rounded-full bg-blue-100 text-[#1B3A6B] font-bold text-[10px] flex items-center justify-center">
-                                    {idx + 1}
-                                  </span>
-                                  <span className="font-bold text-gray-800">{ts.name}</span>
-                                </div>
-                                <div className="space-x-1.5">
-                                  <strong className="text-[#1B3A6B]">{ts.orders} đơn</strong>
-                                  <span className="text-gray-400 text-[11px]">({pct}%)</span>
-                                </div>
-                              </div>
-                              <div className="w-full h-1.5 bg-gray-200 rounded-full overflow-hidden">
-                                <div
-                                  className="h-full rounded-full bg-gradient-to-r from-[#1B3A6B] to-[#00A3FF] transition-all duration-500"
-                                  style={{ width: `${Math.min(pct, 100)}%` }}
-                                ></div>
-                              </div>
-                            </div>
-                          );
-                        })
-                      )
-                    ) : (
-                      /* DANH SÁCH THEO TRẠM CHÍNH (ĐỐI TÁC) */
-                      (!dashStats.stationStats || dashStats.stationStats.length === 0) ? (
-                        <div className="py-8 text-center text-gray-400 text-xs">Chưa có dữ liệu trạm chính</div>
-                      ) : (
-                        dashStats.stationStats.map((st: any, idx: number) => {
-                          const totalOrdersAll = dashStats.stationStats.reduce((sum: number, item: any) => sum + item.totalOrders, 0) || 1;
-                          const pct = Math.round((st.totalOrders / totalOrdersAll) * 100);
-
-                          return (
-                            <div key={idx} className="p-2.5 rounded-xl border border-gray-100 bg-gray-50/60 hover:bg-blue-50/40 transition-colors">
-                              <div className="flex items-center justify-between text-xs mb-1.5">
-                                <span className="font-bold text-gray-800 flex items-center gap-1.5">
-                                  <span className="w-2 h-2 rounded-full bg-[#1B3A6B]"></span>
-                                  {st.name}
-                                </span>
-                                <div className="space-x-1.5">
-                                  <span className="font-bold text-[#1B3A6B]">{st.totalOrders} đơn</span>
-                                  <span className="text-gray-400 text-[11px]">({pct}%)</span>
-                                </div>
-                              </div>
-
-                              <div className="w-full h-1.5 bg-gray-200 rounded-full overflow-hidden">
-                                <div
-                                  className="h-full rounded-full bg-gradient-to-r from-[#1B3A6B] to-[#00A3FF] transition-all duration-500"
-                                  style={{ width: `${Math.min(pct, 100)}%` }}
-                                ></div>
-                              </div>
-
-                              {st.techStations && st.techStations.length > 0 && (
-                                <div className="flex flex-wrap gap-1 mt-2 pt-1.5 border-t border-gray-200/60">
-                                  {st.techStations.map((tech: any, tIdx: number) => (
-                                    <span key={tIdx} className="text-[10px] px-2 py-0.5 rounded-md bg-white border border-gray-200 text-gray-600">
-                                      {tech.name}: <strong className="text-gray-800">{tech.orders}</strong>
-                                    </span>
-                                  ))}
-                                </div>
-                              )}
-                            </div>
-                          );
-                        })
-                      )
-                    )}
-                  </div>
-                </div>
-
-                {/* Card 2: Top 5 Điểm nóng & Tỷ lệ Đúng hẹn */}
-                <div className="bg-white p-5 rounded-2xl border border-gray-200 shadow-sm flex flex-col flex-1">
-                  <div className="flex items-center justify-between mb-3 pb-2 border-b border-gray-100">
-                    <div className="flex items-center gap-2">
-                      <div className="w-7 h-7 rounded-lg bg-cyan-50 text-cyan-700 flex items-center justify-center font-bold">
-                        <TrendingUp size={16} />
-                      </div>
-                      <div>
-                        <h3 className="font-bold text-sm text-gray-800">Top Khu vực & Tỷ lệ Đúng hẹn</h3>
-                        <p className="text-[11px] text-gray-400">Hiệu suất thực hiện ca theo từng tỉnh thành trọng điểm</p>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="overflow-y-auto max-h-[220px] pr-1 custom-scrollbar">
-                    {(!analysisData.provinceStats || analysisData.provinceStats.length === 0) ? (
-                      <div className="py-8 text-center text-gray-400 text-xs">Chưa có dữ liệu thống kê</div>
-                    ) : (
-                      <table className="w-full text-left text-xs">
-                        <thead>
-                          <tr className="text-gray-400 border-b border-gray-100 pb-1 text-[11px]">
-                            <th className="font-medium pb-2">Tỉnh / Thành</th>
-                            <th className="font-medium pb-2 text-right">Số ca</th>
-                            <th className="font-medium pb-2 text-right">Đúng hẹn</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-gray-50">
-                          {[...analysisData.provinceStats]
-                            .sort((a, b) => b.total - a.total)
-                            .slice(0, 5)
-                            .map((entry: any, index: number, arr: any[]) => {
-                              const displayedTotal = arr.reduce((sum: number, e: any) => sum + e.total, 0) || 1;
-                              const pct = Math.round((entry.total / displayedTotal) * 100);
-                              const onTimeRate: number | null = entry.onTimeRate ?? null;
-
-                              return (
-                                <tr key={index} className="hover:bg-slate-50/80 transition-colors">
-                                  <td className="py-2.5 font-medium text-gray-800 flex items-center gap-2">
-                                    <span className="w-5 h-5 rounded-full bg-blue-50 text-[#1B3A6B] text-[10px] font-bold flex items-center justify-center">
-                                      {index + 1}
-                                    </span>
-                                    <span>{entry.name}</span>
-                                  </td>
-                                  <td className="py-2.5 text-right font-bold text-gray-900">
-                                    {entry.total}
-                                    <span className="text-[10px] text-gray-400 font-normal ml-1">({pct}%)</span>
-                                  </td>
-                                  <td className="py-2.5 text-right">
-                                    {onTimeRate == null ? (
-                                      <span className="text-[11px] text-gray-400" title="Chưa có ca nào đến hạn đánh giá">—</span>
-                                    ) : (
-                                    <span
-                                      className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-bold ${
-                                        onTimeRate >= 90
-                                          ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-                                          : onTimeRate >= 80
-                                          ? 'bg-amber-50 text-amber-700 border border-amber-200'
-                                          : 'bg-rose-50 text-rose-700 border border-rose-200'
-                                      }`}
-                                    >
-                                      {onTimeRate}%
-                                    </span>
-                                    )}
-                                  </td>
-                                </tr>
-                              );
-                            })}
-                        </tbody>
-                      </table>
-                    )}
-                  </div>
-
-                  {/* Tổng kết cuối cột */}
-                  <div className="mt-auto pt-3 border-t border-gray-100 flex items-center justify-between text-xs">
-                    <span className="text-gray-500 font-medium">Tổng ca trong phân tích</span>
-                    <span className="font-extrabold text-[#1B3A6B] text-sm">
-                      {[...analysisData.provinceStats].reduce((sum, item) => sum + item.total, 0)} ca
-                    </span>
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
-        </div>
+        <ProvinceMapTab
+          provinceStats={analysisData?.provinceStats || []}
+          overallOnTimeRate={analysisData?.summary?.onTimeRate ?? null}
+          loading={loadingAnalysis}
+          onFilterProvince={(name) => setSelectedProvinces([name])}
+        />
       )}
 
       {/* TAB CONTENT 2: COMBINED ON-TIME & LATE SLA PERFORMANCE REPORT */}
