@@ -346,12 +346,58 @@ export async function searchCustomerHistory(req: Request, res: Response) {
       })
     ]);
 
+    // E. Lịch sử dịch vụ cũ (import ẩn, bảng legacy_service_histories).
+    // Dữ liệu không public: luôn kiểm tra quyền HOTLINE_SEARCH_CUSTOMER (kể cả khi tra theo SĐT, vốn được miễn quyền ở trên),
+    // và bỏ qua lời gọi gợi ý SĐT (?phone=) của các form.
+    let legacyServiceHistory: any[] = [];
+    const canSeeLegacy = !req.query.phone
+      && await checkDynamicPermission(user.role, 'HOTLINE_SEARCH_CUSTOMER', user.group, user.id);
+    if (canSeeLegacy) {
+      const legacyOr: any[] = [
+        { customerName: { contains: queryParam, mode: 'insensitive' } },
+        { legacyOrderCode: { equals: queryParam, mode: 'insensitive' } }
+      ];
+      if (matchedPhones.length > 0) legacyOr.push({ customerPhone: { in: matchedPhones } });
+      if (/^\d{4,}$/.test(queryParam)) legacyOr.push({ customerPhone: { contains: queryParam } });
+      if (matchedSerials.length > 0) legacyOr.push({ serialNumber: { in: matchedSerials } });
+      if (queryParam.length >= 3) legacyOr.push({ serialNumber: { contains: queryParam, mode: 'insensitive' } });
+
+      legacyServiceHistory = await prisma.legacyServiceHistory.findMany({
+        where: { OR: legacyOr },
+        select: {
+          id: true,
+          legacyOrderCode: true,
+          customerName: true,
+          customerPhone: true,
+          address: true,
+          provinceName: true,
+          status: true,
+          completedAt: true,
+          workType: true,
+          serviceType: true,
+          products: true,
+          moneyToCollect: true,
+          mainStation: true,
+          techStation: true,
+          ktvName: true,
+          appointmentTime: true,
+          requestedAt: true,
+          note: true,
+          serialNumber: true,
+          parts: true
+        },
+        take: 50,
+        orderBy: { completedAt: 'desc' }
+      });
+    }
+
     return res.json({
       query: queryParam,
       customers: finalCustomers,
       serials: finalSerials,
       orders: finalOrders,
       serviceOrders: finalOrders,
+      legacyServiceHistory,
       hotlineTickets: finalHotlineTickets
     });
   } catch (error: any) {

@@ -670,6 +670,42 @@ model HotlineTicket {
   @@map("hotline_tickets")
 }
 
+// ── Lịch sử dịch vụ cũ (import ẩn từ hệ thống cũ, 12/2016 → 10/2026) ──
+// KHÔNG phải đơn hàng: không hiện ở Quản lý dịch vụ / Dashboard / Lương KTV / đồng bộ Pancake.
+// Chỉ đọc qua GET /api/hotlines/search-customer (mục 3 "Lịch sử dịch vụ"), cần quyền HOTLINE_SEARCH_CUSTOMER.
+// Nạp bằng scripts/import_legacy_service_history.js
+model LegacyServiceHistory {
+  id              String    @id @default(uuid())
+  importBatch     String    @map("import_batch")
+  legacyOrderCode String?   @map("legacy_order_code") // Mã đơn hệ thống cũ (ORD...)
+  customerName    String?   @map("customer_name") @db.Text
+  customerPhone   String?   @map("customer_phone")    // Đã chuẩn hóa 10 số bắt đầu bằng 0
+  address         String?   @db.Text
+  provinceName    String?   @map("province_name")
+  status          String    @default("Hoàn thành")
+  completedAt     DateTime? @map("completed_at")
+  workType        String?   @map("work_type")
+  serviceType     String?   @map("service_type") @db.Text
+  products        String?   @db.Text
+  moneyToCollect  Float?    @map("money_to_collect")
+  mainStation     String?   @map("main_station")
+  techStation     String?   @map("tech_station")
+  ktvName         String?   @map("ktv_name")
+  appointmentTime DateTime? @map("appointment_time")
+  requestedAt     DateTime? @map("requested_at")
+  note            String?   @db.Text
+  serialNumber    String?   @map("serial_number")
+  parts           String?   @db.Text
+  createdAt       DateTime  @default(now()) @map("created_at")
+
+  @@index([customerPhone])
+  @@index([serialNumber])
+  @@index([legacyOrderCode])
+  @@index([completedAt])
+  @@index([importBatch])
+  @@map("legacy_service_histories")
+}
+
 // ── Lịch sử ghi chú tư vấn ──
 model HotlineTicketNoteHistory {
   id              String        @id @default(uuid())

@@ -105,6 +105,30 @@ function removeAccents(str: string): string {
     .toLowerCase();
 }
 
+// Lịch sử dịch vụ cũ (import ẩn) — GET /hotlines/search-customer → legacyServiceHistory
+interface LegacyServiceHistory {
+  id: string;
+  legacyOrderCode: string | null;
+  customerName: string | null;
+  customerPhone: string | null;
+  address: string | null;
+  provinceName: string | null;
+  status: string;
+  completedAt: string | null;
+  workType: string | null;
+  serviceType: string | null;
+  products: string | null;
+  moneyToCollect: number | null;
+  mainStation: string | null;
+  techStation: string | null;
+  ktvName: string | null;
+  appointmentTime: string | null;
+  requestedAt: string | null;
+  note: string | null;
+  serialNumber: string | null;
+  parts: string | null;
+}
+
 function formatDateDisplay(dateStr: string): string {
   if (!dateStr) return '';
   const parts = dateStr.split('-');
@@ -231,6 +255,7 @@ export default function HotlineManage() {
     customers: any[];
     serials: any[];
     serviceOrders: any[];
+    legacyServiceHistory?: LegacyServiceHistory[];
     hotlineTickets: any[];
   } | null>(null);
 
@@ -488,16 +513,47 @@ export default function HotlineManage() {
   }, [wsConnected, activeMainTab]);
 
   // ── History Search Handler ──
-  const handleHistorySearch = async () => {
-    if (!historyQuery.trim()) return;
+  // Chỉ nhận kết quả của lần tra cứu mới nhất (tránh kết quả cũ về muộn đè lên kết quả mới khi tự tra lúc gõ)
+  const historyReqIdRef = useRef(0);
+  const historyPastedRef = useRef(false);
+  const runHistorySearch = useCallback(async (raw: string) => {
+    const q = raw.trim();
+    if (!q) return;
+    const reqId = ++historyReqIdRef.current;
     setHistoryLoading(true);
     try {
-      const data = await fetchApi(`/hotlines/search-customer?q=${encodeURIComponent(historyQuery.trim())}`);
-      setHistoryResults(data);
+      const data = await fetchApi(`/hotlines/search-customer?q=${encodeURIComponent(q)}`);
+      if (reqId === historyReqIdRef.current) setHistoryResults(data);
     } catch (err) {
       console.error('Lỗi tra cứu lịch sử KH:', err);
     } finally {
-      setHistoryLoading(false);
+      if (reqId === historyReqIdRef.current) setHistoryLoading(false);
+    }
+  }, []);
+
+  const handleHistorySearch = () => runHistorySearch(historyQuery);
+
+  // Tự tra cứu: paste → tra ngay; gõ tay → tra sau khi ngừng gõ 500ms (từ 3 ký tự)
+  useEffect(() => {
+    const q = historyQuery.trim();
+    const pasted = historyPastedRef.current;
+    historyPastedRef.current = false;
+    if (q.length < (pasted ? 2 : 3)) return;
+    const t = setTimeout(() => runHistorySearch(q), pasted ? 0 : 500);
+    return () => clearTimeout(t);
+  }, [historyQuery, runHistorySearch]);
+
+  // Paste SĐT dạng "0909 123 456", "0909.123.456", "+84 909 123 456" → chuẩn 10 số
+  const handleHistoryPaste = (e: React.ClipboardEvent<HTMLInputElement>) => {
+    const text = e.clipboardData.getData('text').trim();
+    historyPastedRef.current = true;
+    if (/^[+\d\s.\-()]+$/.test(text)) {
+      let digits = text.replace(/\D/g, '');
+      if (digits.startsWith('84') && digits.length === 11) digits = '0' + digits.slice(2);
+      if (/^0\d{9}$/.test(digits) && digits !== text) {
+        e.preventDefault();
+        setHistoryQuery(digits);
+      }
     }
   };
 
@@ -736,11 +792,12 @@ export default function HotlineManage() {
                   placeholder="Nhập Tên khách hàng, Số điện thoại hoặc Số Serial / Model / ID Sản phẩm..."
                   value={historyQuery}
                   onChange={(e) => setHistoryQuery(e.target.value)}
+                  onPaste={handleHistoryPaste}
                   onKeyDown={(e) => e.key === 'Enter' && handleHistorySearch()}
                   className="w-full pl-10 pr-10 py-3 border border-gray-300 rounded-xl text-sm focus:ring-2 focus:ring-blue-200 outline-none"
                 />
                 {historyQuery && (
-                  <button onClick={() => { setHistoryQuery(''); setHistoryResults(null); }} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
+                  <button onClick={() => { historyReqIdRef.current++; setHistoryLoading(false); setHistoryQuery(''); setHistoryResults(null); }} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
                     <X size={16} />
                   </button>
                 )}
@@ -781,7 +838,7 @@ export default function HotlineManage() {
                   📦 Thiết bị / Serial: <b>{historyResults.serials?.length || 0}</b>
                 </span>
                 <span className="px-3 py-1 bg-amber-100 text-amber-700 rounded-full">
-                  🛠️ Đơn yêu cầu dịch vụ: <b>{historyResults.serviceOrders?.length || 0}</b>
+                  🛠️ Đơn yêu cầu dịch vụ: <b>{(historyResults.serviceOrders?.length || 0) + (historyResults.legacyServiceHistory?.length || 0)}</b>
                 </span>
                 <span className="px-3 py-1 bg-emerald-100 text-emerald-700 rounded-full">
                   📞 Phiếu Hotline: <b>{historyResults.hotlineTickets?.length || 0}</b>
@@ -954,13 +1011,15 @@ export default function HotlineManage() {
                 <div className="flex items-center justify-between border-b border-gray-100 pb-3">
                   <div className="flex items-center gap-2">
                     <Wrench className="text-amber-600" size={18} />
-                    <h4 className="font-bold text-gray-800 text-sm">3. Lịch sử dịch vụ ({historyResults.serviceOrders?.length || 0})</h4>
+                    <h4 className="font-bold text-gray-800 text-sm">3. Lịch sử dịch vụ ({(historyResults.serviceOrders?.length || 0) + (historyResults.legacyServiceHistory?.length || 0)})</h4>
                   </div>
                   <span className="text-[11px] text-gray-400">Dữ liệu từ màn hình Quản lý dịch vụ</span>
                 </div>
 
-                {historyResults.serviceOrders?.length === 0 ? (
-                  <div className="text-xs text-gray-400 py-3 italic">Không có đơn dịch vụ nào</div>
+                {!historyResults.serviceOrders?.length ? (
+                  !historyResults.legacyServiceHistory?.length && (
+                    <div className="text-xs text-gray-400 py-3 italic">Không có đơn dịch vụ nào</div>
+                  )
                 ) : (
                   <div className="overflow-x-auto">
                     <table className="w-full text-xs text-left">
@@ -1198,6 +1257,102 @@ export default function HotlineManage() {
                         })}
                       </tbody>
                     </table>
+                  </div>
+                )}
+
+                {/* 3b. Lịch sử dịch vụ cũ (import ẩn, chỉ tra cứu tại đây) */}
+                {historyResults.legacyServiceHistory && historyResults.legacyServiceHistory.length > 0 && (
+                  <div className="space-y-2 pt-2">
+                    <div className="flex items-center justify-between">
+                      <div className="text-xs font-bold text-gray-700">
+                        Dữ liệu dịch vụ cũ ({historyResults.legacyServiceHistory.length}{historyResults.legacyServiceHistory.length >= 50 ? '+' : ''})
+                      </div>
+                      <span className="text-[10px] text-gray-400">Hệ thống cũ 12/2016 – 10/2026 · chỉ tra cứu, không có trên Quản lý dịch vụ</span>
+                    </div>
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-xs text-left">
+                        <thead className="bg-gray-50/80 border-b border-gray-200 font-bold text-gray-600">
+                          <tr>
+                            <th className="px-3 py-2.5 whitespace-nowrap">Mã đơn cũ</th>
+                            <th className="px-3 py-2.5 whitespace-nowrap">Khách hàng</th>
+                            <th className="px-3 py-2.5 whitespace-nowrap">Công việc</th>
+                            <th className="px-3 py-2.5 whitespace-nowrap">Ghi chú</th>
+                            <th className="px-3 py-2.5 whitespace-nowrap">Trạm - KTV</th>
+                            <th className="px-3 py-2.5 whitespace-nowrap">Thông tin máy</th>
+                            <th className="px-3 py-2.5 whitespace-nowrap">Thời gian</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-100">
+                          {historyResults.legacyServiceHistory.map((h) => {
+                            const fmtDate = (v?: string | null) => v ? new Date(v).toLocaleDateString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' }) : '—';
+                            return (
+                              <tr key={h.id} className="hover:bg-gray-50/60 transition-colors bg-slate-50/30">
+                                <td className="px-3 py-2.5 align-top whitespace-nowrap">
+                                  <div className="font-mono font-semibold text-gray-700">{h.legacyOrderCode || '—'}</div>
+                                  <span className="text-[9px] text-gray-500 font-medium bg-gray-100 rounded px-1.5 py-0.2">Dữ liệu cũ</span>
+                                </td>
+                                <td className="px-3 py-2.5 align-top min-w-[160px] max-w-[220px]">
+                                  <div className="font-bold text-gray-900 text-xs whitespace-pre-wrap">{h.customerName || 'Khách lẻ'}</div>
+                                  {h.customerPhone && (
+                                    <div
+                                      onClick={(e) => handleCopyPhone(h.customerPhone || '', e)}
+                                      className="text-gray-700 font-semibold text-[11px] my-0.5 cursor-pointer hover:text-blue-600 flex items-center gap-1"
+                                      title="Click để sao chép SĐT"
+                                    >
+                                      <Phone size={10} className="text-gray-400" />
+                                      <span>{h.customerPhone}</span>
+                                    </div>
+                                  )}
+                                  <div className="text-gray-500 text-[11px] leading-tight line-clamp-2" title={h.address || ''}>{h.address || '—'}</div>
+                                  {h.provinceName && (
+                                    <span className="inline-flex items-center gap-0.5 text-[9px] font-bold text-blue-700 bg-blue-50 border border-blue-200/60 rounded px-1.5 py-0.2 mt-1">
+                                      📍 {h.provinceName}
+                                    </span>
+                                  )}
+                                </td>
+                                <td className="px-3 py-2.5 align-top min-w-[180px] max-w-[260px]">
+                                  <div className="text-[10px] font-bold text-emerald-800 bg-emerald-50 border border-emerald-200/60 rounded px-1.5 py-0.5 mb-1 inline-flex items-center gap-1">
+                                    <CheckCircle2 size={11} className="text-emerald-600 shrink-0" />
+                                    <span>{h.status || 'Hoàn thành'}: {fmtDate(h.completedAt)}</span>
+                                  </div>
+                                  <div className="text-[11px] font-medium text-gray-800">
+                                    <span className="text-gray-500">CV: </span>
+                                    <span className="font-semibold text-blue-800">{h.workType || 'Chưa xác định'}</span>
+                                    {h.serviceType && <span className="text-gray-500 font-normal text-[10px]"> ({h.serviceType})</span>}
+                                  </div>
+                                  {h.products && <div className="text-[11px] text-gray-700 font-medium mt-1">📦 {h.products}</div>}
+                                  {h.parts && <div className="text-[10px] text-gray-500 mt-0.5">Linh kiện: {h.parts}</div>}
+                                  {(h.moneyToCollect ?? 0) > 0 && (
+                                    <div className="text-emerald-700 font-bold text-[11px] mt-1">Thu: {Number(h.moneyToCollect).toLocaleString('vi-VN')} đ</div>
+                                  )}
+                                </td>
+                                <td className="px-3 py-2.5 align-top min-w-[140px] max-w-[260px]">
+                                  <div className="text-gray-700 text-[11px] italic whitespace-pre-wrap leading-relaxed">{h.note || '—'}</div>
+                                </td>
+                                <td className="px-3 py-2.5 align-top whitespace-nowrap">
+                                  <div className="font-bold text-gray-800 text-xs">{h.mainStation || 'Chưa phân trạm'}</div>
+                                  {h.techStation && <div className="text-[11px] text-gray-600 font-medium">{h.techStation}</div>}
+                                  <div className="text-gray-500 text-[11px] mt-0.5">
+                                    KTV: <span className="font-semibold text-gray-700">{h.ktvName || 'Chưa gán'}</span>
+                                  </div>
+                                </td>
+                                <td className="px-3 py-2.5 align-top min-w-[130px] max-w-[200px]">
+                                  {h.serialNumber ? (
+                                    <div className="font-mono font-bold text-purple-700 text-[11px] whitespace-pre-wrap break-all">{h.serialNumber}</div>
+                                  ) : (
+                                    <span className="text-gray-400 italic text-[11px]">Chưa có thông tin máy</span>
+                                  )}
+                                </td>
+                                <td className="px-3 py-2.5 align-top whitespace-nowrap text-gray-600 text-[11px]">
+                                  <div>Gửi YC: <span className="font-semibold text-gray-800">{fmtDate(h.requestedAt)}</span></div>
+                                  <div>Hẹn: <span className="font-semibold text-gray-800">{fmtDate(h.appointmentTime)}</span></div>
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
                   </div>
                 )}
               </div>
