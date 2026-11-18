@@ -786,7 +786,9 @@ export default function HotlineManage() {
 
             <div className="flex items-center gap-3">
               <div className="relative flex-1">
-                <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+                {historyLoading
+                  ? <Loader2 className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#00A3FF] animate-spin" size={18} />
+                  : <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" size={18} />}
                 <input
                   type="text"
                   placeholder="Nhập Tên khách hàng, Số điện thoại hoặc Số Serial / Model / ID Sản phẩm..."
@@ -802,13 +804,6 @@ export default function HotlineManage() {
                   </button>
                 )}
               </div>
-              <button
-                onClick={handleHistorySearch}
-                disabled={historyLoading || !historyQuery.trim()}
-                className="px-6 py-3 bg-[#00A3FF] text-white rounded-xl text-sm font-semibold hover:bg-[#0090E0] disabled:opacity-50 transition-all flex items-center gap-2"
-              >
-                {historyLoading ? <Loader2 size={16} className="animate-spin" /> : <Search size={16} />} Tra cứu lịch sử
-              </button>
             </div>
           </div>
 
