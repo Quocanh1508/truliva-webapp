@@ -1,6 +1,7 @@
 import { useEffect, useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { fetchApi, getDashboardStats, getStations, getDispatchAnalysis, getKtvUsers, getProductQualityAnalysis, getRevenueAnalysis } from '../../api/client';
+import { fetchApi, getDashboardStats, getStations, getDispatchAnalysis, getKtvUsers, getProductQualityAnalysis, getRevenueAnalysis, getDashboardOverview } from '../../api/client';
+import OverviewTab, { type OverviewData } from './dashboard/OverviewTab';
 import {
   FileText, CheckCircle, Clock, Building, MapPin,
   AlertTriangle, Info, Filter, AlertCircle, RefreshCw, TrendingUp,
@@ -40,6 +41,13 @@ function formatLocalDate(d: Date): string {
   const month = String(d.getMonth() + 1).padStart(2, '0');
   const day = String(d.getDate()).padStart(2, '0');
   return `${year}-${month}-${day}`;
+}
+
+/** Ngày đầu & cuối của tháng chứa `ref`, lệch `offset` tháng (giờ trình duyệt). */
+function monthRange(ref: Date, offset = 0): { start: string; end: string } {
+  const first = new Date(ref.getFullYear(), ref.getMonth() + offset, 1);
+  const last = new Date(ref.getFullYear(), ref.getMonth() + offset + 1, 0);
+  return { start: formatLocalDate(first), end: formatLocalDate(last) };
 }
 
 function formatDateVN(dateStr: string): string {
@@ -268,7 +276,17 @@ function MultiSelect({
 
 export default function Dashboard() {
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState<'summary' | 'ontime' | 'late' | 'workload' | 'stationComp' | 'productQuality' | 'revenue'>('summary');
+  const [activeTab, setActiveTab] = useState<'overview' | 'summary' | 'ontime' | 'late' | 'workload' | 'stationComp' | 'productQuality' | 'revenue'>('overview');
+
+  // Mở trang Đơn hàng lọc đúng 1 mã đơn (xóa các bộ lọc cũ để chắc chắn thấy đơn)
+  const navigateToOrder = (pancakeOrderId: number) => {
+    try {
+      sessionStorage.setItem('truliva_order_filters', JSON.stringify({ filterPancakeOrderId: String(pancakeOrderId), page: 1 }));
+    } catch (e) {
+      console.error(e);
+    }
+    navigate('/admin/orders');
+  };
 
   const navigateToOrdersWithStatus = (statuses?: string[], customStart?: string, customEnd?: string) => {
     try {
@@ -292,6 +310,8 @@ export default function Dashboard() {
   const [analysisData, setAnalysisData] = useState<any>(null);
   const [qualityData, setQualityData] = useState<any>(null);
   const [revenueData, setRevenueData] = useState<any>(null);
+  const [overviewData, setOverviewData] = useState<OverviewData | null>(null);
+  const [loadingOverviewTab, setLoadingOverviewTab] = useState(false);
   const [loadingQuality, setLoadingQuality] = useState(false);
   const [loadingRevenue, setLoadingRevenue] = useState(false);
 
@@ -311,14 +331,9 @@ export default function Dashboard() {
   const [stationViewMode, setStationViewMode] = useState<'tech' | 'main'>('tech');
 
   // Filter States
-  const [startDate, setStartDate] = useState(() => {
-    const d = new Date();
-    return formatLocalDate(new Date(d.getFullYear(), 0, 1));
-  });
-  const [endDate, setEndDate] = useState(() => {
-    const d = new Date();
-    return formatLocalDate(new Date(d.getFullYear(), d.getMonth() + 1, 0));
-  });
+  // Mặc định: tháng hiện tại (phân tích theo từng tháng, so với tháng trước)
+  const [startDate, setStartDate] = useState(() => monthRange(new Date()).start);
+  const [endDate, setEndDate] = useState(() => monthRange(new Date()).end);
   const [selectedProvinces, setSelectedProvinces] = useState<string[]>([]);
   const [selectedMainStations, setSelectedMainStations] = useState<string[]>([]);
   const [selectedTechStations, setSelectedTechStations] = useState<string[]>([]);
@@ -504,6 +519,26 @@ export default function Dashboard() {
       .finally(() => setLoadingRevenue(false));
   }, [activeTab, startDate, endDate, selectedProvinces, selectedMainStations, selectedTechStations, selectedWorkTypes, selectedKtvIds, compareMode, prevStartDate, prevEndDate, revenueScope, revenueMetricType]);
 
+  // Tổng quan vận hành (bộ lọc trạng thái không áp dụng; bỏ kết quả của request cũ nếu bộ lọc đổi nhanh)
+  useEffect(() => {
+    if (activeTab !== 'overview') return;
+    let cancelled = false;
+    setLoadingOverviewTab(true);
+    getDashboardOverview({
+      startDate,
+      endDate,
+      province: selectedProvinces,
+      mainStationId: selectedMainStations,
+      techStationId: selectedTechStations,
+      workType: selectedWorkTypes,
+      assignedKtvId: selectedKtvIds
+    })
+      .then((data: OverviewData) => { if (!cancelled) setOverviewData(data); })
+      .catch(console.error)
+      .finally(() => { if (!cancelled) setLoadingOverviewTab(false); });
+    return () => { cancelled = true; };
+  }, [activeTab, startDate, endDate, selectedProvinces, selectedMainStations, selectedTechStations, selectedWorkTypes, selectedKtvIds]);
+
   useEffect(() => {
     setSelectedLateProvince('');
   }, [analysisData]);
@@ -544,10 +579,24 @@ export default function Dashboard() {
     ? analysisData.lateOrders.filter((o: any) => o.province === selectedLateProvince)
     : (analysisData?.lateOrders || []);
 
+  // Chuyển nhanh theo tháng (dựa trên tháng của ngày bắt đầu đang chọn)
+  const shiftMonth = (offset: number) => {
+    const [y, m] = startDate ? startDate.split('-').map(Number) : [new Date().getFullYear(), new Date().getMonth() + 1];
+    const r = monthRange(new Date(y, m - 1, 1), offset);
+    setStartDate(r.start);
+    setEndDate(r.end);
+  };
+  const isWholeMonth = (() => {
+    if (!startDate || !endDate || !startDate.endsWith('-01')) return false;
+    const [y, m] = startDate.split('-').map(Number);
+    return monthRange(new Date(y, m - 1, 1)).end === endDate;
+  })();
+  const monthLabel = isWholeMonth ? `Tháng ${Number(startDate.slice(5, 7))}/${startDate.slice(0, 4)}` : 'Khoảng tùy chọn';
+
   const resetFilters = () => {
-    const d = new Date();
-    setStartDate(formatLocalDate(new Date(d.getFullYear(), 0, 1)));
-    setEndDate(formatLocalDate(new Date(d.getFullYear(), d.getMonth() + 1, 0)));
+    const r = monthRange(new Date());
+    setStartDate(r.start);
+    setEndDate(r.end);
     setSelectedProvinces([]);
     setSelectedMainStations([]);
     setSelectedTechStations([]);
@@ -605,7 +654,14 @@ export default function Dashboard() {
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-3">
           {/* Khoảng ngày phân tích */}
           <div className="flex flex-col sm:col-span-2">
-            <label className="text-[11px] font-semibold text-gray-500 mb-1 uppercase">Khoảng ngày phân tích</label>
+            <div className="flex items-center justify-between mb-1">
+              <label className="text-[11px] font-semibold text-gray-500 uppercase">Kỳ phân tích (ngày tạo đơn)</label>
+              <div className="flex items-center gap-1 text-[11px]">
+                <button type="button" onClick={() => shiftMonth(-1)} className="px-1.5 rounded hover:bg-gray-100 text-gray-600 font-bold" title="Tháng trước" aria-label="Tháng trước">‹</button>
+                <span className={`font-semibold ${isWholeMonth ? 'text-[#1B3A6B]' : 'text-gray-400'}`}>{monthLabel}</span>
+                <button type="button" onClick={() => shiftMonth(1)} className="px-1.5 rounded hover:bg-gray-100 text-gray-600 font-bold" title="Tháng sau" aria-label="Tháng sau">›</button>
+              </div>
+            </div>
             <DateRangePicker
               startDate={startDate}
               endDate={endDate}
@@ -721,15 +777,17 @@ export default function Dashboard() {
             onToggle={() => setOpenDropdown(openDropdown === 'workType' ? null : 'workType')}
           />
 
-          {/* Admin Status */}
-          <MultiSelect
-            label="Trạng thái đơn"
-            options={STATUS_OPTIONS}
-            selectedValues={selectedAdminStatuses}
-            onChange={setSelectedAdminStatuses}
-            isOpen={openDropdown === 'adminStatus'}
-            onToggle={() => setOpenDropdown(openDropdown === 'adminStatus' ? null : 'adminStatus')}
-          />
+          {/* Admin Status (không áp dụng cho Tổng quan vận hành) */}
+          {activeTab !== 'overview' && (
+            <MultiSelect
+              label="Trạng thái đơn"
+              options={STATUS_OPTIONS}
+              selectedValues={selectedAdminStatuses}
+              onChange={setSelectedAdminStatuses}
+              isOpen={openDropdown === 'adminStatus'}
+              onToggle={() => setOpenDropdown(openDropdown === 'adminStatus' ? null : 'adminStatus')}
+            />
+          )}
 
           {/* Kỹ thuật viên */}
           <MultiSelect
@@ -754,8 +812,8 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* DATA SOURCE EXPLANATION BANNER */}
-      <div className="bg-blue-50/60 border border-blue-100 text-[#1B3A6B] px-4 py-3.5 rounded-xl flex items-start space-x-3 shadow-sm animate-fade-in">
+      {/* DATA SOURCE EXPLANATION BANNER (tab Tổng quan có chú thích riêng) */}
+      {activeTab !== 'overview' && <div className="bg-blue-50/60 border border-blue-100 text-[#1B3A6B] px-4 py-3.5 rounded-xl flex items-start space-x-3 shadow-sm animate-fade-in">
         <Info className="text-blue-600 mt-0.5 flex-shrink-0" size={16} />
         <div className="text-xs space-y-1">
           <p className="font-bold text-[13px] text-[#1B3A6B]">Thông tin nguồn dữ liệu & bộ lọc:</p>
@@ -764,19 +822,32 @@ export default function Dashboard() {
             Các chỉ số hiệu suất, tỷ lệ Đúng/Trễ hẹn và các biểu đồ phân tích liên quan được tính toán dựa trên <b>Ngày hẹn khách hàng</b> (hệ thống tự động thiết lập hoặc điều phối viên gán).
           </p>
         </div>
-      </div>
+      </div>}
 
       {/* TAB NAVIGATION */}
       <div className="flex items-center overflow-x-auto border-b border-gray-200 bg-gray-50/70 p-1.5 rounded-xl gap-1.5 scrollbar-none select-none">
         <button
-          onClick={() => setActiveTab('summary')}
+          onClick={() => setActiveTab('overview')}
           className={`shrink-0 whitespace-nowrap px-4 py-2 rounded-lg text-sm font-semibold transition-all flex items-center space-x-1.5 ${
-            activeTab === 'summary' 
-              ? 'bg-white text-blue-600 shadow-sm border border-gray-200/80 font-bold' 
+            activeTab === 'overview'
+              ? 'bg-white text-[#1B3A6B] shadow-sm border border-gray-200/80 font-bold'
               : 'text-gray-600 hover:text-gray-900 hover:bg-white/60'
           }`}
         >
-          <span>Tổng quan & Mật độ</span>
+          <ClipboardList size={15} className={activeTab === 'overview' ? 'text-[#1B3A6B]' : 'text-gray-500'} />
+          <span>Tổng quan vận hành</span>
+        </button>
+
+        <button
+          onClick={() => setActiveTab('summary')}
+          className={`shrink-0 whitespace-nowrap px-4 py-2 rounded-lg text-sm font-semibold transition-all flex items-center space-x-1.5 ${
+            activeTab === 'summary'
+              ? 'bg-white text-blue-600 shadow-sm border border-gray-200/80 font-bold'
+              : 'text-gray-600 hover:text-gray-900 hover:bg-white/60'
+          }`}
+        >
+          <MapPin size={15} className={activeTab === 'summary' ? 'text-blue-600' : 'text-gray-500'} />
+          <span>Bản đồ & Khu vực</span>
         </button>
 
         <button
@@ -839,6 +910,16 @@ export default function Dashboard() {
           <span>Doanh Thu</span>
         </button>
       </div>
+
+      {/* TAB CONTENT 0: OPERATIONS OVERVIEW */}
+      {activeTab === 'overview' && (
+        <OverviewTab
+          data={overviewData}
+          loading={loadingOverviewTab}
+          onOpenOrder={navigateToOrder}
+          onOpenOrders={(statuses) => navigateToOrdersWithStatus(statuses, '', '')}
+        />
+      )}
 
       {/* TAB CONTENT 1: SUMMARY & MAP */}
       {activeTab === 'summary' && (
@@ -1019,8 +1100,9 @@ export default function Dashboard() {
                               return cleanGeoName === cleanP || cleanGeoName.includes(cleanP) || cleanP.includes(cleanGeoName);
                             });
 
-                            const onTimeRate = provStat && provStat.total > 0
-                              ? Math.round((provStat.onTime / provStat.total) * 100)
+                            // Tỷ lệ chỉ tính trên các ca đã đến hạn đánh giá (đúng + trễ)
+                            const onTimeRate: number | undefined = provStat && provStat.onTimeRate != null
+                              ? provStat.onTimeRate
                               : undefined;
 
                             const percentShare = totalOrdersAll > 0
@@ -1366,9 +1448,7 @@ export default function Dashboard() {
                             .map((entry: any, index: number, arr: any[]) => {
                               const displayedTotal = arr.reduce((sum: number, e: any) => sum + e.total, 0) || 1;
                               const pct = Math.round((entry.total / displayedTotal) * 100);
-                              const onTimeRate = entry.total > 0
-                                ? Math.round((entry.onTime / entry.total) * 100)
-                                : 100;
+                              const onTimeRate: number | null = entry.onTimeRate ?? null;
 
                               return (
                                 <tr key={index} className="hover:bg-slate-50/80 transition-colors">
@@ -1383,6 +1463,9 @@ export default function Dashboard() {
                                     <span className="text-[10px] text-gray-400 font-normal ml-1">({pct}%)</span>
                                   </td>
                                   <td className="py-2.5 text-right">
+                                    {onTimeRate == null ? (
+                                      <span className="text-[11px] text-gray-400" title="Chưa có ca nào đến hạn đánh giá">—</span>
+                                    ) : (
                                     <span
                                       className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-bold ${
                                         onTimeRate >= 90
@@ -1394,6 +1477,7 @@ export default function Dashboard() {
                                     >
                                       {onTimeRate}%
                                     </span>
+                                    )}
                                   </td>
                                 </tr>
                               );
@@ -1452,6 +1536,9 @@ export default function Dashboard() {
                     <p className="text-gray-600 leading-relaxed">
                       Ca đã hoàn thành nhưng ngày nghiệm thu &gt; ngày hẹn, HOẶC ca chưa hoàn thành (chờ xử lý / đã phân công) đã quá ngày hẹn khách.
                     </p>
+                    <p className="text-gray-500 leading-relaxed pt-1">
+                      <b>Tỷ lệ đúng hẹn</b> = Đúng / (Đúng + Trễ). Không tính đơn hủy, đơn chưa tới hạn, đơn hoàn thành nhưng không có báo cáo nghiệm thu và báo cáo bị từ chối. Ngày tính theo giờ Việt Nam.
+                    </p>
                   </div>
                 </div>
               </div>
@@ -1465,7 +1552,14 @@ export default function Dashboard() {
                     <span className="p-1.5 bg-blue-50 text-blue-600 rounded-lg"><Clock size={16} /></span>
                   </div>
                   <div className="text-3xl font-extrabold text-[#1B3A6B] mt-2">{analysisData.summary.totalWithAppointments.toLocaleString('vi-VN')}</div>
-                  <div className="text-[11px] text-gray-400 mt-1">Đơn có ngày hẹn trong kỳ lọc</div>
+                  <div className="text-[11px] text-gray-400 mt-1">
+                    Đã đến hạn: <b className="text-gray-600">{(analysisData.summary.totalEvaluated ?? 0).toLocaleString('vi-VN')}</b>
+                    {' · '}Chưa tới hạn: {(analysisData.summary.totalNotDue ?? 0).toLocaleString('vi-VN')}
+                    {' · '}Hủy: {(analysisData.summary.totalCancelled ?? 0).toLocaleString('vi-VN')}
+                    {(analysisData.summary.totalCompletedNoReport ?? 0) > 0 && (
+                      <span title="Đơn đã hoàn thành nhưng không có báo cáo nghiệm thu nên không xác định được ngày hoàn thành"> · Hoàn thành không báo cáo: {analysisData.summary.totalCompletedNoReport.toLocaleString('vi-VN')}</span>
+                    )}
+                  </div>
                 </div>
 
                 {/* Card 2: Số ca đúng hẹn */}
@@ -1476,7 +1570,7 @@ export default function Dashboard() {
                   </div>
                   <div className="text-3xl font-extrabold text-emerald-600 mt-2">{analysisData.summary.totalOnTime.toLocaleString('vi-VN')}</div>
                   <div className="text-[11px] text-emerald-700 font-medium mt-1">
-                    Đạt {analysisData.summary.totalWithAppointments > 0 ? Math.round((analysisData.summary.totalOnTime / analysisData.summary.totalWithAppointments) * 100) : 0}% tổng lịch hẹn
+                    Đạt {analysisData.summary.totalEvaluated > 0 ? Math.round((analysisData.summary.totalOnTime / analysisData.summary.totalEvaluated) * 100) : 0}% số ca đã đến hạn
                   </div>
                 </div>
 
@@ -1488,7 +1582,7 @@ export default function Dashboard() {
                   </div>
                   <div className="text-3xl font-extrabold text-rose-600 mt-2">{analysisData.summary.totalLate.toLocaleString('vi-VN')}</div>
                   <div className="text-[11px] text-rose-700 font-medium mt-1">
-                    Chiếm {analysisData.summary.totalWithAppointments > 0 ? Math.round((analysisData.summary.totalLate / analysisData.summary.totalWithAppointments) * 100) : 0}% tổng lịch hẹn
+                    Chiếm {analysisData.summary.totalEvaluated > 0 ? Math.round((analysisData.summary.totalLate / analysisData.summary.totalEvaluated) * 100) : 0}% số ca đã đến hạn
                   </div>
                 </div>
 
@@ -1496,17 +1590,25 @@ export default function Dashboard() {
                 <div className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm border-l-4 border-indigo-600 hover:shadow-md transition-shadow flex flex-col justify-between">
                   <div className="flex items-center justify-between">
                     <span className="text-indigo-900 font-semibold text-xs uppercase tracking-wider">Tỷ Lệ Đúng Hẹn SLA</span>
-                    <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${analysisData.summary.onTimeRate >= 90 ? 'bg-emerald-100 text-emerald-700' : analysisData.summary.onTimeRate >= 75 ? 'bg-amber-100 text-amber-700' : 'bg-rose-100 text-rose-700'}`}>
-                      {analysisData.summary.onTimeRate >= 90 ? 'Xuất sắc' : analysisData.summary.onTimeRate >= 75 ? 'Đạt' : 'Cần cải thiện'}
-                    </span>
+                    {analysisData.summary.onTimeRate == null ? (
+                      <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-gray-100 text-gray-500">Chưa có dữ liệu</span>
+                    ) : (
+                      <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${analysisData.summary.onTimeRate >= 90 ? 'bg-emerald-100 text-emerald-700' : analysisData.summary.onTimeRate >= 75 ? 'bg-amber-100 text-amber-700' : 'bg-rose-100 text-rose-700'}`}>
+                        {analysisData.summary.onTimeRate >= 90 ? 'Xuất sắc' : analysisData.summary.onTimeRate >= 75 ? 'Đạt' : 'Cần cải thiện'}
+                      </span>
+                    )}
                   </div>
-                  <div className="text-3xl font-extrabold text-indigo-950 mt-1">{analysisData.summary.onTimeRate}%</div>
-                  <div className="w-full bg-rose-200 h-2 rounded-full mt-2 overflow-hidden flex" title={`Đúng: ${analysisData.summary.onTimeRate}%, Trễ: ${100 - analysisData.summary.onTimeRate}%`}>
-                    <div
-                      className="bg-emerald-500 h-full rounded-full transition-all duration-500"
-                      style={{ width: `${Math.min(100, Math.max(0, analysisData.summary.onTimeRate))}%` }}
-                    />
+                  <div className="text-3xl font-extrabold text-indigo-950 mt-1">
+                    {analysisData.summary.onTimeRate == null ? '—' : `${analysisData.summary.onTimeRate}%`}
                   </div>
+                  {analysisData.summary.onTimeRate != null && (
+                    <div className="w-full bg-rose-200 h-2 rounded-full mt-2 overflow-hidden flex" title={`Đúng: ${analysisData.summary.onTimeRate}%, Trễ: ${100 - analysisData.summary.onTimeRate}% (trên ${analysisData.summary.totalEvaluated} ca đã đến hạn)`}>
+                      <div
+                        className="bg-emerald-500 h-full rounded-full transition-all duration-500"
+                        style={{ width: `${Math.min(100, Math.max(0, analysisData.summary.onTimeRate))}%` }}
+                      />
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -1748,6 +1850,7 @@ export default function Dashboard() {
                     <table className="w-full text-left text-xs whitespace-nowrap divide-y divide-gray-100">
                       <thead className="bg-[#f8f9fa] text-gray-600 font-semibold uppercase tracking-wider">
                         <tr>
+                          <th className="px-5 py-3.5">Mã đơn</th>
                           <th className="px-5 py-3.5">Tên khách hàng</th>
                           <th className="px-5 py-3.5">Số điện thoại</th>
                           <th className="px-5 py-3.5">Khu vực (Tỉnh/Thành)</th>
@@ -1759,7 +1862,10 @@ export default function Dashboard() {
                       </thead>
                       <tbody className="divide-y divide-gray-100 bg-white">
                         {filteredLateOrders.map((o: any, index: number) => (
-                          <tr key={index} className="hover:bg-rose-50/30 transition-colors">
+                          <tr key={o.id || index} className="hover:bg-rose-50/30 transition-colors">
+                            <td className="px-5 py-3.5 font-bold text-blue-700">
+                              {o.pancakeOrderId != null ? `#${Math.abs(o.pancakeOrderId)}` : '-'}
+                            </td>
                             <td className="px-5 py-3.5 font-medium text-gray-900">{o.customerName}</td>
                             <td className="px-5 py-3.5 text-gray-500">{o.customerPhone || '-'}</td>
                             <td className="px-5 py-3.5 text-gray-700 flex items-center space-x-1">
@@ -2105,11 +2211,17 @@ export default function Dashboard() {
                             </div>
                           </div>
                           <div className="text-right">
-                            <span className={`inline-block px-2 py-0.5 rounded text-[10px] font-bold ${st.onTimeRate >= 80 ? 'bg-emerald-100 text-emerald-800' :
-                                st.onTimeRate >= 50 ? 'bg-amber-100 text-amber-800' : 'bg-rose-100 text-rose-800'
-                              }`}>
-                              Đúng hẹn {st.onTimeRate}%
-                            </span>
+                            {st.onTimeRate == null ? (
+                              <span className="inline-block px-2 py-0.5 rounded text-[10px] font-bold bg-gray-100 text-gray-500">
+                                Chưa có ca đến hạn
+                              </span>
+                            ) : (
+                              <span className={`inline-block px-2 py-0.5 rounded text-[10px] font-bold ${st.onTimeRate >= 80 ? 'bg-emerald-100 text-emerald-800' :
+                                  st.onTimeRate >= 50 ? 'bg-amber-100 text-amber-800' : 'bg-rose-100 text-rose-800'
+                                }`}>
+                                Đúng hẹn {st.onTimeRate}%
+                              </span>
+                            )}
                             {st.late > 0 && (
                               <div className="text-[10px] text-rose-500 font-semibold mt-0.5">
                                 Trễ: {st.late} ca
@@ -2593,9 +2705,9 @@ export default function Dashboard() {
                   <span className="font-bold text-blue-950">Nguồn dữ liệu & Quy tắc tính toán:</span>
                   <p className="text-blue-800 leading-relaxed">
                     {revenueMetricType === 'moneyToCollect' ? (
-                      <>💵 <b>Đang tính theo Doanh Thu Thực Thu Thông Minh (Smart Net Revenue)</b>: Bao gồm tiền COD POS thực nhận + các đơn POS chuyển khoản trước (`totalPrice`) + tiền thu hộ từ các Ca thủ công/kỹ thuật. Dữ liệu này <b>cao hơn POS (~2.980 tỷ) đúng bằng phần doanh thu gia tăng từ ca thủ công (đạt ~3.017 tỷ cho tháng 07/2026)</b>.</>
+                      <>💵 <b>Doanh thu thực thu</b>: Đơn POS lấy tiền COD (`moneyToCollect`); đơn POS đã chuyển khoản trước (COD = 0) lấy giá trị đơn (`totalPrice`); ca tạo thủ công lấy tiền thu hộ thực tế. Chỉ tính đơn ở trạng thái <b>hoàn thành</b>, lọc theo <b>ngày tạo đơn</b> (giờ Việt Nam).</>
                     ) : (
-                      <>📊 <b>Đang tính theo Tổng Doanh Số Niêm Yết (`totalPrice`)</b>: Tính tổng tiền giá trị đơn hàng niêm yết của tất cả đơn POS và ca dịch vụ. Dữ liệu này dùng để <b>đối chiếu với Tổng Hàng Chốt trên Pancake POS</b> (Khoảng ~6.21 tỷ cho tháng 07/2026).</>
+                      <>📊 <b>Doanh số niêm yết</b>: Tổng giá trị đơn (`totalPrice`) của các đơn POS và ca dịch vụ ở trạng thái <b>hoàn thành</b>, lọc theo <b>ngày tạo đơn</b> (giờ Việt Nam). Dùng để đối chiếu với Tổng Hàng Chốt trên Pancake POS.</>
                     )}
                   </p>
                 </div>

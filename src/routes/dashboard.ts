@@ -18,6 +18,47 @@ function removeAccents(str: string): string {
     .trim();
 }
 
+// ── Múi giờ Việt Nam (UTC+7, không có giờ mùa hè) ──
+// DB lưu mốc thời gian UTC; mọi "ngày" trên dashboard phải hiểu theo ngày VN.
+const VN_OFFSET_MS = 7 * 60 * 60 * 1000;
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+/** 00:00:00.000 giờ VN của ngày `YYYY-MM-DD` */
+function vnDayStart(dateStr: string): Date {
+  return new Date(`${dateStr}T00:00:00.000+07:00`);
+}
+
+/** 23:59:59.999 giờ VN của ngày `YYYY-MM-DD` */
+function vnDayEnd(dateStr: string): Date {
+  return new Date(`${dateStr}T23:59:59.999+07:00`);
+}
+
+/** Ngày VN dạng `YYYY-MM-DD` của một mốc thời gian */
+function toVnDateStr(d: Date): string {
+  return new Date(d.getTime() + VN_OFFSET_MS).toISOString().slice(0, 10);
+}
+
+/** Cộng/trừ ngày trên chuỗi `YYYY-MM-DD` (không phụ thuộc múi giờ server) */
+function addDaysStr(dateStr: string, days: number): string {
+  return new Date(new Date(`${dateStr}T00:00:00.000Z`).getTime() + days * DAY_MS).toISOString().slice(0, 10);
+}
+
+/** Số ngày giữa 2 chuỗi `YYYY-MM-DD` (b - a) */
+function diffDaysStr(a: string, b: string): number {
+  return Math.round((new Date(`${b}T00:00:00.000Z`).getTime() - new Date(`${a}T00:00:00.000Z`).getTime()) / DAY_MS);
+}
+
+/** Điều kiện lọc khoảng ngày (theo ngày VN) cho Prisma */
+function vnDateRange(startDate: any, endDate: any): { gte?: Date; lte?: Date } {
+  return {
+    ...(startDate ? { gte: vnDayStart(String(startDate)) } : {}),
+    ...(endDate ? { lte: vnDayEnd(String(endDate)) } : {})
+  };
+}
+
+// Báo cáo bị từ chối không được tính là đã làm / đã hoàn thành
+const validReportFilter: Prisma.ServiceReportWhereInput = { approvalStatus: { not: 'REJECTED' } };
+
 function parseMultiValue(param: any): string[] {
   if (!param) return [];
   return String(param).split(',').map(s => s.trim()).filter(Boolean);
@@ -54,6 +95,129 @@ const nonEcomFilter: Prisma.OrderWhereInput = {
     }
   ]
 };
+
+// ── Helper dùng chung giữa các API dashboard (để các tab tính theo CÙNG một công thức) ──
+
+const LEGACY_TRULIVA_STATIONS = ['Trạm Hồ Chí Minh', 'Trạm Đồng Nai', 'Trạm Vũng Tàu'];
+
+/** Tên trạm chính hiển thị của đơn: trạm đang hoạt động; trạm cũ HCM/ĐN/VT gộp thành "Truliva". */
+function resolveMainStationName(o: {
+  mainStation?: { name: string; isActive: boolean } | null;
+  techStation?: { mainStation?: { name: string; isActive: boolean } | null } | null;
+}): string {
+  const pick = (ms?: { name: string; isActive: boolean } | null) => {
+    if (!ms) return null;
+    if (ms.isActive) return ms.name;
+    if (LEGACY_TRULIVA_STATIONS.includes(ms.name)) return 'Truliva';
+    return null;
+  };
+  return pick(o.mainStation) || pick(o.techStation?.mainStation) || 'Chưa phân trạm';
+}
+
+function isEcomSource(src?: string | null): boolean {
+  const s = (src || '').toLowerCase();
+  return s.includes('shopee') || s.includes('lazada') || s.includes('tiktok') || s.includes('tiki');
+}
+
+/** Đơn hợp lệ để thống kê (giống validOrderFilter): bỏ đơn Pancake "mới" (status 0) và đơn đã ẩn. */
+function isValidOrder(o: { statusCode?: number | null; pancakeOrderId?: number | null; adminStatus?: string | null }): boolean {
+  const statusOk = o.statusCode == null || o.statusCode !== 0 || (o.pancakeOrderId ?? 0) < 0;
+  return statusOk && o.adminStatus !== 'đã ẩn';
+}
+
+const CLOSED_STATUSES = ['hoàn thành', 'hủy đơn', 'đã ẩn', 'đang hoàn', 'đã hoàn', 'đang đổi', 'đã đổi', 'hoàn một phần'];
+const RETURN_STATUSES = ['đang hoàn', 'đã hoàn', 'đang đổi', 'đã đổi', 'hoàn một phần'];
+
+/**
+ * Doanh thu 1 đơn:
+ * - totalPrice: Doanh số niêm yết.
+ * - moneyToCollect (mặc định): Thực thu — đơn POS lấy COD nếu > 0, COD = 0 (chuyển khoản trước) lấy totalPrice;
+ *   ca thủ công lấy tiền thu hộ thực tế.
+ */
+function smartRevenue(o: { totalPrice?: number | null; moneyToCollect?: number | null; pancakeOrderId?: number | null; orderSource?: string | null }, metric: string): number {
+  if (metric === 'totalPrice') return Number(o.totalPrice) || 0;
+  const isPosOrder = (o.pancakeOrderId ?? 0) > 100 && o.orderSource !== 'unknown';
+  if (isPosOrder) {
+    if (o.moneyToCollect != null && Number(o.moneyToCollect) > 0) return Number(o.moneyToCollect);
+    return Number(o.totalPrice) || 0;
+  }
+  return Number(o.moneyToCollect) || 0;
+}
+
+/**
+ * Kỳ đối chiếu của [startStr, endStr]:
+ * - Nếu kỳ là trọn 1 tháng dương lịch → tháng liền trước (trọn tháng).
+ * - Ngược lại → khoảng liền trước cùng số ngày.
+ */
+function previousPeriod(startStr: string, endStr: string): { start: string; end: string } {
+  const [sy, sm, sd] = startStr.split('-').map(Number);
+  const lastDayOfStartMonth = new Date(Date.UTC(sy, sm, 0)).toISOString().slice(0, 10);
+  if (sd === 1 && endStr === lastDayOfStartMonth) {
+    const prevEnd = addDaysStr(startStr, -1);
+    return { start: `${prevEnd.slice(0, 7)}-01`, end: prevEnd };
+  }
+  const days = Math.max(1, diffDaysStr(startStr, endStr) + 1);
+  const end = addDaysStr(startStr, -1);
+  return { start: addDaysStr(end, -(days - 1)), end };
+}
+
+function percentile(values: number[], p: number): number | null {
+  if (values.length === 0) return null;
+  const s = [...values].sort((a, b) => a - b);
+  const idx = (s.length - 1) * p;
+  const lo = Math.floor(idx);
+  const hi = Math.ceil(idx);
+  const v = s[lo] + (s[hi] - s[lo]) * (idx - lo);
+  return Math.round(v * 10) / 10;
+}
+
+/** Đơn giao hàng do đơn vị vận chuyển thực hiện — không tính vào SLA của KTV. */
+const isDeliveryOnly = (workType?: string | null) => workType === 'Giao hàng';
+
+/**
+ * Phân loại đúng/trễ hẹn theo NGÀY VN, so với lịch hẹn SAU CÙNG (lịch tự sinh +2h vẫn tính).
+ * - Ngày hoàn thành = ngày nộp báo cáo nghiệm thu đầu tiên (không tính báo cáo bị từ chối).
+ * - Đơn "hoàn thành" không có báo cáo: không xếp đúng/trễ (không dùng updatedAt).
+ * - Đơn chưa xong, chưa quá ngày hẹn: "chưa tới hạn".
+ */
+function classifySla(
+  o: { appointmentTime?: Date | null; adminStatus?: string | null; firstReportAt?: Date | null },
+  todayStr: string
+) {
+  const hasAppointment = o.appointmentTime != null;
+  const appointmentDateStr = hasAppointment ? toVnDateStr(o.appointmentTime!) : null;
+  const hasReport = o.firstReportAt != null;
+  const isCompleted = o.adminStatus === 'hoàn thành' || hasReport;
+  const isCancelled = o.adminStatus === 'hủy đơn';
+  const completionDateStr = hasReport ? toVnDateStr(o.firstReportAt!) : null;
+  const completedWithoutReport = isCompleted && !hasReport;
+
+  let isOnTime = false;
+  let isLate = false;
+  let isNotDue = false;
+  let delayDays = 0;
+
+  if (appointmentDateStr) {
+    if (isCompleted) {
+      if (completionDateStr) {
+        if (completionDateStr <= appointmentDateStr) isOnTime = true;
+        else {
+          isLate = true;
+          delayDays = Math.max(0, diffDaysStr(appointmentDateStr, completionDateStr));
+        }
+      }
+    } else if (!isCancelled) {
+      if (todayStr > appointmentDateStr) {
+        isLate = true;
+        delayDays = Math.max(0, diffDaysStr(appointmentDateStr, todayStr));
+      } else {
+        isNotDue = true;
+      }
+    }
+  }
+
+  return { appointmentDateStr, completionDateStr, isCompleted, isCancelled, completedWithoutReport, isOnTime, isLate, isNotDue, delayDays };
+}
 
 // Tất cả dashboard routes yêu cầu quyền dashboard access
 router.use(requireAuth, requireDashboardAccess);
@@ -96,81 +260,8 @@ router.get('/stats', async (req: Request, res: Response): Promise<void> => {
       ]
     };
 
-    const activeBaseFilter: Prisma.OrderWhereInput = {
-      AND: [
-        validOrderFilter,
-        ...(isIncludeEcom ? [] : [nonEcomFilter])
-      ]
-    };
-
-    // 1. Thống kê số lượng đơn hàng theo Trạm (Main Station)
-    const stations = await prisma.mainStation.findMany({
-      where: { isActive: true },
-      select: {
-        name: true,
-        _count: {
-          select: {
-            orders: {
-              where: activeBaseFilter
-            }
-          }
-        },
-        techStations: {
-          where: { isActive: true },
-          select: {
-            name: true,
-            _count: {
-              select: {
-                orders: {
-                  where: activeBaseFilter
-                }
-              }
-            }
-          }
-        }
-      }
-    });
-
-    const stationStats = stations.map(main => ({
-      name: main.name,
-      totalOrders: main._count.orders,
-      techStations: main.techStations.map(tech => ({
-        name: tech.name,
-        orders: tech._count.orders
-      }))
-    }));
-
-    // 2. Mật độ đơn hàng theo Tỉnh/Thành phố
-    const customers = await prisma.customer.findMany({
-      where: { provinceName: { not: null } },
-      select: {
-        provinceName: true,
-        _count: {
-          select: {
-            orders: {
-              where: activeBaseFilter
-            }
-          }
-        }
-      }
-    });
-
-    const density: Record<string, number> = {};
-    customers.forEach(c => {
-      let p = c.provinceName ? (normalizeProvince(c.provinceName) || c.provinceName) : '';
-      // Clean up common prefixes to match map data
-      p = p.replace(/^(Tỉnh |Thành phố |TP\.?\s*)/i, '').trim();
-      density[p] = (density[p] || 0) + c._count.orders;
-    });
-
-    // 3. Tổng quan đơn hàng theo trạng thái
-    const statusCounts = await prisma.order.groupBy({
-      by: ['adminStatus'],
-      where: activeBaseFilter,
-      _count: { id: true }
-    });
-
-    // 4. Thống kê theo yêu cầu của user có áp dụng bộ lọc (Lọc theo Ngày tạo đơn hàng trên Pancake)
+    // Thống kê theo bộ lọc của user (Lọc theo Ngày tạo đơn hàng trên Pancake, ngày VN).
+    // Bản đồ mật độ, tải trọng trạm và KPI đều tính trên CÙNG tập đơn đã lọc này.
     const where: any = {
       AND: [
         validOrderFilter
@@ -184,8 +275,7 @@ router.get('/stats', async (req: Request, res: Response): Promise<void> => {
     if (startDate || endDate) {
       where.pancakeCreatedAt = {
         not: null,
-        ...(startDate ? { gte: new Date(`${startDate}T00:00:00.000Z`) } : {}),
-        ...(endDate ? { lte: new Date(`${endDate}T23:59:59.999Z`) } : {})
+        ...vnDateRange(startDate, endDate)
       };
     }
 
@@ -280,6 +370,55 @@ router.get('/stats', async (req: Request, res: Response): Promise<void> => {
       }
     });
 
+    // 1. Tải trọng theo Trạm chính / Trạm kỹ thuật (đang hoạt động) trên tập đơn đã lọc
+    const stations = await prisma.mainStation.findMany({
+      where: { isActive: true },
+      select: {
+        id: true,
+        name: true,
+        techStations: {
+          where: { isActive: true },
+          select: { id: true, name: true }
+        }
+      }
+    });
+
+    const mainCount: Record<string, number> = {};
+    const techCount: Record<string, number> = {};
+    const statusCountMap: Record<string, number> = {};
+    const density: Record<string, number> = {};
+
+    filteredOrders.forEach(o => {
+      if (o.mainStationId) mainCount[o.mainStationId] = (mainCount[o.mainStationId] || 0) + 1;
+      if (o.techStationId) techCount[o.techStationId] = (techCount[o.techStationId] || 0) + 1;
+
+      const statusKey = o.adminStatus ?? '';
+      statusCountMap[statusKey] = (statusCountMap[statusKey] || 0) + 1;
+
+      // 2. Mật độ theo Tỉnh/Thành (ưu tiên tỉnh khách hàng, fallback địa chỉ giao hàng)
+      const provRaw = o.customer?.provinceName || (o.shippingAddress as any)?.province_name || '';
+      if (provRaw) {
+        let p = normalizeProvince(provRaw) || provRaw;
+        p = p.replace(/^(Tỉnh |Thành phố |TP\.?\s*)/i, '').trim();
+        if (p) density[p] = (density[p] || 0) + 1;
+      }
+    });
+
+    const stationStats = stations.map(main => ({
+      name: main.name,
+      totalOrders: mainCount[main.id] || 0,
+      techStations: main.techStations.map(tech => ({
+        name: tech.name,
+        orders: techCount[tech.id] || 0
+      }))
+    }));
+
+    // 3. Tổng quan đơn hàng theo trạng thái (giữ nguyên shape groupBy cũ)
+    const statusCounts = Object.entries(statusCountMap).map(([adminStatus, count]) => ({
+      adminStatus: adminStatus || null,
+      _count: { id: count }
+    }));
+
     res.json({
       stationStats,
       mapDensity: density,
@@ -330,12 +469,11 @@ router.get('/dispatch-analysis', async (req: Request, res: Response): Promise<vo
       ]
     };
 
-    // Áp dụng bộ lọc thời gian tạo đơn hàng trên Pancake
+    // Áp dụng bộ lọc thời gian tạo đơn hàng trên Pancake (theo ngày VN)
     if (startDate || endDate) {
       where.pancakeCreatedAt = {
         not: null,
-        ...(startDate ? { gte: new Date(`${startDate}T00:00:00.000Z`) } : {}),
-        ...(endDate ? { lte: new Date(`${endDate}T23:59:59.999Z`) } : {})
+        ...vnDateRange(startDate, endDate)
       };
     }
 
@@ -363,12 +501,12 @@ router.get('/dispatch-analysis', async (req: Request, res: Response): Promise<vo
         workType: true,
         adminStatus: true,
         appointmentTime: true,
-        updatedAt: true,
         createdAt: true,
         shippingAddress: true,
         mainStationId: true,
         techStationId: true,
         serviceReports: {
+          where: validReportFilter,
           select: {
             createdAt: true
           },
@@ -413,77 +551,24 @@ router.get('/dispatch-analysis', async (req: Request, res: Response): Promise<vo
       orders = orders.filter(order => matchOrderProvince(order, searchProvinces));
     }
 
-    const now = new Date();
-    const todayStr = now.toISOString().slice(0, 10);
-    const todayTime = new Date(todayStr).getTime();
+    const todayStr = toVnDateStr(new Date());
 
-    // 1. Phân loại đúng/trễ cho từng đơn hàng (Xử lý trường hợp chưa xếp lịch hẹn)
+    // 1. Phân loại đúng/trễ cho từng đơn hàng — dùng chung classifySla() với trang Tổng quan
     const processedOrders = orders.map(order => {
-      const hasAppointment = order.appointmentTime != null;
-      const appointmentDateStr = hasAppointment 
-        ? order.appointmentTime!.toISOString().slice(0, 10) 
-        : 'Chưa xếp lịch';
-      const appointmentTimeMs = hasAppointment 
-        ? new Date(appointmentDateStr).getTime() 
-        : 0;
-      
-      const hasReport = order.serviceReports && order.serviceReports.length > 0;
-      const isCompleted = order.adminStatus === 'hoàn thành' || hasReport;
-      
-      let completionDateStr = '';
-      let completionTimeMs = 0;
-      
-      if (hasReport) {
-        completionDateStr = order.serviceReports[0].createdAt.toISOString().slice(0, 10);
-        completionTimeMs = new Date(completionDateStr).getTime();
-      } else if (order.adminStatus === 'hoàn thành') {
-        completionDateStr = order.updatedAt.toISOString().slice(0, 10);
-        completionTimeMs = new Date(completionDateStr).getTime();
-      }
-      
-      let isOnTime = false;
-      let isLate = false;
-      let delayDays = 0;
-      
-      if (hasAppointment) {
-        if (isCompleted) {
-          if (completionTimeMs <= appointmentTimeMs) {
-            isOnTime = true;
-          } else {
-            isLate = true;
-            delayDays = Math.max(0, Math.floor((completionTimeMs - appointmentTimeMs) / (24 * 60 * 60 * 1000)));
-          }
-        } else {
-          if (order.adminStatus !== 'hủy đơn') {
-            if (todayTime > appointmentTimeMs) {
-              isLate = true;
-              delayDays = Math.max(0, Math.floor((todayTime - appointmentTimeMs) / (24 * 60 * 60 * 1000)));
-            }
-          }
-        }
-      }
-      
+      const sla = classifySla(
+        { appointmentTime: order.appointmentTime, adminStatus: order.adminStatus, firstReportAt: order.serviceReports?.[0]?.createdAt ?? null },
+        todayStr
+      );
+      const appointmentDateStr = sla.appointmentDateStr ?? 'Chưa xếp lịch';
+      const completionDateStr = sla.completionDateStr ?? '';
+      const { isCompleted, isCancelled, completedWithoutReport, isOnTime, isLate, isNotDue, delayDays } = sla;
+
       // Chuẩn hóa tên tỉnh thành
       const rawProvString = order.customer?.provinceName || (order.shippingAddress as any)?.province_name || 'Khác';
       let provName = normalizeProvince(rawProvString) || rawProvString;
       provName = provName.replace(/^(Tỉnh |Thành phố |TP\.?\s*)/i, '').trim();
 
-      // Determine mapped main station name
-      let mainStationName = 'Chưa phân trạm';
-      if (order.mainStation) {
-        if (order.mainStation.isActive) {
-          mainStationName = order.mainStation.name;
-        } else if (['Trạm Hồ Chí Minh', 'Trạm Đồng Nai', 'Trạm Vũng Tàu'].includes(order.mainStation.name)) {
-          mainStationName = 'Truliva';
-        }
-      }
-      if (mainStationName === 'Chưa phân trạm' && order.techStation?.mainStation) {
-        if (order.techStation.mainStation.isActive) {
-          mainStationName = order.techStation.mainStation.name;
-        } else if (['Trạm Hồ Chí Minh', 'Trạm Đồng Nai', 'Trạm Vũng Tàu'].includes(order.techStation.mainStation.name)) {
-          mainStationName = 'Truliva';
-        }
-      }
+      const mainStationName = resolveMainStationName(order);
 
       return {
         id: order.id,
@@ -498,6 +583,9 @@ router.get('/dispatch-analysis', async (req: Request, res: Response): Promise<vo
         isOnTime,
         isLate,
         delayDays,
+        isNotDue,
+        isCancelled,
+        completedWithoutReport,
         mainStationName,
         techStationName: order.techStation?.name || 'Chưa phân trạm',
         techStationId: order.techStationId,
@@ -524,14 +612,25 @@ router.get('/dispatch-analysis', async (req: Request, res: Response): Promise<vo
     }
 
     // 2. Tính toán Summary (chỉ tính đối với các đơn đã xếp lịch hẹn)
-    const totalWithAppointments = filteredOrders.filter(o => o.appointmentDateStr !== 'Chưa xếp lịch').length;
-    const totalOnTime = filteredOrders.filter(o => o.isOnTime).length;
-    const totalLate = filteredOrders.filter(o => o.isLate).length;
-    const onTimeRate = totalWithAppointments > 0 ? Math.round((totalOnTime / totalWithAppointments) * 100) : 100;
+    // SLA của KTV: KHÔNG tính đơn "Giao hàng" (đơn vị vận chuyển giao, không có báo cáo KTV).
+    // Các biểu đồ phân rã theo loại công việc vẫn hiển thị Giao hàng để tham khảo.
+    const slaOrders = filteredOrders.filter(o => !isDeliveryOnly(o.workType));
+    const withAppointments = slaOrders.filter(o => o.appointmentDateStr !== 'Chưa xếp lịch');
+    const totalWithAppointments = withAppointments.length;
+    const totalOnTime = slaOrders.filter(o => o.isOnTime).length;
+    const totalLate = slaOrders.filter(o => o.isLate).length;
+    const totalDeliveryExcluded = filteredOrders.length - slaOrders.length;
+    const totalNotDue = withAppointments.filter(o => o.isNotDue).length;
+    const totalCancelled = withAppointments.filter(o => o.isCancelled && !o.isCompleted).length;
+    const totalCompletedNoReport = withAppointments.filter(o => o.completedWithoutReport).length;
+    // Mẫu số tỷ lệ = các ca ĐÃ ĐẾN HẠN đánh giá (đúng + trễ); không gồm đơn hủy,
+    // đơn chưa tới hạn và đơn hoàn thành không có báo cáo (không rõ ngày hoàn thành).
+    const totalEvaluated = totalOnTime + totalLate;
+    const onTimeRate = totalEvaluated > 0 ? Math.round((totalOnTime / totalEvaluated) * 100) : null;
 
     // 3. Gom nhóm theo Ngày hẹn (Daily Stats - bỏ qua đơn chưa xếp lịch)
     const dailyMap: Record<string, { date: string; onTime: number; late: number; total: number }> = {};
-    filteredOrders.forEach(o => {
+    slaOrders.forEach(o => { // xu hướng đúng/trễ: không gồm Giao hàng
       const d = o.appointmentDateStr;
       if (d === 'Chưa xếp lịch') return;
       if (!dailyMap[d]) {
@@ -558,10 +657,7 @@ router.get('/dispatch-analysis', async (req: Request, res: Response): Promise<vo
         
         // Tính thời gian xử lý trung bình đối với ca đã hoàn thành (chỉ tính khi đã xếp lịch hẹn)
         if (o.isCompleted && o.completionDateStr && o.appointmentDateStr !== 'Chưa xếp lịch') {
-          const compTime = new Date(o.completionDateStr).getTime();
-          const appTime = new Date(o.appointmentDateStr).getTime();
-          const diffDays = Math.floor((compTime - appTime) / (24 * 60 * 60 * 1000));
-          map[val].totalLeadTimeDays += diffDays;
+          map[val].totalLeadTimeDays += diffDaysStr(o.appointmentDateStr, o.completionDateStr);
           map[val].completedCount++;
         }
       });
@@ -571,6 +667,7 @@ router.get('/dispatch-analysis', async (req: Request, res: Response): Promise<vo
         onTime: item.onTime,
         late: item.late,
         total: item.total,
+        onTimeRate: item.onTime + item.late > 0 ? Math.round((item.onTime / (item.onTime + item.late)) * 100) : null,
         avgLeadTimeDays: item.completedCount > 0 ? Math.round((item.totalLeadTimeDays / item.completedCount) * 10) / 10 : 0
       }));
     };
@@ -582,8 +679,11 @@ router.get('/dispatch-analysis', async (req: Request, res: Response): Promise<vo
 
     // 4. Danh sách các đơn trễ hẹn (để hiển thị bảng)
     const lateOrders = filteredOrders
-      .filter(o => o.isLate && o.adminStatus !== 'hoàn thành')
+      // Chỉ các ca CHƯA hoàn thành (kể cả hoàn thành qua báo cáo nghiệm thu) mà đã quá hẹn
+      .filter(o => o.isLate && !o.isCompleted)
       .map(o => ({
+        id: o.id,
+        pancakeOrderId: o.pancakeOrderId,
         customerName: o.customerName,
         customerPhone: o.customerPhone,
         province: o.province,
@@ -689,7 +789,7 @@ router.get('/dispatch-analysis', async (req: Request, res: Response): Promise<vo
 
     // 8. Hiệu suất & Tỷ lệ hoàn thành của các Trạm chính thực tế (loại bỏ Chưa phân trạm)
     const stationPerfMap: Record<string, { name: string; total: number; completed: number; onTime: number; late: number }> = {};
-    filteredOrders.forEach(o => {
+    slaOrders.forEach(o => { // KPI trạm: không gồm Giao hàng
       if (o.mainStationName === 'Chưa phân trạm') return; // Bỏ qua chưa phân trạm
       const name = o.mainStationName;
       if (!stationPerfMap[name]) {
@@ -704,7 +804,7 @@ router.get('/dispatch-analysis', async (req: Request, res: Response): Promise<vo
     const stationPerformanceStats = Object.values(stationPerfMap)
       .map(item => ({
         ...item,
-        onTimeRate: item.total > 0 ? Math.round((item.onTime / item.total) * 100) : 0,
+        onTimeRate: item.onTime + item.late > 0 ? Math.round((item.onTime / (item.onTime + item.late)) * 100) : null,
         completionRate: item.total > 0 ? Math.round((item.completed / item.total) * 100) : 0
       }))
       .sort((a, b) => b.total - a.total);
@@ -714,6 +814,11 @@ router.get('/dispatch-analysis', async (req: Request, res: Response): Promise<vo
         totalWithAppointments,
         totalOnTime,
         totalLate,
+        totalEvaluated,
+        totalNotDue,
+        totalCancelled,
+        totalCompletedNoReport,
+        totalDeliveryExcluded,
         onTimeRate
       },
       dailyStats,
@@ -752,16 +857,11 @@ router.get('/product-quality', async (req: Request, res: Response): Promise<void
 
     const where: any = {};
     if (startDate || endDate) {
-      where.createdAt = {};
-      if (startDate) {
-        where.createdAt.gte = new Date(`${startDate}T00:00:00.000Z`);
-      }
-      if (endDate) {
-        where.createdAt.lte = new Date(`${endDate}T23:59:59.999Z`);
-      }
+      where.createdAt = vnDateRange(startDate, endDate);
     }
 
     where.AND = [
+      validReportFilter,
       {
         OR: [
           { orderId: null },
@@ -891,31 +991,53 @@ router.get('/product-quality', async (req: Request, res: Response): Promise<void
       .sort((a, b) => b.total - a.total);
 
     // Helper hàm chuẩn hóa loại sự cố
+    // So khớp theo CỤM TỪ NGUYÊN VẸN (có ranh giới từ) trên chuỗi đã bỏ dấu.
+    // Không dùng includes() với chuỗi ngắn: 'ho' từng khớp "không"/"hỏng", 'van' khớp "vấn đề",
+    // 'voi' khớp "với" → dồn sai gần hết sự cố vào nhóm "Rò nước & Tắc van".
+    // Thứ tự quan trọng: nhóm van/rò (toàn cụm từ cụ thể) đứng trước nhóm Nguồn để
+    // "tắc van điện từ" không bị bắt bởi từ "điện".
+    const ISSUE_GROUPS: { group: string; phrases: string[] }[] = [
+      {
+        group: 'Rò nước & Tắc van',
+        phrases: ['ro ri', 'ro nuoc', 'ri nuoc', 'bi ro', 'chay nuoc', 'tran nuoc', 'tac van', 'khoa van', 'hong van',
+          'van dien tu', 'van cap', 'van xa', 'van mot chieu', 'van ap thap', 'van ap cao', 'bi tac', 'tac loi', 'tac nuoc', 'nghet', 'ong nuoc', 'day ong', 'ro water']
+      },
+      {
+        group: 'Lỗi Nguồn / Điện',
+        phrases: ['nguon', 'dien', 'bien ap', 'adapter', 'phich', 'o cam', 'mach', 'bo mach', 'chap', 'e11', 'cau chi']
+      },
+      {
+        group: 'Chất lượng nước & Cảm biến',
+        phrases: ['chat luong', 'tds', 'mui', 'nuoc duc', 'vi la', 'cam bien', 'khong lanh', 'khong nong', 'lanh', 'nong',
+          'cold', 'voi nuoc', 'voi lanh', 'voi nong', 'hong voi', 'voi bi']
+      },
+      {
+        group: 'Lỗi Lắp đặt & Vỏ máy',
+        phrases: ['lap nham', 'lap sai', 'thay doi vi tri', 'doi vi tri', 'vo mat kinh', 'mat kinh', 'vo may', 'bong mieng dan',
+          'mieng dan', 'giao nham', 'giao sai', 'giao thieu', 'mop', 'tray xuoc', 'xuoc']
+      },
+      {
+        group: 'Khảo sát & Thay lọc',
+        phrases: ['khao sat', 'lay mau', 'thay loc', 'thay loi', 'loi loc']
+      }
+    ];
+    const escapeRegExp = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const ISSUE_MATCHERS = ISSUE_GROUPS.map(g => ({
+      group: g.group,
+      regex: new RegExp(`(^|[^a-z0-9])(${g.phrases.map(escapeRegExp).join('|')})(?=$|[^a-z0-9])`)
+    }));
+
     const categorizeIssue = (raw: string): string => {
       if (!raw) return 'Khác';
       const clean = removeAccents(raw);
-      if (clean.includes('nguon') || clean.includes('dien') || clean.includes('bien ap') || clean.includes('phich') || clean.includes('e11') || clean.includes('mach')) {
-        return 'Lỗi Nguồn / Điện';
-      }
-      if (clean.includes('ro ri') || clean.includes('ro water') || clean.includes('tac van') || clean.includes('khoa van') || clean.includes('van') || clean.includes('ho')) {
-        return 'Rò nước & Tắc van';
-      }
-      if (clean.includes('chat luong') || clean.includes('tds') || clean.includes('mui') || clean.includes('cold') || clean.includes('lanh') || clean.includes('nong') || clean.includes('voi')) {
-        return 'Chất lượng nước & Cảm biến';
-      }
-      if (clean.includes('lap nham') || clean.includes('thay doi vi tri') || clean.includes('vo mat kinh') || clean.includes('bong mieng dan') || clean.includes('giao')) {
-        return 'Lỗi Lắp đặt & Vỏ máy';
-      }
-      if (clean.includes('khao sat') || clean.includes('lay mau') || clean.includes('thay loc')) {
-        return 'Khảo sát & Thay lọc';
-      }
-      return 'Sự cố kỹ thuật khác';
+      const matched = ISSUE_MATCHERS.find(m => m.regex.test(clean));
+      return matched ? matched.group : 'Sự cố kỹ thuật khác';
     };
 
     // 4. Theo tháng, tỉ lệ gặp mỗi sự cố (issueType distribution by month - đã chuẩn hóa nhóm)
     const monthlyIssueMap: Record<string, Record<string, number>> = {};
     issueReports.forEach(r => {
-      const monthStr = r.createdAt.toISOString().slice(0, 7); // "YYYY-MM"
+      const monthStr = toVnDateStr(r.createdAt).slice(0, 7); // "YYYY-MM" theo giờ VN
       if (!monthlyIssueMap[monthStr]) {
         monthlyIssueMap[monthStr] = {};
       }
@@ -945,6 +1067,7 @@ router.get('/product-quality', async (req: Request, res: Response): Promise<void
       if (r.serialNumber && r.serialNumber !== 'Không rõ') {
         const installRep = await prisma.serviceReport.findFirst({
           where: {
+            ...validReportFilter,
             serialNumber: r.serialNumber,
             workType: { in: ['Lắp đặt', 'Giao hàng và Lắp đặt'] }
           },
@@ -966,6 +1089,7 @@ router.get('/product-quality', async (req: Request, res: Response): Promise<void
           if (order.customerId) {
             const customerInstall = await prisma.serviceReport.findFirst({
               where: {
+                ...validReportFilter,
                 order: { customerId: order.customerId },
                 workType: { in: ['Lắp đặt', 'Giao hàng và Lắp đặt'] }
               },
@@ -1093,35 +1217,41 @@ router.get('/revenue', async (req: Request, res: Response): Promise<void> => {
         .toLowerCase();
     };
 
-    // 1. Xác định khoảng thời gian hiện tại (Kỳ này) và Kỳ đối chiếu (Kỳ trước)
-    const now = new Date();
-    const currStartStr = (startDate as string) || new Date(now.getFullYear(), 0, 1).toISOString().slice(0, 10);
-    const currEndStr = (endDate as string) || new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().slice(0, 10);
+    // 1. Xác định khoảng thời gian hiện tại (Kỳ này) và Kỳ đối chiếu (Kỳ trước) — theo ngày VN
+    const todayVn = toVnDateStr(new Date());
+    const [tyStr, tmStr] = todayVn.split('-');
+    const lastDayOfMonth = new Date(Date.UTC(Number(tyStr), Number(tmStr), 0)).toISOString().slice(0, 10);
+    const currStartStr = (startDate as string) || `${tyStr}-01-01`;
+    const currEndStr = (endDate as string) || lastDayOfMonth;
 
-    const currStart = new Date(`${currStartStr}T00:00:00.000Z`);
-    const currEnd = new Date(`${currEndStr}T23:59:59.999Z`);
+    const shiftYear = (dateStr: string, years: number) => {
+      const [y, m, d] = dateStr.split('-').map(Number);
+      // 29/02 → 28/02 của năm không nhuận
+      const lastDay = new Date(Date.UTC(y + years, m, 0)).getUTCDate();
+      return `${y + years}-${String(m).padStart(2, '0')}-${String(Math.min(d, lastDay)).padStart(2, '0')}`;
+    };
 
     const mode = (compareMode as string) || 'auto';
-    let prevStart: Date;
-    let prevEnd: Date;
+    let prevStartStr: string;
+    let prevEndStr: string;
 
     if (mode === 'custom' && prevStartDate && prevEndDate) {
-      prevStart = new Date(`${prevStartDate}T00:00:00.000Z`);
-      prevEnd = new Date(`${prevEndDate}T23:59:59.999Z`);
+      prevStartStr = String(prevStartDate);
+      prevEndStr = String(prevEndDate);
     } else if (mode === 'yoy') {
-      prevStart = new Date(currStart);
-      prevStart.setFullYear(prevStart.getFullYear() - 1);
-      prevEnd = new Date(currEnd);
-      prevEnd.setFullYear(prevEnd.getFullYear() - 1);
+      prevStartStr = shiftYear(currStartStr, -1);
+      prevEndStr = shiftYear(currEndStr, -1);
     } else {
-      // mode === 'auto' (Kỳ liền trước tự động)
-      const durationMs = Math.max(1, currEnd.getTime() - currStart.getTime());
-      prevEnd = new Date(currStart.getTime() - 1);
-      prevStart = new Date(prevEnd.getTime() - durationMs);
+      // mode === 'auto': trọn 1 tháng → tháng trước; khác → khoảng liền trước cùng số ngày
+      const prev = previousPeriod(currStartStr, currEndStr);
+      prevStartStr = prev.start;
+      prevEndStr = prev.end;
     }
 
-    const prevStartStr = prevStart.toISOString().slice(0, 10);
-    const prevEndStr = prevEnd.toISOString().slice(0, 10);
+    const currStart = vnDayStart(currStartStr);
+    const currEnd = vnDayEnd(currEndStr);
+    const prevStart = vnDayStart(prevStartStr);
+    const prevEnd = vnDayEnd(prevEndStr);
 
     // 2. Xây dựng điều kiện lọc cơ bản cho Đơn hoàn thành
     const buildWhere = (sDate: Date, eDate: Date) => {
@@ -1152,6 +1282,10 @@ router.get('/revenue', async (req: Request, res: Response): Promise<void> => {
     // 3. Query đơn hàng kỳ hiện tại và kỳ trước
     const selectFields = {
       id: true,
+      // Bắt buộc cho getRevenue(): thiếu 2 trường này thì isPosOrder luôn false
+      // → đơn POS đã chuyển khoản trước (COD = 0) bị tính 0đ.
+      pancakeOrderId: true,
+      orderSource: true,
       moneyToCollect: true,
       totalPrice: true,
       pancakeCreatedAt: true,
@@ -1235,19 +1369,7 @@ router.get('/revenue', async (req: Request, res: Response): Promise<void> => {
     // - Nếu activeMetric === 'moneyToCollect': Doanh thu thực thu thông minh (Smart Net Revenue):
     //   + Đơn POS (pancakeOrderId > 100 & orderSource != 'unknown'): Lấy moneyToCollect nếu > 0 (đơn COD), fallback totalPrice nếu == 0 (chuyển khoản trước)
     //   + Ca thủ công: Lấy tiền thu hộ COD thực tế tại nhà khách (moneyToCollect)
-    const getRevenue = (o: any) => {
-      if (activeMetric === 'totalPrice') {
-        return Number(o.totalPrice) || 0;
-      }
-      const isPosOrder = o.pancakeOrderId > 100 && o.orderSource !== 'unknown';
-      if (isPosOrder) {
-        if (o.moneyToCollect !== null && o.moneyToCollect !== undefined && Number(o.moneyToCollect) > 0) {
-          return Number(o.moneyToCollect);
-        }
-        return Number(o.totalPrice) || 0;
-      }
-      return Number(o.moneyToCollect) || 0;
-    };
+    const getRevenue = (o: any) => smartRevenue(o, activeMetric);
 
     // 5. Tổng doanh thu kỳ hiện tại vs kỳ trước
     const totalCurrRevenue = currOrders.reduce((sum, o) => sum + getRevenue(o), 0);
@@ -1257,28 +1379,17 @@ router.get('/revenue', async (req: Request, res: Response): Promise<void> => {
       ? Math.round((revDiff / totalPrevRevenue) * 100)
       : (totalCurrRevenue > 0 ? 100 : 0);
 
-    // Helper format local date YYYY-MM-DD
-    const formatKeyDate = (d: Date) => {
-      const year = d.getFullYear();
-      const month = String(d.getMonth() + 1).padStart(2, '0');
-      const day = String(d.getDate()).padStart(2, '0');
-      return `${year}-${month}-${day}`;
-    };
+    // Ngày VN YYYY-MM-DD (không phụ thuộc múi giờ của server)
+    const formatKeyDate = (d: Date) => toVnDateStr(d);
 
     // 6. Doanh thu theo thời gian (Daily breakdown)
-    const currDates: string[] = [];
-    let cIter = new Date(currStart);
-    while (cIter <= currEnd) {
-      currDates.push(formatKeyDate(cIter));
-      cIter.setDate(cIter.getDate() + 1);
-    }
-
-    const prevDates: string[] = [];
-    let pIter = new Date(prevStart);
-    while (pIter <= prevEnd) {
-      prevDates.push(formatKeyDate(pIter));
-      pIter.setDate(pIter.getDate() + 1);
-    }
+    const listDates = (fromStr: string, toStr: string) => {
+      const out: string[] = [];
+      for (let d = fromStr; d <= toStr && out.length < 3700; d = addDaysStr(d, 1)) out.push(d);
+      return out;
+    };
+    const currDates = listDates(currStartStr, currEndStr);
+    const prevDates = listDates(prevStartStr, prevEndStr);
 
     const currDailyMap: Record<string, { revenue: number; ordersCount: number }> = {};
     currOrders.forEach(o => {
@@ -1464,6 +1575,425 @@ router.get('/revenue', async (req: Request, res: Response): Promise<void> => {
   } catch (error: any) {
     logger.error('Get revenue analysis error', { error: error.message });
     res.status(500).json({ error: 'Lỗi lấy dữ liệu phân tích doanh thu' });
+  }
+});
+
+/**
+ * GET /api/dashboard/overview
+ * Trang Tổng quan vận hành — 3 tầng:
+ *  1. action:   việc cần xử lý NGAY (tính tại thời điểm hiện tại, KHÔNG theo bộ lọc ngày)
+ *  2. kpis:     sức khỏe kỳ đang chọn so với kỳ trước (mặc định: tháng hiện tại vs tháng trước)
+ *  3. trend / breakdown / dataQuality: xu hướng 6 tháng, phân rã theo loại công việc & kênh, chất lượng dữ liệu
+ * Bộ lọc tỉnh / trạm / loại công việc / KTV áp dụng cho cả 3 tầng; bộ lọc ngày chỉ áp dụng cho tầng 2–3.
+ * Vận hành (action, SLA, thời gian xử lý) không tính đơn eCom; doanh thu & kênh tính mọi kênh.
+ */
+const SYSTEM_GO_LIVE = '2026-06-01'; // Trước mốc này là dữ liệu nhập lại: không loại CV, không KTV, không báo cáo
+const AUTO_APPOINTMENT_OFFSET_MS = 2 * 60 * 60 * 1000;
+
+router.get('/overview', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { startDate, endDate, province, mainStationId, techStationId, workType, assignedKtvId } = req.query;
+
+    const now = new Date();
+    const todayStr = toVnDateStr(now);
+    const tomorrowStr = addDaysStr(todayStr, 1);
+    const lastDayOfMonth = (ym: string) => {
+      const [y, m] = ym.split('-').map(Number);
+      return new Date(Date.UTC(y, m, 0)).toISOString().slice(0, 10);
+    };
+
+    const currStartStr = startDate ? String(startDate) : `${todayStr.slice(0, 7)}-01`;
+    const currEndStr = endDate ? String(endDate) : lastDayOfMonth(todayStr.slice(0, 7));
+    const prev = previousPeriod(currStartStr, currEndStr);
+
+    // Xu hướng: 6 tháng dương lịch, kết thúc ở tháng chứa ngày cuối kỳ
+    const months: string[] = [];
+    {
+      let [y, m] = currEndStr.slice(0, 7).split('-').map(Number);
+      for (let i = 0; i < 6; i++) {
+        months.unshift(`${y}-${String(m).padStart(2, '0')}`);
+        m--;
+        if (m === 0) { m = 12; y--; }
+      }
+    }
+    const trendEndStr = lastDayOfMonth(months[months.length - 1]);
+    const fetchStartStr = [prev.start, currStartStr, `${months[0]}-01`].sort()[0];
+    const fetchEndStr = [currEndStr, trendEndStr].sort().reverse()[0];
+
+    // ── Bộ lọc dùng chung ──
+    const dbFilters: Prisma.OrderWhereInput[] = [];
+    const workTypes = parseMultiValue(workType);
+    if (workTypes.length > 0) dbFilters.push({ workType: { in: workTypes } });
+    const ktvIds = parseMultiValue(assignedKtvId);
+    if (ktvIds.length > 0) dbFilters.push({ assignedKtvId: { in: ktvIds } });
+
+    const searchProvinces = getSearchProvinces(province);
+    const mainStationIds = parseMultiValue(mainStationId);
+    const targetMainNames = mainStationIds.length > 0
+      ? (await prisma.mainStation.findMany({ where: { id: { in: mainStationIds } }, select: { name: true } })).map(s => s.name)
+      : [];
+    const techStationIds = parseMultiValue(techStationId);
+
+    const orderSelect = {
+      id: true,
+      pancakeOrderId: true,
+      statusCode: true,
+      adminStatus: true,
+      orderSource: true,
+      workType: true,
+      appointmentTime: true,
+      pancakeCreatedAt: true,
+      createdAt: true,
+      assignedKtvId: true,
+      assignedKtv: { select: { id: true, fullName: true } },
+      billFullName: true,
+      billPhoneNumber: true,
+      customer: { select: { fullName: true, phoneNumber: true, provinceName: true } },
+      shippingAddress: true,
+      mainStationId: true,
+      techStationId: true,
+      mainStation: { select: { name: true, isActive: true } },
+      techStation: { select: { name: true, mainStation: { select: { name: true, isActive: true } } } },
+      moneyToCollect: true,
+      totalPrice: true,
+      serviceReports: {
+        where: validReportFilter,
+        select: { createdAt: true },
+        orderBy: { createdAt: 'asc' as const },
+        take: 1
+      }
+    } satisfies Prisma.OrderSelect;
+
+    type Row = Prisma.OrderGetPayload<{ select: typeof orderSelect }>;
+
+    const applyMemoryFilters = (list: Row[]) => list.filter(o => {
+      if (searchProvinces.length > 0 && !matchOrderProvince(o, searchProvinces)) return false;
+      if (targetMainNames.length > 0 && !targetMainNames.includes(resolveMainStationName(o))) return false;
+      if (techStationIds.length > 0 && !(o.techStationId && techStationIds.includes(o.techStationId))) return false;
+      return true;
+    });
+
+    const [openRaw, periodRaw] = await Promise.all([
+      prisma.order.findMany({
+        where: {
+          AND: [
+            { OR: [{ statusCode: { not: 0 } }, { statusCode: null }, { pancakeOrderId: { lt: 0 } }] },
+            nonEcomFilter,
+            { OR: [{ adminStatus: null }, { adminStatus: { notIn: CLOSED_STATUSES } }] },
+            ...dbFilters
+          ]
+        },
+        select: orderSelect
+      }),
+      prisma.order.findMany({
+        where: {
+          AND: [
+            { pancakeCreatedAt: { gte: vnDayStart(fetchStartStr), lte: vnDayEnd(fetchEndStr) } },
+            ...dbFilters
+          ]
+        },
+        select: orderSelect
+      })
+    ]);
+
+    const openOrders = applyMemoryFilters(openRaw);
+    const periodOrders = applyMemoryFilters(periodRaw).filter(isValidOrder);
+
+    const createdAtOf = (o: Row) => o.pancakeCreatedAt || o.createdAt;
+    const firstReportOf = (o: Row) => o.serviceReports?.[0]?.createdAt ?? null;
+    const isAutoAppointment = (o: Row) =>
+      o.appointmentTime != null &&
+      Math.abs(o.appointmentTime.getTime() - createdAtOf(o).getTime() - AUTO_APPOINTMENT_OFFSET_MS) < 5 * 60 * 1000;
+
+    // ── Đếm số lần DỜI NGÀY HẸN thật sự (từ audit log) ──
+    // Bỏ qua: lần đặt lịch đầu tiên thay cho lịch tự sinh +2h, và đổi giờ trong cùng một ngày.
+    const createdById = new Map<string, Date>();
+    [...openOrders, ...periodOrders].forEach(o => createdById.set(o.id, createdAtOf(o)));
+    const rescheduleCount = new Map<string, number>();
+    const idList = Array.from(createdById.keys());
+    for (let i = 0; i < idList.length; i += 5000) {
+      const logs = await prisma.auditLog.findMany({
+        where: { entityType: 'Order', entityId: { in: idList.slice(i, i + 5000) } },
+        select: { entityId: true, changes: true }
+      });
+      for (const log of logs) {
+        const items = Array.isArray(log.changes) ? log.changes : (log.changes ? [log.changes] : []);
+        for (const it of items as any[]) {
+          if (!it || it.field !== 'appointmentTime' || !it.from || !it.to) continue;
+          const from = new Date(it.from);
+          const to = new Date(it.to);
+          if (isNaN(from.getTime()) || isNaN(to.getTime())) continue;
+          if (toVnDateStr(from) === toVnDateStr(to)) continue;
+          const created = createdById.get(log.entityId);
+          if (created && Math.abs(from.getTime() - created.getTime() - AUTO_APPOINTMENT_OFFSET_MS) < 5 * 60 * 1000) continue;
+          rescheduleCount.set(log.entityId, (rescheduleCount.get(log.entityId) || 0) + 1);
+        }
+      }
+    }
+
+    // ══ Tầng 1: VIỆC CẦN XỬ LÝ ══
+    const AGING = [
+      { key: 'lt1', label: '< 1 ngày', max: 1 },
+      { key: '1to3', label: '1–3 ngày', max: 3 },
+      { key: '3to7', label: '3–7 ngày', max: 7 },
+      { key: '7to30', label: '7–30 ngày', max: 30 },
+      { key: 'gt30', label: '> 30 ngày', max: Infinity }
+    ];
+    const aging = AGING.map(a => ({ key: a.key, label: a.label, assigned: 0, unassigned: 0 }));
+    const action = {
+      open: 0, overdue: 0, dueToday: 0, dueTomorrow: 0, noAppointment: 0,
+      unassignedKtv: 0, unassignedStation: 0, reportedNotClosed: 0
+    };
+    const ktvLoadMap: Record<string, { id: string; name: string; open: number; overdue: number; dueToday: number }> = {};
+    const attention: any[] = [];
+
+    for (const o of openOrders) {
+      const hasReport = firstReportOf(o) != null;
+      const apptStr = o.appointmentTime ? toVnDateStr(o.appointmentTime) : null;
+      const ageDays = (now.getTime() - createdAtOf(o).getTime()) / DAY_MS;
+      const isOverdue = !hasReport && apptStr != null && apptStr < todayStr;
+      const delayDays = isOverdue ? diffDaysStr(apptStr!, todayStr) : 0;
+      const noKtv = !hasReport && !o.assignedKtvId;
+      const stationName = resolveMainStationName(o);
+      const noStation = !hasReport && stationName === 'Chưa phân trạm' && !o.techStationId;
+
+      action.open++;
+      if (hasReport) action.reportedNotClosed++;
+      if (isOverdue) action.overdue++;
+      if (!hasReport && apptStr === todayStr) action.dueToday++;
+      if (!hasReport && apptStr === tomorrowStr) action.dueTomorrow++;
+      if (!hasReport && apptStr == null) action.noAppointment++;
+      if (noKtv) action.unassignedKtv++;
+      if (noStation) action.unassignedStation++;
+
+      const bucket = aging[AGING.findIndex(a => ageDays < a.max)];
+      if (o.assignedKtvId) bucket.assigned++; else bucket.unassigned++;
+
+      if (!hasReport && o.assignedKtv) {
+        const k = (ktvLoadMap[o.assignedKtv.id] ||= { id: o.assignedKtv.id, name: o.assignedKtv.fullName, open: 0, overdue: 0, dueToday: 0 });
+        k.open++;
+        if (isOverdue) k.overdue++;
+        if (apptStr === todayStr) k.dueToday++;
+      }
+
+      const reasons: string[] = [];
+      if (isOverdue) reasons.push(`Quá hẹn ${delayDays} ngày`);
+      if (hasReport) reasons.push('Đã có báo cáo – chưa đóng đơn');
+      if (noKtv) reasons.push('Chưa gán KTV');
+      if (!hasReport && apptStr == null) reasons.push('Chưa có lịch hẹn');
+      if (!hasReport && apptStr === todayStr) reasons.push('Hẹn hôm nay');
+      if (reasons.length > 0) {
+        attention.push({
+          id: o.id,
+          pancakeOrderId: o.pancakeOrderId,
+          customerName: o.billFullName || o.customer?.fullName || 'Khách lẻ',
+          customerPhone: o.billPhoneNumber || o.customer?.phoneNumber || '',
+          workType: o.workType || 'Chưa xác định',
+          adminStatus: o.adminStatus || 'chờ xử lý',
+          ktvName: o.assignedKtv?.fullName || null,
+          stationName,
+          appointmentDate: apptStr,
+          ageDays: Math.floor(ageDays),
+          delayDays,
+          rescheduleCount: rescheduleCount.get(o.id) || 0,
+          reasons
+        });
+      }
+    }
+    attention.sort((a, b) => b.delayDays - a.delayDays || b.ageDays - a.ageDays);
+
+    // ══ Tầng 2: KPI kỳ này vs kỳ trước ══
+    const inRange = (o: Row, s: string, e: string) => {
+      const d = toVnDateStr(createdAtOf(o));
+      return d >= s && d <= e;
+    };
+
+    const computeKpis = (list: Row[]) => {
+      const service = list.filter(o => !isEcomSource(o.orderSource));
+      const slaSet = service.filter(o => !isDeliveryOnly(o.workType));
+      const completed = service.filter(o => o.adminStatus === 'hoàn thành').length;
+      const cancelled = service.filter(o => o.adminStatus === 'hủy đơn').length;
+      const returned = service.filter(o => RETURN_STATUSES.includes(o.adminStatus || '')).length;
+      const open = service.filter(o => !CLOSED_STATUSES.includes(o.adminStatus || '')).length;
+
+      let onTime = 0;
+      let late = 0;
+      const leadTimes: number[] = [];
+      let rescheduled = 0;
+      for (const o of slaSet) {
+        const sla = classifySla({ appointmentTime: o.appointmentTime, adminStatus: o.adminStatus, firstReportAt: firstReportOf(o) }, todayStr);
+        if (sla.isOnTime) onTime++;
+        if (sla.isLate) late++;
+        const rep = firstReportOf(o);
+        if (rep) leadTimes.push(Math.max(0, (rep.getTime() - createdAtOf(o).getTime()) / DAY_MS));
+        if ((rescheduleCount.get(o.id) || 0) > 0) rescheduled++;
+      }
+      const completedOrders = list.filter(o => o.adminStatus === 'hoàn thành');
+      const delivery = service.filter(o => isDeliveryOnly(o.workType));
+
+      return {
+        createdAll: list.length,
+        ecomCreated: list.length - service.length,
+        created: service.length,
+        completed,
+        cancelled,
+        returned,
+        open,
+        cancelRate: service.length > 0 ? Math.round((cancelled / service.length) * 1000) / 10 : null,
+        onTime,
+        late,
+        onTimeRate: onTime + late > 0 ? Math.round((onTime / (onTime + late)) * 100) : null,
+        leadTimeP50: percentile(leadTimes, 0.5),
+        leadTimeP80: percentile(leadTimes, 0.8),
+        leadTimeSample: leadTimes.length,
+        slaOrders: slaSet.length,
+        rescheduled,
+        rescheduleRate: slaSet.length > 0 ? Math.round((rescheduled / slaSet.length) * 1000) / 10 : null,
+        deliveryCreated: delivery.length,
+        deliveryCompleted: delivery.filter(o => o.adminStatus === 'hoàn thành').length,
+        revenue: completedOrders.reduce((s, o) => s + smartRevenue(o, 'moneyToCollect'), 0),
+        grossSales: completedOrders.reduce((s, o) => s + smartRevenue(o, 'totalPrice'), 0),
+        completedAll: completedOrders.length
+      };
+    };
+
+    const currList = periodOrders.filter(o => inRange(o, currStartStr, currEndStr));
+    const prevList = periodOrders.filter(o => inRange(o, prev.start, prev.end));
+    // Kỳ đang chạy dở (chứa hôm nay): so với CÙNG SỐ NGÀY đầu kỳ trước để không so "nửa tháng" với "cả tháng"
+    let previousToDate: { start: string; end: string } | null = null;
+    if (todayStr >= currStartStr && todayStr < currEndStr) {
+      const elapsed = diffDaysStr(currStartStr, todayStr);
+      const end = addDaysStr(prev.start, elapsed);
+      previousToDate = { start: prev.start, end: end < prev.end ? end : prev.end };
+    }
+    const kpis = {
+      current: computeKpis(currList),
+      previous: computeKpis(prevList),
+      previousToDate: previousToDate
+        ? computeKpis(periodOrders.filter(o => inRange(o, previousToDate!.start, previousToDate!.end)))
+        : null
+    };
+
+    // ══ Tầng 3a: Xu hướng 6 tháng (theo tháng TẠO đơn — cohort) ══
+    const trend = months.map(m => {
+      const list = periodOrders.filter(o => toVnDateStr(createdAtOf(o)).slice(0, 7) === m);
+      const k = computeKpis(list);
+      return {
+        month: m,
+        created: k.created,
+        completed: k.completed,
+        cancelled: k.cancelled,
+        returned: k.returned,
+        open: k.open,
+        onTimeRate: k.onTimeRate,
+        leadTimeP50: k.leadTimeP50,
+        leadTimeP80: k.leadTimeP80,
+        rescheduleRate: k.rescheduleRate,
+        revenue: k.revenue,
+        isPartial: m === todayStr.slice(0, 7),
+        isLegacy: `${m}-01` < SYSTEM_GO_LIVE
+      };
+    });
+
+    // ══ Tầng 3b: Phân rã kỳ hiện tại ══
+    const groupBy = <T extends string>(list: Row[], keyOf: (o: Row) => T) => {
+      const map = new Map<T, Row[]>();
+      list.forEach(o => {
+        const k = keyOf(o);
+        if (!map.has(k)) map.set(k, []);
+        map.get(k)!.push(o);
+      });
+      return map;
+    };
+
+    const byWorkType = Array.from(groupBy(currList.filter(o => !isEcomSource(o.orderSource)), o => o.workType || 'Chưa xác định').entries())
+      .map(([name, list]) => {
+        const k = computeKpis(list);
+        const delivery = isDeliveryOnly(name);
+        return {
+          name,
+          created: k.created,
+          completed: k.completed,
+          cancelled: k.cancelled,
+          open: k.open,
+          cancelRate: k.cancelRate,
+          onTimeRate: delivery ? null : k.onTimeRate,
+          leadTimeP50: delivery ? null : k.leadTimeP50,
+          leadTimeP80: delivery ? null : k.leadTimeP80,
+          rescheduleRate: delivery ? null : k.rescheduleRate,
+          excludedFromSla: delivery
+        };
+      })
+      .sort((a, b) => b.created - a.created);
+
+    const channelName = (o: Row) => o.orderSource || 'Không ghi nguồn';
+    const prevByChannel = groupBy(prevList, channelName);
+    const byChannel = Array.from(groupBy(currList, channelName).entries())
+      .map(([name, list]) => {
+        const completedList = list.filter(o => o.adminStatus === 'hoàn thành');
+        const cancelled = list.filter(o => o.adminStatus === 'hủy đơn').length;
+        const prevListCh = prevByChannel.get(name) || [];
+        return {
+          name,
+          isEcom: isEcomSource(name),
+          created: list.length,
+          prevCreated: prevListCh.length,
+          completed: completedList.length,
+          cancelled,
+          cancelRate: list.length > 0 ? Math.round((cancelled / list.length) * 1000) / 10 : null,
+          revenue: completedList.reduce((s, o) => s + smartRevenue(o, 'moneyToCollect'), 0),
+          prevRevenue: prevListCh.filter(o => o.adminStatus === 'hoàn thành').reduce((s, o) => s + smartRevenue(o, 'moneyToCollect'), 0)
+        };
+      })
+      .sort((a, b) => b.created - a.created);
+
+    // ══ Tầng 3c: Chất lượng dữ liệu (kỳ hiện tại, đơn dịch vụ không eCom) ══
+    const dqBase = currList.filter(o => !isEcomSource(o.orderSource));
+    const pct = (n: number) => (dqBase.length > 0 ? Math.round((n / dqBase.length) * 1000) / 10 : 0);
+    const dqCount = {
+      missingWorkType: dqBase.filter(o => !o.workType).length,
+      completedNoReport: dqBase.filter(o => o.adminStatus === 'hoàn thành' && !firstReportOf(o) && !isDeliveryOnly(o.workType)).length,
+      autoAppointment: dqBase.filter(o => isAutoAppointment(o) && (rescheduleCount.get(o.id) || 0) === 0).length,
+      unassignedStation: dqBase.filter(o => resolveMainStationName(o) === 'Chưa phân trạm' && !o.techStationId).length,
+      missingSource: dqBase.filter(o => !o.orderSource).length
+    };
+    const dataQuality = {
+      total: dqBase.length,
+      items: [
+        { key: 'missingWorkType', label: 'Thiếu loại công việc', count: dqCount.missingWorkType, pct: pct(dqCount.missingWorkType) },
+        { key: 'completedNoReport', label: 'Hoàn thành nhưng không có báo cáo nghiệm thu (trừ Giao hàng)', count: dqCount.completedNoReport, pct: pct(dqCount.completedNoReport) },
+        { key: 'autoAppointment', label: 'Lịch hẹn tự sinh (+2h) chưa được điều phối chỉnh', count: dqCount.autoAppointment, pct: pct(dqCount.autoAppointment) },
+        { key: 'unassignedStation', label: 'Chưa phân trạm', count: dqCount.unassignedStation, pct: pct(dqCount.unassignedStation) },
+        { key: 'missingSource', label: 'Không ghi nguồn đơn', count: dqCount.missingSource, pct: pct(dqCount.missingSource) }
+      ],
+      includesLegacyData: currStartStr < SYSTEM_GO_LIVE || prev.start < SYSTEM_GO_LIVE,
+      systemGoLive: SYSTEM_GO_LIVE
+    };
+
+    res.json({
+      generatedAt: now.toISOString(),
+      today: todayStr,
+      period: {
+        current: { start: currStartStr, end: currEndStr },
+        previous: prev,
+        previousToDate,
+        currentToDate: previousToDate ? { start: currStartStr, end: todayStr } : null
+      },
+      action: {
+        ...action,
+        aging,
+        attentionTotal: attention.length,
+        attentionList: attention.slice(0, 100),
+        ktvLoad: Object.values(ktvLoadMap).sort((a, b) => b.open - a.open)
+      },
+      kpis,
+      trend,
+      breakdown: { byWorkType, byChannel },
+      dataQuality
+    });
+  } catch (error: any) {
+    logger.error('Get dashboard overview error', { error: error.message });
+    res.status(500).json({ error: 'Lỗi lấy dữ liệu tổng quan' });
   }
 });
 
