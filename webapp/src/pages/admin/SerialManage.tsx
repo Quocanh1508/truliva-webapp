@@ -765,51 +765,51 @@ export default function SerialManage() {
   return (
     <div className="p-3 sm:p-5 max-w-[1400px] mx-auto w-full overflow-x-clip">
       {/* Header */}
-      <div className="flex items-center gap-2.5 sm:gap-3 mb-4 sm:mb-6">
+      <div className="flex items-center gap-2.5 sm:gap-3 mb-3 sm:mb-6">
         <Hash className="w-6 h-6 sm:w-7 sm:h-7 text-[#4472C4]" />
         <h1 className="m-0 text-xl sm:text-2xl font-bold text-slate-800">Quản lý Serial</h1>
       </div>
 
       {/* Stats Cards - Tầng 1: Tổng thể (Lưới 2x2 trên mobile, 4 cột trên desktop) */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-4 mb-3">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-4 mb-2 sm:mb-3">
         {[
           { label: 'Tổng Serial', value: stats.total, color: '#4472C4', bg: '#dbeafe' },
           { label: 'Đã kích hoạt', value: stats.activated, color: '#16a34a', bg: '#dcfce7' },
           { label: 'KH xác nhận', value: stats.confirmed, color: '#1e40af', bg: '#e0e7ff' },
           { label: 'Chưa kích hoạt', value: stats.unactivated, color: '#d97706', bg: '#fef3c7' },
         ].map((stat, i) => (
-          <div key={i} className="bg-white rounded-xl p-3 sm:p-4 border border-slate-200 shadow-xs">
-            <div className="text-xs sm:text-sm text-slate-500 mb-1 font-medium">{stat.label}</div>
-            <div className="text-xl sm:text-2xl font-bold" style={{ color: stat.color }}>{stat.value.toLocaleString()}</div>
+          <div key={i} className="bg-white rounded-xl px-3 py-2 sm:p-4 border border-slate-200 shadow-xs flex items-center justify-between gap-2 sm:block">
+            <div className="text-[11px] sm:text-sm text-slate-500 sm:mb-1 font-medium leading-tight">{stat.label}</div>
+            <div className="text-base sm:text-2xl font-bold shrink-0" style={{ color: stat.color }}>{stat.value.toLocaleString()}</div>
           </div>
         ))}
       </div>
 
       {/* Stats Cards - Tầng 2: Chi tiết bảo hành */}
-      <div className="mb-4 sm:mb-6">
-        <div className="text-xs text-slate-400 font-semibold mb-2 px-1">
+      <div className="mb-3 sm:mb-6">
+        <div className="text-[11px] sm:text-xs text-slate-400 font-semibold mb-1.5 sm:mb-2 px-1">
           Trong đó (Đã kích hoạt + KH xác nhận = {(stats.activated + stats.confirmed).toLocaleString()}):
         </div>
         <div className="grid grid-cols-2 gap-2 sm:gap-3 max-w-md">
-          <div className="bg-white rounded-xl p-2.5 sm:p-3 border-2 border-emerald-300 shadow-2xs flex items-center gap-2 sm:gap-2.5">
+          <div className="bg-white rounded-xl px-3 py-2 sm:p-3 border-2 border-emerald-300 shadow-2xs flex items-center gap-2 sm:gap-2.5">
             <div className="w-2.5 h-2.5 rounded-full bg-emerald-500 shrink-0" />
-            <div>
-              <div className="text-xs text-slate-500">Còn hạn BH</div>
-              <div className="text-lg sm:text-xl font-bold text-emerald-600">{stats.valid.toLocaleString()}</div>
+            <div className="flex-1 flex items-center justify-between gap-2 sm:block">
+              <div className="text-[11px] sm:text-xs text-slate-500 leading-tight">Còn hạn BH</div>
+              <div className="text-base sm:text-xl font-bold text-emerald-600">{stats.valid.toLocaleString()}</div>
             </div>
           </div>
-          <div className="bg-white rounded-xl p-2.5 sm:p-3 border-2 border-slate-300 shadow-2xs flex items-center gap-2 sm:gap-2.5">
+          <div className="bg-white rounded-xl px-3 py-2 sm:p-3 border-2 border-slate-300 shadow-2xs flex items-center gap-2 sm:gap-2.5">
             <div className="w-2.5 h-2.5 rounded-full bg-slate-400 shrink-0" />
-            <div>
-              <div className="text-xs text-slate-500">Đã hết hạn BH</div>
-              <div className="text-lg sm:text-xl font-bold text-slate-500">{stats.expired.toLocaleString()}</div>
+            <div className="flex-1 flex items-center justify-between gap-2 sm:block">
+              <div className="text-[11px] sm:text-xs text-slate-500 leading-tight">Đã hết hạn BH</div>
+              <div className="text-base sm:text-xl font-bold text-slate-500">{stats.expired.toLocaleString()}</div>
             </div>
           </div>
         </div>
       </div>
 
       {/* Toolbar: Tối ưu 2 tầng chuẩn responsive không vỡ layout */}
-      <div className="flex flex-col gap-3 mb-4 w-full">
+      <div className="flex flex-col gap-2 sm:gap-3 mb-3 sm:mb-4 w-full">
         {/* Hàng 1: Tìm kiếm & Bộ lọc */}
         <div className="flex flex-wrap items-center gap-2 w-full">
           {/* Search */}
@@ -834,43 +834,43 @@ export default function SerialManage() {
           </div>
 
           {/* Nhóm Filter Dropdown (Cuộn ngang trơn tru trên mobile nếu hẹp) */}
-          <div className="flex items-center gap-2 overflow-x-auto pb-1 max-w-full no-scrollbar shrink-0">
+          <div className="grid grid-cols-3 sm:flex items-center gap-1.5 sm:gap-2 w-full sm:w-auto">
             {/* Status filter */}
-            <div className="relative shrink-0">
+            <div className="relative min-w-0 sm:shrink-0">
               <select
                 value={statusFilter}
                 onChange={e => { setStatusFilter(e.target.value); setPage(1); }}
-                className="py-2 pl-3 pr-8 rounded-lg border border-slate-300 bg-white text-xs sm:text-sm text-slate-700 cursor-pointer appearance-none shrink-0 shadow-2xs focus:ring-2 focus:ring-blue-500/20"
+                className="w-full sm:w-auto py-2 pl-2 sm:pl-3 pr-6 sm:pr-8 rounded-lg border border-slate-300 bg-white text-xs sm:text-sm text-slate-700 cursor-pointer appearance-none truncate shadow-2xs focus:ring-2 focus:ring-blue-500/20"
               >
-                <option value="">Tất cả trạng thái</option>
+                <option value="">Mọi trạng thái</option>
                 <option value="Chưa kích hoạt">Chưa kích hoạt</option>
                 <option value="Đã kích hoạt">Đã kích hoạt</option>
                 <option value="KH xác nhận">KH xác nhận</option>
                 <option value="Chờ duyệt">Chờ duyệt</option>
                 <option value="Đã hết hạn">Đã hết hạn</option>
               </select>
-              <Filter size={14} className="absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400" />
+              <Filter size={14} className="absolute right-1.5 sm:right-2.5 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400" />
             </div>
 
             {/* Batch filter */}
-            <div className="relative shrink-0">
+            <div className="relative min-w-0 sm:shrink-0">
               <select
                 value={batchFilter}
                 onChange={e => { setBatchFilter(e.target.value); setPage(1); }}
-                className="py-2 pl-3 pr-8 rounded-lg border border-slate-300 bg-white text-xs sm:text-sm text-slate-700 cursor-pointer appearance-none max-w-[160px] truncate shrink-0 shadow-2xs focus:ring-2 focus:ring-blue-500/20"
+                className="w-full sm:w-auto py-2 pl-2 sm:pl-3 pr-6 sm:pr-8 rounded-lg border border-slate-300 bg-white text-xs sm:text-sm text-slate-700 cursor-pointer appearance-none sm:max-w-[160px] truncate shadow-2xs focus:ring-2 focus:ring-blue-500/20"
               >
-                <option value="">Tất cả các lô import</option>
+                <option value="">Mọi lô import</option>
                 {batches.map(b => (
                   <option key={b.batchId} value={b.batchId}>
                     {b.batchId} ({b.count} máy)
                   </option>
                 ))}
               </select>
-              <Filter size={14} className="absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400" />
+              <Filter size={14} className="absolute right-1.5 sm:right-2.5 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400" />
             </div>
 
             {/* Quick Sort selector */}
-            <div className="relative shrink-0">
+            <div className="relative min-w-0 sm:shrink-0">
               <select
                 value={`${sortBy}:${sortOrder}`}
                 onChange={e => {
@@ -879,7 +879,7 @@ export default function SerialManage() {
                   setSortOrder(order as 'asc' | 'desc');
                   setPage(1);
                 }}
-                className="py-2 pl-3 pr-8 rounded-lg border border-slate-300 bg-white text-xs sm:text-sm text-slate-700 cursor-pointer appearance-none max-w-[160px] truncate shrink-0 shadow-2xs focus:ring-2 focus:ring-blue-500/20"
+                className="w-full sm:w-auto py-2 pl-2 sm:pl-3 pr-6 sm:pr-8 rounded-lg border border-slate-300 bg-white text-xs sm:text-sm text-slate-700 cursor-pointer appearance-none sm:max-w-[160px] truncate shadow-2xs focus:ring-2 focus:ring-blue-500/20"
                 title="Tiêu chí sắp xếp danh sách"
               >
                 <option value="updatedAt:desc">Mới cập nhật</option>
@@ -892,20 +892,20 @@ export default function SerialManage() {
                 <option value="createdAt:asc">Ngày nhập cũ nhất</option>
                 <option value="customerName:asc">Tên KH (A → Z)</option>
               </select>
-              <ArrowUpDown size={14} className="absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400" />
+              <ArrowUpDown size={14} className="absolute right-1.5 sm:right-2.5 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400" />
             </div>
           </div>
         </div>
 
         {/* Hàng 2: Nút thao tác (Cuộn ngang êm ái trên mobile, không tràn màn hình) */}
-        <div className="flex items-center gap-2 overflow-x-auto pb-1 max-w-full no-scrollbar flex-nowrap sm:flex-wrap">
+        <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 max-w-full">
           {/* Rollback batch button */}
           <button
             onClick={() => setShowBatchModal(true)}
-            className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-red-500 hover:bg-red-600 text-white border-none text-xs sm:text-sm font-semibold cursor-pointer shrink-0 whitespace-nowrap shadow-2xs"
+            className="flex items-center gap-1 sm:gap-1.5 px-2.5 sm:px-3 py-1.5 sm:py-2 rounded-lg bg-red-500 hover:bg-red-600 text-white border-none text-xs sm:text-sm font-semibold cursor-pointer shrink-0 whitespace-nowrap shadow-2xs"
             title="Quản lý các lô đã import và hoàn tác (Rollback)"
           >
-            <RotateCcw size={15} /> Lịch sử Lô
+            <RotateCcw size={14} className="shrink-0" /> Lịch sử Lô
           </button>
 
           {/* Quản lý Model button */}
@@ -915,10 +915,10 @@ export default function SerialManage() {
                 setShowModelModal(true);
                 loadMachineModels();
               }}
-              className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-[#1B3A6B] hover:bg-[#2A518E] text-white border-none text-xs sm:text-sm font-semibold cursor-pointer shrink-0 whitespace-nowrap shadow-2xs transition-colors"
+              className="flex items-center gap-1 sm:gap-1.5 px-2.5 sm:px-3 py-1.5 sm:py-2 rounded-lg bg-[#1B3A6B] hover:bg-[#2A518E] text-white border-none text-xs sm:text-sm font-semibold cursor-pointer shrink-0 whitespace-nowrap shadow-2xs transition-colors"
               title="Khai báo và quản lý danh sách Model máy để đồng bộ dropdown Excel"
             >
-              <Layers size={15} /> Quản lý Model
+              <Layers size={14} className="shrink-0" /> <span className="hidden sm:inline">Quản lý </span>Model
             </button>
           )}
 
@@ -926,9 +926,9 @@ export default function SerialManage() {
           {hasPermission('SERIAL_IMPORT_EXCEL') && (
             <button
               onClick={() => setShowImportModal(true)}
-              className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white border-none text-xs sm:text-sm font-semibold cursor-pointer shrink-0 whitespace-nowrap shadow-2xs"
+              className="flex items-center gap-1 sm:gap-1.5 px-2.5 sm:px-3 py-1.5 sm:py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white border-none text-xs sm:text-sm font-semibold cursor-pointer shrink-0 whitespace-nowrap shadow-2xs"
             >
-              <Upload size={15} /> Import Excel
+              <Upload size={14} className="shrink-0" /> Import<span className="hidden sm:inline"> Excel</span>
             </button>
           )}
 
@@ -936,18 +936,18 @@ export default function SerialManage() {
           {canExportExcel && (
             <button
               onClick={handleExport}
-              className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-white hover:bg-slate-50 text-slate-700 border border-slate-300 text-xs sm:text-sm font-semibold cursor-pointer shrink-0 whitespace-nowrap shadow-2xs"
+              className="flex items-center gap-1 sm:gap-1.5 px-2.5 sm:px-3 py-1.5 sm:py-2 rounded-lg bg-white hover:bg-slate-50 text-slate-700 border border-slate-300 text-xs sm:text-sm font-semibold cursor-pointer shrink-0 whitespace-nowrap shadow-2xs"
             >
-              <Download size={15} /> Xuất Excel
+              <Download size={14} className="shrink-0" /> Xuất<span className="hidden sm:inline"> Excel</span>
             </button>
           )}
 
           {/* Zalo OA OAuth Button */}
           <button
             onClick={handleConnectZalo}
-            className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-white border-none text-xs sm:text-sm font-semibold cursor-pointer shrink-0 whitespace-nowrap shadow-2xs ${zaloStatus?.isConnected ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-rose-500 hover:bg-rose-600'}`}
+            className={`flex items-center gap-1 sm:gap-1.5 px-2.5 sm:px-3 py-1.5 sm:py-2 rounded-lg text-white border-none text-xs sm:text-sm font-semibold cursor-pointer shrink-0 whitespace-nowrap shadow-2xs ${zaloStatus?.isConnected ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-rose-500 hover:bg-rose-600'}`}
           >
-            <Sparkles size={15} /> {zaloStatus?.isConnected ? 'Đã kết nối Zalo OA' : 'Kết nối Zalo OA'}
+            <Sparkles size={14} className="shrink-0" /> <span className="hidden sm:inline">{zaloStatus?.isConnected ? 'Đã kết nối Zalo OA' : 'Kết nối Zalo OA'}</span><span className="sm:hidden">{zaloStatus?.isConnected ? 'Zalo OA ✓' : 'Zalo OA'}</span>
           </button>
         </div>
       </div>
@@ -955,7 +955,7 @@ export default function SerialManage() {
       {/* Table */}
       {isStickyHeaderVisible && (
         <div
-          className="fixed z-40 bg-[#f8fafc] shadow-lg border-b border-slate-300 overflow-hidden pointer-events-auto select-none rounded-t-xl"
+          className="hidden md:block fixed z-40 bg-[#f8fafc] shadow-lg border-b border-slate-300 overflow-hidden pointer-events-auto select-none rounded-t-xl"
           style={{
             top: `${stickyTopOffset}px`,
             left: `${tableBounds.left}px`,
@@ -1018,9 +1018,103 @@ export default function SerialManage() {
 
       {/* Table: Bao bọc trong card full width và cuộn ngang an toàn */}
       <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-xs w-full max-w-full">
+        {/* Mobile: danh sách dạng thẻ thay cho bảng */}
+        <div className="md:hidden divide-y divide-slate-200">
+          {loading ? (
+            <div className="p-8 text-center text-sm text-slate-400">Đang tải...</div>
+          ) : serials.length === 0 ? (
+            <div className="p-8 text-center text-sm text-slate-400">Không có dữ liệu serial</div>
+          ) : serials.map(s => {
+            const isExpired = !!s.warrantyExpiryDate && new Date(s.warrantyExpiryDate).getTime() < new Date().getTime();
+            const activatedByLabel = s.activatedBy === 'CUSTOMER' ? 'Khách hàng' : s.activatedBy === 'KTV' ? 'Kỹ thuật viên' : s.activatedBy === 'ADMIN' ? 'Quản trị viên' : s.activatedBy;
+            return (
+              <div key={s.id} className="p-3">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <div className="font-mono font-semibold text-[14px] text-blue-800 break-all">{s.serialNumber}</div>
+                    <div className="text-xs text-slate-600 mt-0.5">
+                      <span className="font-medium">{s.productLine || s.model}</span>
+                      {s.productLine && s.model && s.productLine !== s.model && (
+                        <span className="text-red-600"> · {s.model}</span>
+                      )}
+                    </div>
+                  </div>
+                  {getStatusBadge(isExpired ? 'Đã hết hạn' : s.status)}
+                </div>
+
+                {(s.customerName || s.customerPhone || s.address || s.province) && (
+                  <div className="mt-2 flex flex-col gap-1 text-xs text-slate-700">
+                    {(s.customerName || s.customerPhone) && (
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <User size={13} className="text-slate-400 shrink-0" />
+                        {s.customerName && <span className="font-semibold text-blue-700">{s.customerName}</span>}
+                        {s.customerPhone && (
+                          <a href={`tel:${s.customerPhone}`} className="font-semibold text-teal-700 no-underline">
+                            {s.customerName ? '· ' : ''}{s.customerPhone}
+                          </a>
+                        )}
+                      </div>
+                    )}
+                    {(s.address || s.province) && (
+                      <div className="flex items-start gap-1.5">
+                        <MapPin size={13} className="text-slate-400 shrink-0 mt-px" />
+                        <span className="line-clamp-2">{[s.address, s.province].filter(Boolean).join(', ')}</span>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                <div className="mt-2 grid grid-cols-2 gap-2 rounded-lg bg-slate-50 border border-slate-200 px-2.5 py-1.5 text-xs">
+                  <div className="min-w-0">
+                    <div className="text-[10px] font-semibold uppercase text-slate-400">Kích hoạt</div>
+                    <div className="font-medium text-slate-700">{formatDate(s.activationDate)}</div>
+                    {activatedByLabel && <div className="text-[11px] text-blue-600 truncate">{activatedByLabel}</div>}
+                  </div>
+                  <div className="min-w-0">
+                    <div className="text-[10px] font-semibold uppercase text-slate-400">Hết hạn BH</div>
+                    <div className="font-semibold text-red-600">{formatDate(s.warrantyExpiryDate)}</div>
+                    {s.customerConfirmationDate && (
+                      <div className="text-[11px] text-teal-700 truncate">KH xác nhận {formatDate(s.customerConfirmationDate)}</div>
+                    )}
+                  </div>
+                </div>
+
+                <div className="mt-2 flex items-center justify-between gap-2">
+                  <div className="min-w-0 text-[11px] text-slate-400 truncate">
+                    {s.importBatchId ? <>Lô <span className="font-mono text-slate-500">{s.importBatchId}</span></> : `Tạo ${formatDate(s.createdAt)}`}
+                  </div>
+                  <div className="flex items-center gap-1 shrink-0">
+                    <button
+                      onClick={() => openDetail(s, false)}
+                      className="flex items-center gap-1 px-2 h-7 rounded-md border border-slate-300 bg-white text-[11px] font-medium text-slate-600"
+                      title="Chỉnh sửa thông tin"
+                    >
+                      <FolderPlus size={13} /> Sửa
+                    </button>
+                    <button
+                      onClick={() => handleConfirmRestore(s)}
+                      className="flex items-center justify-center w-7 h-7 rounded-md border border-slate-300 bg-white text-slate-500"
+                      title="Khôi phục trạng thái"
+                    >
+                      <RotateCcw size={13} />
+                    </button>
+                    <button
+                      onClick={() => openDetail(s, true)}
+                      className={`flex items-center justify-center w-7 h-7 rounded-md border border-slate-300 bg-white ${canChangeWarrantyPeriod ? 'text-slate-500' : 'text-slate-300 cursor-not-allowed'}`}
+                      title="Thay đổi thời gian bảo hành"
+                    >
+                      <Database size={13} />
+                    </button>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
         <div
           ref={tableWrapperRef}
-          className="overflow-x-auto relative w-full"
+          className="hidden md:block overflow-x-auto relative w-full"
           style={{
             WebkitOverflowScrolling: 'touch',
           }}
@@ -1269,7 +1363,7 @@ export default function SerialManage() {
         {/* Pagination */}
         <div style={{
           display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center', gap: 12,
-          padding: '12px 16px', borderTop: '1px solid #e2e8f0', background: '#f8fafc',
+          padding: '10px 12px', borderTop: '1px solid #e2e8f0', background: '#f8fafc',
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: '#64748b' }}>
             <span>Hiển thị:</span>
@@ -1289,7 +1383,7 @@ export default function SerialManage() {
               <option value={100}>100 / trang</option>
             </select>
             {stats.total > 0 && (
-              <span style={{ marginLeft: 4 }}>
+              <span className="hidden sm:inline" style={{ marginLeft: 4 }}>
                 (Tổng <strong>{stats.total.toLocaleString('vi-VN')}</strong> serial)
               </span>
             )}
@@ -1306,7 +1400,7 @@ export default function SerialManage() {
                 fontSize: 13, fontWeight: 500,
               }}
             >
-              <ChevronLeft size={16} /> Trước
+              <ChevronLeft size={16} /> <span className="hidden sm:inline">Trước</span>
             </button>
             <span style={{ fontSize: 13, color: '#64748b', display: 'flex', alignItems: 'center', gap: 4 }}>
               Trang
@@ -1339,7 +1433,7 @@ export default function SerialManage() {
                 fontSize: 13, fontWeight: 500,
               }}
             >
-              Sau <ChevronRight size={16} />
+              <span className="hidden sm:inline">Sau</span> <ChevronRight size={16} />
             </button>
           </div>
         </div>
