@@ -96,6 +96,42 @@ const getGroupedStats = (dailyStats: any[], mode: 'day' | 'week' | 'month') => {
   }).sort((a, b) => a.key.localeCompare(b.key));
 };
 
+type MainTab = 'overview' | 'performance' | 'productQuality' | 'revenue';
+type PerfView = 'sla' | 'workload' | 'region' | 'station';
+
+const MAIN_TABS: { id: MainTab; label: string; icon: typeof ClipboardList }[] = [
+  { id: 'overview', label: 'Tổng quan vận hành', icon: ClipboardList },
+  { id: 'performance', label: 'Hiệu suất', icon: Clock },
+  { id: 'productQuality', label: 'Chất lượng sản phẩm', icon: AlertCircle },
+  { id: 'revenue', label: 'Doanh thu', icon: DollarSign }
+];
+
+const PERF_VIEWS: { id: PerfView; label: string; hint: string }[] = [
+  { id: 'sla', label: 'Đúng / Trễ hẹn', hint: 'Tỷ lệ đúng hẹn, xu hướng, theo loại CV / trạm / KTV, danh sách ca trễ' },
+  { id: 'workload', label: 'Khối lượng công việc', hint: 'Số ca theo tháng và cơ cấu loại công việc' },
+  { id: 'region', label: 'Khu vực', hint: 'Bản đồ và xếp hạng theo Tỉnh/Thành' },
+  { id: 'station', label: 'Phân trạm', hint: 'Đơn chưa phân trạm theo tỉnh, KPI trạm' }
+];
+
+const VIEW_STORAGE_KEY = 'truliva_dashboard_view';
+function readSavedView(): { tab: MainTab; perf: PerfView } {
+  const fallback = { tab: 'overview' as MainTab, perf: 'sla' as PerfView };
+  try {
+    const raw = sessionStorage.getItem(VIEW_STORAGE_KEY);
+    if (!raw) return fallback;
+    const v = JSON.parse(raw);
+    return {
+      tab: MAIN_TABS.some(t => t.id === v.tab) ? v.tab : fallback.tab,
+      perf: PERF_VIEWS.some(p => p.id === v.perf) ? v.perf : fallback.perf
+    };
+  } catch {
+    return fallback;
+  }
+}
+function saveView(v: { tab: MainTab; perf: PerfView }) {
+  try { sessionStorage.setItem(VIEW_STORAGE_KEY, JSON.stringify(v)); } catch { /* bỏ qua: trình duyệt chặn storage */ }
+}
+
 const WORK_TYPE_OPTIONS = ['Giao hàng và Lắp đặt', 'Lắp đặt', 'Giao hàng', 'Thay lọc', 'Bảo hành', 'Sửa chữa'];
 const STATUS_OPTIONS = [
   { value: 'chờ xử lý', label: 'Chờ xử lý' },
@@ -231,7 +267,11 @@ function MultiSelect({
 
 export default function Dashboard() {
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState<'overview' | 'summary' | 'ontime' | 'late' | 'workload' | 'stationComp' | 'productQuality' | 'revenue'>('overview');
+  // Tab đang mở được nhớ trong phiên (quay lại từ trang Đơn hàng không bị về tab đầu)
+  const [activeTab, setActiveTabState] = useState<MainTab>(() => readSavedView().tab);
+  const [perfView, setPerfViewState] = useState<PerfView>(() => readSavedView().perf);
+  const setActiveTab = (t: MainTab) => { setActiveTabState(t); saveView({ tab: t, perf: perfView }); };
+  const setPerfView = (v: PerfView) => { setPerfViewState(v); saveView({ tab: activeTab, perf: v }); };
 
   // Mở trang Đơn hàng lọc đúng 1 mã đơn (xóa các bộ lọc cũ để chắc chắn thấy đơn)
   const navigateToOrder = (pancakeOrderId: number) => {
@@ -337,7 +377,10 @@ export default function Dashboard() {
   }, [selectedTechStations]);
 
   // Fetch dynamic analysis data whenever filters change
+  // Chỉ tải khi đang ở tab Hiệu suất (cả 4 góc nhìn dùng chung dữ liệu này)
   useEffect(() => {
+    if (activeTab !== 'performance') return;
+    let cancelled = false;
     setLoadingAnalysis(true);
 
     getDispatchAnalysis({
@@ -351,11 +394,12 @@ export default function Dashboard() {
       assignedKtvId: selectedKtvIds
     })
       .then(data => {
-        setAnalysisData(data);
+        if (!cancelled) setAnalysisData(data);
       })
       .catch(console.error)
-      .finally(() => setLoadingAnalysis(false));
-  }, [startDate, endDate, selectedProvinces, selectedMainStations, selectedTechStations, selectedWorkTypes, selectedAdminStatuses, selectedKtvIds]);
+      .finally(() => { if (!cancelled) setLoadingAnalysis(false); });
+    return () => { cancelled = true; };
+  }, [activeTab, startDate, endDate, selectedProvinces, selectedMainStations, selectedTechStations, selectedWorkTypes, selectedAdminStatuses, selectedKtvIds]);
 
   // Fetch quality analysis data
   useEffect(() => {
@@ -482,35 +526,9 @@ export default function Dashboard() {
     <div className="animate-fade-in relative font-sans space-y-6">
 
       {/* Header */}
-      <div className="flex justify-between items-center border-b pb-4">
-        <div>
-          <h2 className="font-bold text-2xl text-[#1B3A6B]">Bảng Phân Tích & Điều Phối Dịch Vụ</h2>
-          <p className="text-gray-500 text-sm mt-0.5">Thống kê mật độ đơn hàng, tiến độ hoàn thành ca và hiệu suất đúng hẹn của KTV</p>
-        </div>
-
-        {/* KPI Definitions Tooltip */}
-        <div className="relative group">
-          <button className="flex items-center space-x-1.5 text-xs text-blue-600 bg-blue-50 border border-blue-200 hover:bg-blue-100 px-3 py-2 rounded-lg transition-all font-semibold shadow-sm cursor-pointer">
-            <Info size={14} />
-            <span>Định nghĩa Đúng/Trễ hẹn</span>
-          </button>
-          <div className="absolute right-0 mt-2 w-80 bg-white border border-gray-200 rounded-xl shadow-xl p-4 hidden group-hover:block z-50 text-xs text-gray-600 space-y-3 animate-fade-in pointer-events-none">
-            <h4 className="font-bold text-gray-900 border-b pb-1.5 flex items-center gap-1.5 text-[13px]">
-              <Info size={15} className="text-blue-600" />
-              Quy chuẩn đánh giá KPI
-            </h4>
-            <div className="space-y-2">
-              <div>
-                <span className="font-bold text-emerald-600">✓ Đúng hẹn (On-time):</span>
-                <p className="mt-0.5 text-gray-500 leading-relaxed">Ca đã hoàn thành có <b>Ngày nghiệm thu thực tế</b> (KTV nộp báo cáo ca) <b>≤ Ngày hẹn khách hàng</b> (so khớp theo ngày YYYY-MM-DD, không xét giờ).</p>
-              </div>
-              <div className="border-t pt-2">
-                <span className="font-bold text-rose-600">⚠ Trễ hẹn (Late):</span>
-                <p className="mt-0.5 text-gray-500 leading-relaxed">Ca đã hoàn thành có ngày nghiệm thu &gt; ngày hẹn, HOẶC ca chưa hoàn thành (chờ xử lý/đang thực hiện) đã quá ngày hẹn khách.</p>
-              </div>
-            </div>
-          </div>
-        </div>
+      <div className="border-b pb-4">
+        <h2 className="font-bold text-2xl text-[#1B3A6B]">Bảng Phân Tích & Điều Phối Dịch Vụ</h2>
+        <p className="text-gray-500 text-sm mt-0.5">Việc cần xử lý hôm nay, hiệu suất thực hiện ca, chất lượng sản phẩm và doanh thu theo tháng</p>
       </div>
 
       {/* GLOBAL FILTER BAR */}
@@ -524,7 +542,7 @@ export default function Dashboard() {
           {/* Khoảng ngày phân tích */}
           <div className="flex flex-col sm:col-span-2">
             <div className="flex items-center justify-between mb-1">
-              <label className="text-[11px] font-semibold text-gray-500 uppercase">Kỳ phân tích (ngày tạo đơn)</label>
+              <label className="text-[11px] font-semibold text-gray-500 uppercase">Kỳ phân tích ({activeTab === 'productQuality' ? 'ngày nộp báo cáo' : 'ngày tạo đơn'})</label>
               <div className="flex items-center gap-1 text-[11px]">
                 <button type="button" onClick={() => shiftMonth(-1)} className="px-1.5 rounded hover:bg-gray-100 text-gray-600 font-bold" title="Tháng trước" aria-label="Tháng trước">‹</button>
                 <span className={`font-semibold ${isWholeMonth ? 'text-[#1B3A6B]' : 'text-gray-400'}`}>{monthLabel}</span>
@@ -646,8 +664,8 @@ export default function Dashboard() {
             onToggle={() => setOpenDropdown(openDropdown === 'workType' ? null : 'workType')}
           />
 
-          {/* Admin Status (không áp dụng cho Tổng quan vận hành) */}
-          {activeTab !== 'overview' && (
+          {/* Trạng thái đơn: chỉ tab Hiệu suất dùng */}
+          {activeTab === 'performance' && (
             <MultiSelect
               label="Trạng thái đơn"
               options={STATUS_OPTIONS}
@@ -681,104 +699,58 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* DATA SOURCE EXPLANATION BANNER (tab Tổng quan có chú thích riêng) */}
-      {activeTab !== 'overview' && <div className="bg-blue-50/60 border border-blue-100 text-[#1B3A6B] px-4 py-3.5 rounded-xl flex items-start space-x-3 shadow-sm animate-fade-in">
-        <Info className="text-blue-600 mt-0.5 flex-shrink-0" size={16} />
-        <div className="text-xs space-y-1">
-          <p className="font-bold text-[13px] text-[#1B3A6B]">Thông tin nguồn dữ liệu & bộ lọc:</p>
-          <p className="text-gray-600 leading-relaxed font-medium">
-            Bộ lọc thời gian trên Dashboard được áp dụng theo <b>Ngày tạo đơn hàng trên Pancake</b>.
-            Các chỉ số hiệu suất, tỷ lệ Đúng/Trễ hẹn và các biểu đồ phân tích liên quan được tính toán dựa trên <b>Ngày hẹn khách hàng</b> (hệ thống tự động thiết lập hoặc điều phối viên gán).
-          </p>
-        </div>
-      </div>}
-
-      {/* TAB NAVIGATION */}
-      <div className="flex items-center overflow-x-auto border-b border-gray-200 bg-gray-50/70 p-1.5 rounded-xl gap-1.5 scrollbar-none select-none">
-        <button
-          onClick={() => setActiveTab('overview')}
-          className={`shrink-0 whitespace-nowrap px-4 py-2 rounded-lg text-sm font-semibold transition-all flex items-center space-x-1.5 ${
-            activeTab === 'overview'
-              ? 'bg-white text-[#1B3A6B] shadow-sm border border-gray-200/80 font-bold'
-              : 'text-gray-600 hover:text-gray-900 hover:bg-white/60'
-          }`}
-        >
-          <ClipboardList size={15} className={activeTab === 'overview' ? 'text-[#1B3A6B]' : 'text-gray-500'} />
-          <span>Tổng quan vận hành</span>
-        </button>
-
-        <button
-          onClick={() => setActiveTab('summary')}
-          className={`shrink-0 whitespace-nowrap px-4 py-2 rounded-lg text-sm font-semibold transition-all flex items-center space-x-1.5 ${
-            activeTab === 'summary'
-              ? 'bg-white text-blue-600 shadow-sm border border-gray-200/80 font-bold'
-              : 'text-gray-600 hover:text-gray-900 hover:bg-white/60'
-          }`}
-        >
-          <MapPin size={15} className={activeTab === 'summary' ? 'text-blue-600' : 'text-gray-500'} />
-          <span>Bản đồ & Khu vực</span>
-        </button>
-
-        <button
-          onClick={() => setActiveTab('ontime')}
-          className={`shrink-0 whitespace-nowrap px-4 py-2 rounded-lg text-sm font-semibold transition-all flex items-center space-x-1.5 ${
-            activeTab === 'ontime' 
-              ? 'bg-white text-[#1B3A6B] shadow-sm border border-gray-200/80 font-bold' 
-              : 'text-gray-600 hover:text-gray-900 hover:bg-white/60'
-          }`}
-        >
-          <Clock size={15} className={activeTab === 'ontime' ? 'text-indigo-600' : 'text-gray-500'} />
-          <span>Báo cáo Đúng / Trễ Hẹn</span>
-        </button>
-
-        <button
-          onClick={() => setActiveTab('workload')}
-          className={`shrink-0 whitespace-nowrap px-4 py-2 rounded-lg text-sm font-semibold transition-all flex items-center space-x-1.5 ${
-            activeTab === 'workload' 
-              ? 'bg-white text-blue-800 shadow-sm border border-gray-200/80 font-bold' 
-              : 'text-gray-600 hover:text-gray-900 hover:bg-white/60'
-          }`}
-        >
-          <TrendingUp size={15} className={activeTab === 'workload' ? 'text-blue-600' : 'text-gray-500'} />
-          <span>Phân tích Công việc</span>
-        </button>
-
-        <button
-          onClick={() => setActiveTab('stationComp')}
-          className={`shrink-0 whitespace-nowrap px-4 py-2 rounded-lg text-sm font-semibold transition-all flex items-center space-x-1.5 ${
-            activeTab === 'stationComp' 
-              ? 'bg-white text-purple-700 shadow-sm border border-gray-200/80 font-bold' 
-              : 'text-gray-600 hover:text-gray-900 hover:bg-white/60'
-          }`}
-        >
-          <Building size={15} className={activeTab === 'stationComp' ? 'text-purple-600' : 'text-gray-500'} />
-          <span>Đối tác & Trạm chính</span>
-        </button>
-
-        <button
-          onClick={() => setActiveTab('productQuality')}
-          className={`shrink-0 whitespace-nowrap px-4 py-2 rounded-lg text-sm font-semibold transition-all flex items-center space-x-1.5 ${
-            activeTab === 'productQuality' 
-              ? 'bg-white text-orange-600 shadow-sm border border-gray-200/80 font-bold' 
-              : 'text-gray-600 hover:text-gray-900 hover:bg-white/60'
-          }`}
-        >
-          <AlertCircle size={15} className={activeTab === 'productQuality' ? 'text-orange-500' : 'text-gray-500'} />
-          <span>Chất lượng sản phẩm</span>
-        </button>
-
-        <button
-          onClick={() => setActiveTab('revenue')}
-          className={`shrink-0 whitespace-nowrap px-4 py-2 rounded-lg text-sm font-semibold transition-all flex items-center space-x-1.5 ${
-            activeTab === 'revenue' 
-              ? 'bg-white text-emerald-600 shadow-sm border border-gray-200/80 font-bold' 
-              : 'text-gray-600 hover:text-gray-900 hover:bg-white/60'
-          }`}
-        >
-          <DollarSign size={15} className={activeTab === 'revenue' ? 'text-emerald-600' : 'text-gray-500'} />
-          <span>Doanh Thu</span>
-        </button>
+      {/* TAB NAVIGATION — 4 nhóm chính */}
+      <div className="flex items-center overflow-x-auto border-b border-gray-200 bg-gray-50/70 p-1.5 rounded-xl gap-1.5 scrollbar-none select-none" role="tablist">
+        {MAIN_TABS.map(t => {
+          const Icon = t.icon;
+          const isActive = activeTab === t.id;
+          return (
+            <button
+              key={t.id}
+              role="tab"
+              aria-selected={isActive}
+              onClick={() => setActiveTab(t.id)}
+              className={`shrink-0 whitespace-nowrap px-4 py-2 rounded-lg text-sm font-semibold transition-all flex items-center space-x-1.5 ${
+                isActive ? 'bg-white text-[#1B3A6B] shadow-sm border border-gray-200/80 font-bold' : 'text-gray-600 hover:text-gray-900 hover:bg-white/60'
+              }`}
+            >
+              <Icon size={15} className={isActive ? 'text-[#1B3A6B]' : 'text-gray-500'} />
+              <span>{t.label}</span>
+            </button>
+          );
+        })}
       </div>
+
+      {/* HIỆU SUẤT: điều hướng phụ + giải thích cách tính */}
+      {activeTab === 'performance' && (
+        <div className="space-y-3">
+          <div className="flex flex-wrap items-center gap-1 bg-white p-1 rounded-xl border border-gray-200 shadow-sm w-fit" role="tablist" aria-label="Góc nhìn hiệu suất">
+            {PERF_VIEWS.map(v => {
+              const isActive = perfView === v.id;
+              return (
+                <button
+                  key={v.id}
+                  role="tab"
+                  aria-selected={isActive}
+                  onClick={() => setPerfView(v.id)}
+                  title={v.hint}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${isActive ? 'bg-[#1B3A6B] text-white shadow-sm' : 'text-gray-600 hover:bg-gray-100'}`}
+                >
+                  {v.label}
+                </button>
+              );
+            })}
+          </div>
+          <div className="bg-blue-50/60 border border-blue-100 text-[#1B3A6B] px-4 py-3 rounded-xl flex items-start space-x-3">
+            <Info className="text-blue-600 mt-0.5 flex-shrink-0" size={16} />
+            <p className="text-xs text-gray-600 leading-relaxed">
+              Đơn dịch vụ (không gồm eCom) <b>tạo trong kỳ lọc</b>, theo giờ Việt Nam.
+              <b> Đúng hẹn</b> khi ngày KTV nộp báo cáo nghiệm thu đầu tiên ≤ <b>ngày hẹn sau cùng</b> (lịch tự sinh +2h vẫn tính).
+              Tỷ lệ = Đúng / (Đúng + Trễ); không tính đơn <b>Giao hàng</b> (đơn vị vận chuyển), đơn hủy, đơn chưa tới hạn và báo cáo bị từ chối.
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* TAB CONTENT 0: OPERATIONS OVERVIEW */}
       {activeTab === 'overview' && (
@@ -791,7 +763,7 @@ export default function Dashboard() {
       )}
 
       {/* TAB CONTENT 1: BẢN ĐỒ & KHU VỰC */}
-      {activeTab === 'summary' && (
+      {activeTab === 'performance' && perfView === 'region' && (
         <ProvinceMapTab
           provinceStats={analysisData?.provinceStats || []}
           overallOnTimeRate={analysisData?.summary?.onTimeRate ?? null}
@@ -801,7 +773,7 @@ export default function Dashboard() {
       )}
 
       {/* TAB CONTENT 2: COMBINED ON-TIME & LATE SLA PERFORMANCE REPORT */}
-      {activeTab === 'ontime' && (
+      {activeTab === 'performance' && perfView === 'sla' && (
         <div className="space-y-6 animate-fade-in">
           {loadingAnalysis ? (
             <div className="flex flex-col items-center justify-center py-20 gap-3">
@@ -1201,7 +1173,7 @@ export default function Dashboard() {
       )}
 
       {/* TAB CONTENT 4: WORKLOAD TRENDS */}
-      {activeTab === 'workload' && (
+      {activeTab === 'performance' && perfView === 'workload' && (
         <div className="space-y-6 animate-fade-in">
           {loadingAnalysis ? (
             <div className="flex flex-col items-center justify-center py-20 gap-3">
@@ -1329,7 +1301,7 @@ export default function Dashboard() {
                         'Sửa chữa': '#ef4444'
                       };
                       const color = colors[entry.name] || '#64748b';
-                      const totalOrders = analysisData.summary.totalWithAppointments || 1;
+                      const totalOrders = analysisData.workTypeStats.reduce((s: number, w: { total: number }) => s + w.total, 0) || 1; // mẫu số = tổng các lát của biểu đồ tròn
                       const percentage = Math.round((entry.total / totalOrders) * 100);
                       return (
                         <div key={index} className="flex justify-between items-center border-b border-gray-50 pb-1">
@@ -1353,7 +1325,7 @@ export default function Dashboard() {
       )}
 
       {/* TAB CONTENT 5: STATION COMPARISON & DISPATCH ANALYTICS */}
-      {activeTab === 'stationComp' && (
+      {activeTab === 'performance' && perfView === 'station' && (
         <div className="space-y-6 animate-fade-in">
           {loadingAnalysis ? (
             <div className="flex flex-col items-center justify-center py-20 gap-3">
