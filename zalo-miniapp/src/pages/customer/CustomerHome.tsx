@@ -32,6 +32,8 @@ import { openPhone, openWebview, openChat } from 'zmp-sdk/apis';
 import { fetchZaloApi } from '../../api/client';
 import { getCustomerRank, MemberTier, RANK_CONFIGS, NEXT_TIER_ORDER } from '../../utils/memberRank';
 import IotDeviceCard from '../../components/IotDeviceCard';
+import DeviceSharingPanel from '../../components/DeviceSharingPanel';
+import { Users } from 'lucide-react';
 import { FEATURES } from '../../config/features';
 
 interface CustomerHomeProps {
@@ -40,6 +42,7 @@ interface CustomerHomeProps {
   onOpenScanner?: () => void;
   onOpenWarranty?: () => void;
   onGoToShop?: () => void;
+  onSerialsChanged?: () => void | Promise<void>;
 }
 
 const FEATURED_NEWS = [
@@ -91,7 +94,7 @@ const FEATURED_NEWS = [
   }
 ];
 
-export default function CustomerHome({ user, mySerials = [], onOpenScanner, onOpenWarranty, onGoToShop }: CustomerHomeProps) {
+export default function CustomerHome({ user, mySerials = [], onOpenScanner, onOpenWarranty, onGoToShop, onSerialsChanged }: CustomerHomeProps) {
   const [showWheelModal, setShowWheelModal] = useState(false);
   const [showLoyaltyModal, setShowLoyaltyModal] = useState(false);
   const [selectedArticle, setSelectedArticle] = useState<any>(null);
@@ -388,6 +391,7 @@ export default function CustomerHome({ user, mySerials = [], onOpenScanner, onOp
                           ? (isSelected ? 'bg-[#00D2FF] animate-pulse' : 'bg-emerald-500') 
                           : (isSelected ? 'bg-slate-400' : 'bg-slate-300')
                       }`}></span>
+                      {device.isShared && <Users size={12} aria-label="Máy được chia sẻ" className="shrink-0" />}
                       <span className="truncate max-w-[130px]">{shortModel}</span>
                       <span className={`text-[10px] font-mono px-1 py-0.2 rounded font-semibold ${
                         isSelected ? 'bg-white/20 text-sky-100' : 'bg-slate-100 text-slate-500'
@@ -405,12 +409,21 @@ export default function CustomerHome({ user, mySerials = [], onOpenScanner, onOp
               const activeIdx = selectedDeviceIndex < mySerials.length ? selectedDeviceIndex : 0;
               const currentDevice = mySerials[activeIdx];
               return (
-                <IotDeviceCard 
-                  key={currentDevice?.serialNumber || activeIdx}
-                  serialData={currentDevice}
-                  user={user}
-                  onBookMaintenance={handleDirectWarranty} 
-                />
+                <>
+                  <IotDeviceCard 
+                    key={currentDevice?.serialNumber || activeIdx}
+                    serialData={currentDevice}
+                    user={user}
+                    onBookMaintenance={handleDirectWarranty} 
+                  />
+                  {currentDevice && (
+                    <DeviceSharingPanel
+                      key={`share-${currentDevice.serialNumber}`}
+                      serial={currentDevice}
+                      onChanged={() => onSerialsChanged?.()}
+                    />
+                  )}
+                </>
               );
             })()}
           </div>

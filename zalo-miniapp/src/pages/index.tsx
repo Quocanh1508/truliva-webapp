@@ -374,6 +374,7 @@ export default function IndexPage() {
             <CustomerHome 
               user={user} 
               mySerials={mySerials}
+              onSerialsChanged={() => loadUserContent(user)}
               onOpenScanner={handleOpenScanner}
               onOpenWarranty={() => setActiveTab('profile')}
               onGoToShop={() => {

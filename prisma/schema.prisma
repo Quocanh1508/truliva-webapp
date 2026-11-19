@@ -440,11 +440,26 @@ model Serial {
   importedById             String?   @map("imported_by_id")                 // ID người thực hiện import
   rawData                  Json?     @map("raw_data")                       // JSON row gốc từ Excel
   importedBy               User?     @relation(fields: [importedById], references: [id])
+  members                  SerialMember[]
 
   createdAt                DateTime  @default(now()) @map("created_at")
   updatedAt                DateTime  @updatedAt @map("updated_at")
 
   @@map("serials")
+}
+
+// ── Người dùng chung máy (người nhà): chủ máy thêm SĐT qua Zalo Mini App ──
+model SerialMember {
+  id        String   @id @default(uuid())
+  serialId  String   @map("serial_id")
+  phone     String                                // Dạng 0xxxxxxxxx
+  addedById String?  @map("added_by_id")          // User (khách) đã thêm
+  createdAt DateTime @default(now()) @map("created_at")
+  serial    Serial   @relation(fields: [serialId], references: [id], onDelete: Cascade)
+
+  @@unique([serialId, phone])
+  @@index([phone])
+  @@map("serial_members")
 }
 
 // ── Chương trình Khuyến mãi Bảo hành ──

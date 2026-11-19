@@ -317,6 +317,12 @@ export async function requireSerialAccess(req: Request, res: Response, next: Nex
  * Middleware xác thực dành riêng cho khách hàng Zalo Mini App.
  * Xác minh JWT bằng ZALO_MINIAPP_JWT_SECRET và audience === 'truliva-miniapp'.
  */
+/** Token Mini App cấp trước mốc MINIAPP_TOKEN_NOT_BEFORE (unix giây) bị từ chối: đặt mốc = bây giờ là thu hồi mọi phiên Mini App. */
+function isRevokedMiniAppToken(decoded: any): boolean {
+  const notBefore = Number(process.env.MINIAPP_TOKEN_NOT_BEFORE || 0);
+  return notBefore > 0 && !(decoded?.iat >= notBefore);
+}
+
 export async function requireCustomerAuth(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
     let token = req.cookies?.zalo_session_token || req.cookies?.session_token;
@@ -347,7 +353,7 @@ export async function requireCustomerAuth(req: Request, res: Response, next: Nex
       return;
     }
 
-    if (!decoded || !decoded.id) {
+    if (!decoded || !decoded.id || isRevokedMiniAppToken(decoded)) {
       res.status(401).json({ error: 'Phiên đăng nhập không hợp lệ' });
       return;
     }
@@ -411,7 +417,7 @@ export async function optionalCustomerAuth(req: Request, res: Response, next: Ne
       return next();
     }
 
-    if (decoded && decoded.id) {
+    if (decoded && decoded.id && !isRevokedMiniAppToken(decoded)) {
       const user = await prisma.user.findUnique({
         where: { id: decoded.id },
         select: { id: true, username: true, fullName: true, phoneNumber: true, role: true, isActive: true, group: true, pancakeAccountName: true },

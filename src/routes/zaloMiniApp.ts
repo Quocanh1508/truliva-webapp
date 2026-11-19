@@ -5,6 +5,8 @@ import { requireAuth, requireCustomerAuth, optionalCustomerAuth } from '../middl
 import { authenticateZaloMiniAppUser } from '../services/zaloMiniAppService';
 import { activateSerialWarranty } from '../services/warrantyService';
 import { getPurifierConfig, resolveIotModel } from '../config/waterPurifiers';
+import { attachSerialSharing } from '../services/serialMemberService';
+import serialMembersRouter from './zaloMiniAppMembers';
 import { buildPhoneVariants, getRedeemedPoints } from '../services/shopPricing';
 
 const router = Router();
@@ -436,6 +438,9 @@ router.get('/my-serials', requireCustomerAuth, async (req: Request, res: Respons
         }
       }
     }
+
+    // Máy mình sở hữu: kèm danh sách người dùng chung; máy người khác chia sẻ cho mình: thêm vào cuối
+    await attachSerialSharing(allSerials, phoneVariants);
 
     const serialNumbers = allSerials.map(s => s.serialNumber);
 
@@ -1018,6 +1023,8 @@ router.post('/shop/orders/:orderCodeOrId/switch-to-cod', requireCustomerAuth, sw
 // confirm-payment: Sandbox → chủ đơn (optionalCustomerAuth); Production → kiểm tra ADMIN nội bộ bên trong controller
 router.post('/shop/orders/:orderCodeOrId/confirm-payment', optionalCustomerAuth, confirmShopOrderPayment);
 router.post('/shop/payment/webhook', handlePaymentWebhook);
+
+router.use('/serial-members', serialMembersRouter);
 
 export default router;
 
