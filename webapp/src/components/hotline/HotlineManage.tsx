@@ -193,7 +193,8 @@ export default function HotlineManage() {
   // Giá trị search thực sự gửi lên API — trễ 400ms sau lần gõ cuối để không gọi API mỗi phím
   const [debouncedSearch, setDebouncedSearch] = useState('');
   useEffect(() => {
-    const t = setTimeout(() => setDebouncedSearch(searchQuery.trim()), 400);
+    // Đổi search và về trang 1 cùng lúc, để không bắn request với từ khoá cũ
+    const t = setTimeout(() => { setDebouncedSearch(searchQuery.trim()); setPage(1); }, 400);
     return () => clearTimeout(t);
   }, [searchQuery]);
   const [activeStatus, setActiveStatus] = useState('ALL');
@@ -1457,13 +1458,13 @@ export default function HotlineManage() {
                 enterKeyHint="search"
                 placeholder="Tìm mã ticket, tên khách, SĐT, địa chỉ, serial, ghi chú..."
                 value={searchQuery}
-                onChange={(e) => { setSearchQuery(e.target.value); setPage(1); }}
-                onKeyDown={(e) => { if (e.key === 'Enter') setDebouncedSearch(searchQuery.trim()); }}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter') { setDebouncedSearch(searchQuery.trim()); setPage(1); } }}
                 className="w-full pl-9 pr-8 py-2.5 sm:py-2 border border-gray-300 rounded-lg text-sm sm:text-xs focus:ring-2 focus:ring-blue-200 focus:border-blue-500 outline-none transition-all [&::-webkit-search-cancel-button]:hidden"
               />
               {searchQuery && (
                 <button
-                  onClick={() => { setSearchQuery(''); setPage(1); }}
+                  onClick={() => { setSearchQuery(''); setDebouncedSearch(''); setPage(1); }}
                   className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
                 >
                   <X size={14} />
