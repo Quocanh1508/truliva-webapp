@@ -628,6 +628,7 @@ router.put('/:id', async (req: Request, res: Response): Promise<void> => {
         return;
       }
       updateData.passwordHash = await bcrypt.hash(password, 10);
+      updateData.tokenVersion = { increment: 1 }; // đăng xuất mọi phiên của user này
     }
 
     const updatedUser = await prisma.user.update({
@@ -721,7 +722,8 @@ router.delete('/:id', async (req: Request, res: Response): Promise<void> => {
 
     await prisma.user.update({
       where: { id },
-      data: { isActive: false },
+      // Tăng tokenVersion để token cũ không sống lại nếu sau này kích hoạt lại tài khoản
+      data: { isActive: false, tokenVersion: { increment: 1 } },
     });
 
     logger.info('User deactivated', { userId: id, by: req.user?.id });

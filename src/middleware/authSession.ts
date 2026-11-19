@@ -31,6 +31,11 @@ function isMiniAppAudience(aud: unknown): boolean {
  * Kiểm tra cookie "session_token" hoặc Bearer JWT ký bằng JWT_SECRET.
  * Từ chối mọi token có role === 'CUSTOMER', aud === 'truliva-miniapp', hoặc user.group === 'CUSTOMER'.
  */
+/** Ký session token 7 ngày. `tv` phải khớp users.token_version, tăng cột đó là thu hồi mọi token cũ. */
+export function signSessionToken(user: { id: string; role: string; tokenVersion: number }, jwtSecret: string): string {
+  return jwt.sign({ id: user.id, role: user.role, tv: user.tokenVersion }, jwtSecret, { expiresIn: '7d' });
+}
+
 export async function requireAuth(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
     let sessionToken = req.cookies?.session_token;
@@ -80,10 +85,11 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
 
     const user = await prisma.user.findUnique({
       where: { id: decoded.id },
-      select: { id: true, username: true, fullName: true, phoneNumber: true, role: true, isActive: true, group: true, pancakeAccountName: true },
+      select: { id: true, username: true, fullName: true, phoneNumber: true, role: true, isActive: true, group: true, pancakeAccountName: true, tokenVersion: true },
     });
 
-    if (!user || !user.isActive) {
+    // Token cấp trước khi có cột này không có `tv` → coi là 0, vẫn dùng được tới khi hết hạn
+    if (!user || !user.isActive || (decoded.tv ?? 0) !== user.tokenVersion) {
       res.status(401).json({ error: 'Phiên đăng nhập không hợp lệ hoặc tài khoản đã bị vô hiệu hóa' });
       return;
     }

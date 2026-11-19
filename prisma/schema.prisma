@@ -280,6 +280,8 @@ model User {
   warehouseName   String?      @map("warehouse_name")
   pancakeAccountName String?   @map("pancake_account_name")
   group           String?
+  // Tăng lên để thu hồi mọi token đã cấp (đăng xuất, đổi mật khẩu, vô hiệu hoá)
+  tokenVersion    Int          @default(0) @map("token_version")
   createdAt       DateTime     @default(now()) @map("created_at")
   updatedAt       DateTime     @updatedAt @map("updated_at")
 

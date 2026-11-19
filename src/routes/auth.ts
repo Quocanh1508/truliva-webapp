@@ -3,7 +3,7 @@ import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import prisma from '../config/database';
 import logger from '../utils/logger';
-import { requireAuth, authenticate, authorize, blockInProduction } from '../middleware/authSession';
+import { requireAuth, authenticate, authorize, blockInProduction, signSessionToken } from '../middleware/authSession';
 import { sendPasswordResetEmail } from '../utils/emailService';
 
 const router = Router();
@@ -86,11 +86,7 @@ router.post('/login', async (req: Request, res: Response): Promise<void> => {
     }
 
     // Generate JWT token
-    const token = jwt.sign(
-      { id: user.id, role: user.role },
-      jwtSecret,
-      { expiresIn: '7d' }
-    );
+    const token = signSessionToken(user, jwtSecret);
 
     // Set session cookie with JWT token (httpOnly, 7 ngày)
     res.cookie('session_token', token, {
@@ -122,7 +118,16 @@ router.post('/login', async (req: Request, res: Response): Promise<void> => {
 /**
  * POST /api/auth/logout
  */
-router.post('/logout', verifyTrustedOrigin, (_req: Request, res: Response): void => {
+router.post('/logout', verifyTrustedOrigin, async (req: Request, res: Response): Promise<void> => {
+  // Thu hồi token phía server (cả bản ai đó đã lưu lại), không chỉ xoá cookie. Đăng xuất mọi thiết bị.
+  const header = req.headers.authorization;
+  const token = header?.startsWith('Bearer ') ? header.substring(7) : req.cookies?.session_token;
+  try {
+    const decoded: any = token && process.env.JWT_SECRET ? jwt.verify(token, process.env.JWT_SECRET) : null;
+    if (decoded?.id) {
+      await prisma.user.updateMany({ where: { id: decoded.id, tokenVersion: decoded.tv ?? 0 }, data: { tokenVersion: { increment: 1 } } });
+    }
+  } catch { /* token hỏng/hết hạn: không còn gì để thu hồi */ }
   res.clearCookie('session_token');
   res.json({ message: 'Đã đăng xuất' });
 });
@@ -151,6 +156,7 @@ router.get('/me', verifyTrustedOrigin, requireAuth, async (req: Request, res: Re
         bankAccount: true,
         bankName: true,
         techStationId: true,
+        tokenVersion: true,
         techStation: {
           select: {
             name: true,
@@ -169,14 +175,11 @@ router.get('/me', verifyTrustedOrigin, requireAuth, async (req: Request, res: Re
       return;
     }
 
+    const { tokenVersion, ...profile } = user;
     const jwtSecret = process.env.JWT_SECRET;
     let token: string | undefined;
     if (jwtSecret) {
-      token = jwt.sign(
-        { id: user.id, role: user.role },
-        jwtSecret,
-        { expiresIn: '7d' }
-      );
+      token = signSessionToken({ id: user.id, role: user.role, tokenVersion }, jwtSecret);
 
       // Thiết lập lại (làm mới) cookie để tự động gia hạn phiên đăng nhập (sliding expiration)
       res.cookie('session_token', token, {
@@ -187,7 +190,7 @@ router.get('/me', verifyTrustedOrigin, requireAuth, async (req: Request, res: Re
       });
     }
 
-    res.json({ user, token });
+    res.json({ user: profile, token });
   } catch (error: any) {
     logger.error('Get profile me error', { error: error.message });
     res.status(500).json({ error: 'Lỗi hệ thống' });
@@ -301,14 +304,23 @@ router.post('/change-password', requireAuth, async (req: Request, res: Response)
 
     const newPasswordHash = await bcrypt.hash(newPassword, 10);
 
-    await prisma.user.update({
+    // Đổi mật khẩu thu hồi mọi phiên cũ; cấp token mới cho phiên đang dùng
+    const updated = await prisma.user.update({
       where: { id: user.id },
-      data: { passwordHash: newPasswordHash },
+      data: { passwordHash: newPasswordHash, tokenVersion: { increment: 1 } },
+      select: { id: true, role: true, tokenVersion: true },
+    });
+    const token = signSessionToken(updated, process.env.JWT_SECRET!);
+    res.cookie('session_token', token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      maxAge: 7 * 24 * 60 * 60 * 1000,
     });
 
     logger.info('Password changed by user', { userId: user.id });
 
-    res.json({ message: 'Thay đổi mật khẩu thành công' });
+    res.json({ message: 'Thay đổi mật khẩu thành công', token });
   } catch (error: any) {
     logger.error('Change password error', { error: error.message });
     res.status(500).json({ error: 'Lỗi khi thay đổi mật khẩu' });
@@ -440,7 +452,7 @@ router.post('/reset-password', async (req: Request, res: Response): Promise<void
     const newPasswordHash = await bcrypt.hash(newPassword, 10);
     await prisma.user.update({
       where: { id: user.id },
-      data: { passwordHash: newPasswordHash },
+      data: { passwordHash: newPasswordHash, tokenVersion: { increment: 1 } },
     });
 
     logger.info('Password reset successfully via email link', { userId: user.id, username: user.username });

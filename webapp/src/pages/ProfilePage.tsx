@@ -55,10 +55,12 @@ export default function ProfilePage() {
     setPwLoading(true);
 
     try {
-      await fetchApi('/auth/change-password', {
+      const res = await fetchApi('/auth/change-password', {
         method: 'POST',
         body: JSON.stringify({ currentPassword, newPassword }),
       });
+      // Server thu hồi token cũ khi đổi mật khẩu, lưu token mới để không bị đăng xuất
+      if (res?.token) localStorage.setItem('session_token', res.token);
 
       setPwSuccess('Thay đổi mật khẩu thành công!');
       setCurrentPassword('');
