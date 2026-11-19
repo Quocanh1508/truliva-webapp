@@ -215,7 +215,11 @@ export async function checkDynamicPermission(role: string, featureKey: string, g
   return getDefaultPermission(role as UserRole, featureKey);
 }
 
-export function requirePermission(featureKey: string) {
+/** Cho qua nếu user có ÍT NHẤT MỘT trong các quyền được liệt kê. */
+export function requirePermission(...featureKeys: string[]) {
+  // Gõ sai key thì quyền luôn bị từ chối âm thầm: báo lỗi ngay lúc khởi động thay vì vậy
+  const unknown = featureKeys.filter(k => !FEATURE_BY_KEY[k]);
+  if (featureKeys.length === 0 || unknown.length) throw new Error(`requirePermission: key không tồn tại: ${unknown.join(', ') || '(trống)'}`);
   return async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     const role = req.user?.role;
     const group = req.user?.group;
@@ -223,7 +227,10 @@ export function requirePermission(featureKey: string) {
       res.status(401).json({ error: 'Chưa đăng nhập' });
       return;
     }
-    const isAllowed = await checkDynamicPermission(role, featureKey, group, req.user?.id);
+    let isAllowed = false;
+    for (const key of featureKeys) {
+      if (await checkDynamicPermission(role, key, group, req.user?.id)) { isAllowed = true; break; }
+    }
     if (!isAllowed) {
       res.status(403).json({ error: 'Tài khoản của bạn không có quyền thực hiện thao tác này' });
       return;

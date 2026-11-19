@@ -26,21 +26,21 @@ router.get('/public/devices', getPublicSupportDevices);
 router.use(requireAuth);
 
 // Phase 1: Tra cứu lịch sử KH & Gợi ý SĐT
-router.get('/search-customer', searchCustomerHistory);
+router.get('/search-customer', requirePermission('HOTLINE_SEARCH_CUSTOMER', 'HOTLINE_TICKET_CREATE', 'HOTLINE_TICKET_VIEW'), searchCustomerHistory);
 
 // Dropdown danh sách người xử lý (HOTLINE/ADMIN/COORDINATOR)
-router.get('/handlers', getHotlineHandlers);
+router.get('/handlers', requirePermission('HOTLINE_TICKET_VIEW', 'HOTLINE_TICKET_CREATE'), getHotlineHandlers);
 
 // Dữ liệu tùy chọn cho bộ lọc
-router.get('/filter-options', getHotlineFilterOptions);
+router.get('/filter-options', requirePermission('HOTLINE_TICKET_VIEW'), getHotlineFilterOptions);
 
 // CRUD & Export
 router.get('/export', requirePermission('HOTLINE_EXPORT_EXCEL'), exportHotlineTickets);
-router.get('/', getHotlineTickets);
+router.get('/', requirePermission('HOTLINE_TICKET_VIEW'), getHotlineTickets);
 router.post('/', createHotlineTicket);
 
 // Parametric routes
-router.get('/:id', getHotlineTicketById);
+router.get('/:id', requirePermission('HOTLINE_TICKET_VIEW'), getHotlineTicketById);
 router.put('/:id', updateHotlineTicket);
 router.delete('/:id', deleteHotlineTicket);
 
