@@ -250,7 +250,7 @@ export default function CustomerProfile({
 
       <div className="max-w-md mx-auto px-4 mt-4 space-y-4">
         {/* 2. My Devices Section */}
-        <div ref={devicesSectionRef} className="space-y-3 scroll-mt-6">
+        <div ref={devicesSectionRef} data-tour="profile-devices" className="space-y-3 scroll-mt-6">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-2">
               <div className="p-1.5 bg-blue-100 text-[#1B3A6B] rounded-lg">
@@ -384,6 +384,7 @@ export default function CustomerProfile({
           )}
 
           <button 
+            data-tour="profile-history"
             onClick={() => setShowHistoryModal(true)}
             className="w-full min-h-[56px] p-3.5 flex items-center justify-between text-slate-800 font-semibold hover:bg-slate-50/80 active:bg-slate-100 transition-colors cursor-pointer touch-tactile"
           >
@@ -411,7 +412,7 @@ export default function CustomerProfile({
         </div>
 
         {/* 4. ⚖️ Khung Pháp Lý & Quy Chế TMĐT (Luật TMĐT 2025 & NĐ 248/2026) */}
-        <div className="bg-white rounded-[2rem] border border-sky-100/90 shadow-[0_6px_30px_rgba(27,58,107,0.06)] divide-y divide-slate-100 text-xs overflow-hidden">
+        <div data-tour="profile-legal" className="bg-white rounded-[2rem] border border-sky-100/90 shadow-[0_6px_30px_rgba(27,58,107,0.06)] divide-y divide-slate-100 text-xs overflow-hidden">
           <div className="p-3 bg-gray-50/80 border-b border-gray-100 flex items-center justify-between text-[11px] text-gray-500 font-bold uppercase tracking-wider">
             <span className="flex items-center gap-1.5">
               <Scale size={14} className="text-[#1B3A6B]" />

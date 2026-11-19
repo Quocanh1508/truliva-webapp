@@ -235,7 +235,13 @@ html, body {
 }
 
 /* Người dùng bật "giảm chuyển động": sóng banner đứng yên */
+/* Linh vật hướng dẫn nhún nhẹ */
+.guide-mascot-bob {
+  animation: p3rFloat 3.2s ease-in-out infinite;
+}
+
 @media (prefers-reduced-motion: reduce) {
+  .guide-mascot-bob,
   .p3r-wave-layer-back,
   .p3r-wave-layer-mid,
   .p3r-wave-layer-front {

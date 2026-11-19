@@ -32,6 +32,7 @@ export default function BottomNavBar({ activeTab, onChangeTab }: BottomNavBarPro
       >
         {/* 🏠 Trang chủ */}
         <button 
+          data-tour="nav-home"
           onClick={() => onChangeTab('home')}
           className={`flex-1 flex flex-col items-center justify-center min-h-[48px] py-1 px-1 rounded-2xl transition-all duration-200 active:scale-95 cursor-pointer touch-tactile ${
             activeTab === 'home' 
@@ -54,6 +55,7 @@ export default function BottomNavBar({ activeTab, onChangeTab }: BottomNavBarPro
 
         {/* 🛍️ Cửa hàng hoặc 📖 Sản phẩm */}
         <button 
+          data-tour="nav-shop"
           onClick={() => onChangeTab('shop')}
           className={`flex-1 flex flex-col items-center justify-center min-h-[48px] py-1 px-1 rounded-2xl transition-all duration-200 active:scale-95 cursor-pointer touch-tactile ${
             activeTab === 'shop' 
@@ -85,6 +87,7 @@ export default function BottomNavBar({ activeTab, onChangeTab }: BottomNavBarPro
 
         {/* 💬 Tư vấn Zalo OA */}
         <button 
+          data-tour="nav-oa"
           onClick={handleOpenOaChat}
           className="flex-1 flex flex-col items-center justify-center min-h-[48px] py-1 px-1 rounded-2xl text-slate-400 hover:text-slate-600 font-semibold transition-all duration-200 active:scale-95 cursor-pointer touch-tactile"
         >
@@ -97,6 +100,7 @@ export default function BottomNavBar({ activeTab, onChangeTab }: BottomNavBarPro
 
         {/* 👤 Cá nhân */}
         <button 
+          data-tour="nav-profile"
           onClick={() => onChangeTab('profile')}
           className={`flex-1 flex flex-col items-center justify-center min-h-[48px] py-1 px-1 rounded-2xl transition-all duration-200 active:scale-95 cursor-pointer touch-tactile ${
             activeTab === 'profile' 
