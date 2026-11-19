@@ -131,12 +131,12 @@ html, body {
 
 /* Persona 3 Reload Fluid SVG Waves */
 .p3r-wave-layer-back {
-  animation: p3rWaveBack 10s ease-in-out infinite;
+  animation: p3rWaveBack 26s ease-in-out infinite;
   will-change: transform;
 }
 
 .p3r-wave-layer-mid {
-  animation: p3rWaveMid 7s ease-in-out infinite;
+  animation: p3rWaveMid 19s ease-in-out infinite;
   will-change: transform;
 }
 
@@ -234,4 +234,11 @@ html, body {
   letter-spacing: -0.02em;
 }
 
-
+/* Người dùng bật "giảm chuyển động": sóng banner đứng yên */
+@media (prefers-reduced-motion: reduce) {
+  .p3r-wave-layer-back,
+  .p3r-wave-layer-mid,
+  .p3r-wave-layer-front {
+    animation: none;
+  }
+}

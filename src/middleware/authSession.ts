@@ -31,6 +31,11 @@ function isMiniAppAudience(aud: unknown): boolean {
  * Kiểm tra cookie "session_token" hoặc Bearer JWT ký bằng JWT_SECRET.
  * Từ chối mọi token có role === 'CUSTOMER', aud === 'truliva-miniapp', hoặc user.group === 'CUSTOMER'.
  */
+/** Ký session token 7 ngày. `tv` phải khớp users.token_version, tăng cột đó là thu hồi mọi token cũ. */
+export function signSessionToken(user: { id: string; role: string; tokenVersion: number }, jwtSecret: string): string {
+  return jwt.sign({ id: user.id, role: user.role, tv: user.tokenVersion }, jwtSecret, { expiresIn: '7d' });
+}
+
 export async function requireAuth(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
     let sessionToken = req.cookies?.session_token;
@@ -80,10 +85,11 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
 
     const user = await prisma.user.findUnique({
       where: { id: decoded.id },
-      select: { id: true, username: true, fullName: true, phoneNumber: true, role: true, isActive: true, group: true, pancakeAccountName: true },
+      select: { id: true, username: true, fullName: true, phoneNumber: true, role: true, isActive: true, group: true, pancakeAccountName: true, tokenVersion: true },
     });
 
-    if (!user || !user.isActive) {
+    // Token cấp trước khi có cột này không có `tv` → coi là 0, vẫn dùng được tới khi hết hạn
+    if (!user || !user.isActive || (decoded.tv ?? 0) !== user.tokenVersion) {
       res.status(401).json({ error: 'Phiên đăng nhập không hợp lệ hoặc tài khoản đã bị vô hiệu hóa' });
       return;
     }
@@ -215,7 +221,11 @@ export async function checkDynamicPermission(role: string, featureKey: string, g
   return getDefaultPermission(role as UserRole, featureKey);
 }
 
-export function requirePermission(featureKey: string) {
+/** Cho qua nếu user có ÍT NHẤT MỘT trong các quyền được liệt kê. */
+export function requirePermission(...featureKeys: string[]) {
+  // Gõ sai key thì quyền luôn bị từ chối âm thầm: báo lỗi ngay lúc khởi động thay vì vậy
+  const unknown = featureKeys.filter(k => !FEATURE_BY_KEY[k]);
+  if (featureKeys.length === 0 || unknown.length) throw new Error(`requirePermission: key không tồn tại: ${unknown.join(', ') || '(trống)'}`);
   return async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     const role = req.user?.role;
     const group = req.user?.group;
@@ -223,7 +233,10 @@ export function requirePermission(featureKey: string) {
       res.status(401).json({ error: 'Chưa đăng nhập' });
       return;
     }
-    const isAllowed = await checkDynamicPermission(role, featureKey, group, req.user?.id);
+    let isAllowed = false;
+    for (const key of featureKeys) {
+      if (await checkDynamicPermission(role, key, group, req.user?.id)) { isAllowed = true; break; }
+    }
     if (!isAllowed) {
       res.status(403).json({ error: 'Tài khoản của bạn không có quyền thực hiện thao tác này' });
       return;
@@ -304,6 +317,12 @@ export async function requireSerialAccess(req: Request, res: Response, next: Nex
  * Middleware xác thực dành riêng cho khách hàng Zalo Mini App.
  * Xác minh JWT bằng ZALO_MINIAPP_JWT_SECRET và audience === 'truliva-miniapp'.
  */
+/** Token Mini App cấp trước mốc MINIAPP_TOKEN_NOT_BEFORE (unix giây) bị từ chối: đặt mốc = bây giờ là thu hồi mọi phiên Mini App. */
+function isRevokedMiniAppToken(decoded: any): boolean {
+  const notBefore = Number(process.env.MINIAPP_TOKEN_NOT_BEFORE || 0);
+  return notBefore > 0 && !(decoded?.iat >= notBefore);
+}
+
 export async function requireCustomerAuth(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
     let token = req.cookies?.zalo_session_token || req.cookies?.session_token;
@@ -334,7 +353,7 @@ export async function requireCustomerAuth(req: Request, res: Response, next: Nex
       return;
     }
 
-    if (!decoded || !decoded.id) {
+    if (!decoded || !decoded.id || isRevokedMiniAppToken(decoded)) {
       res.status(401).json({ error: 'Phiên đăng nhập không hợp lệ' });
       return;
     }
@@ -398,7 +417,7 @@ export async function optionalCustomerAuth(req: Request, res: Response, next: Ne
       return next();
     }
 
-    if (decoded && decoded.id) {
+    if (decoded && decoded.id && !isRevokedMiniAppToken(decoded)) {
       const user = await prisma.user.findUnique({
         where: { id: decoded.id },
         select: { id: true, username: true, fullName: true, phoneNumber: true, role: true, isActive: true, group: true, pancakeAccountName: true },

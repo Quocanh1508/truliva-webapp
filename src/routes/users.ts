@@ -4,7 +4,7 @@ import ExcelJS from 'exceljs';
 import { UserRole } from '@prisma/client';
 import prisma from '../config/database';
 import logger from '../utils/logger';
-import { requireAuth, requireCoordinatorOrAdmin } from '../middleware/authSession';
+import { requireAuth, requireCoordinatorOrAdmin, requirePermission } from '../middleware/authSession';
 
 const router = Router();
 
@@ -27,7 +27,7 @@ const ROLE_RANKS: Record<string, number> = {
  * GET /api/users/ktvs
  * Lấy danh sách kỹ thuật viên (public cho authenticated users)
  */
-router.get('/ktvs', requireAuth, async (req: Request, res: Response): Promise<void> => {
+router.get('/ktvs', requireAuth, requirePermission('ORDER_VIEW', 'DASHBOARD_VIEW', 'ORDER_ASSIGN_KTV'), async (req: Request, res: Response): Promise<void> => {
   try {
     const { techStationId, excludeOrderId } = req.query;
     const where: any = { role: 'KTV', isActive: true };
@@ -82,7 +82,7 @@ router.get('/ktvs', requireAuth, async (req: Request, res: Response): Promise<vo
 // ==========================================
 // ADMIN ROUTES
 // ==========================================
-router.use(requireAuth, requireCoordinatorOrAdmin);
+router.use(requireAuth, requireCoordinatorOrAdmin, requirePermission('USER_MANAGE', 'USER_PERMISSIONS_MATRIX'));
 
 /**
  * GET /api/users/export
@@ -628,6 +628,7 @@ router.put('/:id', async (req: Request, res: Response): Promise<void> => {
         return;
       }
       updateData.passwordHash = await bcrypt.hash(password, 10);
+      updateData.tokenVersion = { increment: 1 }; // đăng xuất mọi phiên của user này
     }
 
     const updatedUser = await prisma.user.update({
@@ -721,7 +722,8 @@ router.delete('/:id', async (req: Request, res: Response): Promise<void> => {
 
     await prisma.user.update({
       where: { id },
-      data: { isActive: false },
+      // Tăng tokenVersion để token cũ không sống lại nếu sau này kích hoạt lại tài khoản
+      data: { isActive: false, tokenVersion: { increment: 1 } },
     });
 
     logger.info('User deactivated', { userId: id, by: req.user?.id });

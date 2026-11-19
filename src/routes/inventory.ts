@@ -3,7 +3,7 @@ import axios from 'axios';
 import ExcelJS from 'exceljs';
 import prisma from '../config/database';
 import logger from '../utils/logger';
-import { requireAuth, requireAdmin, requireCoordinatorOrAdmin } from '../middleware/authSession';
+import { requireAuth, requireAdmin, requireCoordinatorOrAdmin, requirePermission } from '../middleware/authSession';
 import { syncProducts } from '../scripts/syncProducts';
 import { getComboMappingsForInventory } from '../controllers/orderController';
 import { PANCAKE_API_BASE } from '../config/pancake';
@@ -158,7 +158,7 @@ router.post('/sync', requireCoordinatorOrAdmin, async (req: Request, res: Respon
  * GET /api/inventory/export
  * Xuất Excel báo cáo tồn kho hàng có áp dụng bộ lọc (Admin hoặc KTV)
  */
-router.get('/export', async (req: Request, res: Response): Promise<void> => {
+router.get('/export', requirePermission('INVENTORY_VIEW'), async (req: Request, res: Response): Promise<void> => {
   try {
     const userId = req.user?.id;
     if (!userId) {
@@ -510,7 +510,7 @@ router.get('/my-stock', async (req: Request, res: Response): Promise<void> => {
  * GET /api/inventory/analytics
  * Lấy báo cáo Xuất - Nhập - Tồn từ Pancake POS (Hỗ trợ lọc theo kho và khoảng thời gian)
  */
-router.get('/analytics', async (req: Request, res: Response): Promise<void> => {
+router.get('/analytics', requirePermission('INVENTORY_VIEW'), async (req: Request, res: Response): Promise<void> => {
   try {
     const apiKey = process.env.PANCAKE_API_KEY;
     if (!apiKey) {
@@ -743,7 +743,7 @@ router.get('/analytics', async (req: Request, res: Response): Promise<void> => {
  * GET /api/inventory/analytics/export
  * Xuất file Excel báo cáo Xuất - Nhập - Tồn kho
  */
-router.get('/analytics/export', async (req: Request, res: Response): Promise<void> => {
+router.get('/analytics/export', requirePermission('INVENTORY_VIEW'), async (req: Request, res: Response): Promise<void> => {
   try {
     const apiKey = process.env.PANCAKE_API_KEY;
     if (!apiKey) {
