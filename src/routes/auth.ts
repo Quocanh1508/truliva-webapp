@@ -118,16 +118,9 @@ router.post('/login', async (req: Request, res: Response): Promise<void> => {
 /**
  * POST /api/auth/logout
  */
-router.post('/logout', verifyTrustedOrigin, async (req: Request, res: Response): Promise<void> => {
-  // Thu hồi token phía server (cả bản ai đó đã lưu lại), không chỉ xoá cookie. Đăng xuất mọi thiết bị.
-  const header = req.headers.authorization;
-  const token = header?.startsWith('Bearer ') ? header.substring(7) : req.cookies?.session_token;
-  try {
-    const decoded: any = token && process.env.JWT_SECRET ? jwt.verify(token, process.env.JWT_SECRET) : null;
-    if (decoded?.id) {
-      await prisma.user.updateMany({ where: { id: decoded.id, tokenVersion: decoded.tv ?? 0 }, data: { tokenVersion: { increment: 1 } } });
-    }
-  } catch { /* token hỏng/hết hạn: không còn gì để thu hồi */ }
+router.post('/logout', verifyTrustedOrigin, (_req: Request, res: Response): void => {
+  // Chỉ đăng xuất thiết bị này: không tăng tokenVersion, để shortcut web của KTV trên máy khác không bị đá ra.
+  // Muốn thu hồi mọi token (nghi lộ token) thì đổi mật khẩu hoặc admin đổi mật khẩu/vô hiệu hoá.
   res.clearCookie('session_token');
   res.json({ message: 'Đã đăng xuất' });
 });
