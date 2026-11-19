@@ -181,6 +181,11 @@ export default function CustomerHome({ user, mySerials = [], onOpenScanner, onOp
 
   const userName = user?.fullName || 'Khách hàng Truliva';
   const userPhone = user?.phoneNumber || '';
+  // 0912345678 → 0912 345 678 (84xxxxxxxxx → 0xxx xxx xxx)
+  const formatPhone = (p: string) => {
+    const d = p.replace(/\D/g, '').replace(/^84(?=\d{9}$)/, '0');
+    return d.length === 10 ? `${d.slice(0, 4)} ${d.slice(4, 7)} ${d.slice(7)}` : p;
+  };
   const userPoints = Number(user?.rewardPoints ?? user?.points ?? 0);
 
   const baseRank = getCustomerRank(user, userPoints);
@@ -195,26 +200,37 @@ export default function CustomerHome({ user, mySerials = [], onOpenScanner, onOp
   return (
     <div className="pb-28 bg-slate-50 min-h-screen font-sans">
       {/* 1. Header Profile Card with Persona 3 Reload Ocean Waves */}
-      <P3ROceanHeader className="p-4 pt-[calc(env(safe-area-inset-top,38px)+28px)] pb-16">
-        <div className="max-w-md mx-auto flex items-center justify-between">
-          <div className="flex items-center space-x-3.5">
-            <div className="relative">
-              <div className="w-13 h-13 rounded-full bg-[#0B2545] border-2 border-white/85 shadow-md flex items-center justify-center text-white font-bold text-lg overflow-hidden transition-all">
+      <P3ROceanHeader className="px-5 pt-[calc(env(safe-area-inset-top,38px)+60px)] pb-[4.5rem]">
+        <div className="max-w-md mx-auto flex items-center justify-between gap-3">
+          <div className="flex items-center gap-4 min-w-0">
+            {/* Avatar có quầng sáng nhẹ như ánh nước */}
+            <div className="relative shrink-0">
+              <div className="absolute -inset-1.5 rounded-full bg-sky-200/15 blur-[6px]" aria-hidden="true" />
+              <div className="relative w-16 h-16 rounded-full bg-[#0B2545] ring-2 ring-white/80 shadow-lg shadow-black/25 flex items-center justify-center overflow-hidden">
                 {user?.avatar ? (
-                  <img src={user.avatar} alt="Avatar" className="w-full h-full object-cover" />
+                  <img src={user.avatar} alt={`Ảnh đại diện của ${userName}`} className="w-full h-full object-cover" />
                 ) : (
-                  <User size={26} className="text-cyan-200" />
+                  <User size={30} className="text-sky-200" aria-hidden="true" />
                 )}
               </div>
             </div>
-            <div>
-              <div className="flex items-center space-x-1.5">
-                <span className="text-[10px] text-sky-200 font-bold uppercase tracking-wider">Xin chào</span>
-                <span className="inline-block w-1.5 h-1.5 bg-[#00D2FF] rounded-full animate-pulse"></span>
-              </div>
-              <h1 className="text-base font-black text-white truncate max-w-[170px] drop-shadow-sm">{userName}</h1>
-              <p className="text-[11px] text-sky-100 font-medium">
-                {userPhone ? userPhone : 'Truliva Care'}
+            <div className="min-w-0">
+              <p className="text-sm text-sky-100/90 font-medium">Xin chào,</p>
+              <h1 className="text-xl font-extrabold text-white leading-tight truncate drop-shadow-[0_1px_2px_rgba(0,0,0,0.35)]">
+                {userName}
+              </h1>
+              <p className="mt-1 text-sm text-sky-100/90 font-medium flex items-center gap-1.5">
+                {userPhone ? (
+                  <>
+                    <PhoneCall size={13} className="text-sky-200 shrink-0" aria-hidden="true" />
+                    <span className="tabular-nums tracking-wide">{formatPhone(userPhone)}</span>
+                  </>
+                ) : (
+                  <>
+                    <Droplets size={13} className="text-sky-200 shrink-0" aria-hidden="true" />
+                    <span>Truliva Care</span>
+                  </>
+                )}
               </p>
             </div>
           </div>
