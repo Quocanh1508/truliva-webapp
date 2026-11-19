@@ -35,7 +35,7 @@ router.get('/handlers', getHotlineHandlers);
 router.get('/filter-options', getHotlineFilterOptions);
 
 // CRUD & Export
-router.get('/export', exportHotlineTickets);
+router.get('/export', requirePermission('HOTLINE_EXPORT_EXCEL'), exportHotlineTickets);
 router.get('/', getHotlineTickets);
 router.post('/', createHotlineTicket);
 
