@@ -265,6 +265,7 @@ export default function CustomerHome({ user, mySerials = [], onOpenScanner, onOp
         <div className={`bg-white/95 backdrop-blur-xl rounded-[2.2rem] shadow-[0_12px_36px_rgba(11,37,69,0.12)] p-3 border border-sky-100/90 grid ${FEATURES.ENABLE_MEMBER_RANKING ? 'grid-cols-4' : 'grid-cols-3'} gap-1.5 text-center items-start`}>
           {/* 1. Cửa hàng / Sản phẩm */}
           <button 
+            data-tour="home-shop"
             onClick={onGoToShop}
             className="flex flex-col items-center justify-start space-y-1.5 px-1 py-2 rounded-2xl hover:bg-sky-50/80 active:scale-95 transition-all cursor-pointer group touch-tactile"
           >
@@ -296,6 +297,7 @@ export default function CustomerHome({ user, mySerials = [], onOpenScanner, onOp
 
           {/* 3. Kích hoạt bảo hành (Kích hoạt & tra cứu bảo hành điện tử) */}
           <button 
+            data-tour="home-warranty"
             onClick={() => handleDirectWarranty()}
             className="flex flex-col items-center justify-start space-y-1.5 px-1 py-2 rounded-2xl hover:bg-sky-50/80 active:scale-95 transition-all cursor-pointer group touch-tactile"
           >
@@ -309,6 +311,7 @@ export default function CustomerHome({ user, mySerials = [], onOpenScanner, onOp
 
           {/* 4. Hotline */}
           <button 
+            data-tour="home-hotline"
             onClick={async () => {
               try {
                 await openPhone({ phoneNumber: '1900638463' });
@@ -386,7 +389,7 @@ export default function CustomerHome({ user, mySerials = [], onOpenScanner, onOp
 
             {/* Bộ chọn máy (Horizontal Device Tabs Selector) khi có nhiều máy */}
             {mySerials.length > 1 && (
-              <div className="flex items-center gap-2 overflow-x-auto pb-1 no-scrollbar pt-0.5">
+              <div data-tour="home-device-picker" className="flex items-center gap-2 overflow-x-auto pb-1 no-scrollbar pt-0.5">
                 {mySerials.map((device, idx) => {
                   const activeIdx = selectedDeviceIndex < mySerials.length ? selectedDeviceIndex : 0;
                   const isSelected = idx === activeIdx;
@@ -444,7 +447,7 @@ export default function CustomerHome({ user, mySerials = [], onOpenScanner, onOp
             })()}
           </div>
         ) : (
-          <div className="bg-white p-4 rounded-3xl border border-sky-100 shadow-[0_4px_20px_rgba(27,58,107,0.06)] flex items-center justify-between hover:shadow-[0_8px_24px_rgba(0,163,255,0.12)] transition-shadow">
+          <div data-tour="home-scan" className="bg-white p-4 rounded-3xl border border-sky-100 shadow-[0_4px_20px_rgba(27,58,107,0.06)] flex items-center justify-between hover:shadow-[0_8px_24px_rgba(0,163,255,0.12)] transition-shadow">
             <div className="flex items-center space-x-3.5">
               <div className="p-3 bg-gradient-to-br from-sky-50 to-cyan-100 text-[#0284C7] rounded-2xl border border-sky-200/60 shadow-xs">
                 <QrCode size={24} />
@@ -466,7 +469,7 @@ export default function CustomerHome({ user, mySerials = [], onOpenScanner, onOp
       </div>
 
       {/* 6. Section Tin Tức & Kiến Thức Nước Sạch */}
-      <div id="tin-tuc-noi-bat" className="max-w-md mx-auto px-4 mt-5 space-y-3 scroll-mt-6">
+      <div id="tin-tuc-noi-bat" data-tour="home-news" className="max-w-md mx-auto px-4 mt-5 space-y-3 scroll-mt-6">
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-2">
             <div className="p-1.5 bg-blue-100 text-[#1B3A6B] rounded-lg">

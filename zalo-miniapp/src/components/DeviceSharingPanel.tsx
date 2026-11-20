@@ -157,7 +157,7 @@ export default function DeviceSharingPanel({ serial, onChanged }: Props) {
   }
 
   return (
-    <section aria-labelledby={`share-title-${serial.id}`} className="bg-white border border-sky-100 rounded-3xl p-4 space-y-3 shadow-[0_4px_20px_rgba(27,58,107,0.06)]">
+    <section data-tour="home-share" aria-labelledby={`share-title-${serial.id}`} className="bg-white border border-sky-100 rounded-3xl p-4 space-y-3 shadow-[0_4px_20px_rgba(27,58,107,0.06)]">
       <div className="flex items-center justify-between gap-2">
         <div className="flex items-center gap-2 min-w-0">
           <div className="p-1.5 bg-sky-100 text-[#1B3A6B] rounded-xl shrink-0" aria-hidden="true">

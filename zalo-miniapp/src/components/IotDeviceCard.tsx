@@ -203,7 +203,7 @@ export default function IotDeviceCard({ serialData, user, onBookMaintenance }: I
       
       {/* ── TOP SEGMENTED CONTROL TABS (Máy của tôi | Cài đặt Wi-Fi) ── */}
       <div className="p-2.5 pb-0 bg-slate-50/80 border-b border-slate-100">
-        <div className="bg-slate-200/70 p-1 rounded-2xl flex items-center gap-1">
+        <div data-tour="device-tabs" className="bg-slate-200/70 p-1 rounded-2xl flex items-center gap-1">
           <button
             onClick={() => setActiveSubTab('device')}
             className={`flex-1 min-h-[38px] py-1.5 rounded-xl text-xs font-black transition-all flex items-center justify-center gap-1.5 cursor-pointer touch-tactile ${
@@ -246,7 +246,7 @@ export default function IotDeviceCard({ serialData, user, onBookMaintenance }: I
         <div className="p-4 space-y-4">
           {/* Header định danh thiết bị - Hiển thị đầy đủ tên máy & số serial */}
           <div className="space-y-1.5">
-            <div className="flex items-center justify-between gap-2">
+            <div data-tour="device-info" className="flex items-center justify-between gap-2">
               <div className="flex items-center space-x-1.5 flex-wrap gap-y-1">
                 <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
                   Máy lọc nước của tôi
@@ -280,7 +280,7 @@ export default function IotDeviceCard({ serialData, user, onBookMaintenance }: I
             </h2>
             
             {/* Trạng thái kết nối Wi-Fi (Xám khi chưa kết nối, Xanh khi trực tuyến) */}
-            <div className={`flex items-center space-x-1.5 text-xs pt-0.5 ${
+            <div data-tour="device-status" className={`flex items-center space-x-1.5 text-xs pt-0.5 ${
               isOnline ? 'text-emerald-600 font-bold' : 'text-slate-500 font-medium'
             }`}>
               {isOnline ? (
@@ -313,7 +313,7 @@ export default function IotDeviceCard({ serialData, user, onBookMaintenance }: I
           </div>
 
           {/* Hộp Thông số Nước Tinh Khiết & Lõi RO tóm tắt (UI/UX Pro Max Telemetry HUD) */}
-          <div className="bg-gradient-to-br from-sky-50/90 via-blue-50/40 to-slate-50/80 rounded-2xl p-3.5 border border-sky-100/90 space-y-2 shadow-xs">
+          <div data-tour="device-water" className="bg-gradient-to-br from-sky-50/90 via-blue-50/40 to-slate-50/80 rounded-2xl p-3.5 border border-sky-100/90 space-y-2 shadow-xs">
             <div className="flex items-center justify-between text-xs">
               <span className="text-slate-600 font-semibold">TDS đầu ra (Sau màng RO)</span>
               <div className="flex items-baseline space-x-1">
@@ -334,7 +334,7 @@ export default function IotDeviceCard({ serialData, user, onBookMaintenance }: I
           </div>
 
           {/* ── BẢNG HIỂN THỊ LÕI LỌC CHUYÊN NGHIỆP (ĐỘNG THEO DÒNG MÁY 2 LÕI / 3 LÕI) ── */}
-          <div className="space-y-2.5">
+          <div data-tour="device-filters" className="space-y-2.5">
             <div className="flex items-center justify-between gap-2">
               <div className="flex items-center space-x-1.5 text-xs font-black text-slate-800 uppercase tracking-tight whitespace-nowrap">
                 <Layers size={14} className="text-[#1B3A6B] shrink-0" />
@@ -476,6 +476,7 @@ export default function IotDeviceCard({ serialData, user, onBookMaintenance }: I
             {/* Nút Bảo Hành: Kích hoạt bảo hành / Đã kích hoạt bảo hành */}
             {isActivated ? (
               <button
+                data-tour="device-warranty"
                 onClick={handleOpenWarranty}
                 className="w-full min-h-[44px] py-2.5 px-3.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 rounded-2xl text-xs font-bold flex items-center justify-between border border-emerald-200 transition-all cursor-pointer active:scale-[0.99] touch-tactile"
               >
@@ -491,6 +492,7 @@ export default function IotDeviceCard({ serialData, user, onBookMaintenance }: I
               </button>
             ) : (
               <button
+                data-tour="device-warranty"
                 onClick={handleOpenWarranty}
                 className="w-full min-h-[44px] py-3 bg-gradient-to-r from-[#1B3A6B] to-[#0284C7] hover:from-[#152e55] hover:to-[#0274b3] text-white rounded-2xl font-bold text-xs flex items-center justify-center space-x-2 shadow-md shadow-blue-900/15 active:scale-[0.99] transition-all cursor-pointer touch-tactile"
               >
@@ -502,6 +504,7 @@ export default function IotDeviceCard({ serialData, user, onBookMaintenance }: I
             {/* Hàng 2 nút tiện ích: Cài đặt lại Wi-Fi & Yêu cầu KTV */}
             <div className="grid grid-cols-2 gap-2 pt-0.5">
               <button
+                data-tour="device-wifi"
                 onClick={() => setActiveSubTab('wifi')}
                 className="min-h-[44px] py-2.5 bg-[#0F172A] hover:bg-[#1E293B] text-white rounded-2xl font-bold text-xs flex items-center justify-center space-x-1.5 transition-all cursor-pointer shadow-xs active:scale-95 touch-tactile"
               >
@@ -510,6 +513,7 @@ export default function IotDeviceCard({ serialData, user, onBookMaintenance }: I
               </button>
 
               <button
+                data-tour="device-ktv"
                 onClick={handleRequestKtv}
                 className="min-h-[44px] py-2.5 bg-sky-50 hover:bg-sky-100 text-[#0284C7] rounded-2xl text-xs font-bold flex items-center justify-center space-x-1.5 transition-all cursor-pointer border border-sky-100 active:scale-95 touch-tactile"
               >

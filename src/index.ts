@@ -145,7 +145,7 @@ app.use((req, res, next) => {
     const duration = Date.now() - start;
     const logData = {
       method: req.method,
-      url: req.originalUrl,
+      url: req.originalUrl.replace(/([?&]secret=)[^&]*/i, '$1***'), // không ghi secret webhook Pancake vào log
       statusCode: res.statusCode,
       duration: `${duration}ms`,
       ip: req.ip,

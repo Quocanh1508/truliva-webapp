@@ -6,7 +6,8 @@ import { resolveIotModel } from '../config/waterPurifiers';
 // ── MQTT Configuration ──
 const MQTT_BROKER_URL = process.env.MQTT_BROKER_URL || 'mqtt://localhost:1883';
 const MQTT_USERNAME = process.env.MQTT_USERNAME || 'truliva_backend';
-const MQTT_PASSWORD = process.env.MQTT_PASSWORD || 'TrulivaM0tt@2026';
+// Không có mật khẩu mặc định trong source: user này gửi được lệnh tới mọi máy của khách
+const MQTT_PASSWORD = process.env.MQTT_PASSWORD;
 const TELEMETRY_TOPIC = 'truliva/devices/+/telemetry';
 const STATUS_TOPIC = 'truliva/devices/+/status';
 const RESPONSE_TOPIC = 'truliva/devices/+/command/response';
@@ -724,6 +725,10 @@ async function checkOfflineDevices() {
 
 // ── Initialize MQTT connection ──
 export function startMqttService() {
+  if (!MQTT_PASSWORD) {
+    logger.error('MQTT: thiếu MQTT_PASSWORD trong .env, không kết nối broker (IoT sẽ không nhận dữ liệu / gửi lệnh)');
+    return;
+  }
   logger.info('MQTT: Connecting to broker...', { url: MQTT_BROKER_URL });
 
   mqttClient = mqtt.connect(MQTT_BROKER_URL, {

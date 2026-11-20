@@ -5,6 +5,7 @@ import logger from '../utils/logger';
 const ALLOWED_DOMAINS = [
   'trulivaofficial.com',
   'www.trulivaofficial.com',
+  'staging.trulivaofficial.com', // sandbox (nginx cổng 8443)
   'localhost',
   '127.0.0.1'
 ];

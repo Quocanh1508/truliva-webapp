@@ -1,6 +1,18 @@
 import prisma from '../config/database';
 import logger from '../utils/logger';
-import { getOfficialTrulivaBaseRate, loadStationRates, normalizePhone } from './salaryService';
+import { getOfficialTrulivaBaseRate, loadStationRates, normalizePhone, monthKeyOf, vnMonthKeyOf, isStrictMonth } from './salaryService';
+
+/**
+ * Tháng tính hoa hồng của đơn (áp dụng từ 11/2026): tháng của báo cáo nghiệm thu APPROVED mới nhất,
+ * không có báo cáo thì tháng hẹn / tháng tạo đơn (giờ VN). Không dùng updatedAt: sửa đơn cũ sẽ kéo đơn sang tháng mới.
+ * `order.serviceReports` phải là báo cáo APPROVED, sắp createdAt giảm dần (như include trong computeCommissionsForMonth).
+ */
+function commissionMonthKey(order: any): number | null {
+  const latest = order.serviceReports?.[0];
+  if (latest) return monthKeyOf(latest.month) ?? vnMonthKeyOf(new Date(latest.createdAt));
+  const d = order.appointmentTime || order.pancakeCreatedAt || order.updatedAt;
+  return d ? vnMonthKeyOf(new Date(d)) : null;
+}
 
 export interface ProductCategorization {
   type: 'DEVICE' | 'FILTER_SPARE_PART' | 'OTHER';
@@ -440,11 +452,15 @@ export async function computeCommissionsForMonth(
     !isNaN(mNum) && !isNaN(yNum) ? `${yNum}-${mNum}` : ''
   ].filter(Boolean);
 
+  const targetMonthKey = monthKeyOf(month);
+  const strict = isStrictMonth(targetMonthKey);
+  // Tháng strict: query chỉ là lọc thô (nới 1 ngày mỗi đầu vì khung UTC lệch giờ VN 7 tiếng), tháng thật chốt bằng commissionMonthKey
+  const pad = strict ? 24 * 60 * 60 * 1000 : 0;
   const startDate = (!isNaN(mNum) && !isNaN(yNum) && mNum >= 1 && mNum <= 12)
-    ? new Date(Date.UTC(yNum, mNum - 1, 1, 0, 0, 0, 0))
+    ? new Date(Date.UTC(yNum, mNum - 1, 1, 0, 0, 0, 0) - pad)
     : new Date(Date.UTC(2000, 0, 1));
   const endDate = (!isNaN(mNum) && !isNaN(yNum) && mNum >= 1 && mNum <= 12)
-    ? new Date(Date.UTC(yNum, mNum, 0, 23, 59, 59, 999))
+    ? new Date(Date.UTC(yNum, mNum, 0, 23, 59, 59, 999) + pad)
     : new Date(Date.UTC(2099, 11, 31, 23, 59, 59, 999));
 
   // 1. Tải danh mục sản phẩm từ DB
@@ -544,6 +560,7 @@ export async function computeCommissionsForMonth(
 
   for (const order of orders) {
     if (!order.salesKtvId) continue;
+    if (strict && commissionMonthKey(order) !== targetMonthKey) continue;
 
     const salesKtvPhoneNorm = normalizePhone(order.salesKtv?.phoneNumber);
     const stationRate = salesKtvPhoneNorm ? stationRates.get(salesKtvPhoneNorm) : null;

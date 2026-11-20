@@ -235,7 +235,19 @@ html, body {
 }
 
 /* Người dùng bật "giảm chuyển động": sóng banner đứng yên */
+/* Hướng dẫn sử dụng: khi cuộn tới nút, chừa chỗ cho thanh tiêu đề Zalo và thanh điều hướng dưới */
+[data-tour] {
+  scroll-margin-top: 96px;
+  scroll-margin-bottom: 110px;
+}
+
+/* Linh vật hướng dẫn nhún nhẹ */
+.guide-mascot-bob {
+  animation: p3rFloat 3.2s ease-in-out infinite;
+}
+
 @media (prefers-reduced-motion: reduce) {
+  .guide-mascot-bob,
   .p3r-wave-layer-back,
   .p3r-wave-layer-mid,
   .p3r-wave-layer-front {

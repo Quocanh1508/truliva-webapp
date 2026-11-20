@@ -121,7 +121,7 @@ export default function ProductCatalog({ onSelectProduct, onGoToCart }: ProductC
           </div>
 
           {/* Search Input Bar */}
-          <form onSubmit={handleSearchSubmit} className="relative">
+          <form data-tour="shop-search" onSubmit={handleSearchSubmit} className="relative">
             <input
               type="text"
               value={search}
@@ -180,7 +180,7 @@ export default function ProductCatalog({ onSelectProduct, onGoToCart }: ProductC
       </P3ROceanHeader>
 
       {/* 3 Category Tabs (Luôn hiển thị 3 lựa chọn giống Website: Máy lọc nước | Lõi lọc nước | Sản phẩm bếp khác) */}
-      <div className="px-4 py-3 sticky top-0 bg-[#F8FAFC]/95 backdrop-blur-md z-20 border-b border-gray-100">
+      <div data-tour="shop-categories" className="px-4 py-3 sticky top-0 bg-[#F8FAFC]/95 backdrop-blur-md z-20 border-b border-gray-100">
         <div className="max-w-md mx-auto grid grid-cols-3 gap-2">
           {CATEGORIES.map(cat => {
             const isSelected = category === cat.key;
@@ -218,7 +218,7 @@ export default function ProductCatalog({ onSelectProduct, onGoToCart }: ProductC
       )}
 
       {/* Product List Grid */}
-      <div className="px-4 py-2">
+      <div data-tour="shop-list" className="px-4 py-2">
         {loading ? (
           <div className="py-20 text-center text-gray-400 flex flex-col items-center justify-center gap-3">
             <div className="w-8 h-8 border-3 border-[#1B3A6B] border-t-transparent rounded-full animate-spin"></div>

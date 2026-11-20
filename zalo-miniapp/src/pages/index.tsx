@@ -18,6 +18,7 @@ import CheckoutPage from './customer/CheckoutPage';
 import OrderSuccessPage from './customer/OrderSuccessPage';
 import MyOrdersPage from './customer/MyOrdersPage';
 import BottomNavBar, { MainTabType } from '../components/BottomNavBar';
+import GuideTour from '../components/GuideTour';
 import { useCart } from '../context/CartContext';
 
 type ShopSubView = 'catalog' | 'detail' | 'cart' | 'checkout' | 'success' | 'my_orders';
@@ -298,6 +299,11 @@ export default function IndexPage() {
     }
   };
 
+  const isMainScreen = !(
+    (activeTab === 'shop' && shopSubView !== 'catalog') ||
+    (activeTab === 'profile' && shopSubView === 'my_orders')
+  );
+
   return (
     <div className="min-h-screen bg-slate-50 text-slate-800 font-sans max-w-md mx-auto relative overflow-hidden">
       
@@ -473,13 +479,23 @@ export default function IndexPage() {
       )}
 
       {/* Bottom Navigation Bar: Luôn hiển thị cho toàn bộ khách hàng ở các tab chính */}
-      {!loading && user && !(
-        (activeTab === 'shop' && shopSubView !== 'catalog') ||
-        (activeTab === 'profile' && shopSubView === 'my_orders')
-      ) && (
-        <BottomNavBar 
-          activeTab={activeTab} 
-          onChangeTab={handleTabChange} 
+      {!loading && user && isMainScreen && (
+        <BottomNavBar
+          activeTab={activeTab}
+          onChangeTab={handleTabChange}
+        />
+      )}
+
+      {/* Hướng dẫn sử dụng: hỏi ở lần đăng nhập đầu, sau đó là linh vật nổi */}
+      {!loading && user && (
+        <GuideTour
+          userKey={String(user.id || user.phoneNumber || 'guest')}
+          currentTab={activeTab}
+          showMascot={isMainScreen}
+          onNavigate={(tab) => {
+            setActiveTab(tab);
+            setShopSubView('catalog');
+          }}
         />
       )}
     </div>
