@@ -67,7 +67,7 @@ Upload `webapp/src/...` → `exec … -- "cd webapp && npm run build"` → kiể
 
 ## Chatbot AI / RAG
 - Luồng: Messenger → `POST /webhooks/facebook` → `src/services/facebookAiBot.ts` (gom tin 5s, Gemini) ; playground/admin: `src/routes/aiAssistant.ts` ; RAG: `src/services/ragService.ts`.
-- Bảng RAG nằm ở **schema Postgres `rag`** (`rag.document_sources`, `rag.document_chunks`: vector(768) + tsvector + HNSW/GIN + trigger `rag.update_chunk_tsv`), **ngoài Prisma** để `db push` không xoá. Ngày 12/11/2026 bảng cũ ở `public` đã bị `db push` xoá, khôi phục từ `/var/backups/truliva_db/hourly/` (có backup DB production theo giờ). Không đưa lại các bảng này vào `public`/`schema.prisma`.
+- Bảng RAG nằm ở **schema Postgres `rag`** (`rag.document_sources`, `rag.document_chunks`: vector(768) + tsvector + HNSW/GIN + trigger `rag.update_chunk_tsv`), **ngoài Prisma** để `db push` không xoá. Ngày 12/11/2026 bảng cũ ở `public` đã bị `db push` xoá, sandbox khôi phục ngay, còn production thì đến 20/11 mới khôi phục (trong khoảng đó RAG production chạy rỗng mà không báo lỗi). Nguồn: backup daily `truliva_db_daily_2026-11-12.sql.gz`, embedding chép từ sandbox; file làm việc ở `/var/www/truliva/backups/rag_restore_20261120/`. Backup: `/var/backups/truliva_db/hourly/` (giữ ~3 ngày) và `daily/` (~30 ngày). Không đưa lại các bảng này vào `public`/`schema.prisma`.
 - `searchHybridRAG` nuốt lỗi và trả `[]` → RAG hỏng thì bot vẫn trả lời, không báo lỗi. Kiểm tra bằng `node scripts/verify_rag_api.js` (chỉ đọc) hoặc cột `retrieved_chunks` trong `ai_chat_messages`.
 - `GEMINI_API_KEY` đang là **Free Tier**: embed giới hạn 100 request/phút (mỗi đoạn trong batch tính 1). Nạp tài liệu lớn sẽ mất embedding; bù bằng `node scripts/rag_reembed.js [--apply]`.
 

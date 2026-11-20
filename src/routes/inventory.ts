@@ -510,7 +510,9 @@ router.get('/my-stock', async (req: Request, res: Response): Promise<void> => {
  * GET /api/inventory/analytics
  * Lấy báo cáo Xuất - Nhập - Tồn từ Pancake POS (Hỗ trợ lọc theo kho và khoảng thời gian)
  */
-router.get('/analytics', requirePermission('INVENTORY_VIEW'), async (req: Request, res: Response): Promise<void> => {
+const requireInventoryView = requirePermission('INVENTORY_VIEW');
+// KTV không có INVENTORY_VIEW nhưng luôn được xem kho của chính mình (handler khoá warehouse theo user)
+router.get('/analytics', (req, res, next) => (req.user?.role === 'KTV' ? next() : requireInventoryView(req, res, next)), async (req: Request, res: Response): Promise<void> => {
   try {
     const apiKey = process.env.PANCAKE_API_KEY;
     if (!apiKey) {

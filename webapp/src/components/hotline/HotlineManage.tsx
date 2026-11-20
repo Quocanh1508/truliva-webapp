@@ -1255,7 +1255,7 @@ export default function HotlineManage() {
                                   </button>
                                   {o.serviceReports && o.serviceReports.length > 0 && (
                                     <button
-                                      onClick={() => navigate(`/admin/reports?search=${o.pancakeOrderId}`)}
+                                      onClick={() => navigate(`/admin/reports?search=${encodeURIComponent(formatOrderId(o.pancakeOrderId))}`)}
                                       className="flex items-center justify-center gap-1 px-2.5 py-1 bg-teal-50 text-teal-700 hover:bg-teal-100 rounded-lg text-xs font-semibold transition-colors w-full cursor-pointer"
                                       title="Xem báo cáo KTV"
                                     >

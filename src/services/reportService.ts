@@ -373,6 +373,13 @@ export async function buildReportFilter(query: any, user: any): Promise<any> {
       if (!isNaN(parsed)) numSearch = parsed;
     }
 
+    // Đúng dạng mã đơn (#6706 / M797) → chỉ khớp chính xác mã đơn, tránh lẫn đơn có SĐT/ghi chú chứa cùng dãy số
+    if (numSearch !== null && /^(#|M)\d+$/i.test(s)) {
+      where.AND = where.AND || [];
+      where.AND.push({ order: { pancakeOrderId: numSearch } });
+      return where;
+    }
+
     const cleanPhone = s.replace(/\D/g, '').replace(/^84/, '').replace(/^0/, '');
 
     const searchConditions: any[] = [

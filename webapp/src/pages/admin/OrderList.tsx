@@ -3758,7 +3758,7 @@ export default function OrderList() {
                         {/* Xem báo cáo dịch vụ (nếu có) */}
                         {order.serviceReports && order.serviceReports.length > 0 && (
                           <button
-                            onClick={() => navigate(`/admin/reports?search=${order.pancakeOrderId}`)}
+                            onClick={() => navigate(`/admin/reports?search=${encodeURIComponent(formatOrderId(order.pancakeOrderId))}`)}
                             className="p-1.5 text-teal-600 hover:bg-teal-50 rounded border border-transparent hover:border-teal-100 transition-colors"
                             title="Xem báo cáo của KTV"
                           >

@@ -27,7 +27,7 @@ const ROLES = ['ADMIN', 'COORDINATOR', 'HOTLINE', 'STAFF', 'SALE_SUPERVISOR', 'S
     ['/reports/my-stats', ['REPORT_CREATE', 'ORDER_VIEW']],
     ['/reports/filter-options', ['REPORT_VIEW']],
     ['/reports/check-serial?serialNumber=X', ['REPORT_CREATE', 'ORDER_VIEW']],
-    ['/inventory/analytics', ['INVENTORY_VIEW']],
+    ['/inventory/analytics', ['INVENTORY_VIEW'], ['KTV']], // KTV luôn xem được kho của mình
     ['/users/ktvs', ['ORDER_VIEW', 'DASHBOARD_VIEW', 'ORDER_ASSIGN_KTV']],
   ];
   // Chỉ kiểm tra "thiếu quyền → 403" (bị chặn trước handler). Có quyền thì KHÔNG gọi: controller còn lọc theo role,
@@ -41,13 +41,14 @@ const ROLES = ['ADMIN', 'COORDINATOR', 'HOTLINE', 'STAFF', 'SALE_SUPERVISOR', 'S
 
   let fail = 0;
   for (const role of ROLES) {
-    const u = await prisma.user.findFirst({ where: { role, isActive: true, NOT: { group: 'CUSTOMER' } }, select: { id: true, role: true, group: true } });
+    // KTV phải có kho được gán, nếu không /inventory/analytics trả 403 từ handler (không phải do quyền)
+    const u = await prisma.user.findFirst({ where: { role, isActive: true, OR: [{ group: null }, { NOT: { group: 'CUSTOMER' } }], ...(role === 'KTV' ? { warehouseId: { not: null } } : {}) }, select: { id: true, role: true, group: true } });
     if (!u) { console.log(`- ${role}: không có user`); continue; }
     const token = jwt.sign({ id: u.id, role: u.role, group: u.group }, process.env.JWT_SECRET, { expiresIn: '5m' });
     const line = [];
-    for (const [p, keys] of [...ROUTES, ...EXTRA]) {
+    for (const [p, keys, alwaysRoles = []] of [...ROUTES, ...EXTRA]) {
       if (p.includes('undefined')) continue;
-      let allowed = false;
+      let allowed = alwaysRoles.includes(u.role);
       for (const k of keys) if (await checkDynamicPermission(u.role, k, u.group, u.id)) { allowed = true; break; }
       const strict = ROUTES.some(([q]) => q === p);
       if (allowed && !strict) continue;
