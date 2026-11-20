@@ -36,7 +36,7 @@ Quy tắc deploy/kiểm thử bắt buộc: xem `DEPLOY_AND_TESTING_RULES.md` (k
   | production | `/var/www/truliva` | `truliva-backend` | 3000 | `truliva_db` |
   | sandbox | `/var/www/truliva-sandbox` | `truliva-sandbox` | 3001 | `truliva_sandbox` |
 - **Bẫy DB:** `src/config/database.ts` khi chưa có `DATABASE_URL` sẽ tự nạp `/var/www/truliva/.env`, tức là **DB production**, kể cả khi đang chạy trong thư mục sandbox. Mọi script chạy trên VPS phải gọi `require('dotenv').config({ path: path.resolve(__dirname, '../.env') })` **trước** khi import `database.ts`, và nên in ra tên DB đang dùng.
-- Không dùng các script trong `scratch/`: chúng hardcode mật khẩu SSH cũ (đã đổi ngày 12/11/2026). Thông tin SSH lấy từ `.env` local (`VPS_HOST`, `VPS_USER`, `VPS_PORT`, `VPS_SSH_KEY_PATH`|`VPS_PASSWORD`).
+- Không dùng các script trong `scratch/`: chúng hardcode mật khẩu SSH cũ (đã đổi ngày 12/11/2026). Ngày 20/11/2026 đã xoá các file trong đó chứa mật khẩu DB/SSH đang dùng; **không viết mật khẩu vào script**, lấy từ `.env`. Thông tin SSH lấy từ `.env` local (`VPS_HOST`, `VPS_USER`, `VPS_PORT`, `VPS_SSH_KEY_PATH`|`VPS_PASSWORD`).
 
 ### Công cụ
 - `node scripts/vps_deploy.js pull <production|sandbox> <outDir> <file...>`: tải bản đang chạy trên VPS về để diff (đặt `outDir` trong scratchpad).
@@ -82,7 +82,7 @@ Upload `webapp/src/...` → `exec … -- "cd webapp && npm run build"` → kiể
 - ⚠️ **Sandbox và production dùng CHUNG broker MQTT và CHUNG thiết bị thật.** Một lệnh gửi từ sandbox vẫn tới máy của khách. Mọi lệnh có tác động (reboot, set_interval, OTA) lên máy thật phải được user đồng ý trước.
 - ⚠️ ESP32 được lắp **nối tiếp trên đường DATA giữa bo chính và màn hình** máy lọc (xem `IOT/TDS-May-loc-nuoc/README.md`). Khi chip reboot, màn hình máy lọc mất dữ liệu trong lúc chip khởi động. Đã có trường hợp chip chạy lại ngay nhưng ~19 phút sau mới gửi dữ liệu trở lại.
 - Xác minh lệnh có tác động thật: `verifyLastCommand` đối chiếu với telemetry sau lệnh. Với reboot: `now - uptime` phải nằm sau lúc gửi lệnh, và `reset_reason` (firmware 1.2.0 có gửi) là `software`. Phản hồi `ok` chỉ cho biết firmware đã *nhận* lệnh.
-- `TRU-UR5840-088`, `TRU-TEST-001`, `TRU-TEST-ESP32` là máy test/giả lập (`scratch/seed_mock_5840.js`), payload của chúng có SSID/MAC giả là bình thường.
+- `TRU-UR5840-088`, `TRU-TEST-001`, `TRU-TEST-ESP32` là máy test/giả lập (seed bằng script scratch, đã xoá 20/11/2026 vì chứa mật khẩu DB). `TRU-TEST-001` là máy UR5676, payload của chúng có SSID/MAC giả là bình thường.
 - Mini App (`zalo-miniapp/`) phát hành bằng `npm run deploy` (`zmp-cli deploy`, cần đăng nhập Zalo), không chạy trên VPS. Thư mục này không có `tsconfig.json`; build thử bằng `npx vite build --outDir <tmp>`.
 - File log PM2 `/root/.pm2/logs/truliva-backend-out.log` rất lớn (4,5 GB tại 13/11/2026), nên grep có chọn lọc.
 - Typecheck webapp: `npx tsc --noEmit -p tsconfig.app.json` (trong `webapp/`). `tsconfig.json` gốc chỉ có `references` nên `-p .` không kiểm tra file nào.
