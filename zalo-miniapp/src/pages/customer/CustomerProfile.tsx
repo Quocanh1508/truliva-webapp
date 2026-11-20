@@ -250,8 +250,8 @@ export default function CustomerProfile({
 
       <div className="max-w-md mx-auto px-4 mt-4 space-y-4">
         {/* 2. My Devices Section */}
-        <div ref={devicesSectionRef} data-tour="profile-devices" className="space-y-3 scroll-mt-6">
-          <div className="flex items-center justify-between">
+        <div ref={devicesSectionRef} className="space-y-3 scroll-mt-6">
+          <div data-tour="profile-devices" className="flex items-center justify-between">
             <div className="flex items-center space-x-2">
               <div className="p-1.5 bg-blue-100 text-[#1B3A6B] rounded-lg">
                 <Droplets size={16} />

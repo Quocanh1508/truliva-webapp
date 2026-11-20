@@ -5,15 +5,15 @@ import { GUIDE_TOPICS, FIRST_TOUR, GuideStep } from '../config/guideTopics';
 import { getSafeStorage, setSafeStorage } from '../api/client';
 // Ảnh được nhúng thẳng vào index.js (xem assetsInlineLimit trong vite.config.ts)
 import livyImg from '../assets/livy.png';
+import livyThinkingImg from '../assets/livy-thinking.png';
 
 // shortcut: cờ "đã hỏi xem hướng dẫn" lưu trong localStorage theo máy, đổi điện thoại sẽ được hỏi lại; cần đồng bộ thì lưu lên server
 const SEEN_KEY = 'truliva_guide_seen_v1:';
 const PAD = 6;
-const TOOLTIP_SPACE = 220;
 
-/** Linh vật Livy. size = chiều cao (px) */
-export function GuideMascot({ size = 56, className = '' }: { size?: number; className?: string }) {
-  return <img src={livyImg} alt="" aria-hidden="true" draggable={false} style={{ height: size, width: 'auto' }} className={className} />;
+/** Linh vật Livy. size = chiều cao (px); pose "thinking" dùng khi khách đang xem hướng dẫn */
+export function GuideMascot({ size = 56, className = '', pose = 'default' }: { size?: number; className?: string; pose?: 'default' | 'thinking' }) {
+  return <img src={pose === 'thinking' ? livyThinkingImg : livyImg} alt="" aria-hidden="true" draggable={false} style={{ height: size, width: 'auto' }} className={className} />;
 }
 
 interface Rect { top: number; left: number; width: number; height: number }
@@ -31,10 +31,14 @@ export default function GuideTour({ userKey, currentTab, showMascot, onNavigate 
   const [steps, setSteps] = useState<GuideStep[]>([]);
   const [index, setIndex] = useState(0);
   const [rect, setRect] = useState<Rect | null>(null);
+  // Chiều cao thật của hộp chữ (đổi theo độ dài nội dung, cỡ chữ máy) để đặt trên/dưới nút cho vừa
+  const [tipHeight, setTipHeight] = useState(260);
   const dirRef = useRef<1 | -1>(1);
   const returnTabRef = useRef<MainTabType>('home');
   const navRef = useRef(onNavigate);
   navRef.current = onNavigate;
+  const currentTabRef = useRef(currentTab);
+  currentTabRef.current = currentTab;
 
   // Lần đầu đăng nhập trên máy này: hỏi khách có muốn xem hướng dẫn không
   useEffect(() => {
@@ -70,6 +74,8 @@ export default function GuideTour({ userKey, currentTab, showMascot, onNavigate 
     const step = steps[index];
     if (!step) { finishTour(); return; }
 
+    // Cùng tab thì màn hình đã có sẵn → thiếu phần tử là bỏ qua ngay; vừa chuyển tab thì chờ tab vẽ xong
+    const waitMs = step.tab === currentTabRef.current ? 120 : 1500;
     navRef.current(step.tab);
     setRect(null);
     let el: Element | null = null;
@@ -82,7 +88,7 @@ export default function GuideTour({ userKey, currentTab, showMascot, onNavigate 
         if (el) {
           const tall = el.getBoundingClientRect().height > window.innerHeight * 0.6;
           el.scrollIntoView({ block: tall ? 'start' : 'center', behavior: 'smooth' });
-        } else if (performance.now() - startedAt > 1500) {
+        } else if (performance.now() - startedAt > waitMs) {
           // Không có phần tử này (vd. chưa có máy) → bỏ qua bước theo chiều đang đi
           setIndex(i => i + dirRef.current);
           return;
@@ -109,8 +115,9 @@ export default function GuideTour({ userKey, currentTab, showMascot, onNavigate 
   let tooltipPos: React.CSSProperties = { bottom: 'calc(16px + env(safe-area-inset-bottom, 0px))' };
   if (rect) {
     const vh = window.innerHeight;
-    if (vh - (rect.top + rect.height) > TOOLTIP_SPACE) tooltipPos = { top: rect.top + rect.height + PAD + 10 };
-    else if (rect.top > TOOLTIP_SPACE) tooltipPos = { bottom: vh - rect.top + PAD + 10 };
+    const need = tipHeight + PAD + 20;
+    if (vh - (rect.top + rect.height) > need) tooltipPos = { top: rect.top + rect.height + PAD + 10 };
+    else if (rect.top > need) tooltipPos = { bottom: vh - rect.top + PAD + 10 };
   }
 
   return (
@@ -168,7 +175,7 @@ export default function GuideTour({ userKey, currentTab, showMascot, onNavigate 
             style={{ paddingBottom: 'calc(16px + env(safe-area-inset-bottom, 0px))' }}
           >
             <div className="flex items-center gap-3">
-              <GuideMascot size={60} />
+              <GuideMascot size={60} pose="thinking" />
               <div className="flex-1">
                 <h2 id="guide-picker-title" className="font-black text-base text-slate-900">Bạn cần hướng dẫn gì?</h2>
                 <p className="text-xs text-slate-500">Chọn một mục, Livy sẽ chỉ từng bước.</p>
@@ -223,10 +230,14 @@ export default function GuideTour({ userKey, currentTab, showMascot, onNavigate 
           )}
 
           {rect && (
-            <div className="fixed left-0 right-0 px-4" style={tooltipPos}>
+            <div
+              className="fixed left-0 right-0 px-4"
+              style={tooltipPos}
+              ref={el => { if (el && el.offsetHeight !== tipHeight) setTipHeight(el.offsetHeight); }}
+            >
               <div role="dialog" aria-modal="true" aria-labelledby="guide-step-title" className="max-w-md mx-auto bg-white rounded-3xl p-4 shadow-2xl space-y-3">
                 <div className="flex items-start gap-3">
-                  <GuideMascot size={56} className="shrink-0" />
+                  <GuideMascot size={56} pose="thinking" className="shrink-0" />
                   <div className="flex-1 min-w-0" aria-live="polite">
                     <p className="text-[11px] font-bold text-[#0284C7]">Bước {index + 1}/{steps.length}</p>
                     <h3 id="guide-step-title" className="font-black text-sm text-slate-900">{step.title}</h3>

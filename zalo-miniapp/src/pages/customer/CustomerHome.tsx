@@ -359,7 +359,7 @@ export default function CustomerHome({ user, mySerials = [], onOpenScanner, onOp
       )}
 
       {/* 4. Section Máy Lọc Nước & Tuổi Thọ Lõi Lọc IoT (Nếu có máy) hoặc Quét Mã QR */}
-      <div data-tour="home-device" className="max-w-md mx-auto px-4 mt-4 space-y-3">
+      <div className="max-w-md mx-auto px-4 mt-4 space-y-3">
         {mySerials.length > 0 ? (
           <div className="space-y-2.5">
             {/* Header: Tiêu đề gọn gàng + Badge số lượng + Nút xem chi tiết (Không bị rớt dòng) */}
@@ -389,7 +389,7 @@ export default function CustomerHome({ user, mySerials = [], onOpenScanner, onOp
 
             {/* Bộ chọn máy (Horizontal Device Tabs Selector) khi có nhiều máy */}
             {mySerials.length > 1 && (
-              <div className="flex items-center gap-2 overflow-x-auto pb-1 no-scrollbar pt-0.5">
+              <div data-tour="home-device-picker" className="flex items-center gap-2 overflow-x-auto pb-1 no-scrollbar pt-0.5">
                 {mySerials.map((device, idx) => {
                   const activeIdx = selectedDeviceIndex < mySerials.length ? selectedDeviceIndex : 0;
                   const isSelected = idx === activeIdx;
@@ -447,7 +447,7 @@ export default function CustomerHome({ user, mySerials = [], onOpenScanner, onOp
             })()}
           </div>
         ) : (
-          <div className="bg-white p-4 rounded-3xl border border-sky-100 shadow-[0_4px_20px_rgba(27,58,107,0.06)] flex items-center justify-between hover:shadow-[0_8px_24px_rgba(0,163,255,0.12)] transition-shadow">
+          <div data-tour="home-scan" className="bg-white p-4 rounded-3xl border border-sky-100 shadow-[0_4px_20px_rgba(27,58,107,0.06)] flex items-center justify-between hover:shadow-[0_8px_24px_rgba(0,163,255,0.12)] transition-shadow">
             <div className="flex items-center space-x-3.5">
               <div className="p-3 bg-gradient-to-br from-sky-50 to-cyan-100 text-[#0284C7] rounded-2xl border border-sky-200/60 shadow-xs">
                 <QrCode size={24} />
