@@ -437,8 +437,8 @@ async function checkAlerts(
     // Dòng 2 lõi không có Lõi 3 (CTO), không phát cảnh báo CTO
   } else {
     // ── Dòng 3 lõi (UR5676, UR5840): Lõi 1 (PGP), Lõi 2 (RO), Lõi 3 (CTO) ──
-    // Quy chuẩn chỉ báo: < 10% hoặc flag replace -> 1 vạch nháy đỏ -> Cần thay
-    if (filter1Replace || (filter1Val !== null && filter1Val < 10)) {
+    // Theo đúng màn hình máy: mức 0–2 (hoặc máy báo replace) mới là 1 vạch nháy đỏ -> Cần thay. Giữ khớp IotMonitor / IotDeviceCard
+    if (filter1Replace || (filter1Val !== null && filter1Val < 3)) {
       alerts.push({
         type: 'FILTER_PPC_REPLACE',
         severity: 'WARNING',
@@ -446,7 +446,7 @@ async function checkAlerts(
       });
     }
 
-    if (data.ro_replace === true || (roVal !== null && roVal < 10)) {
+    if (data.ro_replace === true || (roVal !== null && roVal < 3)) {
       alerts.push({
         type: 'FILTER_RO_REPLACE',
         severity: 'CRITICAL',
@@ -454,7 +454,7 @@ async function checkAlerts(
       });
     }
 
-    if (data.cto_replace === true || (ctoVal !== null && ctoVal < 10)) {
+    if (data.cto_replace === true || (ctoVal !== null && ctoVal < 3)) {
       alerts.push({
         type: 'FILTER_CTO_REPLACE',
         severity: 'WARNING',
