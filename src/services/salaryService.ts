@@ -18,6 +18,24 @@ export function normalizePhone(phone: any): string {
   return str;
 }
 
+/** "11/2026" | "2026-11" → 2026*12+11; sai định dạng → null */
+export function monthKeyOf(month: string | null | undefined): number | null {
+  const m = String(month || '').trim().match(/^(\d{1,2})\/(\d{4})$|^(\d{4})-(\d{1,2})$/);
+  if (!m) return null;
+  const mo = Number(m[1] ?? m[4]);
+  return mo >= 1 && mo <= 12 ? Number(m[2] ?? m[3]) * 12 + mo : null;
+}
+
+/** Tháng (giờ VN) của một thời điểm, cùng dạng với monthKeyOf */
+export function vnMonthKeyOf(d: Date): number {
+  const s = d.toLocaleDateString('sv-SE', { timeZone: 'Asia/Ho_Chi_Minh' }); // YYYY-MM-DD
+  return Number(s.slice(0, 4)) * 12 + Number(s.slice(5, 7));
+}
+
+// Từ 11/2026 mỗi ca lương / đơn hoa hồng chỉ thuộc đúng 1 tháng. Tháng trước giữ cách tính cũ để khớp số đã chi.
+const STRICT_MONTH_FROM = 2026 * 12 + 11;
+export const isStrictMonth = (key: number | null): boolean => key !== null && key >= STRICT_MONTH_FROM;
+
 export function getRateType(workType: string | null | undefined): 'giaoHang' | 'baoHanh' | 'suaChua' | 'thayLoc' | 'lapDat' | 'giaoHangLapDat' | 'thaoLapLai' | 'other' {
   if (!workType) return 'baoHanh';
   const normalized = workType.toLowerCase().trim();
@@ -430,6 +448,9 @@ export async function computeFullSalariesForMonth(month: string) {
     ? new Date(Date.UTC(yNum, mNum, 0, 23, 59, 59, 999))
     : new Date(Date.UTC(2099, 11, 31, 23, 59, 59, 999));
 
+  // Tháng strict chỉ lọc theo cột month: khung createdAt tính theo UTC nên ca nộp 0h–7h ngày 1 lọt vào cả tháng trước
+  const strict = isStrictMonth(monthKeyOf(month));
+
   const savedRecords = await prisma.salaryRecord.findMany({
     where: { month: { in: monthVariants } }
   });
@@ -442,7 +463,7 @@ export async function computeFullSalariesForMonth(month: string) {
         approvalStatus: 'APPROVED',
         OR: [
           { month: { in: monthVariants } },
-          { createdAt: { gte: startDate, lte: endDate } }
+          ...(strict ? [] : [{ createdAt: { gte: startDate, lte: endDate } }])
         ],
         AND: [
           {

@@ -1,4 +1,5 @@
 import { Router, Request, Response } from 'express';
+import crypto from 'crypto';
 import { v4 as uuidv4 } from 'uuid';
 import prisma from '../config/database';
 import logger from '../utils/logger';
@@ -50,8 +51,10 @@ router.post(
       // ── Lấy event_type từ nhiều format có thể có ──
       const eventType: string = body.event_type || body.eventType || body.type || 'unknown';
 
-      // ── Lấy event_id để chống gửi lặp (Step 5) ──
-      const externalEventId: string | null = body.event_id || body.eventId || body.id || null;
+      // ── Khoá chống gửi lặp ──
+      // Pancake không gửi event_id. Không dùng body.id: đó là mã đơn/khách, nên mọi lần cập nhật sau lần đầu bị coi là trùng.
+      // Băm nguyên body: Pancake gửi lại đúng sự kiện thì trùng khoá, mỗi lần cập nhật thật có nội dung khác.
+      const externalEventId: string = String(body.event_id || body.eventId || crypto.createHash('sha1').update(JSON.stringify(body)).digest('hex'));
 
       // ── Kiểm tra trùng lặp nếu có event_id ──
       if (externalEventId) {

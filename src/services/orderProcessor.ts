@@ -179,6 +179,18 @@ export async function processOrderEvent(rawEventId: string | null, payload: any)
       }
     });
 
+    // Snapshot cũ hơn bản đã lưu (webhook tới trễ sau lượt quét / webhook mới hơn) → bỏ qua, không ghi đè trạng thái mới hơn
+    if (existingOrder?.pancakeUpdatedAt && pancakeUpdatedAt && pancakeUpdatedAt.getTime() < existingOrder.pancakeUpdatedAt.getTime()) {
+      logger.info('Skipped stale Pancake order snapshot', {
+        rawEventId,
+        pancakeOrderId: systemId,
+        payloadUpdatedAt: pancakeUpdatedAt.toISOString(),
+        storedUpdatedAt: existingOrder.pancakeUpdatedAt.toISOString(),
+      });
+      if (rawEventId) await markProcessed(rawEventId);
+      return;
+    }
+
     let newAdminStatus = existingOrder?.adminStatus || (existingOrder?.assignedKtvId ? 'đang thực hiện' : 'chờ xử lý');
     const pStatus = (payload.status_name || '').toLowerCase();
     const statusId = typeof payload.status === 'number' ? payload.status : statusCode;
