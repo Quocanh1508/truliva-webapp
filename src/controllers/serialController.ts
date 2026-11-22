@@ -4,6 +4,7 @@ import logger from '../utils/logger';
 import ExcelJS from 'exceljs';
 import XLSX from 'xlsx';
 import axios from 'axios';
+import jwt from 'jsonwebtoken';
 import fs from 'fs';
 import path from 'path';
 import readline from 'readline';
@@ -212,53 +213,6 @@ export async function activatePublicSerial(req: Request, res: Response): Promise
   }
 }
 
-export async function confirmPublicSerial(req: Request, res: Response): Promise<void> {
-  try {
-    const { serialNumber } = req.body;
-    if (!serialNumber) {
-      res.status(400).json({ error: 'Thiếu số Serial' });
-      return;
-    }
-
-    const cleaned = cleanSerialNumber(serialNumber);
-    const unhyphenated = cleaned.replace(/[-_]/g, '');
-    const serial = await prisma.serial.findFirst({
-      where: {
-        OR: [
-          { serialNumber: cleaned },
-          { serialNumber: unhyphenated }
-        ]
-      }
-    });
-
-    if (!serial) {
-      res.status(404).json({ error: 'Không tìm thấy số Serial trong hệ thống' });
-      return;
-    }
-
-    const updatedSerial = await prisma.serial.update({
-      where: { id: serial.id },
-      data: {
-        status: 'Đã kích hoạt',
-        customerConfirmationDate: new Date()
-      }
-    });
-
-    res.json({
-      success: true,
-      message: 'Xác nhận kích hoạt bảo hành thành công!',
-      serial: {
-        serialNumber: updatedSerial.serialNumber,
-        model: updatedSerial.model,
-        warrantyExpiryDate: updatedSerial.warrantyExpiryDate
-      }
-    });
-  } catch (error: any) {
-    logger.error('Public confirm serial error', { error: error.message });
-    res.status(500).json({ error: 'Lỗi hệ thống khi xác nhận bảo hành' });
-  }
-}
-
 export async function zaloAuthorize(req: Request, res: Response): Promise<void> {
   try {
     const config = await getZaloConfig();
@@ -268,7 +222,9 @@ export async function zaloAuthorize(req: Request, res: Response): Promise<void> 
     }
 
     const redirectUri = process.env.ZALO_REDIRECT_URI || `${req.protocol}://${req.get('host')}/api/serials/zalo/callback`;
-    const authorizeUrl = `https://oauth.zalo.me/v4/oa/permission?app_id=${config.appId}&redirect_uri=${encodeURIComponent(redirectUri)}&state=truliva`;
+    // state ký bằng JWT_SECRET, gắn với người bấm liên kết: callback chỉ nhận code do chính phiên này khởi tạo (chống login CSRF)
+    const state = jwt.sign({ purpose: 'zalo_oa_oauth', uid: req.user!.id }, process.env.JWT_SECRET!, { expiresIn: '10m' });
+    const authorizeUrl = `https://oauth.zalo.me/v4/oa/permission?app_id=${config.appId}&redirect_uri=${encodeURIComponent(redirectUri)}&state=${encodeURIComponent(state)}`;
 
     logger.info('Redirecting admin to Zalo OAuth page', { appId: config.appId, redirectUri });
     res.redirect(authorizeUrl);
@@ -282,6 +238,17 @@ export async function zaloCallback(req: Request, res: Response): Promise<void> {
     const code = req.query.code as string;
     if (!code) {
       res.status(400).send('Thiếu mã authorization code từ Zalo OA');
+      return;
+    }
+
+    let stateOk = false;
+    try {
+      const decoded: any = jwt.verify(String(req.query.state || ''), process.env.JWT_SECRET!);
+      stateOk = decoded.purpose === 'zalo_oa_oauth' && decoded.uid === req.user!.id;
+    } catch { /* hết hạn hoặc giả */ }
+    if (!stateOk) {
+      logger.warn('Zalo OAuth callback rejected: invalid state', { userId: req.user!.id });
+      res.status(400).send('Phiên liên kết Zalo OA không hợp lệ hoặc đã hết hạn (10 phút). Vui lòng bấm liên kết lại từ trang Quản lý Serial.');
       return;
     }
 
