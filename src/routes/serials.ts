@@ -3,13 +3,12 @@ import multer from 'multer';
 import { v2 as cloudinary } from 'cloudinary';
 import { CloudinaryStorage } from 'multer-storage-cloudinary';
 import logger from '../utils/logger';
-import { requireAuth, requireSerialAccess, requireDev } from '../middleware/authSession';
+import { requireAuth, requireSerialAccess, requireDev, authorize } from '../middleware/authSession';
 import {
   uploadInvoiceResponse,
   previewDuration,
   checkPublicSerial,
   activatePublicSerial,
-  confirmPublicSerial,
   zaloAuthorize,
   zaloCallback,
   getSerials,
@@ -98,11 +97,11 @@ router.post('/public/upload-invoice', (req, res, next) => {
 router.get('/public/preview-duration', previewDuration);
 router.get('/public/check/:serialNumber', checkPublicSerial);
 router.post('/public/activate', activatePublicSerial);
-router.post('/public/confirm', confirmPublicSerial);
 
 // ZALO OA OAUTH ROUTES
-router.get('/zalo/authorize', zaloAuthorize);
-router.get('/zalo/callback', zaloCallback);
+// Liên kết OA quyết định ZNS gửi từ OA nào: chỉ ADMIN/DEV, mở popup từ webapp nên cookie session_token đi kèm
+router.get('/zalo/authorize', requireAuth, authorize('ADMIN', 'DEV'), zaloAuthorize);
+router.get('/zalo/callback', requireAuth, authorize('ADMIN', 'DEV'), zaloCallback);
 
 // PROTECTED ROUTES
 router.use(requireAuth);
