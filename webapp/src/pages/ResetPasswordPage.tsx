@@ -24,8 +24,8 @@ export default function ResetPasswordPage() {
       return;
     }
 
-    if (newPassword.length < 4) {
-      setError('Mật khẩu mới phải có ít nhất 4 ký tự');
+    if (newPassword.length < 8) {
+      setError('Mật khẩu mới phải có ít nhất 8 ký tự');
       return;
     }
 
@@ -81,7 +81,7 @@ export default function ResetPasswordPage() {
                     className="form-input"
                     value={newPassword}
                     onChange={(e) => setNewPassword(e.target.value)}
-                    placeholder="Nhập ít nhất 4 ký tự"
+                    placeholder="Nhập ít nhất 8 ký tự"
                     required
                   />
                 </div>
