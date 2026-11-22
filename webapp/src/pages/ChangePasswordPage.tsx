@@ -17,8 +17,8 @@ export default function ChangePasswordPage() {
     setError('');
     setSuccess('');
 
-    if (newPassword.length < 4) {
-      setError('Mật khẩu mới phải có ít nhất 4 ký tự.');
+    if (newPassword.length < 8) {
+      setError('Mật khẩu mới phải có ít nhất 8 ký tự.');
       return;
     }
 
