@@ -213,12 +213,26 @@ async function getDynamicCatalogContext(contextText: string): Promise<{ catalogC
  */
 async function fetchImageAsBase64(imageUrl: string): Promise<{ mimeType: string; data: string } | null> {
   try {
-    const response = await axios.get(imageUrl, {
+    // Chống SSRF: chỉ tải ảnh từ CDN của Meta (kể cả sau redirect)
+    const isMetaCdn = (u: { protocol?: string | null; hostname?: string | null }) =>
+      u.protocol === 'https:' && /^([a-z0-9-]+\.)*(fbcdn\.net|fbsbx\.com)$/i.test(u.hostname || '');
+    const parsed = new URL(imageUrl);
+    if (!isMetaCdn(parsed)) {
+      logger.warn('Blocked non-Meta attachment URL in Facebook bot', { imageUrl });
+      return null;
+    }
+    const response = await axios.get(parsed.toString(), {
       responseType: 'arraybuffer',
-      timeout: 10000
+      timeout: 10000,
+      maxContentLength: 10 * 1024 * 1024,
+      maxRedirects: 3,
+      beforeRedirect: (opts: any) => {
+        if (!isMetaCdn(opts)) throw new Error(`Redirect to non-Meta host blocked: ${opts.hostname}`);
+      }
     });
     const rawContentType = response.headers['content-type'];
     const contentType = typeof rawContentType === 'string' ? rawContentType : 'image/jpeg';
+    if (!contentType.startsWith('image/')) return null;
     const base64Data = Buffer.from(response.data).toString('base64');
     return {
       mimeType: contentType.split(';')[0].trim(),
