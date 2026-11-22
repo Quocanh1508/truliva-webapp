@@ -1,6 +1,7 @@
 import { WebSocketServer, WebSocket } from 'ws';
-import { Server } from 'http';
+import { Server, IncomingMessage } from 'http';
 import logger from '../utils/logger';
+import { requireAuth } from '../middleware/authSession';
 
 let wss: WebSocketServer | null = null;
 const clients = new Set<WebSocket>();
@@ -14,8 +15,14 @@ export function initWebSocketServer(server: Server) {
     const pathname = url.pathname;
 
     if (pathname === '/ws') {
-      wss?.handleUpgrade(request, socket, head, (ws) => {
-        wss?.emit('connection', ws, request);
+      isStaffSession(request).then((ok) => {
+        if (!ok) {
+          socket.end('HTTP/1.1 401 Unauthorized\r\nConnection: close\r\n\r\n');
+          return;
+        }
+        wss?.handleUpgrade(request, socket, head, (ws) => {
+          wss?.emit('connection', ws, request);
+        });
       });
     } else {
       socket.destroy();
@@ -35,6 +42,17 @@ export function initWebSocketServer(server: Server) {
       logger.error('WebSocket client error', err);
       clients.delete(ws);
     });
+  });
+}
+
+// Upgrade request không đi qua Express nên tự đọc cookie, rồi chạy đúng requireAuth (token hết hạn/thu hồi, token khách Zalo, user bị khoá).
+function isStaffSession(request: IncomingMessage): Promise<boolean> {
+  const match = /(?:^|;\s*)session_token=([^;]+)/.exec(request.headers.cookie || '');
+  const req: any = request;
+  req.cookies = match ? { session_token: decodeURIComponent(match[1]) } : {};
+  return new Promise((resolve) => {
+    const res: any = { status: () => res, json: () => resolve(false) };
+    requireAuth(req, res, () => resolve(true)).catch(() => resolve(false));
   });
 }
 
