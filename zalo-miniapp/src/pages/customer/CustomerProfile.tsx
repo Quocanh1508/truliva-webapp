@@ -32,7 +32,7 @@ import CustomerVoucherModal from '../../components/CustomerVoucherModal';
 import CustomerHistoryModal from '../../components/CustomerHistoryModal';
 import CustomerLoyaltyModal from '../../components/CustomerLoyaltyModal';
 import LegalPagesModal, { LegalDocType } from '../../components/LegalPagesModal';
-import P3ROceanHeader from '../../components/P3ROceanHeader';
+import ChristmasKnitHeader from '../../components/ChristmasKnitHeader';
 import IotDeviceCard from '../../components/IotDeviceCard';
 import { FEATURES } from '../../config/features';
 
@@ -159,7 +159,7 @@ export default function CustomerProfile({
   return (
     <div className="pb-28 bg-slate-50 min-h-screen font-sans">
       {/* 1. Header Profile Card with Persona 3 Reload Ocean Waves */}
-      <P3ROceanHeader className="p-5 pt-[calc(env(safe-area-inset-top,38px)+24px)] pb-12">
+      <ChristmasKnitHeader className="p-5 pt-[calc(env(safe-area-inset-top,38px)+24px)] pb-12">
         <div className="max-w-md mx-auto space-y-4">
           <div className="flex items-center space-x-4">
             <div 
@@ -167,11 +167,11 @@ export default function CustomerProfile({
               title="Nhấn để đồng bộ avatar và tên từ Zalo"
               className="relative cursor-pointer group"
             >
-              <div className="w-16 h-16 rounded-full bg-[#0B2545] border-2 border-white/85 shadow-md flex items-center justify-center text-white font-black text-xl overflow-hidden transition-all group-hover:opacity-90">
+              <div className="w-16 h-16 rounded-full bg-[#0B2545] noel:bg-[#4A0811] border-2 border-white/85 shadow-md flex items-center justify-center text-white font-black text-xl overflow-hidden transition-all group-hover:opacity-90">
                 {user?.avatar ? (
                   <img src={user.avatar} alt="Avatar" className="w-full h-full object-cover" />
                 ) : (
-                  <User size={32} className="text-cyan-200" />
+                  <User size={32} className="text-cyan-200 noel:text-[#F7DFB0]" />
                 )}
               </div>
             </div>
@@ -180,15 +180,15 @@ export default function CustomerProfile({
               <div className="flex items-center space-x-2">
                 <h1 className="text-lg font-black text-white truncate drop-shadow-sm">{userName}</h1>
               </div>
-              <p className="text-xs text-sky-200 flex items-center mt-0.5 font-medium">
-                <Phone size={12} className="mr-1 flex-shrink-0 text-[#00D2FF]" />
+              <p className="text-xs text-sky-200 noel:text-[#FBEFDD] flex items-center mt-0.5 font-medium">
+                <Phone size={12} className="mr-1 flex-shrink-0 text-[#00D2FF] noel:text-[#F7DFB0]" />
                 {userPhone}
               </p>
               
               <button 
                 onClick={handleSyncZaloProfile}
                 disabled={syncing}
-                className="text-[10px] text-cyan-300 hover:text-white underline mt-1 block cursor-pointer transition-colors"
+                className="text-[10px] text-cyan-300 noel:text-[#F7DFB0] hover:text-white underline mt-1 block cursor-pointer transition-colors"
               >
                 {syncing ? 'Đang đồng bộ Zalo...' : 'Đồng bộ tên & avatar Zalo'}
               </button>
@@ -218,21 +218,21 @@ export default function CustomerProfile({
           </div>
 
           {/* Quick Stats Grid: Thiết bị | Điểm tích lũy | Hotline (UI/UX Pro Max Ocean Glass HUD) */}
-          <div className={`grid ${FEATURES.ENABLE_MEMBER_RANKING ? 'grid-cols-3' : 'grid-cols-2'} gap-2 bg-[#041426]/75 backdrop-blur-xl rounded-3xl p-2.5 text-center border border-cyan-400/30 text-xs shadow-[0_6px_25px_rgba(0,210,255,0.18)]`}>
+          <div className={`grid ${FEATURES.ENABLE_MEMBER_RANKING ? 'grid-cols-3' : 'grid-cols-2'} gap-2 bg-[#041426]/75 noel:bg-[#3A0610]/80 backdrop-blur-xl rounded-3xl p-2.5 text-center border border-cyan-400/30 noel:border-[#F7DFB0]/35 text-xs shadow-[0_6px_25px_rgba(0,210,255,0.18)] noel:shadow-[0_6px_20px_rgba(40,4,12,0.35)]`}>
             <button 
               onClick={scrollToDevices}
               className="p-1.5 rounded-2xl hover:bg-white/10 active:scale-95 transition-all cursor-pointer group touch-tactile"
             >
-              <p className="text-[9px] text-sky-200 uppercase tracking-wider font-extrabold group-hover:text-white transition-colors">Thiết bị</p>
+              <p className="text-[9px] text-sky-200 noel:text-[#FBEFDD] uppercase tracking-wider font-extrabold group-hover:text-white transition-colors">Thiết bị</p>
               <p className="font-black text-white text-base mt-0.5 tabular-num">{(mySerials || []).length} máy</p>
             </button>
 
             {FEATURES.ENABLE_MEMBER_RANKING && (
             <button
               onClick={() => setShowLoyaltyModal(true)}
-              className="p-1.5 rounded-2xl border-x border-cyan-400/25 hover:bg-white/10 active:scale-95 transition-all cursor-pointer group touch-tactile"
+              className="p-1.5 rounded-2xl border-x border-cyan-400/25 noel:border-[#F7DFB0]/25 hover:bg-white/10 active:scale-95 transition-all cursor-pointer group touch-tactile"
             >
-              <p className="text-[9px] text-sky-200 uppercase tracking-wider font-extrabold group-hover:text-white transition-colors">Điểm tích lũy</p>
+              <p className="text-[9px] text-sky-200 noel:text-[#FBEFDD] uppercase tracking-wider font-extrabold group-hover:text-white transition-colors">Điểm tích lũy</p>
               <p className="font-black text-amber-400 text-base mt-0.5 drop-shadow-xs tabular-num">{userPoints.toLocaleString('vi-VN')}</p>
             </button>
             )}
@@ -241,12 +241,12 @@ export default function CustomerProfile({
               href="tel:1900638463"
               className="p-1.5 rounded-2xl hover:bg-white/10 active:scale-95 transition-all cursor-pointer group block touch-tactile"
             >
-              <p className="text-[9px] text-sky-200 uppercase tracking-wider font-extrabold group-hover:text-white transition-colors">Hotline</p>
-              <p className="font-black text-cyan-300 text-sm mt-1 tracking-tight">1900 63 84 63</p>
+              <p className="text-[9px] text-sky-200 noel:text-[#FBEFDD] uppercase tracking-wider font-extrabold group-hover:text-white transition-colors">Hotline</p>
+              <p className="font-black text-cyan-300 noel:text-[#F7DFB0] text-sm mt-1 tracking-tight">1900 63 84 63</p>
             </a>
           </div>
         </div>
-      </P3ROceanHeader>
+      </ChristmasKnitHeader>
 
       <div className="max-w-md mx-auto px-4 mt-4 space-y-4">
         {/* 2. My Devices Section */}

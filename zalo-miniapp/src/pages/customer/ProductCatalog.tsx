@@ -17,7 +17,7 @@ import {
 import { fetchZaloApi } from '../../api/client';
 import { useCart } from '../../context/CartContext';
 import LegalPagesModal, { LegalDocType } from '../../components/LegalPagesModal';
-import P3ROceanHeader from '../../components/P3ROceanHeader';
+import ChristmasKnitHeader from '../../components/ChristmasKnitHeader';
 import { FEATURES } from '../../config/features';
 
 interface ProductCatalogProps {
@@ -83,12 +83,12 @@ export default function ProductCatalog({ onSelectProduct, onGoToCart }: ProductC
   return (
     <div className="min-h-screen bg-[#F8FAFC] pb-24 font-sans text-gray-800 animate-fade-in">
       {/* Top Banner Header with Persona 3 Reload Ocean Waves */}
-      <P3ROceanHeader className="p-5 pt-[calc(env(safe-area-inset-top,38px)+24px)] pb-8">
+      <ChristmasKnitHeader className="p-5 pt-[calc(env(safe-area-inset-top,38px)+24px)] pb-8 noel:pb-10">
         <div className="max-w-md mx-auto space-y-3">
           <div className="flex items-center justify-between gap-3">
             <div className="min-w-0">
-              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#06182E]/80 text-white text-[10.5px] font-black border border-cyan-400/40 backdrop-blur-md mb-2 shadow-[0_2px_8px_rgba(6,24,46,0.35)]">
-                <span className="w-1.5 h-1.5 rounded-full bg-[#00D2FF] shadow-[0_0_8px_#00D2FF] shrink-0"></span>
+              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#06182E]/80 noel:bg-[#3A0610]/85 text-white text-[10.5px] font-black border border-cyan-400/40 noel:border-[#F7DFB0]/45 backdrop-blur-md mb-2 shadow-[0_2px_8px_rgba(6,24,46,0.35)] noel:shadow-[0_2px_8px_rgba(40,4,12,0.35)]">
+                <span className="w-1.5 h-1.5 rounded-full bg-[#00D2FF] shadow-[0_0_8px_#00D2FF] noel:bg-[#F0BA48] noel:shadow-none shrink-0"></span>
                 <span className="tracking-wide">{FEATURES.ENABLE_ECOMMERCE ? 'Gian hàng chính hãng Truliva' : 'Thiết bị & Hướng dẫn sử dụng'}</span>
               </div>
               <h1 className="text-lg sm:text-xl font-black text-white tracking-tight leading-snug">
@@ -114,7 +114,7 @@ export default function ProductCatalog({ onSelectProduct, onGoToCart }: ProductC
                 )}
               </button>
             ) : (
-              <div className="w-10 h-10 rounded-2xl bg-white/10 border border-white/15 flex items-center justify-center text-cyan-300 backdrop-blur-md shrink-0">
+              <div className="w-10 h-10 rounded-2xl bg-white/10 noel:bg-[#3A0610]/70 border border-white/15 noel:border-[#F7DFB0]/35 flex items-center justify-center text-cyan-300 noel:text-[#F7DFB0] backdrop-blur-md shrink-0">
                 <BookOpen className="w-5 h-5" />
               </div>
             )}
@@ -133,16 +133,16 @@ export default function ProductCatalog({ onSelectProduct, onGoToCart }: ProductC
                   ? 'Tìm kiếm thiết bị nhà bếp Truliva...'
                   : 'Tìm kiếm dòng máy lọc nước, model...'
               }
-              className="w-full h-10 pl-9 pr-4 rounded-xl bg-white text-slate-800 placeholder-slate-400 text-xs shadow-xs focus:outline-none focus:ring-2 focus:ring-[#00D2FF]"
+              className="w-full h-10 pl-9 pr-4 rounded-xl bg-white text-slate-800 placeholder-slate-400 text-xs shadow-xs focus:outline-none focus:ring-2 focus:ring-[#00D2FF] noel:focus:ring-[#F0BA48]"
             />
             <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
           </form>
 
           {/* Trust Badges Strip (Thay đổi theo từng lựa chọn danh mục) */}
           {category === 'WATER_PURIFIER' && (
-            <div className="flex items-center justify-between text-[11px] text-sky-200/90 pt-2 border-t border-white/10 font-medium whitespace-nowrap">
+            <div className="flex items-center justify-between text-[11px] text-sky-200/90 noel:text-[#FBEFDD] pt-2 border-t border-white/10 font-medium whitespace-nowrap">
               <div className="flex items-center gap-1">
-                <Truck size={13} className="text-cyan-300" />
+                <Truck size={13} className="text-cyan-300 noel:text-[#F7DFB0]" />
                 <span>Miễn phí giao lắp</span>
               </div>
               <span className="text-white/20">•</span>
@@ -159,9 +159,9 @@ export default function ProductCatalog({ onSelectProduct, onGoToCart }: ProductC
           )}
 
           {category === 'FILTER_CARTRIDGE' && (
-            <div className="flex items-center justify-between text-[11px] text-sky-200/90 pt-2 border-t border-white/10 font-medium whitespace-nowrap">
+            <div className="flex items-center justify-between text-[11px] text-sky-200/90 noel:text-[#FBEFDD] pt-2 border-t border-white/10 font-medium whitespace-nowrap">
               <div className="flex items-center gap-1">
-                <ShieldCheck size={13} className="text-cyan-300" />
+                <ShieldCheck size={13} className="text-cyan-300 noel:text-[#F7DFB0]" />
                 <span>Chính hãng 100%</span>
               </div>
               <span className="text-white/20">•</span>
@@ -177,7 +177,7 @@ export default function ProductCatalog({ onSelectProduct, onGoToCart }: ProductC
             </div>
           )}
         </div>
-      </P3ROceanHeader>
+      </ChristmasKnitHeader>
 
       {/* 3 Category Tabs (Luôn hiển thị 3 lựa chọn giống Website: Máy lọc nước | Lõi lọc nước | Sản phẩm bếp khác) */}
       <div data-tour="shop-categories" className="px-4 py-3 sticky top-0 bg-[#F8FAFC]/95 backdrop-blur-md z-20 border-b border-gray-100">

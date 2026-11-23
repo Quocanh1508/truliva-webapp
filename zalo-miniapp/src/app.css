@@ -1,5 +1,8 @@
 @import "tailwindcss";
 
+/* noel:xxx chỉ có tác dụng trong banner Giáng sinh (ChristmasKnitHeader) */
+@custom-variant noel (&:where(.noel, .noel *));
+
 /* Ngăn chặn cử chỉ vuốt mép ngang màn hình ngoài ý muốn làm thoát Mini App & tối ưu font chữ tiếng Việt */
 html, body {
   overscroll-behavior-x: none;
@@ -252,5 +255,24 @@ html, body {
   .p3r-wave-layer-mid,
   .p3r-wave-layer-front {
     animation: none;
+  }
+}
+
+/* Tuyết rơi trên banner Giáng sinh: cột cao bằng banner nên 100% = rơi hết banner */
+@keyframes noelSnow {
+  from { transform: translate3d(0, -16px, 0); }
+  33% { transform: translate3d(9px, 33%, 0); }
+  66% { transform: translate3d(-5px, 66%, 0); }
+  to { transform: translate3d(6px, 100%, 0); }
+}
+
+.noel-snow {
+  animation: noelSnow 18s linear infinite;
+  will-change: transform;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .noel-snow {
+    display: none;
   }
 }
