@@ -8,6 +8,12 @@ import { sendPasswordResetEmail } from '../utils/emailService';
 
 const router = Router();
 
+// Hash giả cùng cost 10 với hash thật, dùng khi username không tồn tại
+const DUMMY_PASSWORD_HASH = bcrypt.hashSync('dummy-password-for-timing', 10);
+
+// IP thật (trust proxy 1 + X-Forwarded-For của nginx) và UA, để điều tra đăng nhập lạ
+const clientInfo = (req: Request) => ({ ip: req.ip, userAgent: String(req.headers['user-agent'] || '').slice(0, 300) });
+
 const defaultAllowedOrigins = [
   'https://trulivaofficial.com',
   'https://www.trulivaofficial.com',
@@ -64,17 +70,21 @@ router.post('/login', async (req: Request, res: Response): Promise<void> => {
     }
 
     const user = await prisma.user.findUnique({
-      where: { username: username.toLowerCase().trim() },
+      where: { username: String(username).toLowerCase().trim() },
     });
 
-    if (!user || !user.isActive) {
-      res.status(401).json({ error: 'Tài khoản không tồn tại hoặc đã bị vô hiệu hóa' });
+    // Luôn chạy bcrypt (kể cả khi không có user) và trả chung 1 thông báo để không dò được username
+    const isValid = await bcrypt.compare(String(password), user?.passwordHash ?? DUMMY_PASSWORD_HASH);
+    if (!user || !isValid) {
+      logger.warn('Login failed', { ...clientInfo(req), username: String(username).slice(0, 100), reason: user ? 'wrong_password' : 'unknown_user' });
+      res.status(401).json({ error: 'Sai tên đăng nhập hoặc mật khẩu' });
       return;
     }
 
-    const isValid = await bcrypt.compare(password, user.passwordHash);
-    if (!isValid) {
-      res.status(401).json({ error: 'Mật khẩu không đúng' });
+    // Chỉ người biết đúng mật khẩu mới biết tài khoản bị khoá
+    if (!user.isActive) {
+      logger.warn('Login failed', { ...clientInfo(req), userId: user.id, username: user.username, reason: 'inactive' });
+      res.status(401).json({ error: 'Tài khoản đã bị vô hiệu hóa. Vui lòng liên hệ Admin.' });
       return;
     }
 
@@ -96,7 +106,7 @@ router.post('/login', async (req: Request, res: Response): Promise<void> => {
       maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
     });
 
-    logger.info('User logged in with JWT', { userId: user.id, username: user.username });
+    logger.info('User logged in with JWT', { ...clientInfo(req), userId: user.id, username: user.username, role: user.role });
 
     res.json({
       token,
@@ -274,8 +284,8 @@ router.post('/change-password', requireAuth, async (req: Request, res: Response)
       return;
     }
 
-    if (newPassword.length < 4) {
-      res.status(400).json({ error: 'Mật khẩu mới phải có ít nhất 4 ký tự' });
+    if (newPassword.length < 8) {
+      res.status(400).json({ error: 'Mật khẩu mới phải có ít nhất 8 ký tự' });
       return;
     }
 
@@ -291,6 +301,7 @@ router.post('/change-password', requireAuth, async (req: Request, res: Response)
 
     const isValid = await bcrypt.compare(currentPassword, user.passwordHash);
     if (!isValid) {
+      logger.warn('Change password failed: wrong current password', { ...clientInfo(req), userId: user.id });
       res.status(400).json({ error: 'Mật khẩu hiện tại không đúng' });
       return;
     }
@@ -311,7 +322,7 @@ router.post('/change-password', requireAuth, async (req: Request, res: Response)
       maxAge: 7 * 24 * 60 * 60 * 1000,
     });
 
-    logger.info('Password changed by user', { userId: user.id });
+    logger.info('Password changed by user', { ...clientInfo(req), userId: user.id });
 
     res.json({ message: 'Thay đổi mật khẩu thành công', token });
   } catch (error: any) {
@@ -342,13 +353,11 @@ router.post('/forgot-password', async (req: Request, res: Response): Promise<voi
       },
     });
 
-    if (!user || !user.isActive) {
-      res.status(404).json({ error: 'Không tìm thấy tài khoản hoạt động với thông tin này' });
-      return;
-    }
-
-    if (!user.email) {
-      res.status(400).json({ error: 'Tài khoản này chưa cấu hình email. Vui lòng liên hệ Admin để đặt lại mật khẩu.' });
+    // Mọi trường hợp đều trả cùng một câu, để không dò được username/email nào tồn tại
+    const genericMessage = 'Nếu tài khoản tồn tại và đã có email, liên kết khôi phục mật khẩu đã được gửi vào email đó. Nếu không nhận được, vui lòng liên hệ Admin để đặt lại mật khẩu.';
+    if (!user || !user.isActive || !user.email) {
+      logger.info('Password reset request ignored', { ...clientInfo(req), reason: !user ? 'not_found' : !user.isActive ? 'inactive' : 'no_email', userId: user?.id });
+      res.json({ message: genericMessage });
       return;
     }
 
@@ -370,14 +379,12 @@ router.post('/forgot-password', async (req: Request, res: Response): Promise<voi
     const appUrl = process.env.APP_URL || 'http://localhost:5173';
     const resetLink = `${appUrl}/reset-password?token=${token}`;
 
-    const emailSent = await sendPasswordResetEmail(user.email, resetLink, user.fullName);
-    if (!emailSent) {
-      res.status(500).json({ error: 'Không thể gửi email. Vui lòng thử lại sau.' });
-      return;
-    }
-
-    logger.info('Password reset request successful', { userId: user.id, email: user.email });
-    res.json({ message: 'Đã gửi liên kết khôi phục mật khẩu vào email của bạn. Vui lòng kiểm tra hộp thư.' });
+    // Không chờ gửi mail: thời gian phản hồi cũng không được lộ là tài khoản có tồn tại
+    const logInfo = { ...clientInfo(req), userId: user.id, email: user.email };
+    sendPasswordResetEmail(user.email, resetLink, user.fullName)
+      .then((sent) => sent ? logger.info('Password reset request successful', logInfo) : logger.error('Password reset email failed', logInfo))
+      .catch((err) => logger.error('Password reset email failed', { ...logInfo, error: err.message }));
+    res.json({ message: genericMessage });
   } catch (error: any) {
     logger.error('Forgot password error', { error: error.message });
     res.status(500).json({ error: 'Lỗi hệ thống khi yêu cầu khôi phục mật khẩu' });
@@ -397,8 +404,8 @@ router.post('/reset-password', async (req: Request, res: Response): Promise<void
       return;
     }
 
-    if (newPassword.length < 4) {
-      res.status(400).json({ error: 'Mật khẩu mới phải có ít nhất 4 ký tự' });
+    if (newPassword.length < 8) {
+      res.status(400).json({ error: 'Mật khẩu mới phải có ít nhất 8 ký tự' });
       return;
     }
 
@@ -413,7 +420,7 @@ router.post('/reset-password', async (req: Request, res: Response): Promise<void
     try {
       decoded = jwt.verify(token, jwtSecret);
     } catch (err: any) {
-      logger.warn('Invalid or expired reset token used', { error: err.message });
+      logger.warn('Invalid or expired reset token used', { ...clientInfo(req), error: err.message });
       res.status(400).json({ error: 'Liên kết đặt lại mật khẩu không hợp lệ hoặc đã hết hạn' });
       return;
     }
@@ -448,7 +455,7 @@ router.post('/reset-password', async (req: Request, res: Response): Promise<void
       data: { passwordHash: newPasswordHash, tokenVersion: { increment: 1 } },
     });
 
-    logger.info('Password reset successfully via email link', { userId: user.id, username: user.username });
+    logger.info('Password reset successfully via email link', { ...clientInfo(req), userId: user.id, username: user.username });
     res.json({ message: 'Đặt lại mật khẩu thành công. Vui lòng đăng nhập lại.' });
   } catch (error: any) {
     logger.error('Reset password error', { error: error.message });

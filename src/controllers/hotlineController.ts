@@ -849,7 +849,7 @@ export async function createHotlineTicket(req: Request, res: Response) {
       }
     });
 
-    broadcastEvent('HOTLINE_TICKET_CREATED', ticket);
+    broadcastEvent('HOTLINE_TICKET_CREATED', { id: ticket.id });
     return res.status(201).json(ticket);
   } catch (error: any) {
     console.error('[createHotlineTicket] Error:', error);
@@ -945,7 +945,7 @@ export async function updateHotlineTicket(req: Request, res: Response) {
       }
     });
 
-    broadcastEvent('HOTLINE_TICKET_UPDATED', ticket);
+    broadcastEvent('HOTLINE_TICKET_UPDATED', { id: ticket.id });
     return res.json(ticket);
   } catch (error: any) {
     console.error('[updateHotlineTicket] Error:', error);
@@ -1002,7 +1002,7 @@ export async function assignHotlineTicket(req: Request, res: Response) {
       })
     ]);
 
-    broadcastEvent('HOTLINE_TICKET_UPDATED', ticket);
+    broadcastEvent('HOTLINE_TICKET_UPDATED', { id: ticket.id });
     return res.json(ticket);
   } catch (error: any) {
     console.error('[assignHotlineTicket] Error:', error);
@@ -1204,7 +1204,7 @@ export async function verifyHotlineTicketPhase3(req: Request, res: Response) {
       })
     ]);
 
-    broadcastEvent('HOTLINE_TICKET_UPDATED', ticket);
+    broadcastEvent('HOTLINE_TICKET_UPDATED', { id: ticket.id });
     return res.json(ticket);
   } catch (error: any) {
     console.error('[verifyHotlineTicketPhase3] Error:', error);
@@ -1376,7 +1376,7 @@ export async function createPublicTechSupportTicket(req: Request, res: Response)
       }
     });
 
-    broadcastEvent('HOTLINE_TICKET_CREATED', ticket);
+    broadcastEvent('HOTLINE_TICKET_CREATED', { id: ticket.id });
 
     return res.status(201).json({
       success: true,

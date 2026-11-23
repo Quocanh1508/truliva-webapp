@@ -16,6 +16,38 @@ export const apiLimiter = rateLimit({
   }
 });
 
+// Endpoint public (không cần đăng nhập): chống spam/đốt quota email, Cloudinary, ZNS và dò mã
+const publicLimiter = (windowMs: number, limit: number, error: string) => rateLimit({
+  windowMs,
+  limit,
+  standardHeaders: true,
+  legacyHeaders: false,
+  handler: (req, res) => {
+    logger.warn('Public endpoint rate limit exceeded', { ip: req.ip, url: req.originalUrl });
+    res.status(429).json({ error });
+  }
+});
+
+export const forgotPasswordLimiter = publicLimiter(60 * 60 * 1000, 5, 'Bạn đã yêu cầu đặt lại mật khẩu quá nhiều lần. Vui lòng thử lại sau 1 giờ.');
+export const publicWriteLimiter = publicLimiter(60 * 60 * 1000, 30, 'Quá nhiều yêu cầu từ địa chỉ IP này. Vui lòng thử lại sau.');
+export const publicReadLimiter = publicLimiter(60 * 1000, 30, 'Quá nhiều yêu cầu. Vui lòng thử lại sau 1 phút.');
+
+// Khoá tạm theo username: chặn dò mật khẩu 1 tài khoản từ nhiều IP. Chỉ đếm lần sai (status >= 400).
+// Đánh đổi: kẻ xấu biết username có thể cố tình làm khoá tài khoản đó tối đa 15 phút.
+export const loginAccountLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: 10,
+  skipSuccessfulRequests: true,
+  standardHeaders: true,
+  legacyHeaders: false,
+  skip: (req) => !req.body?.username,
+  keyGenerator: (req) => 'user:' + String(req.body.username).toLowerCase().trim(),
+  handler: (req, res) => {
+    logger.warn('Login account temporarily locked (too many failed attempts)', { ip: req.ip, username: String(req.body?.username) });
+    res.status(429).json({ error: 'Tài khoản tạm bị khoá do đăng nhập sai quá nhiều lần. Vui lòng thử lại sau 15 phút.' });
+  }
+});
+
 // Rate limiter for authentication/login endpoint
 export const loginLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes

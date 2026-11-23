@@ -42,7 +42,6 @@ import SalaryManage from './pages/admin/SalaryManage';
 import IotMonitor from './pages/admin/IotMonitor';
 import AiAssistantManage from './pages/admin/AiAssistantManage';
 import WarrantyActivate from './pages/public/WarrantyActivate';
-import WarrantyConfirm from './pages/public/WarrantyConfirm';
 
 // Feedback / DEV Pages
 import FeedbackPage from './pages/FeedbackPage';
@@ -330,7 +329,6 @@ export default function App() {
                 <Route path="/forgot-password" element={<ForgotPasswordPage />} />
                 <Route path="/reset-password" element={<ResetPasswordPage />} />
                 <Route path="/warranty-activate" element={<WarrantyActivate />} />
-                <Route path="/warranty-confirm" element={<WarrantyConfirm />} />
                 
                 <Route element={<Layout />}>
                 {/* KTV Routes */}

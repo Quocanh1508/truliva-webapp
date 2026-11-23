@@ -191,17 +191,20 @@ function getTdsQuality(tds?: number | null) {
   return { text: 'Cần kiểm tra màng RO', color: 'text-rose-700', bg: 'bg-rose-50', border: 'border-rose-200' };
 }
 
+// Máy 3 lõi (vạch): theo đúng màn hình máy (bảng giải mã QY-KRL5018-P): 0–2 nháy đỏ | 3–24 1 vạch | 25–49 2 | 50–74 3 | 75–100 4.
+// Máy 2 lõi (đèn) chưa khảo sát màn hình nên giữ ngưỡng cũ (<10 đỏ, ≤25 sắp thay). Giữ khớp với IotDeviceCard (Mini App) và mqttService.
 function getFilterState(percent?: number | null, replace?: boolean, indicatorType: 'BARS' | 'LIGHT' = 'BARS', customBars?: number | null) {
   const val = percent ?? 80;
-  if (replace || (percent != null && percent < 10)) {
-    const ind = indicatorType === 'LIGHT' ? 'Nháy đèn đỏ' : '1 vạch nháy đỏ';
+  const isLight = indicatorType === 'LIGHT';
+  if (replace || (percent != null && (isLight ? percent < 10 : percent < 3))) {
+    const ind = isLight ? 'Nháy đèn đỏ' : '1 vạch nháy đỏ';
     return { text: 'Cần thay', color: 'text-rose-700', bg: 'bg-rose-100', bar: 'bg-rose-600', isCritical: true, indicator: ind, bars: 1 };
   }
-  if (percent != null && percent <= 25) {
-    const ind = indicatorType === 'LIGHT' ? 'Sáng đèn trắng' : '1 vạch xanh';
+  if (percent != null && (isLight ? percent <= 25 : percent < 25)) {
+    const ind = isLight ? 'Sáng đèn trắng' : '1 vạch xanh';
     return { text: 'Sắp thay', color: 'text-amber-700', bg: 'bg-amber-100', bar: 'bg-amber-500', isCritical: false, indicator: ind, bars: 1 };
   }
-  const calcBars = customBars ?? (val > 75 ? 4 : (val > 50 ? 3 : 2));
+  const calcBars = customBars ?? (val >= 75 ? 4 : (val >= 50 ? 3 : 2));
   const ind = indicatorType === 'LIGHT' ? 'Sáng đèn trắng' : `${calcBars}/4 vạch`;
   return { text: 'Đang tốt', color: 'text-emerald-700', bg: 'bg-emerald-100', bar: 'bg-emerald-500', isCritical: false, indicator: ind, bars: calcBars };
 }

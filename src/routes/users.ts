@@ -318,8 +318,8 @@ router.post('/', async (req: Request, res: Response): Promise<void> => {
       return;
     }
 
-    if (password.length < 4) {
-      res.status(400).json({ error: 'Mật khẩu phải có ít nhất 4 ký tự' });
+    if (password.length < 8) {
+      res.status(400).json({ error: 'Mật khẩu phải có ít nhất 8 ký tự' });
       return;
     }
 
@@ -486,8 +486,8 @@ router.put('/:id', async (req: Request, res: Response): Promise<void> => {
 
       let newPasswordHash = targetUser.passwordHash;
       if (password && password.trim()) {
-        if (password.length < 4) {
-          res.status(400).json({ error: 'Mật khẩu phải có ít nhất 4 ký tự' });
+        if (password.length < 8) {
+          res.status(400).json({ error: 'Mật khẩu phải có ít nhất 8 ký tự' });
           return;
         }
         newPasswordHash = await bcrypt.hash(password, 10);
@@ -623,8 +623,8 @@ router.put('/:id', async (req: Request, res: Response): Promise<void> => {
     }
 
     if (password) {
-      if (password.length < 4) {
-        res.status(400).json({ error: 'Mật khẩu phải có ít nhất 4 ký tự' });
+      if (password.length < 8) {
+        res.status(400).json({ error: 'Mật khẩu phải có ít nhất 8 ký tự' });
         return;
       }
       updateData.passwordHash = await bcrypt.hash(password, 10);

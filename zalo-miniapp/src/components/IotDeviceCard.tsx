@@ -105,9 +105,9 @@ export default function IotDeviceCard({ serialData, user, onBookMaintenance }: I
       : modelUpper.includes('61096') || (telemetry?.cto == null && (telemetry?.ppc != null || telemetry?.pcb != null));
   const indicatorType: 'BARS' | 'LIGHT' = isTwoFilter ? 'LIGHT' : 'BARS';
 
-  // Helper tính màu & trạng thái chỉ báo (Vạch / Đèn) theo đặc tả kỹ thuật:
-  // - Dòng UR5676 / UR5840 (vạch): >25%: 2,3,4 vạch xanh ("Đang tốt") | 10%-25%: 1 vạch xanh ("Sắp thay") | <10%: 1 vạch nháy đỏ ("Cần thay")
-  // - Dòng UR61096H / lõi PCB (đèn): >25%: sáng đèn trắng ("Đang tốt") | 10%-25%: sáng đèn trắng ("Sắp thay") | <10%: nháy đèn đỏ ("Cần thay")
+  // Helper tính màu & trạng thái chỉ báo (Vạch / Đèn), giữ khớp với IotMonitor (webapp) và mqttService:
+  // - Dòng UR5676 / UR5840 (vạch), theo đúng màn hình máy: 0–2 1 vạch nháy đỏ ("Cần thay") | 3–24 1 vạch xanh ("Sắp thay") | 25–49 2 | 50–74 3 | 75–100 4 vạch ("Đang tốt")
+  // - Dòng UR61096H / lõi PCB (đèn), chưa khảo sát màn hình nên giữ ngưỡng cũ: <10% nháy đèn đỏ | 10%-25% sáng đèn trắng ("Sắp thay") | >25% sáng đèn trắng
   const getFilterHealth = (pct: number | null | undefined, isReplace?: boolean, customBars?: number | null) => {
     // Không có số liệu thật từ máy → không bịa số, hiển thị "--"
     if (pct == null && !isReplace) {
@@ -123,7 +123,8 @@ export default function IotDeviceCard({ serialData, user, onBookMaintenance }: I
       };
     }
     const val = pct ?? 0;
-    if (isReplace || val < 10) {
+    const isLight = indicatorType === 'LIGHT';
+    if (isReplace || val < (isLight ? 10 : 3)) {
       return { 
         val,
         label: 'Cần thay', 
@@ -135,10 +136,10 @@ export default function IotDeviceCard({ serialData, user, onBookMaintenance }: I
         barsDisplay: indicatorType === 'LIGHT' ? 'Nháy đèn đỏ' : '(1 vạch nháy đỏ)'
       };
     }
-    if (val <= 25) {
-      return { 
+    if (isLight ? val <= 25 : val < 25) {
+      return {
         val,
-        label: 'Sắp thay', 
+        label: 'Sắp thay',
         color: 'bg-amber-500', 
         textColor: 'text-amber-600',
         badgeClass: 'bg-amber-50 text-amber-700 border-amber-200',
@@ -147,10 +148,10 @@ export default function IotDeviceCard({ serialData, user, onBookMaintenance }: I
         barsDisplay: indicatorType === 'LIGHT' ? 'Sáng đèn trắng' : '(1/4 vạch)'
       };
     }
-    const calcBars = customBars ?? (val > 75 ? 4 : (val > 50 ? 3 : 2));
-    return { 
+    const calcBars = customBars ?? (val >= 75 ? 4 : (val >= 50 ? 3 : 2));
+    return {
       val,
-      label: 'Đang tốt', 
+      label: 'Đang tốt',
       color: 'bg-emerald-500', 
       textColor: 'text-emerald-600',
       badgeClass: 'bg-emerald-50 text-emerald-700 border-emerald-200',

@@ -5,7 +5,6 @@ export const API_URL = '/api';
 export const PUBLIC_PATHS = [
   '/login',
   '/warranty-activate',
-  '/warranty-confirm',
   '/forgot-password',
   '/reset-password'
 ];

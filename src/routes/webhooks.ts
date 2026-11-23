@@ -259,21 +259,29 @@ router.get('/check-nga', blockInProduction, authenticate, authorize('ADMIN'), as
  * Xác thực Webhook với Meta Developer Portal
  */
 router.get('/facebook', (req: Request, res: Response): void => {
-  const FB_VERIFY_TOKEN = process.env.FB_VERIFY_TOKEN || 'truliva_fb_token_2026';
+  const FB_VERIFY_TOKEN = process.env.FB_VERIFY_TOKEN;
 
   const mode = req.query['hub.mode'];
   const token = req.query['hub.verify_token'];
   const challenge = req.query['hub.challenge'];
 
-  if (mode === 'subscribe' && token === FB_VERIFY_TOKEN) {
+  if (FB_VERIFY_TOKEN && mode === 'subscribe' && token === FB_VERIFY_TOKEN) {
     logger.info('Facebook Webhook verification successful');
     res.status(200).send(challenge);
     return;
   }
 
-  logger.warn('Facebook Webhook verification failed', { mode, token });
+  logger.warn('Facebook Webhook verification failed', { mode, hasVerifyToken: !!FB_VERIFY_TOKEN });
   res.sendStatus(403);
 });
+
+/** Meta ký raw body bằng App Secret: header `X-Hub-Signature-256: sha256=<hex HMAC-SHA256>`. */
+export function isValidFacebookSignature(rawBody: Buffer | undefined, header: string | undefined, secret: string | undefined): boolean {
+  if (!secret || !rawBody || !header?.startsWith('sha256=')) return false;
+  const expected = Buffer.from(crypto.createHmac('sha256', secret).update(rawBody).digest('hex'));
+  const received = Buffer.from(header.slice('sha256='.length).toLowerCase());
+  return expected.length === received.length && crypto.timingSafeEqual(expected, received);
+}
 
 /**
  * POST /webhooks/facebook
@@ -281,6 +289,17 @@ router.get('/facebook', (req: Request, res: Response): void => {
  */
 router.post('/facebook', (req: Request, res: Response): void => {
   const body = req.body;
+
+  // Không có chữ ký hợp lệ = không phải Meta gửi (thiếu FB_APP_SECRET thì từ chối tất cả)
+  if (!isValidFacebookSignature((req as any).rawBody, req.get('x-hub-signature-256'), process.env.FB_APP_SECRET)) {
+    logger.warn('Rejected Facebook webhook: invalid signature', {
+      ip: req.ip,
+      hasSignature: !!req.get('x-hub-signature-256'),
+      hasAppSecret: !!process.env.FB_APP_SECRET,
+    });
+    res.sendStatus(403);
+    return;
+  }
 
   // Trả về 200 OK ngay lập tức để Meta không gửi lại (retry)
   if (body.object === 'page') {
