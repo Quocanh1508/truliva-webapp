@@ -1,7 +1,9 @@
 import { Router } from 'express';
 import { requireAuth, requirePermission } from '../middleware/authSession';
+import { legacyHistoryWriteLimiter } from '../middleware/rateLimiter';
 import {
   searchCustomerHistory,
+  createLegacyServiceHistory,
   getHotlineTickets,
   getHotlineFilterOptions,
   createHotlineTicket,
@@ -27,6 +29,9 @@ router.use(requireAuth);
 
 // Phase 1: Tra cứu lịch sử KH & Gợi ý SĐT
 router.get('/search-customer', requirePermission('HOTLINE_SEARCH_CUSTOMER', 'HOTLINE_TICKET_CREATE', 'HOTLINE_TICKET_VIEW'), searchCustomerHistory);
+
+// Nhập thủ công lịch sử dịch vụ khách hàng (bảng legacy_service_histories, không ghi vào orders)
+router.post('/legacy-history', legacyHistoryWriteLimiter, requirePermission('HOTLINE_LEGACY_HISTORY_CREATE'), createLegacyServiceHistory);
 
 // Dropdown danh sách người xử lý (HOTLINE/ADMIN/COORDINATOR)
 router.get('/handlers', requirePermission('HOTLINE_TICKET_VIEW', 'HOTLINE_TICKET_CREATE'), getHotlineHandlers);
