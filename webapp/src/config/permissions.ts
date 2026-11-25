@@ -183,6 +183,14 @@ export const SYSTEM_FEATURES: SystemFeature[] = [
     addedAt: 'v1.1'
   },
   {
+    key: 'HOTLINE_LEGACY_HISTORY_CREATE',
+    module: 'hotline',
+    name: 'Nhập thủ công Lịch sử Dịch vụ Khách hàng',
+    description: 'Cho phép tự nhập thông tin lịch sử dịch vụ khách hàng trong mục Tra cứu lịch sử khách hàng của Quản lý Hotline (Admin, Điều phối viên, Sales, Hotline)',
+    defaultRoles: ['ADMIN', 'DEV', 'COORDINATOR', 'HOTLINE', 'SALE_SUPERVISOR', 'SALER'],
+    addedAt: '2026-11-25'
+  },
+  {
     key: 'HOTLINE_TICKET_CREATE',
     module: 'hotline',
     name: 'Tạo phiếu Yêu cầu Hotline (Phase 2)',
