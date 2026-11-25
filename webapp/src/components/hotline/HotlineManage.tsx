@@ -11,6 +11,7 @@ import {
   Calendar, XCircle, Download, Check, ChevronDown, UserCheck, Tag, FileText
 } from 'lucide-react';
 import HotlineTicketModal from './HotlineTicketModal';
+import LegacyHistoryModal from './LegacyHistoryModal';
 import DateRangePicker from '../DateRangePicker';
 import { formatOrderId } from '../../utils/text';
 import { normalizeProvince } from '../../utils/provinces';
@@ -108,6 +109,7 @@ function removeAccents(str: string): string {
 // Lịch sử dịch vụ cũ (import ẩn) — GET /hotlines/search-customer → legacyServiceHistory
 interface LegacyServiceHistory {
   id: string;
+  importBatch?: string | null;
   legacyOrderCode: string | null;
   customerName: string | null;
   customerPhone: string | null;
@@ -268,6 +270,7 @@ export default function HotlineManage() {
 
   // Modal states
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [showLegacyHistoryModal, setShowLegacyHistoryModal] = useState(false);
   const [showAssignModal, setShowAssignModal] = useState(false);
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [selectedTicket, setSelectedTicket] = useState<HotlineTicket | null>(null);
@@ -792,14 +795,26 @@ export default function HotlineManage() {
         <div className="space-y-6">
           {/* Header & Search Bar */}
           <div className="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm space-y-4">
-            <div className="flex items-center gap-3">
-              <div className="p-3 bg-blue-50 text-[#00A3FF] rounded-xl">
-                <Search size={22} />
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <div className="p-3 bg-blue-50 text-[#00A3FF] rounded-xl">
+                  <Search size={22} />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-[#1B3A6B]">Tra cứu toàn bộ lịch sử tương tác Khách hàng</h3>
+                  <p className="text-xs text-gray-500">Tìm kiếm nhanh theo Tên khách hàng, Số điện thoại (chính/phụ) hoặc Số Serial máy / ID Sản phẩm.</p>
+                </div>
               </div>
-              <div>
-                <h3 className="text-base font-bold text-[#1B3A6B]">Tra cứu toàn bộ lịch sử tương tác Khách hàng</h3>
-                <p className="text-xs text-gray-500">Tìm kiếm nhanh theo Tên khách hàng, Số điện thoại (chính/phụ) hoặc Số Serial máy / ID Sản phẩm.</p>
-              </div>
+              {hasPermission('HOTLINE_SEARCH_CUSTOMER') && hasPermission('HOTLINE_LEGACY_HISTORY_CREATE') && (
+                <button
+                  type="button"
+                  onClick={() => setShowLegacyHistoryModal(true)}
+                  className="inline-flex items-center justify-center gap-2 px-4 py-2.5 min-h-[44px] bg-[#1B3A6B] hover:bg-[#152e56] text-white rounded-xl font-semibold text-xs sm:text-sm shadow-sm transition-all cursor-pointer shrink-0"
+                >
+                  <Plus size={16} />
+                  <span>Nhập lịch sử khách hàng</span>
+                </button>
+              )}
             </div>
 
             <div className="flex items-center gap-3">
@@ -967,8 +982,8 @@ export default function HotlineManage() {
                                 )}
                               </td>
 
-                              {/* 4. Địa chỉ */}
-                              <td className="px-3 py-2.5 text-gray-600 max-w-xs truncate" title={[s.address, s.province].filter(Boolean).join(', ')}>
+                              {/* 4. Địa chỉ — Thể hiện full địa chỉ */}
+                              <td className="px-3 py-2.5 text-gray-600 min-w-[220px] max-w-[380px] whitespace-normal break-words leading-relaxed">
                                 {[s.address, s.province].filter(Boolean).join(', ') || <span className="text-gray-400 italic">—</span>}
                               </td>
 
@@ -1302,9 +1317,13 @@ export default function HotlineManage() {
                               <tr key={h.id} className="hover:bg-gray-50/60 transition-colors bg-slate-50/30">
                                 <td className="px-3 py-2.5 align-top whitespace-nowrap">
                                   <div className="font-mono font-semibold text-gray-700">{h.legacyOrderCode || '—'}</div>
-                                  <span className="text-[9px] text-gray-500 font-medium bg-gray-100 rounded px-1.5 py-0.2">Dữ liệu cũ</span>
+                                  {h.importBatch === 'manual_hotline_input' ? (
+                                    <span className="text-[9px] text-blue-700 font-semibold bg-blue-50 border border-blue-200/70 rounded px-1.5 py-0.2">Nhập thủ công</span>
+                                  ) : (
+                                    <span className="text-[9px] text-gray-500 font-medium bg-gray-100 rounded px-1.5 py-0.2">Dữ liệu cũ</span>
+                                  )}
                                 </td>
-                                <td className="px-3 py-2.5 align-top min-w-[160px] max-w-[220px]">
+                                <td className="px-3 py-2.5 align-top min-w-[180px] max-w-[280px]">
                                   <div className="font-bold text-gray-900 text-xs whitespace-pre-wrap">{h.customerName || 'Khách lẻ'}</div>
                                   {h.customerPhone && (
                                     <div
@@ -1316,7 +1335,7 @@ export default function HotlineManage() {
                                       <span>{h.customerPhone}</span>
                                     </div>
                                   )}
-                                  <div className="text-gray-500 text-[11px] leading-tight line-clamp-2" title={h.address || ''}>{h.address || '—'}</div>
+                                  <div className="text-gray-500 text-[11px] leading-relaxed whitespace-normal break-words">{h.address || '—'}</div>
                                   {h.provinceName && (
                                     <span className="inline-flex items-center gap-0.5 text-[9px] font-bold text-blue-700 bg-blue-50 border border-blue-200/60 rounded px-1.5 py-0.2 mt-1">
                                       📍 {h.provinceName}
@@ -2949,6 +2968,26 @@ export default function HotlineManage() {
           onClose={() => { setShowCreateModal(false); setShowDetailModal(false); setSelectedTicket(null); }}
           onSaved={() => { setShowCreateModal(false); setShowDetailModal(false); setSelectedTicket(null); fetchTickets(); }}
           userRole={user?.role || ''}
+        />
+      )}
+
+      {/* ══════════════════════════════════════════════════
+           LEGACY SERVICE HISTORY MANUAL INPUT MODAL
+         ══════════════════════════════════════════════════ */}
+      {showLegacyHistoryModal && hasPermission('HOTLINE_SEARCH_CUSTOMER') && hasPermission('HOTLINE_LEGACY_HISTORY_CREATE') && (
+        <LegacyHistoryModal
+          isOpen={showLegacyHistoryModal}
+          onClose={() => setShowLegacyHistoryModal(false)}
+          fallbackProductNames={filterOptions.productNames}
+          initialPhone={historyQuery}
+          onSaved={(record) => {
+            if (record?.customerPhone) {
+              setHistoryQuery(record.customerPhone);
+              runHistorySearch(record.customerPhone);
+            } else if (historyQuery.trim()) {
+              runHistorySearch(historyQuery);
+            }
+          }}
         />
       )}
 
