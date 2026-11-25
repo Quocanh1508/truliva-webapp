@@ -5,6 +5,11 @@ import { useAuth } from '../context/AuthContext';
 import { fetchApi } from '../api/client';
 import { Capacitor } from '@capacitor/core';
 import { isSandboxEnvironment } from '../components/SandboxBanner';
+import NoelLoginTheme from '../components/NoelLoginTheme';
+import logoTheu from '../assets/noel-logo-theu.webp';
+
+// Hết ngày 25/12/2026 (giờ VN) tự về giao diện cũ
+const IS_NOEL = Date.now() < Date.parse('2026-12-26T00:00:00+07:00');
 
 interface Particle {
   x: number;
@@ -263,22 +268,26 @@ export default function LoginPage() {
       onTouchStart={handleTouchStart}
       onTouchMove={handleTouchMove}
       onTouchEnd={handleTouchEnd}
-      className="relative flex items-center justify-center min-h-screen h-[100dvh] w-full overflow-hidden cyber-bg"
+      className={`relative flex items-center justify-center min-h-screen h-[100dvh] w-full overflow-hidden cyber-bg ${IS_NOEL ? 'noel-login' : ''}`}
       style={{ WebkitTapHighlightColor: 'transparent' }}
     >
-      {/* Subtle grid pattern overlay */}
-      <div className="absolute inset-0 pointer-events-none z-0 cyber-grid" />
+      {IS_NOEL ? <NoelLoginTheme /> : (
+        <>
+          {/* Subtle grid pattern overlay */}
+          <div className="absolute inset-0 pointer-events-none z-0 cyber-grid" />
 
-      {/* Interactive Canvas Particle Network */}
-      <canvas 
-        ref={canvasRef} 
-        className="absolute inset-0 pointer-events-none z-10" 
-        style={{ transform: 'translateZ(0)', willChange: 'transform' }}
-      />
+          {/* Interactive Canvas Particle Network */}
+          <canvas 
+            ref={canvasRef} 
+            className="absolute inset-0 pointer-events-none z-10" 
+            style={{ transform: 'translateZ(0)', willChange: 'transform' }}
+          />
 
-      {/* Ambient Glowing Orbs */}
-      <div className="cyber-orb orb-blue z-0" />
-      <div className="cyber-orb orb-cyan z-0" />
+          {/* Ambient Glowing Orbs */}
+          <div className="cyber-orb orb-blue z-0" />
+          <div className="cyber-orb orb-cyan z-0" />
+        </>
+      )}
 
       <style>{`
         .cyber-bg {
@@ -428,15 +437,21 @@ export default function LoginPage() {
         <div className="text-center mb-6">
           {/* Logo - Enlarged Container */}
           <div className="flex justify-center mb-5 relative">
-            <div className="bg-white rounded-3xl p-2.5 shadow-[0_12px_40px_rgba(37,99,235,0.25)] border border-white/20 flex items-center justify-center h-28 w-28 overflow-hidden transition-all duration-300 group-hover:scale-[1.05]">
-              <img 
-                src="/logo.png?v=2" 
-                alt="Truliva Logo" 
-                className="h-[145%] w-[145%] object-contain"
-              />
-            </div>
-            {/* Ambient logo glow */}
-            <div className="absolute inset-0 bg-blue-500/15 blur-3xl rounded-full pointer-events-none z-[-1]" />
+            {IS_NOEL ? (
+              <img src={logoTheu} alt="Truliva Logo" width={600} height={190} className="w-[270px] h-auto" />
+            ) : (
+              <>
+                <div className="bg-white rounded-3xl p-2.5 shadow-[0_12px_40px_rgba(37,99,235,0.25)] border border-white/20 flex items-center justify-center h-28 w-28 overflow-hidden transition-all duration-300 group-hover:scale-[1.05]">
+                  <img 
+                    src="/logo.png?v=2" 
+                    alt="Truliva Logo" 
+                    className="h-[145%] w-[145%] object-contain"
+                  />
+                </div>
+                {/* Ambient logo glow */}
+                <div className="absolute inset-0 bg-blue-500/15 blur-3xl rounded-full pointer-events-none z-[-1]" />
+              </>
+            )}
           </div>
           {isSandboxEnvironment() ? (
             <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full text-[13px] font-bold tracking-wide uppercase bg-amber-500/20 text-amber-300 border border-amber-500/40 shadow-[0_0_20px_rgba(245,158,11,0.25)] select-none animate-pulse">
@@ -472,7 +487,7 @@ export default function LoginPage() {
           <div className="form-group">
             <div className="flex justify-between items-center mb-1">
               <label className="cyber-label mb-0">Mật khẩu</label>
-              <Link to="/forgot-password" style={{ color: '#60A5FA' }} className="text-xs font-semibold hover:underline transition-colors">
+              <Link to="/forgot-password" style={{ color: IS_NOEL ? '#F7DFB0' : '#60A5FA' }} className="text-xs font-semibold hover:underline transition-colors">
                 Quên mật khẩu?
               </Link>
             </div>
