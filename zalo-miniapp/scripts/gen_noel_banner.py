@@ -1,8 +1,8 @@
-"""Sinh ảnh banner Giáng sinh cho Mini App: vải len đan + logo Truliva thêu.
+"""Sinh ảnh Giáng sinh cho Mini App và trang đăng nhập webapp: vải len đan + logo Truliva thêu.
 
 Chạy: python scripts/gen_noel_banner.py   (cần pillow, numpy, scipy)
 Muốn đổi họa tiết thì sửa các bảng chữ bên dưới: mỗi ký tự là một mũi đan.
-Đổi STITCH_W/STITCH_H/số hàng/số cột thì sửa kích thước trong ChristmasKnitHeader.tsx.
+Đổi STITCH_W/STITCH_H/số hàng/số cột thì sửa kích thước trong ChristmasKnitHeader.tsx và NoelLoginTheme.tsx.
 """
 from pathlib import Path
 
@@ -11,7 +11,7 @@ from PIL import Image
 from scipy import ndimage as ndi
 
 ROOT = Path(__file__).resolve().parents[1]
-OUT = ROOT / 'src' / 'assets'
+OUTS = [ROOT / 'src' / 'assets', ROOT.parent / 'webapp' / 'src' / 'assets']
 LOGO = ROOT.parent / 'logo' / 'Truliva_cropped_logo.png'
 
 STITCH_W, STITCH_H, SS = 14, 11, 4  # px ảnh @3x mỗi mũi, hệ số khử răng cưa
@@ -266,6 +266,7 @@ if __name__ == '__main__':
         ('noel-knit-scene', knit(scene_chart(), 2, False), 76),
         ('noel-logo-theu', embroider_logo(), 86),
     ):
-        path = OUT / f'{name}.webp'
-        im.save(path, quality=q, method=6)
+        for out in OUTS:
+            path = out / f'{name}.webp'
+            im.save(path, quality=q, method=6)
         print(path.name, im.size, f'{path.stat().st_size / 1024:.0f} KB')
