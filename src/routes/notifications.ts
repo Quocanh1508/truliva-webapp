@@ -48,13 +48,24 @@ router.get('/', async (req: Request, res: Response): Promise<void> => {
       });
     }
 
+    // Thông báo khách tự kích hoạt bảo hành: lấy ảnh hóa đơn hiện tại từ serial (thông báo cũ không lưu URL ảnh)
+    const serialIds = notifications
+      .filter((n: any) => (n.rawData as any)?.type === 'WARRANTY_ACTIVATION')
+      .map((n: any) => (n.rawData as any)?.serialId)
+      .filter(Boolean) as string[];
+    const serials = serialIds.length > 0
+      ? await prisma.serial.findMany({ where: { id: { in: serialIds } }, select: { id: true, invoiceImageUrl: true } })
+      : [];
+
     const enrichedNotifications = notifications.map((n: any) => {
       const reportId = (n.rawData as any)?.reportId;
       const report = reports.find(r => r.id === reportId);
+      const serialId = (n.rawData as any)?.type === 'WARRANTY_ACTIVATION' ? (n.rawData as any)?.serialId : undefined;
       return {
         ...n,
         reportStatus: report ? report.approvalStatus : undefined,
-        rejectReason: report ? report.rejectReason : undefined
+        rejectReason: report ? report.rejectReason : undefined,
+        invoiceImageUrl: serialId ? serials.find(s => s.id === serialId)?.invoiceImageUrl ?? undefined : undefined
       };
     });
 

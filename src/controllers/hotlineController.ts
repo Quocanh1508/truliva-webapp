@@ -3,6 +3,8 @@ import ExcelJS from 'exceljs';
 import prisma from '../config/database';
 import { broadcastEvent } from '../services/websocketService';
 import { checkDynamicPermission } from '../middleware/authSession';
+import { normalizeProvince } from '../utils/provinces';
+import logger from '../utils/logger';
 
 // ═══════════════════════════════════════════════════
 //  HOTLINE TICKET STATUSES
@@ -366,6 +368,7 @@ export async function searchCustomerHistory(req: Request, res: Response) {
         where: { OR: legacyOr },
         select: {
           id: true,
+          importBatch: true,
           legacyOrderCode: true,
           customerName: true,
           customerPhone: true,
@@ -1780,5 +1783,329 @@ export async function exportHotlineTickets(req: Request, res: Response): Promise
     res.status(500).json({ error: 'Lỗi xuất file Excel yêu cầu Hotline', details: error.message });
   }
 }
+
+// ═══════════════════════════════════════════════════
+//  POST /api/hotlines/legacy-history
+//  Nhân viên tự nhập thông tin lịch sử dịch vụ khách hàng
+//  vào mục "Tra cứu lịch sử khách hàng" (bảng legacy_service_histories)
+// ═══════════════════════════════════════════════════
+
+const MANUAL_LEGACY_BATCH = 'manual_hotline_input';
+
+const ALLOWED_LEGACY_WORK_TYPES = new Set([
+  'Bảo hành',
+  'Giao hàng',
+  'Giao hàng và lắp đặt',
+  'Giao hàng và Lắp đặt',
+  'Lắp đặt',
+  'Thay lọc',
+  'Sửa chữa'
+]);
+
+const ALLOWED_LEGACY_STATUSES = new Set([
+  'Hoàn thành',
+  'Chờ xử lý',
+  'Đang thực hiện',
+  'Hủy đơn',
+  'Đổi hoàn'
+]);
+
+const MIN_HISTORY_TIMESTAMP = new Date('2010-01-01T00:00:00.000Z').getTime();
+
+function parseOptionalString(
+  raw: unknown,
+  fieldLabel: string,
+  maxLen: number,
+  allowNewlines = false
+): { value: string | null; error?: string } {
+  if (raw === undefined || raw === null || raw === '') {
+    return { value: null };
+  }
+  if (typeof raw !== 'string') {
+    return { value: null, error: `${fieldLabel} phải là chuỗi ký tự hợp lệ` };
+  }
+  const cleaned = allowNewlines
+    ? raw.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '').trim()
+    : raw.replace(/[\x00-\x1F\x7F]/g, ' ').replace(/\s+/g, ' ').trim();
+  if (!cleaned) return { value: null };
+  if (cleaned.length > maxLen) {
+    return { value: null, error: `${fieldLabel} không được vượt quá ${maxLen} ký tự` };
+  }
+  return { value: cleaned };
+}
+
+function parseOptionalDate(
+  raw: unknown,
+  fieldLabel: string,
+  maxTimestamp: number
+): { value: Date | null; error?: string } {
+  if (raw === undefined || raw === null || raw === '') {
+    return { value: null };
+  }
+  if (typeof raw !== 'string' && typeof raw !== 'number') {
+    return { value: null, error: `${fieldLabel} không đúng định dạng ngày giờ` };
+  }
+  const d = new Date(raw);
+  const ts = d.getTime();
+  if (Number.isNaN(ts)) {
+    return { value: null, error: `${fieldLabel} không hợp lệ` };
+  }
+  if (ts < MIN_HISTORY_TIMESTAMP || ts > maxTimestamp) {
+    return { value: null, error: `${fieldLabel} nằm ngoài phạm vi thời gian hợp lệ` };
+  }
+  return { value: d };
+}
+
+export async function createLegacyServiceHistory(req: Request, res: Response) {
+  try {
+    const user = (req as any).user;
+    if (!user) {
+      return res.status(401).json({ error: 'Chưa đăng nhập' });
+    }
+    if (user.role === 'CUSTOMER' || user.group === 'CUSTOMER') {
+      return res.status(403).json({ error: 'Tài khoản khách hàng không có quyền thực hiện thao tác này' });
+    }
+
+    // Chốt bảo mật 2 lớp: người dùng PHẢI vừa truy cập được mục "Tra cứu lịch sử khách hàng"
+    // vừa có quyền "Nhập thủ công lịch sử dịch vụ khách hàng".
+    const [canAccessTab, canCreate] = await Promise.all([
+      checkDynamicPermission(user.role, 'HOTLINE_SEARCH_CUSTOMER', user.group, user.id),
+      checkDynamicPermission(user.role, 'HOTLINE_LEGACY_HISTORY_CREATE', user.group, user.id)
+    ]);
+    if (!canAccessTab || !canCreate) {
+      logger.warn('[createLegacyServiceHistory] Forbidden attempt', {
+        userId: user.id,
+        role: user.role,
+        group: user.group,
+        canAccessTab,
+        canCreate
+      });
+      return res.status(403).json({
+        error: 'Tài khoản của bạn không có quyền nhập thông tin lịch sử khách hàng'
+      });
+    }
+
+    const body = req.body;
+    if (!body || typeof body !== 'object' || Array.isArray(body)) {
+      return res.status(400).json({ error: 'Dữ liệu gửi lên không hợp lệ' });
+    }
+
+    // ── 1. Validate 7 trường bắt buộc (*) ──
+    const customerNameRes = parseOptionalString(body.customerName, 'Tên khách hàng', 200);
+    if (customerNameRes.error || !customerNameRes.value) {
+      return res.status(400).json({ error: customerNameRes.error || 'Vui lòng nhập Tên khách hàng' });
+    }
+
+    if (typeof body.customerPhone !== 'string') {
+      return res.status(400).json({ error: 'Số điện thoại bắt buộc gồm đúng 10 ký tự số, bắt đầu bằng số 0' });
+    }
+    const customerPhone = body.customerPhone.trim();
+    if (!/^0\d{9}$/.test(customerPhone)) {
+      return res.status(400).json({ error: 'Số điện thoại bắt buộc gồm đúng 10 ký tự số liền nhau, bắt đầu bằng số 0' });
+    }
+
+    const addressRes = parseOptionalString(body.address, 'Địa chỉ chi tiết', 500);
+    if (addressRes.error || !addressRes.value) {
+      return res.status(400).json({ error: addressRes.error || 'Vui lòng nhập Địa chỉ chi tiết' });
+    }
+
+    const rawProvinceRes = parseOptionalString(body.provinceName, 'Tỉnh/thành phố', 100);
+    if (rawProvinceRes.error || !rawProvinceRes.value) {
+      return res.status(400).json({ error: rawProvinceRes.error || 'Vui lòng chọn Tỉnh/thành phố' });
+    }
+    const provinceName = normalizeProvince(rawProvinceRes.value);
+    if (!provinceName) {
+      return res.status(400).json({ error: 'Tỉnh/thành phố không thuộc danh sách hợp lệ' });
+    }
+
+    // Sản phẩm: chấp nhận chuỗi hoặc mảng chuỗi từ droplist
+    let productsStr: string | null = null;
+    if (Array.isArray(body.products)) {
+      const cleanItems: string[] = [];
+      for (const item of body.products) {
+        if (typeof item !== 'string') {
+          return res.status(400).json({ error: 'Danh sách sản phẩm không hợp lệ' });
+        }
+        const cleaned = item.replace(/^PROD:\s*/i, '').replace(/[\x00-\x1F\x7F]/g, ' ').replace(/\s+/g, ' ').trim();
+        if (cleaned) cleanItems.push(cleaned);
+      }
+      productsStr = Array.from(new Set(cleanItems)).join(', ');
+      if (productsStr.length > 500) {
+        return res.status(400).json({ error: 'Danh sách sản phẩm không được vượt quá 500 ký tự' });
+      }
+    } else {
+      const productsRes = parseOptionalString(
+        typeof body.products === 'string' ? body.products.replace(/^PROD:\s*/i, '') : body.products,
+        'Sản phẩm',
+        500
+      );
+      if (productsRes.error) {
+        return res.status(400).json({ error: productsRes.error });
+      }
+      productsStr = productsRes.value;
+    }
+    if (!productsStr) {
+      return res.status(400).json({ error: 'Vui lòng chọn Sản phẩm' });
+    }
+
+    const workTypeRes = parseOptionalString(body.workType, 'Loại công việc', 100);
+    if (workTypeRes.error || !workTypeRes.value) {
+      return res.status(400).json({ error: workTypeRes.error || 'Vui lòng chọn Loại công việc' });
+    }
+    if (!ALLOWED_LEGACY_WORK_TYPES.has(workTypeRes.value)) {
+      return res.status(400).json({ error: 'Loại công việc không thuộc danh sách cho phép' });
+    }
+
+    const nowMs = Date.now();
+    const maxCompletedMs = nowMs + 24 * 60 * 60 * 1000;
+    const maxFutureMs = nowMs + 365 * 24 * 60 * 60 * 1000;
+
+    const completedAtRes = parseOptionalDate(body.completedAt, 'Thời gian hoàn thành', maxCompletedMs);
+    if (completedAtRes.error || !completedAtRes.value) {
+      return res.status(400).json({ error: completedAtRes.error || 'Vui lòng nhập Thời gian hoàn thành hợp lệ' });
+    }
+
+    // ── 2. Validate các trường tùy chọn (theo file Excel quản lý dịch vụ) ──
+    const legacyOrderCodeRes = parseOptionalString(body.legacyOrderCode, 'Mã đơn', 100);
+    if (legacyOrderCodeRes.error) return res.status(400).json({ error: legacyOrderCodeRes.error });
+
+    const statusRes = parseOptionalString(body.status, 'Trạng thái xử lý', 50);
+    if (statusRes.error) return res.status(400).json({ error: statusRes.error });
+    const status = statusRes.value || 'Hoàn thành';
+    if (!ALLOWED_LEGACY_STATUSES.has(status)) {
+      return res.status(400).json({ error: 'Trạng thái xử lý không hợp lệ' });
+    }
+
+    const serviceTypeRes = parseOptionalString(body.serviceType, 'Loại dịch vụ chi tiết', 300);
+    if (serviceTypeRes.error) return res.status(400).json({ error: serviceTypeRes.error });
+
+    let moneyToCollect: number | null = null;
+    if (body.moneyToCollect !== undefined && body.moneyToCollect !== null && body.moneyToCollect !== '') {
+      const parsedMoney = typeof body.moneyToCollect === 'number'
+        ? body.moneyToCollect
+        : (typeof body.moneyToCollect === 'string' ? Number(body.moneyToCollect.replace(/[.,\s]/g, '')) : NaN);
+      if (!Number.isFinite(parsedMoney) || parsedMoney < 0 || parsedMoney > 1_000_000_000) {
+        return res.status(400).json({ error: 'Tiền cần thu (COD) phải là số từ 0 đến 1.000.000.000' });
+      }
+      moneyToCollect = parsedMoney;
+    }
+
+    const mainStationRes = parseOptionalString(body.mainStation, 'Trạm chính', 200);
+    if (mainStationRes.error) return res.status(400).json({ error: mainStationRes.error });
+
+    const techStationRes = parseOptionalString(body.techStation, 'Trạm kỹ thuật', 200);
+    if (techStationRes.error) return res.status(400).json({ error: techStationRes.error });
+
+    const ktvNameRes = parseOptionalString(body.ktvName, 'Kỹ thuật viên gán', 200);
+    if (ktvNameRes.error) return res.status(400).json({ error: ktvNameRes.error });
+
+    const appointmentTimeRes = parseOptionalDate(body.appointmentTime, 'Thời gian hẹn khách', maxFutureMs);
+    if (appointmentTimeRes.error) return res.status(400).json({ error: appointmentTimeRes.error });
+
+    const requestedAtRes = parseOptionalDate(body.requestedAt, 'Ngày tạo / yêu cầu', maxCompletedMs);
+    if (requestedAtRes.error) return res.status(400).json({ error: requestedAtRes.error });
+
+    const noteRes = parseOptionalString(body.note, 'Ghi chú', 2000, true);
+    if (noteRes.error) return res.status(400).json({ error: noteRes.error });
+
+    const serialNumberRes = parseOptionalString(body.serialNumber, 'Serial', 200);
+    if (serialNumberRes.error) return res.status(400).json({ error: serialNumberRes.error });
+
+    const partsRes = parseOptionalString(body.parts, 'Linh kiện', 500);
+    if (partsRes.error) return res.status(400).json({ error: partsRes.error });
+
+    // ── 3. Lưu vào bảng legacy_service_histories (KHÔNG ghi vào orders) + AuditLog ──
+    const record = await prisma.$transaction(async (tx) => {
+      const created = await tx.legacyServiceHistory.create({
+        data: {
+          importBatch: MANUAL_LEGACY_BATCH,
+          legacyOrderCode: legacyOrderCodeRes.value,
+          customerName: customerNameRes.value,
+          customerPhone,
+          address: addressRes.value,
+          provinceName,
+          status,
+          completedAt: completedAtRes.value,
+          workType: workTypeRes.value,
+          serviceType: serviceTypeRes.value,
+          products: productsStr,
+          moneyToCollect,
+          mainStation: mainStationRes.value,
+          techStation: techStationRes.value,
+          ktvName: ktvNameRes.value,
+          appointmentTime: appointmentTimeRes.value,
+          requestedAt: requestedAtRes.value,
+          note: noteRes.value,
+          serialNumber: serialNumberRes.value,
+          parts: partsRes.value
+        },
+        select: {
+          id: true,
+          importBatch: true,
+          legacyOrderCode: true,
+          customerName: true,
+          customerPhone: true,
+          address: true,
+          provinceName: true,
+          status: true,
+          completedAt: true,
+          workType: true,
+          serviceType: true,
+          products: true,
+          moneyToCollect: true,
+          mainStation: true,
+          techStation: true,
+          ktvName: true,
+          appointmentTime: true,
+          requestedAt: true,
+          note: true,
+          serialNumber: true,
+          parts: true,
+          createdAt: true
+        }
+      });
+
+      await tx.auditLog.create({
+        data: {
+          entityType: 'LegacyServiceHistory',
+          entityId: created.id,
+          action: 'created',
+          userId: user.id,
+          userName: user.fullName || user.username,
+          changes: {
+            importBatch: MANUAL_LEGACY_BATCH,
+            customerName: created.customerName,
+            customerPhone: created.customerPhone,
+            provinceName: created.provinceName,
+            workType: created.workType,
+            products: created.products,
+            completedAt: created.completedAt?.toISOString() || null
+          }
+        }
+      });
+
+      return created;
+    });
+
+    logger.info('[createLegacyServiceHistory] Manual history record created', {
+      recordId: record.id,
+      userId: user.id,
+      role: user.role,
+      customerPhone
+    });
+
+    return res.status(201).json({
+      message: 'Đã thêm lịch sử dịch vụ khách hàng thành công',
+      record
+    });
+  } catch (error: any) {
+    logger.error('[createLegacyServiceHistory] Error', {
+      error: error?.message,
+      userId: (req as any).user?.id
+    });
+    return res.status(500).json({ error: 'Lỗi hệ thống khi lưu lịch sử dịch vụ khách hàng' });
+  }
+}
+
 
 

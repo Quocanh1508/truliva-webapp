@@ -257,6 +257,20 @@ export default function Notifications() {
                     <div className="text-[13px] text-gray-600 leading-relaxed space-y-1.5">
                       {renderFormattedContent(n.content)}
                     </div>
+
+                  {n.invoiceImageUrl && (
+                    <div className="mt-3">
+                      <div className="text-xs font-semibold text-gray-600 mb-1.5">Ảnh hóa đơn khách tải lên (bấm để xem ảnh gốc):</div>
+                      <a href={n.invoiceImageUrl} target="_blank" rel="noreferrer">
+                        <img
+                          src={n.invoiceImageUrl}
+                          alt="Hóa đơn mua hàng"
+                          loading="lazy"
+                          className="max-h-48 max-w-full rounded-lg border border-gray-200 object-contain bg-white"
+                        />
+                      </a>
+                    </div>
+                  )}
                   
                   {n.rawData?.type === 'REPORT_APPROVAL_REQUEST' && (
                     <div className="mt-3 p-3 bg-gray-50 border border-gray-150 rounded-lg flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 text-left">

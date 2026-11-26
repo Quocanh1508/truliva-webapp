@@ -32,6 +32,26 @@ export const forgotPasswordLimiter = publicLimiter(60 * 60 * 1000, 5, 'Bạn đ�
 export const publicWriteLimiter = publicLimiter(60 * 60 * 1000, 30, 'Quá nhiều yêu cầu từ địa chỉ IP này. Vui lòng thử lại sau.');
 export const publicReadLimiter = publicLimiter(60 * 1000, 30, 'Quá nhiều yêu cầu. Vui lòng thử lại sau 1 phút.');
 
+// Giới hạn tốc độ nhập thủ công lịch sử dịch vụ khách hàng theo user (tránh spam/lạm dụng ghi hàng loạt)
+export const legacyHistoryWriteLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: 60,
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req) => {
+    const userId = (req as any).user?.id;
+    return userId ? `legacy-history:user:${userId}` : `legacy-history:ip:${req.ip || 'unknown'}`;
+  },
+  handler: (req, res) => {
+    logger.warn('Legacy history write rate limit exceeded', {
+      ip: req.ip,
+      userId: (req as any).user?.id,
+      url: req.originalUrl
+    });
+    res.status(429).json({ error: 'Bạn thao tác nhập lịch sử quá nhanh. Vui lòng thử lại sau 15 phút.' });
+  }
+});
+
 // Khoá tạm theo username: chặn dò mật khẩu 1 tài khoản từ nhiều IP. Chỉ đếm lần sai (status >= 400).
 // Đánh đổi: kẻ xấu biết username có thể cố tình làm khoá tài khoản đó tối đa 15 phút.
 export const loginAccountLimiter = rateLimit({

@@ -27,7 +27,8 @@ import CustomerLoyaltyModal from '../../components/CustomerLoyaltyModal';
 import LuckyWheelModal from '../../components/LuckyWheelModal';
 import NewsDetailModal from '../../components/NewsDetailModal';
 import LegalPagesModal, { LegalDocType } from '../../components/LegalPagesModal';
-import P3ROceanHeader from '../../components/P3ROceanHeader';
+import ChristmasKnitHeader from '../../components/ChristmasKnitHeader';
+import logoTheu from '../../assets/noel-logo-theu.webp';
 import { openPhone, openWebview, openChat } from 'zmp-sdk/apis';
 import { fetchZaloApi } from '../../api/client';
 import { getCustomerRank, MemberTier, RANK_CONFIGS, NEXT_TIER_ORDER } from '../../utils/memberRank';
@@ -200,34 +201,37 @@ export default function CustomerHome({ user, mySerials = [], onOpenScanner, onOp
   return (
     <div className="pb-28 bg-slate-50 min-h-screen font-sans">
       {/* 1. Header Profile Card with Persona 3 Reload Ocean Waves */}
-      <P3ROceanHeader className="px-5 pt-[calc(env(safe-area-inset-top,38px)+60px)] pb-[4.5rem]">
+      <ChristmasKnitHeader className="px-5 pt-[calc(env(safe-area-inset-top,38px)+60px)] noel:pt-[calc(env(safe-area-inset-top,38px)+4px)] pb-[4.5rem] noel:pb-[7.5rem]" scene>
+        <div className="hidden noel:block max-w-md mx-auto mb-2.5">
+          <img src={logoTheu} alt="Máy lọc nước Truliva" width={600} height={190} className="-ml-1 w-[168px] h-auto" />
+        </div>
         <div className="max-w-md mx-auto flex items-center justify-between gap-3">
           <div className="flex items-center gap-4 min-w-0">
             {/* Avatar có quầng sáng nhẹ như ánh nước */}
             <div className="relative shrink-0">
-              <div className="absolute -inset-1.5 rounded-full bg-sky-200/15 blur-[6px]" aria-hidden="true" />
-              <div className="relative w-16 h-16 rounded-full bg-[#0B2545] ring-2 ring-white/80 shadow-lg shadow-black/25 flex items-center justify-center overflow-hidden">
+              <div className="absolute -inset-1.5 rounded-full bg-sky-200/15 noel:bg-amber-100/20 blur-[6px]" aria-hidden="true" />
+              <div className="relative w-16 h-16 rounded-full bg-[#0B2545] noel:bg-[#4A0811] ring-2 ring-white/80 shadow-lg shadow-black/25 flex items-center justify-center overflow-hidden">
                 {user?.avatar ? (
                   <img src={user.avatar} alt={`Ảnh đại diện của ${userName}`} className="w-full h-full object-cover" />
                 ) : (
-                  <User size={30} className="text-sky-200" aria-hidden="true" />
+                  <User size={30} className="text-sky-200 noel:text-[#F7DFB0]" aria-hidden="true" />
                 )}
               </div>
             </div>
             <div className="min-w-0">
-              <p className="text-sm text-sky-100/90 font-medium">Xin chào,</p>
+              <p className="text-sm text-sky-100/90 noel:text-[#FBEFDD] font-medium">Xin chào,</p>
               <h1 className="text-xl font-extrabold text-white leading-tight truncate drop-shadow-[0_1px_2px_rgba(0,0,0,0.35)]">
                 {userName}
               </h1>
-              <p className="mt-1 text-sm text-sky-100/90 font-medium flex items-center gap-1.5">
+              <p className="mt-1 text-sm text-sky-100/90 noel:text-[#FBEFDD] font-medium flex items-center gap-1.5">
                 {userPhone ? (
                   <>
-                    <PhoneCall size={13} className="text-sky-200 shrink-0" aria-hidden="true" />
+                    <PhoneCall size={13} className="text-sky-200 noel:text-[#F7DFB0] shrink-0" aria-hidden="true" />
                     <span className="tabular-nums tracking-wide">{formatPhone(userPhone)}</span>
                   </>
                 ) : (
                   <>
-                    <Droplets size={13} className="text-sky-200 shrink-0" aria-hidden="true" />
+                    <Droplets size={13} className="text-sky-200 noel:text-[#F7DFB0] shrink-0" aria-hidden="true" />
                     <span>Truliva Care</span>
                   </>
                 )}
@@ -258,7 +262,7 @@ export default function CustomerHome({ user, mySerials = [], onOpenScanner, onOp
             </div>
           )}
         </div>
-      </P3ROceanHeader>
+      </ChristmasKnitHeader>
 
       {/* 2. Floating Quick Nav Card (UI/UX Pro Max Modern Bento Quick Actions) */}
       <div className="max-w-md mx-auto px-4 -mt-7 relative z-10">

@@ -16,6 +16,7 @@ import {
   parseExcelDate
 } from '../services/serialService';
 import { activateSerialWarranty } from '../services/warrantyService';
+import { buildPhoneVariants } from '../services/shopPricing';
 import { 
   getZaloConfig, 
   exchangeAuthorizationCode, 
@@ -81,6 +82,27 @@ export async function checkPublicSerial(req: Request, res: Response): Promise<vo
   }
 }
 
+const MAX_SELF_ACTIVATIONS_PER_PHONE_PER_DAY = 3;
+const INVOICE_MAX_AGE_MS = 24 * 60 * 60 * 1000;
+
+/** Ảnh phải do /public/upload-invoice tải lên Cloudinary của Truliva trong 24h qua và có thật (URL tự gõ thì HEAD trả 404). */
+async function isFreshOwnInvoice(url: string): Promise<boolean> {
+  const cloud = process.env.CLOUDINARY_CLOUD_NAME;
+  let u: URL;
+  try { u = new URL(url); } catch { return false; }
+  // public_id = `${Date.now()}-<random>` do invoiceStorage trong routes/serials.ts đặt
+  const m = /^\/([^/]+)\/image\/upload\/v\d+\/truliva_invoices\/(\d{13})-\d+\.jpg$/.exec(u.pathname);
+  if (!cloud || u.protocol !== 'https:' || u.hostname !== 'res.cloudinary.com' || u.search || !m || m[1] !== cloud) return false;
+  const age = Date.now() - Number(m[2]);
+  if (age < 0 || age > INVOICE_MAX_AGE_MS) return false;
+  try {
+    await axios.head(u.toString(), { timeout: 5000, maxRedirects: 0 });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 export async function activatePublicSerial(req: Request, res: Response): Promise<void> {
   try {
     const { serialNumber, customerName, customerPhone, address, province, invoiceImageUrl } = req.body;
@@ -108,6 +130,34 @@ export async function activatePublicSerial(req: Request, res: Response): Promise
 
     if (serial.status === 'Đã kích hoạt' || serial.status === 'KH xác nhận') {
       res.status(400).json({ error: 'Số Serial này đã được kích hoạt bảo hành.' });
+      return;
+    }
+
+    // Endpoint public: chặn chiếm serial và spam ZNS có phí tới SĐT bất kỳ (xem verify_public_activation.js)
+    const phone = String(customerPhone).trim();
+    if (!/^\d{10}$/.test(phone)) {
+      res.status(400).json({ error: 'Số điện thoại không hợp lệ. Vui lòng nhập đúng 10 chữ số.' });
+      return;
+    }
+
+    const invoiceUrl = String(invoiceImageUrl).trim();
+    const invoiceReused = await prisma.serial.findFirst({ where: { invoiceImageUrl: invoiceUrl }, select: { id: true } });
+    if (invoiceReused || !(await isFreshOwnInvoice(invoiceUrl))) {
+      logger.warn('Public activation rejected: invalid invoice image', { serialNumber: cleaned, ip: req.ip, invoiceUrl, reused: !!invoiceReused });
+      res.status(400).json({ error: 'Ảnh hóa đơn không hợp lệ hoặc đã hết hạn. Vui lòng tải lại ảnh hóa đơn rồi gửi lại.' });
+      return;
+    }
+
+    const recentByPhone = await prisma.serial.count({
+      where: {
+        activatedBy: 'CUSTOMER',
+        customerPhone: { in: buildPhoneVariants(phone) },
+        activationDate: { gte: new Date(Date.now() - 24 * 60 * 60 * 1000) }
+      }
+    });
+    if (recentByPhone >= MAX_SELF_ACTIVATIONS_PER_PHONE_PER_DAY) {
+      logger.warn('Public activation rejected: too many activations for phone', { serialNumber: cleaned, ip: req.ip, phone, recentByPhone });
+      res.status(429).json({ error: 'Số điện thoại này đã kích hoạt nhiều máy trong 24 giờ qua. Vui lòng liên hệ CSKH Truliva để được hỗ trợ.' });
       return;
     }
 

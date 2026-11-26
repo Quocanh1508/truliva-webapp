@@ -1630,6 +1630,22 @@ export default function SerialManage() {
               </button>
             </div>
 
+            {/* Ảnh hóa đơn khách tải lên khi tự kích hoạt qua link: đặt đầu popup để CSKH đối chiếu ngay */}
+            {selectedSerial.invoiceImageUrl && (
+              <div style={{ marginBottom: 20, padding: 12, borderRadius: 12, border: '1px solid #cbd5e1', background: '#f8fafc' }}>
+                <div style={{ fontSize: 13, fontWeight: 700, color: '#475569', marginBottom: 8 }}>
+                  Ảnh hóa đơn khách tải lên <span style={{ fontWeight: 400, color: '#94a3b8' }}>(bấm vào ảnh để xem ảnh gốc)</span>
+                </div>
+                <a href={selectedSerial.invoiceImageUrl} target="_blank" rel="noreferrer">
+                  <img
+                    src={selectedSerial.invoiceImageUrl}
+                    alt="Hóa đơn mua hàng"
+                    style={{ display: 'block', maxWidth: '100%', maxHeight: 320, margin: '0 auto', borderRadius: 8, objectFit: 'contain', border: '1px solid #e2e8f0', background: 'white' }}
+                  />
+                </a>
+              </div>
+            )}
+
             {/* Serial Info Card & Edit Form */}
             <div style={{
               background: '#f8fafc', borderRadius: 12, padding: 20, marginBottom: 24,
@@ -1873,20 +1889,6 @@ export default function SerialManage() {
                   <strong>Thời gian tạo bản ghi:</strong> {formatDateTime(selectedSerial.createdAt)}
                 </div>
               </div>
-
-              {/* Invoice Image view if present */}
-              {selectedSerial.invoiceImageUrl && (
-                <div style={{ marginTop: 16, paddingTop: 16, borderTop: '1px solid #e2e8f0' }}>
-                  <div style={{ fontSize: 13, fontWeight: 700, color: '#475569', marginBottom: 8 }}>Ảnh hóa đơn mua hàng</div>
-                  <a href={selectedSerial.invoiceImageUrl} target="_blank" rel="noreferrer">
-                    <img 
-                      src={selectedSerial.invoiceImageUrl} 
-                      alt="Hóa đơn" 
-                      style={{ maxWidth: '100%', maxHeight: 200, borderRadius: 8, objectFit: 'contain', border: '1px solid #cbd5e1' }} 
-                    />
-                  </a>
-                </div>
-              )}
 
               {/* Approval Form for pending verification */}
               {selectedSerial.status === 'Chờ duyệt' && (
