@@ -2,21 +2,29 @@ import { useState, useEffect } from 'react';
 import { Outlet, useNavigate, useLocation, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { usePermission } from '../context/PermissionContext';
-import { LogOut, Menu, X, FileText, List, Users, BarChart, Building, Image as ImageIcon, MessageSquare, Bell, Wrench, User, Warehouse, Network, Send, Hash, Tag, Calculator, Cpu, PhoneCall, Bot } from 'lucide-react';
+import { LogOut, Menu, X, FileText, List, Users, BarChart, Building, Image as ImageIcon, MessageSquare, Bell, Wrench, User, Warehouse, Network, Send, Hash, Tag, Calculator, Cpu, PhoneCall, Bot, HelpCircle } from 'lucide-react';
 import { fetchApi } from '../api/client';
 import SyncManager from './SyncManager';
+import WebGuideTour from './WebGuideTour';
+import { getAvailableGuideTopics } from '../config/webGuideTopics';
 import { fetchCurrentWeather, type WeatherInfo } from '../utils/weather';
 
 export default function Layout() {
   const { user, logout } = useAuth();
-  const { hasPermission } = usePermission();
+  const { hasPermission, loading: permLoading } = usePermission();
   const navigate = useNavigate();
   const location = useLocation();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [guidePickerOpen, setGuidePickerOpen] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
   const [weather, setWeather] = useState<WeatherInfo | null>(null);
   const isOfficeRole = user && user.role !== 'KTV' && user.role !== 'DEV';
   const logoPath = isOfficeRole ? '/admin/orders' : (user?.role === 'DEV' ? '/dev/feedbacks' : '/ktv/my-orders');
+  const availableGuideTopics = !permLoading && user
+    ? getAvailableGuideTopics({ role: user.role, group: user.group, hasPermission })
+    : [];
+  const hasAnyGuide = availableGuideTopics.length > 0;
+  const hasCurrentPageGuide = availableGuideTopics.some((t) => t.route === location.pathname);
 
   useEffect(() => {
     if (!user || user.role !== 'KTV') return;
@@ -232,6 +240,48 @@ export default function Layout() {
           ))}
         </nav>
 
+        {/* Guide Button (Enterprise, static above footer) */}
+        {hasAnyGuide && (
+          <div style={{ padding: '10px 16px', borderTop: '1px solid var(--border-color)', backgroundColor: '#f8fafc' }}>
+            <button
+              type="button"
+              onClick={() => setGuidePickerOpen(true)}
+              style={{
+                width: '100%',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                gap: '8px',
+                padding: '9px 12px',
+                borderRadius: '10px',
+                border: hasCurrentPageGuide ? '1px solid #bfdbfe' : '1px solid #e2e8f0',
+                backgroundColor: hasCurrentPageGuide ? '#eff6ff' : '#ffffff',
+                color: '#1B3A6B',
+                fontSize: '13px',
+                fontWeight: 600,
+                cursor: 'pointer',
+              }}
+              title="Mở hướng dẫn sử dụng hệ thống"
+            >
+              <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <HelpCircle size={16} color="#00A3FF" />
+                <span>Hướng dẫn sử dụng</span>
+              </span>
+              {hasCurrentPageGuide && (
+                <span
+                  style={{
+                    width: '8px',
+                    height: '8px',
+                    borderRadius: '9999px',
+                    backgroundColor: '#00A3FF',
+                    flexShrink: 0,
+                  }}
+                />
+              )}
+            </button>
+          </div>
+        )}
+
         {/* Profile / Logout at Bottom */}
         <div style={{ padding: '16px', borderTop: '1px solid var(--border-color)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', backgroundColor: '#fff' }}>
           <div style={{ minWidth: 0 }}>
@@ -267,7 +317,26 @@ export default function Layout() {
             </Link>
           </div>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            {hasAnyGuide && (
+              <button
+                type="button"
+                onClick={() => setGuidePickerOpen(true)}
+                style={{
+                  padding: '8px',
+                  color: '#1B3A6B',
+                  background: hasCurrentPageGuide ? '#eff6ff' : 'transparent',
+                  borderRadius: '8px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+                title="Hướng dẫn sử dụng"
+                aria-label="Hướng dẫn sử dụng"
+              >
+                <HelpCircle size={20} color="#00A3FF" />
+              </button>
+            )}
             <button 
               onClick={handleLogout}
               style={{ padding: '8px', color: 'var(--text-muted)', background: 'transparent' }}
@@ -393,6 +462,13 @@ export default function Layout() {
         <Outlet />
       </main>
       <SyncManager />
+      {user && (
+        <WebGuideTour
+          userKey={String(user.id || user.username || '')}
+          pickerOpen={guidePickerOpen}
+          onClosePicker={() => setGuidePickerOpen(false)}
+        />
+      )}
     </div>
   );
 }
