@@ -351,4 +351,180 @@ router.post('/facebook', (req: Request, res: Response): void => {
   }
 });
 
+// ── Zalo Mini App Webhooks (NĐ 13/2023/NĐ-CP: user.revoke.consent) ──
+
+/**
+ * Xác thực chữ ký X-ZEvent-Signature từ Zalo Mini App Platform.
+ * Thuật toán chuẩn Zalo: sắp xếp key A-Z, nối liền value (object/array -> JSON.stringify),
+ * tính SHA-256 của `${content}${apiKey}` và so sánh timing-safe.
+ */
+export function verifyZaloMiniAppSignature(
+  data: Record<string, any> | null | undefined,
+  signatureHeader: string | undefined,
+  candidateKeys: string[]
+): boolean {
+  if (!data || typeof data !== 'object' || !signatureHeader || candidateKeys.length === 0) {
+    return false;
+  }
+
+  const keys = Object.keys(data).sort();
+  let content = '';
+  for (const k of keys) {
+    const val = data[k];
+    if (val !== null && typeof val === 'object') {
+      content += JSON.stringify(val);
+    } else if (val !== undefined) {
+      content += String(val);
+    }
+  }
+
+  const receivedBuf = Buffer.from(signatureHeader.trim().toLowerCase());
+  for (const key of candidateKeys) {
+    const expectedHex = crypto.createHash('sha256').update(`${content}${key}`).digest('hex');
+    const expectedBuf = Buffer.from(expectedHex);
+    if (expectedBuf.length === receivedBuf.length && crypto.timingSafeEqual(expectedBuf, receivedBuf)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+/**
+ * GET /api/webhooks/zalo-miniapp (và /webhooks/zalo-miniapp)
+ * Health-check / kiểm tra kết nối từ Zalo Mini App Center
+ */
+router.get('/zalo-miniapp', (_req: Request, res: Response): void => {
+  res.status(200).json({
+    error: 0,
+    status: 'active',
+    message: 'Truliva Zalo Mini App Webhook Endpoint is ready',
+    timestamp: new Date().toISOString()
+  });
+});
+
+/**
+ * POST /api/webhooks/zalo-miniapp (và /webhooks/zalo-miniapp)
+ * Tiếp nhận sự kiện từ Zalo Mini App Platform (vd: user.revoke.consent - rút lại đồng ý & yêu cầu xóa dữ liệu).
+ * Tuân thủ Zero Hard-Delete Policy: chỉ ẩn danh hóa / vô hiệu hóa mềm và ghi AuditLog.
+ */
+router.post('/zalo-miniapp', async (req: Request, res: Response): Promise<void> => {
+  const startTime = Date.now();
+  const body = (req.body && typeof req.body === 'object') ? req.body : {};
+  const eventName = String(body.event || body.event_name || 'ping');
+  const signatureHeader = (req.get('x-zevent-signature') || req.get('X-ZEvent-Signature') || '').trim();
+
+  const dedicatedApiKeys = Array.from(new Set([
+    process.env.ZALO_MINI_APP_WEBHOOK_KEY,
+    process.env.ZALO_API_KEY
+  ].map(k => (k || '').trim()).filter(Boolean)));
+
+  const allCandidateKeys = Array.from(new Set([
+    ...dedicatedApiKeys,
+    process.env.ZALO_MINI_APP_SECRET,
+    ...(process.env.ZALO_MINI_APP_SECRET_FALLBACKS || '').split(',')
+  ].map(k => (k || '').trim()).filter(Boolean)));
+
+  const signatureVerified = verifyZaloMiniAppSignature(body, signatureHeader, allCandidateKeys);
+
+  // Nếu đã cấu hình ZALO_MINI_APP_WEBHOOK_KEY / ZALO_API_KEY riêng và sự kiện có chữ ký sai -> từ chối
+  if (dedicatedApiKeys.length > 0 && signatureHeader && !signatureVerified) {
+    logger.warn('Rejected Zalo Mini App webhook: invalid X-ZEvent-Signature', {
+      event: eventName,
+      ip: req.ip
+    });
+    res.status(401).json({ error: -1, message: 'Invalid signature' });
+    return;
+  }
+
+  try {
+    // Lưu raw event vào bảng webhookRawEvent để kiểm toán & truy vết
+    const externalEventId = `zma_${eventName}_${body.userId || 'anon'}_${body.timestamp || Date.now()}`;
+    await prisma.webhookRawEvent.create({
+      data: {
+        externalEventId,
+        source: 'zalo_miniapp',
+        eventType: eventName,
+        payload: {
+          ...body,
+          _meta: {
+            hasSignature: Boolean(signatureHeader),
+            signatureVerified
+          }
+        },
+        status: 'PROCESSED',
+        processingTimeMs: Date.now() - startTime
+      }
+    }).catch((err: any) => {
+      // Bỏ qua trùng eventId nếu Zalo gửi lại (retry)
+      if (err?.code !== 'P2002') {
+        logger.warn('Could not persist Zalo Mini App webhookRawEvent', { error: err?.message });
+      }
+    });
+
+    // Xử lý sự kiện người dùng rút lại đồng ý & yêu cầu xóa dữ liệu cá nhân (NĐ 13/2023/NĐ-CP)
+    if (eventName === 'user.revoke.consent' || eventName === 'user_revoke_consent') {
+      const zaloUserId = body.userId ? String(body.userId).trim() : '';
+
+      logger.info('Received Zalo Mini App user.revoke.consent event', {
+        appId: body.appId,
+        zaloUserId,
+        timestamp: body.timestamp,
+        signatureVerified
+      });
+
+      // Chỉ thực hiện ẩn danh hóa mềm tài khoản khách hàng khi chữ ký đã được xác thực hợp lệ
+      if (zaloUserId && signatureVerified) {
+        const matchedUsers = await prisma.user.findMany({
+          where: {
+            username: `zalo_${zaloUserId}`,
+            group: 'CUSTOMER'
+          },
+          select: { id: true, username: true, fullName: true }
+        });
+
+        for (const u of matchedUsers) {
+          await prisma.user.update({
+            where: { id: u.id },
+            data: {
+              isActive: false,
+              avatar: null,
+              fullName: 'Người dùng đã rút đồng ý',
+              tokenVersion: { increment: 1 }
+            }
+          });
+
+          await prisma.auditLog.create({
+            data: {
+              entityType: 'User',
+              entityId: u.id,
+              action: 'zalo_revoke_consent',
+              userId: u.id,
+              userName: u.fullName || 'Zalo Mini App User',
+              changes: {
+                appId: body.appId || null,
+                zaloUserId,
+                timestamp: body.timestamp || Date.now(),
+                reason: 'Zalo Mini App user.revoke.consent webhook (soft-anonymized)'
+              }
+            }
+          }).catch(() => {});
+        }
+      }
+    }
+
+    // Luôn trả 200 OK chuẩn cho Zalo Mini App Platform (bao gồm request test khi bấm "Thiết lập")
+    res.status(200).json({
+      error: 0,
+      message: 'ok',
+      event: eventName
+    });
+  } catch (error: any) {
+    logger.error('Failed to process Zalo Mini App webhook', {
+      event: eventName,
+      error: error.message
+    });
+    res.status(500).json({ error: -1, message: 'Internal server error' });
+  }
+});
+
 export default router;

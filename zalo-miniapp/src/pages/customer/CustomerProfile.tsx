@@ -4,7 +4,6 @@ import {
   Phone, 
   Lock, 
   Wrench, 
-  QrCode, 
   Star, 
   Ticket, 
   History, 
@@ -40,7 +39,6 @@ interface CustomerProfileProps {
   user: any;
   mySerials: any[];
   onLogout?: () => void;
-  onOpenScanner?: () => void;
   onRefresh?: () => void;
   onViewMyOrders?: () => void;
 }
@@ -49,7 +47,6 @@ export default function CustomerProfile({
   user, 
   mySerials, 
   onLogout, 
-  onOpenScanner,
   onRefresh,
   onViewMyOrders 
 }: CustomerProfileProps) {
@@ -271,19 +268,17 @@ export default function CustomerProfile({
               <div className="space-y-1">
                 <p className="text-xs font-bold text-slate-700">Chưa có thiết bị nào kích hoạt</p>
                 <p className="text-[11px] text-slate-400 max-w-xs mx-auto leading-relaxed">
-                  Quét mã QR trên thân máy hoặc nhập số Serial để theo dõi bảo hành và tuổi thọ lõi lọc tự động.
+                  Kích hoạt bảo hành điện tử bằng số Serial trên thân máy để tự động đồng bộ và theo dõi tuổi thọ lõi lọc.
                 </p>
               </div>
               <div className="flex items-center justify-center gap-2 pt-1 flex-wrap">
-                {onOpenScanner && (
-                  <button
-                    onClick={onOpenScanner}
-                    className="inline-flex items-center space-x-1.5 px-3.5 py-2 bg-[#1B3A6B] hover:bg-[#152e55] text-white rounded-xl text-xs font-bold shadow-xs active:scale-95 transition-all cursor-pointer"
-                  >
-                    <QrCode size={13} />
-                    <span>Quét mã QR</span>
-                  </button>
-                )}
+                <button
+                  onClick={() => handleBookMaintenance()}
+                  className="inline-flex items-center space-x-1.5 px-3.5 py-2 bg-[#1B3A6B] hover:bg-[#152e55] text-white rounded-xl text-xs font-bold shadow-xs active:scale-95 transition-all cursor-pointer"
+                >
+                  <Award size={13} />
+                  <span>Kích hoạt bảo hành</span>
+                </button>
                 {onRefresh && (
                   <button
                     onClick={onRefresh}
@@ -487,7 +482,6 @@ export default function CustomerProfile({
           onClose={() => setShowLoyaltyModal(false)}
           userPoints={userPoints}
           rank={rank}
-          onOpenScanner={onOpenScanner}
         />
       )}
 

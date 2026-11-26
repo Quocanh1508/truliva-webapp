@@ -10,7 +10,6 @@ import {
   Sparkles, 
   User, 
   MessageSquare,
-  QrCode,
   Calendar,
   Crown,
   Award,
@@ -40,7 +39,6 @@ import { FEATURES } from '../../config/features';
 interface CustomerHomeProps {
   user: any;
   mySerials?: any[];
-  onOpenScanner?: () => void;
   onOpenWarranty?: () => void;
   onGoToShop?: () => void;
   onSerialsChanged?: () => void | Promise<void>;
@@ -95,7 +93,7 @@ const FEATURED_NEWS = [
   }
 ];
 
-export default function CustomerHome({ user, mySerials = [], onOpenScanner, onOpenWarranty, onGoToShop, onSerialsChanged }: CustomerHomeProps) {
+export default function CustomerHome({ user, mySerials = [], onOpenWarranty, onGoToShop, onSerialsChanged }: CustomerHomeProps) {
   const [showWheelModal, setShowWheelModal] = useState(false);
   const [showLoyaltyModal, setShowLoyaltyModal] = useState(false);
   const [selectedArticle, setSelectedArticle] = useState<any>(null);
@@ -454,19 +452,19 @@ export default function CustomerHome({ user, mySerials = [], onOpenScanner, onOp
           <div data-tour="home-scan" className="bg-white p-4 rounded-3xl border border-sky-100 shadow-[0_4px_20px_rgba(27,58,107,0.06)] flex items-center justify-between hover:shadow-[0_8px_24px_rgba(0,163,255,0.12)] transition-shadow">
             <div className="flex items-center space-x-3.5">
               <div className="p-3 bg-gradient-to-br from-sky-50 to-cyan-100 text-[#0284C7] rounded-2xl border border-sky-200/60 shadow-xs">
-                <QrCode size={24} />
+                <Award size={24} />
               </div>
               <div>
                 <h4 className="font-black text-xs text-slate-900 uppercase tracking-tight">Kích hoạt bảo hành</h4>
-                <p className="text-[11px] text-slate-500 font-medium mt-0.5">Quét mã QR thân máy để đo TDS & lõi lọc</p>
+                <p className="text-[11px] text-slate-500 font-medium mt-0.5">Nhập số Serial thân máy để theo dõi bảo hành & lõi lọc</p>
               </div>
             </div>
             <button 
               onClick={() => handleDirectWarranty()}
-              className="shrink-0 w-14 h-16 rounded-2xl bg-gradient-to-b from-[#1B3A6B] to-[#0284C7] hover:from-[#0284C7] hover:to-[#00D2FF] text-white flex flex-col items-center justify-center text-center shadow-md shadow-blue-900/15 border border-sky-300/30 active:scale-95 transition-all cursor-pointer"
+              className="shrink-0 w-16 h-16 rounded-2xl bg-gradient-to-b from-[#1B3A6B] to-[#0284C7] hover:from-[#0284C7] hover:to-[#00D2FF] text-white flex flex-col items-center justify-center text-center shadow-md shadow-blue-900/15 border border-sky-300/30 active:scale-95 transition-all cursor-pointer"
             >
-              <span className="text-[11px] font-black tracking-wider uppercase leading-tight">QUÉT</span>
-              <span className="text-[11px] font-black tracking-wider uppercase leading-tight mt-0.5">MÃ</span>
+              <span className="text-[10px] font-black tracking-wider uppercase leading-tight">KÍCH</span>
+              <span className="text-[10px] font-black tracking-wider uppercase leading-tight mt-0.5">HOẠT</span>
             </button>
           </div>
         )}

@@ -181,6 +181,7 @@ app.get('/health', (_req, res) => {
 
 // ── Webhook routes (Step 2) ──
 app.use('/webhooks', webhookRoutes);
+app.use('/api/webhooks', webhookRoutes);
 
 // Apply rate limiting to secure logins against brute-force
 app.use('/api/auth/login', loginLimiter, loginAccountLimiter);

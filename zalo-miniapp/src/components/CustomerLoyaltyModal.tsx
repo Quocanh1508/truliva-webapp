@@ -7,7 +7,6 @@ interface CustomerLoyaltyModalProps {
   onClose: () => void;
   userPoints: number;
   rank?: any;
-  onOpenScanner?: () => void;
 }
 
 export default function CustomerLoyaltyModal({ isOpen, onClose, userPoints }: CustomerLoyaltyModalProps) {

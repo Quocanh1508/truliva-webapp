@@ -4,10 +4,9 @@ import {
   Phone,
   AlertTriangle,
   RefreshCw,
-  User,
-  QrCode
+  User
 } from 'lucide-react';
-import { getPhoneNumber, getUserInfo, getAccessToken, scanQRCode } from 'zmp-sdk/apis';
+import { getPhoneNumber, getUserInfo, getAccessToken } from 'zmp-sdk/apis';
 import { fetchZaloApi, getSafeStorage, setSafeStorage } from '../api/client';
 import CustomerHome from './customer/CustomerHome';
 import CustomerProfile from './customer/CustomerProfile';
@@ -127,21 +126,6 @@ export default function IndexPage() {
       // Không có fallback đăng nhập bằng SĐT thô: bắt buộc xác thực qua Zalo SDK
       setError(err.message || 'Lỗi cấp quyền Zalo. Vui lòng cho phép chia sẻ số điện thoại để đăng nhập.');
       setLoading(false);
-    }
-  };
-
-  const handleOpenScanner = async () => {
-    try {
-      const scanResult: any = await scanQRCode({});
-      if (scanResult && scanResult.content) {
-        const content = scanResult.content;
-        const serialMatch = content.match(/serial=([A-Za-z0-9_-]+)/) || [null, content];
-        const extractedSerial = serialMatch[1];
-        window.location.href = `https://trulivaofficial.com/warranty-activate?serial=${encodeURIComponent(extractedSerial)}`;
-      }
-    } catch (err: any) {
-      console.warn('QR scan cancelled or not supported', err);
-      window.location.href = 'https://trulivaofficial.com/warranty-activate';
     }
   };
 
@@ -365,7 +349,6 @@ export default function IndexPage() {
           {/* Home preview */}
           <CustomerHome 
             user={null} 
-            onOpenScanner={handleOpenScanner}
             onOpenWarranty={() => handle1ClickZaloAuth()} 
             onGoToShop={() => handle1ClickZaloAuth()}
           />
@@ -381,7 +364,6 @@ export default function IndexPage() {
               user={user} 
               mySerials={mySerials}
               onSerialsChanged={() => loadUserContent(user)}
-              onOpenScanner={handleOpenScanner}
               onOpenWarranty={() => setActiveTab('profile')}
               onGoToShop={() => {
                 setActiveTab('shop');
@@ -465,7 +447,6 @@ export default function IndexPage() {
                   user={user} 
                   mySerials={mySerials} 
                   onLogout={handleLogout} 
-                  onOpenScanner={handleOpenScanner}
                   onRefresh={() => loadUserContent(user)}
                   onViewMyOrders={() => {
                     setShopSubView('my_orders');

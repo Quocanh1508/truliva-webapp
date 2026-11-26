@@ -21,7 +21,7 @@ const shopLabel = FEATURES.ENABLE_ECOMMERCE ? 'Cửa hàng' : 'Sản phẩm';
 
 const S = {
   // Chưa có máy
-  homeScan: { target: 'home-scan', tab: 'home', title: 'Thêm máy lọc nước', text: 'Chưa thấy máy của bạn? Nhấn "Quét mã" và quét mã QR trên thân máy để kích hoạt bảo hành. Máy sẽ hiện ở đây sau khi kích hoạt.' },
+  homeScan: { target: 'home-scan', tab: 'home', title: 'Thêm máy lọc nước', text: 'Chưa thấy máy của bạn? Nhấn "Kích hoạt" và nhập số Serial trên thân máy để kích hoạt bảo hành điện tử. Máy sẽ tự động hiển thị ở đây sau khi kích hoạt.' },
   // Thẻ máy (chỉ có khi khách đã có máy)
   homePicker: { target: 'home-device-picker', tab: 'home', title: 'Chọn máy', text: 'Bạn có nhiều máy? Nhấn vào tên máy để xem thông tin của máy đó.' },
   deviceTabs: { target: 'device-tabs', tab: 'home', title: 'Máy của tôi & Cài đặt Wi-Fi', text: '"Máy của tôi" hiện tình trạng nước và lõi lọc. "Cài đặt Wi-Fi" để xem hoặc kết nối lại mạng cho máy.' },
