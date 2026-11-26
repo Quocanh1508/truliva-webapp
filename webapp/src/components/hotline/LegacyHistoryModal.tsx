@@ -4,7 +4,7 @@ import { X, Loader2, Save, ClipboardList, AlertCircle, CheckCircle2 } from 'luci
 import { fetchApi, getFiltersData } from '../../api/client';
 import ProvinceSelect from '../ProvinceSelect';
 import CategoryTreeSelect from '../CategoryTreeSelect';
-import { WORK_TYPES, WORK_TYPE_SERVICES } from '../../utils/workTypes';
+import { WORK_TYPE_SERVICES } from '../../utils/workTypes';
 
 interface LegacyHistoryModalProps {
   isOpen: boolean;
@@ -15,7 +15,11 @@ interface LegacyHistoryModalProps {
 }
 
 const LEGACY_WORK_TYPE_OPTIONS = [
-  ...WORK_TYPES,
+  'Bảo hành',
+  'Giao hàng',
+  'Giao hàng và lắp đặt',
+  'Lắp đặt',
+  'Sửa chữa',
   'Thay lọc'
 ];
 
