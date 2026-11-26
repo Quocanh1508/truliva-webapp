@@ -2208,7 +2208,7 @@ export default function OrderList() {
         </div>
         
         {/* Right side: Auto Refresh */}
-        <div className="pb-1.5 pr-2">
+        <div className="pb-1.5 pr-2" data-tour="orders-autorefresh">
           <div 
             onClick={() => {
               if (canUseAutoRefresh) {
@@ -2279,7 +2279,7 @@ export default function OrderList() {
       {/* Toolbar */}
       <div className="flex flex-col bg-white border-b border-gray-200">
         <div className="flex flex-col md:flex-row justify-between items-stretch md:items-center px-4 py-3 gap-3">
-          <form onSubmit={handleSearch} className="relative w-full md:max-w-sm">
+          <form onSubmit={handleSearch} data-tour="orders-search" className="relative w-full md:max-w-sm">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
             <input
               type="text"
@@ -2304,6 +2304,7 @@ export default function OrderList() {
             {/* Tạo mới ca dịch vụ */}
             {hasPermission('ORDER_CREATE') && (
               <button
+                data-tour="orders-create"
                 onClick={openCreateModal}
                 className="flex items-center justify-center gap-1 md:gap-1.5 px-2 md:px-3 py-1.5 md:py-2 text-xs md:text-[13px] border border-transparent rounded-md bg-blue-600 text-white hover:bg-blue-700 focus:outline-none font-semibold shadow-sm transition-colors whitespace-nowrap"
                 title="Tạo mới ca dịch vụ thủ công"
@@ -2317,6 +2318,7 @@ export default function OrderList() {
             {/* Đồng bộ từ Pancake button */}
             {hasPermission('ORDER_SYNC_PANCAKE') && (
               <button
+                data-tour="orders-sync"
                 onClick={handleSync}
                 disabled={syncing}
                 className={`flex items-center justify-center gap-1 md:gap-1.5 px-2 md:px-3 py-1.5 md:py-2 text-xs md:text-[13px] border border-gray-300 rounded-md bg-white text-gray-700 hover:bg-gray-50 focus:outline-none font-medium transition-colors whitespace-nowrap ${syncing ? 'opacity-60 cursor-not-allowed' : ''}`}
@@ -2331,6 +2333,7 @@ export default function OrderList() {
             {/* Xuất Excel button */}
             {canExportExcel && (
               <button
+                data-tour="orders-export"
                 onClick={handleExportExcel}
                 className="flex items-center justify-center gap-1 md:gap-1.5 px-2 md:px-3 py-1.5 md:py-2 text-xs md:text-[13px] border border-gray-300 rounded-md bg-white text-gray-700 hover:bg-gray-50 focus:outline-none font-medium transition-colors whitespace-nowrap"
                 title="Xuất file Excel danh sách đơn hàng theo bộ lọc đang chọn"
@@ -2344,6 +2347,7 @@ export default function OrderList() {
             {/* Bộ lọc button & popover container */}
             <div className="relative z-50">
               <button
+                data-tour="orders-filter"
                 onClick={() => toggleDropdown('main')}
                 className={`flex items-center justify-center gap-1 md:gap-1.5 px-2 md:px-3 py-1.5 md:py-2 text-xs md:text-[13px] border rounded-md font-medium transition-colors whitespace-nowrap ${
                   hasActiveFilters
@@ -3284,7 +3288,7 @@ export default function OrderList() {
       </div>
 
       {/* Quick Stats Summary */}
-      <div className="grid grid-cols-2 md:grid-cols-6 gap-2.5 px-4 py-1.5 bg-gray-50 border-b border-gray-200">
+      <div data-tour="orders-stats" className="grid grid-cols-2 md:grid-cols-6 gap-2.5 px-4 py-1.5 bg-gray-50 border-b border-gray-200">
         <div className="bg-white px-3 py-1.5 rounded-lg border border-gray-200 shadow-sm flex flex-row items-center justify-between">
           <span className="text-[11px] font-semibold text-gray-500 uppercase tracking-wider">Tổng số đơn</span>
           <span className="text-[17px] font-bold text-gray-900">{stats.total}</span>
@@ -3415,11 +3419,11 @@ export default function OrderList() {
             {orders.length === 0 ? (
               <div className="text-center py-12 text-gray-400">Không tìm thấy yêu cầu nào</div>
             ) : (
-              <table ref={tableRef} className="min-w-[1300px] lg:w-full text-left text-[13px] border-collapse">
+              <table ref={tableRef} data-tour="orders-table" className="min-w-[1300px] lg:w-full text-left text-[13px] border-collapse">
             <thead ref={realTheadRef} className="bg-[#f8f9fa] border-b border-gray-200">
               <tr className="bg-[#f8f9fa] text-gray-700 font-bold border-b border-gray-200">
                 {(currentUser?.role === 'ADMIN' || currentUser?.role === 'DEV' || currentUser?.role === 'COORDINATOR') && (
-                  <th className="px-4 py-2.5 w-[40px] text-center bg-[#f8f9fa] sticky top-0 z-30 border-b border-gray-200">
+                  <th data-tour="orders-select-all" className="px-4 py-2.5 w-[40px] text-center bg-[#f8f9fa] sticky top-0 z-30 border-b border-gray-200">
                     <input
                       type="checkbox"
                       className="rounded text-blue-600 focus:ring-blue-500 cursor-pointer"
@@ -3673,10 +3677,11 @@ export default function OrderList() {
 
                     {/* 5. Thao tác */}
                     <td className="px-4 py-2 align-top">
-                      <div className="flex items-center justify-center flex-wrap gap-1.5">
+                      <div data-tour={idx === 0 ? 'orders-row-actions' : undefined} className="flex items-center justify-center flex-wrap gap-1.5">
                         {/* Phân công */}
                         {!isViewOnlyStaff && (
                           <button
+                            data-tour="orders-action-assign"
                             onClick={() => openAssignModal(order)}
                             className="p-1.5 text-blue-600 hover:bg-blue-50 rounded border border-transparent hover:border-blue-100 transition-colors"
                             title="Phân loại & Phân công"
@@ -3688,6 +3693,7 @@ export default function OrderList() {
                         {/* Sửa đơn tự tạo */}
                         {!isViewOnlyStaff && order.pancakeOrderId < 0 && (
                           <button
+                            data-tour="orders-action-edit"
                             onClick={() => openEditManualOrderModal(order)}
                             className="p-1.5 text-amber-600 hover:bg-amber-50 rounded border border-transparent hover:border-amber-100 transition-colors"
                             title="Chỉnh sửa ca tự tạo"
@@ -3699,6 +3705,7 @@ export default function OrderList() {
                         {/* Đồng bộ đơn từ Pancake */}
                         {order.pancakeOrderId > 0 && !isViewOnlyStaff && (
                           <button
+                            data-tour="orders-action-sync-single"
                             onClick={() => handleSyncSingle(order.id)}
                             className="p-1.5 text-blue-600 hover:bg-blue-50 rounded border border-transparent hover:border-blue-100 transition-colors cursor-pointer"
                             title="Đồng bộ lại từ Pancake"
@@ -3713,6 +3720,7 @@ export default function OrderList() {
                           ['ADMIN', 'COORDINATOR', 'DEV', 'SALER'].includes(currentUser?.role || '')
                         ) && (
                           <button
+                            data-tour="orders-action-report"
                             onClick={() => navigate('/ktv/report', { state: { order } })}
                             className="p-1.5 text-emerald-600 hover:bg-emerald-50 rounded border border-transparent hover:border-emerald-100 transition-colors"
                             title="Báo cáo hoàn thành ca"
@@ -3723,6 +3731,7 @@ export default function OrderList() {
  
                         {/* Copy nhanh thông tin đi Zalo */}
                         <button
+                          data-tour="orders-action-copy"
                           onClick={() => handleCopyOrderInfo(order)}
                           className="p-1.5 text-indigo-600 hover:bg-indigo-50 rounded border border-transparent hover:border-indigo-100 transition-colors"
                           title="Copy thông tin"
@@ -3734,6 +3743,7 @@ export default function OrderList() {
                         {/* Hủy đơn (chỉ hiện khi chưa hoàn thành/hủy) */}
                         {!isViewOnlyStaff && order.adminStatus !== 'hoàn thành' && order.adminStatus !== 'hủy đơn' && (
                           <button
+                            data-tour="orders-action-cancel"
                             onClick={() => handleStatusChange(order.id, 'hủy đơn')}
                             className="p-1.5 text-red-600 hover:bg-red-50 rounded border border-transparent hover:border-red-100 transition-colors"
                             title="Hủy đơn hàng"
@@ -3745,6 +3755,7 @@ export default function OrderList() {
                         {/* Mở lại đơn (Khôi phục lại tính năng mở lại đơn hàng) */}
                         {!isViewOnlyStaff && (order.adminStatus === 'hoàn thành' || order.adminStatus === 'hủy đơn') && (
                           <button
+                            data-tour="orders-action-reopen"
                             onClick={() => handleReopenOrder(order)}
                             className="p-1.5 text-amber-600 hover:bg-amber-50 rounded border border-transparent hover:border-amber-100 transition-colors"
                             title="Mở lại đơn (Về Chờ xử lý & xóa phân công)"
@@ -3758,6 +3769,7 @@ export default function OrderList() {
                         {/* Xem báo cáo dịch vụ (nếu có) */}
                         {order.serviceReports && order.serviceReports.length > 0 && (
                           <button
+                            data-tour="orders-action-view-report"
                             onClick={() => navigate(`/admin/reports?search=${encodeURIComponent(formatOrderId(order.pancakeOrderId))}`)}
                             className="p-1.5 text-teal-600 hover:bg-teal-50 rounded border border-transparent hover:border-teal-100 transition-colors"
                             title="Xem báo cáo của KTV"
@@ -3768,6 +3780,7 @@ export default function OrderList() {
 
                         {/* Nhật ký lịch sử đơn */}
                         <button
+                          data-tour="orders-action-audit"
                           onClick={() => openAuditModal(order.id)}
                           className="p-1.5 text-gray-500 hover:bg-gray-100 rounded border border-transparent hover:border-gray-200 transition-colors"
                           title="Lịch sử thay đổi đơn"
