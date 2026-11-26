@@ -1797,9 +1797,7 @@ const ALLOWED_LEGACY_WORK_TYPES = new Set([
   'Giao hàng',
   'Giao hàng và lắp đặt',
   'Giao hàng và Lắp đặt',
-  'Hướng dẫn và Tư vấn',
   'Lắp đặt',
-  'Thay lõi lọc',
   'Thay lọc',
   'Sửa chữa'
 ]);
