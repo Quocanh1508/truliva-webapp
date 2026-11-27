@@ -60,14 +60,16 @@ export default function NewsDetailModal({ article, onClose }: NewsDetailModalPro
   if (!article) return null;
 
   const activeArticle = detail || article;
-  const originalLink = activeArticle.linkView || activeArticle.url;
+  const rawOriginalLink = activeArticle.linkView || activeArticle.url || '';
+  const isZaloDomainLink = /^https:\/\/([a-z0-9-]+\.)?zalo\.me(\/|$)/i.test(rawOriginalLink);
+  const originalLink = isZaloDomainLink ? rawOriginalLink : '';
 
   const handleOpenOriginal = async () => {
     if (!originalLink) return;
     try {
       await openWebview({ url: originalLink });
     } catch {
-      window.open(originalLink, '_blank');
+      // Không điều hướng bằng window.open ra bên thứ 3
     }
   };
 

@@ -26,9 +26,10 @@ import CustomerLoyaltyModal from '../../components/CustomerLoyaltyModal';
 import LuckyWheelModal from '../../components/LuckyWheelModal';
 import NewsDetailModal from '../../components/NewsDetailModal';
 import LegalPagesModal, { LegalDocType } from '../../components/LegalPagesModal';
+import WarrantyServiceModal, { WarrantyModalMode } from '../../components/WarrantyServiceModal';
 import ChristmasKnitHeader from '../../components/ChristmasKnitHeader';
 import logoTheu from '../../assets/noel-logo-theu.webp';
-import { openPhone, openWebview, openChat } from 'zmp-sdk/apis';
+import { openPhone, openChat } from 'zmp-sdk/apis';
 import { fetchZaloApi } from '../../api/client';
 import { getCustomerRank, MemberTier, RANK_CONFIGS, NEXT_TIER_ORDER } from '../../utils/memberRank';
 import IotDeviceCard from '../../components/IotDeviceCard';
@@ -111,27 +112,34 @@ export default function CustomerHome({ user, mySerials = [], onOpenWarranty, onG
   // Quản lý máy lọc nước đang chọn xem (hỗ trợ nhiều máy)
   const [selectedDeviceIndex, setSelectedDeviceIndex] = useState(0);
 
-  // Mở trang Web Bảo hành Truliva (Auto-fill Serial, Phone, Tên của khách hàng)
-  const handleDirectWarranty = (targetSerial?: string) => {
+  // Modal Kích hoạt bảo hành & Yêu cầu KTV ngay trong Mini App (không điều hướng ra ngoài)
+  const [warrantyModalState, setWarrantyModalState] = useState<{
+    isOpen: boolean;
+    mode: WarrantyModalMode;
+    serial: string;
+    model: string;
+  }>({ isOpen: false, mode: 'warranty', serial: '', model: '' });
+
+  const handleDirectWarranty = (
+    targetSerial?: string,
+    mode: WarrantyModalMode = 'warranty',
+    model?: string
+  ) => {
     const activeIdx = selectedDeviceIndex < mySerials.length ? selectedDeviceIndex : 0;
     const currentDevice = mySerials[activeIdx];
     const sn = targetSerial || currentDevice?.serialNumber || '';
-    const phone = user?.phoneNumber || currentDevice?.customerPhone || '';
-    const name = user?.fullName || currentDevice?.customerName || '';
-    const url = sn 
-      ? `https://trulivaofficial.com/warranty-activate?serial=${encodeURIComponent(sn)}&phone=${encodeURIComponent(phone)}&name=${encodeURIComponent(name)}`
-      : 'https://trulivaofficial.com/warranty-activate';
-
-    try {
-      openWebview({ url });
-    } catch {
-      window.open(url, '_blank');
-    }
+    const resolvedModel = model || currentDevice?.model || currentDevice?.productLine || '';
+    setWarrantyModalState({
+      isOpen: true,
+      mode,
+      serial: sn,
+      model: resolvedModel,
+    });
   };
 
   // Đóng bài viết hoặc modal khi vuốt mép màn hình (Edge Swipe Back) thay vì thoát app
   React.useEffect(() => {
-    const isAnyOpen = Boolean(selectedArticle || showLegalModal || showWheelModal);
+    const isAnyOpen = Boolean(selectedArticle || showLegalModal || showWheelModal || warrantyModalState.isOpen);
     if (isAnyOpen) {
       try {
         window.history.pushState({ modalHome: true }, '');
@@ -141,6 +149,7 @@ export default function CustomerHome({ user, mySerials = [], onOpenWarranty, onG
         setSelectedArticle(null);
         setShowLegalModal(false);
         setShowWheelModal(false);
+        setWarrantyModalState((prev) => ({ ...prev, isOpen: false }));
       };
 
       window.addEventListener('popstate', handlePop, { once: true });
@@ -148,7 +157,7 @@ export default function CustomerHome({ user, mySerials = [], onOpenWarranty, onG
         window.removeEventListener('popstate', handlePop);
       };
     }
-  }, [selectedArticle, showLegalModal, showWheelModal]);
+  }, [selectedArticle, showLegalModal, showWheelModal, warrantyModalState.isOpen]);
 
   const totalArticlePages = Math.ceil(newsList.length / ARTICLES_PER_PAGE) || 1;
   const currentArticles = newsList.slice(
@@ -610,6 +619,16 @@ export default function CustomerHome({ user, mySerials = [], onOpenWarranty, onG
         isOpen={showLegalModal}
         onClose={() => setShowLegalModal(false)}
         initialType={legalDocType}
+      />
+
+      <WarrantyServiceModal
+        isOpen={warrantyModalState.isOpen}
+        onClose={() => setWarrantyModalState((prev) => ({ ...prev, isOpen: false }))}
+        initialMode={warrantyModalState.mode}
+        initialSerial={warrantyModalState.serial}
+        initialModel={warrantyModalState.model}
+        user={user}
+        onActivated={() => onSerialsChanged?.()}
       />
     </div>
   );

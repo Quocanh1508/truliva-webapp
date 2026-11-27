@@ -24,13 +24,14 @@ import {
   Scale,
   Coins
 } from 'lucide-react';
-import { openWebview, openChat, getUserInfo } from 'zmp-sdk/apis';
+import { openChat, getUserInfo } from 'zmp-sdk/apis';
 import { fetchZaloApi, setSafeStorage } from '../../api/client';
 import { getCustomerRank, MemberTier, RANK_CONFIGS, NEXT_TIER_ORDER } from '../../utils/memberRank';
 import CustomerVoucherModal from '../../components/CustomerVoucherModal';
 import CustomerHistoryModal from '../../components/CustomerHistoryModal';
 import CustomerLoyaltyModal from '../../components/CustomerLoyaltyModal';
 import LegalPagesModal, { LegalDocType } from '../../components/LegalPagesModal';
+import WarrantyServiceModal, { WarrantyModalMode } from '../../components/WarrantyServiceModal';
 import ChristmasKnitHeader from '../../components/ChristmasKnitHeader';
 import IotDeviceCard from '../../components/IotDeviceCard';
 import { FEATURES } from '../../config/features';
@@ -58,10 +59,16 @@ export default function CustomerProfile({
   // Legal Modal
   const [showLegalModal, setShowLegalModal] = useState(false);
   const [legalDocType, setLegalDocType] = useState<LegalDocType>('TERMS');
+  const [warrantyModalState, setWarrantyModalState] = useState<{
+    isOpen: boolean;
+    mode: WarrantyModalMode;
+    serial: string;
+    model: string;
+  }>({ isOpen: false, mode: 'warranty', serial: '', model: '' });
 
   // Đóng modal khi người dùng vuốt mép màn hình (Edge Swipe Back) thay vì thoát app
   useEffect(() => {
-    const isAnyModalOpen = showHistoryModal || showLegalModal || showVoucherModal || showLoyaltyModal;
+    const isAnyModalOpen = showHistoryModal || showLegalModal || showVoucherModal || showLoyaltyModal || warrantyModalState.isOpen;
     if (isAnyModalOpen) {
       try {
         window.history.pushState({ modalOpen: true }, '');
@@ -72,6 +79,7 @@ export default function CustomerProfile({
         setShowLegalModal(false);
         setShowVoucherModal(false);
         setShowLoyaltyModal(false);
+        setWarrantyModalState((prev) => ({ ...prev, isOpen: false }));
       };
 
       window.addEventListener('popstate', handleModalPopState, { once: true });
@@ -79,7 +87,7 @@ export default function CustomerProfile({
         window.removeEventListener('popstate', handleModalPopState);
       };
     }
-  }, [showHistoryModal, showLegalModal, showVoucherModal, showLoyaltyModal]);
+  }, [showHistoryModal, showLegalModal, showVoucherModal, showLoyaltyModal, warrantyModalState.isOpen]);
   
   const devicesSectionRef = useRef<HTMLDivElement>(null);
 
@@ -95,15 +103,17 @@ export default function CustomerProfile({
     setOverrideTier(nextTier);
   };
 
-  const handleBookMaintenance = async (serialNumber?: string) => {
-    const url = serialNumber 
-      ? `https://trulivaofficial.com/warranty-activate?serial=${encodeURIComponent(serialNumber)}`
-      : 'https://trulivaofficial.com/warranty-activate';
-    try {
-      await openWebview({ url });
-    } catch {
-      window.open(url, '_blank');
-    }
+  const handleBookMaintenance = (
+    serialNumber?: string,
+    mode: WarrantyModalMode = 'warranty',
+    model?: string
+  ) => {
+    setWarrantyModalState({
+      isOpen: true,
+      mode,
+      serial: serialNumber || '',
+      model: model || '',
+    });
   };
 
   const handleOpenOaChat = async () => {
@@ -509,6 +519,16 @@ export default function CustomerProfile({
         isOpen={showLegalModal}
         onClose={() => setShowLegalModal(false)}
         initialType={legalDocType}
+      />
+
+      <WarrantyServiceModal
+        isOpen={warrantyModalState.isOpen}
+        onClose={() => setWarrantyModalState((prev) => ({ ...prev, isOpen: false }))}
+        initialMode={warrantyModalState.mode}
+        initialSerial={warrantyModalState.serial}
+        initialModel={warrantyModalState.model}
+        user={user}
+        onActivated={() => onRefresh?.()}
       />
     </div>
   );

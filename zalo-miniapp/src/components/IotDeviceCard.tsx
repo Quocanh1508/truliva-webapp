@@ -18,12 +18,12 @@ import {
   Sparkles,
   CheckCircle2
 } from 'lucide-react';
-import { openPhone, openWebview } from 'zmp-sdk/apis';
+import { openPhone } from 'zmp-sdk/apis';
 
 interface IotDeviceCardProps {
   serialData: any;
   user?: any;
-  onBookMaintenance?: (serialNumber: string) => void;
+  onBookMaintenance?: (serialNumber?: string, mode?: 'warranty' | 'support', model?: string) => void;
 }
 
 export default function IotDeviceCard({ serialData, user, onBookMaintenance }: IotDeviceCardProps) {
@@ -51,43 +51,18 @@ export default function IotDeviceCard({ serialData, user, onBookMaintenance }: I
     }
   };
 
-  // Điều hướng thẳng về form Hỗ Trợ Kỹ Thuật (auto-fill serial, phone, name, model)
-  const handleRequestKtv = async () => {
+  // Mở form Hỗ Trợ Kỹ Thuật trực tiếp trong Mini App (auto-fill serial, model)
+  const handleRequestKtv = () => {
     const sn = s?.serialNumber || '';
-    const phone = user?.phoneNumber || s?.customerPhone || '';
-    const name = user?.fullName || s?.customerName || '';
     const model = s?.model || s?.productLine || modelTitle || '';
-
-    const params = new URLSearchParams();
-    params.set('mode', 'support');
-    if (sn) params.set('serial', sn);
-    if (phone) params.set('phone', phone);
-    if (name) params.set('name', name);
-    if (model) params.set('model', model);
-
-    const url = `https://trulivaofficial.com/warranty-activate?${params.toString()}`;
-
-    try {
-      await openWebview({ url });
-    } catch {
-      window.open(url, '_blank');
-    }
+    onBookMaintenance?.(sn, 'support', model);
   };
 
-  // Mở trang Web Bảo hành Truliva với Serial được Auto-Fill tự động
-  const handleOpenWarranty = async () => {
+  // Mở form Kích hoạt / Tra cứu bảo hành trực tiếp trong Mini App
+  const handleOpenWarranty = () => {
     const sn = s?.serialNumber || '';
-    const phone = user?.phoneNumber || s?.customerPhone || '';
-    const name = user?.fullName || s?.customerName || '';
-    const url = sn
-      ? `https://trulivaofficial.com/warranty-activate?serial=${encodeURIComponent(sn)}&phone=${encodeURIComponent(phone)}&name=${encodeURIComponent(name)}`
-      : 'https://trulivaofficial.com/warranty-activate';
-
-    try {
-      await openWebview({ url });
-    } catch {
-      window.open(url, '_blank');
-    }
+    const model = s?.model || s?.productLine || modelTitle || '';
+    onBookMaintenance?.(sn, 'warranty', model);
   };
 
   // Kiểm tra trạng thái kích hoạt bảo hành của thiết bị

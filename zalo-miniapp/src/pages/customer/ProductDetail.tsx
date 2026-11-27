@@ -24,7 +24,7 @@ import {
   ChevronUp,
   Layers
 } from 'lucide-react';
-import { openWebview, openPhone, openChat } from 'zmp-sdk/apis';
+import { openPhone, openChat } from 'zmp-sdk/apis';
 import { useCart } from '../../context/CartContext';
 import LegalPagesModal, { LegalDocType } from '../../components/LegalPagesModal';
 import { FEATURES } from '../../config/features';
@@ -640,25 +640,6 @@ export default function ProductDetail({ product, onBack, onGoToCart, onBuyNow }:
           </div>
         );
       })()}
-
-      {/* Official Website Link */}
-      {specs?.productUrl && (
-        <div className="bg-white p-4 mt-2 border-y border-gray-100">
-          <button
-            onClick={() => {
-              try {
-                openWebview({ url: specs.productUrl });
-              } catch {
-                window.open(specs.productUrl, '_blank');
-              }
-            }}
-            className="w-full py-2.5 px-4 bg-sky-50 hover:bg-sky-100 text-[#0284C7] rounded-xl text-xs font-bold flex items-center justify-center gap-2 transition border border-sky-200 active:scale-98 cursor-pointer"
-          >
-            <ExternalLink className="w-4 h-4 text-[#0284C7]" />
-            <span>Xem chi tiết trên website trulivavietnam.com</span>
-          </button>
-        </div>
-      )}
 
       {/* Bottom Sticky Action Bar */}
       <div className="fixed bottom-0 left-0 right-0 z-50 bg-white/98 backdrop-blur-md border-t border-slate-200 px-4 pt-3 pb-[max(14px,env(safe-area-inset-bottom))] shadow-[0_-6px_25px_rgba(0,0,0,0.08)] flex items-center gap-3">
