@@ -12,7 +12,9 @@ if (typeof (globalThis as any).ImageData === 'undefined') {
   (globalThis as any).ImageData = class ImageData {};
 }
 
-const GEMINI_API_KEY = process.env.GEMINI_API_KEY || '';
+function getGeminiApiKey(): string {
+  return (process.env.GEMINI_API_KEY || '').trim();
+}
 const EMBEDDING_MODEL = 'gemini-embedding-001';
 const EMBEDDING_DIMENSION = 768;
 
@@ -64,7 +66,8 @@ export async function extractTextWithGeminiVision(buffer: Buffer, fileName: stri
   pages: Array<{ pageNumber: number; text: string }>;
   totalPages: number;
 }> {
-  if (!GEMINI_API_KEY) {
+  const apiKey = getGeminiApiKey();
+  if (!apiKey) {
     throw new Error('Chưa cấu hình GEMINI_API_KEY trong hệ thống để thực hiện OCR');
   }
 
@@ -77,7 +80,7 @@ export async function extractTextWithGeminiVision(buffer: Buffer, fileName: stri
   try {
     // 1. Khởi tạo phiên Resumable Upload
     const initRes = await axios.post(
-      `https://generativelanguage.googleapis.com/upload/v1beta/files?key=${GEMINI_API_KEY}`,
+      `https://generativelanguage.googleapis.com/upload/v1beta/files?key=${apiKey}`,
       { file: { display_name: fileName } },
       {
         headers: {
@@ -125,7 +128,7 @@ export async function extractTextWithGeminiVision(buffer: Buffer, fileName: stri
     while (fileState === 'PROCESSING' && pollCount < 25) {
       await new Promise(r => setTimeout(r, 2000));
       const pollRes = await axios.get(
-        `https://generativelanguage.googleapis.com/v1beta/${fileResourceName}?key=${GEMINI_API_KEY}`
+        `https://generativelanguage.googleapis.com/v1beta/${fileResourceName}?key=${apiKey}`
       );
       fileState = pollRes.data?.state;
       pollCount++;
@@ -158,7 +161,7 @@ TUYỆT ĐỐI không tóm tắt sơ sài, hãy giữ nguyên các chi tiết s�
       try {
         logger.info(`[OCR] Đang gọi mô hình ${model} để nhận dạng chữ từ hình ảnh...`);
         const genRes = await axios.post(
-          `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${GEMINI_API_KEY}`,
+          `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
           {
             contents: [
               {
@@ -225,7 +228,7 @@ TUYỆT ĐỐI không tóm tắt sơ sài, hãy giữ nguyên các chi tiết s�
     if (fileResourceName) {
       try {
         await axios.delete(
-          `https://generativelanguage.googleapis.com/v1beta/${fileResourceName}?key=${GEMINI_API_KEY}`
+          `https://generativelanguage.googleapis.com/v1beta/${fileResourceName}?key=${apiKey}`
         );
         logger.info('[OCR] Đã dọn dẹp tệp tạm trên Gemini File API thành công', { fileResourceName });
       } catch (e: any) {
@@ -381,8 +384,9 @@ export function chunkTextWithPages(
  */
 export async function getBatchEmbeddings(texts: string[]): Promise<number[][]> {
   if (texts.length === 0) return [];
+  const apiKey = getGeminiApiKey();
 
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${EMBEDDING_MODEL}:batchEmbedContents?key=${GEMINI_API_KEY}`;
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${EMBEDDING_MODEL}:batchEmbedContents?key=${apiKey}`;
   const batchSize = 25;
   const allEmbeddings: number[][] = [];
 
@@ -419,7 +423,8 @@ export async function getBatchEmbeddings(texts: string[]): Promise<number[][]> {
  * Sinh vector embedding cho 1 câu đơn lẻ (dành cho search query)
  */
 export async function getSingleEmbedding(text: string): Promise<number[] | null> {
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${EMBEDDING_MODEL}:embedContent?key=${GEMINI_API_KEY}`;
+  const apiKey = getGeminiApiKey();
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${EMBEDDING_MODEL}:embedContent?key=${apiKey}`;
   try {
     const res = await axios.post(url, {
       content: { parts: [{ text }] },
@@ -570,6 +575,10 @@ export async function searchHybridRAG(
     if (!query || !query.trim()) return [];
 
     const safeLimit = typeof limit === 'object' && limit !== null ? Number((limit as any).limit) || 4 : Number(limit) || 4;
+    const safeVectorThreshold =
+      typeof vectorThreshold === 'number' && !Number.isNaN(vectorThreshold)
+        ? Math.max(0, Math.min(1, vectorThreshold))
+        : 0.35;
     const cleanQuery = query.trim();
     // Tự động phát hiện model nếu chưa truyền (ví dụ: UR3626, 3626, UR5840...)
     const kw = (modelKeyword || cleanQuery.match(/\b(?:UR|CR|CR-ZX|W|UX|YDZ|QY\/F)?[0-9]{4,6}[A-Z]*\b/i)?.[0] || '').trim();
@@ -628,7 +637,9 @@ export async function searchHybridRAG(
           ROW_NUMBER() OVER (ORDER BY c.embedding <=> $1::vector) AS rank_vec
         FROM rag.document_chunks c
         JOIN rag.document_sources s ON s.id = c.document_id
-        WHERE s.is_active = true AND c.embedding IS NOT NULL
+        WHERE s.is_active = true
+          AND c.embedding IS NOT NULL
+          AND (1 - (c.embedding <=> $1::vector)) >= $6
         ORDER BY c.embedding <=> $1::vector
         LIMIT 25
       ),
@@ -676,7 +687,7 @@ export async function searchHybridRAG(
       WHERE s.is_active = true
       ORDER BY "rrfScore" DESC
       LIMIT $5;
-    `, embStr, orQuery, cleanQuery, kw, safeLimit);
+    `, embStr, orQuery, cleanQuery, kw, safeLimit, safeVectorThreshold);
 
     return rawResults || [];
   } catch (error: any) {
