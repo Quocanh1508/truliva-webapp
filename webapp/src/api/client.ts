@@ -114,6 +114,33 @@ export async function uploadImages(files: File[]): Promise<string[]> {
   return data.urls;
 }
 
+export async function uploadMedia(files: File[]): Promise<string[]> {
+  const preparedFiles = await Promise.all(
+    files.map((f) => (f.type.startsWith('image/') ? compressImage(f) : Promise.resolve(f)))
+  );
+  const formData = new FormData();
+  preparedFiles.forEach((f) => formData.append('files', f));
+
+  const token = localStorage.getItem('session_token');
+  const headers: Record<string, string> = {};
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+
+  const response = await fetch(`${API_URL}/upload/media`, {
+    method: 'POST',
+    headers,
+    body: formData,
+  });
+
+  const data = await response.json();
+  if (!response.ok) {
+    throw new Error(data.error || 'Lỗi tải lên tệp đính kèm');
+  }
+
+  return data.urls;
+}
+
 export async function getOrders(params: Record<string, any> = {}) {
   const query = new URLSearchParams();
   for (const [key, value] of Object.entries(params)) {

@@ -1,11 +1,12 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { createPortal } from 'react-dom';
-import { fetchApi, getFiltersData, uploadImages } from '../../api/client';
+import { fetchApi, getFiltersData, uploadMedia } from '../../api/client';
 import { WORK_TYPES, WORK_TYPE_SERVICES, HOTLINE_SERVICE_REQUEST_TYPES } from '../../utils/workTypes';
-import { X, Loader2, Clock, Send, User, ShoppingBag, UploadCloud } from 'lucide-react';
+import { X, Loader2, Clock, Send, User, ShoppingBag, UploadCloud, Play } from 'lucide-react';
 import ProvinceSelect from '../ProvinceSelect';
 import CategoryTreeSelect from '../CategoryTreeSelect';
 import SourceTreeSelect from '../SourceTreeSelect';
+import MediaLightbox, { isVideoUrl } from '../MediaLightbox';
 
 // ═══════════════════════════════════════════════════
 //  Types
@@ -186,21 +187,34 @@ export default function HotlineTicketModal({ ticket, isOpen, onClose, onSaved, u
   const [attachmentUrls, setAttachmentUrls] = useState<string[]>([]);
   const [uploadingAttachment, setUploadingAttachment] = useState(false);
   const [uploadError, setUploadError] = useState('');
+  const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
 
   const handleUploadAttachments = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files || e.target.files.length === 0) return;
     const selectedFiles = Array.from(e.target.files);
+    e.target.value = '';
+
     if (attachmentUrls.length + selectedFiles.length > 5) {
-      setUploadError('Tối đa 5 ảnh đính kèm');
+      setUploadError('Tối đa 5 tệp đính kèm');
       return;
     }
+
+    for (const file of selectedFiles) {
+      const isVideo = file.type.startsWith('video/');
+      const maxBytes = isVideo ? 50 * 1024 * 1024 : 30 * 1024 * 1024;
+      if (file.size > maxBytes) {
+        setUploadError(isVideo ? 'Video tối đa 50MB (dưới 1 phút)' : 'Ảnh tối đa 30MB');
+        return;
+      }
+    }
+
     setUploadingAttachment(true);
     setUploadError('');
     try {
-      const urls = await uploadImages(selectedFiles);
+      const urls = await uploadMedia(selectedFiles);
       setAttachmentUrls(prev => [...prev, ...urls]);
     } catch (err: any) {
-      setUploadError(err.message || 'Lỗi upload ảnh');
+      setUploadError(err.message || 'Lỗi tải lên tệp đính kèm');
     } finally {
       setUploadingAttachment(false);
     }
@@ -228,6 +242,7 @@ export default function HotlineTicketModal({ ticket, isOpen, onClose, onSaved, u
     if (isEditMode && ticket?.id) {
       fetchApi(`/hotlines/${ticket.id}`).then(data => {
         setTicketDetail(data);
+        setAttachmentUrls(Array.isArray(data.attachmentUrls) ? data.attachmentUrls : []);
         setFormData({
           customerName: data.customerName || '',
           customerPhone: data.customerPhone || '',
@@ -272,13 +287,13 @@ export default function HotlineTicketModal({ ticket, isOpen, onClose, onSaved, u
   // ── ESC Key listener to close modal ──
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && isOpen) {
+      if (e.key === 'Escape' && isOpen && lightboxIndex === null) {
         onClose();
       }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isOpen, onClose]);
+  }, [isOpen, onClose, lightboxIndex]);
 
   // ── Phase 2: Save ──
   const handleSavePhase2 = async () => {
@@ -524,30 +539,61 @@ export default function HotlineTicketModal({ ticket, isOpen, onClose, onSaved, u
                   className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-blue-200 resize-none" />
               </div>
 
-              {/* Hình ảnh đính kèm (Không bắt buộc) */}
+              {/* Hình ảnh / Video đính kèm (Không bắt buộc) */}
               <div>
                 <div className="flex items-center justify-between mb-1.5">
                   <label className="text-sm font-semibold text-gray-700">
-                    Hình ảnh đính kèm <span className="text-xs text-gray-400 font-normal">(không bắt buộc)</span>
+                    Hình ảnh / Video đính kèm <span className="text-xs text-gray-400 font-normal">(không bắt buộc)</span>
                   </label>
-                  <span className="text-xs text-gray-400 font-medium">{attachmentUrls.length}/5 ảnh</span>
+                  <span className="text-xs text-gray-400 font-medium">{attachmentUrls.length}/5 tệp</span>
                 </div>
 
                 <div className="space-y-2">
                   <div className="flex flex-wrap gap-2.5">
-                    {attachmentUrls.map((url, idx) => (
-                      <div key={idx} className="relative w-20 h-20 rounded-xl overflow-hidden border border-gray-200 shadow-xs group">
-                        <img src={url} alt={`attachment-${idx}`} className="w-full h-full object-cover" />
-                        <button
-                          type="button"
-                          onClick={() => handleRemoveAttachment(idx)}
-                          className="absolute top-1 right-1 p-1 bg-black/60 text-white rounded-full hover:bg-red-600 transition-colors opacity-90"
-                          title="Xóa ảnh"
+                    {attachmentUrls.map((url, idx) => {
+                      const isVideo = isVideoUrl(url);
+                      return (
+                        <div
+                          key={idx}
+                          onClick={() => setLightboxIndex(idx)}
+                          className="relative w-20 h-20 rounded-xl overflow-hidden border border-gray-200 shadow-xs group cursor-pointer bg-slate-900"
                         >
-                          <X size={12} />
-                        </button>
-                      </div>
-                    ))}
+                          {isVideo ? (
+                            <>
+                              <video
+                                src={url}
+                                muted
+                                playsInline
+                                preload="metadata"
+                                className="w-full h-full object-cover opacity-90 group-hover:opacity-100 transition-opacity"
+                              />
+                              <div className="absolute inset-0 flex items-center justify-center bg-black/25 group-hover:bg-black/35 transition-colors">
+                                <div className="w-7 h-7 rounded-full bg-black/60 text-white flex items-center justify-center">
+                                  <Play size={13} className="fill-white ml-0.5" />
+                                </div>
+                              </div>
+                            </>
+                          ) : (
+                            <img
+                              src={url}
+                              alt={`attachment-${idx}`}
+                              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
+                            />
+                          )}
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleRemoveAttachment(idx);
+                            }}
+                            className="absolute top-1 right-1 p-1 bg-black/60 text-white rounded-full hover:bg-red-600 transition-colors opacity-90"
+                            title="Xóa"
+                          >
+                            <X size={12} />
+                          </button>
+                        </div>
+                      );
+                    })}
 
                     {attachmentUrls.length < 5 && (
                       <label className={`w-20 h-20 border-2 border-dashed border-gray-300 rounded-xl flex flex-col items-center justify-center cursor-pointer hover:border-blue-500 hover:bg-blue-50/50 transition-all ${uploadingAttachment ? 'opacity-50 pointer-events-none' : ''}`}>
@@ -556,13 +602,13 @@ export default function HotlineTicketModal({ ticket, isOpen, onClose, onSaved, u
                         ) : (
                           <>
                             <UploadCloud size={20} className="text-gray-400" />
-                            <span className="text-[10px] text-gray-500 font-medium mt-1">+ Thêm ảnh</span>
+                            <span className="text-[10px] text-gray-500 font-medium mt-1">Ảnh / Video</span>
                           </>
                         )}
                         <input
                           type="file"
                           multiple
-                          accept="image/*"
+                          accept="image/*,video/mp4,video/quicktime,video/webm,video/x-m4v,video/3gpp"
                           className="hidden"
                           disabled={uploadingAttachment || attachmentUrls.length >= 5}
                           onChange={handleUploadAttachments}
@@ -740,6 +786,15 @@ export default function HotlineTicketModal({ ticket, isOpen, onClose, onSaved, u
           </div>
         </div>
       </div>
+
+      {lightboxIndex !== null && attachmentUrls.length > 0 && (
+        <MediaLightbox
+          urls={attachmentUrls}
+          currentIndex={lightboxIndex}
+          onClose={() => setLightboxIndex(null)}
+          onChangeIndex={setLightboxIndex}
+        />
+      )}
     </div>,
     document.body
   );

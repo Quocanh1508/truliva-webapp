@@ -8,11 +8,12 @@ import {
   Search, Plus, UserPlus, ArrowRightCircle, ShoppingCart, Phone, MapPin, User,
   Clock, Loader2, ChevronLeft, ChevronRight, X, Wrench, Package,
   PhoneCall, Copy, CheckCircle2, Filter, Layers, Settings, Building2, Users,
-  Calendar, XCircle, Download, Check, ChevronDown, UserCheck, Tag, FileText
+  Calendar, XCircle, Download, Check, ChevronDown, UserCheck, Tag, FileText, Play
 } from 'lucide-react';
 import HotlineTicketModal from './HotlineTicketModal';
 import LegacyHistoryModal from './LegacyHistoryModal';
 import DateRangePicker from '../DateRangePicker';
+import MediaLightbox, { isVideoUrl } from '../MediaLightbox';
 import { formatOrderId } from '../../utils/text';
 import { normalizeProvince } from '../../utils/provinces';
 
@@ -49,6 +50,7 @@ interface HotlineTicket {
   sparePartName?: string;
   consultationNote?: string;
   phase3Feedback?: string;
+  attachmentUrls?: string[];
 }
 
 interface BadgeCounts {
@@ -275,6 +277,7 @@ export default function HotlineManage() {
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [selectedTicket, setSelectedTicket] = useState<HotlineTicket | null>(null);
   const [copiedPhone, setCopiedPhone] = useState<string | null>(null);
+  const [mediaLightbox, setMediaLightbox] = useState<{ urls: string[]; index: number } | null>(null);
 
   // Fetch Filter Options on Mount
   useEffect(() => {
@@ -2319,6 +2322,41 @@ export default function HotlineManage() {
                         <span className="line-clamp-2 inline">{ticket.customerSupportDetail}</span>
                       </div>
                     )}
+                    {ticket.attachmentUrls && ticket.attachmentUrls.length > 0 && (
+                      <div className="flex items-center gap-1.5 pt-0.5" onClick={(e) => e.stopPropagation()}>
+                        {ticket.attachmentUrls.slice(0, 4).map((url, idx) => {
+                          const isVideo = isVideoUrl(url);
+                          return (
+                            <button
+                              key={idx}
+                              type="button"
+                              onClick={() => setMediaLightbox({ urls: ticket.attachmentUrls!, index: idx })}
+                              className="relative w-10 h-10 rounded-lg overflow-hidden border border-gray-200 bg-slate-900 shrink-0"
+                            >
+                              {isVideo ? (
+                                <>
+                                  <video src={url} muted playsInline preload="metadata" className="w-full h-full object-cover opacity-90" />
+                                  <span className="absolute inset-0 flex items-center justify-center bg-black/25">
+                                    <Play size={12} className="text-white fill-white ml-0.5" />
+                                  </span>
+                                </>
+                              ) : (
+                                <img src={url} alt="" className="w-full h-full object-cover" />
+                              )}
+                            </button>
+                          );
+                        })}
+                        {ticket.attachmentUrls.length > 4 && (
+                          <button
+                            type="button"
+                            onClick={() => setMediaLightbox({ urls: ticket.attachmentUrls!, index: 4 })}
+                            className="w-10 h-10 rounded-lg border border-gray-200 bg-gray-100 text-[11px] font-semibold text-gray-600 flex items-center justify-center shrink-0"
+                          >
+                            +{ticket.attachmentUrls.length - 4}
+                          </button>
+                        )}
+                      </div>
+                    )}
                     <div className="text-[11px] text-gray-500">
                       Xử lý: <span className="font-medium text-gray-700">{ticket.handlerUser?.fullName || ticket.targetTeam || 'Chưa có người xử lý'}</span>
                     </div>
@@ -2537,6 +2575,41 @@ export default function HotlineManage() {
                             </div>
                           ) : (
                             <span className="text-gray-400 italic">Chưa có nội dung</span>
+                          )}
+                          {ticket.attachmentUrls && ticket.attachmentUrls.length > 0 && (
+                            <div className="flex items-center gap-1.5 pt-1" onClick={(e) => e.stopPropagation()}>
+                              {ticket.attachmentUrls.slice(0, 3).map((url, idx) => {
+                                const isVideo = isVideoUrl(url);
+                                return (
+                                  <button
+                                    key={idx}
+                                    type="button"
+                                    onClick={() => setMediaLightbox({ urls: ticket.attachmentUrls!, index: idx })}
+                                    className="relative w-9 h-9 rounded-lg overflow-hidden border border-gray-200 bg-slate-900 shrink-0 hover:ring-2 hover:ring-blue-400 transition-all"
+                                  >
+                                    {isVideo ? (
+                                      <>
+                                        <video src={url} muted playsInline preload="metadata" className="w-full h-full object-cover opacity-90" />
+                                        <span className="absolute inset-0 flex items-center justify-center bg-black/25">
+                                          <Play size={11} className="text-white fill-white ml-0.5" />
+                                        </span>
+                                      </>
+                                    ) : (
+                                      <img src={url} alt="" className="w-full h-full object-cover" />
+                                    )}
+                                  </button>
+                                );
+                              })}
+                              {ticket.attachmentUrls.length > 3 && (
+                                <button
+                                  type="button"
+                                  onClick={() => setMediaLightbox({ urls: ticket.attachmentUrls!, index: 3 })}
+                                  className="w-9 h-9 rounded-lg border border-gray-200 bg-gray-100 hover:bg-gray-200 text-[11px] font-semibold text-gray-600 flex items-center justify-center shrink-0 transition-colors"
+                                >
+                                  +{ticket.attachmentUrls.length - 3}
+                                </button>
+                              )}
+                            </div>
                           )}
                         </div>
                       </td>
@@ -2999,6 +3072,15 @@ export default function HotlineManage() {
           <CheckCircle2 size={16} className="text-emerald-400 shrink-0" />
           <span>Đã sao chép SĐT: <strong className="text-emerald-300 font-mono text-xs">{copiedPhone}</strong></span>
         </div>
+      )}
+
+      {mediaLightbox && (
+        <MediaLightbox
+          urls={mediaLightbox.urls}
+          currentIndex={mediaLightbox.index}
+          onClose={() => setMediaLightbox(null)}
+          onChangeIndex={(index) => setMediaLightbox((prev) => (prev ? { ...prev, index } : null))}
+        />
       )}
     </div>
   );
