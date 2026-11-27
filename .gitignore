@@ -29,3 +29,6 @@ id_rsa*
 id_ed25519*
 scripts/*.local.js
 scripts/*secret*
+BAO_CAO_*.md
+*security-report*.md
+SECURITY_AUDIT_REPORT.md

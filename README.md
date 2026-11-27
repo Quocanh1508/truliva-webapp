@@ -318,5 +318,4 @@ node scripts/vps_deploy.js exec sandbox -- "pm2 status && node scripts/verify_<m
 | [INVENTORY_FLOW.md](INVENTORY_FLOW.md) | Luồng quản lý kho và đồng bộ tồn kho Pancake POS |
 | [ESP32_MQTT_Integration_Spec.md](ESP32_MQTT_Integration_Spec.md) | Đặc tả giao thức tích hợp ESP32 & MQTT |
 | [docs/IOT_PARTNER_INTEGRATION_GUIDE.md](docs/IOT_PARTNER_INTEGRATION_GUIDE.md) | Hướng dẫn tích hợp IoT dành cho đối tác |
-| [SECURITY_AUDIT_REPORT.md](SECURITY_AUDIT_REPORT.md) | Báo cáo rà soát và hardening bảo mật hệ thống |
 | [.env.example](.env.example) | Mẫu cấu hình biến môi trường |
