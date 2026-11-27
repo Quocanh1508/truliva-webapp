@@ -22,6 +22,10 @@ export interface MockPrismaClient {
   product: {
     findMany: (...args: any[]) => Promise<any[]>;
   };
+  shopProduct: {
+    findMany: (...args: any[]) => Promise<any[]>;
+    update: (...args: any[]) => Promise<any>;
+  };
   productCombo: {
     findMany: (...args: any[]) => Promise<any[]>;
   };
@@ -55,6 +59,10 @@ export function installMockPrisma(overrides?: Partial<MockPrismaClient>): MockPr
     },
     product: {
       findMany: async () => [],
+    },
+    shopProduct: {
+      findMany: async () => [],
+      update: async (args: any) => args?.data || {},
     },
     productCombo: {
       findMany: async () => [],

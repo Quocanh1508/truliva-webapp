@@ -190,6 +190,9 @@ export function buildSystemInstruction(params: {
   }
 
   if (catalogText?.trim()) {
+    sections.push(
+      `\nQUY TẮC BÁO GIÁ ƯU ĐÃI & TƯ VẤN ĐẦY ĐỦ:\n- Khi sản phẩm có cả "Giá ưu đãi hiện tại" và "Giá niêm yết gốc" trong BẢNG GIÁ BÁN ƯU ĐÃI CHÍNH THỨC, BẮT BUỘC báo rõ cả Giá ưu đãi hiện tại (kèm % giảm / số tiền tiết kiệm) VÀ Giá niêm yết gốc, tuyệt đối không chỉ báo mỗi giá niêm yết gốc.\n- Nêu ngắn gọn các điểm nổi bật chính (công suất, chế độ nóng/lạnh, bảo hành, lắp đặt 0 đồng, trả góp 0%) để tư vấn đầy đủ cho khách.`
+    );
     sections.push(catalogText.trim());
   }
 

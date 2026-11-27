@@ -15,6 +15,7 @@ import {
 } from '../services/agent/promptBuilder';
 import { runAgentTurn } from '../services/agent/agentOrchestrator';
 import { DEFAULT_GEMINI_MODEL } from '../services/agent/geminiClient';
+import { syncShopPricesFromWebsite } from '../services/websitePriceSyncService';
 
 const router = Router();
 const upload = multer({
@@ -135,7 +136,7 @@ router.put('/config', requireAuth, requireAdmin, async (req: Request, res: Respo
  */
 router.get('/catalog-summary', requireAuth, async (req: Request, res: Response): Promise<void> => {
   try {
-    const [products, combos] = await Promise.all([
+    const [products, combos, shopProducts] = await Promise.all([
       prisma.product.findMany({
         where: { isActive: true },
         select: { id: true, name: true, sku: true, sellingPrice: true },
@@ -147,6 +148,12 @@ router.get('/catalog-summary', requireAuth, async (req: Request, res: Response):
         select: { id: true, displayName: true, comboKey: true, keywords: true },
         orderBy: { sortOrder: 'asc' },
         take: 30
+      }),
+      prisma.shopProduct.findMany({
+        where: { isActive: true },
+        select: { id: true, name: true, sku: true, price: true, originalPrice: true, warrantyMonths: true, updatedAt: true },
+        orderBy: { sortOrder: 'asc' },
+        take: 40
       })
     ]);
 
@@ -154,12 +161,34 @@ router.get('/catalog-summary', requireAuth, async (req: Request, res: Response):
       success: true,
       totalActiveProducts: products.length,
       totalActiveCombos: combos.length,
+      totalActiveShopProducts: shopProducts.length,
       products,
-      combos
+      combos,
+      shopProducts
     });
   } catch (error: any) {
     logger.error('Failed to fetch catalog summary for AI', { error: error.message });
     res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+/**
+ * POST /api/ai-assistant/sync-website-prices
+ * Đồng bộ giá bán ưu đãi & giá niêm yết trực tiếp từ trulivavietnam.com vào ShopProduct
+ */
+router.post('/sync-website-prices', requireAuth, requireAdmin, async (_req: Request, res: Response): Promise<void> => {
+  try {
+    const summary = await syncShopPricesFromWebsite();
+    res.json({
+      success: true,
+      message: summary.updatedCount > 0
+        ? `Đã đồng bộ cập nhật giá ${summary.updatedCount} sản phẩm từ website trulivavietnam.com!`
+        : `Đã kiểm tra ${summary.totalChecked} sản phẩm, giá hiện tại đã khớp 100% với website trulivavietnam.com.`,
+      summary
+    });
+  } catch (error: any) {
+    logger.error('Failed to sync website prices for AI', { error: error.message });
+    res.status(500).json({ success: false, message: error.message || 'Lỗi đồng bộ giá từ website' });
   }
 });
 

@@ -35,6 +35,7 @@ import { startOrderSyncScheduler } from './services/orderSyncScheduler';
 import { startReportCleanupScheduler } from './services/reportCleanupScheduler';
 import { startPancakeRetryScheduler } from './services/pancakeRetryScheduler';
 import { startProductSyncScheduler } from './services/productSyncScheduler';
+import { startWebsitePriceSyncScheduler } from './services/websitePriceSyncService';
 import { initWebSocketServer } from './services/websocketService';
 import { startMqttService } from './services/mqttService';
 import { syncPermissionCatalog } from './services/permissionSync';
@@ -342,6 +343,11 @@ const server = app.listen(Number(PORT), HOST, () => {
 
   // Khởi động lập lịch tự động đồng bộ lại đơn lỗi sang Pancake POS (đã có Sandbox Guard bên trong)
   startPancakeRetryScheduler(10); // Chạy định kỳ mỗi 10 phút
+
+  // Khởi động lập lịch đồng bộ giá khuyến mãi từ website trulivavietnam.com
+  if (process.env.WEBSITE_PRICE_SYNC_ENABLED !== 'false') {
+    startWebsitePriceSyncScheduler(6);
+  }
 
   // Khởi động MQTT service kết nối Mosquitto broker cho IoT
   startMqttService();

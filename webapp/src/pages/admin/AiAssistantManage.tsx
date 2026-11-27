@@ -65,8 +65,18 @@ interface AiConfig {
 interface CatalogSummary {
   totalActiveProducts: number;
   totalActiveCombos: number;
+  totalActiveShopProducts?: number;
   products: Array<{ id: string; name: string; sku: string; sellingPrice?: number }>;
   combos: Array<{ id: string; displayName: string; comboKey: string }>;
+  shopProducts?: Array<{
+    id: string;
+    name: string;
+    sku: string;
+    price: number;
+    originalPrice?: number | null;
+    warrantyMonths?: number;
+    updatedAt?: string;
+  }>;
 }
 
 interface DocumentSource {
@@ -164,6 +174,7 @@ export default function AiAssistantManage() {
   // Database Catalog Data
   const [catalog, setCatalog] = useState<CatalogSummary | null>(null);
   const [loadingCatalog, setLoadingCatalog] = useState(false);
+  const [syncingWebsitePrices, setSyncingWebsitePrices] = useState(false);
 
   // Documents & RAG State
   const [documents, setDocuments] = useState<DocumentSource[]>([]);
@@ -257,6 +268,26 @@ export default function AiAssistantManage() {
       console.error('Lỗi khi tải danh mục sản phẩm AI', err);
     } finally {
       setLoadingCatalog(false);
+    }
+  };
+
+  const handleSyncWebsitePrices = async () => {
+    try {
+      setSyncingWebsitePrices(true);
+      setSuccessMsg('');
+      setErrorMsg('');
+      const res = await fetchApi('/ai-assistant/sync-website-prices', {
+        method: 'POST',
+      });
+      if (res.success) {
+        setSuccessMsg(res.message || 'Đã đồng bộ giá website thành công!');
+        await loadCatalogSummary();
+        setTimeout(() => setSuccessMsg(''), 5000);
+      }
+    } catch (err: any) {
+      setErrorMsg(err.message || 'Lỗi đồng bộ giá từ website');
+    } finally {
+      setSyncingWebsitePrices(false);
     }
   };
 
@@ -2062,7 +2093,18 @@ export default function AiAssistantManage() {
               </p>
             </div>
 
-            <div className="flex items-center gap-3">
+            <div className="flex flex-wrap items-center gap-3">
+              {hasPermission('AI_ASSISTANT_CONFIG') && (
+                <button
+                  type="button"
+                  onClick={handleSyncWebsitePrices}
+                  disabled={syncingWebsitePrices}
+                  className="inline-flex items-center gap-2 px-4 py-2 bg-[#1B3A6B] hover:bg-[#142d55] text-white text-xs font-bold rounded-xl shadow-xs disabled:opacity-60 transition-all cursor-pointer"
+                >
+                  {syncingWebsitePrices ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
+                  <span>{syncingWebsitePrices ? 'Đang đồng bộ giá...' : 'Đồng bộ giá Website'}</span>
+                </button>
+              )}
               {loadingCatalog && <Loader2 size={16} className="animate-spin text-[#00A3FF]" />}
               <label className="text-xs font-semibold text-gray-700">Đồng bộ Database:</label>
               <input
@@ -2073,6 +2115,56 @@ export default function AiAssistantManage() {
               />
             </div>
           </div>
+
+          {catalog?.shopProducts && catalog.shopProducts.length > 0 && (
+            <div className="bg-white p-5 rounded-2xl border border-gray-100 shadow-xs space-y-3">
+              <div className="flex items-center justify-between border-b border-gray-100 pb-3">
+                <h3 className="text-sm font-bold text-gray-900 flex items-center gap-2">
+                  <Tag size={16} className="text-emerald-600" />
+                  Bảng giá ưu đãi Website / Shop (AI ưu tiên tư vấn)
+                </h3>
+                <span className="text-xs font-bold text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded-full">
+                  {catalog.totalActiveShopProducts ?? catalog.shopProducts.length} sản phẩm
+                </span>
+              </div>
+
+              <div className="divide-y divide-gray-100 max-h-80 overflow-y-auto pr-1 text-xs">
+                {catalog.shopProducts.map(sp => {
+                  const hasDiscount = sp.originalPrice && sp.originalPrice > sp.price;
+                  const discountPct = hasDiscount
+                    ? Math.round(((sp.originalPrice! - sp.price) / sp.originalPrice!) * 100)
+                    : 0;
+                  return (
+                    <div key={sp.id} className="py-2.5 flex items-center justify-between gap-3">
+                      <div className="min-w-0">
+                        <div className="font-semibold text-gray-800 truncate">{sp.name}</div>
+                        <div className="text-[11px] text-gray-400">
+                          SKU: {sp.sku} • BH {sp.warrantyMonths || 12} tháng
+                        </div>
+                      </div>
+                      <div className="text-right shrink-0">
+                        <div className="flex items-center justify-end gap-1.5">
+                          <span className="font-bold text-[#1B3A6B]">
+                            {sp.price.toLocaleString('vi-VN')} đ
+                          </span>
+                          {hasDiscount && (
+                            <span className="px-1.5 py-0.5 text-[10px] font-bold bg-red-50 text-red-600 rounded-md">
+                              -{discountPct}%
+                            </span>
+                          )}
+                        </div>
+                        {hasDiscount && (
+                          <div className="text-[11px] text-gray-400 line-through">
+                            {sp.originalPrice!.toLocaleString('vi-VN')} đ
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {/* Box Sản phẩm */}
